@@ -1,0 +1,14 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and troubleshooting
+    url: https://github.com/noldova-com/teamrun/blob/main/.github/CONTRIBUTING.md#issues-and-support
+    about: Read the support guidance, or open a blank issue to ask a question.
+  - name: Report a security vulnerability
+    url: https://github.com/noldova-com/teamrun/blob/main/.github/SECURITY.md
+    about: Read how to report privately. Do not post vulnerability details in public issues.
