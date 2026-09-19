@@ -1,0 +1,28 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Development task
+description: Describe development or maintenance work.
+body:
+  - type: textarea
+    id: scope
+    attributes:
+      label: What needs to change?
+      description: Briefly explain the work and why it is needed.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: How will we know it is done?
+      description: List the outcomes or checks needed to complete the task.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Extra details (optional)
+      description: Dependencies, constraints or relevant links. Leave out private information.
