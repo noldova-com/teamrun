@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Verify the issue in the PR description
+      - name: Verify PR description and tracking issue
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -41,11 +41,16 @@ jobs:
             exit 1
           fi
 
-          # Ignore fenced examples; only a standalone Issue: #123 line counts.
+          # Fenced examples cannot supply issue references or section headings.
           issue_number=''
           fence=''
+          section=''
+          has_summary=false
+          has_testing=false
           fence_pattern='^ {0,3}(`{3,}|~{3,})(.*)$'
           issue_pattern='^issue:[[:blank:]]*#([1-9][0-9]*)[[:blank:]]*$'
+          heading_pattern='^ {0,3}(#{1,6})([[:blank:]]|$)'
+          section_pattern='^ {0,3}##[[:blank:]]+(summary|testing)([[:blank:]]+#+)?[[:blank:]]*$'
           while IFS= read -r line; do
             line=${line%$'\r'}
             if [[ "$line" =~ $fence_pattern ]]; then
@@ -55,14 +60,37 @@ jobs:
               elif [[ "$marker" == "$fence"* && ${BASH_REMATCH[2]} =~ ^[[:blank:]]*$ ]]; then
                 fence=''
               fi
+              continue
+            elif [[ -z "$fence" && "$line" =~ $heading_pattern ]]; then
+              if (( ${#BASH_REMATCH[1]} <= 2 )); then
+                section=''
+                if [[ ${line,,} =~ $section_pattern ]]; then
+                  section=${BASH_REMATCH[1]}
+                fi
+              fi
+              continue
             elif [[ -z "$fence" && ${line,,} =~ $issue_pattern ]]; then
-              issue_number=${BASH_REMATCH[1]}
-              break
+              if [[ -z "$issue_number" ]]; then
+                issue_number=${BASH_REMATCH[1]}
+              fi
+              continue
+            fi
+
+            if [[ "$line" =~ [^[:space:]] ]]; then
+              case "$section" in
+                summary) has_summary=true ;;
+                testing) has_testing=true ;;
+              esac
             fi
           done <<< "$body"
 
           if [[ -z "$issue_number" ]]; then
             echo '::error::Add a standalone Issue: #123 line naming a tracking issue in this repository. Add Closes: #123 separately only when completing it.'
+            exit 1
+          fi
+
+          if [[ "$has_summary" != true || "$has_testing" != true ]]; then
+            echo '::error::Fill both ## Summary and ## Testing with content. HTML comments and headings alone do not count; explain any checks not run.'
             exit 1
           fi
 
@@ -78,4 +106,4 @@ jobs:
             exit 1
           fi
 
-          printf 'Verified tracking issue #%s.\n' "$issue_number"
+          printf 'Verified tracking issue #%s and completed Summary and Testing sections.\n' "$issue_number"
