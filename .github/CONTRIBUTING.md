@@ -20,6 +20,16 @@ Change requests describe the use case, desired outcome and workaround. Questions
 
 Use synthetic data and a disposable project for reproductions. Review logs, screenshots and attached files before sharing; remove secrets and unrelated personal or project information. Do not upload real conversations, provider profiles or TeamRun data directories. Support is provided on a best-effort basis, with no response-time commitment.
 
+### Labels and triage
+
+You can submit an issue without choosing labels. Maintainers classify reports and manage their progress:
+
+- `needs triage` marks a report awaiting assessment; remove it after that assessment.
+- `needs information` marks missing details and stays until the required information is supplied.
+- `good first issue` identifies clearly scoped work suitable for newcomers, with enough guidance to get started.
+
+The [labels page](https://github.com/noldova-com/teamrun/labels) describes each label's meaning.
+
 ## Before making a change
 
 Create or reuse a relevant issue in this repository for every change, including documentation, small fixes, dependencies and agent-assisted work. Discuss substantial product or architecture changes in the issue before implementing them. Agree on a bounded scope and observable acceptance criteria; split larger work into linked issues when needed.
