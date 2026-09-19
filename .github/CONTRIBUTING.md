@@ -38,6 +38,14 @@ Follow the [coding standards](../docs/CODING-STANDARDS.md), the [UI standards](.
 
 Dependency updates are proposed and reviewed manually through the same issue and PR workflow. Review their compatibility, installation behavior and verification needs under the coding standards.
 
+## Development setup
+
+Use a Node.js version within the range and the npm version declared in [package.json](../package.json). From the repository root, using Bash, install the pinned development tools:
+
+```bash
+npm ci
+```
+
 ## Pull requests
 
 Work on a focused branch in your fork, or a repository branch when you have the necessary access. Open the PR against `main`. Contributors do not need access to a maintainer's checkout; maintainers and agents working in a shared checkout follow [AGENTS.md](../AGENTS.md).
