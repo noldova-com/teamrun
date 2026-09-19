@@ -50,7 +50,9 @@ Issue: #123
 
 Replace `123` with an existing issue from this repository, not a PR or another repository's issue. Link additional issues as needed. Add `Closes #123` only when completing its scope; partial work leaves it open. Reviewers verify relevance.
 
-Describe the problem, resulting behavior, verification and remaining limitations. Keep the change small enough to review coherently. Include before/after screenshots for visual changes when useful, using disposable data. Commit messages describe the concrete change.
+Use the [PR template](PULL_REQUEST_TEMPLATE.md). Fill `## Summary` with what changed and why, and `## Testing` with the checks run, results and remaining limitations; explain relevant checks that were not run or do not apply. These sections and a valid issue reference are required. HTML comments, headings and empty code blocks alone do not count as completed sections. `## Notes` is optional. Automated checks verify presence; reviewers assess accuracy and relevance.
+
+Keep the change small enough to review coherently. Include before/after screenshots for visual changes when useful, using disposable data. Commit messages describe the concrete change.
 
 AI-assisted contributions are welcome. Explain material AI involvement and how you reviewed and verified the result. The contributor remains responsible for correctness, security and licensing; no authorship label is required. Keep discussion constructive and address findings on their merits.
 
