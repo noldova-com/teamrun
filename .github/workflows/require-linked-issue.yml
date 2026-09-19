@@ -1,0 +1,81 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Require linked issue
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check-linked-issue:
+    name: Require linked issue
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify the issue in the PR description
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          # Read current metadata so reruns also see description corrections.
+          if ! body=$(timeout 30s gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            --jq '(.body // "") | gsub("(?s)<!--.*?(-->|$)"; "")'); then
+            echo '::error::Could not read the PR description from GitHub.'
+            exit 1
+          fi
+
+          # Ignore fenced examples; only a standalone Issue: #123 line counts.
+          issue_number=''
+          fence=''
+          fence_pattern='^ {0,3}(`{3,}|~{3,})(.*)$'
+          issue_pattern='^issue:[[:blank:]]*#([1-9][0-9]*)[[:blank:]]*$'
+          while IFS= read -r line; do
+            line=${line%$'\r'}
+            if [[ "$line" =~ $fence_pattern ]]; then
+              marker=${BASH_REMATCH[1]}
+              if [[ -z "$fence" ]]; then
+                fence=$marker
+              elif [[ "$marker" == "$fence"* && ${BASH_REMATCH[2]} =~ ^[[:blank:]]*$ ]]; then
+                fence=''
+              fi
+            elif [[ -z "$fence" && ${line,,} =~ $issue_pattern ]]; then
+              issue_number=${BASH_REMATCH[1]}
+              break
+            fi
+          done <<< "$body"
+
+          if [[ -z "$issue_number" ]]; then
+            echo '::error::Add a standalone Issue: #123 line naming a tracking issue in this repository. Add Closes: #123 separately only when completing it.'
+            exit 1
+          fi
+
+          if ! issue_url=$(timeout 30s gh api "repos/$GITHUB_REPOSITORY/issues/$issue_number" \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            --jq 'if type == "object" and (has("pull_request") | not) then .url else "" end'); then
+            echo '::error::Could not verify the tracking issue. Check that it exists in this repository and retry if GitHub is unavailable.'
+            exit 1
+          fi
+
+          if [[ "$issue_url" != "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/$issue_number" ]]; then
+            echo '::error::The reference must identify an issue in this repository, not a pull request or a transferred issue.'
+            exit 1
+          fi
+
+          printf 'Verified tracking issue #%s.\n' "$issue_number"
