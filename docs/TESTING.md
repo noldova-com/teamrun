@@ -47,6 +47,8 @@ Assertions compare values according to a documented operation; truthiness or for
 
 Package results carry stable identities, outcomes, durations and failure/skip details, accounting for each data row. Distinguish executed, skipped, unselected and unreached tests. Totals reconcile with discovery and selection; missing results never pass.
 
+Console results retain their package/file/class headings and test details, printed as each class completes. Reduced-detail mode hides passing tests and entirely passing classes. Final totals and GitHub summaries describe the complete run; a completed class does not establish that the whole run passed.
+
 Console, GitHub and machine-readable reports derive from structured results; machine consumers do not parse console text. Reduced detail may hide passing details, but preserves failures, skip reasons, incomplete coverage and totals. Setup, discovery, coverage and reporting failures make the run unsuccessful even if every executed test passed.
 
 A deliberate skip requires a declared reason and remains visible in the report. Do not turn failures into skips automatically or use hidden exclusion lists. A full gate cannot pass while a required test is unaccounted, interrupted or silently not run. A declared skip does not waive required behavior or coverage; any accepted exception must state its scope explicitly.

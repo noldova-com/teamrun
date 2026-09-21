@@ -21,6 +21,7 @@ import {
 } from "@noldova/teamrun-foundation-testing";
 
 import { ExecutionFixture } from "../../fixtures/execution/execution-fixture.fixture.js";
+import { RecordingTestProgress } from "../../fixtures/execution/recording-test-progress.fixture.js";
 
 @TestClass
 export class TestExecutorTests {
@@ -157,6 +158,31 @@ export class TestExecutorTests {
     const classResults = await new TestExecutor(1000).executeAsync([testClass]);
 
     Assert.isInstanceOf(classResults[0]?.methodResults[0]?.failure, AssertFailedException);
+  }
+
+  @TestMethod
+  public async reportsEachClassBeforeProceedingToTheNext(): Promise<void> {
+    const progress = new RecordingTestProgress();
+    const first = new DiscoveredTestClass("Package", "FirstTests", "first.test.js", ExecutionFixture, undefined,
+      [new DiscoveredTestMethod("recordsExecution", 0, [progress.events, "first"], undefined)]);
+    const second = new DiscoveredTestClass("Package", "SecondTests", "second.test.js", ExecutionFixture, undefined,
+      [new DiscoveredTestMethod("recordsExecution", 0, [progress.events, "second"], undefined),
+      new DiscoveredTestMethod("failsOnAssertion", undefined, [], undefined)]);
+    const results = await new TestExecutor(1000).executeAsync([first, second], progress);
+
+    Assert.areEqual("run:first,complete:first.test.js,run:second,complete:second.test.js", progress.events.join(","));
+    Assert.areEqual(results[0], progress.results[0]);
+    Assert.areEqual(TestOutcome.Failed, progress.results[1]?.methodResults[1]?.outcome);
+  }
+
+  @TestMethod
+  public async propagatesProgressFailuresAndRemovesItsRejectionListener(): Promise<void> {
+    const testClass = this.discoveredClass(["increments"], undefined);
+    const before = process.listenerCount("unhandledRejection");
+    const completed = new RecordingTestProgress();
+    completed.completionFailure = new Error("completion output failed");
+    Assert.areEqual(completed.completionFailure, await Assert.throwsAsync(() => new TestExecutor(1000).executeAsync([testClass], completed), Error));
+    Assert.areEqual(before, process.listenerCount("unhandledRejection"));
   }
 
   private discoveredClass(methodNames: readonly string[], skipReason: string | undefined): DiscoveredTestClass {

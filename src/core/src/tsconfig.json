@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../../_build/dist/core",
+    "sourceMap": true,
+    "types": [
+      "node"
+    ]
+  }
+}

@@ -490,6 +490,18 @@ export declare class TestDiscovery {
 }
 
 /**
+ * Receives serial progress for the selected test classes. A callback failure
+ * stops the run and propagates to its caller.
+ */
+export interface ITestProgressListener {
+  /**
+   * Reports a completed class before execution proceeds to the next class.
+   * @param result The class's structured test outcomes and durations.
+   */
+  onClassCompleted(result: TestClassResult): void;
+}
+
+/**
  * Executes discovered tests: a fresh instance per method invocation, awaited
  * asynchronous work, a loud timeout, and unhandled-rejection attribution.
  */
@@ -503,8 +515,11 @@ export declare class TestExecutor {
   /**
    * Executes every method invocation of every class in order and returns its
    * independent result.
+   * @param testClasses The selected classes, in execution order.
+   * @param progress Optional observer notified after each class, before the next begins.
+   * @returns Completed class results in execution order.
    */
-  public executeAsync(testClasses: readonly DiscoveredTestClass[]): Promise<TestClassResult[]>;
+  public executeAsync(testClasses: readonly DiscoveredTestClass[], progress?: ITestProgressListener): Promise<TestClassResult[]>;
 }
 
 /**
@@ -521,8 +536,12 @@ export declare class TestRunner {
    * package name, file path, class name, `ClassName.methodName`, indexed
    * data-case substring, or exact `category:name` identity and are combined
    * with OR semantics. Fails when result totals do not reconcile with discovery.
+   * @param testProjects The package identities and compiled test roots to discover.
+   * @param filters Optional selection filters; an empty list selects all discovered tests.
+   * @param progress Optional observer for selected class execution.
+   * @returns The reconciled aggregate result.
    */
-  public runAsync(testProjects: readonly TestProject[], filters?: readonly string[]): Promise<TestRunResult>;
+  public runAsync(testProjects: readonly TestProject[], filters?: readonly string[], progress?: ITestProgressListener): Promise<TestRunResult>;
 }
 
 /**
@@ -530,14 +549,38 @@ export declare class TestRunner {
  * package, package-relative file path, and class identity. The structured
  * result remains the authority; no consumer parses this output.
  */
-export declare class TestReportWriter {
+export declare class TestReportWriter implements ITestProgressListener {
+  /**
+   * Configures progress reporting; whole-report methods keep their explicit setting.
+   * @param skipPassingDetails Hide passed-test details and entirely passing classes;
+   * defaults to false. Failures and skips remain visible.
+   */
+  public constructor(skipPassingDetails?: boolean);
+
+  /**
+   * Writes the completed class's heading and test details in the whole-report format.
+   * @param result The completed class's structured result.
+   */
+  public onClassCompleted(result: TestClassResult): void;
+
+  /**
+   * Writes final aggregate totals without repeating class details.
+   * @param result The complete, reconciled run result.
+   */
+  public writeSummary(result: TestRunResult): void;
+
   /**
    * Writes the formatted report to the console.
+   * @param result The complete run result to present.
+   * @param skipPassingDetails Hide passed-test details and entirely passing classes.
    */
   public write(result: TestRunResult, skipPassingDetails: boolean): void;
 
   /**
    * Returns the report lines without writing them.
+   * @param result The complete run result to present.
+   * @param skipPassingDetails Hide passed-test details and entirely passing classes.
+   * @returns Class reports followed by final totals, including terminal color sequences.
    */
   public formatLines(result: TestRunResult, skipPassingDetails: boolean): string[];
 }

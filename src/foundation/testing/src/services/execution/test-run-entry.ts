@@ -44,9 +44,10 @@ export class TestRunEntry {
       }
 
       const runner = new TestRunner(new TestDiscovery(), new TestExecutor(TestRunEntry.DEFAULT_TIMEOUT_MILLISECONDS));
-      const result = await runner.runAsync(testProjects, filters);
+      const reporter = new TestReportWriter(!Object.isUndefined(process.env[TestRunEntry.SKIP_TEST_DETAILS_VARIABLE]));
+      const result = await runner.runAsync(testProjects, filters, reporter);
 
-      new TestReportWriter().write(result, !Object.isUndefined(process.env[TestRunEntry.SKIP_TEST_DETAILS_VARIABLE]));
+      reporter.writeSummary(result);
       summary.writeTests(result);
       process.exitCode = Math.min(result.failed + Number(result.total === 0), 1);
     }

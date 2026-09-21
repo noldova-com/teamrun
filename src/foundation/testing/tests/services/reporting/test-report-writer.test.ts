@@ -19,6 +19,8 @@ import {
   TestRunResult
 } from "@noldova/teamrun-foundation-testing";
 
+import { ConsoleCapture } from "../../fixtures/reporting/console-capture.fixture.js";
+
 @TestClass
 export class TestReportWriterTests {
   @TestMethod
@@ -170,6 +172,59 @@ export class TestReportWriterTests {
 
     Assert.isTrue(lines.every(t => !t.includes("AllGreenTests")));
     Assert.isTrue(lines.some(t => t.includes("Total:   1")));
+  }
+
+  @TestMethod
+  @TestData(false)
+  @TestData(true)
+  public preservesTheExactReportWhenWritingCompletedClasses(skipPassingDetails: boolean): void {
+    const passed = new TestClassResult("TestPackage", "GreenTests", "green.test.js", [
+      new TestMethodResult("TestPackage", "GreenTests", "passes", undefined, [], TestOutcome.Passed, 1, undefined, undefined),
+    ]);
+    const mixed = new TestClassResult("TestPackage", "MixedTests", "mixed.test.js", [
+      new TestMethodResult("TestPackage", "MixedTests", "accepts", 0, ["value"], TestOutcome.Passed, 3, undefined, undefined),
+      new TestMethodResult("TestPackage", "MixedTests", "fails", undefined, [], TestOutcome.Failed, 2, new AssertFailedException("mismatch", 1, 2), undefined),
+      new TestMethodResult("TestPackage", "MixedTests", "skips", undefined, [], TestOutcome.Skipped, 0, undefined, "pending"),
+    ]);
+    const result = new TestRunResult([passed, mixed]);
+    const firstLines = skipPassingDetails ? [] : [
+      "TestPackage/green.test.js — GreenTests",
+      "  \u001b[32m✓\u001b[0m passes (1 ms)",
+      "",
+    ];
+    const classLines = [
+      ...firstLines,
+      "TestPackage/mixed.test.js — MixedTests",
+      ...(skipPassingDetails ? [] : ["  \u001b[32m✓\u001b[0m accepts[0](\"value\") (3 ms)"]),
+      "  \u001b[31m✘\u001b[0m fails (2 ms)",
+      "    AssertFailedException: mismatch",
+      "    expected: 1",
+      "    actual:   2",
+      "  \u001b[33m○\u001b[0m skips — skipped: pending",
+      "",
+    ];
+    const expected = [
+      ...classLines,
+      "----------------------------------------",
+      "Total:   4",
+      "Time:    6 ms",
+      "\u001b[32mPassed:  2\u001b[0m",
+      "\u001b[31mFailed:  1\u001b[0m",
+      "\u001b[33mSkipped: 1\u001b[0m",
+    ];
+    using capture = new ConsoleCapture();
+    const writer = new TestReportWriter(skipPassingDetails);
+
+    writer.onClassCompleted(passed);
+    Assert.areEqual(firstLines.join("\n"), capture.lines.join("\n"));
+    writer.onClassCompleted(mixed);
+    Assert.areEqual(classLines.join("\n"), capture.lines.join("\n"));
+    writer.writeSummary(result);
+    Assert.areEqual(expected.join("\n"), capture.lines.join("\n"));
+
+    capture.lines.length = 0;
+    writer.write(result, skipPassingDetails);
+    Assert.areEqual(expected.join("\n"), capture.lines.join("\n"));
   }
 
   private format(methodResult: TestMethodResult): string[] {
