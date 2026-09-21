@@ -47,6 +47,7 @@ export default class Config {
     new PackageInfo("foundation-data-sql", "@noldova/teamrun-foundation-data-sql", "src/foundation/data-sql"),
     new PackageInfo("foundation-data-sql-sqlite", "@noldova/teamrun-foundation-data-sql-sqlite", "src/foundation/data-sql-sqlite"),
     new PackageInfo("protocol", "@noldova/teamrun-protocol", "src/protocol"),
-    new PackageInfo("core", "@noldova/teamrun-core", "src/core")
+    new PackageInfo("core", "@noldova/teamrun-core", "src/core"),
+    new PackageInfo("providers", "@noldova/teamrun-providers", "src/providers")
   ];
 }

@@ -1,0 +1,17 @@
+{
+  "name": "@noldova/teamrun-providers",
+  "version": "__VERSION__",
+  "private": true,
+  "type": "module",
+  "main": "api/index.js",
+  "types": "api/index.d.ts",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.263",
+    "@noldova/teamrun-core": "__VERSION__",
+    "@noldova/teamrun-foundation-core": "__VERSION__",
+    "@noldova/teamrun-foundation-exceptions": "__VERSION__",
+    "@noldova/teamrun-foundation-json": "__VERSION__",
+    "@noldova/teamrun-protocol": "__VERSION__"
+  }
+}
