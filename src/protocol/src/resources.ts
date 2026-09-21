@@ -91,6 +91,7 @@ export class Resources {
   public static readonly protocolVersion: string = "__PROTOCOL_VERSION__";
 
   public static readonly versionSeparator: string = ".";
+  public static readonly versionTextPattern: RegExp = /^[0-9]+\.[0-9]+$/;
 
   public static readonly kindField: string = "kind";
   public static readonly idField: string = "id";
@@ -187,7 +188,7 @@ export class Resources {
   public static readonly decisionStatusMismatch: string = "An approved or denied approval names the chosen option; a pending or cancelled one names none.";
   public static readonly unknownDecision: string = "The decision names one of the offered options.";
   public static readonly decisionOutcomeMismatch: string = "The chosen option's outcome matches the status.";
-  public static readonly versionTextInvalid: string = "A protocol version is two non-negative integers separated by a dot.";
+  public static readonly versionTextInvalid: string = "A protocol version is two non-negative decimal integers separated by a dot.";
   public static readonly versionParameterName: string = "text";
   public static readonly successForbidsInfo: string = "A success carries no info.";
   public static readonly failureRequiresInfo: string = "A failure carries its info.";

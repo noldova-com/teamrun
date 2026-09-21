@@ -9,7 +9,7 @@
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException, ArgumentOutOfRangeException } from "@noldova/teamrun-foundation-exceptions";
 import { JsonException } from "@noldova/teamrun-foundation-json";
-import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { ProtocolVersion } from "@noldova/teamrun-protocol";
 
 @TestClass
@@ -33,6 +33,42 @@ export class ProtocolVersionTests {
   public rejectsMalformedText(): void {
     for (const text of ["1", "1.2.3", "a.b", "-1.0", "1.5.", String.empty, "1.-2"])
       Assert.throws(() => ProtocolVersion.parse(text), ArgumentException);
+  }
+
+  @TestMethod
+  @TestData(".1")
+  @TestData("0.")
+  @TestData(".")
+  @TestData("0x0.1")
+  @TestData("0.0x1")
+  @TestData("0b0.1")
+  @TestData("1e0.1")
+  @TestData("0.1e0")
+  @TestData("+0.1")
+  @TestData("0.+1")
+  @TestData(" 0.1")
+  @TestData("0.1 ")
+  @TestData("0.1\n")
+  @TestData("0.1\r\n")
+  @TestData("0.\t1")
+  @TestData("٠.١")
+  public rejectsMissingPartsAndNonDecimalSyntax(text: string): void {
+    const exception = Assert.throws(() => ProtocolVersion.parse(text), ArgumentException);
+
+    Assert.areEqual("text", exception.parameterName);
+  }
+
+  @TestMethod
+  public preservesDecimalPartsWithLeadingZeroes(): void {
+    Assert.areEqual("0.1", ProtocolVersion.parse("00.01").toString());
+  }
+
+  @TestMethod
+  public rejectsComponentsThatOverflowNumbers(): void {
+    const overflow = "9".repeat(309);
+
+    for (const text of [overflow + ".1", "0." + overflow])
+      Assert.areEqual("text", Assert.throws(() => ProtocolVersion.parse(text), ArgumentException).parameterName);
   }
 
   @TestMethod
