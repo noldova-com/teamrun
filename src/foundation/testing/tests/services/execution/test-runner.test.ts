@@ -22,6 +22,7 @@ import {
 import { ExecutionFixture } from "../../fixtures/execution/execution-fixture.fixture.js";
 import { LossyExecutor } from "../../fixtures/execution/lossy-executor.fixture.js";
 import { QuietFixture } from "../../fixtures/execution/quiet-fixture.fixture.js";
+import { RecordingTestProgress } from "../../fixtures/execution/recording-test-progress.fixture.js";
 import { StubDiscovery } from "../../fixtures/execution/stub-discovery.fixture.js";
 
 @TestClass
@@ -32,6 +33,17 @@ export class TestRunnerTests {
 
     Assert.areEqual(4, result.total);
     Assert.areEqual(0, result.failed);
+  }
+
+  @TestMethod
+  public async reportsOnlySelectedClasses(): Promise<void> {
+    const progress = new RecordingTestProgress();
+    const result = await this.runner().runAsync([], ["Alpha"], progress);
+
+    Assert.areEqual(2, result.total);
+    Assert.areEqual(1, progress.results.length);
+    Assert.areEqual(1, progress.events.length);
+    Assert.isTrue(progress.results.every(t => t.className.includes("Alpha")));
   }
 
   @TestMethod

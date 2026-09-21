@@ -10,18 +10,35 @@ import "@noldova/teamrun-foundation-core";
 
 import { TestOutcome } from "../../enums/test-outcome.js";
 import { AssertFailedException } from "../../exceptions/assert-failed.exception.js";
+import type { ITestProgressListener } from "../../interfaces/i-test-progress-listener.js";
 import { TerminalColor } from "../../models/reporting/terminal-color.js";
+import type { TestClassResult } from "../../models/results/test-class-result.js";
 import type { TestMethodResult } from "../../models/results/test-method-result.js";
 import type { TestRunResult } from "../../models/results/test-run-result.js";
 import { Resources } from "../../resources.js";
 
-export class TestReportWriter {
+export class TestReportWriter implements ITestProgressListener {
   private static readonly CENTISECONDS_PER_SECOND: number = 100;
   private static readonly DURATION_DECIMAL_PLACES: number = 2;
   private static readonly MILLISECONDS_PER_CENTISECOND: number = 10;
   private static readonly MILLISECONDS_PER_SECOND: number = 1_000;
   private static readonly MINUTES_PER_HOUR: number = 60;
   private static readonly SECONDS_PER_MINUTE: number = 60;
+  private readonly skipPassingDetails: boolean;
+
+  public constructor(skipPassingDetails: boolean = false) {
+    this.skipPassingDetails = skipPassingDetails;
+  }
+
+  public onClassCompleted(result: TestClassResult): void {
+    for (const line of this.formatClassLines(result, this.skipPassingDetails))
+      console.log(line);
+  }
+
+  public writeSummary(result: TestRunResult): void {
+    for (const line of this.formatSummaryLines(result))
+      console.log(line);
+  }
 
   public write(result: TestRunResult, skipPassingDetails: boolean): void {
     for (const line of this.formatLines(result, skipPassingDetails))
@@ -31,21 +48,28 @@ export class TestReportWriter {
   public formatLines(result: TestRunResult, skipPassingDetails: boolean): string[] {
     const lines: string[] = [];
 
-    for (const classResult of result.classResults) {
-      const methodLines: string[] = [];
-      for (const methodResult of classResult.methodResults) {
-        if (skipPassingDetails && methodResult.outcome === TestOutcome.Passed)
-          continue;
+    for (const classResult of result.classResults)
+      lines.push(...this.formatClassLines(classResult, skipPassingDetails));
 
-        methodLines.push(...this.formatMethodLines(methodResult));
-      }
+    return [...lines, ...this.formatSummaryLines(result)];
+  }
 
-      if (skipPassingDetails && methodLines.length === 0)
+  private formatClassLines(result: TestClassResult, skipPassingDetails: boolean): string[] {
+    const methodLines: string[] = [];
+    for (const method of result.methodResults) {
+      if (skipPassingDetails && method.outcome === TestOutcome.Passed)
         continue;
-
-      lines.push(`${classResult.packageName}/${classResult.filePath} — ${classResult.className}`, ...methodLines, String.empty);
+      methodLines.push(...this.formatMethodLines(method));
     }
 
+    if (skipPassingDetails && methodLines.length === 0)
+      return [];
+
+    return [`${result.packageName}/${result.filePath} — ${result.className}`, ...methodLines, String.empty];
+  }
+
+  private formatSummaryLines(result: TestRunResult): string[] {
+    const lines: string[] = [];
     lines.push(Resources.testReportSeparator);
     lines.push(`${Resources.totalLabel}   ${result.total}`);
     lines.push(`${Resources.timeLabel}    ${this.formatDuration(result.durationMilliseconds)}`);

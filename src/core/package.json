@@ -1,0 +1,19 @@
+{
+  "name": "@noldova/teamrun-core",
+  "version": "__VERSION__",
+  "private": true,
+  "type": "module",
+  "main": "api/index.js",
+  "types": "api/index.d.ts",
+  "license": "MIT",
+  "dependencies": {
+    "@noldova/teamrun-foundation-core": "__VERSION__",
+    "@noldova/teamrun-foundation-data": "__VERSION__",
+    "@noldova/teamrun-foundation-data-sql": "__VERSION__",
+    "@noldova/teamrun-foundation-data-sql-sqlite": "__VERSION__",
+    "@noldova/teamrun-foundation-exceptions": "__VERSION__",
+    "@noldova/teamrun-foundation-json": "__VERSION__",
+    "@noldova/teamrun-foundation-services": "__VERSION__",
+    "@noldova/teamrun-protocol": "__VERSION__"
+  }
+}

@@ -25,6 +25,10 @@ export class ExecutionFixture {
     Assert.areEqual(1, this.counter);
   }
 
+  public recordsExecution(events: string[], name: string): void {
+    events.push("run:" + name);
+  }
+
   public receivesData(value: string, expectedLength: number): void {
     this.counter++;
     Assert.areEqual(1, this.counter);

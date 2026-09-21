@@ -17,6 +17,7 @@ export { TestOutcome } from "../enums/test-outcome.js";
 export { AssertFailedException } from "../exceptions/assert-failed.exception.js";
 export { TestingException } from "../exceptions/testing.exception.js";
 export { TestTimeoutException } from "../exceptions/test-timeout.exception.js";
+export type { ITestProgressListener } from "../interfaces/i-test-progress-listener.js";
 export type { ISourceMapData } from "../interfaces/coverage/i-source-map-data.js";
 export { BlockCoverage } from "../models/coverage/block-coverage.js";
 export { CoverageProject } from "../models/coverage/coverage-project.js";

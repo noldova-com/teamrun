@@ -7,6 +7,7 @@
  */
 
 import { TestingException } from "../../exceptions/testing.exception.js";
+import type { ITestProgressListener } from "../../interfaces/i-test-progress-listener.js";
 import { DiscoveredTestClass } from "../../models/discovery/discovered-test-class.js";
 import type { TestProject } from "../../models/discovery/test-project.js";
 import { TestRunResult } from "../../models/results/test-run-result.js";
@@ -23,10 +24,10 @@ export class TestRunner {
     this.executor = executor;
   }
 
-  public async runAsync(testProjects: readonly TestProject[], filters: readonly string[] = []): Promise<TestRunResult> {
+  public async runAsync(testProjects: readonly TestProject[], filters: readonly string[] = [], progress?: ITestProgressListener): Promise<TestRunResult> {
     const discovered = await this.discovery.discoverAsync(testProjects);
     const selected = this.applyFilters(discovered, filters);
-    const classResults = await this.executor.executeAsync(selected);
+    const classResults = await this.executor.executeAsync(selected, progress);
     const result = new TestRunResult(classResults);
 
     const selectedCount = selected.reduce((count, testClass) => count + testClass.methods.length, 0);

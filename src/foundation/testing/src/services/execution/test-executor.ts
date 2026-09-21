@@ -13,6 +13,7 @@ import { ArgumentOutOfRangeException } from "@noldova/teamrun-foundation-excepti
 import { TestOutcome } from "../../enums/test-outcome.js";
 import { TestingException } from "../../exceptions/testing.exception.js";
 import { TestTimeoutException } from "../../exceptions/test-timeout.exception.js";
+import type { ITestProgressListener } from "../../interfaces/i-test-progress-listener.js";
 import type { DiscoveredTestClass } from "../../models/discovery/discovered-test-class.js";
 import type { DiscoveredTestMethod } from "../../models/discovery/discovered-test-method.js";
 import { TestClassResult } from "../../models/results/test-class-result.js";
@@ -38,7 +39,7 @@ export class TestExecutor {
     this.timeoutMilliseconds = timeoutMilliseconds;
   }
 
-  public async executeAsync(testClasses: readonly DiscoveredTestClass[]): Promise<TestClassResult[]> {
+  public async executeAsync(testClasses: readonly DiscoveredTestClass[], progress?: ITestProgressListener): Promise<TestClassResult[]> {
     const ownsRejectionListener = !process.listeners(TestExecutor.UNHANDLED_REJECTION_EVENT).includes(TestExecutor.ON_UNHANDLED_REJECTION);
     if (ownsRejectionListener)
       process.on(TestExecutor.UNHANDLED_REJECTION_EVENT, TestExecutor.ON_UNHANDLED_REJECTION);
@@ -50,7 +51,9 @@ export class TestExecutor {
         for (const method of testClass.methods)
           methodResults.push(await this.executeMethodAsync(testClass, method));
 
-        classResults.push(new TestClassResult(testClass.packageName, testClass.className, testClass.filePath, methodResults));
+        const result = new TestClassResult(testClass.packageName, testClass.className, testClass.filePath, methodResults);
+        classResults.push(result);
+        progress?.onClassCompleted(result);
       }
 
       return classResults;
