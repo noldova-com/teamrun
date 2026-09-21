@@ -46,6 +46,21 @@ Use a Node.js version within the range and the npm version declared in [package.
 npm ci
 ```
 
+Build and install a selected package with:
+
+```bash
+npm run build -- foundation-core
+```
+
+Packages build in the configured order; a selected package's dependencies must already be built. The build installs the generated npm archives without changing the root manifest or lockfile. Running `npm ci` removes these local installations; build them again afterward. The command without package names builds all configured packages.
+
+Build all configured packages before running their tests and coverage gate:
+
+```bash
+npm run build
+npm run test -- --skip-test-details --skip-coverage-details
+```
+
 ## Pull requests
 
 Work on a focused branch in your fork, or a repository branch when you have the necessary access. Open the PR against `main`. Contributors do not need access to a maintainer's checkout; maintainers and agents working in a shared checkout follow [AGENTS.md](../AGENTS.md).
