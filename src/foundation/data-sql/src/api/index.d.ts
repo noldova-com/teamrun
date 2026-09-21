@@ -305,7 +305,8 @@ export declare abstract class SqlConnection extends Connection {
  * The change feed in a framework-owned `__changes` table of the connected
  * database, created with its index on first use. The store assigns the
  * sequence; a record whose operation the feed does not know throws
- * `DataException`.
+ * `DataException`. Each operation ensures the table and index exist, so
+ * initialization rolled back by a transaction is recreated on the next use.
  */
 export declare class SqlChangeFeed extends ChangeFeed {
   /**

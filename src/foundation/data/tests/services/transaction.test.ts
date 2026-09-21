@@ -48,4 +48,29 @@ export class TransactionTests {
     Assert.areEqual(1, incomplete.rollbacks);
     Assert.areEqual(0, committed.rollbacks);
   }
+
+  @TestMethod
+  public leavesAFailedCommitIncompleteSoDisposalRollsBack(): void {
+    const transaction = new MemoryTransaction();
+    const failure = new Error("Commit failed");
+    transaction.commitFailure = failure;
+
+    Assert.areEqual(failure, Assert.throws(() => transaction.commit(), Error));
+    Assert.isFalse(transaction.isCompleted);
+    transaction[Symbol.dispose]();
+
+    Assert.isTrue(transaction.isCompleted);
+    Assert.areEqual(1, transaction.commits);
+    Assert.areEqual(1, transaction.rollbacks);
+  }
+
+  @TestMethod
+  public leavesAFailedRollbackIncomplete(): void {
+    const transaction = new MemoryTransaction();
+    const failure = new Error("Rollback failed");
+    transaction.rollbackFailure = failure;
+
+    Assert.areEqual(failure, Assert.throws(() => transaction.rollback(), Error));
+    Assert.isFalse(transaction.isCompleted);
+  }
 }

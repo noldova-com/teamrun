@@ -15,7 +15,7 @@ import { RecordingConnection } from "../fixtures/recording-connection.fixture.js
 @TestClass
 export class SqlChangeFeedTests {
   @TestMethod
-  public preparesItsTableOnceAndAppendsWithTheAssignedSequence(): void {
+  public ensuresItsSchemaForEachAppendAndUsesTheAssignedSequence(): void {
     const connection = new RecordingConnection();
     const feed = new SqlChangeFeed(connection);
 
@@ -28,8 +28,10 @@ export class SqlChangeFeedTests {
     Assert.areEqual(ChangeOperation.Delete, second.operation);
     Assert.isTrue(connection.statements[0]?.startsWith("CREATE TABLE IF NOT EXISTS __changes") === true);
     Assert.isTrue(connection.statements[1]?.startsWith("CREATE INDEX IF NOT EXISTS IX___changes_entity_entityId") === true);
+    Assert.areEqual(connection.statements[0], connection.statements[3]);
+    Assert.areEqual(connection.statements[1], connection.statements[4]);
     Assert.areEqual(2, connection.statements.filter(t => t.startsWith("INSERT INTO __changes")).length);
-    Assert.areEqual(4, connection.statements.length);
+    Assert.areEqual(6, connection.statements.length);
   }
 
   @TestMethod

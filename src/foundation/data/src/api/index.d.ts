@@ -251,18 +251,20 @@ export declare class DbContextOptions<TConnection extends Connection, TMigration
  */
 export declare abstract class Transaction implements Disposable {
   /**
-   * True once committed or rolled back.
+   * True once the store successfully committed or rolled back.
    */
   public get isCompleted(): boolean;
 
   /**
    * Makes the work permanent. A completed transaction throws
-   * `DataException`.
+   * `DataException`. If the store's commit fails, the transaction remains
+   * incomplete so disposal can attempt rollback.
    */
   public commit(): void;
 
   /**
    * Discards the work. A completed transaction throws `DataException`.
+   * Completion is recorded only after the store's rollback succeeds.
    */
   public rollback(): void;
 
@@ -354,7 +356,9 @@ export declare abstract class Connection implements Disposable {
    * started while another is running joins the outer transaction: nothing is
    * committed until the outermost action returns, and an inner failure rolls
    * the outer transaction back, with `DataException` when the outer action
-   * swallowed it.
+   * swallowed it. A failed commit also triggers rollback. If the action or
+   * commit and the rollback both fail, a `SuppressedError` retains the original
+   * failure in `suppressed` and the rollback failure in `error`.
    */
   public transaction<T>(action: () => T): T;
 

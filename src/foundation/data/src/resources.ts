@@ -25,6 +25,7 @@ export class Resources {
   public static readonly nestedTransactionFailed: string = "An inner transaction failed, so the outer transaction was rolled back.";
   public static readonly sequenceParameterName: string = "sequence";
   public static readonly transactionCompleted: string = "The transaction has already been committed or rolled back.";
+  public static readonly transactionRollbackFailed: string = "The transaction failed and rollback also failed.";
 
   public static formatFieldMissing(field: string): string {
     return `The record has no field "${field}".`;

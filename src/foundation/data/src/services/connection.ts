@@ -44,10 +44,18 @@ export abstract class Connection implements Disposable {
       transaction.commit();
       return result;
     }
+    catch (error) {
+      try {
+        transaction[Symbol.dispose]();
+      }
+      catch (rollbackError) {
+        throw new SuppressedError(rollbackError, error, Resources.transactionRollbackFailed);
+      }
+      throw error;
+    }
     finally {
       this.transactionDepth = 0;
       this.rollbackRequested = false;
-      transaction[Symbol.dispose]();
     }
   }
 
