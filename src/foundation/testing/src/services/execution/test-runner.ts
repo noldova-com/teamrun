@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { TestingException } from "../../exceptions/testing-exception.js";
+import { TestingException } from "../../exceptions/testing.exception.js";
 import { DiscoveredTestClass } from "../../models/discovery/discovered-test-class.js";
 import type { TestProject } from "../../models/discovery/test-project.js";
 import { TestRunResult } from "../../models/results/test-run-result.js";

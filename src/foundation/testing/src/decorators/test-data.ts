@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { TestingException } from "../exceptions/testing-exception.js";
+import { TestingException } from "../exceptions/testing.exception.js";
 import { TestDataEntry } from "../models/decorators/test-data-entry.js";
 import { TestMarks } from "../models/decorators/test-marks.js";
 import { Resources } from "../resources.js";

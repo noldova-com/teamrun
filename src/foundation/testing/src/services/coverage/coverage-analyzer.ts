@@ -11,12 +11,12 @@ import { join, resolve } from "node:path";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 
-import { TestingException } from "../../exceptions/testing-exception.js";
+import { TestingException } from "../../exceptions/testing.exception.js";
 import { CoverageProject } from "../../models/coverage/coverage-project.js";
 import { CoverageResult } from "../../models/coverage/coverage-result.js";
 import { FileCoverage } from "../../models/coverage/file-coverage.js";
 import { Resources } from "../../resources.js";
-import { CoverageReportReader } from "./coverage-report-reader.js";
+import { CoverageReportReader } from "./coverage-report.reader.js";
 import { FileCoverageAnalyzer } from "./file-coverage-analyzer.js";
 
 export class CoverageAnalyzer {

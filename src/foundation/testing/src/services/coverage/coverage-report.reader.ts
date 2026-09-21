@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { nameof } from "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
-import { TestingException } from "../../exceptions/testing-exception.js";
+import { TestingException } from "../../exceptions/testing.exception.js";
 import type { ICoverageRange } from "../../interfaces/coverage/i-coverage-range.js";
 import type { ICoverageReport } from "../../interfaces/coverage/i-coverage-report.js";
 import type { IFunctionCoverage } from "../../interfaces/coverage/i-function-coverage.js";

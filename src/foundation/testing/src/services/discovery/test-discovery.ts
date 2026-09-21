@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 
-import { TestingException } from "../../exceptions/testing-exception.js";
+import { TestingException } from "../../exceptions/testing.exception.js";
 import { TestDataEntry } from "../../models/decorators/test-data-entry.js";
 import { TestMarks } from "../../models/decorators/test-marks.js";
 import { DiscoveredTestClass } from "../../models/discovery/discovered-test-class.js";

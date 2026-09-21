@@ -12,7 +12,7 @@ import { writeSync } from "node:fs";
 
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
-import { TestingException } from "../../exceptions/testing-exception.js";
+import { TestingException } from "../../exceptions/testing.exception.js";
 import { TestProject } from "../../models/discovery/test-project.js";
 import { Resources } from "../../resources.js";
 import { TestDiscovery } from "../discovery/test-discovery.js";

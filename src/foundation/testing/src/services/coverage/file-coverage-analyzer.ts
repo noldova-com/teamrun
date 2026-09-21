@@ -12,7 +12,7 @@ import { dirname, isAbsolute, relative } from "node:path";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import { EcmaScriptLineTerminator } from "@noldova/teamrun-foundation-text";
 
-import { TestingException } from "../../exceptions/testing-exception.js";
+import { TestingException } from "../../exceptions/testing.exception.js";
 import type { ISourceMapData } from "../../interfaces/coverage/i-source-map-data.js";
 import { BlockCoverage } from "../../models/coverage/block-coverage.js";
 import type { CoverageProject } from "../../models/coverage/coverage-project.js";
