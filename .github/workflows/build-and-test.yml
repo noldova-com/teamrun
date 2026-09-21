@@ -1,0 +1,122 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Build and test
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  validate:
+    name: Build and test (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: Linux x64
+            runner: ubuntu-24.04
+            architecture: x64
+          - target: Linux ARM64
+            runner: ubuntu-24.04-arm
+            architecture: arm64
+          - target: Windows x64
+            runner: windows-2025
+            architecture: x64
+          - target: Windows ARM64
+            runner: windows-11-arm
+            architecture: arm64
+          - target: macOS x64
+            runner: macos-15-intel
+            architecture: x64
+          - target: macOS ARM64
+            runner: macos-15
+            architecture: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    env:
+      CI: 'true'
+    steps:
+      - name: Check out the revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          architecture: ${{ matrix.architecture }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Verify toolchain versions and architecture
+        env:
+          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          node --version
+          npm --version
+          node --print "process.platform + '/' + process.arch"
+          test "$(node --version)" = v26.7.0
+          test "$(npm --version)" = 11.19.0
+          test "$(node --print process.arch)" = "$EXPECTED_ARCHITECTURE"
+
+      - name: Install dependencies
+        run: |
+          mkdir -p "$RUNNER_TEMP/teamrun-ci"
+          trap 'cat "$RUNNER_TEMP/teamrun-ci/install.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/install.stderr.log" >&2' EXIT
+          npm ci --no-audit --no-fund > "$RUNNER_TEMP/teamrun-ci/install.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/install.stderr.log"
+
+      - name: Build packages
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-ci/build.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/build.stderr.log" >&2' EXIT
+          npm run build > "$RUNNER_TEMP/teamrun-ci/build.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/build.stderr.log"
+
+      - name: Type-check repository scripts
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-ci/typecheck.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/typecheck.stderr.log" >&2' EXIT
+          node node_modules/typescript/bin/tsc --project scripts/tsconfig.json > "$RUNNER_TEMP/teamrun-ci/typecheck.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/typecheck.stderr.log"
+
+      - name: Run package tests and coverage gate
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-ci/test.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/test.stderr.log" >&2' EXIT
+          npm run test -- --skip-test-details --skip-coverage-details > "$RUNNER_TEMP/teamrun-ci/test.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/test.stderr.log"
+
+      - name: Retain diagnostic logs
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: logs-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/teamrun-ci/*.log
+          if-no-files-found: warn
+          retention-days: 7
+
+  validation-result:
+    name: Build and test (all targets)
+    needs: validate
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every target to pass
+        env:
+          VALIDATION_RESULT: ${{ needs.validate.result }}
+        run: test "$VALIDATION_RESULT" = success
