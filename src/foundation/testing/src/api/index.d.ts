@@ -183,17 +183,17 @@ export declare enum TestOutcome {
   /**
    * The test executed without a failure.
    */
-  Passed = "passed",
+  Passed = "Passed",
 
   /**
    * The test executed and produced a failure.
    */
-  Failed = "failed",
+  Failed = "Failed",
 
   /**
    * The test did not execute because it carries an explicit skip reason.
    */
-  Skipped = "skipped",
+  Skipped = "Skipped",
 }
 
 /**

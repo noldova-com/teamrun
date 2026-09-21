@@ -12,8 +12,8 @@ import { Assert, TestClass, TestMethod, TestOutcome } from "@noldova/teamrun-fou
 export class TestOutcomeTests {
   @TestMethod
   public namesTheOutcomesCanonically(): void {
-    Assert.areEqual<string>("passed", TestOutcome.Passed);
-    Assert.areEqual<string>("failed", TestOutcome.Failed);
-    Assert.areEqual<string>("skipped", TestOutcome.Skipped);
+    Assert.areEqual<string>("Passed", TestOutcome.Passed);
+    Assert.areEqual<string>("Failed", TestOutcome.Failed);
+    Assert.areEqual<string>("Skipped", TestOutcome.Skipped);
   }
 }

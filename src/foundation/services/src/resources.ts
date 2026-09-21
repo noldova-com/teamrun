@@ -6,8 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export enum TestOutcome {
-  Passed = "Passed",
-  Failed = "Failed",
-  Skipped = "Skipped",
+export class Resources {
+  public static readonly messageParameterName: string = "message";
+  public static readonly nameParameterName: string = "name";
 }

@@ -6,8 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export enum TestOutcome {
-  Passed = "Passed",
-  Failed = "Failed",
-  Skipped = "Skipped",
+export class ServiceRequest<T> {
+  public readonly payload: T;
+
+  public constructor(payload: T) {
+    this.payload = payload;
+  }
 }

@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export enum TestOutcome {
-  Passed = "Passed",
-  Failed = "Failed",
-  Skipped = "Skipped",
-}
+import type { JsonValue } from "./json-value.js";
+
+export type JsonObject = { readonly [key: string]: JsonValue };

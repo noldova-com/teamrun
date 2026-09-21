@@ -6,8 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export enum TestOutcome {
-  Passed = "Passed",
-  Failed = "Failed",
-  Skipped = "Skipped",
+export enum ServiceResponseStatus {
+  Success = "Success",
+  Failure = "Failure"
 }
