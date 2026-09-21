@@ -15,7 +15,6 @@ import type { SqlConnection } from "./sql-connection.js";
 
 export class SqlChangeFeed extends ChangeFeed {
   private readonly connection: SqlConnection;
-  private isPrepared: boolean = false;
 
   public constructor(connection: SqlConnection) {
     super();
@@ -36,12 +35,8 @@ export class SqlChangeFeed extends ChangeFeed {
   }
 
   private prepare(): void {
-    if (this.isPrepared)
-      return;
-
     this.connection.execute(new SqlQuery(Resources.createChangesTable));
     this.connection.execute(new SqlQuery(Resources.createChangesIndex));
-    this.isPrepared = true;
   }
 
   private static toChange(record: DataRecord): Change {

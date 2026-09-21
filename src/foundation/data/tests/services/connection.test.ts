@@ -7,7 +7,7 @@
  */
 
 import { DataException } from "@noldova/teamrun-foundation-data";
-import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 
 import { MemoryConnection } from "../fixtures/memory-connection.fixture.js";
 
@@ -98,5 +98,32 @@ export class ConnectionTests {
     connection[Symbol.dispose]();
 
     Assert.isFalse(connection.isOpen);
+  }
+
+  @TestMethod
+  @TestData(false)
+  @TestData(true)
+  public preservesTheOriginalFailureWhenRollbackAlsoFails(failOnCommit: boolean): void {
+    const connection = new MemoryConnection();
+    const original = new Error("Original failure");
+    const rollback = new Error("Rollback failed");
+
+    const failure = Assert.throws(() => connection.transaction(() => {
+      Assert.areEqual(1, connection.transactions.length);
+      for (const transaction of connection.transactions) {
+        transaction.rollbackFailure = rollback;
+        if (failOnCommit)
+          transaction.commitFailure = original;
+      }
+      if (!failOnCommit)
+        throw original;
+      return 42;
+    }), SuppressedError);
+
+    Assert.areEqual(original, failure.suppressed);
+    Assert.areEqual(rollback, failure.error);
+    Assert.areEqual("The transaction failed and rollback also failed.", failure.message);
+    Assert.areEqual(1, connection.transactions[0]?.rollbacks);
+    Assert.isFalse(connection.isInTransaction);
   }
 }

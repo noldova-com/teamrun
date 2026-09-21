@@ -18,14 +18,14 @@ export abstract class Transaction implements Disposable {
 
   public commit(): void {
     this.throwIfCompleted();
-    this.completed = true;
     this.commitCore();
+    this.completed = true;
   }
 
   public rollback(): void {
     this.throwIfCompleted();
-    this.completed = true;
     this.rollbackCore();
+    this.completed = true;
   }
 
   public [Symbol.dispose](): void {

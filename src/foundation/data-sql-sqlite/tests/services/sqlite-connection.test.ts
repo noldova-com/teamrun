@@ -107,4 +107,27 @@ export class SQLiteConnectionTests {
 
     Assert.areEqual(2, connection.query(SQLiteConnectionTests.selectNotes).length);
   }
+
+  @TestMethod
+  public rollsBackAFailedCommitAndAllowsTheNextTransaction(): void {
+    using directory = new TemporaryDirectory();
+    using connection = SQLiteConnection.open(directory.dataSource("commit-failure"));
+    connection.execute(new SqlQuery("CREATE TABLE owners (id INTEGER PRIMARY KEY)"));
+    connection.execute(new SqlQuery("CREATE TABLE pets (ownerId INTEGER REFERENCES owners(id) DEFERRABLE INITIALLY DEFERRED)"));
+
+    const failure = Assert.throws(() => connection.transaction(() => {
+      connection.execute(new SqlQuery("INSERT INTO pets (ownerId) VALUES (?)", [1]));
+    }), Error);
+
+    Assert.areEqual("FOREIGN KEY constraint failed", failure.message);
+    Assert.isFalse(connection.isInTransaction);
+    Assert.areEqual(0, connection.query(new SqlQuery("SELECT ownerId FROM pets")).length);
+
+    connection.transaction(() => {
+      connection.execute(new SqlQuery("INSERT INTO owners (id) VALUES (?)", [1]));
+      connection.execute(new SqlQuery("INSERT INTO pets (ownerId) VALUES (?)", [1]));
+    });
+
+    Assert.areEqual(1, connection.query(new SqlQuery("SELECT ownerId FROM pets")).length);
+  }
 }
