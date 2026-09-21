@@ -9,7 +9,7 @@
 import "@noldova/teamrun-foundation-core";
 
 import { TestOutcome } from "../../enums/test-outcome.js";
-import { AssertFailedException } from "../../exceptions/assert-failed-exception.js";
+import { AssertFailedException } from "../../exceptions/assert-failed.exception.js";
 import { TerminalColor } from "../../models/reporting/terminal-color.js";
 import type { TestMethodResult } from "../../models/results/test-method-result.js";
 import type { TestRunResult } from "../../models/results/test-run-result.js";

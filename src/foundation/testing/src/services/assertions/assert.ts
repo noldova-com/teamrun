@@ -8,7 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 
-import { AssertFailedException } from "../../exceptions/assert-failed-exception.js";
+import { AssertFailedException } from "../../exceptions/assert-failed.exception.js";
 import { Resources } from "../../resources.js";
 
 export class Assert {

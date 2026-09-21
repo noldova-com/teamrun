@@ -11,8 +11,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { ArgumentOutOfRangeException } from "@noldova/teamrun-foundation-exceptions";
 
 import { TestOutcome } from "../../enums/test-outcome.js";
-import { TestingException } from "../../exceptions/testing-exception.js";
-import { TestTimeoutException } from "../../exceptions/test-timeout-exception.js";
+import { TestingException } from "../../exceptions/testing.exception.js";
+import { TestTimeoutException } from "../../exceptions/test-timeout.exception.js";
 import type { DiscoveredTestClass } from "../../models/discovery/discovered-test-class.js";
 import type { DiscoveredTestMethod } from "../../models/discovery/discovered-test-method.js";
 import { TestClassResult } from "../../models/results/test-class-result.js";

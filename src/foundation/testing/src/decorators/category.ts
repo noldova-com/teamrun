@@ -8,7 +8,7 @@
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 
-import { TestingException } from "../exceptions/testing-exception.js";
+import { TestingException } from "../exceptions/testing.exception.js";
 import { TestMarks } from "../models/decorators/test-marks.js";
 import { Resources } from "../resources.js";
 

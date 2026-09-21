@@ -8,7 +8,7 @@
 
 import type { ExceptionOptions } from "../models/exception-options.js";
 import { Resources } from "../resources.js";
-import { ArgumentException } from "./argument-exception.js";
+import { ArgumentException } from "./argument.exception.js";
 
 export class ArgumentOutOfRangeException extends ArgumentException {
   public readonly actualValue: unknown;

@@ -9,7 +9,7 @@
 import type { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 import { Resources } from "../resources.js";
-import { TestingException } from "./testing-exception.js";
+import { TestingException } from "./testing.exception.js";
 
 export class AssertFailedException extends TestingException {
   public readonly expected: unknown;

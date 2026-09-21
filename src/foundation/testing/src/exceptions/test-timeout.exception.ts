@@ -10,7 +10,7 @@ import { nameof } from "@noldova/teamrun-foundation-core";
 import { ArgumentOutOfRangeException, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 import { Resources } from "../resources.js";
-import { TestingException } from "./testing-exception.js";
+import { TestingException } from "./testing.exception.js";
 
 export class TestTimeoutException extends TestingException {
   public readonly timeoutMilliseconds: number;

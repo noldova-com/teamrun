@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 
 import { ArgumentException, ArgumentOutOfRangeException } from "@noldova/teamrun-foundation-exceptions";
 
-import { TestingException } from "../../exceptions/testing-exception.js";
+import { TestingException } from "../../exceptions/testing.exception.js";
 import type { ISourceMapData } from "../../interfaces/coverage/i-source-map-data.js";
 import { SourceMapSegment } from "../../models/coverage/source-map-segment.js";
 import { SourcePosition } from "../../models/coverage/source-position.js";
