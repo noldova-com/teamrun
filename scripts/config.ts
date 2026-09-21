@@ -40,6 +40,8 @@ export default class Config {
     new PackageInfo("foundation-core", "@noldova/teamrun-foundation-core", "src/foundation/core"),
     new PackageInfo("foundation-exceptions", "@noldova/teamrun-foundation-exceptions", "src/foundation/exceptions"),
     new PackageInfo("foundation-text", "@noldova/teamrun-foundation-text", "src/foundation/text"),
-    new PackageInfo("foundation-testing", "@noldova/teamrun-foundation-testing", "src/foundation/testing")
+    new PackageInfo("foundation-testing", "@noldova/teamrun-foundation-testing", "src/foundation/testing"),
+    new PackageInfo("foundation-json", "@noldova/teamrun-foundation-json", "src/foundation/json"),
+    new PackageInfo("foundation-services", "@noldova/teamrun-foundation-services", "src/foundation/services")
   ];
 }
