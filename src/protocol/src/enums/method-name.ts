@@ -1,0 +1,54 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+export enum MethodName {
+  RuntimePause = "RuntimePause",
+  RuntimeResume = "RuntimeResume",
+  RuntimeStopForUpdate = "RuntimeStopForUpdate",
+  DesktopPrepareUpdate = "DesktopPrepareUpdate",
+  DesktopResumeUpdate = "DesktopResumeUpdate",
+  DesktopCloseForUpdate = "DesktopCloseForUpdate",
+  TeammateList = "TeammateList",
+  TeammateCreate = "TeammateCreate",
+  TeammateUpdate = "TeammateUpdate",
+  TeammateDelete = "TeammateDelete",
+  ConversationAddMember = "ConversationAddMember",
+  ConversationRemoveMember = "ConversationRemoveMember",
+  ConversationListMembers = "ConversationListMembers",
+  AttachmentPrepare = "AttachmentPrepare",
+  AttachmentDiscard = "AttachmentDiscard",
+  ProviderList = "ProviderList",
+  ProviderListModels = "ProviderListModels",
+  ProviderModelCatalog = "ProviderModelCatalog",
+  ProviderAccountList = "ProviderAccountList",
+  ProviderAccountCreate = "ProviderAccountCreate",
+  ProviderAccountCheck = "ProviderAccountCheck",
+  ProviderAccountDelete = "ProviderAccountDelete",
+  ProjectList = "ProjectList",
+  ProjectOpen = "ProjectOpen",
+  ProjectForget = "ProjectForget",
+  ConversationList = "ConversationList",
+  ConversationCreate = "ConversationCreate",
+  ConversationRename = "ConversationRename",
+  ConversationMove = "ConversationMove",
+  ConversationDelete = "ConversationDelete",
+  ConversationRewind = "ConversationRewind",
+  ConversationSearch = "ConversationSearch",
+  MessageList = "MessageList",
+  MessageListOpen = "MessageListOpen",
+  MessagePage = "MessagePage",
+  MessageActivityPage = "MessageActivityPage",
+  MessageChangesPage = "MessageChangesPage",
+  MessageSummary = "MessageSummary",
+  MessageDetails = "MessageDetails",
+  MessageSend = "MessageSend",
+  MessageCancel = "MessageCancel",
+  ApprovalList = "ApprovalList",
+  ApprovalListPending = "ApprovalListPending",
+  ApprovalDecide = "ApprovalDecide"
+}
