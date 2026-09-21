@@ -162,7 +162,7 @@ Releasing content must not lose the reader's position. Geometry corrections happ
 
 ## 10. Build, installation and updates
 
-The repository is self-contained. Reviewed foundation source is built here; no sibling checkout, copied installation directory or private reference repository is a build dependency. Exact external dependency versions and lockfiles describe the install inputs. The root manifest owns product and protocol versions, and the build stamps sibling package versions consistently. A new Git repository does not reset the version lineage of existing installed applications.
+The repository is self-contained. Reviewed foundation source is built here; no sibling checkout, copied installation directory or private reference repository is a build dependency. Exact external dependency versions and lockfiles describe the install inputs. The root manifest owns product and protocol versions, and the build stamps sibling package versions consistently. Published application updates must use a version newer than the installed version.
 
 Compile, package and install local packages through one reproducible path. Tests and the renderer consume the intended fresh installed artifacts; detect stale inputs before trusting results. Public declarations and documentation follow the coding standards' source-owned generation and migration rules.
 
