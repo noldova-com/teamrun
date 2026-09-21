@@ -42,6 +42,9 @@ export default class Config {
     new PackageInfo("foundation-text", "@noldova/teamrun-foundation-text", "src/foundation/text"),
     new PackageInfo("foundation-testing", "@noldova/teamrun-foundation-testing", "src/foundation/testing"),
     new PackageInfo("foundation-json", "@noldova/teamrun-foundation-json", "src/foundation/json"),
-    new PackageInfo("foundation-services", "@noldova/teamrun-foundation-services", "src/foundation/services")
+    new PackageInfo("foundation-services", "@noldova/teamrun-foundation-services", "src/foundation/services"),
+    new PackageInfo("foundation-data", "@noldova/teamrun-foundation-data", "src/foundation/data"),
+    new PackageInfo("foundation-data-sql", "@noldova/teamrun-foundation-data-sql", "src/foundation/data-sql"),
+    new PackageInfo("foundation-data-sql-sqlite", "@noldova/teamrun-foundation-data-sql-sqlite", "src/foundation/data-sql-sqlite")
   ];
 }
