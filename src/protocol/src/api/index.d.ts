@@ -1052,6 +1052,10 @@ export declare class Resources {
    */
   public static readonly versionSeparator: string;
   /**
+   * Decimal major/minor text pattern; the parser requires the match to cover the entire input.
+   */
+  public static readonly versionTextPattern: RegExp;
+  /**
    * Name of the field that carries a message's `WireMessageKind`: `kind`.
    */
   public static readonly kindField: string;
@@ -1383,7 +1387,7 @@ export declare class Resources {
    */
   public static readonly decisionOutcomeMismatch: string;
   /**
-   * Message for protocol version text that is not two non-negative integers separated by a dot.
+   * Message for protocol version text that is not two non-negative decimal integers separated by a dot.
    */
   public static readonly versionTextInvalid: string;
   /**
@@ -1475,9 +1479,10 @@ export declare class ProtocolVersion {
 
   /**
    * Parses `major.minor` text, the form used in configuration and shown to users.
-   * @param text The text, such as `0.1`.
+   * @param text Two nonempty sequences of ASCII decimal digits separated by one dot, such as `0.1`.
+   * Leading zeroes are accepted; signs, whitespace, base prefixes and exponents are rejected.
    * @returns The version.
-   * @throws ArgumentException when the text is not two non-negative integers separated by a dot.
+   * @throws ArgumentException when the text has another form or either component overflows a finite number.
    */
   public static parse(text: string): ProtocolVersion;
 

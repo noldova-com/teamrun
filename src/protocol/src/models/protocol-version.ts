@@ -30,7 +30,7 @@ export class ProtocolVersion {
     const parts = text.split(Resources.versionSeparator);
     const major = Number(parts[0]);
     const minor = Number(parts[1]);
-    if (parts.length !== 2 || !Number.isInteger(major) || !Number.isInteger(minor) || major < 0 || minor < 0)
+    if (Resources.versionTextPattern.exec(text)?.[0] !== text || !Number.isInteger(major) || !Number.isInteger(minor))
       throw new ArgumentException(Resources.versionTextInvalid, Resources.versionParameterName);
     return new ProtocolVersion(major, minor);
   }
