@@ -49,6 +49,7 @@ export default class Config {
     new PackageInfo("protocol", "@noldova/teamrun-protocol", "src/protocol"),
     new PackageInfo("core", "@noldova/teamrun-core", "src/core"),
     new PackageInfo("providers", "@noldova/teamrun-providers", "src/providers"),
-    new PackageInfo("runtime", "@noldova/teamrun-runtime", "src/runtime")
+    new PackageInfo("runtime", "@noldova/teamrun-runtime", "src/runtime"),
+    new PackageInfo("cli", "@noldova/teamrun-cli", "src/cli")
   ];
 }
