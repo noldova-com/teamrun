@@ -1,0 +1,26 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import * as api from "@noldova/teamrun-runtime";
+
+@TestClass
+export class RuntimeApiTests {
+  @TestMethod
+  public exportsTheCompleteCatalog(): void {
+    const expected = [
+      "ClientSession", "ConnectionException", "Endpoint", "EndpointKind", "IdleMonitor", "InvalidOperationException", "LaunchException", "LineBuffer",
+      "LockFile", "PendingCall", "ProcessInspector", "ProcessProbe", "ProcessRegistry", "ProviderRegistryFactory", "Resources",
+      "RuntimeAlreadyRunningException", "RuntimeClient", "RuntimeEntry", "RuntimeLauncher", "RuntimeLock", "RuntimeServer", "RuntimeService",
+      "RuntimeSettings", "RuntimeTimings", "TokenGenerator", "TrackedProcess"
+    ];
+
+    expected.push("InstallationRole", "InstallationUpdatePhase", "InstallationMember", "InstallationUpdate", "InstallationRegistry");
+    Assert.areEqual([...expected].sort().join(","), Object.keys(api).sort().join(","));
+  }
+}
