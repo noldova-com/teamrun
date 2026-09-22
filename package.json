@@ -14,7 +14,8 @@
   },
   "scripts": {
     "build": "node scripts/build.ts",
-    "test": "node scripts/test.ts"
+    "test": "node scripts/test.ts",
+    "cli": "node node_modules/@noldova/teamrun-cli/services/cli-entry.js"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

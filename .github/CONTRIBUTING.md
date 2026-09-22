@@ -61,6 +61,12 @@ npm run build
 npm run test -- --skip-test-details --skip-coverage-details
 ```
 
+After building, list the available terminal commands with:
+
+```bash
+npm run cli -- help
+```
+
 ## Pull requests
 
 Work on a focused branch in your fork, or a repository branch when you have the necessary access. Open the PR against `main`. Contributors do not need access to a maintainer's checkout; maintainers and agents working in a shared checkout follow [AGENTS.md](../AGENTS.md).
