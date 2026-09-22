@@ -78,7 +78,7 @@ export class ClaudeAdapterTests {
     await Assert.throwsAsync(() => host.createAdapter(process.env, null).listModels(null), Error);
     host.factory.next.modelsHang = true;
     const hanging = new ClaudeAdapter(host.command, process.env, "test", host.factory, host.runner, host.versionReader,
-      new ProviderTimings(5000, 1, 5000, 5000, 1000, 300, 500, 200, 1, 20));
+      new ProviderTimings(5000, 5000, 5000, 1, 1000, 300, 500, 200, 1, 20));
     const error = await Assert.throwsAsync(() => hanging.listModels(null), Error);
     Assert.isTrue(error.message.includes("in time"));
     Assert.areEqual(0, hanging.activeRunCount);

@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { mock } from "node:test";
+
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { AcpClient, type IAcpClientListener, Resources } from "@noldova/teamrun-providers";
@@ -22,12 +24,44 @@ export class AcpClientTests {
     terminator.ignores = true;
     const client = new AcpClient(host.command, { ...process.env, TEAMRUN_FAKE_GROK_STAY_OPEN: "1" }, host.directory.path, terminator, host.timings, host.tracker);
     client.start();
+    let watchdog: NodeJS.Timeout | undefined;
     try {
       await client.request("initialize", {});
-      const error = await Assert.throwsAsync(() => client.stop(), Error);
-      Assert.isTrue(error.message.includes("shutdown timeout"));
+      // This guard remains on the real clock if the controlled shutdown stops making progress.
+      const deadline = new Promise<never>((_resolve, reject) => {
+        watchdog = setTimeout(() => reject(new Error("Controlled ACP shutdown did not settle.")), 5000);
+      });
+      mock.timers.enable({ apis: ["setTimeout"] });
+      let settled = false;
+      let failure: unknown;
+      const stopped = client.stop().then(
+        () => { settled = true; },
+        error => { settled = true; failure = error; });
+
+      mock.timers.tick(99);
+      await Promise.race([new Promise<void>(resolve => setImmediate(resolve)), deadline]);
+      Assert.areEqual(0, terminator.calls);
+      Assert.isFalse(settled);
+
+      mock.timers.tick(1);
+      await Promise.race([new Promise<void>(resolve => setImmediate(resolve)), deadline]);
+      Assert.areEqual(1, terminator.calls);
+      mock.timers.tick(4999);
+      await Promise.race([new Promise<void>(resolve => setImmediate(resolve)), deadline]);
+      Assert.isFalse(settled);
+
+      mock.timers.tick(1);
+      await Promise.race([stopped, deadline]);
+      Assert.isInstanceOf(failure, Error);
+      Assert.isTrue(failure.message.includes("shutdown timeout"));
     }
-    finally { terminator.ignores = false; await client.stop(); }
+    finally {
+      mock.timers.reset();
+      clearTimeout(watchdog);
+      terminator.ignores = false;
+      await client.stop();
+    }
+    Assert.areEqual(host.tracker.tracked.length, host.tracker.untracked.length);
   }
 
   @TestMethod

@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { mock } from "node:test";
+
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { Conversation, ErrorCode, MessageSendResult, MethodName, Project, ProviderModel } from "@noldova/teamrun-protocol";
 import { EndpointKind, RuntimeClient, RuntimeServer } from "@noldova/teamrun-runtime";
@@ -38,19 +40,36 @@ export class RuntimePauseTests {
   @TestMethod
   public async refusesInstallationWhenProviderShutdownNeverFinishes(): Promise<void> {
     await using host = new RuntimeTestHost();
+    const entered = Promise.withResolvers<void>();
     const released = Promise.withResolvers<void>();
-    host.adapter.shutdown = () => released.promise;
+    host.adapter.shutdown = () => { entered.resolve(); return released.promise; };
     const service = host.createService();
     await service.start();
     const owner = await host.connect(service, "updater");
+    let watchdog: NodeJS.Timeout | undefined;
+    const deadline = new Promise<never>((_resolve, reject) => {
+      watchdog = setTimeout(() => reject(new Error("Controlled runtime shutdown did not settle.")), 5000);
+    });
     try {
-      await owner.call(MethodName.RuntimePause, null);
-      const result = await owner.call(MethodName.RuntimeStopForUpdate, null).catch(() => null);
-      Assert.isNull(result);
-      Assert.areEqual("update", await service.waitForStop());
+      mock.timers.enable({ apis: ["setTimeout"] });
+      await Promise.race([owner.call(MethodName.RuntimePause, null), deadline]);
+      const result = owner.call(MethodName.RuntimeStopForUpdate, null).catch(() => null);
+      await Promise.race([entered.promise, deadline]);
+
+      mock.timers.tick(9999);
+      await Promise.race([new Promise<void>(resolve => setImmediate(resolve)), deadline]);
+      Assert.isTrue(service.isRunning);
+      Assert.isNull(await Promise.race([result, deadline]));
+
+      mock.timers.tick(1);
+      Assert.areEqual("update", await Promise.race([service.waitForStop(), deadline]));
       Assert.isFalse(service.isRunning);
     }
-    finally { released.resolve(); }
+    finally {
+      mock.timers.reset();
+      clearTimeout(watchdog);
+      released.resolve();
+    }
   }
 
   @TestMethod
