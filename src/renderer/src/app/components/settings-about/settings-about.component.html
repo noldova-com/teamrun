@@ -1,0 +1,21 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="mt-6 flex items-center gap-3">
+  <tr-brand-mark class="h-9 w-9" />
+  <h2 class="tr-emphasis">{{ resources.applicationName }}</h2>
+</div>
+<p class="mt-3">{{ resources.aboutText }}</p>
+<button mat-button class="-ml-2 mt-1" (click)="bridge.openExternal(resources.websiteUrl)">
+  <mat-icon>{{ resources.icons["openExternal"] }}</mat-icon>
+  {{ resources.websiteLabel }}
+</button>
+<tr-app-updates [state]="updates.state()" [pending]="updates.isPending()" [error]="updates.error()"
+  (command)="updates.execute($event)" />
+<h3 class="mb-1 mt-8">{{ resources.licensesTitle }}</h3>
+<p class="tr-muted">{{ resources.licensesText }}</p>

@@ -1,0 +1,37 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="tr-activity-summary mb-1 tr-muted">{{ label() }}</div>
+<ol class="tr-activity">
+  @for (entry of entries(); track entry.detail.sequence) {
+    <li class="py-0.5">
+      <button type="button" class="tr-step flex w-full items-start gap-2 text-left tr-muted" (click)="toggle(entry)"
+        [attr.aria-expanded]="isOpen(entry)">
+        <mat-icon class="tr-nav-icon mt-[3px] shrink-0">{{ formatter.detailIcon(entry.detail) }}</mat-icon>
+        <span class="min-w-0 flex-1" [class.truncate]="!isOpen(entry)" [class.tr-wrap]="isOpen(entry)"
+          [class.tr-mono]="entry.detail.kind === commandKind">{{ formatter.title(entry.detail, rootPath()) }}</span>
+      </button>
+      @if (isOpen(entry)) {
+        @if (bodyOf(entry); as body) {
+          <div class="flex items-start gap-2">
+            <span class="tr-step-spacer shrink-0" aria-hidden="true"></span>
+            <div class="min-w-0 flex-1">
+              <pre class="tr-raised tr-mono my-1 max-h-64 overflow-auto whitespace-pre-wrap break-words p-2"
+                [class.tr-error]="isError(entry)">{{ isExpanded(entry) ? body : preview(body) }}</pre>
+              @if (hasMore(body)) {
+                <button mat-button class="tr-step-more" type="button" (click)="expand(entry)">
+                  {{ isExpanded(entry) ? resources.showLessLabel : resources.showMoreLabel }}
+                </button>
+              }
+            </div>
+          </div>
+        }
+      }
+    </li>
+  }
+</ol>

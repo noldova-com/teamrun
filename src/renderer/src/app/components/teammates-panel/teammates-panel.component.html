@@ -1,0 +1,21 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<h3 class="tr-nav-title">{{ resources.teammatesTitle }}</h3>
+<div class="tr-teammates-list overflow-y-auto">
+  @for (teammate of members(); track teammate.id) {
+    <div class="tr-teammate-row flex items-center gap-2" [class.tr-teammate-unavailable]="store.isTeammateUnavailable(teammate.id)">
+      <tr-teammate-avatar [teammateId]="teammate.id" [name]="teammate.name" [description]="summary(teammate)" />
+      <span class="min-w-0"><span class="block truncate">{{ teammate.name }}</span>
+        <span class="tr-teammate-secondary block truncate tr-muted">{{ formatter.teammateSummary(teammate, store.accounts(), store.providers()) }}</span>
+      </span>
+    </div>
+  } @empty {
+    <p class="tr-sidebar-empty tr-muted px-2 py-2">{{ activeConversation() ? resources.noConversationTeammates : resources.noActiveConversationTeammates }}</p>
+  }
+</div>

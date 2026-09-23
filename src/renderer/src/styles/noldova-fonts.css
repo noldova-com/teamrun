@@ -1,0 +1,136 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/* Noldova fonts — OFL derivatives of Inter/Inconsolata.
+ * License notices are in the repository's assets/fonts directory.
+ */
+
+@font-face {
+  font-family: "Noldova Sans";
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-sans-light.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Sans";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-sans.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Sans";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-sans-medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Sans";
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-sans-semibold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Sans";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-sans-bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Sans";
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-sans-light-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Sans";
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-sans-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Sans";
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-sans-medium-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Sans";
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-sans-semibold-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Sans";
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-sans-bold-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Mono";
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-mono-light.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Mono";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-mono.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Mono";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-mono-medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Mono";
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-mono-semibold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Noldova Mono";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../../assets/fonts/noldova-mono-bold.woff2") format("woff2");
+}
+
+body      { font-family: "Noldova Sans", system-ui, sans-serif; }
+code, pre { font-family: "Noldova Mono", ui-monospace, monospace; font-synthesis: weight; }
+strong    { font-weight: 600; }
+em        { font-style: italic; }

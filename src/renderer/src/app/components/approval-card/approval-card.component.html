@@ -1,0 +1,23 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<mat-card appearance="outlined" class="my-2">
+  <mat-card-header>
+    <mat-icon mat-card-avatar class="tr-primary">{{ resources.icons["approval"] }}</mat-icon>
+    <mat-card-title>{{ resources.approvalTitle }}</mat-card-title>
+    <mat-card-subtitle>{{ approval().kind }} · {{ approval().nativeKind }}</mat-card-subtitle>
+  </mat-card-header>
+  <mat-card-content>
+    <pre class="tr-mono whitespace-pre-wrap break-words">{{ approval().summary }}</pre>
+  </mat-card-content>
+  <mat-card-actions align="end">
+    @for (option of approval().options; track option.id) {
+      <button mat-stroked-button [disabled]="store.isBusy()" (click)="store.decide(approval().id, option.id)">{{ option.label }}</button>
+    }
+  </mat-card-actions>
+</mat-card>

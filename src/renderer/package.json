@@ -1,0 +1,37 @@
+{
+  "name": "@noldova/teamrun-renderer",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "ng build",
+    "start": "ng serve",
+    "test": "ng test"
+  },
+  "dependencies": {
+    "@angular/cdk": "22.1.7",
+    "@angular/common": "22.1.7",
+    "@angular/compiler": "22.1.7",
+    "@angular/core": "22.1.7",
+    "@angular/forms": "22.1.7",
+    "@angular/material": "22.1.7",
+    "@angular/platform-browser": "22.1.7",
+    "highlight.js": "11.11.1",
+    "marked": "18.0.12",
+    "material-symbols": "0.39.0",
+    "rxjs": "7.8.2",
+    "tslib": "2.8.1"
+  },
+  "devDependencies": {
+    "@angular/build": "22.1.8",
+    "@angular/cli": "22.1.8",
+    "@angular/compiler-cli": "22.1.7",
+    "@tailwindcss/postcss": "4.3.3",
+    "jsdom": "27.4.0",
+    "postcss": "8.5.28",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

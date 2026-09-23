@@ -1,0 +1,21 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<h2 class="tr-settings-title">{{ resources.shortcutsTitle }}</h2>
+<p class="tr-muted mb-2">{{ resources.shortcutsText }}</p>
+@for (shortcut of global; track shortcut.action) {
+  <tr-settings-row [label]="resources.shortcutLabels[shortcut.action]">
+    <kbd class="tr-key">{{ shortcuts.describe(shortcut) }}</kbd>
+  </tr-settings-row>
+}
+<h3 class="mb-1 mt-8">{{ resources.composerShortcutsTitle }}</h3>
+@for (shortcut of composer; track shortcut.action) {
+  <tr-settings-row [label]="resources.shortcutLabels[shortcut.action]">
+    <kbd class="tr-key">{{ shortcuts.describe(shortcut) }}</kbd>
+  </tr-settings-row>
+}

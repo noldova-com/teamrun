@@ -1,0 +1,129 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<ng-template #activityStatus>
+  @if (activity().length> 0) {
+    <button type="button" class="tr-activity-toggle flex shrink-0 items-center gap-2 whitespace-nowrap py-2 text-left"
+      (click)="toggleActivity()" [attr.aria-expanded]="isActivityOpen()">
+      <span>{{ activityLabel() }}</span>
+      <mat-icon class="tr-activity-chevron shrink-0">{{ isActivityOpen() ? resources.icons["expandMore"] : resources.icons["chevronRight"] }}</mat-icon>
+    </button>
+  } @else {
+    <span>{{ activityLabel() }}</span>
+  }
+</ng-template>
+@if (isUser()) {
+  <article class="group mt-6 flex flex-col items-end">
+    <div class="tr-bubble max-w-[70%] px-4 py-3">
+      @for (image of attachedImages(); track image.key) {
+        <tr-image-preview [image]="image" [images]="attachedImages()" [showCaption]="false" (settled)="imageReady(image.key)" />
+      }
+      @for (attachment of message().attachments; track attachment.path) {
+        <div class="tr-attachment my-1 flex items-center gap-2 px-2 py-1" [matTooltip]="attachment.path">
+          <mat-icon class="shrink-0">{{ resources.icons["attachment"] }}</mat-icon>
+          <span class="truncate">{{ attachment.name }}</span>
+        </div>
+      }
+      @for (detail of answers(); track detail.sequence) {
+        <tr-markdown [text]="detail.text" [mentions]="message().mentions" [unavailableMentions]="unavailableMentions()"
+          [wrapChoices]="state().wrappingFor(detail.sequence)" (wrapChanged)="rememberControls()" />
+      }
+    </div>
+    <div class="mt-1 flex items-center gap-1 tr-muted">
+      <button mat-icon-button class="tr-small-icon-button tr-message-action" [matTooltip]="resources.rewindLabel"
+        [attr.aria-label]="resources.rewindLabel" (click)="rewind()">
+        <mat-icon>{{ resources.icons["rewind"] }}</mat-icon>
+      </button>
+      <button mat-icon-button class="tr-small-icon-button tr-message-action" [class.tr-copied]="copied()"
+        #copyTooltip="matTooltip" [matTooltip]="copied() ? resources.copiedLabel : resources.copyMessageLabel"
+        [attr.aria-label]="copied() ? resources.copiedLabel : resources.copyMessageLabel" (click)="copy(); copyTooltip.show()">
+        <mat-icon>{{ copied() ? resources.copiedIcon : resources.icons["copy"] }}</mat-icon>
+      </button>
+      <span class="tr-message-meta ml-1" [matTooltip]="formatter.dateTime(message().createdAt)">{{ formatter.time(message().createdAt) }}</span>
+    </div>
+  </article>
+} @else {
+  <article class="group mt-6">
+    <header class="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 tr-muted">
+      @if (message().author === providerAuthor) {
+        <tr-teammate-avatar [teammateId]="message().teammateId" [name]="message().teammateName ?? resources.defaultTeammateLabel" [description]="authorDescription()"
+          [unavailable]="authorUnavailable()" />
+      }
+      <span [class.tr-teammate-unavailable]="authorUnavailable()">{{ formatter.authorLabel(message(), store.providers()) }}</span>
+      @if (formatter.modelLine(message()); as model) {
+        <span>{{ model }}</span>
+      }
+      @if (statusLabel(); as status) {
+        <span class="tr-badge" [class.tr-error]="isFailed()">{{ status }}</span>
+      }
+    </header>
+    @if (!isActive() && (message().author === providerAuthor || activity().length> 0)) {
+      <div class="tr-reply-summary mb-3 tr-muted">
+        <ng-container [ngTemplateOutlet]="activityStatus" />
+      </div>
+    }
+    @for (segment of segments(); track segment.key) {
+      @switch (segment.kind) {
+        @case (textKind) {
+          @if (segment.detail; as detail) {
+            @if (detail.kind === errorKind) {
+              <p class="my-2 flex items-start gap-2 tr-error">
+                <mat-icon class="mt-0.5 shrink-0">{{ resources.icons["error"] }}</mat-icon>
+                <span class="whitespace-pre-wrap break-words">{{ detail.text }}</span>
+              </p>
+            } @else {
+              <div [class.tr-interim]="isInterim(segment)">
+                <tr-markdown [text]="detail.text" [wrapChoices]="state().wrappingFor(detail.sequence)" (wrapChanged)="rememberControls()" />
+              </div>
+            }
+          }
+        }
+        @case (imageKind) {
+          @if (imageOf(segment); as image) {
+            <tr-image-preview [image]="image" (settled)="imageReady(segment.key)" />
+          }
+        }
+        @default {
+          @if (isActivityOpen()) {
+            <tr-activity-block [entries]="segment.entries" [label]="formatter.activitySummary(segment.entries)" [rootPath]="rootPath()"
+              [expansion]="state().expansion" />
+          }
+        }
+      }
+    }
+    @for (image of imageFiles(); track image.key) {
+      <tr-image-preview [image]="image" (settled)="imageReady(image.key)" />
+    }
+    @if (edits().length> 0) {
+      <tr-edited-files-card [edits]="edits()" [rootPath]="rootPath()" [expansion]="state().expansion" />
+    }
+    @for (approval of approvals(); track approval.id) {
+      <tr-approval-card [approval]="approval" />
+    }
+    @if (isActive()) {
+      <div class="tr-reply-status mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 tr-muted">
+        <div class="flex shrink-0 items-center gap-2 whitespace-nowrap">
+          <mat-spinner class="shrink-0" [diameter]="resources.spinnerDiameter"></mat-spinner>
+          <ng-container [ngTemplateOutlet]="activityStatus" />
+        </div>
+        <button mat-button type="button" class="shrink-0" (click)="store.cancel(message().id)">
+          <mat-icon>{{ resources.icons["stop"] }}</mat-icon>
+          {{ resources.cancelLabel }}
+        </button>
+      </div>
+    }
+    <div class="mt-2 flex items-center gap-1 tr-muted">
+      <button mat-icon-button class="tr-small-icon-button tr-message-action" [class.tr-copied]="copied()"
+        #copyTooltip="matTooltip" [matTooltip]="copied() ? resources.copiedLabel : resources.copyMessageLabel"
+        [attr.aria-label]="copied() ? resources.copiedLabel : resources.copyMessageLabel" (click)="copy(); copyTooltip.show()">
+        <mat-icon>{{ copied() ? resources.copiedIcon : resources.icons["copy"] }}</mat-icon>
+      </button>
+      <span class="tr-message-meta ml-1" [matTooltip]="formatter.dateTime(message().createdAt)">{{ formatter.time(message().createdAt) }}</span>
+    </div>
+  </article>
+}

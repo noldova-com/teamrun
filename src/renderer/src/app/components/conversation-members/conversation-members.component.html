@@ -1,0 +1,35 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (store.selectedConversationId(); as conversationId) {
+    <div class="tr-conversation-members flex min-w-0 items-center gap-2 px-4 py-2" [attr.aria-label]="resources.conversationMembersLabel" role="group">
+      <tr-teammate-avatar [description]="defaultDescription()" />
+      <div class="flex min-w-0 items-center gap-2 overflow-x-auto">
+        @for (teammate of members(); track teammate.id) {
+          <button type="button" class="tr-avatar-button shrink-0" [matMenuTriggerFor]="memberMenu" [attr.aria-label]="teammate.name">
+            <tr-teammate-avatar [teammateId]="teammate.id" [name]="teammate.name" [description]="description(teammate)" [unavailable]="store.isTeammateUnavailable(teammate.id)" />
+          </button>
+          <mat-menu #memberMenu="matMenu">
+            <button mat-menu-item [disabled]="store.isWorking(conversationId)" (click)="store.removeMember(conversationId, teammate.id)">
+              {{ resources.removeMemberLabel }}
+            </button>
+          </mat-menu>
+        }
+      </div>
+      <button mat-icon-button type="button" class="tr-small-icon-button shrink-0" [matMenuTriggerFor]="addMenu"
+        [attr.aria-label]="resources.addMemberLabel" [matTooltip]="resources.addMemberLabel"><mat-icon>{{ resources.icons['add'] }}</mat-icon></button>
+      <mat-menu #addMenu="matMenu">
+        @if (others().length === 0) { <button mat-menu-item disabled>{{ resources.noTeammates }}</button> }
+        @for (teammate of others(); track teammate.id) {
+          <button mat-menu-item (click)="store.addMember(conversationId, teammate.id)" [class.tr-teammate-unavailable]="store.isTeammateUnavailable(teammate.id)">
+            {{ teammate.name }}
+          </button>
+        }
+      </mat-menu>
+    </div>
+  }

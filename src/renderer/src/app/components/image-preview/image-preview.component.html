@@ -1,0 +1,26 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<tr-image-actions #actions [source]="source()" [name]="image().label"
+  [alternativeOpenMode]="alternativeOpenMode()" (openRequested)="open($event)" />
+@if (dimensions(); as size) {
+  <figure class="tr-image-preview my-3 inline-block max-w-full"
+    [class.tr-image-compact]="compact()"
+    [style.--tr-image-width]="size.width + 'px'" [style.--tr-image-ratio]="size.width / size.height">
+    <button #trigger type="button" class="tr-image-frame tr-image-preview-trigger" [disabled]="!source()"
+      [attr.aria-label]="image().label" [matTooltip]="image().label" (click)="open()"
+      [matContextMenuTriggerFor]="actions.menu() ?? null">
+      @if (source(); as source) {
+        <img [src]="source" [alt]="image().label" [width]="size.width" [height]="size.height" class="tr-image block h-full w-full object-contain">
+      }
+    </button>
+    @if (!compact() && showCaption()) {
+      <figcaption class="tr-muted mt-1">{{ image().label }}</figcaption>
+    }
+  </figure>
+}

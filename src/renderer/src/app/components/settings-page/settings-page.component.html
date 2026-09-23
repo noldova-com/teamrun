@@ -1,0 +1,47 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="tr-settings-grid grid h-full min-h-0">
+  <aside class="min-h-0 overflow-y-auto px-1 py-1">
+    <mat-nav-list class="tr-row-list tr-settings-nav">
+      @for (section of sections; track section) {
+        <a mat-list-item [activated]="section === navigation.section()" (click)="navigation.showSection(section)">
+          <mat-icon matListItemIcon>{{ resources.sectionIcons[section] }}</mat-icon>
+          <span matListItemTitle>{{ resources.sectionLabels[section] }}</span>
+        </a>
+      }
+    </mat-nav-list>
+  </aside>
+  <div class="min-h-0 overflow-y-auto px-8 pb-8">
+      <div class="mx-auto max-w-[55rem]">
+        @switch (navigation.section()) {
+          @case (general) {
+            <tr-settings-general />
+          }
+          @case (appearance) {
+            <tr-settings-appearance />
+          }
+          @case (providers) {
+            <tr-settings-providers />
+          }
+          @case (teammates) {
+            <tr-settings-teammates />
+          }
+          @case (shortcuts) {
+            <tr-settings-shortcuts />
+          }
+          @case (gallery) {
+            <tr-settings-gallery />
+          }
+          @default {
+            <tr-settings-about />
+          }
+        }
+      </div>
+  </div>
+</div>

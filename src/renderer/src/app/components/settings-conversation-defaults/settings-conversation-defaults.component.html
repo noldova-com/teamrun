@@ -1,0 +1,58 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<h2 class="tr-settings-title">{{ resources.defaultsTitle }}</h2>
+<p class="tr-muted mb-2 px-[15px]">{{ resources.defaultsHint }}</p>
+<tr-settings-row [label]="resources.providerLabel">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-select">
+    <mat-select [aria-label]="resources.providerLabel" [value]="provider()" (valueChange)="selectProvider($event)">
+      @for (choice of store.providers(); track choice.id) {
+        <mat-option [value]="choice.id">{{ choice.displayName }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</tr-settings-row>
+<tr-settings-row [label]="resources.accountLabel" [hint]="resources.accountSelectionHint">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-select">
+    <mat-select [aria-label]="resources.accountLabel" [value]="selectedAccount()?.key ?? null" (valueChange)="selectAccount($event)">
+      @if (accountId() && !selectedAccount()) { <mat-option [value]="null" disabled>{{ resources.unavailableAccountLabel }}</mat-option> }
+      @for (choice of accounts(); track choice.key) {
+        <mat-option [value]="choice.key">{{ choice.label }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</tr-settings-row>
+<tr-settings-row [label]="resources.modelLabel">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-select">
+    <mat-select [aria-label]="resources.modelLabel" [canSelectNullableOptions]="true" [value]="model()" (valueChange)="selectModel($event)"
+      [disabled]="modelsLoading() || !selectedAccount()">
+      <mat-option [value]="null">{{ resources.providerDefaultModel }}</mat-option>
+      @if (model() && !selectedModel()) { <mat-option [value]="model()" disabled>{{ model() }}{{ resources.unavailableChoiceSuffix }}</mat-option> }
+      @for (choice of models(); track choice.id) {
+        <mat-option [value]="choice.id">{{ choice.displayName }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</tr-settings-row>
+<div class="flex items-center gap-2 px-[15px]">
+  <button mat-button type="button" [disabled]="modelsLoading()" (click)="loadModels(true)">{{ resources.refreshModelsLabel }}</button>
+  @if (modelsLoading()) { <span class="tr-muted" role="status">{{ resources.loadingModelsLabel }}</span> }
+  @if (catalog()?.failed) { <span class="tr-muted" role="status">{{ resources.modelCatalogUnavailable }}</span> }
+</div>
+<tr-settings-row [label]="resources.effortLabel">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-select">
+    <mat-select [aria-label]="resources.effortLabel" [canSelectNullableOptions]="true" [value]="effort()" (valueChange)="effort.set($event); save()"
+      [disabled]="modelsLoading() || !selectedAccount() || (effortLevels().length === 0 && !effort())">
+      <mat-option [value]="null">{{ resources.providerDefaultEffort }}</mat-option>
+      @if (effort() && !effortLevels().includes(effort()!)) { <mat-option [value]="effort()" disabled>{{ effort() }}{{ resources.unavailableChoiceSuffix }}</mat-option> }
+      @for (level of effortLevels(); track level) {
+        <mat-option [value]="level">{{ level }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</tr-settings-row>

@@ -1,0 +1,33 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (toolbar()) {
+  <button mat-icon-button type="button" [disabled]="!source() || copying()" (click)="copy()"
+    [attr.aria-label]="copied() ? resources.copiedLabel : resources.copyImageLabel"
+    [matTooltip]="copied() ? resources.copiedLabel : resources.copyImageLabel">
+    <mat-icon>{{ copied() ? resources.copiedIcon : resources.icons['copy'] }}</mat-icon>
+  </button>
+  <a mat-icon-button [href]="source()" [download]="name()" [disabled]="!source()"
+    [attr.aria-label]="resources.downloadImageLabel" [matTooltip]="resources.downloadImageLabel">
+    <mat-icon>{{ resources.icons['download'] }}</mat-icon>
+  </a>
+}
+<mat-menu #imageMenu="matMenu">
+  @if (alternativeOpenMode(); as mode) {
+    <button mat-menu-item [disabled]="!source()" (click)="openRequested.emit(mode)">
+      <mat-icon>{{ resources.imageOpenActionIcons[mode] }}</mat-icon><span>{{ resources.imageOpenActionLabels[mode] }}</span>
+    </button>
+    <mat-divider />
+  }
+  <button mat-menu-item [disabled]="!source() || copying()" (click)="copy()">
+    <mat-icon>{{ resources.icons['copy'] }}</mat-icon><span>{{ resources.copyImageLabel }}</span>
+  </button>
+  <a mat-menu-item [href]="source()" [download]="name()" [disabled]="!source()">
+    <mat-icon>{{ resources.icons['download'] }}</mat-icon><span>{{ resources.downloadImageLabel }}</span>
+  </a>
+</mat-menu>

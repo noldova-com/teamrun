@@ -52,7 +52,7 @@ Build and install a selected package with:
 npm run build -- foundation-core
 ```
 
-Packages build in the configured order; a selected package's dependencies must already be built. The build installs the generated npm archives without changing the root manifest or lockfile. Running `npm ci` removes these local installations; build them again afterward. The command without package names builds all configured packages.
+Packages build in the configured order; a selected package's dependencies must already be built. The build installs the generated npm archives without changing the root manifest or lockfile. Running `npm ci` removes these local installations; build them again afterward. The command without package names builds all configured packages and the renderer. Renderer dependencies are installed from its lockfile when needed.
 
 Build all configured packages before running their tests and coverage gate:
 
@@ -66,6 +66,31 @@ After building, list the available terminal commands with:
 ```bash
 npm run cli -- help
 ```
+
+## Run the desktop and UI checks
+
+After installing dependencies, install the pinned Electron runtime once and launch the built application:
+
+```bash
+npm exec -- install-electron
+npm run build
+npm run desktop
+```
+
+Development launches use Electron directly. To try the application with separate local data, set `TEAMRUN_DATA_DIR` before launching:
+
+```bash
+TEAMRUN_DATA_DIR=_build/dev-data npm run desktop
+```
+
+Run the renderer component tests and native desktop workflows with:
+
+```bash
+npm run test:renderer
+npm run test:ui
+```
+
+Linux needs a display; a headless host can use `xvfb-run --auto-servernum npm run test:ui`. The UI suite uses disposable projects and a fixture provider, never provider sign-in or paid turns. It preserves Electron sandboxing and records selected screenshots and traces in `_build/ui-results/`, with the HTML report at `_build/ui-report/index.html`. These checks do not establish native clipboard/file-picker, installer, or live-provider behavior.
 
 ## Pull requests
 

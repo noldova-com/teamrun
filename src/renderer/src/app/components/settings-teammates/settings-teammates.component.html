@@ -1,0 +1,37 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="tr-settings-heading-row flex flex-wrap items-center justify-between gap-2">
+  <h2 class="tr-settings-title">{{ resources.teammatesTitle }}</h2>
+  <button mat-flat-button type="button" [attr.aria-label]="resources.addTeammateLabel" (click)="edit(null)">{{ resources.addTeammateLabel }}</button>
+</div>
+<p class="tr-muted mb-4">{{ resources.teammatesSettingsHint }}</p>
+@if (error(); as message) { <p class="tr-error mb-3" role="alert">{{ message }}</p> }
+<div class="overflow-x-auto">
+  <table class="tr-settings-table w-full" [attr.aria-label]="resources.teammatesTitle">
+    <thead><tr><th scope="col">{{ resources.teammateNameLabel }}</th><th scope="col">{{ resources.connectionColumn }}</th>
+      <th scope="col">{{ resources.modelLabel }}</th><th scope="col">{{ resources.effortLabel }}</th><th scope="col">{{ resources.actionsColumn }}</th></tr></thead>
+    <tbody>
+      @for (teammate of store.teammates(); track teammate.id) {
+        <tr>
+          <td><div class="flex items-center gap-2" [class.tr-teammate-unavailable]="store.isTeammateUnavailable(teammate.id)">
+            <tr-teammate-avatar [teammateId]="teammate.id" [name]="teammate.name" [description]="summary(teammate)" /><span>{{ teammate.name }}</span>
+          </div></td>
+          <td>{{ connection(teammate) }}</td>
+          <td>{{ teammate.model ?? resources.providerDefaultModel }}</td>
+          <td>{{ teammate.effort ?? resources.providerDefaultEffort }}</td>
+          <td><div class="flex flex-wrap gap-1">
+            <button mat-button type="button" (click)="edit(teammate)">{{ resources.editLabel }}</button>
+            <button mat-button type="button" [disabled]="!store.selectedProjectId()" (click)="createConversation(teammate)">{{ resources.newConversationLabel }}</button>
+            <button mat-button type="button" (click)="remove(teammate)">{{ resources.deleteTeammateLabel }}</button>
+          </div></td>
+        </tr>
+      } @empty { <tr><td colspan="5" class="tr-muted">{{ resources.noTeammates }}</td></tr> }
+    </tbody>
+  </table>
+</div>

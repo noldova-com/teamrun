@@ -1,0 +1,34 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div #scroller class="tr-scroller h-full overflow-y-auto px-8 py-2" (scroll)="onScroll()">
+  <div class="mx-auto max-w-[55rem]">
+    @if (store.selectedConversationId() === null) {
+      <p class="tr-muted py-6">{{ resources.noConversation }}</p>
+    } @else if (store.messageIndex().length === 0) {
+      <p class="tr-muted py-6">{{ resources.noMessages }}</p>
+    }
+    <div class="tr-message-space relative overflow-clip" [style.height.px]="height()">
+      <div #content class="absolute inset-x-0" [style.top.px]="range().top">
+        @for (entry of shown(); track entry.id) {
+          @if (messagesById().get(entry.id); as message) {
+            <tr-message-card [message]="message" [controls]="entry.controls" [reservedHeight]="heightOf(entry.id)" />
+          } @else {
+            <div [style.height.px]="heightOf(entry.id)" aria-hidden="true"></div>
+          }
+        }
+      </div>
+    </div>
+  </div>
+</div>
+@if (isAway()) {
+  <button type="button" class="tr-scroll-down absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center justify-center"
+    [attr.aria-label]="resources.scrollDownLabel" (click)="scrollToBottom()">
+    <mat-icon class="tr-nav-icon">{{ resources.icons["arrowDown"] }}</mat-icon>
+  </button>
+}

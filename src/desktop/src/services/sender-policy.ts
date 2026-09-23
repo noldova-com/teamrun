@@ -35,4 +35,8 @@ export class SenderPolicy {
       || sender.frameUrl.startsWith(`${origin}${Resources.hashPrefix}`)
       || sender.frameUrl.startsWith(`${origin}${Resources.queryPrefix}`);
   }
+
+  public allowsPermission(sender: SenderInfo, permission: string): boolean {
+    return permission === Resources.clipboardWritePermission && this.isTrusted(sender);
+  }
 }

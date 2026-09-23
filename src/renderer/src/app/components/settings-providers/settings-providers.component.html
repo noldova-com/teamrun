@@ -1,0 +1,43 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="tr-settings-heading-row flex flex-wrap items-center justify-between gap-2">
+  <h2 class="tr-settings-title">{{ resources.providersTitle }}</h2>
+  <button mat-flat-button type="button" (click)="add()">{{ resources.addProviderLabel }}</button>
+</div>
+<p class="tr-muted mb-4">{{ resources.providerConnectionsHint }}</p>
+@if (store.error(); as error) { <p class="tr-error mb-3" role="alert">{{ error }}</p> }
+<div class="overflow-x-auto">
+  <table class="tr-settings-table w-full" [attr.aria-label]="resources.providersTitle">
+    <thead><tr><th scope="col">{{ resources.providerLabel }}</th><th scope="col">{{ resources.accountLabel }}</th>
+      <th scope="col">{{ resources.statusColumn }}</th><th scope="col">{{ resources.actionsColumn }}</th></tr></thead>
+    <tbody>
+      @for (account of store.accounts(); track account.id) {
+        <tr>
+          <td>{{ formatter.providerName(account.provider, store.providers()) }}</td>
+          <td><span>{{ account.label }}</span>
+            <div class="tr-muted">{{ resources.thisComputerLabel }}</div>
+            @if (account.identity?.email; as email) { <div class="tr-muted">{{ email }}</div> }
+            <details class="tr-connection-details mt-1"><summary class="tr-muted">{{ resources.profileDirectoryLabel }}</summary>
+              <div class="tr-mono mt-1">{{ account.profileDir }}</div>
+            </details>
+          </td>
+          <td><span>{{ resources.accountStatusLabels[account.authStatus] }}</span>
+            @if (account.lastError; as error) { <div class="tr-error mt-1" role="status">{{ error }}</div> }
+          </td>
+          <td><div class="flex flex-wrap gap-1">
+            <button mat-button type="button" [disabled]="store.isBusy()" (click)="store.checkAccount(account.id)">{{ resources.checkAccountLabel }}</button>
+            <button mat-button type="button" [disabled]="store.isBusy()" (click)="remove(account)">{{ resources.removeAccountLabel }}</button>
+          </div></td>
+        </tr>
+      } @empty {
+        <tr><td colspan="4" class="tr-muted">{{ resources.noProviderConnections }}</td></tr>
+      }
+    </tbody>
+  </table>
+</div>

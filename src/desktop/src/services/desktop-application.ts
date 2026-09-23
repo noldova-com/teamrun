@@ -16,10 +16,12 @@ import { Guid } from "@noldova/teamrun-foundation-core";
 
 import type { IBridgeHost } from "../interfaces/i-bridge-host.js";
 import type { DesktopSettings } from "../models/desktop-settings.js";
+import { SenderInfo } from "../models/sender-info.js";
 import { Resources } from "../resources.js";
 import type { BridgeGateway } from "./bridge-gateway.js";
 import type { RuntimeConnection } from "./runtime-connection.js";
 import type { WindowFactory } from "./window-factory.js";
+import { SenderPolicy } from "./sender-policy.js";
 import type { UpdateService } from "./update.service.js";
 import type { RendererCheckpoint } from "./renderer-checkpoint.js";
 import type { UpdatePeer } from "./update-peer.js";
@@ -151,8 +153,11 @@ export class DesktopApplication {
   }
 
   private applyContentSecurityPolicy(): void {
-    session.defaultSession.setPermissionCheckHandler(() => false);
-    session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+    const senders = new SenderPolicy(this.settings);
+    session.defaultSession.setPermissionCheckHandler((_contents, permission, _origin, details) =>
+      senders.allowsPermission(new SenderInfo(details.requestingUrl ?? String.empty, details.isMainFrame), permission));
+    session.defaultSession.setPermissionRequestHandler((_contents, permission, callback, details) =>
+      callback(senders.allowsPermission(new SenderInfo(details.requestingUrl, details.isMainFrame), permission)));
     const policy = this.settings.contentSecurityPolicy;
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       callback({ responseHeaders: { ...details.responseHeaders, [Resources.contentSecurityPolicyHeader]: [policy] } });

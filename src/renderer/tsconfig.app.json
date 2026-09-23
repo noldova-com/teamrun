@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "../../_build/renderer/app-tsc",
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

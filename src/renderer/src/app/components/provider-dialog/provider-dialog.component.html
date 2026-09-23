@@ -1,0 +1,42 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<h2 mat-dialog-title>{{ resources.addProviderLabel }}</h2>
+<form (submit)="save($event)">
+  <mat-dialog-content class="tr-configuration-form flex flex-col gap-3">
+    <p class="tr-muted">{{ resources.addProviderHint }}</p>
+    <label>{{ resources.providerLabel }}
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+        <mat-select name="provider" [attr.aria-label]="resources.providerLabel" [ngModel]="provider()"
+          (ngModelChange)="provider.set($event)" [disabled]="saving()">
+          @for (item of store.providers(); track item.id) { <mat-option [value]="item.id">{{ item.displayName }}</mat-option> }
+        </mat-select>
+      </mat-form-field>
+    </label>
+    <label>{{ resources.connectionNameLabel }}
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+        <input matInput cdkFocusInitial name="label" [attr.aria-label]="resources.connectionNameLabel" [placeholder]="resources.connectionNameHint"
+          [ngModel]="label()" (ngModelChange)="label.set($event)" [disabled]="saving()">
+      </mat-form-field>
+    </label>
+    <label>{{ resources.profileDirectoryLabel }}
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+        <input matInput name="profileDir" [attr.aria-label]="resources.profileDirectoryLabel" [ngModel]="profileDir()"
+          (ngModelChange)="profileDir.set($event)" [disabled]="saving()">
+        <button mat-icon-button matSuffix type="button" [disabled]="saving()" [attr.aria-label]="resources.chooseProfileLabel"
+          (click)="pickProfile()"><mat-icon>{{ resources.icons['folderOpen'] }}</mat-icon></button>
+      </mat-form-field>
+    </label>
+    <p class="tr-muted">{{ resources.providerProfileHints[provider() ?? ''] ?? resources.providerProfileHint }}</p>
+    @if (error(); as message) { <p class="tr-error" role="alert">{{ message }}</p> }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close [disabled]="saving()">{{ resources.closeLabel }}</button>
+    <button mat-flat-button type="submit" [disabled]="!canSave()">{{ resources.addProviderLabel }}</button>
+  </mat-dialog-actions>
+</form>

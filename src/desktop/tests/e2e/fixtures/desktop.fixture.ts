@@ -1,0 +1,205 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import { createWriteStream, type WriteStream } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { _electron, type ElectronApplication, expect, type Page, type TestInfo } from "@playwright/test";
+import { ProviderRegistry } from "@noldova/teamrun-core";
+import { ConversationCreateParams, MethodName, Project, ProjectOpenParams } from "@noldova/teamrun-protocol";
+import { ProcessInspector, ProcessProbe, ProcessRegistry, RuntimeClient, RuntimeService, RuntimeSettings, RuntimeTimings } from "@noldova/teamrun-runtime";
+
+import { FixtureProvider } from "./fixture-provider.fixture.ts";
+
+export class DesktopFixture {
+  private readonly info: TestInfo;
+  private readonly errors: string[] = [];
+  private readonly logs: WriteStream[] = [];
+  private directory: string | null = null;
+  private runtime: RuntimeService | null = null;
+  private application: ElectronApplication | null = null;
+  private window: Page | null = null;
+  private launches: number = 0;
+
+  public readonly provider = new FixtureProvider();
+
+  public constructor(info: TestInfo) {
+    this.info = info;
+  }
+
+  public get page(): Page {
+    if (!this.window)
+      throw new Error("The fixture window is not running.");
+    return this.window;
+  }
+
+  public async start(): Promise<void> {
+    this.directory = await mkdtemp(path.join(tmpdir(), "teamrun-ui-"));
+    const projectPath = path.join(this.directory, "project");
+    await mkdir(projectPath);
+    const settings = RuntimeSettings.forPlatform(process.platform, path.join(this.directory, "data"), "0.0.1", null);
+    const processes = new ProcessRegistry(settings.processesPath, process.pid, new ProcessProbe(), ProcessInspector.fromPlatform(process.platform));
+    const providers = new ProviderRegistry();
+    providers.register(this.provider);
+    this.runtime = new RuntimeService(settings, providers, processes);
+    await this.runtime.start();
+    const lock = this.runtime.lock;
+    if (!lock)
+      throw new Error("The fixture runtime did not publish an endpoint.");
+    const client = await RuntimeClient.connect(lock.endpoint, lock.token, "ui-fixture",
+      { onEvent: () => undefined, onDisconnected: () => undefined }, RuntimeTimings.createDefault());
+    try {
+      const opened = await client.call(MethodName.ProjectOpen, new ProjectOpenParams(projectPath).toJson());
+      if (opened.hasErrors)
+        throw new Error("The fixture project could not be opened.");
+      const project = Project.fromJson(opened.payload);
+      for (const title of ["Conversation A", "Conversation B"]) {
+        const response = await client.call(MethodName.ConversationCreate, new ConversationCreateParams(project.id, title).toJson());
+        if (response.hasErrors)
+          throw new Error("The fixture conversation could not be created.");
+      }
+    }
+    finally {
+      client.close();
+    }
+    await this.launch();
+  }
+
+  public async restart(): Promise<void> {
+    await this.closeWindow();
+    await this.launch();
+  }
+
+  public async capture(name: string): Promise<void> {
+    const metrics = await this.page.evaluate(() => ({
+      width: window.innerWidth, height: window.innerHeight, devicePixelRatio: window.devicePixelRatio,
+      visualWidth: window.visualViewport?.width, visualHeight: window.visualViewport?.height,
+      documentWidth: document.documentElement.clientWidth, documentScrollWidth: document.documentElement.scrollWidth
+    }));
+    const viewportPath = this.info.outputPath(`${name}-viewport.json`);
+    const imagePath = this.info.outputPath(`${name}.png`);
+    await writeFile(viewportPath, JSON.stringify(metrics, null, 2));
+    await this.info.attach(`${name}-viewport`, { path: viewportPath, contentType: "application/json" });
+    
+    const session = await this.page.context().newCDPSession(this.page);
+    try {
+      const screenshot = await session.send("Page.captureScreenshot", { format: "png" });
+      await writeFile(imagePath, Buffer.from(screenshot.data, "base64"));
+    }
+    finally {
+      await session.detach();
+    }
+    await this.info.attach(name, { path: imagePath, contentType: "image/png" });
+  }
+
+  public async attachImage(): Promise<void> {
+    if (!this.directory)
+      throw new Error("The fixture data directory is not available.");
+    const file = path.join(this.directory, "fixture.png");
+    await writeFile(file, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=", "base64"));
+    await this.page.locator('input[type="file"]').setInputFiles(file);
+  }
+
+  public async setZoom(factor: number): Promise<void> {
+    if (!this.application)
+      throw new Error("The fixture application is not running.");
+    await this.application.evaluate(({ BrowserWindow }, zoom) => BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(zoom), factor);
+  }
+
+  public async dispose(): Promise<void> {
+    try {
+      if (this.info.status !== this.info.expectedStatus && this.window && !this.window.isClosed())
+        await this.capture("failure").catch(error => this.errors.push(String(error)));
+      await this.closeWindow();
+    }
+    finally {
+      await this.runtime?.stop("UI fixture finished");
+      for (const log of this.logs)
+        await new Promise<void>(resolve => log.end(resolve));
+      if (this.directory)
+        await rm(this.directory, { recursive: true, force: true });
+    }
+    expect(this.errors, "Unexpected renderer or main-process errors").toEqual([]);
+  }
+
+  private async launch(): Promise<void> {
+    if (!this.directory)
+      throw new Error("The fixture data directory is not available.");
+    const environment: Record<string, string> = {};
+    for (const [name, value] of Object.entries(process.env))
+      if (value !== undefined)
+        environment[name] = value;
+    environment["TEAMRUN_DATA_DIR"] = path.join(this.directory, "data");
+    delete environment["ELECTRON_RUN_AS_NODE"];
+    delete environment["TEAMRUN_RENDERER_URL"];
+    delete environment["TEAMRUN_RENDERER_INDEX"];
+    delete environment["TEAMRUN_SCREENSHOT"];
+    this.application = await _electron.launch({
+      args: [fileURLToPath(new URL("./desktop-entry.fixture.ts", import.meta.url))], env: environment, chromiumSandbox: true, timeout: 15_000
+    });
+    expect(this.application.process().spawnargs).not.toContain("--no-sandbox");
+    this.launches++;
+    for (const [name, stream] of [["stdout", this.application.process().stdout], ["stderr", this.application.process().stderr]] as const) {
+      const log = createWriteStream(this.info.outputPath(`desktop-${this.launches}.${name}.log`));
+      this.logs.push(log);
+      stream?.pipe(log, { end: false });
+    }
+    this.window = await this.application.firstWindow();
+    await this.window.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+    const host = await this.application.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (!window)
+        throw new Error("The native fixture window is missing.");
+      return {
+        platform: process.platform, architecture: process.arch, electron: process.versions.electron,
+        bounds: window.getBounds(), zoom: window.webContents.getZoomFactor()
+      };
+    });
+    const renderer = await this.window.evaluate(() => ({
+      nodeGlobal: "process" in globalThis, requireGlobal: "require" in globalThis, bridge: "teamrun" in globalThis
+    }));
+    expect(renderer).toEqual({ nodeGlobal: false, requireGlobal: false, bridge: true });
+    await this.info.attach(`host-${this.launches}`, {
+      body: JSON.stringify({ ...host, renderer, chromiumSandboxRequested: true,
+        colorScheme: "dark", reducedMotion: "reduce", screenshotAnimations: "reduced-motion preference" }, null, 2),
+      contentType: "application/json"
+    });
+    this.window.on("pageerror", error => this.errors.push(error.message));
+    this.window.on("console", message => {
+      if (message.type() === "error")
+        this.errors.push(message.text());
+    });
+    await this.window.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
+    await expect(this.window.locator("tr-sidebar")).toBeVisible();
+    await expect(this.window.getByRole("button", { name: "Conversation A", exact: true })).toBeVisible();
+  }
+
+  private async closeWindow(): Promise<void> {
+    if (!this.application)
+      return;
+    const application = this.application;
+    const child = application.process();
+    this.application = null;
+    try {
+      if (this.window && !this.window.isClosed()) {
+        const trace = this.info.outputPath(`desktop-${this.launches}.zip`);
+        await this.window.context().tracing.stop({ path: trace });
+        await this.info.attach(`trace-${this.launches}`, { path: trace, contentType: "application/zip" });
+      }
+      await application.close();
+    }
+    finally {
+      if (child.exitCode === null && child.signalCode === null)
+        child.kill();
+      this.window = null;
+    }
+  }
+}

@@ -8,5 +8,6 @@
       "node"
     ],
     "skipLibCheck": true
-  }
+  },
+  "exclude": ["e2e"]
 }

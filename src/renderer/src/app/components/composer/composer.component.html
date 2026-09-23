@@ -1,0 +1,163 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<form class="px-8 pb-6 pt-1" (submit)="submit($event)" (paste)="paste($event)">
+  <div class="tr-composer mx-auto flex max-w-[55rem] flex-col px-3 pb-2 pt-3"
+    [class.opacity-60]="!canCompose()">
+    <input #filePicker type="file" multiple hidden (change)="pickFiles(filePicker)">
+    @if (attachments().length > 0) {
+      <div class="mb-2 flex gap-2 overflow-x-auto" role="list">
+        @for (attachment of attachments(); track attachment) {
+          <div class="tr-attachment flex max-w-full shrink-0 items-center gap-2 px-2 py-1" [class.tr-attachment-image]="attachment.image" role="listitem">
+            @if (attachment.image; as image) {
+              <tr-image-preview [image]="image" [images]="attachmentImages()" [compact]="true" />
+            } @else {
+              <mat-icon class="shrink-0">{{ resources.icons["attachment"] }}</mat-icon>
+              <span class="max-w-48 truncate" [matTooltip]="attachment.name">{{ attachment.name }}</span>
+            }
+            <button mat-icon-button type="button" class="tr-small-icon-button tr-attachment-remove shrink-0" [disabled]="preparing() || savedDrafts.loading()"
+              [attr.aria-label]="resources.removeAttachmentLabel + ': ' + attachment.name" [matTooltip]="resources.removeAttachmentLabel"
+              (click)="removeAttachment(attachment)"><mat-icon>{{ resources.icons["close"] }}</mat-icon></button>
+          </div>
+        }
+      </div>
+    }
+    @if (attachmentError(); as error) {
+      <p class="tr-error mb-2" role="alert">{{ error }}</p>
+    }
+    @if (imagesUnsupported()) { <p class="tr-error mb-2" role="alert">{{ resources.modelImagesUnsupported }}</p> }
+    @if (savedDrafts.error(); as error) {
+      <div class="tr-error mb-2" role="alert">{{ error }}
+        <button mat-button type="button" (click)="savedDrafts.retry()">{{ resources.draftRetryLabel }}</button>
+      </div>
+    }
+    <div class="tr-composer-input relative">
+      @if (completion(); as found) {
+        <div class="tr-mention-completion absolute bottom-full left-0 right-0 z-20 overflow-y-auto" role="listbox" [id]="resources.mentionListId">
+          @for (teammate of found.choices; track teammate.id; let index = $index) {
+            @if (index === 0 || isMember(teammate.id) !== isMember(found.choices[index - 1]!.id)) {
+              <div class="tr-menu-label tr-muted">{{ isMember(teammate.id) ? resources.conversationMembersLabel : resources.otherTeammatesLabel }}</div>
+            }
+            <button type="button" class="tr-mention-option flex w-full items-center gap-2 text-left" role="option"
+              [id]="resources.mentionOptionPrefix + index" [attr.aria-selected]="completionIndex() === index"
+              [class.tr-teammate-unavailable]="store.isTeammateUnavailable(teammate.id)"
+              (mousedown)="$event.preventDefault()" (click)="insertMention(teammate)">
+              <tr-teammate-avatar [teammateId]="teammate.id" [name]="teammate.name" />
+              <span class="truncate">{{ teammate.name }}</span>
+            </button>
+          }
+        </div>
+      }
+      <textarea #box class="tr-composer-text relative block w-full resize-none bg-transparent px-1 outline-none" rows="1" name="text"
+        [trInlineCode]="text()" [placeholder]="resources.composerPlaceholder" [ngModel]="text()" (ngModelChange)="text.set($event)" [disabled]="!canCompose()"
+        role="combobox" aria-autocomplete="list" [attr.aria-expanded]="completion() !== null"
+        [attr.aria-controls]="completion() ? resources.mentionListId : null"
+        [attr.aria-activedescendant]="completion() ? resources.mentionOptionPrefix + completionIndex() : null"
+        (input)="updateCompletion()" (click)="updateCompletion()" (keyup)="moveCaret($event)"
+        (blur)="closeCompletion()" (keydown)="onKeyDown($event)"></textarea>
+    </div>
+    <div class="mt-2 flex min-w-0 items-center gap-1">
+      <button mat-icon-button type="button" class="tr-small-icon-button shrink-0" [disabled]="!canCompose()"
+        [attr.aria-label]="resources.addFilesLabel" [matTooltip]="resources.addFilesLabel" (click)="filePicker.click()">
+        <mat-icon>{{ resources.icons["add"] }}</mat-icon>
+      </button>
+      <button type="button" class="tr-access flex min-w-0 items-center gap-1 px-2 py-1 tr-muted" [matMenuTriggerFor]="accessMenu"
+        [matTooltip]="resources.accessModeHints[accessMode()]" [attr.aria-label]="resources.accessMenuLabel">
+        <mat-icon class="tr-nav-icon">{{ accessMode() === fullAccess ? resources.icons["fullAccess"] : resources.icons["shield"] }}</mat-icon>
+        <span class="truncate">{{ resources.accessModeLabels[accessMode()] }}</span>
+      </button>
+      <span class="flex-1"></span>
+      <button mat-button type="button" class="tr-settings-trigger min-w-0" [matMenuTriggerFor]="settingsMenu" [matTooltip]="resources.settingsLabel">
+        <tr-teammate-avatar [teammateId]="responderId()" [name]="responder()?.name ?? resources.defaultTeammateLabel" [description]="summary()"
+          [unavailable]="responderId() !== null && store.isTeammateUnavailable(responderId()!)" />
+        <span class="truncate">{{ summary() }}</span>
+        <mat-icon iconPositionEnd>{{ resources.icons["expandMore"] }}</mat-icon>
+      </button>
+      <button mat-icon-button type="submit" class="tr-send" [disabled]="!canSend()" [attr.aria-label]="resources.sendLabel"
+        [matTooltip]="resources.sendLabel">
+        <mat-icon>{{ resources.icons["send"] }}</mat-icon>
+      </button>
+    </div>
+  </div>
+</form>
+<mat-menu #accessMenu="matMenu" class="tr-settings-menu">
+  @for (mode of accessModes; track mode) {
+    <button mat-menu-item (click)="preferences.setAccessMode(mode)">
+      <mat-icon>{{ mode === accessMode() ? resources.icons["selected"] : resources.icons["unselected"] }}</mat-icon>
+      <span>{{ resources.accessModeLabels[mode] }}</span>
+    </button>
+  }
+</mat-menu>
+<mat-menu #settingsMenu="matMenu" class="tr-settings-menu">
+  <div class="tr-menu-label tr-muted">{{ resources.responderLabel }}</div>
+  <button mat-menu-item (click)="selectResponder(null)">{{ resources.defaultTeammateLabel }}</button>
+  @for (teammate of memberTeammates(); track teammate.id) {
+    <button mat-menu-item (click)="selectResponder(teammate.id)" [class.tr-teammate-unavailable]="store.isTeammateUnavailable(teammate.id)">
+      {{ teammate.name }}
+    </button>
+  }
+  <mat-divider />
+  <div class="tr-menu-label tr-muted">{{ resources.providerLabel }}</div>
+  @if (responder()) {
+    <div class="tr-menu-label">{{ formatter.providerName(chosenProvider(), store.providers()) }}</div>
+  } @else {
+    @for (choice of store.providers(); track choice.id) {
+      <button mat-menu-item (click)="selectProvider(choice.id)">
+        <mat-icon>{{ choice.id === provider() ? resources.icons["selected"] : resources.icons["unselected"] }}</mat-icon>
+        {{ choice.displayName }}
+      </button>
+    }
+  }
+  <mat-divider />
+  <div class="tr-menu-label tr-muted">{{ resources.accountLabel }}</div>
+  @if (responder()) {
+    <div class="tr-menu-label" [matTooltip]="resources.namedAccountHint">{{ selectedAccount()?.label ?? resources.unavailableAccountLabel }}</div>
+  } @else {
+    @if (accountId() && !selectedAccount()) { <button mat-menu-item disabled>{{ resources.unavailableAccountLabel }}</button> }
+    @for (choice of accounts(); track choice.key) {
+      <button mat-menu-item (click)="selectAccount(choice)">
+        <mat-icon>{{ choice.key === selectedAccount()?.key ? resources.icons["selected"] : resources.icons["unselected"] }}</mat-icon>
+        {{ choice.label }}
+      </button>
+    }
+  }
+  <mat-divider />
+  <div class="tr-menu-label tr-muted flex items-center justify-between">
+    <span>{{ resources.modelLabel }}</span>
+    <button mat-icon-button type="button" class="tr-small-icon-button" [disabled]="modelsLoading()" [attr.aria-label]="resources.refreshModelsLabel"
+      [matTooltip]="resources.refreshModelsLabel" (click)="$event.stopPropagation(); loadModels(true)"><mat-icon>{{ resources.modelRefreshIcon }}</mat-icon></button>
+  </div>
+  @if (modelsLoading()) { <div class="tr-menu-label tr-muted" role="status">{{ resources.loadingModelsLabel }}</div> }
+  @if (catalog()?.failed) { <div class="tr-menu-label tr-muted" role="status">{{ resources.modelCatalogUnavailable }}</div> }
+  @if (chosenModel() && !selectedModel()) { <button mat-menu-item disabled>{{ chosenModel() }}{{ resources.unavailableChoiceSuffix }}</button> }
+  <button mat-menu-item [disabled]="modelsLoading()" (click)="selectModel(null)">
+    <mat-icon>{{ chosenModel() === null ? resources.icons["selected"] : resources.icons["unselected"] }}</mat-icon>
+    {{ resources.providerDefaultModel }}
+  </button>
+  @for (choice of models(); track choice.id) {
+    <button mat-menu-item [disabled]="modelsLoading()" (click)="selectModel(choice.id)">
+      <mat-icon>{{ choice.id === chosenModel() ? resources.icons["selected"] : resources.icons["unselected"] }}</mat-icon>
+      {{ choice.displayName }}
+    </button>
+  }
+  @if (effortLevels().length > 0 || chosenEffort()) {
+    <mat-divider />
+    <div class="tr-menu-label tr-muted">{{ resources.effortLabel }}</div>
+    <button mat-menu-item [disabled]="modelsLoading()" (click)="selectEffort(null)">
+      <mat-icon>{{ chosenEffort() === null ? resources.icons["selected"] : resources.icons["unselected"] }}</mat-icon>
+      {{ resources.providerDefaultEffort }}
+    </button>
+    @if (chosenEffort() && !effortLevels().includes(chosenEffort()!)) { <button mat-menu-item disabled>{{ chosenEffort() }}{{ resources.unavailableChoiceSuffix }}</button> }
+    @for (level of effortLevels(); track level) {
+      <button mat-menu-item [disabled]="modelsLoading()" (click)="selectEffort(level)">
+        <mat-icon>{{ level === chosenEffort() ? resources.icons["selected"] : resources.icons["unselected"] }}</mat-icon>
+        {{ level }}
+      </button>
+    }
+  }
+</mat-menu>

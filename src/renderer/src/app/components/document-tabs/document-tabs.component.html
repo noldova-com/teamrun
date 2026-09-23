@@ -1,0 +1,78 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="tr-tabs tr-tabs-document flex" role="tablist">
+  <div #strip class="tr-tab-strip flex min-w-0 flex-1" (wheel)="onWheel($event)" (mousedown)="onTabMouseDown($event)">
+    @for (conversationId of layout.documents(); track conversationId) {
+      <button type="button" class="tr-tab max-w-[16rem]" role="tab" [class.tr-tab-active]="isShown(conversationId)"
+        [class.tr-tab-preview]="layout.previewDocument() === conversationId" (dblclick)="keepOpen(conversationId)"
+        [attr.data-conversation-id]="conversationId"
+        [class.tr-tab-working]="store.isWorking(conversationId)" [attr.aria-selected]="isShown(conversationId)"
+        [matTooltip]="projectNameOf(conversationId)" (click)="show(conversationId)" (auxclick)="onTabAuxClick($event, conversationId)">
+        <span class="tr-tab-label">{{ titleOf(conversationId) }}</span>
+        <span class="tr-tab-actions">
+          @if (store.isWorking(conversationId)) {
+            <mat-progress-spinner class="tr-tab-spinner" mode="indeterminate" [diameter]="resources.spinnerDiameter"
+              [attr.aria-label]="resources.workingLabel" />
+          }
+          <span role="button" class="tr-tab-close" [attr.aria-label]="resources.closeTabLabel" (click)="close($event, conversationId)">
+            <mat-icon class="tr-tab-icon">{{ resources.icons["close"] }}</mat-icon>
+          </span>
+        </span>
+      </button>
+    }
+    @for (image of navigation.images(); track image.id) {
+      <button type="button" class="tr-tab tr-image-tab max-w-[16rem]" role="tab"
+        [attr.data-image-id]="image.id" [class.tr-tab-active]="isImageShown(image.id)" [attr.aria-selected]="isImageShown(image.id)"
+        [matTooltip]="image.data.image.label" (click)="navigation.showImage(image.id)" (auxclick)="onImageAuxClick($event, image.id)">
+        <span class="tr-tab-label flex items-center gap-1.5">
+          <mat-icon class="tr-tab-icon">{{ resources.icons['image'] }}</mat-icon>
+          <span class="truncate">{{ image.data.image.label }}</span>
+        </span>
+        <span class="tr-tab-actions"><span role="button" class="tr-tab-close" [attr.aria-label]="resources.closeTabLabel" (click)="closeImage($event, image.id)">
+          <mat-icon class="tr-tab-icon">{{ resources.icons['close'] }}</mat-icon>
+        </span></span>
+      </button>
+    }
+    @if (navigation.settingsOpen()) {
+      <button type="button" class="tr-tab tr-settings-tab" role="tab" [class.tr-tab-active]="navigation.view() === settingsView"
+        [attr.aria-selected]="navigation.view() === settingsView" (click)="navigation.openSettings()" (auxclick)="onTabAuxClick($event, null)">
+        <span class="tr-tab-label flex items-center gap-1.5">
+          <mat-icon class="tr-tab-icon">{{ resources.icons["settings"] }}</mat-icon>
+          <span>{{ resources.settingsTitle }}</span>
+        </span>
+        <span class="tr-tab-actions">
+          <span role="button" class="tr-tab-close" [attr.aria-label]="resources.closeTabLabel" (click)="closeSettings($event)">
+            <mat-icon class="tr-tab-icon">{{ resources.icons["close"] }}</mat-icon>
+          </span>
+        </span>
+      </button>
+    }
+  </div>
+  <span class="tr-tabs-actions">
+    <button mat-icon-button class="tr-small-icon-button tr-documents-menu" [matMenuTriggerFor]="documentsMenu"
+      [matTooltip]="resources.openDocumentsLabel" [attr.aria-label]="resources.openDocumentsLabel">
+      <mat-icon>{{ resources.icons["openDocuments"] }}</mat-icon>
+    </button>
+  </span>
+</div>
+<mat-menu #documentsMenu="matMenu" class="tr-documents-panel">
+  @for (conversationId of layout.documents(); track conversationId) {
+    <button mat-menu-item (click)="show(conversationId)">
+      <mat-icon>{{ isShown(conversationId) ? resources.icons["selected"] : resources.icons["unselected"] }}</mat-icon>
+      {{ titleOf(conversationId) }}
+    </button>
+  }
+  <mat-divider />
+  @for (image of navigation.images(); track image.id) {
+    <button mat-menu-item (click)="navigation.showImage(image.id)">
+      <mat-icon>{{ resources.icons['image'] }}</mat-icon>{{ image.data.image.label }}
+    </button>
+  }
+  <button mat-menu-item (click)="closeAll()">{{ resources.closeAllLabel }}</button>
+</mat-menu>
