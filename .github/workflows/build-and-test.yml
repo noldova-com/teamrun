@@ -120,6 +120,11 @@ jobs:
           trap 'cat "$RUNNER_TEMP/teamrun-ci/test.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/test.stderr.log" >&2' EXIT
           npm run test -- --skip-test-details --skip-coverage-details > "$RUNNER_TEMP/teamrun-ci/test.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/test.stderr.log"
 
+      - name: Check packaging contracts
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-ci/package.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/package.stderr.log" >&2' EXIT
+          npm run test:package > "$RUNNER_TEMP/teamrun-ci/package.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/package.stderr.log"
+
       - name: Run renderer tests
         run: |
           trap 'cat "$RUNNER_TEMP/teamrun-ci/renderer.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/renderer.stderr.log" >&2' EXIT

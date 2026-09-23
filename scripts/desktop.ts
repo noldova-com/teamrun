@@ -11,7 +11,7 @@ import { access } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 
-import BuildEvidence from "./build-evidence.ts";
+import BuildEvidence from "./build/build-evidence.ts";
 
 class Desktop {
   private static readonly MAIN: string = "node_modules/@noldova/teamrun-desktop/main.js";

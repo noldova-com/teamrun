@@ -1,0 +1,60 @@
+{
+  "$schema": "./node_modules/app-builder-lib/scheme.json",
+  "appId": "com.noldova.teamrun",
+  "productName": "TeamRun",
+  "copyright": "Copyright (c) Noldova",
+  "directories": {
+    "app": "_build/app",
+    "output": "_build/package"
+  },
+  "asar": true,
+  "npmRebuild": false,
+  "nodeGypRebuild": false,
+  "files": [
+    "**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "assets/icons",
+      "to": "assets/icons",
+      "filter": [
+        "*.png",
+        "*.ico"
+      ]
+    }
+  ],
+  "win": {
+    "target": [
+      "nsis",
+      "zip"
+    ],
+    "artifactName": "TeamRun-${version}-windows-${arch}.${ext}",
+    "icon": "assets/icons/icon-dark.ico",
+    "signExecutable": false
+  },
+  "mac": {
+    "target": [
+      "dmg",
+      "zip"
+    ],
+    "artifactName": "TeamRun-${version}-mac-${arch}.${ext}",
+    "icon": "assets/icons/icon-dock-512.png",
+    "type": "distribution",
+    "category": "public.app-category.developer-tools"
+  },
+  "linux": {
+    "target": [
+      "AppImage"
+    ],
+    "artifactName": "TeamRun-${version}-linux-${arch}.${ext}",
+    "executableName": "teamrun",
+    "icon": "assets/icons/icon-dark-512.png",
+    "category": "Development"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "artifactName": "TeamRun-${version}-windows-${arch}-setup.${ext}"
+  }
+}

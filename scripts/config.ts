@@ -8,7 +8,7 @@
 
 import { readFileSync } from "node:fs";
 
-import PackageInfo from "./package-info.ts";
+import PackageInfo from "./build/package-info.ts";
 
 export default class Config {
   public static readonly PACKAGE_MANIFEST_FILE_NAME: string = "package.json";

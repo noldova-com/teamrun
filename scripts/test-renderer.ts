@@ -8,7 +8,7 @@
 
 import path from "node:path";
 
-import BuildEvidence from "./build-evidence.ts";
+import BuildEvidence from "./build/build-evidence.ts";
 import Config from "./config.ts";
 import Script from "./script.ts";
 

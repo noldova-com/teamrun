@@ -18,8 +18,8 @@
 import path from "node:path";
 
 import Config from "./config.ts";
-import BuildEvidence from "./build-evidence.ts";
-import type PackageInfo from "./package-info.ts";
+import BuildEvidence from "./build/build-evidence.ts";
+import type PackageInfo from "./build/package-info.ts";
 import Script from "./script.ts";
 
 export class Build extends Script {

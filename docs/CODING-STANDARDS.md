@@ -212,6 +212,8 @@ Separate non-empty groups with one blank line and add no blank lines within a gr
 
 ## 11. Automation and scripts
 
+Keep runnable entry points and bootstrap configuration directly in `scripts/`. Group supporting implementations by responsibility, such as `scripts/build/` and `scripts/packaging/`; their tests mirror those paths under `scripts/tests/`, with fixtures beside the tests they support.
+
 Standalone repository automation is TypeScript: build, test, packaging, generation, fixtures, live checks, developer tools. No standalone shell, PowerShell, batch, Python, or other-language scripts or wrappers. Scripts follow the same ownership, OOP, no-helper, naming, and licensing rules; npm commands expose TypeScript entry points and pass arguments rather than inline shell. Subprocesses are spawned without a shell with explicit argument arrays. Validate the executable, argument meaning, working directory and inherited environment; shell-free spawning alone does not establish safety. Follow section 7 for deadlines, retries and shutdown. External dependencies require an explicit decision, exact pins, and a present need. Scripts keep the language's own value checks instead of the Core predicates so they can run before foundation packages have been built.
 
 GitHub-native configuration uses YAML under `.github`. Files in `.github/workflows` may contain inline workflow scripts and invoke toolchain commands or existing npm entry points. Inline scripts follow the same security, failure-handling and verification requirements; pass untrusted event data through environment variables or API responses, never interpolate it into executable script text. Actions are pinned to full commit SHAs with their release versions recorded.
