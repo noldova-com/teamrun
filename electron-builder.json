@@ -10,6 +10,9 @@
   "asar": true,
   "npmRebuild": false,
   "nodeGypRebuild": false,
+  "toolsets": {
+    "appimage": "1.0.3"
+  },
   "files": [
     "**/*"
   ],
@@ -48,8 +51,18 @@
     ],
     "artifactName": "TeamRun-${version}-linux-${arch}.${ext}",
     "executableName": "teamrun",
+    "executableArgs": [],
+    "extraFiles": [
+      {
+        "from": "_build/appimage/${arch}/AppRun",
+        "to": "AppRun"
+      }
+    ],
     "icon": "assets/icons/icon-dark-512.png",
     "category": "Development"
+  },
+  "appImage": {
+    "compression": "gzip"
   },
   "nsis": {
     "oneClick": false,

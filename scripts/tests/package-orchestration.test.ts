@@ -73,6 +73,11 @@ class PackageOrchestrationTests {
         assert.ok(!("devDependencies" in manifest));
         assert.equal(await readFile(path.join(app, "_build/renderer/browser/index.html"), "utf8"), "fixture renderer");
         await assert.rejects(access(path.join(app, "package-lock.json")));
+        const launcher = path.join("_build/appimage/x64/AppRun");
+        if (host === "linux")
+          assert.match(await readFile(launcher, "utf8"), /exec "\$APPDIR\/teamrun" "\$@"/);
+        else
+          await assert.rejects(access(launcher));
         const command = PackageScriptFixture.processCommands.at(-1);
         assert.ok(command);
         assert.equal(command[command.indexOf("--publish") + 1], "never");

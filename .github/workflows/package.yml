@@ -123,6 +123,18 @@ jobs:
         run: |
           trap 'cat "$RUNNER_TEMP/teamrun-package/package.stdout.log"; cat "$RUNNER_TEMP/teamrun-package/package.stderr.log" >&2' EXIT
           npm run package -- --platform "$PACKAGE_PLATFORM" --arch "$PACKAGE_ARCHITECTURE" > "$RUNNER_TEMP/teamrun-package/package.stdout.log" 2> "$RUNNER_TEMP/teamrun-package/package.stderr.log"
+          if [ "$RUNNER_OS" = Linux ]; then
+            appimages=("$GITHUB_WORKSPACE/_build/package/linux-$PACKAGE_ARCHITECTURE/"*.AppImage)
+            test "${#appimages[@]}" -eq 1
+            inspection=$(mktemp -d "$RUNNER_TEMP/teamrun-appimage.XXXXXX")
+            (
+              cd "$inspection"
+              "${appimages[0]}" --appimage-extract AppRun
+              "${appimages[0]}" --appimage-extract '*.desktop'
+              cmp "$GITHUB_WORKSPACE/_build/appimage/$PACKAGE_ARCHITECTURE/AppRun" squashfs-root/AppRun
+              grep -Fx 'Exec=AppRun %U' squashfs-root/*.desktop
+            ) >> "$RUNNER_TEMP/teamrun-package/package.stdout.log" 2>> "$RUNNER_TEMP/teamrun-package/package.stderr.log"
+          fi
 
       - name: Retain installers and reports
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

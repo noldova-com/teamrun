@@ -15,13 +15,15 @@ class TestPackage extends Script {
     "--test-coverage-lines=100", "--test-coverage-branches=100", "--test-coverage-functions=100",
   ];
   private static readonly SUPPORT_ARGUMENTS: readonly string[] = [
+    "--test-coverage-include=scripts/packaging/app-image-launcher.ts",
     "--test-coverage-include=scripts/packaging/package-options.ts",
     "--test-coverage-include=scripts/packaging/package-artifacts.ts",
     "--test-coverage-include=scripts/packaging/packaged-manifest.ts",
     "--test-coverage-include=scripts/packaging/package.exception.ts",
     "--test-coverage-include=scripts/packaging/windows-installer-policy.ts",
     "scripts/tests/packaging/package-options.test.ts", "scripts/tests/packaging/package-artifacts.test.ts",
-    "scripts/tests/packaging/windows-installer-policy.test.ts"
+    "scripts/tests/packaging/windows-installer-policy.test.ts",
+    "scripts/tests/packaging/app-image-launcher.test.ts"
   ];
   private static readonly COMMAND_ARGUMENTS: readonly string[] = [
     "--experimental-test-module-mocks", "--test-coverage-include=scripts/package.ts",
