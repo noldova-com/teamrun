@@ -133,6 +133,8 @@ export default class PackageOptions {
       argumentsList.push(PackageOptions.DIRECTORY_OPTION);
     else if (this.platform === PackageOptions.WINDOWS_PLATFORM)
       argumentsList.push(PackageOptions.formatInstallerPolicyOption(this.installerPolicyPath));
+    if (this.platform === PackageOptions.LINUX_PLATFORM)
+      argumentsList.push(PackageOptions.formatLinuxArtifactNameOption(this.architecture));
     if (this.signed) {
       argumentsList.push(...PackageOptions.SIGNED_OPTIONS);
       argumentsList.push(this.platform === PackageOptions.WINDOWS_PLATFORM ? PackageOptions.SIGNED_WINDOWS_OPTION : PackageOptions.SIGNED_MAC_OPTION);
@@ -186,6 +188,10 @@ export default class PackageOptions {
   }
 
   private static formatInstallerPolicyOption(path: string): string { return `--config.nsis.include=${path}`; }
+
+  private static formatLinuxArtifactNameOption(architecture: string): string {
+    return `--config.linux.artifactName=TeamRun-\${version}-linux-${architecture}.\${ext}`;
+  }
 
   private static formatNpmPlatform(platform: NodeJS.Platform): string {
     return `--os=${platform}`;
