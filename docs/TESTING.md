@@ -127,6 +127,8 @@ Screenshot attachments are review evidence. Pixel comparison is a separately sel
 
 CI reports expose identities, steps, outcomes, screenshots and traces, retaining run artifacts under an explicit retention policy. Commit evidence only under section 8's lasting-value rule. Aggregation preserves startup, execution, capture and cleanup failures. Evidence applies only to its recorded build and environment.
 
+GitHub Actions job summaries include desktop UI outcomes, duration and bounded failure details beside package results. Totals account for all selected tests even when displayed details are limited. A main-window checkpoint is retained as a separate PNG artifact per target, linked from the summary for browser viewing; the full HTML report and traces remain downloadable artifacts, without separate report hosting.
+
 ## 7. Verification of the testing infrastructure
 
 Before relying on the package runner or a changed reporting path, use controlled negative fixtures through its real entry point. Verify assertion failures, throws, rejected promises, timeouts, unexpected late errors, malformed discovery, declared skips and incomplete results. The outer test asserts their expected failure classifications without allowing the deliberately failing child to appear as a successful product test run.

@@ -54,7 +54,7 @@ test("preserves drafts and tabs across Settings, navigation, sending and restart
   await expect(desktop.page.locator("tr-message-list")).toContainText("Fixture reply completed.");
   await expect(desktop.page.locator("tr-composer textarea")).toHaveValue("");
   expect(desktop.provider.requests).toHaveLength(1);
-  await desktop.capture("composer-cleared-after-send");
+  await desktop.capture("main-window");
 });
 
 test("opens an attachment in a modal or tab and retains the composer draft", async () => {

@@ -16,5 +16,9 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   workers: 1,
   retries: 0,
-  reporter: [["list"], ["html", { outputFolder: "../../../../_build/ui-report", open: "never" }]]
+  reporter: [
+    ["list"],
+    ["html", { outputFolder: "../../../../_build/ui-report", open: "never" }],
+    ["../../../../scripts/testing/git-hub-ui-reporter.ts"]
+  ]
 });
