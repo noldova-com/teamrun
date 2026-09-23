@@ -1,0 +1,50 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="tr-image-viewer" [class.tr-image-viewer-tab]="embedded()" (click)="closeBackdrop($event)">
+  <header class="tr-image-viewer-header flex items-center gap-3">
+    <span class="min-w-0 flex-1 truncate">{{ current().label }}</span>
+    <tr-image-actions #actions [source]="loaded()?.src ?? null" [name]="current().label" [toolbar]="true" />
+    <button #closeButton mat-icon-button type="button" data-image-close (click)="closed.emit()" [attr.aria-label]="resources.closeLabel" [matTooltip]="resources.closeLabel">
+      <mat-icon>{{ resources.icons["close"] }}</mat-icon>
+    </button>
+  </header>
+  <div #viewport class="tr-image-viewer-viewport">
+    <div class="tr-image-viewer-canvas" (click)="closeBackdrop($event)">
+      @if (loaded(); as image) {
+        <img class="tr-image-viewer-image" [src]="image.src" [alt]="current().label" draggable="false"
+          [matContextMenuTriggerFor]="actions.menu() ?? null"
+          [style.width.px]="image.naturalWidth * zoom()" [style.height.px]="image.naturalHeight * zoom()">
+      } @else {
+        <span role="status">{{ failed() ? resources.imageLoadFailed : resources.imageLoading }}</span>
+      }
+    </div>
+  </div>
+  @if (data().images.length > 1) {
+    <button mat-icon-button type="button" class="tr-image-viewer-previous" [disabled]="index() === 0"
+      [attr.aria-label]="resources.previousImageLabel" [matTooltip]="resources.previousImageLabel" (click)="move(-1)">
+      <mat-icon>{{ resources.icons["back"] }}</mat-icon>
+    </button>
+    <button mat-icon-button type="button" class="tr-image-viewer-next" [disabled]="index() === data().images.length - 1"
+      [attr.aria-label]="resources.nextImageLabel" [matTooltip]="resources.nextImageLabel" (click)="move(1)">
+      <mat-icon>{{ resources.icons["forward"] }}</mat-icon>
+    </button>
+  }
+  <footer class="tr-image-viewer-tools flex items-center gap-2">
+    <button mat-icon-button type="button" [disabled]="!loaded() || zoom() <= resources.imageMinimumZoom"
+      [attr.aria-label]="resources.zoomOutLabel" [matTooltip]="resources.zoomOutLabel" (click)="changeZoom(false)">
+      <mat-icon>{{ resources.icons["zoomOut"] }}</mat-icon>
+    </button>
+    <button mat-button type="button" [disabled]="!loaded()" [attr.aria-label]="resources.fitImageLabel"
+      [matTooltip]="resources.fitImageLabel" (click)="fit()">{{ percent() }}%</button>
+    <button mat-icon-button type="button" [disabled]="!loaded() || zoom() >= resources.imageMaximumZoom"
+      [attr.aria-label]="resources.zoomInLabel" [matTooltip]="resources.zoomInLabel" (click)="changeZoom(true)">
+      <mat-icon>{{ resources.icons["zoomIn"] }}</mat-icon>
+    </button>
+  </footer>
+</div>

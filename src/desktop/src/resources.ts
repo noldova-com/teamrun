@@ -118,13 +118,13 @@ export class Resources {
   public static readonly enabledValue: string = "1";
   public static readonly dataDirectorySegments: readonly string[] = [".noldova", "teamrun"];
   public static readonly rendererIndexSegments: readonly string[] = ["_build", "renderer", "browser", "index.html"];
-  public static readonly defaultIconFileName: string = "icon.png";
-  public static readonly iconSegments: readonly string[] = ["build", Resources.defaultIconFileName];
-  public static readonly blackIconFileName: string = "icon-black.png";
-  public static readonly whiteIconFileName: string = "icon-white.png";
-  public static readonly blackWindowsIconFileName: string = "icon-black.ico";
-  public static readonly whiteWindowsIconFileName: string = "icon-white.ico";
-  public static readonly dockIconFileName: string = "icon-dock.png";
+  public static readonly lightIconFileName: string = "icon-light-512.png";
+  public static readonly darkIconFileName: string = "icon-dark-512.png";
+  public static readonly defaultIconFileName: string = Resources.darkIconFileName;
+  public static readonly iconSegments: readonly string[] = ["assets", "icons", Resources.defaultIconFileName];
+  public static readonly lightWindowsIconFileName: string = "icon-light.ico";
+  public static readonly darkWindowsIconFileName: string = "icon-dark.ico";
+  public static readonly dockIconFileName: string = "icon-dock-512.png";
   public static readonly windowsPlatform: "win32" = "win32";
   public static readonly macPlatform: "darwin" = "darwin";
   public static readonly themeUpdatedEvent: "updated" = "updated";
@@ -197,6 +197,7 @@ export class Resources {
   public static readonly rendererMissingPage: string =
     "data:text/html,<h1 style=\"font-family:sans-serif\">Renderer not built</h1><p>Run <code>npm run build</code> first.</p>";
   public static readonly untrustedSender: string = "The request did not come from the application window.";
+  public static readonly clipboardWritePermission: string = "clipboard-sanitized-write";
   public static readonly runtimeUnavailable: string = "The runtime could not be reached.";
 
   public static readonly dataDirectoryParameterName: string = "dataDirectory";

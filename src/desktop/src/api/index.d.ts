@@ -536,9 +536,9 @@ export declare class DesktopSettings {
    */
   public readonly rendererIndexPath: string;
   /**
-   * The absolute default icon path (`build/icon.png` in development, the white Weave). For the standard
-   * `icon.png` name, the window selects the variant beside it for the system theme: the white artwork on a
-   * dark shell, the black one on a light shell (D37); on macOS the Dock tile (D38). A custom filename is used
+   * The absolute default icon path (`assets/icons/icon-dark-512.png` in development). For the standard
+   * `icon-dark-512.png` name, the window selects the matching system-theme variant beside it,
+   * or the Dock tile on macOS. A custom filename is used
    * unchanged; the default remains the fallback if its variant is missing.
    */
   public readonly iconPath: string;
@@ -564,7 +564,7 @@ export declare class DesktopSettings {
    * @param dataDirectory The absolute data directory.
    * @param productVersion The product version.
    * @param rendererIndexPath The renderer's `index.html`.
-   * @param iconPath The default window icon; the standard `icon.png` name enables adjacent theme variants.
+   * @param iconPath The default window icon; the standard `icon-dark-512.png` name enables adjacent theme variants.
    * @param rendererUrl The development server URL, or `null`.
    * @param screenshotPath The screenshot path, or `null`.
    * @param screenshotDelayMilliseconds The screenshot delay.
@@ -1032,23 +1032,23 @@ export declare class Resources {
   public static readonly defaultIconFileName: string;
   public static readonly iconSegments: readonly string[];
   /**
-   * The black PNG used on a light system surface.
+   * The 512px PNG for a light system surface.
    */
-  public static readonly blackIconFileName: string;
+  public static readonly lightIconFileName: string;
   /**
-   * The white PNG used on a dark system surface.
+   * The 512px PNG for a dark system surface.
    */
-  public static readonly whiteIconFileName: string;
+  public static readonly darkIconFileName: string;
   /**
-   * The black Windows ICO with multiple pixel sizes.
+   * The light-theme Windows ICO with multiple pixel sizes.
    */
-  public static readonly blackWindowsIconFileName: string;
+  public static readonly lightWindowsIconFileName: string;
   /**
-   * The white Windows ICO with multiple pixel sizes.
+   * The dark-theme Windows ICO with multiple pixel sizes.
    */
-  public static readonly whiteWindowsIconFileName: string;
+  public static readonly darkWindowsIconFileName: string;
   /**
-   * The macOS Dock PNG: the black Weave on a white rounded tile, as the Dock's other tiles are drawn.
+   * The 512px macOS Dock PNG with its own background, used in both system themes.
    */
   public static readonly dockIconFileName: string;
   public static readonly windowsPlatform: "win32";
@@ -1101,6 +1101,10 @@ export declare class Resources {
   public static readonly didFinishLoadEvent: "did-finish-load";
   public static readonly rendererMissingPage: string;
   public static readonly untrustedSender: string;
+  /**
+   * Electron permission for writing clipboard content; clipboard reads remain denied.
+   */
+  public static readonly clipboardWritePermission: string;
   public static readonly runtimeUnavailable: string;
   public static readonly dataDirectoryParameterName: string;
   public static readonly productVersionParameterName: string;
@@ -1335,4 +1339,12 @@ export declare class SenderPolicy {
    * @returns `true` for the application's own top-level page.
    */
   public isTrusted(sender: SenderInfo): boolean;
+
+  /**
+   * Allows clipboard writes only from the trusted top-level renderer.
+   * @param sender The requesting frame.
+   * @param permission Electron's permission name.
+   * @returns Whether the request is an allowed clipboard write.
+   */
+  public allowsPermission(sender: SenderInfo, permission: string): boolean;
 }

@@ -29,6 +29,9 @@ export class Build extends Script {
   private static readonly BUILDING_RENDERER: string = "Building the renderer...";
   private static readonly NPM_QUIET_ARGUMENTS: readonly string[] = ["--no-audit", "--no-fund"];
   private static readonly ANGULAR_BUILD_ARGUMENTS: readonly string[] = ["build", "--configuration", "production"];
+  private static readonly FONT_LICENSES: readonly string[] = ["INTER-OFL.txt", "INCONSOLATA-OFL.txt"];
+  private static readonly FONT_ASSETS_DIRECTORY: string = "assets/fonts";
+  private static readonly RENDERER_FONT_LICENSES_DIRECTORY: string = "_build/renderer/browser/licenses/fonts";
 
   public override async runAsync(): Promise<void> {
     await this.bootstrapNodeModulesAsync();
@@ -45,7 +48,7 @@ export class Build extends Script {
       this.writeLog(`${progress} Done.`, true);
     }
     this.writeLog(`Built ${packages.length} package(s).`);
-    if (requested.includes(Build.RENDERER_OPTION))
+    if (requested.length === 0 || requested.includes(Build.RENDERER_OPTION))
       await this.buildRendererAsync();
   }
 
@@ -57,6 +60,8 @@ export class Build extends Script {
       await this.executeNpmCommandAsync(["ci", ...Build.NPM_QUIET_ARGUMENTS], rendererDirectory);
     const angularCli = path.join(rendererDirectory, Config.ANGULAR_CLI_PATH);
     await this.executeProcessAsync(process.execPath, [angularCli, ...Build.ANGULAR_BUILD_ARGUMENTS], rendererDirectory);
+    for (const name of Build.FONT_LICENSES)
+      await this.copyFileAsync(path.join(Build.FONT_ASSETS_DIRECTORY, name), path.join(Build.RENDERER_FONT_LICENSES_DIRECTORY, name));
   }
 
   private async bootstrapNodeModulesAsync(): Promise<void> {

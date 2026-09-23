@@ -54,4 +54,16 @@ export class SenderPolicyTests {
     Assert.isFalse(defaultPort.isTrusted(new SenderInfo("http://localhost.evil/", true)));
     Assert.isTrue(defaultPort.isTrusted(new SenderInfo("http://localhost:80/conversations/1", true)));
   }
+
+  @TestMethod
+  public permitsOnlyClipboardWritesFromTheTrustedTopLevelPage(): void {
+    const policy = new SenderPolicy(new DesktopSettings(resolve("data"), "1", SenderPolicyTests.index, resolve("icon.png"), null, null, 1));
+    const sender = new SenderInfo(SenderPolicyTests.indexUrl, true);
+
+    Assert.isTrue(policy.allowsPermission(sender, "clipboard-sanitized-write"));
+    for (const permission of ["clipboard-read", "notifications", "media", "unknown"])
+      Assert.isFalse(policy.allowsPermission(sender, permission));
+    Assert.isFalse(policy.allowsPermission(new SenderInfo(SenderPolicyTests.indexUrl, false), "clipboard-sanitized-write"));
+    Assert.isFalse(policy.allowsPermission(new SenderInfo("https://example.com/", true), "clipboard-sanitized-write"));
+  }
 }

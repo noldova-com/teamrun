@@ -17,7 +17,7 @@ import { DesktopSettings, Resources } from "@noldova/teamrun-desktop";
 export class DesktopSettingsTests {
   private static readonly data: string = resolve("data");
   private static readonly index: string = resolve("renderer", "index.html");
-  private static readonly icon: string = resolve("build", "icon.png");
+  private static readonly icon: string = resolve("assets", "icons", "icon-dark-512.png");
 
   @TestMethod
   public describesTheBuiltRenderer(): void {
@@ -48,7 +48,7 @@ export class DesktopSettingsTests {
     Assert.areEqual(resolve("user", ".noldova", "teamrun"), settings.dataDirectory);
     Assert.areEqual("2.0.0", settings.productVersion);
     Assert.areEqual(resolve("module", "dist", "..", "..", "..", "_build", "renderer", "browser", "index.html"), settings.rendererIndexPath);
-    Assert.areEqual(resolve("module", "dist", "..", "..", "..", "build", "icon.png"), settings.iconPath);
+    Assert.areEqual(resolve("module", "dist", "..", "..", "..", "assets", "icons", "icon-dark-512.png"), settings.iconPath);
     Assert.isNull(settings.rendererUrl);
     Assert.isNull(settings.screenshotPath);
     Assert.areEqual(Resources.defaultScreenshotDelay, settings.screenshotDelayMilliseconds);
@@ -61,7 +61,7 @@ export class DesktopSettingsTests {
     const moduleDirectory = join(resourcesDirectory, "app.asar", "node_modules", "@noldova", "teamrun-desktop");
     const settings = DesktopSettings.fromEnvironment({}, resolve("user"), moduleDirectory, "2.0.0", resourcesDirectory);
 
-    Assert.areEqual(join(resourcesDirectory, "build", "icon.png"), settings.iconPath);
+    Assert.areEqual(join(resourcesDirectory, "assets", "icons", "icon-dark-512.png"), settings.iconPath);
     Assert.areEqual(join(resourcesDirectory, "app.asar", "_build", "renderer", "browser", "index.html"), settings.rendererIndexPath);
   }
 

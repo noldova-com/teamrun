@@ -1,0 +1,65 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<h2 mat-dialog-title>{{ original ? resources.editTeammateLabel : resources.addTeammateLabel }}</h2>
+<form (submit)="save($event)">
+  <mat-dialog-content class="tr-teammate-form flex flex-col gap-3">
+    <label>{{ resources.teammateNameLabel }}
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+        <input matInput cdkFocusInitial name="name" [attr.aria-label]="resources.teammateNameLabel"
+          [ngModel]="name()" (ngModelChange)="name.set($event)" [disabled]="saving()">
+      </mat-form-field>
+      <span class="tr-muted">{{ resources.teammateNameHint }}</span>
+    </label>
+    <label>{{ resources.accountLabel }}
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+        <mat-select name="account" [aria-label]="resources.accountLabel" [ngModel]="accountId()"
+          (ngModelChange)="changeAccount($event)" [disabled]="saving()">
+          @if (!account() && accountId()) { <mat-option [value]="accountId()">{{ resources.unavailableTeammateLabel }}</mat-option> }
+          @for (item of accounts(); track item.key) {
+            <mat-option [value]="item.accountId">{{ item.fullLabel }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </label>
+    @if (store.accounts().length === 0 && !original) { <p class="tr-muted">{{ resources.noAccountsForTeammate }}</p> }
+    <label>{{ resources.modelLabel }}
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+        <mat-select name="model" [aria-label]="resources.modelLabel" [canSelectNullableOptions]="true" [ngModel]="model()" (ngModelChange)="changeModel($event)"
+          [disabled]="saving() || loading() || !account()">
+          <mat-option [value]="null">{{ resources.providerDefaultModel }}</mat-option>
+          @if (model() && !selectedModel()) { <mat-option [value]="model()">{{ model() }}{{ resources.unavailableChoiceSuffix }}</mat-option> }
+          @for (item of catalog()?.models ?? []; track item.id) { <mat-option [value]="item.id">{{ item.displayName }}</mat-option> }
+        </mat-select>
+      </mat-form-field>
+    </label>
+    <button mat-button type="button" [disabled]="loading() || !account() || saving()" (click)="loadModels(true)">
+      {{ loading() ? resources.loadingModelsLabel : resources.refreshModelsLabel }}
+    </button>
+    @if (catalog()?.failed) { <p role="status" class="tr-muted">{{ resources.modelCatalogUnavailable }}</p> }
+    <label>{{ resources.effortLabel }}
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+        <mat-select name="effort" [aria-label]="resources.effortLabel" [canSelectNullableOptions]="true" [ngModel]="effort()" (ngModelChange)="effort.set($event)"
+          [disabled]="saving() || loading() || !account() || (efforts().length === 0 && !effort())">
+          <mat-option [value]="null">{{ resources.providerDefaultEffort }}</mat-option>
+          @if (effort() && !efforts().includes(effort()!)) { <mat-option [value]="effort()">{{ effort() }}{{ resources.unavailableChoiceSuffix }}</mat-option> }
+          @for (level of efforts(); track level) { <mat-option [value]="level">{{ level }}</mat-option> }
+        </mat-select>
+      </mat-form-field>
+    </label>
+    <label>{{ resources.teammateRoleLabel }}
+      <textarea class="tr-teammate-role w-full" name="role" [attr.aria-label]="resources.teammateRoleLabel"
+        [rows]="resources.teammateRoleRows" [ngModel]="role()" (ngModelChange)="role.set($event)" [disabled]="saving()"></textarea>
+    </label>
+    @if (error(); as message) { <p role="alert" class="tr-error">{{ message }}</p> }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close [disabled]="saving()">{{ resources.closeLabel }}</button>
+    <button mat-flat-button type="submit" [disabled]="!canSave() || saving()">{{ resources.saveLabel }}</button>
+  </mat-dialog-actions>
+</form>

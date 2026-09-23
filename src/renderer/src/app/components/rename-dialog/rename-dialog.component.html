@@ -1,0 +1,21 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<h2 mat-dialog-title>{{ resources.renameTitle }}</h2>
+<form (submit)="save($event)">
+  <mat-dialog-content>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+      <input matInput cdkFocusInitial name="title" [attr.aria-label]="resources.renameFieldLabel" [ngModel]="title()"
+        (ngModelChange)="title.set($event)">
+    </mat-form-field>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close>{{ resources.closeLabel }}</button>
+    <button mat-flat-button type="submit" [disabled]="!canSave()">{{ resources.saveLabel }}</button>
+  </mat-dialog-actions>
+</form>

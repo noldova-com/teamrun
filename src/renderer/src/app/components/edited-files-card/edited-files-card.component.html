@@ -1,0 +1,61 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<section class="tr-card my-3">
+  <header class="flex items-center gap-3 px-4 py-2">
+    <mat-icon class="tr-content-icon tr-muted">{{ resources.icons["fileChange"] }}</mat-icon>
+    <span>{{ title() }}</span>
+    <span>
+      <span class="tr-added">+{{ additions() }}</span>
+      <span class="tr-removed ml-1">-{{ deletions() }}</span>
+    </span>
+  </header>
+  <ul class="border-t tr-outline">
+    @for (edit of shown(); track edit.path) {
+      <li class="border-b last:border-b-0 tr-outline">
+        <div class="flex items-center gap-1 pr-4">
+          <button type="button" class="flex min-w-0 flex-1 items-center gap-3 px-4 py-2 text-left" (click)="toggle(edit.path)" [disabled]="!edit.hasDiff">
+            <span class="min-w-0 flex-1 truncate">
+              <span class="tr-muted">{{ directoryOf(edit.path) }}</span><span>{{ fileNameOf(edit.path) }}</span>
+            </span>
+            <span class="shrink-0">
+              <span class="tr-added">+{{ edit.additions }}</span>
+              <span class="tr-removed ml-1">-{{ edit.deletions }}</span>
+            </span>
+          </button>
+          @if (edit.hasDiff) {
+            <button mat-icon-button type="button" class="tr-small-icon-button tr-wrap-toggle shrink-0"
+              [attr.aria-label]="resources.wordWrapLabel" [attr.aria-pressed]="isWrapped(edit.path)"
+              [matTooltip]="isWrapped(edit.path) ? resources.disableWordWrapLabel : resources.enableWordWrapLabel" (click)="toggleWrap(edit.path)">
+              <mat-icon>{{ resources.wordWrapIcon }}</mat-icon>
+            </button>
+            <button mat-icon-button type="button" class="tr-small-icon-button shrink-0"
+              [attr.aria-label]="isOpen(edit.path) ? resources.collapseDiffLabel : resources.expandDiffLabel"
+              [attr.aria-expanded]="isOpen(edit.path)" (click)="toggle(edit.path)">
+              <mat-icon>{{ isOpen(edit.path) ? resources.icons["expandLess"] : resources.icons["expandMore"] }}</mat-icon>
+            </button>
+          }
+        </div>
+        @if (isOpen(edit.path)) {
+          <div class="tr-diff tr-mono max-h-96 overflow-auto whitespace-pre border-t px-4 py-2 tr-outline" [class.tr-wrap]="isWrapped(edit.path)">
+            @for (line of linesOf(edit.path); track $index) {
+              <div class="tr-diff-line" [class.tr-diff-added]="line.kind === added" [class.tr-diff-removed]="line.kind === removed"
+                [class.tr-muted]="line.kind === meta">{{ prefixOf(line.kind) }}{{ line.text }}</div>
+            }
+          </div>
+        }
+      </li>
+    }
+  </ul>
+  @if (hidden()> 0) {
+    <button mat-button class="m-1" type="button" (click)="expansion().allFiles.set(true)">
+      {{ resources.formatShowMoreFiles(hidden()) }}
+      <mat-icon iconPositionEnd>{{ resources.icons["expandMore"] }}</mat-icon>
+    </button>
+  }
+</section>

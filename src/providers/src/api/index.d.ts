@@ -22,7 +22,7 @@ import type {
 } from "@noldova/teamrun-core";
 import type { Exception } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject, JsonReader, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { ObservedSettings, ProviderAccount, ProviderAccountIdentity, ProviderDescriptor, ProviderModel } from "@noldova/teamrun-protocol";
+import type { DetailKind, ObservedSettings, ProviderAccount, ProviderAccountIdentity, ProviderDescriptor, ProviderModel } from "@noldova/teamrun-protocol";
 
 /**
  * Where an executable was found.
@@ -1043,7 +1043,6 @@ export declare class Resources {
   public static readonly modelField: string;
   public static readonly hiddenField: string;
   public static readonly threadField: string;
-  public static readonly threadIdField: string;
   public static readonly turnField: string;
   public static readonly reasoningEffortField: string;
   public static readonly cwdField: string;

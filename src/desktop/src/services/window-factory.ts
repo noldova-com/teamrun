@@ -97,11 +97,11 @@ export class WindowFactory {
   private static iconFileName(platform: string, dark: boolean): string {
     switch (platform) {
       case Resources.windowsPlatform:
-        return dark ? Resources.whiteWindowsIconFileName : Resources.blackWindowsIconFileName;
+        return dark ? Resources.darkWindowsIconFileName : Resources.lightWindowsIconFileName;
       case Resources.macPlatform:
         return Resources.dockIconFileName;
       default:
-        return dark ? Resources.whiteIconFileName : Resources.blackIconFileName;
+        return dark ? Resources.darkIconFileName : Resources.lightIconFileName;
     }
   }
 

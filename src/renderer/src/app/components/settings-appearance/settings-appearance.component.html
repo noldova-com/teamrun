@@ -1,0 +1,54 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<h2 class="tr-settings-title">{{ resources.appearanceTitle }}</h2>
+<tr-settings-row [label]="resources.themeLabel" [hint]="resources.themeHint">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-select">
+    <mat-select class="tr-theme-select" [value]="preferences.theme()" (valueChange)="preferences.setTheme($event)">
+      <mat-option [value]="resources.systemThemeId">{{ resources.systemThemeLabel }}</mat-option>
+      @for (theme of themeService.themes; track theme.id) {
+        <mat-option [value]="theme.id">{{ theme.name }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</tr-settings-row>
+<tr-settings-row [label]="resources.interfaceFontLabel" [hint]="resources.interfaceFontHint">
+  <mat-button-toggle-group [value]="preferences.interfaceFont()" (change)="preferences.setInterfaceFont($event.value)">
+    @for (font of fonts; track font) {
+      <mat-button-toggle [value]="font">{{ resources.fontLabels[font] }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</tr-settings-row>
+<tr-settings-row [label]="resources.codeFontLabel" [hint]="resources.codeFontHint">
+  <mat-button-toggle-group [value]="preferences.codeFont()" (change)="preferences.setCodeFont($event.value)">
+    @for (font of fonts; track font) {
+      <mat-button-toggle [value]="font">{{ resources.fontLabels[font] }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</tr-settings-row>
+<tr-settings-row [label]="resources.panelTextSizeLabel" [hint]="resources.panelTextSizeHint">
+  <mat-button-toggle-group [value]="preferences.panelTextSize()" (change)="preferences.setPanelTextSize($event.value)">
+    @for (size of sizes; track size) {
+      <mat-button-toggle [value]="size">{{ size }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</tr-settings-row>
+<tr-settings-row [label]="resources.messageTextSizeLabel" [hint]="resources.messageTextSizeHint">
+  <mat-button-toggle-group [value]="preferences.messageTextSize()" (change)="preferences.setMessageTextSize($event.value)">
+    @for (size of sizes; track size) {
+      <mat-button-toggle [value]="size">{{ size }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</tr-settings-row>
+<tr-settings-row [label]="resources.codeTextSizeLabel" [hint]="resources.codeTextSizeHint">
+  <mat-button-toggle-group [value]="preferences.codeTextSize()" (change)="preferences.setCodeTextSize($event.value)">
+    @for (size of sizes; track size) {
+      <mat-button-toggle [value]="size">{{ size }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</tr-settings-row>

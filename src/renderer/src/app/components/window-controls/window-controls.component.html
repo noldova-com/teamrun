@@ -1,0 +1,49 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="flex items-center gap-0.5">
+  <button mat-icon-button class="tr-small-icon-button tr-panel-toggle"
+    [matTooltip]="isLeftCollapsed() ? showSidebarTooltip : hideSidebarTooltip"
+    [attr.aria-label]="isLeftCollapsed() ? resources.showSidebarLabel : resources.hideSidebarLabel" (click)="layout.toggleDock(leftSide)">
+    <mat-icon>{{ isLeftCollapsed() ? resources.icons["showSidebar"] : resources.icons["hideSidebar"] }}</mat-icon>
+  </button>
+  <button mat-icon-button class="tr-small-icon-button tr-history-back" [disabled]="!history.canGoBack()" [matTooltip]="backTooltip"
+    [attr.aria-label]="resources.historyBackLabel" (click)="history.back()">
+    <mat-icon>{{ resources.icons["back"] }}</mat-icon>
+  </button>
+  <button mat-icon-button class="tr-small-icon-button tr-history-forward" [disabled]="!history.canGoForward()" [matTooltip]="forwardTooltip"
+    [attr.aria-label]="resources.historyForwardLabel" (click)="history.forward()">
+    <mat-icon>{{ resources.icons["forward"] }}</mat-icon>
+  </button>
+  <button mat-icon-button class="tr-small-icon-button tr-search-open" [matTooltip]="searchTooltip" [attr.aria-label]="resources.searchLabel"
+    (click)="search.open()">
+    <mat-icon>{{ resources.icons["search"] }}</mat-icon>
+  </button>
+  <button mat-icon-button class="tr-small-icon-button tr-panels-menu" [matTooltip]="resources.panelsMenuLabel" [attr.aria-label]="resources.panelsMenuLabel"
+    [matMenuTriggerFor]="panelsMenu">
+    <mat-icon>{{ resources.icons["panels"] }}</mat-icon>
+  </button>
+  <button mat-icon-button class="tr-small-icon-button tr-settings-open" [matTooltip]="settingsTooltip" [attr.aria-label]="resources.settingsTitle"
+    (click)="navigation.openSettings()">
+    <mat-icon>{{ resources.icons["settings"] }}</mat-icon>
+  </button>
+  <mat-menu #panelsMenu="matMenu">
+    @for (panel of panels; track panel) {
+      <button mat-menu-item (click)="layout.togglePanel(panel)">
+        <mat-icon>{{ layout.isOpen(panel) ? resources.icons["selected"] : resources.panelIcons[panel] }}</mat-icon>
+        <span>{{ resources.panelLabels[panel] }}</span>
+        <span class="tr-muted ml-4">{{ shortcuts.keysOf(resources.panelShortcutActions[panel]) }}</span>
+      </button>
+    }
+    <mat-divider />
+    <button mat-menu-item class="tr-reset-layout" (click)="layout.reset()">
+      <mat-icon>{{ resources.icons["resetLayout"] }}</mat-icon>
+      <span>{{ resources.resetLayoutLabel }}</span>
+    </button>
+  </mat-menu>
+</div>

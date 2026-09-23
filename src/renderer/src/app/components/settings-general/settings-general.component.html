@@ -1,0 +1,60 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<h2 class="tr-settings-title">{{ resources.generalTitle }}</h2>
+@if (info(); as info) {
+  <tr-settings-row [label]="resources.dataDirectoryLabel" [hint]="resources.dataDirectoryHint">
+    <span class="tr-mono">{{ info.dataDirectory }}</span>
+  </tr-settings-row>
+  <tr-settings-row [label]="resources.versionLabel">
+    <span>{{ info.productVersion }}</span>
+  </tr-settings-row>
+  <tr-settings-row [label]="resources.platformLabel">
+    <span>{{ info.platform }}</span>
+  </tr-settings-row>
+} @else {
+  <p class="tr-muted py-4">{{ resources.desktopInfoUnavailable }}</p>
+}
+<tr-settings-row [label]="resources.runtimeLabel">
+  <span [class.tr-error]="store.error() !== null">{{ store.providers().length> 0 ? resources.runtimeConnected : resources.runtimeUnavailable }}</span>
+</tr-settings-row>
+<tr-settings-row [label]="resources.openModeLabel" [hint]="resources.openModeHint">
+  <mat-button-toggle-group [value]="preferences.openMode()" (change)="preferences.setOpenMode($event.value)" [attr.aria-label]="resources.openModeLabel">
+    @for (mode of openModes; track mode) {
+      <mat-button-toggle [value]="mode">{{ resources.openModeLabels[mode] }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</tr-settings-row>
+<tr-settings-row [label]="resources.imageOpenModeLabel" [hint]="resources.imageOpenModeHint">
+  <mat-button-toggle-group [value]="preferences.imageOpenMode()" (change)="preferences.setImageOpenMode($event.value)" [attr.aria-label]="resources.imageOpenModeLabel">
+    @for (mode of imageOpenModes; track mode) {
+      <mat-button-toggle [value]="mode">{{ resources.imageOpenModeLabels[mode] }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</tr-settings-row>
+<tr-settings-row [label]="resources.clockLabel" [hint]="resources.clockHint">
+  <mat-button-toggle-group [value]="preferences.clock()" (change)="preferences.setClock($event.value)" [attr.aria-label]="resources.clockLabel">
+    @for (clock of clocks; track clock) {
+      <mat-button-toggle [value]="clock">{{ resources.clockLabels[clock] }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</tr-settings-row>
+<tr-settings-row [label]="resources.timeFormatLabel" [hint]="resources.timeFormatHint">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-field">
+    <input matInput name="timeFormat" [ngModel]="preferences.timeFormat()" (ngModelChange)="preferences.setTimeFormat($event)">
+  </mat-form-field>
+  <span class="tr-muted ml-3">{{ dates.format(now, preferences.timeFormat()) }}</span>
+</tr-settings-row>
+<tr-settings-row [label]="resources.dateTimeFormatLabel" [hint]="resources.dateTimeFormatHint">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-field">
+    <input matInput name="dateTimeFormat" [ngModel]="preferences.dateTimeFormat()" (ngModelChange)="preferences.setDateTimeFormat($event)">
+  </mat-form-field>
+  <span class="tr-muted ml-3">{{ dates.format(now, preferences.dateTimeFormat()) }}</span>
+</tr-settings-row>
+<p class="tr-muted mt-2">{{ resources.formatTokensHint }}</p>
+<tr-settings-conversation-defaults class="mt-6 block" />

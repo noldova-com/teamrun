@@ -15,9 +15,13 @@
   "scripts": {
     "build": "node scripts/build.ts",
     "test": "node scripts/test.ts",
-    "cli": "node node_modules/@noldova/teamrun-cli/services/cli-entry.js"
+    "cli": "node node_modules/@noldova/teamrun-cli/services/cli-entry.js",
+    "desktop": "node scripts/desktop.ts",
+    "test:renderer": "node scripts/test-renderer.ts",
+    "test:ui": "playwright test --config src/desktop/tests/e2e/playwright.config.ts"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "26.2.0",
     "electron": "44.3.0",
     "typescript": "7.0.2"

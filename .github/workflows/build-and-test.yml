@@ -66,7 +66,9 @@ jobs:
           node-version: '26.7.0'
           architecture: ${{ matrix.architecture }}
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            src/renderer/package-lock.json
 
       - name: Verify toolchain versions and architecture
         env:
@@ -90,15 +92,48 @@ jobs:
           trap 'cat "$RUNNER_TEMP/teamrun-ci/build.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/build.stderr.log" >&2' EXIT
           npm run build > "$RUNNER_TEMP/teamrun-ci/build.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/build.stderr.log"
 
+      - name: Install Electron runtime
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-ci/electron.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/electron.stderr.log" >&2' EXIT
+          node node_modules/electron/install.js > "$RUNNER_TEMP/teamrun-ci/electron.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/electron.stderr.log"
+
       - name: Type-check repository scripts
         run: |
           trap 'cat "$RUNNER_TEMP/teamrun-ci/typecheck.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/typecheck.stderr.log" >&2' EXIT
           node node_modules/typescript/bin/tsc --project scripts/tsconfig.json > "$RUNNER_TEMP/teamrun-ci/typecheck.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/typecheck.stderr.log"
+          node node_modules/typescript/bin/tsc --project src/desktop/tests/e2e/tsconfig.json >> "$RUNNER_TEMP/teamrun-ci/typecheck.stdout.log" 2>> "$RUNNER_TEMP/teamrun-ci/typecheck.stderr.log"
 
       - name: Run package tests and coverage gate
         run: |
           trap 'cat "$RUNNER_TEMP/teamrun-ci/test.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/test.stderr.log" >&2' EXIT
           npm run test -- --skip-test-details --skip-coverage-details > "$RUNNER_TEMP/teamrun-ci/test.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/test.stderr.log"
+
+      - name: Run renderer tests
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-ci/renderer.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/renderer.stderr.log" >&2' EXIT
+          npm run test:renderer > "$RUNNER_TEMP/teamrun-ci/renderer.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/renderer.stderr.log"
+
+      - name: Run desktop UI workflows
+        env:
+          RUNNER_PLATFORM: ${{ runner.os }}
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-ci/ui.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/ui.stderr.log" >&2' EXIT
+          if [ "$RUNNER_PLATFORM" = Linux ]; then
+            xvfb-run --auto-servernum npm run test:ui > "$RUNNER_TEMP/teamrun-ci/ui.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/ui.stderr.log"
+          else
+            npm run test:ui > "$RUNNER_TEMP/teamrun-ci/ui.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/ui.stderr.log"
+          fi
+
+      - name: Retain desktop screenshots and traces
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}
+          path: |
+            _build/ui-results/
+            _build/ui-report/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Retain diagnostic logs
         if: always() && !cancelled()

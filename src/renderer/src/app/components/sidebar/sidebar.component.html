@@ -1,0 +1,117 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nav class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-1 pb-2">
+  <button type="button" class="tr-nav-row flex w-full items-center gap-2 text-left" (click)="startConversation()">
+    <mat-icon class="tr-nav-icon">{{ resources.icons["newChat"] }}</mat-icon>
+    <span>{{ resources.newConversationLabel }}</span>
+  </button>
+  <button type="button" class="tr-nav-row flex w-full items-center gap-2 text-left" (click)="store.openFolder()">
+    <mat-icon class="tr-nav-icon">{{ resources.icons["folderOpen"] }}</mat-icon>
+    <span>{{ resources.openProjectLabel }}</span>
+  </button>
+
+  @if (pinnedConversations().length > 0) {
+    <h3 class="tr-nav-title">{{ resources.pinnedTitle }}</h3>
+    <div cdkDropList class="tr-drop-list" (cdkDropListDropped)="dropPin($event)">
+      @for (conversation of pinnedConversations(); track conversation.id) {
+        <div cdkDrag class="tr-drag-item">
+          <ng-container [ngTemplateOutlet]="conversationRow" [ngTemplateOutletContext]="{ $implicit: conversation, nested: false }" />
+        </div>
+      }
+    </div>
+  }
+
+  <tr-teammates-panel />
+  <h3 class="tr-nav-title">{{ resources.projectsTitle }}</h3>
+  @if (store.projects().length === 0) {
+    <p class="tr-nav-row tr-muted flex items-center">{{ resources.noProjects }}</p>
+  }
+  <div cdkDropList class="tr-drop-list" (cdkDropListDropped)="dropProject($event)">
+  @for (project of orderedProjects(); track project.id) {
+    <div cdkDrag class="tr-drag-item">
+    <div cdkDragHandle class="tr-row-list tr-nav-row tr-project-row flex items-center gap-1" [matTooltip]="project.rootPath" matTooltipPosition="right">
+      <button type="button" class="tr-nav-twistie flex shrink-0 items-center" (click)="layout.toggleProject(project.id)"
+        [attr.aria-label]="isCollapsed(project.id) ? resources.expandProjectLabel : resources.collapseProjectLabel"
+        [attr.aria-expanded]="!isCollapsed(project.id)">
+        <mat-icon class="tr-nav-icon">{{ isCollapsed(project.id) ? resources.icons["chevronRight"] : resources.icons["expandMore"] }}</mat-icon>
+      </button>
+      <button type="button" class="min-w-0 flex-1 truncate text-left uppercase tracking-wide"
+        (click)="layout.toggleProject(project.id)">
+        {{ project.name }}
+      </button>
+      <button mat-icon-button class="tr-small-icon-button tr-row-actions shrink-0" [matMenuTriggerFor]="projectMenu"
+        [attr.aria-label]="resources.rowMenuLabel">
+        <mat-icon>{{ resources.icons["more"] }}</mat-icon>
+      </button>
+      <mat-menu #projectMenu="matMenu">
+        <button mat-menu-item (click)="store.createConversation(null, project.id)">
+          <mat-icon>{{ resources.icons["add"] }}</mat-icon>
+          <span>{{ resources.newConversationLabel }}</span>
+        </button>
+        <button mat-menu-item (click)="forget(project.id, project.name)">
+          <mat-icon>{{ resources.icons["forget"] }}</mat-icon>
+          <span>{{ resources.forgetProjectLabel }}</span>
+        </button>
+      </mat-menu>
+    </div>
+    @if (!isCollapsed(project.id)) {
+      <div cdkDropList class="tr-drop-list" [id]="listIdOf(project.id)" [cdkDropListData]="project.id"
+        [cdkDropListConnectedTo]="listIds()" (cdkDropListDropped)="dropConversation($event)">
+      @if (store.conversationsOf(project.id).length === 0) {
+        <p class="tr-nav-row tr-nav-row-nested tr-muted flex items-center">{{ resources.noConversations }}</p>
+      }
+      @for (conversation of shownConversationsOf(project.id); track conversation.id) {
+        <div cdkDrag [cdkDragData]="conversation.id" class="tr-drag-item">
+          <ng-container [ngTemplateOutlet]="conversationRow" [ngTemplateOutletContext]="{ $implicit: conversation, nested: true }" />
+        </div>
+      }
+      @if (hiddenCountOf(project.id) > 0) {
+        <button type="button" class="tr-nav-row tr-nav-row-nested tr-show-more flex w-full items-center text-left tr-muted"
+          (click)="showAll(project.id)">
+          {{ resources.formatShowMore(hiddenCountOf(project.id)) }}
+        </button>
+      }
+      </div>
+    }
+    </div>
+  }
+  </div>
+</nav>
+
+<ng-template #conversationRow let-conversation let-nested="nested">
+    <div class="tr-row-list tr-nav-row tr-conversation-row flex items-center gap-1" [class.tr-nav-row-nested]="nested"
+      [class.tr-nav-row-selected]="conversation.id === store.selectedConversationId()" [matTooltip]="projectNameOf(conversation)"
+      matTooltipPosition="right">
+      <button type="button" class="min-w-0 flex-1 truncate text-left" (click)="open(conversation.id)" (dblclick)="keepOpen(conversation.id)">
+        {{ conversation.title || resources.untitledConversation }}
+      </button>
+      @if (store.isWorking(conversation.id)) {
+        <mat-progress-spinner class="tr-row-working mr-1 shrink-0" mode="indeterminate" [diameter]="resources.spinnerDiameter"
+          [attr.aria-label]="resources.workingLabel" />
+      }
+      <button mat-icon-button class="tr-small-icon-button tr-row-actions shrink-0" [matMenuTriggerFor]="conversationMenu"
+        [attr.aria-label]="resources.rowMenuLabel">
+        <mat-icon>{{ resources.icons["more"] }}</mat-icon>
+      </button>
+      <mat-menu #conversationMenu="matMenu">
+        <button mat-menu-item (click)="layout.togglePin(conversation.id)">
+          <mat-icon>{{ isPinned(conversation.id) ? resources.icons["unpin"] : resources.icons["pin"] }}</mat-icon>
+          <span>{{ isPinned(conversation.id) ? resources.unpinLabel : resources.pinLabel }}</span>
+        </button>
+        <button mat-menu-item (click)="rename(conversation.id, conversation.title)">
+          <mat-icon>{{ resources.icons["edit"] }}</mat-icon>
+          <span>{{ resources.renameConversationLabel }}</span>
+        </button>
+        <button mat-menu-item (click)="remove(conversation.id, conversation.title)">
+          <mat-icon>{{ resources.icons["forget"] }}</mat-icon>
+          <span>{{ resources.deleteConversationLabel }}</span>
+        </button>
+      </mat-menu>
+    </div>
+</ng-template>

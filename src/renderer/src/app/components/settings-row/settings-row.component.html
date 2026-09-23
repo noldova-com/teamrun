@@ -1,0 +1,17 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="tr-setting tr-settings-row">
+  <div class="tr-setting-title tr-emphasis">{{ label() }}</div>
+  @if (hint(); as text) {
+    <div class="tr-setting-description">{{ text }}</div>
+  }
+  <div class="tr-setting-control tr-value flex min-w-0 items-center gap-2">
+    <ng-content />
+  </div>
+</div>

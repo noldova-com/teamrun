@@ -87,9 +87,13 @@ Define supported protocol versions and any capability negotiation explicitly. Re
 
 ### Package organization
 
+Application icons and fonts live in `assets/icons` and `assets/fonts`, with their license notices. Renderer styles, including font-face declarations, live in `src/renderer/src/styles`.
+
+Theme-specific icons use `dark` or `light` for the intended background theme. PNG names include their square pixel size, such as `icon-dark-128.png` or `icon-light-512.png`. Purpose-specific icons use a descriptive variant, such as `icon-dock-512.png`; ICO files contain multiple resolutions and omit a single-size suffix.
+
 Package source trees use the concept categories `api`, `enums`, `exceptions`, `interfaces`, `models`, `services`, and `types`; create only those the package uses. Domain subfolders are optional and added only when they make current navigation clearer. Models hold state, identities, options, and results; services own operations such as tracking, supervising, dispatching, parsing, reading, writing, and verifying. The package manifest, TypeScript configuration, and `resources.ts` stay at the source root; tests mirror the full path.
 
-The Angular renderer (`src/renderer`) follows the same rules for services and models under `src/app`; a component is one `<name>.component.ts` file with an inline template, its class named `<Name>Component` and its selector prefixed `tr-`, under `src/app/components/<name>/`; services end in `.service.ts`; specs are `<name>.spec.ts` beside the file they test and use the fakes under `src/testing`. The renderer has its own `resources.ts` and follows the literal rule; template text comes from it through a `resources` field.
+The Angular renderer (`src/renderer`) follows the same rules for services and models under `src/app`; a production component pairs `<name>.component.ts` with a neighboring `<name>.component.html`, referenced through `templateUrl`. Its class is named `<Name>Component` and its selector is prefixed `tr-`, under `src/app/components/<name>/`; services end in `.service.ts`. Specs live in the sibling `tests` directory, mirroring each source file's path relative to `src` and replacing `.ts` with `.spec.ts`: `src/app/services/chat-store.service.ts` has `tests/app/services/chat-store.service.spec.ts`. Shared fixtures live in `tests/fixtures`, and test-environment configuration lives directly under `tests`. The renderer has its own `resources.ts` and follows the literal rule; template text comes from it through a `resources` field.
 
 ## 6. Methods and control flow
 
@@ -243,7 +247,7 @@ tests/services/snapshot-tracker.test.ts
 
 Never change production code solely to accommodate tests or coverage: no widened APIs, weakened visibility, test-only paths, or altered ownership. A test uses an accepted product boundary or is redesigned around one.
 
-Every production file with executable behavior has a corresponding test file. Tests run by foundation Testing use the production type's name plus `Tests`; methods name the behavior they prove. Angular's colocated `.spec.ts` files follow section 5. Playwright workflows use `.spec.ts` files and descriptive test titles in their own UI suite; they need neither test classes nor a one-to-one mapping to production files.
+Every production file with executable behavior has a corresponding test file. Tests run by foundation Testing use the production type's name plus `Tests`; methods name the behavior they prove. Angular's mirrored `.spec.ts` files follow section 5. Playwright desktop workflows live in `src/desktop/tests/e2e`, with support files in its `fixtures` directory. They use `.spec.ts` files and descriptive test titles, without test classes or a one-to-one mapping to production files. Their TypeScript project and runner are separate from package-test compilation.
 
 Tests exercise observable behavior, branches, boundaries and failures through the owning public API. Provider doubles are named fakes with scripted behavior. Regression tests record required behavior; live-provider tests are labelled and excluded from the default gate.
 

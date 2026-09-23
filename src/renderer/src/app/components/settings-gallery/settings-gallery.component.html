@@ -1,0 +1,270 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<h2 class="tr-settings-title">{{ resources.galleryTitle }}</h2>
+<p class="tr-muted mb-4 px-[15px]">{{ resources.galleryHint }}</p>
+<div class="tr-gallery">
+  <section class="tr-gallery-scope">
+    <h3 class="tr-gallery-scope-title tr-emphasis">{{ resources.galleryThemeInEffect }}: {{ themes.active().name }}</h3>
+    <ng-container [ngTemplateOutlet]="samples" />
+  </section>
+  <section class="tr-gallery-scope" [trThemeScope]="other()">
+    <h3 class="tr-gallery-scope-title tr-emphasis">{{ resources.galleryOtherTheme }}: {{ other().name }}</h3>
+    <ng-container [ngTemplateOutlet]="samples" />
+  </section>
+</div>
+
+<ng-template #samples>
+  <h4 class="mb-2 mt-4 tr-emphasis">{{ resources.galleryButtonsTitle }}</h4>
+  <div class="tr-gallery-row">
+    <button mat-flat-button type="button">{{ resources.galleryPrimary }}</button>
+    <button mat-flat-button type="button" disabled>{{ resources.galleryDisabled }}</button>
+    <button mat-stroked-button type="button">{{ resources.gallerySecondary }}</button>
+    <button mat-stroked-button type="button" disabled>{{ resources.galleryDisabled }}</button>
+    <button mat-button type="button">{{ resources.galleryText }}</button>
+    <button mat-button type="button" disabled>{{ resources.galleryDisabled }}</button>
+    <button mat-icon-button type="button" class="tr-small-icon-button" [attr.aria-label]="resources.galleryIconButton">
+      <mat-icon>{{ resources.icons["settings"] }}</mat-icon>
+    </button>
+    <button mat-icon-button type="button" class="tr-small-icon-button" disabled [attr.aria-label]="resources.galleryDisabled">
+      <mat-icon>{{ resources.icons["settings"] }}</mat-icon>
+    </button>
+  </div>
+
+  <h4 class="mb-2 mt-6 tr-emphasis">{{ resources.galleryFieldsTitle }}</h4>
+  <div class="tr-gallery-row">
+    <div class="tr-gallery-sample">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-field">
+        <input matInput [value]="resources.galleryValue">
+      </mat-form-field>
+      <span class="tr-gallery-caption">{{ resources.galleryValue }}</span>
+    </div>
+    <div class="tr-gallery-sample">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-field">
+        <input matInput [placeholder]="resources.galleryPlaceholder">
+      </mat-form-field>
+      <span class="tr-gallery-caption">{{ resources.galleryPlaceholder }}</span>
+    </div>
+    <div class="tr-gallery-sample">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-field">
+        <input matInput [value]="resources.galleryValue" disabled>
+      </mat-form-field>
+      <span class="tr-gallery-caption">{{ resources.galleryDisabled }}</span>
+    </div>
+    <div class="tr-gallery-sample">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-field">
+        <mat-label>{{ resources.galleryLabel }}</mat-label>
+        <input matInput [value]="resources.galleryValue">
+      </mat-form-field>
+      <span class="tr-gallery-caption">{{ resources.galleryLabel }}</span>
+    </div>
+  </div>
+  <div class="tr-gallery-row mt-3">
+    <div class="tr-gallery-sample">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-select">
+        <mat-select [value]="resources.galleryOptions[0]">
+          @for (option of resources.galleryOptions; track option) {
+            <mat-option [value]="option">{{ option }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <span class="tr-gallery-caption">{{ resources.galleryValue }}</span>
+    </div>
+    <div class="tr-gallery-sample">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-select">
+        <mat-select [value]="resources.galleryOptions[0]" disabled>
+          @for (option of resources.galleryOptions; track option) {
+            <mat-option [value]="option">{{ option }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <span class="tr-gallery-caption">{{ resources.galleryDisabled }}</span>
+    </div>
+  </div>
+
+  <h4 class="mb-2 mt-6 tr-emphasis">{{ resources.galleryChoicesTitle }}</h4>
+  <div class="tr-gallery-row">
+    <mat-checkbox>{{ resources.galleryClear }}</mat-checkbox>
+    <mat-checkbox [checked]="true">{{ resources.galleryChecked }}</mat-checkbox>
+    <mat-checkbox disabled>{{ resources.galleryDisabled }}</mat-checkbox>
+    <mat-checkbox [checked]="true" disabled>{{ resources.galleryDisabled }}</mat-checkbox>
+  </div>
+  <div class="tr-gallery-row mt-3">
+    <mat-button-toggle-group [value]="resources.galleryPills[0]">
+      @for (pill of resources.galleryPills; track pill) {
+        <mat-button-toggle [value]="pill">{{ pill }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+    <mat-button-toggle-group [value]="resources.galleryPills[0]" disabled>
+      @for (pill of resources.galleryPills; track pill) {
+        <mat-button-toggle [value]="pill">{{ pill }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+  </div>
+
+  <h4 class="mb-2 mt-6 tr-emphasis">{{ resources.gallerySettingTitle }}</h4>
+  <tr-settings-row [label]="resources.imageOpenModeLabel" [hint]="resources.imageOpenModeHint">
+    <mat-button-toggle-group [value]="imageOpenModes[0]" [attr.aria-label]="resources.imageOpenModeLabel">
+      @for (mode of imageOpenModes; track mode) {
+        <mat-button-toggle [value]="mode">{{ resources.imageOpenModeLabels[mode] }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+  </tr-settings-row>
+  <tr-settings-row [label]="resources.gallerySettingLabel" [hint]="resources.gallerySettingHint">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tr-field">
+      <input matInput [value]="resources.galleryValue">
+    </mat-form-field>
+  </tr-settings-row>
+
+  <h4 class="mb-2 mt-6 tr-emphasis">{{ resources.galleryRowsTitle }}</h4>
+  <div class="w-56">
+    <h3 class="tr-nav-title">{{ resources.galleryHeader }}</h3>
+    <div class="tr-nav-row flex items-center">{{ resources.galleryRow }}</div>
+    <div class="tr-nav-row tr-nav-row-selected flex items-center">{{ resources.gallerySelectedRow }}</div>
+  </div>
+  <div class="tr-gallery-row mt-3">
+    <span class="tr-badge">{{ resources.galleryBadge }}</span>
+    <span class="tr-badge tr-error">{{ resources.galleryError }}</span>
+    <kbd class="tr-key">{{ resources.galleryKey }}</kbd>
+    <a class="tr-link" href="#" (click)="$event.preventDefault()">{{ resources.galleryLink }}</a>
+    <span class="tr-muted">{{ resources.galleryMuted }}</span>
+    <span class="tr-error">{{ resources.galleryError }}</span>
+  </div>
+
+  <h4 class="mb-2 mt-6 tr-emphasis">{{ resources.galleryCardsTitle }}</h4>
+  <div class="tr-panel tr-panel-card tr-gallery-tabs">
+    <div class="tr-tabs flex" role="tablist">
+      <button type="button" class="tr-tab tr-tab-active" role="tab" aria-selected="true">
+        <span class="tr-tab-label">{{ resources.galleryTabActive }}</span>
+        <span class="tr-tab-actions">
+          <span role="button" class="tr-tab-close" [attr.aria-label]="resources.closeTabLabel">
+            <mat-icon class="tr-tab-icon">{{ resources.icons["close"] }}</mat-icon>
+          </span>
+        </span>
+      </button>
+      <button type="button" class="tr-tab" role="tab" aria-selected="false">
+        <span class="tr-tab-label">{{ resources.galleryTabInactive }}</span>
+        <span class="tr-tab-actions">
+          <span role="button" class="tr-tab-close" [attr.aria-label]="resources.closeTabLabel">
+            <mat-icon class="tr-tab-icon">{{ resources.icons["close"] }}</mat-icon>
+          </span>
+        </span>
+      </button>
+    </div>
+    <div class="p-3">
+      <div class="flex justify-end">
+        <div class="tr-bubble px-4 py-3"><tr-markdown [text]="resources.galleryBubble" /></div>
+      </div>
+      <section class="tr-card mt-3 p-3">{{ resources.galleryCard }}</section>
+      <tr-markdown [text]="resources.galleryInlineCode" />
+      <tr-markdown [text]="resources.galleryCode" />
+      <div class="tr-composer mt-3 px-3 py-3">
+        <div class="mb-2 flex flex-wrap gap-2">
+          <div class="tr-attachment tr-attachment-image flex items-center gap-2 px-2 py-1">
+            <tr-image-preview [image]="attachmentImage" [compact]="true" />
+            <button mat-icon-button class="tr-small-icon-button tr-attachment-remove" [attr.aria-label]="resources.removeAttachmentLabel"
+              [matTooltip]="resources.removeAttachmentLabel"><mat-icon>{{ resources.icons["close"] }}</mat-icon></button>
+          </div>
+          <div class="tr-attachment flex items-center gap-2 px-2 py-1">
+            <mat-icon>{{ resources.icons["attachment"] }}</mat-icon><span>{{ resources.galleryAttachmentFile }}</span>
+            <button mat-icon-button disabled class="tr-small-icon-button" [attr.aria-label]="resources.removeAttachmentLabel">
+              <mat-icon>{{ resources.icons["close"] }}</mat-icon></button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <tr-image-actions [source]="attachmentImage.data" [name]="attachmentImage.label" [toolbar]="true" />
+          <tr-image-actions [name]="attachmentImage.label" [toolbar]="true" />
+        </div>
+        <p class="tr-error mb-2">{{ resources.attachmentLimitExceeded }}</p>
+        <div class="tr-composer-input relative">
+          <textarea class="tr-composer-text relative block w-full resize-none bg-transparent px-1 outline-none" rows="1"
+            [trInlineCode]="resources.galleryInlineCode" [value]="resources.galleryInlineCode"
+            [placeholder]="resources.composerPlaceholder" [attr.aria-label]="resources.composerPlaceholder"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h4 class="mb-2 mt-6 tr-emphasis">{{ resources.teammatesTitle }}</h4>
+  <div class="overflow-x-auto mb-3">
+    <table class="tr-settings-table w-full" [attr.aria-label]="resources.teammatesTitle">
+      <thead><tr><th scope="col">{{ resources.teammateNameLabel }}</th><th scope="col">{{ resources.modelLabel }}</th>
+        <th scope="col">{{ resources.actionsColumn }}</th></tr></thead>
+      <tbody>
+        <tr><td>{{ resources.galleryTeammateName }}</td><td>{{ resources.providerDefaultModel }}</td>
+          <td><button mat-button type="button">{{ resources.editLabel }}</button></td></tr>
+        <tr><td class="tr-teammate-unavailable">{{ resources.unavailableTeammateLabel }}</td><td>{{ resources.providerDefaultModel }}</td>
+          <td><button mat-button type="button" disabled>{{ resources.editLabel }}</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="tr-conversation-members flex items-center gap-2 py-2">
+    <tr-teammate-avatar />
+    <tr-teammate-avatar [teammateId]="resources.galleryTeammateId" [name]="resources.galleryTeammateName" [description]="resources.galleryTeammateName" />
+    <tr-teammate-avatar [teammateId]="resources.galleryUnavailableTeammateId" [name]="resources.unavailableTeammateLabel" [unavailable]="true" />
+    <button mat-icon-button class="tr-small-icon-button" [attr.aria-label]="resources.addMemberLabel">
+      <mat-icon>{{ resources.icons['add'] }}</mat-icon>
+    </button>
+  </div>
+  <div class="tr-teammate-row flex items-center gap-2">
+    <tr-teammate-avatar [teammateId]="resources.galleryTeammateId" [name]="resources.galleryTeammateName" />
+    <div><span>{{ resources.galleryTeammateName }}</span><div class="tr-teammate-secondary tr-muted">{{ resources.providerDefaultModel }}</div></div>
+  </div>
+  <h4 class="mb-2 mt-6 tr-emphasis">{{ resources.galleryAvatarColorsLabel }}</h4>
+  <div class="tr-gallery-row tr-gallery-avatar-colors mb-3">
+    <tr-teammate-avatar />
+    @for (id of resources.galleryAvatarIds; track id; let index = $index) {
+      <tr-teammate-avatar [teammateId]="id" [name]="resources.avatarColors[index] ?? resources.defaultTeammateLabel" />
+    }
+  </div>
+  <div class="tr-mention-completion">
+    <div class="tr-menu-label tr-muted">{{ resources.conversationMembersLabel }}</div>
+    <button type="button" role="option" aria-selected="true" class="tr-mention-option w-full text-left">{{ resources.galleryTeammateName }}</button>
+    <div class="tr-menu-label tr-muted">{{ resources.otherTeammatesLabel }}</div>
+    <button type="button" role="option" aria-selected="false" class="tr-mention-option tr-teammate-unavailable w-full text-left">{{ resources.unavailableTeammateLabel }}</button>
+  </div>
+  <div class="tr-gallery-row mt-2">
+    <span class="tr-mention">{{ resources.galleryMention }}</span>
+    <span class="tr-mention tr-teammate-unavailable">{{ resources.galleryMention }}</span>
+    <button mat-stroked-button type="button" (click)="openTeammateDialog()">{{ resources.addTeammateLabel }}</button>
+  </div>
+
+  <h4 class="mb-2 mt-6 tr-emphasis">{{ resources.galleryOverlaysTitle }}</h4>
+  <div class="relative mb-3 p-8">
+    <p>{{ resources.galleryCard }}</p>
+    <div class="tr-file-drop-overlay tr-drop-preview pointer-events-none absolute inset-0 flex items-center justify-center">
+      <span class="tr-card px-3 py-2">{{ resources.dropToAttachLabel }}</span>
+    </div>
+  </div>
+  <div class="tr-gallery-row">
+    <button mat-stroked-button type="button" [matMenuTriggerFor]="galleryMenu">{{ resources.galleryMenuLabel }}</button>
+    <mat-menu #galleryMenu="matMenu">
+      <div class="tr-menu-label tr-muted">{{ resources.galleryMenuSection }}</div>
+      @for (option of resources.galleryOptions; track option; let first = $first) {
+        <button mat-menu-item>
+          <mat-icon>{{ first ? resources.icons["selected"] : resources.icons["unselected"] }}</mat-icon>
+          {{ option }}
+        </button>
+      }
+      <mat-divider />
+      <button mat-menu-item disabled>{{ resources.galleryDisabled }}</button>
+    </mat-menu>
+    <button mat-stroked-button type="button" [matTooltip]="resources.galleryHoverText">{{ resources.galleryHoverLabel }}</button>
+    <button mat-stroked-button type="button" (click)="openDialog()">{{ resources.galleryDialogLabel }}</button>
+    <button mat-stroked-button type="button" (click)="search.open()">{{ resources.gallerySearchLabel }}</button>
+  </div>
+
+  <h4 class="mb-2 mt-6 tr-emphasis">{{ resources.galleryProgressTitle }}</h4>
+  @for (state of resources.galleryUpdateStates; track state.status) {
+    <tr-app-updates [state]="state" />
+  }
+  <div class="tr-gallery-row">
+    <mat-progress-spinner mode="indeterminate" [diameter]="resources.spinnerDiameter" [attr.aria-label]="resources.workingLabel" />
+    <mat-progress-bar class="w-56" mode="indeterminate" />
+  </div>
+</ng-template>

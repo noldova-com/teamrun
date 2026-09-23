@@ -1,0 +1,36 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<form (submit)="submit($event)">
+  <mat-dialog-content class="tr-search">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+      <mat-icon matPrefix>{{ resources.icons["search"] }}</mat-icon>
+      <input matInput cdkFocusInitial name="query" [placeholder]="resources.searchPlaceholder" [ngModel]="query()" (ngModelChange)="onQuery($event)"
+        autocomplete="off">
+    </mat-form-field>
+    @if (hits().length> 0) {
+      <ul class="tr-search-hits">
+        @for (hit of hits(); track hit.conversationId) {
+          <li>
+            <button type="button" class="tr-result flex w-full flex-col items-start gap-0.5 text-left" (click)="choose(hit)">
+              <span class="flex w-full items-baseline gap-2">
+                <span class="truncate">{{ hit.title || resources.untitledConversation }}</span>
+                <span class="tr-muted shrink-0">{{ projectNameOf(hit) }}</span>
+              </span>
+              @if (hit.messageId !== null) {
+                <span class="tr-muted line-clamp-2">{{ hit.snippet }}</span>
+              }
+            </button>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="tr-muted mt-1 px-1">{{ searched() ? resources.searchEmpty : resources.searchHint }}</p>
+    }
+  </mat-dialog-content>
+</form>

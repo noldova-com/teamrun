@@ -1,0 +1,125 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (restart.frozen()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" role="status">
+    <div class="tr-raised px-6 py-4">{{ resources.restartPreparing }}</div>
+  </div>
+}
+@if (restart.error(); as error) { <div class="tr-error fixed bottom-4 left-4 z-50 tr-raised px-4 py-2" role="alert">{{ error }}</div> }
+<div class="tr-window grid h-screen grid-rows-[auto_minmax(0,1fr)]" [inert]="restart.frozen()">
+  <div class="tr-window-row tr-drag tr-title-bar-inset flex items-center gap-2 px-2">
+    <tr-window-controls />
+    <header class="flex min-w-0 items-center gap-2 px-2">
+      @if (navigation.view() === settingsView) {
+        <span class="tr-muted">{{ resources.settingsTitle }}</span>
+        <span class="tr-muted">/</span>
+        <span class="tr-emphasis">{{ resources.sectionLabels[navigation.section()] }}</span>
+      } @else if (navigation.view() === imageView) {
+        @if (navigation.activeImage(); as image) {
+          <mat-icon class="tr-muted tr-nav-icon">{{ resources.icons['image'] }}</mat-icon>
+          <span class="truncate tr-emphasis">{{ image.data.image.label }}</span>
+        }
+      } @else {
+        @if (store.selectedProject(); as project) {
+          <mat-icon class="tr-muted tr-nav-icon">{{ resources.icons["folder"] }}</mat-icon>
+          <span class="tr-muted">{{ project.name }}</span>
+        }
+        @if (store.selectedConversation(); as conversation) {
+          <span class="tr-muted">/</span>
+          <span class="truncate tr-emphasis">{{ conversation.title || resources.untitledConversation }}</span>
+        }
+      }
+    </header>
+  </div>
+  @if (drag.dragging(); as panel) {
+    <div class="tr-drag-ghost pointer-events-none flex items-center gap-1 px-2 py-1"
+      [style.left.px]="drag.point()[0] + ghostOffset" [style.top.px]="drag.point()[1] + ghostOffset">
+      <mat-icon class="tr-nav-icon">{{ resources.panelIcons[panel] }}</mat-icon>
+      <span>{{ resources.panelLabels[panel] }}</span>
+    </div>
+  }
+  <div class="tr-shell-panels relative grid min-h-0" [style.grid-template-columns]="columns()">
+    @if (drag.dragging() !== null) {
+      @if (preview(); as box) {
+        <div class="tr-drop-preview pointer-events-none absolute bottom-0 z-40" [attr.data-preview]="box.side" [style.left]="box.left"
+          [style.right]="box.right" [style.top]="box.top" [style.width]="box.width" [style.height]="box.height"></div>
+      }
+      @for (guide of guides(); track guide.side) {
+        <button type="button" class="tr-dock-guide tr-dock-guide-edge absolute z-40 grid place-items-center" [style.left]="guide.centerX"
+          [style.top]="guide.centerY" [class.tr-dock-guide-active]="drag.target()?.side === guide.side" [attr.data-guide]="guide.side"
+          [attr.data-drop-side]="guide.side" [attr.aria-label]="resources.dockGuideLabels[guide.side]">
+          <mat-icon>{{ resources.dockGuideIcons[guide.side] }}</mat-icon>
+        </button>
+      }
+    }
+    <tr-dock [side]="leftSide" class="col-start-1" />
+    <div class="col-start-2 grid min-h-0" [style.grid-template-rows]="rows()">
+      <div class="tr-panel tr-panel-card row-start-1 flex min-h-0 flex-col">
+      <tr-document-tabs />
+      <main class="relative grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto]">
+        @if (drag.dragging() !== null) {
+          <div class="pointer-events-none absolute inset-0 z-40 grid place-items-center">
+            <div class="tr-dock-compass pointer-events-auto grid grid-cols-3 grid-rows-2 gap-0.5 p-1">
+              @for (side of sides; track side) {
+                <button type="button" class="tr-dock-guide tr-dock-guide-arm grid place-items-center"
+                  [class.tr-dock-guide-active]="drag.target()?.side === side" [attr.data-arm]="side" [attr.data-drop-side]="side"
+                  [attr.aria-label]="resources.dockGuideLabels[side]">
+                  <mat-icon>{{ resources.dockGuideIcons[side] }}</mat-icon>
+                </button>
+              }
+              <span class="tr-dock-compass-hub grid place-items-center">
+                <mat-icon>{{ resources.compassIcon }}</mat-icon>
+              </span>
+            </div>
+          </div>
+        }
+        @if (navigation.view() === settingsView) {
+          <tr-settings-page class="absolute inset-0 min-h-0" />
+        }
+        @if (navigation.view() === imageView) {
+          @if (navigation.activeImage(); as image) {
+            <tr-image-viewer class="absolute inset-0 min-h-0" [data]="image.data" [embedded]="true" (closed)="navigation.closeImage(image.id)" />
+          }
+        }
+        <div class="tr-chat-view relative col-start-1 row-start-1 row-end-4 grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]"
+          [trFileDrop]="navigation.view() === chatView && composer.canCompose()" #fileDrop="trFileDrop"
+          (filesDropped)="composer.addFiles($event)"
+          [style.visibility]="navigation.view() === chatView ? null : 'hidden'" [inert]="navigation.view() !== chatView">
+          <div class="row-start-1">
+            <tr-conversation-members />
+            <div class="h-1">
+            @if (busyShown()) {
+              <mat-progress-bar mode="indeterminate" />
+            }
+            </div>
+          </div>
+          <tr-message-list class="row-start-2 min-h-0" />
+          <div class="row-start-3">
+            @if (store.error(); as error) {
+              <div class="tr-raised mx-auto mb-2 flex max-w-[55rem] items-center gap-2 px-3 py-2 tr-error" role="alert">
+                <mat-icon>{{ resources.icons["error"] }}</mat-icon>
+                <span class="flex-1">{{ error }}</span>
+                <button mat-button (click)="store.dismissError()">{{ resources.dismissLabel }}</button>
+              </div>
+            }
+            <tr-composer #composer />
+          </div>
+          @if (fileDrop.active()) {
+            <div class="tr-file-drop-overlay tr-drop-preview pointer-events-none absolute inset-0 z-50 flex items-center justify-center" role="status">
+              <span class="tr-card px-3 py-2">{{ resources.dropToAttachLabel }}</span>
+            </div>
+          }
+        </div>
+      </main>
+      </div>
+      <tr-dock [side]="bottomSide" class="row-start-2" />
+    </div>
+    <tr-dock [side]="rightSide" class="col-start-3" />
+  </div>
+</div>
