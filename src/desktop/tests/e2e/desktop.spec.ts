@@ -30,6 +30,14 @@ test("permits clipboard writing without granting clipboard reads or notification
   expect(notifications).toBe("denied");
 });
 
+test("keeps application updates disabled in the branded development application", async () => {
+  await desktop.page.getByRole("button", { name: "Settings", exact: true }).click();
+  await desktop.page.locator("tr-settings-page a").filter({ hasText: "About" }).click();
+  await expect(desktop.page.locator("tr-app-updates")).toContainText("Updates are unavailable when running TeamRun from source.");
+  await expect(desktop.page.getByRole("button", { name: "Check for updates", exact: true })).toHaveCount(0);
+  await desktop.capture("branded-development-about");
+});
+
 test("preserves drafts and tabs across Settings, navigation, sending and restart", async () => {
   const page = desktop.page;
   await page.getByRole("button", { name: "Conversation A", exact: true }).dblclick();

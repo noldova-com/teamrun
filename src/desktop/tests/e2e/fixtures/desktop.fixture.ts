@@ -17,6 +17,7 @@ import { ProviderRegistry } from "@noldova/teamrun-core";
 import { ConversationCreateParams, MethodName, Project, ProjectOpenParams } from "@noldova/teamrun-protocol";
 import { ProcessInspector, ProcessProbe, ProcessRegistry, RuntimeClient, RuntimeService, RuntimeSettings, RuntimeTimings } from "@noldova/teamrun-runtime";
 
+import DevelopmentBinary from "../../../../../scripts/desktop/development-binary.ts";
 import { FixtureProvider } from "./fixture-provider.fixture.ts";
 
 export class DesktopFixture {
@@ -28,6 +29,7 @@ export class DesktopFixture {
   private application: ElectronApplication | null = null;
   private window: Page | null = null;
   private launches: number = 0;
+  private tracing: boolean = false;
 
   public readonly provider = new FixtureProvider();
 
@@ -143,6 +145,7 @@ export class DesktopFixture {
     delete environment["TEAMRUN_RENDERER_INDEX"];
     delete environment["TEAMRUN_SCREENSHOT"];
     this.application = await _electron.launch({
+      executablePath: await new DevelopmentBinary().prepare(),
       args: [fileURLToPath(new URL("./desktop-entry.fixture.ts", import.meta.url))], env: environment, chromiumSandbox: true, timeout: 15_000
     });
     expect(this.application.process().spawnargs).not.toContain("--no-sandbox");
@@ -153,16 +156,22 @@ export class DesktopFixture {
       stream?.pipe(log, { end: false });
     }
     this.window = await this.application.firstWindow();
+    await this.window.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
+    this.tracing = true;
     await this.window.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
-    const host = await this.application.evaluate(({ BrowserWindow }) => {
+    const host = await this.application.evaluate(({ app, BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
       if (!window)
         throw new Error("The native fixture window is missing.");
       return {
         platform: process.platform, architecture: process.arch, electron: process.versions.electron,
+        name: app.getName(), executable: process.execPath, packaged: app.isPackaged, defaultApp: process.defaultApp,
         bounds: window.getBounds(), zoom: window.webContents.getZoomFactor()
       };
     });
+    expect(host.name).toBe("TeamRun");
+    expect(host.defaultApp).toBe(true);
+    expect(path.basename(host.executable)).toBe(process.platform === "win32" ? "TeamRun.exe" : process.platform === "darwin" ? "TeamRun" : "teamrun");
     const renderer = await this.window.evaluate(() => ({
       nodeGlobal: "process" in globalThis, requireGlobal: "require" in globalThis, bridge: "teamrun" in globalThis
     }));
@@ -177,7 +186,6 @@ export class DesktopFixture {
       if (message.type() === "error")
         this.errors.push(message.text());
     });
-    await this.window.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
     await expect(this.window.locator("tr-sidebar")).toBeVisible();
     await expect(this.window.getByRole("button", { name: "Conversation A", exact: true })).toBeVisible();
   }
@@ -189,16 +197,28 @@ export class DesktopFixture {
     const child = application.process();
     this.application = null;
     try {
-      if (this.window && !this.window.isClosed()) {
+      if (this.tracing && this.window && !this.window.isClosed()) {
         const trace = this.info.outputPath(`desktop-${this.launches}.zip`);
         await this.window.context().tracing.stop({ path: trace });
         await this.info.attach(`trace-${this.launches}`, { path: trace, contentType: "application/zip" });
       }
-      await application.close();
+    }
+    catch (error) {
+      this.errors.push(String(error));
     }
     finally {
-      if (child.exitCode === null && child.signalCode === null)
-        child.kill();
+      this.tracing = false;
+      try {
+        await application.close();
+      }
+      finally {
+        if (child.exitCode === null && child.signalCode === null)
+          await new Promise<void>((resolve, reject) => {
+            child.once("exit", () => resolve());
+            if (!child.kill())
+              reject(new Error("The fixture process could not be stopped."));
+          });
+      }
       this.window = null;
     }
   }

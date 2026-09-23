@@ -34,8 +34,6 @@ export class WindowFactory {
     this.senders = new SenderPolicy(settings);
   }
 
-  // The window opens where it was closed, as big and maximized as it was; a remembered position off every
-  // display is dropped and the system places the window.
   public create(): BrowserWindow {
     const state = this.states.read();
     const options: BrowserWindowConstructorOptions = {
@@ -48,8 +46,6 @@ export class WindowFactory {
       titleBarStyle: Resources.hiddenTitleBarStyle,
       webPreferences: { preload: this.preloadPath, contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true, spellcheck: false }
     };
-    // Windows and Linux draw the window controls as an overlay the renderer recolours; macOS keeps its traffic lights, placed
-    // in the row the renderer leaves clear.
     if (process.platform === Resources.macPlatform)
       options.trafficLightPosition = { ...Resources.trafficLightPosition };
     else
@@ -82,7 +78,6 @@ export class WindowFactory {
     return window;
   }
 
-  // Windows can use dark system chrome while its applications use a light theme; the Dock gets its tile whatever the theme.
   private getIconPath(): string {
     if (basename(this.settings.iconPath) !== Resources.defaultIconFileName)
       return this.settings.iconPath;
@@ -105,13 +100,10 @@ export class WindowFactory {
     }
   }
 
-  // Windows shows the taskbar button's relaunch name and icon in the jump list and gives them to a pinned entry; without
-  // them a window run from source reads "Electron" and a pin starts the bare Electron executable. The relaunch command is
-  // the packaged executable, or the executable with the main script when running from source.
   private describeToTaskbar(window: BrowserWindow, iconPath: string): void {
     if (process.platform !== Resources.windowsPlatform)
       return;
-    const script = app.isPackaged ? null : resolve(process.argv[Resources.mainScriptArgumentIndex] ?? String.empty);
+    const script = process.defaultApp ? resolve(process.argv[Resources.mainScriptArgumentIndex] ?? String.empty) : null;
     window.setAppDetails({
       appId: Resources.appUserModelId,
       ...(existsSync(iconPath) ? { appIconPath: iconPath, appIconIndex: Resources.appIconIndex } : {}),
@@ -138,7 +130,6 @@ export class WindowFactory {
     window.once(Resources.closedEvent, () => nativeTheme.off(Resources.themeUpdatedEvent, update));
   }
 
-  // Saves the state a little after every resize or move (the normal bounds while maximized) and at close.
   private remember(window: BrowserWindow): void {
     let timer: NodeJS.Timeout | null = null;
     const save = (): void => {
@@ -161,7 +152,6 @@ export class WindowFactory {
     });
   }
 
-  // At least a corner of the window on some display's work area.
   private static isVisible(bounds: Rectangle): boolean {
     return screen.getAllDisplays().some(display => {
       const area = display.workArea;
@@ -180,7 +170,6 @@ export class WindowFactory {
     return window.loadURL(Resources.rendererMissingPage);
   }
 
-  // Evidence mode: trace what the renderer reports, then capture the window and quit.
   private scheduleScreenshot(window: BrowserWindow): void {
     const path = this.settings.screenshotPath;
     if (Object.isNull(path))
@@ -210,8 +199,6 @@ export class WindowFactory {
     app.quit();
   }
 
-  // capturePage needs the GPU compositor, which is unavailable when the app is launched from a service session;
-  // the DevTools protocol screenshot works in both cases.
   private static async captureThroughDevTools(window: BrowserWindow): Promise<Buffer> {
     const contents = window.webContents;
     contents.debugger.attach(Resources.devToolsProtocolVersion);

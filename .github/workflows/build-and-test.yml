@@ -103,9 +103,12 @@ jobs:
           trap 'cat "$RUNNER_TEMP/teamrun-ci/electron.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/electron.stderr.log" >&2' EXIT
           {
             node node_modules/electron/install.js
+            npm run desktop -- --prepare-only
             if [ "$RUNNER_OS" = Linux ]; then
               sudo chown root:root node_modules/electron/dist/chrome-sandbox
               sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+              sudo chown root:root _build/electron-dev/chrome-sandbox
+              sudo chmod 4755 _build/electron-dev/chrome-sandbox
             fi
           } > "$RUNNER_TEMP/teamrun-ci/electron.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/electron.stderr.log"
 
@@ -124,6 +127,11 @@ jobs:
         run: |
           trap 'cat "$RUNNER_TEMP/teamrun-ci/package.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/package.stderr.log" >&2' EXIT
           npm run test:package > "$RUNNER_TEMP/teamrun-ci/package.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/package.stderr.log"
+
+      - name: Check development launcher
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-ci/desktop.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/desktop.stderr.log" >&2' EXIT
+          npm run test:desktop > "$RUNNER_TEMP/teamrun-ci/desktop.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/desktop.stderr.log"
 
       - name: Run renderer tests
         run: |
