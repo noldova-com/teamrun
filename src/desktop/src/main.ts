@@ -34,9 +34,10 @@ import { RestartProcesses } from "./services/restart-processes.js";
 import { UpdatePeer } from "./services/update-peer.js";
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
+const isPackaged = app.isPackaged && !process.defaultApp;
 const settings = DesktopSettings.fromEnvironment(
   process.env, app.getPath(Resources.homePathName), moduleDirectory, Resources.productVersion,
-  app.isPackaged ? process.resourcesPath : undefined);
+  isPackaged ? process.resourcesPath : undefined);
 const runtimeSettings = RuntimeSettings.forPlatform(process.platform, settings.dataDirectory, settings.productVersion, Resources.idleGrace);
 const runtimeEnvironment = { ...process.env, [Resources.runAsNodeVariable]: Resources.enabledValue };
 const launcher = new RuntimeLauncher(runtimeSettings, process.execPath, RuntimeEntry.entryPath, [], runtimeEnvironment, RuntimeTimings.createDefault());
@@ -44,7 +45,7 @@ const host = new ElectronBridgeHost();
 const attacher = new TimedAttacher(launcher, line => console.error(line));
 const connection = new RuntimeConnection(attacher, { forward: event => host.broadcast(Resources.eventChannel, event.toJson()) }, Resources.clientName);
 const info = new DesktopInfo(settings.dataDirectory, settings.productVersion, process.platform);
-const updateSettings = UpdateSettings.fromEnvironment(process.env, app.isPackaged, process.platform, process.arch);
+const updateSettings = UpdateSettings.fromEnvironment(process.env, isPackaged, process.platform, process.arch);
 const checkpoints = new RendererCheckpoint(host);
 const installation = InstallationRegistry.forEntry(moduleDirectory, process.env[Resources.appImageVariable] ?? process.execPath, app.getPath(Resources.homePathName));
 const peer = Object.isNull(installation) ? null : new UpdatePeer(installation, settings.dataDirectory, settings.productVersion,

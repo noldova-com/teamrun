@@ -8,21 +8,22 @@
 
 import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
-import { createRequire } from "node:module";
 import path from "node:path";
 
 import BuildEvidence from "./build/build-evidence.ts";
+import DevelopmentBinary from "./desktop/development-binary.ts";
 
-class Desktop {
+export default class Desktop {
   private static readonly MAIN: string = "node_modules/@noldova/teamrun-desktop/main.js";
   private static readonly RENDERER: string = "_build/renderer/browser/index.html";
+  private static readonly PREPARE_OPTION: string = "--prepare-only";
 
   public async runAsync(): Promise<void> {
     await BuildEvidence.requireCurrent();
     await access(Desktop.RENDERER);
-    const executable: unknown = createRequire(import.meta.url)("electron");
-    if (typeof executable !== "string")
-      throw new Error("The Electron package did not provide an executable path.");
+    const executable = await new DevelopmentBinary().prepare();
+    if (process.argv.length === 3 && process.argv[2] === Desktop.PREPARE_OPTION)
+      return;
 
     const environment = { ...process.env };
     delete environment["ELECTRON_RUN_AS_NODE"];
@@ -39,4 +40,5 @@ class Desktop {
   }
 }
 
-await new Desktop().runAsync();
+if (import.meta.main)
+  await new Desktop().runAsync();

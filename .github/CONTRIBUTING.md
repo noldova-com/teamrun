@@ -77,7 +77,11 @@ npm run build
 npm run desktop
 ```
 
-Development launches use Electron directly. To try the application with separate local data, set `TEAMRUN_DATA_DIR` before launching:
+Development launches prepare a TeamRun-branded copy of Electron in `_build/electron-dev`. The installed Electron distribution stays unchanged. The copy is reused until its branding inputs, Electron version, product version, platform or architecture changes. Close development windows before refreshing the copy.
+
+`npm run desktop -- --prepare-only` prepares the binary without opening a window. On Linux hosts that require the setuid sandbox, apply the Electron sandbox ownership/mode setup to `_build/electron-dev/chrome-sandbox` after preparing it, as the workflows do; do not disable the sandbox.
+
+To try the application with separate local data, set `TEAMRUN_DATA_DIR` before launching:
 
 ```bash
 TEAMRUN_DATA_DIR=_build/dev-data npm run desktop
@@ -87,6 +91,7 @@ Run the renderer component tests and native desktop workflows with:
 
 ```bash
 npm run test:renderer
+npm run test:desktop
 npm run test:ui
 ```
 

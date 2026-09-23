@@ -95,9 +95,12 @@ jobs:
           trap 'cat "$RUNNER_TEMP/teamrun-package/electron.stdout.log"; cat "$RUNNER_TEMP/teamrun-package/electron.stderr.log" >&2' EXIT
           {
             node node_modules/electron/install.js
+            npm run desktop -- --prepare-only
             if [ "$RUNNER_OS" = Linux ]; then
               sudo chown root:root node_modules/electron/dist/chrome-sandbox
               sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+              sudo chown root:root _build/electron-dev/chrome-sandbox
+              sudo chmod 4755 _build/electron-dev/chrome-sandbox
             fi
           } > "$RUNNER_TEMP/teamrun-package/electron.stdout.log" 2> "$RUNNER_TEMP/teamrun-package/electron.stderr.log"
 
@@ -106,6 +109,7 @@ jobs:
           trap 'cat "$RUNNER_TEMP/teamrun-package/tests.stdout.log"; cat "$RUNNER_TEMP/teamrun-package/tests.stderr.log" >&2' EXIT
           {
             npm run test:package
+            npm run test:desktop
             npm run test -- --skip-test-details --skip-coverage-details
             npm run test:renderer
             if [ "$RUNNER_OS" = Linux ]; then

@@ -17,6 +17,7 @@
     "test": "node scripts/test.ts",
     "cli": "node node_modules/@noldova/teamrun-cli/services/cli-entry.js",
     "desktop": "node scripts/desktop.ts",
+    "test:desktop": "node scripts/test-desktop.ts",
     "package": "node scripts/package.ts",
     "test:package": "node scripts/test-package.ts",
     "test:renderer": "node scripts/test-renderer.ts",
@@ -27,6 +28,7 @@
     "@types/node": "26.2.0",
     "electron": "44.3.0",
     "electron-builder": "26.15.3",
+    "resedit": "1.7.2",
     "typescript": "7.0.2"
   },
   "dependencies": {
