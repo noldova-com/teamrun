@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "rootDir": ".",
     "outDir": "../../_build/renderer/spec-tsc",
     "types": ["vitest/globals"]
   },
