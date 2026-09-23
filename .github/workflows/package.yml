@@ -136,6 +136,7 @@ jobs:
           retention-days: 7
 
       - name: Retain diagnostics
+        id: ui-report
         if: always() && !cancelled()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -146,3 +147,38 @@ jobs:
             _build/ui-report/
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Retain main-window screenshot
+        id: ui-main-window
+        if: always() && !cancelled() && hashFiles('_build/ui-results/main-window.png') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-main-window-${{ matrix.platform }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}.png
+          path: _build/ui-results/main-window.png
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Link desktop UI evidence in the summary
+        if: always() && !cancelled()
+        env:
+          UI_REPORT_URL: ${{ steps.ui-report.outputs.artifact-url }}
+          UI_MAIN_WINDOW_URL: ${{ steps.ui-main-window.outputs.artifact-url }}
+        run: |
+          {
+            if [ ! -f _build/ui-results/summary.md ]; then
+              printf '\n### Desktop UI\n\nUI results were not produced. Check the preceding job steps.\n'
+            fi
+            printf '\n#### UI evidence\n\n'
+            if [ -n "$UI_MAIN_WINDOW_URL" ]; then
+              printf '[View main window (PNG)](%s)\n\n' "$UI_MAIN_WINDOW_URL"
+            else
+              printf 'Main-window screenshot was not captured or uploaded.\n\n'
+            fi
+            if [ -n "$UI_REPORT_URL" ]; then
+              printf '[Download the full UI report, screenshots and traces](%s)\n\n' "$UI_REPORT_URL"
+            else
+              printf 'The full UI artifact is unavailable.\n\n'
+            fi
+            printf 'Artifacts are retained for seven days.\n'
+          } >> "$GITHUB_STEP_SUMMARY"

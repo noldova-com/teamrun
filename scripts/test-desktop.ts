@@ -22,6 +22,9 @@ class TestDesktop extends Script {
     await this.executeProcessAsync(process.execPath, [
       ...TestDesktop.COVERAGE_ARGUMENTS, "--test-coverage-include=scripts/desktop/development-binary.ts", "scripts/tests/desktop/development-binary.test.ts"
     ], process.cwd());
+    await this.executeProcessAsync(process.execPath, [
+      ...TestDesktop.COVERAGE_ARGUMENTS, "--test-coverage-include=scripts/testing/git-hub-ui-reporter.ts", "scripts/tests/testing/git-hub-ui-reporter.test.ts"
+    ], process.cwd());
   }
 }
 
