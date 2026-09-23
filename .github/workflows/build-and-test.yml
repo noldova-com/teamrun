@@ -97,6 +97,12 @@ jobs:
           trap 'cat "$RUNNER_TEMP/teamrun-ci/electron.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/electron.stderr.log" >&2' EXIT
           node node_modules/electron/install.js > "$RUNNER_TEMP/teamrun-ci/electron.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/electron.stderr.log"
 
+      - name: Configure Electron sandbox on Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
       - name: Type-check repository scripts
         run: |
           trap 'cat "$RUNNER_TEMP/teamrun-ci/typecheck.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/typecheck.stderr.log" >&2' EXIT
