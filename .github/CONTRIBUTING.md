@@ -92,6 +92,30 @@ npm run test:ui
 
 Linux needs a display; a headless host can use `xvfb-run --auto-servernum npm run test:ui`. The UI suite uses disposable projects and a fixture provider, never provider sign-in or paid turns. It preserves Electron sandboxing and records selected screenshots and traces in `_build/ui-results/`, with the HTML report at `_build/ui-report/index.html`. These checks do not establish native clipboard/file-picker, installer, or live-provider behavior.
 
+## Build installers
+
+Build the application first, then package it on the target operating system:
+
+```bash
+npm run build
+npm run test:package
+npm run package
+```
+
+Packaging defaults to the host OS and CPU. Select `--platform windows|linux|mac` and `--arch x64|arm64` explicitly when needed; a different CPU may be packaged on the same OS, but execution still requires the native target. Use `--dir` for an unpacked application. Outputs are isolated under `_build/package/<platform>-<arch>`:
+
+| Platform | Formats |
+|---|---|
+| Windows | NSIS installer and ZIP |
+| macOS | DMG and ZIP |
+| Linux | AppImage |
+
+Application code uses ASAR. Icons are physical resources; the renderer includes its fonts and notices. Foundation Testing and development dependencies are excluded. Packaging uses the locked production dependency versions and writes a report of artifact names, sizes and SHA-256 hashes.
+
+Builds are unsigned by default for installation testing. `--signed` requires Windows signing credentials or macOS signing and notarization configuration. The packaging command always disables publication. Fresh Windows installs default to the current user, while existing installation scope is preserved.
+
+The **Package installers** workflow is manually dispatched from `main`, with a platform and architecture selection or all six targets. It retains installers, reports and diagnostics as Actions artifacts for seven days. It does not create GitHub Releases. Native installation and update acceptance are separate from producing these files; do not infer target support from an archive or installer alone.
+
 ## Pull requests
 
 Work on a focused branch in your fork, or a repository branch when you have the necessary access. Open the PR against `main`. Contributors do not need access to a maintainer's checkout; maintainers and agents working in a shared checkout follow [AGENTS.md](../AGENTS.md).

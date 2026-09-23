@@ -17,7 +17,7 @@
 import path from "node:path";
 
 import Config from "./config.ts";
-import BuildEvidence from "./build-evidence.ts";
+import BuildEvidence from "./build/build-evidence.ts";
 import Script from "./script.ts";
 
 export class Test extends Script {

@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import Config from "./config.ts";
+import Config from "../config.ts";
 import type PackageInfo from "./package-info.ts";
 
 export default class BuildEvidence {
@@ -21,10 +21,10 @@ export default class BuildEvidence {
     "tsconfig.base.json",
     "package-lock.json",
     "scripts/build.ts",
-    "scripts/build-evidence.ts",
+    "scripts/build/build-evidence.ts",
     "scripts/config.ts",
     "scripts/script.ts",
-    "scripts/package-info.ts"
+    "scripts/build/package-info.ts"
   ];
 
   public static async record(packageInfo: PackageInfo): Promise<void> {

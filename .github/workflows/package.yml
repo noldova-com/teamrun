@@ -1,0 +1,144 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Package installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to build
+        type: choice
+        options: [all, windows, linux, mac]
+        default: all
+        required: true
+      architecture:
+        description: CPU architecture to build
+        type: choice
+        options: [all, x64, arm64]
+        default: all
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.platform }}-${{ inputs.architecture }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package:
+    name: Package ${{ matrix.platform }} ${{ matrix.architecture }}
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(inputs.platform == 'all' && '["windows","linux","mac"]' || format('["{0}"]', inputs.platform)) }}
+        architecture: ${{ fromJSON(inputs.architecture == 'all' && '["x64","arm64"]' || format('["{0}"]', inputs.architecture)) }}
+    runs-on: >-
+      ${{ fromJSON('{"windows-x64":"windows-2025","windows-arm64":"windows-11-arm",
+      "linux-x64":"ubuntu-24.04","linux-arm64":"ubuntu-24.04-arm",
+      "mac-x64":"macos-15-intel","mac-arm64":"macos-15"}')[format('{0}-{1}', matrix.platform, matrix.architecture)] }}
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      PACKAGE_PLATFORM: ${{ matrix.platform }}
+      PACKAGE_ARCHITECTURE: ${{ matrix.architecture }}
+    steps:
+      - name: Check out the run revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          architecture: ${{ matrix.architecture }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/renderer/package-lock.json
+
+      - name: Verify toolchain and architecture
+        run: |
+          node --version
+          npm --version
+          test "$(node --version)" = v26.7.0
+          test "$(npm --version)" = 11.19.0
+          test "$(node --print process.arch)" = "$PACKAGE_ARCHITECTURE"
+
+      - name: Install dependencies
+        run: |
+          mkdir -p "$RUNNER_TEMP/teamrun-package"
+          trap 'cat "$RUNNER_TEMP/teamrun-package/install.stdout.log"; cat "$RUNNER_TEMP/teamrun-package/install.stderr.log" >&2' EXIT
+          {
+            npm ci --no-audit --no-fund
+            npm ci --prefix src/renderer --no-audit --no-fund
+          } > "$RUNNER_TEMP/teamrun-package/install.stdout.log" 2> "$RUNNER_TEMP/teamrun-package/install.stderr.log"
+
+      - name: Build packages and renderer
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-package/build.stdout.log"; cat "$RUNNER_TEMP/teamrun-package/build.stderr.log" >&2' EXIT
+          npm run build > "$RUNNER_TEMP/teamrun-package/build.stdout.log" 2> "$RUNNER_TEMP/teamrun-package/build.stderr.log"
+
+      - name: Prepare Electron runtime
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-package/electron.stdout.log"; cat "$RUNNER_TEMP/teamrun-package/electron.stderr.log" >&2' EXIT
+          {
+            node node_modules/electron/install.js
+            if [ "$RUNNER_OS" = Linux ]; then
+              sudo chown root:root node_modules/electron/dist/chrome-sandbox
+              sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+            fi
+          } > "$RUNNER_TEMP/teamrun-package/electron.stdout.log" 2> "$RUNNER_TEMP/teamrun-package/electron.stderr.log"
+
+      - name: Verify packages, renderer and desktop UI
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-package/tests.stdout.log"; cat "$RUNNER_TEMP/teamrun-package/tests.stderr.log" >&2' EXIT
+          {
+            npm run test:package
+            npm run test -- --skip-test-details --skip-coverage-details
+            npm run test:renderer
+            if [ "$RUNNER_OS" = Linux ]; then
+              xvfb-run --auto-servernum npm run test:ui
+            else
+              npm run test:ui
+            fi
+          } > "$RUNNER_TEMP/teamrun-package/tests.stdout.log" 2> "$RUNNER_TEMP/teamrun-package/tests.stderr.log"
+
+      - name: Build unsigned installers and integrity report
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-package/package.stdout.log"; cat "$RUNNER_TEMP/teamrun-package/package.stderr.log" >&2' EXIT
+          npm run package -- --platform "$PACKAGE_PLATFORM" --arch "$PACKAGE_ARCHITECTURE" > "$RUNNER_TEMP/teamrun-package/package.stdout.log" 2> "$RUNNER_TEMP/teamrun-package/package.stderr.log"
+
+      - name: Retain installers and reports
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-${{ matrix.platform }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            _build/package/${{ matrix.platform }}-${{ matrix.architecture }}/TeamRun-*
+            _build/package/${{ matrix.platform }}-${{ matrix.architecture }}/latest*.yml
+            _build/package/${{ matrix.platform }}-${{ matrix.architecture }}/package-report-*.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain diagnostics
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-logs-${{ matrix.platform }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/teamrun-package/*.log
+            _build/ui-results/
+            _build/ui-report/
+          if-no-files-found: warn
+          retention-days: 7
