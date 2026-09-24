@@ -42,7 +42,9 @@ export default class GitHubReleaseFixture {
     if (url.pathname.includes("/commits/"))
       return Response.json({ sha: this.candidate.revision });
     if (method === "GET" && url.pathname.endsWith("/releases"))
-      return Response.json(this.history);
+      return Response.json(Array.isArray(this.history) ? [...this.history, ...(this.release === null ? [] : [this.release])] : this.history);
+    if (method === "GET" && url.pathname.includes("/releases/tags/") && this.release?.["draft"] === true)
+      return new Response(null, { status: 404 });
     if (method === "GET")
       return this.release === null ? new Response(null, { status: 404 }) : Response.json(this.release);
     if (method === "POST" && url.hostname === "uploads.github.com") {

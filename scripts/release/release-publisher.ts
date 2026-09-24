@@ -36,6 +36,7 @@ export default class ReleasePublisher {
   private static readonly INVALID_RELEASE_ENTRY: string = "Invalid release list entry.";
   private static readonly VERSION_NOT_NEWER: string = "The candidate must be newer than published versions.";
   private static readonly HISTORY_LIMIT: string = "Release history exceeds the publication verification limit.";
+  private static readonly DUPLICATE_RELEASE: string = "Multiple releases use this tag. Resolve the duplicate drafts before retrying publication.";
 
   private readonly token: string;
   private readonly candidate: ReleaseCandidate;
@@ -56,10 +57,11 @@ export default class ReleasePublisher {
     if (release === null) {
       await this.assertNewer();
       for (let attempt = 0; attempt < ReleasePublisher.ATTEMPTS && release === null; attempt++) {
-        await this.mutate(`${ReleasePublisher.API}/releases`, "POST", JSON.stringify({ tag_name: this.candidate.tag,
+        const response = await this.send(`${ReleasePublisher.API}/releases`, { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tag_name: this.candidate.tag,
           target_commitish: this.candidate.revision, name: `TeamRun ${this.candidate.version.value}`, body: notes,
-          draft: true, prerelease: false, make_latest: "false" }));
-        release = await this.findRelease();
+          draft: true, prerelease: false, make_latest: "false" }) }, true);
+        release = response === null ? await this.findRelease() : this.parse(await response.json());
         if (release === null)
           await this.delay(attempt);
       }
@@ -162,8 +164,26 @@ export default class ReleasePublisher {
   }
 
   private async findRelease(): Promise<ReleaseResponse | null> {
-    const response = await this.send(`${ReleasePublisher.API}/releases/tags/${this.candidate.tag}`, { method: "GET" }, true);
-    return response.status === 404 ? null : this.parse(await response.json());
+    let match: ReleaseResponse | null = null;
+    for (let page = 1; page <= ReleasePublisher.MAX_PAGES; page++) {
+      const response = await this.send(`${ReleasePublisher.API}/releases?per_page=${ReleasePublisher.PAGE_SIZE}&page=${page}`);
+      const value: unknown = await response.json();
+      if (!Array.isArray(value))
+        throw new PackageException(ReleasePublisher.INVALID_RELEASE_LIST);
+      const entries: readonly unknown[] = value;
+      for (const entry of entries) {
+        if (typeof entry !== "object" || entry === null || !("tag_name" in entry) || typeof entry.tag_name !== "string")
+          throw new PackageException(ReleasePublisher.INVALID_RELEASE_ENTRY);
+        if (entry.tag_name !== this.candidate.tag)
+          continue;
+        if (match !== null)
+          throw new PackageException(ReleasePublisher.DUPLICATE_RELEASE);
+        match = this.parse(entry);
+      }
+      if (entries.length < ReleasePublisher.PAGE_SIZE)
+        return match;
+    }
+    throw new PackageException(ReleasePublisher.HISTORY_LIMIT);
   }
 
   private async getRelease(id: number): Promise<ReleaseResponse> {
@@ -176,14 +196,14 @@ export default class ReleasePublisher {
   }
 
   private async mutate(url: string, method: string, body?: string | Blob, contentType: string = "application/json"): Promise<void> {
-    const response = await this.send(url, { method, ...(body === undefined ? {} : { body }), headers: { "Content-Type": contentType } }, false, true);
+    const response = await this.send(url, { method, ...(body === undefined ? {} : { body }), headers: { "Content-Type": contentType } }, true);
     if (response !== null)
       await response.arrayBuffer();
   }
 
-  private async send(url: string, options?: RequestInit, allowMissing?: boolean, allowTransient?: false): Promise<Response>;
-  private async send(url: string, options: RequestInit, allowMissing: boolean, allowTransient: true): Promise<Response | null>;
-  private async send(url: string, options: RequestInit = {}, allowMissing: boolean = false, allowTransient: boolean = false): Promise<Response | null> {
+  private async send(url: string, options?: RequestInit, allowTransient?: false): Promise<Response>;
+  private async send(url: string, options: RequestInit, allowTransient: true): Promise<Response | null>;
+  private async send(url: string, options: RequestInit = {}, allowTransient: boolean = false): Promise<Response | null> {
     let response: Response;
     try {
       response = await this.request(url, { ...options, headers: { ...options.headers, Accept: "application/vnd.github+json",
@@ -196,7 +216,7 @@ export default class ReleasePublisher {
       console.error(`Release request interrupted (${error.name}); verifying remote state before retry.`);
       return null;
     }
-    if (response.ok || allowMissing && response.status === 404)
+    if (response.ok)
       return response;
     await response.arrayBuffer();
     if (allowTransient && ReleasePublisher.TRANSIENT_STATUSES.includes(response.status)) {
