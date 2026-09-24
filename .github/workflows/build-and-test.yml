@@ -123,6 +123,11 @@ jobs:
           trap 'cat "$RUNNER_TEMP/teamrun-ci/test.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/test.stderr.log" >&2' EXIT
           npm run test -- --skip-test-details --skip-coverage-details > "$RUNNER_TEMP/teamrun-ci/test.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/test.stderr.log"
 
+      - name: Check release contracts
+        run: |
+          trap 'cat "$RUNNER_TEMP/teamrun-ci/release.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/release.stderr.log" >&2' EXIT
+          npm run test:release > "$RUNNER_TEMP/teamrun-ci/release.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/release.stderr.log"
+
       - name: Check packaging contracts
         run: |
           trap 'cat "$RUNNER_TEMP/teamrun-ci/package.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/package.stderr.log" >&2' EXIT
