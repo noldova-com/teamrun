@@ -23,6 +23,7 @@ export class UpdateSettingsTests {
     for (const [platform, architecture] of [["win32", "arm64"], ["linux", "x64"], ["darwin", "arm64"]] as const) {
       const settings = UpdateSettings.fromEnvironment({}, true, platform, architecture);
       Assert.isNull(settings.feedUrl);
+      Assert.isNull(settings.disabledReason);
       Assert.isFalse(settings.allowInstallation);
     }
   }
@@ -37,8 +38,11 @@ export class UpdateSettingsTests {
     Assert.areEqual(Resources.updatesDevelopmentDisabled, UpdateSettings.fromEnvironment(environment, false, "win32", "x64").disabledReason);
     Assert.isTrue(UpdateSettings.fromEnvironment(environment, true, "win32", "x64").isTestFeed);
     Assert.isFalse(UpdateSettings.fromEnvironment(environment, true, "win32", "x64").allowInstallation);
-    Assert.areEqual(Resources.updatesPlatformDisabled, UpdateSettings.fromEnvironment(environment, true, "linux", "x64").disabledReason);
-    Assert.areEqual(Resources.updatesPlatformDisabled, UpdateSettings.fromEnvironment(environment, true, "win32", "ia32").disabledReason);
+    for (const [platform, architecture] of [["linux", "x64"], ["win32", "ia32"]] as const) {
+      const settings = UpdateSettings.fromEnvironment(environment, true, platform, architecture);
+      Assert.isNull(settings.feedUrl);
+      Assert.isNull(settings.disabledReason);
+    }
   }
 
   @TestMethod

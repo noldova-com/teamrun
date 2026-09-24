@@ -30,9 +30,9 @@ export class UpdateSettings {
     if (Object.isUndefined(value) || String.isNullOrWhitespace(value))
       return platform === Resources.windowsPlatform && architecture === Resources.publicUpdateArchitecture
         ? new UpdateSettings(Resources.publicUpdateFeed, null, true)
-        : new UpdateSettings(null, Resources.updatesPlatformDisabled);
+        : new UpdateSettings(null, null);
     if (platform !== Resources.windowsPlatform || !Resources.updateArchitectures.includes(architecture))
-      return new UpdateSettings(null, Resources.updatesPlatformDisabled);
+      return new UpdateSettings(null, null);
     try {
       const url = new URL(value);
       if (url.protocol !== Resources.httpProtocol || !Resources.updateLoopbackHosts.includes(url.hostname)

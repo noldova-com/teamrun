@@ -8,6 +8,7 @@
 
 import { ChangeDetectionStrategy, Component, computed, input, output } from "@angular/core";
 import { MatButtonModule } from "@angular/material/button";
+import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 
 import "@noldova/teamrun-foundation-core";
@@ -17,7 +18,7 @@ import { Resources } from "../../resources";
 
 @Component({
   selector: "tr-app-updates",
-  imports: [MatButtonModule, MatProgressBarModule],
+  imports: [MatButtonModule, MatIconModule, MatProgressBarModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: "./app-updates.component.html"
 })
@@ -32,4 +33,5 @@ export class AppUpdatesComponent {
   public readonly error = input<string | null>(null);
   public readonly pending = input(false);
   public readonly command = output<AppUpdateCommand>();
+  public readonly openReleases = output<void>();
 }
