@@ -166,6 +166,15 @@ export class DesktopFixture {
       stream?.pipe(log, { end: false });
     }
     this.window = await this.application.firstWindow();
+    const application = this.application;
+    await application.evaluate(({ BrowserWindow }, size) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (!window)
+        throw new Error("The native fixture window is missing.");
+      window.setContentSize(size.width, size.height);
+    }, { width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT });
+    await expect.poll(() => application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getContentBounds()))
+      .toMatchObject({ width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT });
     await this.window.setViewportSize({ width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT });
     await expect.poll(() => this.page.evaluate(() => ({
       width: window.innerWidth, height: window.innerHeight, scale: window.devicePixelRatio
@@ -180,7 +189,7 @@ export class DesktopFixture {
       return {
         platform: process.platform, architecture: process.arch, electron: process.versions.electron,
         name: app.getName(), executable: process.execPath, packaged: app.isPackaged, defaultApp: process.defaultApp,
-        bounds: window.getBounds(), zoom: window.webContents.getZoomFactor()
+        bounds: window.getBounds(), contentBounds: window.getContentBounds(), zoom: window.webContents.getZoomFactor()
       };
     });
     expect(host.name).toBe("TeamRun");
