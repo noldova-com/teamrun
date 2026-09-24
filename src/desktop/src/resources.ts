@@ -58,7 +58,6 @@ export class Resources {
   public static readonly updateProgressEvent: "download-progress" = "download-progress";
   public static readonly updatesDevelopmentDisabled: string = "Updates are unavailable when running TeamRun from source.";
   public static readonly updatesFeedMissing: string = "Update downloads are not configured for this build.";
-  public static readonly updatesPlatformDisabled: string = "Update delivery is currently available for packaged Windows x64 releases.";
   public static readonly updatesFeedInvalid: string = "The local update test feed must be an HTTP loopback URL without credentials, a query or a fragment.";
   public static readonly updateCheckFailed: string = "Could not check for updates. Check the connection to the update server and try again.";
   public static readonly updateDownloadFailed: string = "The update could not be downloaded or verified. Try downloading it again.";

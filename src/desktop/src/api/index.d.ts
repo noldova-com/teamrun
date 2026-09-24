@@ -248,7 +248,8 @@ export declare class UpdateSettings {
    */
   public readonly feedUrl: string | null;
   /**
-   * Safe explanation when disabled, otherwise null.
+   * Safe explanation for a development build or an invalid test feed; null when enabled or when a packaged target has no in-app
+   * update delivery.
    */
   public readonly disabledReason: string | null;
   /**
@@ -262,9 +263,10 @@ export declare class UpdateSettings {
    * Selects the fixed public release feed for packaged Windows x64, or validates an explicit local test override.
    * @param environment TEAMRUN_UPDATE_TEST_FEED optionally supplies an HTTP loopback base URL without credentials, query or fragment.
    * @param isPackaged Whether Electron is running a packaged app.
-   * @param platform Node platform; Windows is the only delivery target currently enabled.
+   * @param platform Node platform; Windows is the only in-app delivery target currently enabled.
    * @param architecture Node CPU architecture; public releases support x64, local test overrides also accept arm64.
-   * @returns Validated settings; invalid input disables updates with an explanation.
+   * @returns Validated settings. Development builds and invalid test feeds are disabled with an explanation; other packaged
+   * targets without in-app delivery are disabled without one.
    */
   public static fromEnvironment(environment: NodeJS.ProcessEnv, isPackaged: boolean, platform: string, architecture: string): UpdateSettings;
 }
@@ -954,10 +956,6 @@ export declare class Resources {
    * Explanation for builds without a feed.
    */
   public static readonly updatesFeedMissing: string;
-  /**
-   * Explanation for platforms outside this local-test slice.
-   */
-  public static readonly updatesPlatformDisabled: string;
   /**
    * Invalid local feed explanation.
    */

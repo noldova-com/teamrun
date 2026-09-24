@@ -51,15 +51,36 @@ describe("AppUpdatesComponent", () => {
     expect(element.textContent).toContain("Download failed");
   });
 
-  it("never offers installation and explains disabled or downloaded states", async () => {
+  it("offers the release page instead of update status when in-app updates are off", async () => {
     const fixture = TestBed.createComponent(AppUpdatesComponent);
     const element: HTMLElement = fixture.nativeElement;
-    for (const status of [AppUpdateStatus.Disabled, AppUpdateStatus.Downloaded]) {
-      fixture.componentRef.setInput("state", new AppUpdateState(status, "0.0.1", null, null, "Explanation", null, false));
-      await fixture.whenStable();
-      expect(element.querySelectorAll("button").length).toBe(0);
-      expect(element.textContent).toContain("Explanation");
-    }
+    const commands: AppUpdateCommand[] = [];
+    let releaseRequests = 0;
+    fixture.componentInstance.command.subscribe(t => commands.push(t));
+    fixture.componentInstance.openReleases.subscribe(() => releaseRequests++);
+    fixture.componentRef.setInput("state", new AppUpdateState(AppUpdateStatus.Disabled, "0.0.1", null, null, null, null, false));
+    await fixture.whenStable();
+    expect(element.textContent).toContain("Installed version: 0.0.1");
+    expect(element.querySelector("[role=status]")).toBeNull();
+    const buttons = element.querySelectorAll("button");
+    expect(buttons.length).toBe(1);
+    expect(buttons[0]?.textContent).toContain("Download the latest version");
+    buttons[0]?.click();
+    expect(releaseRequests).toBe(1);
+    expect(commands).toEqual([]);
+    fixture.componentRef.setInput("state", new AppUpdateState(AppUpdateStatus.Disabled, "0.0.1", null, null, "Explanation", null, false));
+    await fixture.whenStable();
+    expect(element.textContent).toContain("Explanation");
+    expect(element.querySelectorAll("button").length).toBe(1);
+  });
+
+  it("never offers installation and explains a download without restart", async () => {
+    const fixture = TestBed.createComponent(AppUpdatesComponent);
+    const element: HTMLElement = fixture.nativeElement;
+    fixture.componentRef.setInput("state", new AppUpdateState(AppUpdateStatus.Downloaded, "0.0.1", null, null, "Explanation", null, false));
+    await fixture.whenStable();
+    expect(element.querySelectorAll("button").length).toBe(0);
+    expect(element.textContent).toContain("Explanation");
     fixture.componentRef.setInput("error", Resources.updateBridgeFailed);
     await fixture.whenStable();
     const commands: AppUpdateCommand[] = [];

@@ -55,14 +55,14 @@ export class Resources {
   public static readonly updatesTitle: string = "Application updates";
   public static readonly checkUpdatesLabel: string = "Check for updates";
   public static readonly downloadUpdateLabel: string = "Download update";
+  public static readonly downloadLatestLabel: string = "Download the latest version";
   public static readonly retryDownloadLabel: string = "Retry download";
   public static readonly updateRetryStatusLabel: string = "Retry";
   public static readonly updateLoadingLabel: string = "Reading update status…";
   public static readonly updateDesktopRequired: string = "Update controls are available in the desktop app.";
   public static readonly updateBridgeFailed: string = "Could not read the update status. Please try again.";
   public static readonly updateTestFeedLabel: string = "Local test feed";
-  public static readonly updateStatusLabels: Readonly<Record<AppUpdateStatus, string>> = {
-    [AppUpdateStatus.Disabled]: "Updates unavailable",
+  public static readonly updateStatusLabels: Readonly<Record<Exclude<AppUpdateStatus, AppUpdateStatus.Disabled>, string>> = {
     [AppUpdateStatus.Idle]: "Ready to check for updates",
     [AppUpdateStatus.Checking]: "Checking for updates…",
     [AppUpdateStatus.UpToDate]: "TeamRun is up to date",
@@ -623,6 +623,7 @@ export class Resources {
   ].join(" ");
   public static readonly websiteLabel: string = "teamrun.ai";
   public static readonly websiteUrl: string = "https://teamrun.ai";
+  public static readonly releasesUrl: string = "https://github.com/noldova-com/teamrun/releases/latest";
 
 
   public static readonly fontLabels: Readonly<Record<FontChoice, string>> = {

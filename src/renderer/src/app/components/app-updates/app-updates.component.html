@@ -10,35 +10,43 @@ LICENSE file in the root directory of this source tree.
   <h3 class="mb-2">{{ resources.updatesTitle }}</h3>
   @if (state(); as value) {
     <p class="tr-muted">{{ resources.formatInstalledVersion(value.currentVersion) }}</p>
-    @if (value.isTestFeed) { <p class="tr-muted mt-1">{{ value.canInstall ? resources.updateInstallTestFeedLabel : resources.updateTestFeedLabel }}</p> }
-    <p class="mt-3" role="status" [class.tr-error]="value.status === statuses.Error">
-      {{ resources.updateStatusLabels[value.status] }}
-      @if (value.availableVersion) { <span>{{ value.availableVersion }}</span> }
-    </p>
-    @if (value.message) { <p class="tr-muted mt-1">{{ value.message }}</p> }
-    @if (value.status === statuses.Checking || value.status === statuses.Preparing) {
-      <mat-progress-bar class="mt-3" mode="indeterminate" [attr.aria-label]="resources.updateStatusLabels[statuses.Checking]" />
-    }
-    @if (value.status === statuses.Downloading) {
-      <mat-progress-bar class="mt-3" mode="determinate" [value]="value.progressPercent ?? 0"
-        [attr.aria-label]="resources.updateStatusLabels[statuses.Downloading]" />
-      <p class="tr-muted mt-1">{{ resources.formatUpdateProgress(value.progressPercent ?? 0) }}</p>
-    }
-    @if (value.canInstall) {
-      <button mat-flat-button class="mt-3" type="button" [disabled]="busy()" (click)="command.emit(commands.Install)">
-        {{ resources.restartToUpdateLabel }}
+    @if (value.status === statuses.Disabled) {
+      @if (value.message) { <p class="tr-muted mt-1">{{ value.message }}</p> }
+      <button mat-stroked-button class="mt-3" type="button" (click)="openReleases.emit()">
+        <mat-icon>{{ resources.icons["openExternal"] }}</mat-icon>
+        {{ resources.downloadLatestLabel }}
       </button>
-    } @else if (value.status !== statuses.Disabled && value.status !== statuses.Downloaded) {
-      <div class="flex flex-wrap gap-2 mt-3">
-        <button mat-stroked-button type="button" [disabled]="busy()" (click)="command.emit(commands.Check)">
-          {{ resources.checkUpdatesLabel }}
+    } @else {
+      @if (value.isTestFeed) { <p class="tr-muted mt-1">{{ value.canInstall ? resources.updateInstallTestFeedLabel : resources.updateTestFeedLabel }}</p> }
+      <p class="mt-3" role="status" [class.tr-error]="value.status === statuses.Error">
+        {{ resources.updateStatusLabels[value.status] }}
+        @if (value.availableVersion) { <span>{{ value.availableVersion }}</span> }
+      </p>
+      @if (value.message) { <p class="tr-muted mt-1">{{ value.message }}</p> }
+      @if (value.status === statuses.Checking || value.status === statuses.Preparing) {
+        <mat-progress-bar class="mt-3" mode="indeterminate" [attr.aria-label]="resources.updateStatusLabels[statuses.Checking]" />
+      }
+      @if (value.status === statuses.Downloading) {
+        <mat-progress-bar class="mt-3" mode="determinate" [value]="value.progressPercent ?? 0"
+          [attr.aria-label]="resources.updateStatusLabels[statuses.Downloading]" />
+        <p class="tr-muted mt-1">{{ resources.formatUpdateProgress(value.progressPercent ?? 0) }}</p>
+      }
+      @if (value.canInstall) {
+        <button mat-flat-button class="mt-3" type="button" [disabled]="busy()" (click)="command.emit(commands.Install)">
+          {{ resources.restartToUpdateLabel }}
         </button>
-        @if (value.availableVersion) {
-          <button mat-flat-button type="button" [disabled]="busy()" (click)="command.emit(commands.Download)">
-            {{ value.status === statuses.Error ? resources.retryDownloadLabel : resources.downloadUpdateLabel }}
+      } @else if (value.status !== statuses.Downloaded) {
+        <div class="flex flex-wrap gap-2 mt-3">
+          <button mat-stroked-button type="button" [disabled]="busy()" (click)="command.emit(commands.Check)">
+            {{ resources.checkUpdatesLabel }}
           </button>
-        }
-      </div>
+          @if (value.availableVersion) {
+            <button mat-flat-button type="button" [disabled]="busy()" (click)="command.emit(commands.Download)">
+              {{ value.status === statuses.Error ? resources.retryDownloadLabel : resources.downloadUpdateLabel }}
+            </button>
+          }
+        </div>
+      }
     }
   } @else if (!error()) {
     <p class="tr-muted">{{ pending() ? resources.updateLoadingLabel : resources.updateDesktopRequired }}</p>
