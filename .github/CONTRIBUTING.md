@@ -125,6 +125,20 @@ Linux packaging pins AppImage toolset `1.0.3` with gzip compression. Its static 
 
 The **Package installers** workflow is manually dispatched from `main`, with a platform and architecture selection or all six targets. It retains installers, reports and diagnostics as Actions artifacts for seven days. It does not create GitHub Releases. Native installation and update acceptance are separate from producing these files; do not infer target support from an archive or installer alone.
 
+## Publish a desktop release
+
+The **Release desktop application** workflow starts when a `v*` tag is pushed, or manually from `main` with an existing tag. Publication requires explicit authorization. First merge the version change and release content through a reviewed PR. The tag must identify a commit on `main` and match `package.json` and both root application versions in `package-lock.json`.
+
+Use numbered tags such as `v0.0.1` and `v0.0.2`, following the [release policy](../docs/ARCHITECTURE.md#10-build-installation-and-updates). Prerelease suffixes and build metadata are rejected. Each successful publication becomes the latest release. The release workflow does not change source files or create tags.
+
+Both workflows call the same native packaging job. A release requires all six targets to build and pass their package, renderer and desktop UI checks. Build jobs have read-only repository access. Only the publisher receives write access, verifies the tag again, checks each report and payload, and creates a draft. It publishes only after every uploaded asset has the expected size and SHA-256 digest. Published files are never replaced.
+
+If publication fails, rerun the failed job within the seven-day artifact retention period. The publisher uses artifact IDs returned by the successful build jobs, including when they ran in an earlier attempt. It resumes a matching draft, verifies existing uploads and uploads missing files. Network interruptions and HTTP 500/502/503/504 responses get at most three mutation attempts with two- and four-second delays; each request has a two-minute deadline. Recovery may remove an empty `starter` asset left by a failed upload in that matching draft. Changed or unexpected assets, tag movement, authentication failures and expired artifacts require investigation. If artifacts have expired, rerun the builds; existing draft assets must still match before publication can resume.
+
+The release includes all installers and archives, package reports, `SHA256SUMS`, and `latest-<platform>-<arch>.yml` metadata. `latest.yml` additionally preserves the Windows x64 feed. These metadata files do not enable automatic macOS, Linux or Windows ARM64 updates in the application. App-side support for those targets and native upgrade acceptance are separate work.
+
+Run `npm run test:release` to check release validation, integrity checks and publication recovery with disposable repositories and a simulated GitHub API. These tests do not publish a release. The workflow and [release notes](RELEASE-NOTES.md) describe unsigned builds; signing and notarization require separate configuration and authorization.
+
 ## Pull requests
 
 Work on a focused branch in your fork, or a repository branch when you have the necessary access. Open the PR against `main`. Contributors do not need access to a maintainer's checkout; maintainers and agents working in a shared checkout follow [AGENTS.md](../AGENTS.md).

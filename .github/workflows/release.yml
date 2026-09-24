@@ -1,0 +1,145 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Release desktop application
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing numbered version tag on main (for example v0.0.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: versioned-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  validate:
+    name: Validate release tag
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      revision: ${{ steps.candidate.outputs.revision }}
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out release validation from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+      - name: Resolve tag, version and main ancestry
+        id: candidate
+        run: node scripts/validate-release.ts
+
+  windows-x64:
+    needs: validate
+    uses: ./.github/workflows/package-target.yml
+    with:
+      platform: windows
+      architecture: x64
+      revision: ${{ needs.validate.outputs.revision }}
+
+  windows-arm64:
+    needs: validate
+    uses: ./.github/workflows/package-target.yml
+    with:
+      platform: windows
+      architecture: arm64
+      revision: ${{ needs.validate.outputs.revision }}
+
+  mac-x64:
+    needs: validate
+    uses: ./.github/workflows/package-target.yml
+    with:
+      platform: mac
+      architecture: x64
+      revision: ${{ needs.validate.outputs.revision }}
+
+  mac-arm64:
+    needs: validate
+    uses: ./.github/workflows/package-target.yml
+    with:
+      platform: mac
+      architecture: arm64
+      revision: ${{ needs.validate.outputs.revision }}
+
+  linux-x64:
+    needs: validate
+    uses: ./.github/workflows/package-target.yml
+    with:
+      platform: linux
+      architecture: x64
+      revision: ${{ needs.validate.outputs.revision }}
+
+  linux-arm64:
+    needs: validate
+    uses: ./.github/workflows/package-target.yml
+    with:
+      platform: linux
+      architecture: arm64
+      revision: ${{ needs.validate.outputs.revision }}
+
+  publish:
+    name: Verify and publish release
+    needs: [validate, windows-x64, windows-arm64, mac-x64, mac-arm64, linux-x64, linux-arm64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      RELEASE_REVISION: ${{ needs.validate.outputs.revision }}
+    steps:
+      - name: Check out the validated publication revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.revision }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+      - name: Download the exact successful build artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ format('{0},{1},{2},{3},{4},{5}', needs.windows-x64.outputs.artifact-id, needs.windows-arm64.outputs.artifact-id, needs.mac-x64.outputs.artifact-id, needs.mac-arm64.outputs.artifact-id, needs.linux-x64.outputs.artifact-id, needs.linux-arm64.outputs.artifact-id) }}
+          path: _build/release-input
+          merge-multiple: false
+          digest-mismatch: error
+      - name: Verify assets, resume draft uploads and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/teamrun-release"
+          trap 'cat "$RUNNER_TEMP/teamrun-release/publish.stdout.log"; cat "$RUNNER_TEMP/teamrun-release/publish.stderr.log" >&2' EXIT
+          node scripts/publish-release.ts > "$RUNNER_TEMP/teamrun-release/publish.stdout.log" 2> "$RUNNER_TEMP/teamrun-release/publish.stderr.log"
+      - name: Retain publication diagnostics
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/teamrun-release/*.log
+          if-no-files-found: warn
+          retention-days: 7
