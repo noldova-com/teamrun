@@ -31,6 +31,9 @@ test("captures the full renderer viewport when the native window starts smaller"
   });
   const image = await desktop.capture("viewport-boundary");
   expect(await desktop.readPixel(image, 1919, 1079)).toEqual([173, 47, 219, 255]);
+  await desktop.setWindowSize(900, 600);
+  const resizedImage = await desktop.capture("viewport-boundary-after-resize");
+  expect(await desktop.readPixel(resizedImage, 1919, 1079)).toEqual([173, 47, 219, 255]);
 });
 
 test("permits clipboard writing without granting clipboard reads or notifications", async () => {

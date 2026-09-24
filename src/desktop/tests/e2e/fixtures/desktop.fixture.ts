@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { _electron, type ElectronApplication, expect, type Page, type TestInfo } from "@playwright/test";
+import { _electron, type CDPSession, type ElectronApplication, expect, type Page, type TestInfo } from "@playwright/test";
 import { ProviderRegistry } from "@noldova/teamrun-core";
 import { ConversationCreateParams, MethodName, Project, ProjectOpenParams } from "@noldova/teamrun-protocol";
 import { ProcessInspector, ProcessProbe, ProcessRegistry, RuntimeClient, RuntimeService, RuntimeSettings, RuntimeTimings } from "@noldova/teamrun-runtime";
@@ -34,6 +34,7 @@ export class DesktopFixture {
   private runtime: RuntimeService | null = null;
   private application: ElectronApplication | null = null;
   private window: Page | null = null;
+  private captureSession: CDPSession | null = null;
   private launches: number = 0;
   private tracing: boolean = false;
 
@@ -87,6 +88,8 @@ export class DesktopFixture {
   }
 
   public async capture(name: string): Promise<Buffer> {
+    if (!this.captureSession)
+      throw new Error("The fixture capture session is not running.");
     const metrics = await this.page.evaluate(() => ({
       width: window.innerWidth, height: window.innerHeight, devicePixelRatio: window.devicePixelRatio,
       visualWidth: window.visualViewport?.width, visualHeight: window.visualViewport?.height,
@@ -97,23 +100,17 @@ export class DesktopFixture {
     await writeFile(viewportPath, JSON.stringify(metrics, null, 2));
     await this.info.attach(`${name}-viewport`, { path: viewportPath, contentType: "application/json" });
     
-    const session = await this.page.context().newCDPSession(this.page);
-    try {
-      const screenshot = await session.send("Page.captureScreenshot", {
-        format: "png",
-        captureBeyondViewport: true,
-        clip: { x: 0, y: 0, width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT, scale: 1 }
-      });
-      const image = Buffer.from(screenshot.data, "base64");
-      await writeFile(imagePath, image);
-      await this.info.attach(name, { path: imagePath, contentType: "image/png" });
-      expect(image.readUInt32BE(DesktopFixture.PNG_WIDTH_OFFSET), "Screenshot width").toBe(DesktopFixture.VIEWPORT_WIDTH);
-      expect(image.readUInt32BE(DesktopFixture.PNG_HEIGHT_OFFSET), "Screenshot height").toBe(DesktopFixture.VIEWPORT_HEIGHT);
-      return image;
-    }
-    finally {
-      await session.detach();
-    }
+    const screenshot = await this.captureSession.send("Page.captureScreenshot", {
+      format: "png",
+      captureBeyondViewport: true,
+      clip: { x: 0, y: 0, width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT, scale: 1 }
+    });
+    const image = Buffer.from(screenshot.data, "base64");
+    await writeFile(imagePath, image);
+    await this.info.attach(name, { path: imagePath, contentType: "image/png" });
+    expect(image.readUInt32BE(DesktopFixture.PNG_WIDTH_OFFSET), "Screenshot width").toBe(DesktopFixture.VIEWPORT_WIDTH);
+    expect(image.readUInt32BE(DesktopFixture.PNG_HEIGHT_OFFSET), "Screenshot height").toBe(DesktopFixture.VIEWPORT_HEIGHT);
+    return image;
   }
 
   public async setWindowSize(width: number, height: number): Promise<void> {
@@ -192,7 +189,13 @@ export class DesktopFixture {
       stream?.pipe(log, { end: false });
     }
     this.window = await this.application.firstWindow();
-    await this.window.setViewportSize({ width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT });
+    this.captureSession = await this.window.context().newCDPSession(this.window);
+    await this.captureSession.send("Emulation.setDeviceMetricsOverride", {
+      width: DesktopFixture.VIEWPORT_WIDTH,
+      height: DesktopFixture.VIEWPORT_HEIGHT,
+      deviceScaleFactor: DesktopFixture.DEVICE_SCALE_FACTOR,
+      mobile: false
+    });
     await expect.poll(() => this.page.evaluate(() => ({
       width: window.innerWidth, height: window.innerHeight, scale: window.devicePixelRatio
     }))).toEqual({ width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT, scale: DesktopFixture.DEVICE_SCALE_FACTOR });
@@ -252,6 +255,7 @@ export class DesktopFixture {
         await application.close();
       }
       finally {
+        this.captureSession = null;
         if (child.exitCode === null && child.signalCode === null)
           await new Promise<void>((resolve, reject) => {
             child.once("exit", () => resolve());
