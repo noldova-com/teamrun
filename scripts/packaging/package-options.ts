@@ -35,6 +35,8 @@ export default class PackageOptions {
   private static readonly PACKAGE_OUTPUT_FOLDER: string = "_build/package";
   private static readonly INSTALLER_POLICY_DIRECTORY: string = "_build/installer-policy";
   private static readonly INSTALLER_POLICY_EXTENSION: string = ".nsh";
+  private static readonly APPIMAGE_LAUNCHER_DIRECTORY: string = "_build/appimage";
+  private static readonly APPIMAGE_LAUNCHER_NAME: string = "AppRun";
   private static readonly NOTARIZATION_ENVIRONMENT_GROUPS: readonly (readonly string[])[] = [
     ["APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_TEAM_ID"],
     ["APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"],
@@ -111,6 +113,10 @@ export default class PackageOptions {
 
   public get installerPolicyPath(): string {
     return path.resolve(PackageOptions.INSTALLER_POLICY_DIRECTORY, this.targetName + PackageOptions.INSTALLER_POLICY_EXTENSION);
+  }
+
+  public get appImageLauncherPath(): string {
+    return path.resolve(PackageOptions.APPIMAGE_LAUNCHER_DIRECTORY, this.architecture, PackageOptions.APPIMAGE_LAUNCHER_NAME);
   }
 
   public assertSigningEnvironment(environment: NodeJS.ProcessEnv): void {

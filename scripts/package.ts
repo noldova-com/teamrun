@@ -13,6 +13,7 @@ import rootLock from "../package-lock.json" with { type: "json" };
 import rootManifest from "../package.json" with { type: "json" };
 import BuildEvidence from "./build/build-evidence.ts";
 import Config from "./config.ts";
+import AppImageLauncher from "./packaging/app-image-launcher.ts";
 import PackageArtifacts from "./packaging/package-artifacts.ts";
 import PackageOptions from "./packaging/package-options.ts";
 import PackageException from "./packaging/package.exception.ts";
@@ -40,6 +41,7 @@ export default class Package extends Script {
   private static readonly RENDERER_SEGMENTS: readonly string[] = ["_build", "renderer", "browser"];
   private static readonly BUILDING: string = "Running electron-builder (publication disabled)...";
   private static readonly WINDOWS_PLATFORM: string = "windows";
+  private static readonly LINUX_PLATFORM: string = "linux";
   private static readonly BUILDER_CLI_PATH: string = "node_modules/electron-builder/cli.js";
   private static readonly RELEASE_REVISION_VARIABLE: string = "RELEASE_REVISION";
   private static readonly GITHUB_REVISION_VARIABLE: string = "GITHUB_SHA";
@@ -95,6 +97,8 @@ export default class Package extends Script {
     await this.removeDirectoryAsync(options.outputDirectory);
     if (options.platform === Package.WINDOWS_PLATFORM && !options.directoryOnly)
       await WindowsInstallerPolicy.write(options.installerPolicyPath);
+    if (options.platform === Package.LINUX_PLATFORM)
+      await AppImageLauncher.write(options.appImageLauncherPath);
     await this.executeProcessAsync(
       process.execPath,
       [path.resolve(Package.BUILDER_CLI_PATH), ...options.createBuilderArguments()],

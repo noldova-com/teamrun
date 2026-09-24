@@ -121,6 +121,8 @@ Application code uses ASAR. Icons are physical resources; the renderer includes 
 
 Builds are unsigned by default for installation testing. `--signed` requires Windows signing credentials or macOS signing and notarization configuration. The packaging command always disables publication. Fresh Windows installs default to the current user, while existing installation scope is preserved.
 
+Linux packaging pins AppImage toolset `1.0.3` with gzip compression. Its static runtime includes the FUSE library, so users do not need to install `libfuse2`. Normal mounting requires host FUSE support and permissions; `APPIMAGE_EXTRACT_AND_RUN=1 ./TeamRun-<version>-linux-<arch>.AppImage` runs from a temporary extraction when mounting is unavailable. Both paths require a host configuration that permits Electron sandboxing; the launcher does not disable the sandbox when the host cannot provide it.
+
 The **Package installers** workflow is manually dispatched from `main`, with a platform and architecture selection or all six targets. It retains installers, reports and diagnostics as Actions artifacts for seven days. It does not create GitHub Releases. Native installation and update acceptance are separate from producing these files; do not infer target support from an archive or installer alone.
 
 ## Pull requests
