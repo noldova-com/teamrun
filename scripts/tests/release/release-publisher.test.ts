@@ -21,6 +21,53 @@ const { default: ReleasePublisher } = await import("../../release/release-publis
 
 class ReleasePublisherTests {
   public static register(): void {
+    test("finds drafts through paginated release listings and keeps the ID returned by creation", async t => {
+      const fixture = await ReleaseFixture.create();
+      t.after(() => fixture.close());
+      const filename = path.join(fixture.directory, "installer.exe");
+      await writeFile(filename, "fixture bytes");
+      const file = await ReleaseFile.read(filename);
+      for (const scenario of ["existing", "later-page", "creation-response", "duplicate", "published-history-limit", "published-history-entry", "published-history-object"]) {
+        const github = new GitHubReleaseFixture(fixture.candidate);
+        if (["existing", "later-page", "duplicate"].includes(scenario))
+          github.seed();
+        if (scenario === "duplicate")
+          github.history = [github.release];
+        let listings = 0;
+        github.intercept = async (url, options) => {
+          if (url.pathname.endsWith("/releases") && options.method === undefined) {
+            listings++;
+            if (scenario === "creation-response")
+              return Response.json([]);
+            if (scenario === "later-page")
+              return Response.json(url.searchParams.get("page") === "1" ? Array(100).fill({ tag_name: "v0.0.0", draft: true }) : [github.release]);
+            if (scenario === "published-history-limit")
+              return Response.json(listings === 1 ? [] : Array(100).fill({ tag_name: "v0.0.0", draft: false }));
+            if (scenario === "published-history-entry")
+              return Response.json(listings === 1 ? [] : [{ tag_name: "v0.0.0" }]);
+            if (scenario === "published-history-object")
+              return Response.json(listings === 1 ? [] : {});
+          }
+          return undefined;
+        };
+        const operation = new ReleasePublisher(fixture.candidate, "fixture-token", github.request.bind(github)).publish([file], "Notes");
+        if (scenario === "duplicate")
+          await assert.rejects(operation, /Multiple releases/);
+        else if (scenario === "published-history-limit")
+          await assert.rejects(operation, /verification limit/);
+        else if (scenario === "published-history-entry")
+          await assert.rejects(operation, /Invalid release list entry/);
+        else if (scenario === "published-history-object")
+          await assert.rejects(operation, /Invalid release list/);
+        else {
+          await operation;
+          assert.equal(github.release?.["draft"], false);
+        }
+        assert.equal(github.calls.filter(t => t === "POST /repos/noldova-com/teamrun/releases").length, scenario === "creation-response" ? 1 : 0);
+        assert.ok(!github.calls.some(t => t.includes("/releases/tags/")));
+      }
+    });
+
     test("publishes numbered releases as latest after verifying digests, and safely repeats a completed publication", async t => {
       for (const version of ["0.0.1", "0.0.2"]) {
         const fixture = await ReleaseFixture.create(version);
