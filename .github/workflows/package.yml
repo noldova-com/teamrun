@@ -113,7 +113,7 @@ jobs:
             npm run test -- --skip-test-details --skip-coverage-details
             npm run test:renderer
             if [ "$RUNNER_OS" = Linux ]; then
-              xvfb-run --auto-servernum npm run test:ui
+              xvfb-run --auto-servernum --server-args="-screen 0 2560x1440x24" npm run test:ui
             else
               npm run test:ui
             fi

@@ -21,6 +21,12 @@ import DevelopmentBinary from "../../../../../scripts/desktop/development-binary
 import { FixtureProvider } from "./fixture-provider.fixture.ts";
 
 export class DesktopFixture {
+  private static readonly VIEWPORT_WIDTH: number = 1920;
+  private static readonly VIEWPORT_HEIGHT: number = 1080;
+  private static readonly DEVICE_SCALE_FACTOR: number = 1;
+  private static readonly PNG_WIDTH_OFFSET: number = 16;
+  private static readonly PNG_HEIGHT_OFFSET: number = 20;
+
   private readonly info: TestInfo;
   private readonly errors: string[] = [];
   private readonly logs: WriteStream[] = [];
@@ -94,12 +100,15 @@ export class DesktopFixture {
     const session = await this.page.context().newCDPSession(this.page);
     try {
       const screenshot = await session.send("Page.captureScreenshot", { format: "png" });
-      await writeFile(imagePath, Buffer.from(screenshot.data, "base64"));
+      const image = Buffer.from(screenshot.data, "base64");
+      await writeFile(imagePath, image);
+      await this.info.attach(name, { path: imagePath, contentType: "image/png" });
+      expect(image.readUInt32BE(DesktopFixture.PNG_WIDTH_OFFSET), "Screenshot width").toBe(DesktopFixture.VIEWPORT_WIDTH);
+      expect(image.readUInt32BE(DesktopFixture.PNG_HEIGHT_OFFSET), "Screenshot height").toBe(DesktopFixture.VIEWPORT_HEIGHT);
     }
     finally {
       await session.detach();
     }
-    await this.info.attach(name, { path: imagePath, contentType: "image/png" });
   }
 
   public async attachImage(): Promise<void> {
@@ -146,7 +155,8 @@ export class DesktopFixture {
     delete environment["TEAMRUN_SCREENSHOT"];
     this.application = await _electron.launch({
       executablePath: await new DevelopmentBinary().prepare(),
-      args: [fileURLToPath(new URL("./desktop-entry.fixture.ts", import.meta.url))], env: environment, chromiumSandbox: true, timeout: 15_000
+      args: [`--force-device-scale-factor=${DesktopFixture.DEVICE_SCALE_FACTOR}`, fileURLToPath(new URL("./desktop-entry.fixture.ts", import.meta.url))],
+      env: environment, chromiumSandbox: true, timeout: 15_000
     });
     expect(this.application.process().spawnargs).not.toContain("--no-sandbox");
     this.launches++;
@@ -156,6 +166,10 @@ export class DesktopFixture {
       stream?.pipe(log, { end: false });
     }
     this.window = await this.application.firstWindow();
+    await this.window.setViewportSize({ width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT });
+    await expect.poll(() => this.page.evaluate(() => ({
+      width: window.innerWidth, height: window.innerHeight, scale: window.devicePixelRatio
+    }))).toEqual({ width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT, scale: DesktopFixture.DEVICE_SCALE_FACTOR });
     await this.window.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
     this.tracing = true;
     await this.window.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });

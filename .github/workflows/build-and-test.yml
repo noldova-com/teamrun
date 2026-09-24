@@ -144,7 +144,7 @@ jobs:
         run: |
           trap 'cat "$RUNNER_TEMP/teamrun-ci/ui.stdout.log"; cat "$RUNNER_TEMP/teamrun-ci/ui.stderr.log" >&2' EXIT
           if [ "$RUNNER_PLATFORM" = Linux ]; then
-            xvfb-run --auto-servernum npm run test:ui > "$RUNNER_TEMP/teamrun-ci/ui.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/ui.stderr.log"
+            xvfb-run --auto-servernum --server-args="-screen 0 2560x1440x24" npm run test:ui > "$RUNNER_TEMP/teamrun-ci/ui.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/ui.stderr.log"
           else
             npm run test:ui > "$RUNNER_TEMP/teamrun-ci/ui.stdout.log" 2> "$RUNNER_TEMP/teamrun-ci/ui.stderr.log"
           fi
