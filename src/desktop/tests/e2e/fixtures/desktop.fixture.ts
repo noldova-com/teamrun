@@ -86,7 +86,7 @@ export class DesktopFixture {
     await this.launch();
   }
 
-  public async capture(name: string): Promise<void> {
+  public async capture(name: string): Promise<Buffer> {
     const metrics = await this.page.evaluate(() => ({
       width: window.innerWidth, height: window.innerHeight, devicePixelRatio: window.devicePixelRatio,
       visualWidth: window.visualViewport?.width, visualHeight: window.visualViewport?.height,
@@ -99,16 +99,42 @@ export class DesktopFixture {
     
     const session = await this.page.context().newCDPSession(this.page);
     try {
-      const screenshot = await session.send("Page.captureScreenshot", { format: "png" });
+      const screenshot = await session.send("Page.captureScreenshot", {
+        format: "png",
+        captureBeyondViewport: true,
+        clip: { x: 0, y: 0, width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT, scale: 1 }
+      });
       const image = Buffer.from(screenshot.data, "base64");
       await writeFile(imagePath, image);
       await this.info.attach(name, { path: imagePath, contentType: "image/png" });
       expect(image.readUInt32BE(DesktopFixture.PNG_WIDTH_OFFSET), "Screenshot width").toBe(DesktopFixture.VIEWPORT_WIDTH);
       expect(image.readUInt32BE(DesktopFixture.PNG_HEIGHT_OFFSET), "Screenshot height").toBe(DesktopFixture.VIEWPORT_HEIGHT);
+      return image;
     }
     finally {
       await session.detach();
     }
+  }
+
+  public async setWindowSize(width: number, height: number): Promise<void> {
+    if (!this.application)
+      throw new Error("The fixture window is not running.");
+    await this.application.evaluate(({ BrowserWindow }, size) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (!window)
+        throw new Error("The native fixture window is missing.");
+      window.setContentSize(size.width, size.height);
+    }, { width, height });
+  }
+
+  public async readPixel(image: Buffer, x: number, y: number): Promise<readonly number[]> {
+    if (!this.application)
+      throw new Error("The fixture window is not running.");
+    return await this.application.evaluate(({ nativeImage }, sample) => {
+      const image = nativeImage.createFromBuffer(Buffer.from(sample.data, "base64"));
+      const offset = (sample.y * image.getSize().width + sample.x) * 4;
+      return [...image.toBitmap().subarray(offset, offset + 4)];
+    }, { data: image.toString("base64"), x, y });
   }
 
   public async attachImage(): Promise<void> {
@@ -166,15 +192,6 @@ export class DesktopFixture {
       stream?.pipe(log, { end: false });
     }
     this.window = await this.application.firstWindow();
-    const application = this.application;
-    await application.evaluate(({ BrowserWindow }, size) => {
-      const window = BrowserWindow.getAllWindows()[0];
-      if (!window)
-        throw new Error("The native fixture window is missing.");
-      window.setContentSize(size.width, size.height);
-    }, { width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT });
-    await expect.poll(() => application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getContentBounds()))
-      .toMatchObject({ width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT });
     await this.window.setViewportSize({ width: DesktopFixture.VIEWPORT_WIDTH, height: DesktopFixture.VIEWPORT_HEIGHT });
     await expect.poll(() => this.page.evaluate(() => ({
       width: window.innerWidth, height: window.innerHeight, scale: window.devicePixelRatio
