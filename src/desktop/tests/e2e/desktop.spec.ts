@@ -21,6 +21,21 @@ test.afterEach(async () => {
   await desktop.dispose();
 });
 
+test("captures the full renderer viewport when the native window starts smaller", async () => {
+  await desktop.setWindowSize(1000, 680);
+  await desktop.restart();
+  await desktop.page.evaluate(() => {
+    const marker = document.createElement("div");
+    marker.style.cssText = "position:fixed;right:0;bottom:0;width:16px;height:16px;background:rgb(219,47,173);z-index:2147483647";
+    document.body.append(marker);
+  });
+  const image = await desktop.capture("viewport-boundary");
+  expect(await desktop.readPixel(image, 1919, 1079)).toEqual([173, 47, 219, 255]);
+  await desktop.setWindowSize(900, 600);
+  const resizedImage = await desktop.capture("viewport-boundary-after-resize");
+  expect(await desktop.readPixel(resizedImage, 1919, 1079)).toEqual([173, 47, 219, 255]);
+});
+
 test("permits clipboard writing without granting clipboard reads or notifications", async () => {
   const write: unknown = await desktop.page.evaluate("navigator.permissions.query({name: 'clipboard-write'}).then(t => t.state)");
   const read: unknown = await desktop.page.evaluate("navigator.permissions.query({name: 'clipboard-read'}).then(t => t.state)");

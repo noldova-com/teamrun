@@ -123,6 +123,8 @@ Choose named screenshot checkpoints deliberately, such as Settings opened, an im
 
 Capture after the expected UI state is established, with a declared animation policy. Use the automation framework's supported stabilization behavior; animation cancellation must not be mistaken for an application failure by a generic wait. Tests of animation behavior still exercise that behavior explicitly. Record the platform, viewport, scale, theme and font settings needed to interpret a visual result.
 
+The shared desktop UI suite uses a 1920 × 1080 renderer viewport at one device pixel per CSS pixel at normal zoom. Captures remain 1920 × 1080 pixels during zoom tests; the recorded CSS viewport and pixel ratio reflect the zoom. Verify the actual viewport and PNG dimensions so host display defaults cannot silently reduce the evidence resolution.
+
 Screenshot attachments are review evidence. Pixel comparison is a separately selected assertion against a deliberately reviewed baseline. Control the rendering environment, use appropriate platform baselines and update expected images only through review; verification never rewrites them to accept a difference. Screenshots do not replace behavioral, computed-style, contrast or accessibility checks.
 
 CI reports expose identities, steps, outcomes, screenshots and traces, retaining run artifacts under an explicit retention policy. Commit evidence only under section 8's lasting-value rule. Aggregation preserves startup, execution, capture and cleanup failures. Evidence applies only to its recorded build and environment.
