@@ -18,8 +18,12 @@ export default class ReleaseAssets {
   private static readonly ARCHITECTURES: readonly string[] = ["x64", "arm64"];
   private static readonly CHECKSUMS_FILE: string = "SHA256SUMS";
   private static readonly REPORT_PATTERN: RegExp = /^package-report-(windows|mac|linux)-(x64|arm64)\.json$/;
+  private static readonly WINDOWS_UPDATE_INFO: string = "latest.yml";
+  private static readonly MAC_UPDATE_INFO: string = "latest-mac.yml";
+  private static readonly LINUX_X64_UPDATE_INFO: string = "latest-linux.yml";
+  private static readonly LINUX_ARM64_UPDATE_INFO: string = "latest-linux-arm64.yml";
   private static readonly BUILDER_METADATA_FILES: readonly string[] = [
-    "latest.yml", "latest-mac.yml", "latest-linux.yml", "latest-linux-arm64.yml"
+    ReleaseAssets.WINDOWS_UPDATE_INFO, ReleaseAssets.MAC_UPDATE_INFO, ReleaseAssets.LINUX_X64_UPDATE_INFO, ReleaseAssets.LINUX_ARM64_UPDATE_INFO
   ];
   private static readonly TARGETS_REQUIRED: string = "Release requires exactly six build artifacts.";
   private static readonly STAGING_NOT_EMPTY: string = "Release staging must be empty.";
@@ -40,7 +44,9 @@ export default class ReleaseAssets {
   public async prepare(input: string, output: string): Promise<readonly ReleaseFile[]> {
     const files: ReleaseFile[] = [];
     const targets = new Set<string>();
-    const directories = await readdir(input);
+    const updateInfo = new Map<string, { url: string; sha512: string; size: number }[]>();
+    // Sorting keeps each update-info file listing its builds in the same order on every run.
+    const directories = (await readdir(input)).sort();
     if (directories.length !== ReleaseAssets.PLATFORMS.length * ReleaseAssets.ARCHITECTURES.length)
       throw new PackageException(ReleaseAssets.TARGETS_REQUIRED);
     await mkdir(output, { recursive: true });
@@ -97,16 +103,17 @@ export default class ReleaseAssets {
         throw new PackageException(ReleaseAssets.INVALID_FILES);
       files.push(await this.copy(reportFile, output));
       const url = `https://github.com/${ReleaseCandidate.REPOSITORY}/releases/download/${this.candidate.tag}/${update.name}`;
-      const metadata = JSON.stringify({ version: this.candidate.version.value, files: [{ url, sha512: update.sha512, size: update.size }],
-        path: url, sha512: update.sha512 }, null, 2) + "\n";
-      const metadataNames = [`latest-${target}.yml`];
-      if (target === "windows-x64")
-        metadataNames.push("latest.yml");
-      for (const name of metadataNames) {
-        const filename = path.join(output, name);
-        await writeFile(filename, metadata, { flag: "wx" });
-        files.push(await ReleaseFile.read(filename));
-      }
+      const updateInfoName = report.targetPlatform === "windows" ? ReleaseAssets.WINDOWS_UPDATE_INFO
+        : report.targetPlatform === "mac" ? ReleaseAssets.MAC_UPDATE_INFO
+        : report.targetArchitecture === "x64" ? ReleaseAssets.LINUX_X64_UPDATE_INFO : ReleaseAssets.LINUX_ARM64_UPDATE_INFO;
+      const updateFiles = updateInfo.get(updateInfoName) ?? [];
+      updateFiles.push({ url, sha512: update.sha512, size: update.size });
+      updateInfo.set(updateInfoName, updateFiles);
+    }
+    for (const [name, updateFiles] of updateInfo) {
+      const filename = path.join(output, name);
+      await writeFile(filename, JSON.stringify({ version: this.candidate.version.value, files: updateFiles }, null, 2) + "\n", { flag: "wx" });
+      files.push(await ReleaseFile.read(filename));
     }
     files.sort((first, second) => first.name < second.name ? -1 : 1);
     const checksums = path.join(output, ReleaseAssets.CHECKSUMS_FILE);

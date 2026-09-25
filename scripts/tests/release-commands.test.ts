@@ -82,7 +82,7 @@ class ReleaseCommandsTests {
       t.mock.method(globalThis, "fetch", github.request.bind(github));
       await new PublishRelease().runAsync();
       assert.equal(github.release?.["draft"], false);
-      assert.equal(github.assets.length, 28);
+      assert.equal(github.assets.length, 25);
       const command = fileURLToPath(new URL("../publish-release.ts", import.meta.url));
       const child = spawnSync(process.execPath, [command], {
         cwd: fixture.directory, env: { ...process.env, GITHUB_REPOSITORY: "wrong", GH_TOKEN: "" }, encoding: "utf8", timeout: 10_000
