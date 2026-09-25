@@ -24,6 +24,7 @@ export default class ReleaseCandidate {
   public readonly tag: string;
   public readonly version: ReleaseVersion;
   public readonly revision: string;
+  public readonly releaseDate: string;
 
   public constructor(tag: string, directory: string = process.cwd(), expectedRevision?: string) {
     if (!tag.startsWith("v"))
@@ -41,10 +42,12 @@ export default class ReleaseCandidate {
       || !("packages" in lock) || typeof lock.packages !== "object" || lock.packages === null
       || !("" in lock.packages) || !ReleaseCandidate.hasVersion(lock.packages[""], version.value))
       throw new PackageException(ReleaseCandidate.VERSION_MISMATCH);
+    const releaseDate = new Date(git(["show", "-s", "--format=%cI", revision])).toISOString();
 
     this.tag = tag;
     this.version = version;
     this.revision = revision;
+    this.releaseDate = releaseDate;
   }
 
   public writeOutputs(filename: string): void {

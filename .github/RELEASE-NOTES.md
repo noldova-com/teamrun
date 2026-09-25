@@ -2,11 +2,11 @@ TeamRun brings coding agents together in one desktop application.
 
 Download the installer for your operating system and CPU:
 
-| Platform | Install | Portable/archive |
-|---|---|---|
-| Windows | `TeamRun-<version>-windows-<arch>-setup.exe` | `.zip` |
-| macOS | `TeamRun-<version>-mac-<arch>.dmg` | `.zip` |
-| Linux | `TeamRun-linux-<arch>.AppImage` | — |
+| Platform | Download |
+|---|---|
+| Windows | `TeamRun-windows-<arch>.exe` |
+| macOS | `TeamRun-mac-<arch>.dmg` |
+| Linux | `TeamRun-linux-<arch>.AppImage` |
 
 Choose `x64` for Intel/AMD computers or `arm64` for Apple Silicon and other ARM computers. GitHub's source-code downloads are not installers.
 

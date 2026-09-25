@@ -10,7 +10,6 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import rootLock from "../../../package-lock.json" with { type: "json" };
-import Config from "../../config.ts";
 import Script from "../../script.ts";
 import PackageOptionsFixture from "../packaging/fixtures/package-options.fixture.ts";
 
@@ -55,10 +54,9 @@ export default class PackageScriptFixture extends Script {
     await mkdir(options.outputDirectory, { recursive: true });
     if (options.directoryOnly)
       return;
-    const suffixes = options.platform === "windows" ? ["-setup.exe", ".zip"] : options.platform === "mac" ? [".dmg", ".zip"] : [".AppImage"];
-    const prefix = options.platform === "linux" ? "TeamRun-" : `TeamRun-${Config.VERSION}-`;
+    const suffixes = options.platform === "windows" ? [".exe"] : options.platform === "mac" ? [".dmg", ".zip"] : [".AppImage"];
     for (const suffix of suffixes)
-      await writeFile(path.join(options.outputDirectory, `${prefix}${options.targetName}${suffix}`), "fixture installer");
+      await writeFile(path.join(options.outputDirectory, `TeamRun-${options.targetName}${suffix}`), "fixture installer");
   }
 
   protected override async executeTypeScriptCompilerAsync(args: readonly string[], _directory: string = process.cwd()): Promise<void> {

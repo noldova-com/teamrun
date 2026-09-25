@@ -45,13 +45,12 @@ export class UpdateSettingsTests {
   }
 
   @TestMethod
-  public permitsOnlyExplicitPackagedLoopbackFeedsAndSeparatesCpuTargets(): void {
+  public permitsOnlyExplicitPackagedLoopbackFeedsForEveryUpdatableTarget(): void {
     const environment = { TEAMRUN_UPDATE_TEST_FEED: "http://127.0.0.1:8000/test///" };
-    Assert.areEqual("http://127.0.0.1:8000/test/windows-x64/", UpdateSettings.fromEnvironment(environment, true, "win32", "x64").feedUrl);
-    Assert.areEqual("http://127.0.0.1:8000/test/windows-arm64/", UpdateSettings.fromEnvironment(environment, true, "win32", "arm64").feedUrl);
     const appImageEnvironment = { ...environment, APPIMAGE: "/opt/TeamRun-linux-arm64.AppImage" };
-    Assert.areEqual("http://127.0.0.1:8000/test/linux-x64/", UpdateSettings.fromEnvironment(appImageEnvironment, true, "linux", "x64").feedUrl);
-    Assert.areEqual("http://127.0.0.1:8000/test/linux-arm64/", UpdateSettings.fromEnvironment(appImageEnvironment, true, "linux", "arm64").feedUrl);
+    for (const [settingsEnvironment, platform, architecture] of [[environment, "win32", "x64"], [environment, "win32", "arm64"],
+      [appImageEnvironment, "linux", "x64"], [appImageEnvironment, "linux", "arm64"]] as const)
+      Assert.areEqual("http://127.0.0.1:8000/test/", UpdateSettings.fromEnvironment(settingsEnvironment, true, platform, architecture).feedUrl);
     for (const host of ["localhost", "[::1]"])
       Assert.isNotNull(UpdateSettings.fromEnvironment({ TEAMRUN_UPDATE_TEST_FEED: `http://${host}:8000` }, true, "win32", "x64").feedUrl);
     Assert.areEqual(Resources.updatesDevelopmentDisabled, UpdateSettings.fromEnvironment(environment, false, "win32", "x64").disabledReason);

@@ -113,8 +113,8 @@ Packaging defaults to the host OS and CPU. Select `--platform windows|linux|mac`
 
 | Platform | Formats |
 |---|---|
-| Windows | NSIS installer and ZIP |
-| macOS | DMG and ZIP |
+| Windows | NSIS installer |
+| macOS | DMG, and the ZIP used for updates |
 | Linux | AppImage |
 
 Application code uses ASAR. Icons are physical resources; the renderer includes its fonts and notices. Foundation Testing and development dependencies are excluded. Packaging uses the locked production dependency versions and writes a report of artifact names, sizes and SHA-256 hashes.
@@ -135,7 +135,7 @@ Both workflows call the same native packaging job. A release requires all six ta
 
 If publication fails, rerun the failed job within the seven-day artifact retention period. The publisher uses artifact IDs returned by the successful build jobs, including when they ran in an earlier attempt. It resumes a matching draft, verifies existing uploads and uploads missing files. Network interruptions and HTTP 500/502/503/504 responses get at most three mutation attempts with two- and four-second delays; each request has a two-minute deadline. Recovery may remove an empty `starter` asset left by a failed upload in that matching draft. Changed or unexpected assets, tag movement, authentication failures and expired artifacts require investigation. If artifacts have expired, rerun the builds; existing draft assets must still match before publication can resume.
 
-The release includes all installers and archives, package reports, `SHA256SUMS`, and one update-info file per platform under the updater's standard names: `latest.yml` lists both Windows installers, `latest-mac.yml` both macOS ZIP archives, and `latest-linux.yml` and `latest-linux-arm64.yml` the Linux AppImages. An installed application downloads the entry for its own CPU. The application installs updates on Windows x64 and from the Linux x64 AppImage. Windows ARM64 and Linux ARM64 await native update verification, and macOS awaits signed builds.
+The release includes all installers, the macOS ZIP archives, package reports, `SHA256SUMS`, and one update-info file per target, `latest-<platform>-<arch>.yml`, naming the file the updater downloads for that target. No file name contains the version, so `releases/latest/download/TeamRun-<platform>-<arch>.<ext>` always serves the newest build. The application installs updates on Windows x64 and from the Linux x64 AppImage. Windows ARM64 and Linux ARM64 await native update verification, and macOS awaits signed builds.
 
 Run `npm run test:release` to check release validation, integrity checks and publication recovery with disposable repositories and a simulated GitHub API. These tests do not publish a release. The workflow and [release notes](RELEASE-NOTES.md) describe unsigned builds; signing and notarization require separate configuration and authorization.
 

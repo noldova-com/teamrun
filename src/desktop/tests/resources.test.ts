@@ -21,6 +21,14 @@ export class ResourcesTests {
   }
 
   @TestMethod
+  public namesTheUpdateInformationOfEachTarget(): void {
+    Assert.areEqual("windows-x64", Resources.formatUpdateTarget("win32", "x64"));
+    Assert.areEqual("mac-arm64", Resources.formatUpdateTarget("darwin", "arm64"));
+    Assert.areEqual("linux-arm64", Resources.formatUpdateTarget("linux", "arm64"));
+    Assert.areEqual("latest-windows-arm64.yml", Resources.formatUpdateInfoName("windows-arm64"));
+  }
+
+  @TestMethod
   public carriesTheStampedProductVersion(): void {
     Assert.isFalse(Resources.productVersion.includes("__"));
     Assert.isTrue(Resources.productVersion.length > 0);

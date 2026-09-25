@@ -23,15 +23,14 @@ class PackageArtifactsTests {
       const directory = await mkdtemp(path.join(os.tmpdir(), "teamrun-artifacts-"));
       t.after(() => rm(directory, { recursive: true, force: true }));
       for (const [platform, host, suffixes] of [
-        ["windows", "win32", ["-setup.exe", ".zip"]],
+        ["windows", "win32", [".exe"]],
         ["linux", "linux", [".AppImage"]],
         ["mac", "darwin", [".dmg", ".zip"]]
       ] as const) {
         for (const architecture of ["x64", "arm64"]) {
           const targetDirectory = path.join(directory, platform + "-" + architecture);
           await mkdir(targetDirectory);
-          const prefix = platform === "linux" ? "TeamRun-" : "TeamRun-1.2.3-";
-          const names = suffixes.map(suffix => prefix + platform + "-" + architecture + suffix).sort();
+          const names = suffixes.map(suffix => "TeamRun-" + platform + "-" + architecture + suffix).sort();
           for (const name of names)
             await writeFile(path.join(targetDirectory, name), "fixture");
           const options = new PackageOptions(["--arch", architecture], host, architecture);
@@ -46,11 +45,11 @@ class PackageArtifactsTests {
       }
     });
 
-    test("rejects a missing required ZIP instead of accepting a partial Windows build", async t => {
+    test("rejects a missing required ZIP instead of accepting a partial macOS build", async t => {
       const directory = await mkdtemp(path.join(os.tmpdir(), "teamrun-artifacts-"));
       t.after(() => rm(directory, { recursive: true, force: true }));
-      await writeFile(path.join(directory, "TeamRun-1.2.3-windows-x64-setup.exe"), "fixture");
-      const options = new PackageOptions([], "win32", "x64");
+      await writeFile(path.join(directory, "TeamRun-mac-x64.dmg"), "fixture");
+      const options = new PackageOptions([], "darwin", "x64");
       await assert.rejects(new PackageArtifacts(options, "1.2.3", directory).writeReport(), { code: "ENOENT" });
     });
 
@@ -76,8 +75,8 @@ class PackageArtifactsTests {
     test("includes update companions but excludes builder diagnostics and unpacked content", async t => {
       const directory = await mkdtemp(path.join(os.tmpdir(), "teamrun-artifacts-"));
       t.after(() => rm(directory, { recursive: true, force: true }));
-      const filename = "TeamRun-1.2.3-mac-arm64.zip";
-      const names = ["TeamRun-1.2.3-mac-arm64.dmg", filename, filename + ".blockmap", "latest-mac.yml"];
+      const filename = "TeamRun-mac-arm64.zip";
+      const names = ["TeamRun-mac-arm64.dmg", filename, filename + ".blockmap", "latest-mac.yml"];
       for (const name of [...names, "builder-debug.yml", "builder-effective-config.yaml"])
         await writeFile(path.join(directory, name), "fixture");
       await mkdir(path.join(directory, "mac-arm64"));

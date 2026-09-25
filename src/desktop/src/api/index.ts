@@ -15,6 +15,7 @@ export type { IUpdateBackend } from "../interfaces/i-update-backend.js";
 export type { IUpdateRestart } from "../interfaces/i-update-restart.js";
 export { DesktopInfo } from "../models/desktop-info.js";
 export { DesktopSettings } from "../models/desktop-settings.js";
+export { ReleaseUpdateInfo } from "../models/release-update-info.js";
 export { SenderInfo } from "../models/sender-info.js";
 export { UpdateParticipant } from "../models/update-participant.js";
 export { UpdateSettings } from "../models/update-settings.js";

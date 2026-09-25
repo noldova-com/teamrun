@@ -18,6 +18,7 @@ import "@noldova/teamrun-foundation-core";
 import type { IUpdateBackend } from "../interfaces/i-update-backend.js";
 import type { UpdateSettings } from "../models/update-settings.js";
 import { Resources } from "../resources.js";
+import { ReleaseUpdateProvider } from "./release-update-provider.js";
 
 export class ElectronUpdateBackend implements IUpdateBackend {
   private readonly settings: UpdateSettings;
@@ -92,7 +93,7 @@ export class ElectronUpdateBackend implements IUpdateBackend {
     const directory = join(this.dataDirectory, Resources.electronDirectoryName);
     const path = join(directory, Resources.updateConfigFileName);
     const cacheId = createHash(Resources.updateHashAlgorithm).update(this.dataDirectory).digest(Resources.updateHashEncoding);
-    const config = { provider: Resources.updateProvider, url: this.settings.feedUrl, updaterCacheDirName: `${Resources.updateCachePrefix}${cacheId}` };
+    const config = { updaterCacheDirName: `${Resources.updateCachePrefix}${cacheId}` };
     await mkdir(directory, { recursive: true });
     await writeFile(path, JSON.stringify(config), Resources.utf8Encoding);
     if (this.disposed)
@@ -106,6 +107,8 @@ export class ElectronUpdateBackend implements IUpdateBackend {
     updater.allowDowngrade = false;
     updater.disableWebInstaller = true;
     updater.updateConfigPath = path;
+    updater.setFeedURL({ provider: Resources.customUpdateProvider, updateProvider: ReleaseUpdateProvider, [Resources.releaseFeedUrlKey]: this.settings.feedUrl,
+      [Resources.releaseFeedTargetKey]: Resources.formatUpdateTarget(process.platform, process.arch) });
     this.updater = updater;
     return updater;
   }
