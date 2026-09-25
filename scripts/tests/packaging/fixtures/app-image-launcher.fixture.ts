@@ -50,7 +50,8 @@ export default class AppImageLauncherFixture implements AsyncDisposable {
     return fixture;
   }
 
-  public async run(args: readonly string[], exitCode: number, inheritedPaths: string): Promise<SpawnSyncReturns<string>> {
+  public async run(args: readonly string[], exitCode: number, inheritedPaths: string,
+    environment: Readonly<Record<string, string>> = {}): Promise<SpawnSyncReturns<string>> {
     await writeFile(path.join(this.directory, "arguments"), args.map(t => t + "\0").join(""));
     await writeFile(path.join(this.directory, "inherited-path"), inheritedPaths + "\n");
     const bash = process.platform === "win32"
@@ -64,7 +65,8 @@ export default class AppImageLauncherFixture implements AsyncDisposable {
         LAUNCHER_FILE: this.launcherPath.replaceAll("\\", "/"),
         LAUNCH_RECORD: path.join(this.directory, "record").replaceAll("\\", "/"),
         PROBE_RECORD: path.join(this.directory, "probe").replaceAll("\\", "/"),
-        LAUNCH_EXIT_CODE: String(exitCode)
+        LAUNCH_EXIT_CODE: String(exitCode),
+        ...environment
       },
       encoding: "utf8",
       timeout: 10_000
