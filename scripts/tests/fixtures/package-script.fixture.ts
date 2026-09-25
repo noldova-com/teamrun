@@ -56,8 +56,9 @@ export default class PackageScriptFixture extends Script {
     if (options.directoryOnly)
       return;
     const suffixes = options.platform === "windows" ? ["-setup.exe", ".zip"] : options.platform === "mac" ? [".dmg", ".zip"] : [".AppImage"];
+    const prefix = options.platform === "linux" ? "TeamRun-" : `TeamRun-${Config.VERSION}-`;
     for (const suffix of suffixes)
-      await writeFile(path.join(options.outputDirectory, `TeamRun-${Config.VERSION}-${options.targetName}${suffix}`), "fixture installer");
+      await writeFile(path.join(options.outputDirectory, `${prefix}${options.targetName}${suffix}`), "fixture installer");
   }
 
   protected override async executeTypeScriptCompilerAsync(args: readonly string[], _directory: string = process.cwd()): Promise<void> {

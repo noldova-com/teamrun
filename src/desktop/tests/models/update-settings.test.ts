@@ -29,10 +29,29 @@ export class UpdateSettingsTests {
   }
 
   @TestMethod
+  public updatesOnlyLinuxX64AppImagesFromThePublicReleaseFeed(): void {
+    const appImage = { APPIMAGE: "/home/user/Applications/TeamRun-linux-x64.AppImage" };
+    const settings = UpdateSettings.fromEnvironment(appImage, true, "linux", "x64");
+    Assert.areEqual("https://github.com/noldova-com/teamrun/releases/latest/download/", settings.feedUrl);
+    Assert.isTrue(settings.allowInstallation);
+    Assert.isNull(settings.disabledReason);
+    for (const [environment, architecture] of [[appImage, "arm64"], [{ APPIMAGE: " " }, "x64"], [appImage, "ia32"]] as const) {
+      const unsupported = UpdateSettings.fromEnvironment(environment, true, "linux", architecture);
+      Assert.isNull(unsupported.feedUrl);
+      Assert.isNull(unsupported.disabledReason);
+      Assert.isFalse(unsupported.allowInstallation);
+    }
+    Assert.isNull(UpdateSettings.fromEnvironment(appImage, true, "darwin", "x64").feedUrl);
+  }
+
+  @TestMethod
   public permitsOnlyExplicitPackagedLoopbackFeedsAndSeparatesCpuTargets(): void {
     const environment = { TEAMRUN_UPDATE_TEST_FEED: "http://127.0.0.1:8000/test///" };
     Assert.areEqual("http://127.0.0.1:8000/test/windows-x64/", UpdateSettings.fromEnvironment(environment, true, "win32", "x64").feedUrl);
     Assert.areEqual("http://127.0.0.1:8000/test/windows-arm64/", UpdateSettings.fromEnvironment(environment, true, "win32", "arm64").feedUrl);
+    const appImageEnvironment = { ...environment, APPIMAGE: "/opt/TeamRun-linux-arm64.AppImage" };
+    Assert.areEqual("http://127.0.0.1:8000/test/linux-x64/", UpdateSettings.fromEnvironment(appImageEnvironment, true, "linux", "x64").feedUrl);
+    Assert.areEqual("http://127.0.0.1:8000/test/linux-arm64/", UpdateSettings.fromEnvironment(appImageEnvironment, true, "linux", "arm64").feedUrl);
     for (const host of ["localhost", "[::1]"])
       Assert.isNotNull(UpdateSettings.fromEnvironment({ TEAMRUN_UPDATE_TEST_FEED: `http://${host}:8000` }, true, "win32", "x64").feedUrl);
     Assert.areEqual(Resources.updatesDevelopmentDisabled, UpdateSettings.fromEnvironment(environment, false, "win32", "x64").disabledReason);

@@ -35,7 +35,7 @@ class PackageOptionsTests {
           assert.equal(options.outputDirectory, path.resolve("_build/package", platform + "-" + architecture));
           assert.equal(options.appImageLauncherPath, path.resolve("_build/appimage", architecture, "AppRun"));
           assert.equal(args.includes("--config.nsis.include=" + path.resolve("_build/installer-policy", platform + "-" + architecture + ".nsh")), platform === "windows");
-          assert.equal(args.includes("--config.linux.artifactName=TeamRun-${version}-linux-" + architecture + ".${ext}"), platform === "linux");
+          assert.equal(args.includes("--config.linux.artifactName=TeamRun-linux-" + architecture + ".${ext}"), platform === "linux");
           assert.ok(options.createInstallArguments().includes("ci"));
           assert.ok(options.createInstallArguments().includes("--cpu=" + architecture));
           assert.ok(options.createInstallArguments().includes("--os=" + nodePlatform));
