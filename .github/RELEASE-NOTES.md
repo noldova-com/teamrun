@@ -14,6 +14,6 @@ These builds are **unsigned** and the macOS app is not notarized. Windows may sh
 
 TeamRun is in early development. Releases use numbered versions such as `0.0.1` and `0.0.2`. Public in-app update delivery currently supports Windows x64 releases only; other targets require downloading the next installer.
 
-`SHA256SUMS` and the package reports identify the downloadable files and their build revision. Separate update metadata is supplied for each target; it does not establish app-side update support for that target.
+`SHA256SUMS` and the package reports identify the downloadable files and their build revision. The `latest*.yml` files describe each platform's builds for in-app updates; they do not establish in-app update support for that platform.
 
 Report problems through [GitHub Issues](https://github.com/noldova-com/teamrun/issues), including the application version, OS and CPU. Keep a backup of important TeamRun data when testing early releases.
