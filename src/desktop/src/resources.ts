@@ -54,7 +54,16 @@ export class Resources {
   public static readonly updateCachePrefix: string = "teamrun-update-test-";
   public static readonly updateHashAlgorithm: string = "sha256";
   public static readonly updateHashEncoding: "hex" = "hex";
-  public static readonly updateProvider: "generic" = "generic";
+  public static readonly customUpdateProvider: "custom" = "custom";
+  public static readonly releaseFeedUrlKey: string = "url";
+  public static readonly releaseFeedTargetKey: string = "target";
+  public static readonly updateInfoInvalid: string = "The update information is invalid.";
+  public static readonly updateVersionField: string = "version";
+  public static readonly updateFilesField: string = "files";
+  public static readonly updateUrlField: string = "url";
+  public static readonly updateSha512Field: string = "sha512";
+  public static readonly updateSizeField: string = "size";
+  public static readonly updateReleaseDateField: string = "releaseDate";
   public static readonly updateProgressEvent: "download-progress" = "download-progress";
   public static readonly updatesDevelopmentDisabled: string = "Updates are unavailable when running TeamRun from source.";
   public static readonly updatesFeedMissing: string = "Update downloads are not configured for this build.";
@@ -64,7 +73,12 @@ export class Resources {
   public static readonly updateInstallDeferred: string = "Download verified. Installation is not enabled in this test build; restart will not install it.";
 
   public static formatUpdateTarget(platform: string, architecture: string): string {
-    return `${platform === Resources.windowsPlatform ? Resources.windowsTargetName : platform}-${architecture}`;
+    const name = platform === Resources.windowsPlatform ? Resources.windowsTargetName : platform === Resources.macPlatform ? Resources.macTargetName : platform;
+    return `${name}-${architecture}`;
+  }
+
+  public static formatUpdateInfoName(target: string): string {
+    return `latest-${target}.yml`;
   }
   public static readonly imageReadMode: string = "r";
   public static readonly connectionClosed: string = "The desktop runtime connection is closed.";
@@ -128,6 +142,7 @@ export class Resources {
   public static readonly macPlatform: "darwin" = "darwin";
   public static readonly linuxPlatform: "linux" = "linux";
   public static readonly windowsTargetName: string = "windows";
+  public static readonly macTargetName: string = "mac";
   public static readonly themeUpdatedEvent: "updated" = "updated";
   public static readonly closedEvent: "closed" = "closed";
   public static readonly repositoryRootSegments: readonly string[] = ["..", "..", ".."];

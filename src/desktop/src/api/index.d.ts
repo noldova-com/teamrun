@@ -235,6 +235,43 @@ export declare class RendererCheckpoint {
 }
 
 /**
+ * One target's update information from a release: the single file the updater downloads, with its integrity data.
+ */
+export declare class ReleaseUpdateInfo {
+  /**
+   * Product version the update installs.
+   */
+  public readonly version: string;
+  /**
+   * Absolute download address of the update file.
+   */
+  public readonly url: string;
+  /**
+   * Base64 SHA-512 digest the updater verifies after downloading.
+   */
+  public readonly sha512: string;
+  /**
+   * Positive size of the update file in bytes.
+   */
+  public readonly size: number;
+  /**
+   * ISO 8601 date of the release revision.
+   */
+  public readonly releaseDate: string;
+
+  private constructor();
+
+  /**
+   * Reads a latest-<platform>-<arch>.yml file published by the release workflow.
+   * @param text JSON text downloaded from the update feed; untrusted.
+   * @returns The validated update information.
+   * @throws Error when the text is not JSON, a field is missing or invalid, the size is not a positive integer, or the file lists
+   * other than exactly one update file.
+   */
+  public static parse(text: string): ReleaseUpdateInfo;
+}
+
+/**
  * Read-only build/feed selection. Development and builds without a feed stay disabled.
  */
 export declare class UpdateSettings {
@@ -244,7 +281,7 @@ export declare class UpdateSettings {
    */
   public readonly allowInstallation: boolean;
   /**
-   * Public release feed for Windows x64 and Linux x64 AppImages, a target-specific loopback feed, or null when disabled.
+   * Public release feed for Windows x64 and Linux x64 AppImages, a loopback feed folder, or null when disabled.
    */
   public readonly feedUrl: string | null;
   /**
@@ -942,9 +979,27 @@ export declare class Resources {
    */
   public static readonly updateHashEncoding: "hex";
   /**
-   * Local generic server provider name.
+   * Provider name that makes electron-updater read update information through TeamRun's release update source.
    */
-  public static readonly updateProvider: "generic";
+  public static readonly customUpdateProvider: "custom";
+  /**
+   * Keys of the update feed address and release target in the custom provider options.
+   */
+  public static readonly releaseFeedUrlKey: string;
+  public static readonly releaseFeedTargetKey: string;
+  /**
+   * Error for unreadable, malformed or multi-file update information.
+   */
+  public static readonly updateInfoInvalid: string;
+  /**
+   * Update-information field names, as written by the release publisher.
+   */
+  public static readonly updateVersionField: string;
+  public static readonly updateFilesField: string;
+  public static readonly updateUrlField: string;
+  public static readonly updateSha512Field: string;
+  public static readonly updateSizeField: string;
+  public static readonly updateReleaseDateField: string;
   /**
    * Library progress event name.
    */
@@ -1054,9 +1109,13 @@ export declare class Resources {
   public static readonly macPlatform: "darwin";
   public static readonly linuxPlatform: "linux";
   /**
-   * The platform segment used for Windows in local update feed directories.
+   * The platform segment used for Windows in release file names.
    */
   public static readonly windowsTargetName: string;
+  /**
+   * The platform segment used for macOS in release file names.
+   */
+  public static readonly macTargetName: string;
   public static readonly themeUpdatedEvent: "updated";
   public static readonly closedEvent: "closed";
   public static readonly repositoryRootSegments: readonly string[];
@@ -1122,12 +1181,19 @@ export declare class Resources {
   public static readonly clientNameParameterName: string;
 
   /**
-   * Names the target-specific subdirectory in a local update feed.
-   * @param platform Validated Node platform, win32 or linux.
-   * @param architecture Validated x64 or arm64 architecture.
-   * @returns The target directory name, such as windows-x64 or linux-arm64.
+   * Names a release target as it appears in release file names.
+   * @param platform Node platform: win32, darwin or linux.
+   * @param architecture Node CPU architecture, x64 or arm64.
+   * @returns The target, such as windows-x64, mac-arm64 or linux-x64.
    */
   public static formatUpdateTarget(platform: string, architecture: string): string;
+
+  /**
+   * Names the update information a release publishes for one target.
+   * @param target Target from {@link Resources.formatUpdateTarget}.
+   * @returns The file name, such as latest-windows-x64.yml.
+   */
+  public static formatUpdateInfoName(target: string): string;
 
   /**
    * Formats the message of a failed runtime call.

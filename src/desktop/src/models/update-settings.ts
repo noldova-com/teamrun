@@ -42,7 +42,7 @@ export class UpdateSettings {
         || !String.isNullOrEmpty(url.username) || !String.isNullOrEmpty(url.password)
         || !String.isNullOrEmpty(url.search) || !String.isNullOrEmpty(url.hash))
         return new UpdateSettings(null, Resources.updatesFeedInvalid);
-      url.pathname = `${url.pathname.replace(Resources.updateTrailingSlashes, String.empty)}/${Resources.formatUpdateTarget(platform, architecture)}/`;
+      url.pathname = `${url.pathname.replace(Resources.updateTrailingSlashes, String.empty)}/`;
       return new UpdateSettings(url.href, null, environment[Resources.updateTestInstallVariable] === Resources.enabledValue, true);
     }
     catch {

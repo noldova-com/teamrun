@@ -28,10 +28,9 @@
   ],
   "win": {
     "target": [
-      "nsis",
-      "zip"
+      "nsis"
     ],
-    "artifactName": "TeamRun-${version}-windows-${arch}.${ext}",
+    "artifactName": "TeamRun-windows-${arch}.${ext}",
     "icon": "assets/icons/icon-dark.ico",
     "signExecutable": false
   },
@@ -40,7 +39,7 @@
       "dmg",
       "zip"
     ],
-    "artifactName": "TeamRun-${version}-mac-${arch}.${ext}",
+    "artifactName": "TeamRun-mac-${arch}.${ext}",
     "icon": "assets/icons/icon-dock-512.png",
     "type": "distribution",
     "category": "public.app-category.developer-tools"
@@ -68,6 +67,6 @@
     "oneClick": false,
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
-    "artifactName": "TeamRun-${version}-windows-${arch}-setup.${ext}"
+    "artifactName": "TeamRun-windows-${arch}.${ext}"
   }
 }

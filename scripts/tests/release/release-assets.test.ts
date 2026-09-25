@@ -27,20 +27,17 @@ class ReleaseAssetsTests {
         const checksums = await readFile(path.join(fixture.output, "SHA256SUMS"), "utf8");
         for (const file of files.filter(t => t.name !== "SHA256SUMS"))
           assert.ok(checksums.includes(`${file.sha256}  ${file.name}\n`));
-        const entry = (name: string): object => {
-          const file = files.find(t => t.name === name);
-          assert.ok(file);
-          return { url: `https://github.com/noldova-com/teamrun/releases/download/v${version}/${file.name}`, sha512: file.sha512, size: file.size };
-        };
-        const updateInfo = new Map([
-          ["latest.yml", [`TeamRun-${version}-windows-arm64-setup.exe`, `TeamRun-${version}-windows-x64-setup.exe`]],
-          ["latest-mac.yml", [`TeamRun-${version}-mac-arm64.zip`, `TeamRun-${version}-mac-x64.zip`]],
-          ["latest-linux.yml", ["TeamRun-linux-x64.AppImage"]],
-          ["latest-linux-arm64.yml", ["TeamRun-linux-arm64.AppImage"]]
-        ]);
-        assert.deepEqual(files.filter(t => t.name.endsWith(".yml")).map(t => t.name), [...updateInfo.keys()].sort());
-        for (const [name, builds] of updateInfo)
-          assert.deepEqual(JSON.parse(await readFile(path.join(fixture.output, name), "utf8")), { version, files: builds.map(entry) });
+        const updates = [["windows-x64", "exe"], ["windows-arm64", "exe"], ["mac-x64", "zip"], ["mac-arm64", "zip"], ["linux-x64", "AppImage"],
+          ["linux-arm64", "AppImage"]] as const;
+        assert.deepEqual(files.filter(t => t.name.endsWith(".yml")).map(t => t.name), updates.map(([target]) => `latest-${target}.yml`).sort());
+        for (const [target, extension] of updates) {
+          const update = files.find(t => t.name === `TeamRun-${target}.${extension}`);
+          assert.ok(update);
+          const url = `https://github.com/noldova-com/teamrun/releases/download/v${version}/${update.name}`;
+          assert.deepEqual(JSON.parse(await readFile(path.join(fixture.output, `latest-${target}.yml`), "utf8")), {
+            version, files: [{ url, sha512: update.sha512, size: update.size }], path: url, sha512: update.sha512, releaseDate: fixture.candidate.releaseDate
+          });
+        }
         await assert.rejects(new ReleaseAssets(fixture.candidate).prepare(fixture.input, fixture.output), /staging must be empty/);
       }
     });
@@ -95,7 +92,7 @@ class ReleaseAssetsTests {
       await writeFile(path.join(fixture.input, "windows-x64/extra"), "extra");
       await assert.rejects(prepare(), /unexpected files/);
       await fixture.seed();
-      await writeFile(path.join(fixture.input, "windows-x64", `TeamRun-${fixture.candidate.version.value}-windows-x64-setup.exe`), "corrupt");
+      await writeFile(path.join(fixture.input, "windows-x64", "TeamRun-windows-x64.exe"), "corrupt");
       await assert.rejects(prepare(), /does not match/);
       await fixture.seed();
       await rm(path.join(fixture.input, "windows-arm64"), { recursive: true });

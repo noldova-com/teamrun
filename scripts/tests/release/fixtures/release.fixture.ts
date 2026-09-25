@@ -56,9 +56,8 @@ export default class ReleaseFixture {
         const target = `${platform}-${architecture}`;
         const directory = path.join(this.input, target);
         await mkdir(directory, { recursive: true });
-        const suffixes = platform === "windows" ? ["-setup.exe", ".zip", "-setup.exe.blockmap"] : platform === "mac" ? [".dmg", ".zip", ".zip.blockmap"] : [".AppImage"];
-        const prefix = platform === "linux" ? "TeamRun-" : `TeamRun-${version}-`;
-        const names = [...suffixes.map(t => `${prefix}${target}${t}`), platform === "mac" ? "latest-mac.yml" : platform === "linux" ? "latest-linux.yml" : "latest.yml"];
+        const suffixes = platform === "windows" ? [".exe", ".exe.blockmap"] : platform === "mac" ? [".dmg", ".zip", ".zip.blockmap"] : [".AppImage"];
+        const names = [...suffixes.map(t => `TeamRun-${target}${t}`), platform === "mac" ? "latest-mac.yml" : platform === "linux" ? "latest-linux.yml" : "latest.yml"];
         const files = [];
         for (const name of names) {
           const bytes = Buffer.from(`Fixture bytes for ${name}`);

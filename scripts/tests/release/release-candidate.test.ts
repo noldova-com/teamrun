@@ -21,6 +21,7 @@ class ReleaseCandidateTests {
       t.after(() => fixture.close());
       const candidate = new ReleaseCandidate(fixture.candidate.tag, fixture.directory, fixture.candidate.revision);
       assert.equal(candidate.revision, fixture.git(["rev-parse", "HEAD"]));
+      assert.equal(candidate.releaseDate, new Date(fixture.git(["show", "-s", "--format=%cI", "HEAD"])).toISOString());
       const output = path.join(fixture.directory, "outputs");
       candidate.writeOutputs(output);
       assert.equal(await readFile(output, "utf8"), `revision=${candidate.revision}\nversion=1.2.3\n`);

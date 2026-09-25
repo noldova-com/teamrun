@@ -16,10 +16,9 @@ import type PackageOptions from "./package-options.ts";
 
 export default class PackageArtifacts {
   private static readonly WINDOWS_PLATFORM: string = "windows";
-  private static readonly WINDOWS_ARTIFACT_SUFFIXES: readonly string[] = ["-setup.exe", ".zip"];
+  private static readonly WINDOWS_ARTIFACT_SUFFIXES: readonly string[] = [".exe"];
   private static readonly MAC_PLATFORM: string = "mac";
   private static readonly MAC_ARTIFACT_SUFFIXES: readonly string[] = [".dmg", ".zip"];
-  private static readonly LINUX_PLATFORM: string = "linux";
   private static readonly LINUX_ARTIFACT_SUFFIXES: readonly string[] = [".AppImage"];
   private static readonly BLOCKMAP_EXTENSION: string = ".blockmap";
   private static readonly UPDATE_METADATA_EXTENSION: string = ".yml";
@@ -41,8 +40,7 @@ export default class PackageArtifacts {
   }
 
   public async writeReport(sourceRevision: string | null = null): Promise<void> {
-    const prefix = this.options.platform === PackageArtifacts.LINUX_PLATFORM ? PackageArtifacts.ARTIFACT_PRODUCT_PREFIX + this.options.targetName
-      : PackageArtifacts.formatArtifactPrefix(this.version, this.options.targetName);
+    const prefix = PackageArtifacts.ARTIFACT_PRODUCT_PREFIX + this.options.targetName;
     const suffixes = this.options.platform === PackageArtifacts.WINDOWS_PLATFORM ? PackageArtifacts.WINDOWS_ARTIFACT_SUFFIXES :
       this.options.platform === PackageArtifacts.MAC_PLATFORM ? PackageArtifacts.MAC_ARTIFACT_SUFFIXES : PackageArtifacts.LINUX_ARTIFACT_SUFFIXES;
     const required = suffixes.map(t => prefix + t);
@@ -83,12 +81,8 @@ export default class PackageArtifacts {
       JSON.stringify(report, null, PackageArtifacts.JSON_INDENTATION) + PackageArtifacts.NEWLINE);
   }
 
-  private static formatArtifactPrefix(version: string, target: string): string {
-    return `${PackageArtifacts.ARTIFACT_PRODUCT_PREFIX}${version}-${target}`;
-  }
-
   private static formatUnexpectedArtifact(filename: string): string {
-    return `Unexpected installer artifact: ${filename}. Check the version, target, and configured formats.`;
+    return `Unexpected installer artifact: ${filename}. Check the target and configured formats.`;
   }
 
   private static formatInvalidArtifact(filename: string): string {
