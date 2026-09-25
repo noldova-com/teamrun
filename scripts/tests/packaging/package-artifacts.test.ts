@@ -30,7 +30,8 @@ class PackageArtifactsTests {
         for (const architecture of ["x64", "arm64"]) {
           const targetDirectory = path.join(directory, platform + "-" + architecture);
           await mkdir(targetDirectory);
-          const names = suffixes.map(suffix => "TeamRun-1.2.3-" + platform + "-" + architecture + suffix).sort();
+          const prefix = platform === "linux" ? "TeamRun-" : "TeamRun-1.2.3-";
+          const names = suffixes.map(suffix => prefix + platform + "-" + architecture + suffix).sort();
           for (const name of names)
             await writeFile(path.join(targetDirectory, name), "fixture");
           const options = new PackageOptions(["--arch", architecture], host, architecture);
@@ -56,7 +57,7 @@ class PackageArtifactsTests {
     test("rejects empty files, directories, and another target's installers", async t => {
       const directory = await mkdtemp(path.join(os.tmpdir(), "teamrun-artifacts-"));
       t.after(() => rm(directory, { recursive: true, force: true }));
-      const filename = path.join(directory, "TeamRun-1.2.3-linux-x64.AppImage");
+      const filename = path.join(directory, "TeamRun-linux-x64.AppImage");
       const artifacts = new PackageArtifacts(new PackageOptions([], "linux", "x64"), "1.2.3", directory);
       await writeFile(filename, "");
       await assert.rejects(artifacts.writeReport(), PackageException);
@@ -65,7 +66,10 @@ class PackageArtifactsTests {
       await assert.rejects(artifacts.writeReport(), PackageException);
       await rm(filename, { recursive: true });
       await writeFile(filename, "fixture");
-      await writeFile(path.join(directory, "TeamRun-1.2.3-linux-arm64.AppImage"), "fixture");
+      await writeFile(path.join(directory, "TeamRun-linux-arm64.AppImage"), "fixture");
+      await assert.rejects(artifacts.writeReport(), /Unexpected installer artifact/);
+      await rm(path.join(directory, "TeamRun-linux-arm64.AppImage"));
+      await writeFile(path.join(directory, "TeamRun-1.2.3-linux-x64.AppImage"), "fixture");
       await assert.rejects(artifacts.writeReport(), /Unexpected installer artifact/);
     });
     

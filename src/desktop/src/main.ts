@@ -47,11 +47,12 @@ const connection = new RuntimeConnection(attacher, { forward: event => host.broa
 const info = new DesktopInfo(settings.dataDirectory, settings.productVersion, process.platform);
 const updateSettings = UpdateSettings.fromEnvironment(process.env, isPackaged, process.platform, process.arch);
 const checkpoints = new RendererCheckpoint(host);
-const installation = InstallationRegistry.forEntry(moduleDirectory, process.env[Resources.appImageVariable] ?? process.execPath, app.getPath(Resources.homePathName));
+const installedExecutable = process.env[Resources.appImageVariable] ?? process.execPath;
+const installation = InstallationRegistry.forEntry(moduleDirectory, installedExecutable, app.getPath(Resources.homePathName));
 const peer = Object.isNull(installation) ? null : new UpdatePeer(installation, settings.dataDirectory, settings.productVersion,
   checkpoints, () => application.quitPrepared());
 const restart = Object.isNull(installation) || Object.isNull(peer) ? null : new RestartCoordinator(installation, peer.member,
-  new RestartProcesses(process.execPath, process.env), value => application.setInstalling(value),
+  new RestartProcesses(installedExecutable, process.env), value => application.setInstalling(value),
   async (directory, operationId) => { await RuntimeService.createRecoveryCopy(directory, operationId); });
 const updates = new UpdateService(updateSettings, settings.productVersion, new ElectronUpdateBackend(updateSettings, settings.dataDirectory),
   t => host.broadcast(Resources.updateEventChannel, t.toJson()), restart);

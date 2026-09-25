@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import electronUpdater, { type CancellationToken, type NsisUpdater, type ProgressInfo } from "electron-updater";
+import electronUpdater, { type BaseUpdater, type CancellationToken, type NsisUpdater, type ProgressInfo } from "electron-updater";
 import { app } from "electron";
 
 import "@noldova/teamrun-foundation-core";
@@ -22,7 +22,7 @@ import { Resources } from "../resources.js";
 export class ElectronUpdateBackend implements IUpdateBackend {
   private readonly settings: UpdateSettings;
   private readonly dataDirectory: string;
-  private updater: NsisUpdater | null = null;
+  private updater: BaseUpdater | null = null;
   private cancellation: CancellationToken | null = null;
   private disposed: boolean = false;
 
@@ -75,7 +75,6 @@ export class ElectronUpdateBackend implements IUpdateBackend {
       updater.once(Resources.updateErrorEvent, failed);
       app.once(Resources.beforeQuitEvent, quitting);
       try {
-        updater.installDirectory = dirname(process.execPath);
         updater.quitAndInstall(true, true);
       }
       catch {
@@ -84,7 +83,7 @@ export class ElectronUpdateBackend implements IUpdateBackend {
     });
   }
 
-  private async getUpdater(): Promise<NsisUpdater> {
+  private async getUpdater(): Promise<BaseUpdater> {
     if (this.disposed || Object.isNull(this.settings.feedUrl))
       throw new Error(Resources.updatesFeedMissing);
     if (!Object.isNull(this.updater))
@@ -99,7 +98,7 @@ export class ElectronUpdateBackend implements IUpdateBackend {
     if (this.disposed)
       throw new Error(Resources.updatesFeedMissing);
 
-    const updater = new electronUpdater.NsisUpdater();
+    const updater = process.platform === Resources.windowsPlatform ? ElectronUpdateBackend.createWindowsUpdater() : new electronUpdater.AppImageUpdater();
     updater.logger = null;
     updater.autoDownload = false;
     updater.autoInstallOnAppQuit = false;
@@ -108,6 +107,12 @@ export class ElectronUpdateBackend implements IUpdateBackend {
     updater.disableWebInstaller = true;
     updater.updateConfigPath = path;
     this.updater = updater;
+    return updater;
+  }
+
+  private static createWindowsUpdater(): NsisUpdater {
+    const updater = new electronUpdater.NsisUpdater();
+    updater.installDirectory = dirname(process.execPath);
     return updater;
   }
 }

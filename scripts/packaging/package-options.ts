@@ -196,7 +196,7 @@ export default class PackageOptions {
   private static formatInstallerPolicyOption(path: string): string { return `--config.nsis.include=${path}`; }
 
   private static formatLinuxArtifactNameOption(architecture: string): string {
-    return `--config.linux.artifactName=TeamRun-\${version}-linux-${architecture}.\${ext}`;
+    return `--config.linux.artifactName=TeamRun-linux-${architecture}.\${ext}`;
   }
 
   private static formatNpmPlatform(platform: NodeJS.Platform): string {

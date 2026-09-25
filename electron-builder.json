@@ -49,7 +49,7 @@
     "target": [
       "AppImage"
     ],
-    "artifactName": "TeamRun-${version}-linux-${arch}.${ext}",
+    "artifactName": "TeamRun-linux-${arch}.${ext}",
     "executableName": "teamrun",
     "executableArgs": [],
     "extraFiles": [

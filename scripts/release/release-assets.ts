@@ -76,8 +76,9 @@ export default class ReleaseAssets {
         throw new PackageException(ReleaseAssets.DUPLICATE_TARGET);
       targets.add(target);
       const prefix = `TeamRun-${this.candidate.version.value}-${target}`;
+      const appImage = `TeamRun-${target}.AppImage`;
       const required = report.targetPlatform === "windows" ? [`${prefix}-setup.exe`, `${prefix}.zip`] :
-        report.targetPlatform === "mac" ? [`${prefix}.dmg`, `${prefix}.zip`] : [`${prefix}.AppImage`];
+        report.targetPlatform === "mac" ? [`${prefix}.dmg`, `${prefix}.zip`] : [appImage];
       const reported = new Set<string>();
       const payloads = new Map<string, ReleaseFile>();
       const entries: readonly unknown[] = report.files;
@@ -95,7 +96,7 @@ export default class ReleaseAssets {
           files.push(await this.copy(file, output));
         }
       }
-      const updateName = report.targetPlatform === "windows" ? `${prefix}-setup.exe` : report.targetPlatform === "mac" ? `${prefix}.zip` : `${prefix}.AppImage`;
+      const updateName = report.targetPlatform === "windows" ? `${prefix}-setup.exe` : report.targetPlatform === "mac" ? `${prefix}.zip` : appImage;
       const update = payloads.get(updateName);
       if (!update)
         throw new PackageException(ReleaseAssets.MISSING_UPDATE);

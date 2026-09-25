@@ -27,20 +27,20 @@ class ReleaseAssetsTests {
         const checksums = await readFile(path.join(fixture.output, "SHA256SUMS"), "utf8");
         for (const file of files.filter(t => t.name !== "SHA256SUMS"))
           assert.ok(checksums.includes(`${file.sha256}  ${file.name}\n`));
-        const entry = (suffix: string): object => {
-          const file = files.find(t => t.name === `TeamRun-${version}-${suffix}`);
+        const entry = (name: string): object => {
+          const file = files.find(t => t.name === name);
           assert.ok(file);
           return { url: `https://github.com/noldova-com/teamrun/releases/download/v${version}/${file.name}`, sha512: file.sha512, size: file.size };
         };
         const updateInfo = new Map([
-          ["latest.yml", ["windows-arm64-setup.exe", "windows-x64-setup.exe"]],
-          ["latest-mac.yml", ["mac-arm64.zip", "mac-x64.zip"]],
-          ["latest-linux.yml", ["linux-x64.AppImage"]],
-          ["latest-linux-arm64.yml", ["linux-arm64.AppImage"]]
+          ["latest.yml", [`TeamRun-${version}-windows-arm64-setup.exe`, `TeamRun-${version}-windows-x64-setup.exe`]],
+          ["latest-mac.yml", [`TeamRun-${version}-mac-arm64.zip`, `TeamRun-${version}-mac-x64.zip`]],
+          ["latest-linux.yml", ["TeamRun-linux-x64.AppImage"]],
+          ["latest-linux-arm64.yml", ["TeamRun-linux-arm64.AppImage"]]
         ]);
         assert.deepEqual(files.filter(t => t.name.endsWith(".yml")).map(t => t.name), [...updateInfo.keys()].sort());
-        for (const [name, suffixes] of updateInfo)
-          assert.deepEqual(JSON.parse(await readFile(path.join(fixture.output, name), "utf8")), { version, files: suffixes.map(entry) });
+        for (const [name, builds] of updateInfo)
+          assert.deepEqual(JSON.parse(await readFile(path.join(fixture.output, name), "utf8")), { version, files: builds.map(entry) });
         await assert.rejects(new ReleaseAssets(fixture.candidate).prepare(fixture.input, fixture.output), /staging must be empty/);
       }
     });

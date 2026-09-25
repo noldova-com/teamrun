@@ -63,8 +63,8 @@ export class Resources {
   public static readonly updateDownloadFailed: string = "The update could not be downloaded or verified. Try downloading it again.";
   public static readonly updateInstallDeferred: string = "Download verified. Installation is not enabled in this test build; restart will not install it.";
 
-  public static formatUpdateTarget(architecture: string): string {
-    return `windows-${architecture}`;
+  public static formatUpdateTarget(platform: string, architecture: string): string {
+    return `${platform === Resources.windowsPlatform ? Resources.windowsTargetName : platform}-${architecture}`;
   }
   public static readonly imageReadMode: string = "r";
   public static readonly connectionClosed: string = "The desktop runtime connection is closed.";
@@ -126,6 +126,8 @@ export class Resources {
   public static readonly dockIconFileName: string = "icon-dock-512.png";
   public static readonly windowsPlatform: "win32" = "win32";
   public static readonly macPlatform: "darwin" = "darwin";
+  public static readonly linuxPlatform: "linux" = "linux";
+  public static readonly windowsTargetName: string = "windows";
   public static readonly themeUpdatedEvent: "updated" = "updated";
   public static readonly closedEvent: "closed" = "closed";
   public static readonly repositoryRootSegments: readonly string[] = ["..", "..", ".."];

@@ -26,12 +26,15 @@ export class UpdateSettings {
   public static fromEnvironment(environment: NodeJS.ProcessEnv, isPackaged: boolean, platform: string, architecture: string): UpdateSettings {
     if (!isPackaged)
       return new UpdateSettings(null, Resources.updatesDevelopmentDisabled);
+    const appImage = environment[Resources.appImageVariable];
+    const canSelfUpdate = platform === Resources.windowsPlatform
+      || (platform === Resources.linuxPlatform && !Object.isUndefined(appImage) && !String.isNullOrWhitespace(appImage));
     const value = environment[Resources.updateTestFeedVariable];
     if (Object.isUndefined(value) || String.isNullOrWhitespace(value))
-      return platform === Resources.windowsPlatform && architecture === Resources.publicUpdateArchitecture
+      return canSelfUpdate && architecture === Resources.publicUpdateArchitecture
         ? new UpdateSettings(Resources.publicUpdateFeed, null, true)
         : new UpdateSettings(null, null);
-    if (platform !== Resources.windowsPlatform || !Resources.updateArchitectures.includes(architecture))
+    if (!canSelfUpdate || !Resources.updateArchitectures.includes(architecture))
       return new UpdateSettings(null, null);
     try {
       const url = new URL(value);
@@ -39,7 +42,7 @@ export class UpdateSettings {
         || !String.isNullOrEmpty(url.username) || !String.isNullOrEmpty(url.password)
         || !String.isNullOrEmpty(url.search) || !String.isNullOrEmpty(url.hash))
         return new UpdateSettings(null, Resources.updatesFeedInvalid);
-      url.pathname = `${url.pathname.replace(Resources.updateTrailingSlashes, String.empty)}/${Resources.formatUpdateTarget(architecture)}/`;
+      url.pathname = `${url.pathname.replace(Resources.updateTrailingSlashes, String.empty)}/${Resources.formatUpdateTarget(platform, architecture)}/`;
       return new UpdateSettings(url.href, null, environment[Resources.updateTestInstallVariable] === Resources.enabledValue, true);
     }
     catch {

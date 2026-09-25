@@ -240,11 +240,11 @@ export declare class RendererCheckpoint {
 export declare class UpdateSettings {
   /**
    * Whether an explicit Restart to update action is allowed after download and coordinated preparation.
-   * Enabled for packaged Windows x64 public releases; local feeds require TEAMRUN_UPDATE_TEST_INSTALL=1.
+   * Enabled for packaged Windows x64 and Linux x64 AppImage public releases; local feeds require TEAMRUN_UPDATE_TEST_INSTALL=1.
    */
   public readonly allowInstallation: boolean;
   /**
-   * Public Windows x64 release feed or architecture-specific loopback feed, or null when disabled.
+   * Public release feed for Windows x64 and Linux x64 AppImages, a target-specific loopback feed, or null when disabled.
    */
   public readonly feedUrl: string | null;
   /**
@@ -260,10 +260,11 @@ export declare class UpdateSettings {
   private constructor();
 
   /**
-   * Selects the fixed public release feed for packaged Windows x64, or validates an explicit local test override.
+   * Selects the fixed public release feed for packaged Windows x64 and Linux x64 AppImages, or validates an explicit local test override.
    * @param environment TEAMRUN_UPDATE_TEST_FEED optionally supplies an HTTP loopback base URL without credentials, query or fragment.
+   * On Linux, APPIMAGE must name the running AppImage; other Linux builds cannot update themselves.
    * @param isPackaged Whether Electron is running a packaged app.
-   * @param platform Node platform; Windows is the only in-app delivery target currently enabled.
+   * @param platform Node platform; Windows and Linux AppImages can install updates, other platforms cannot yet.
    * @param architecture Node CPU architecture; public releases support x64, local test overrides also accept arm64.
    * @returns Validated settings. Development builds and invalid test feeds are disabled with an explanation; other packaged
    * targets without in-app delivery are disabled without one.
@@ -1051,6 +1052,11 @@ export declare class Resources {
   public static readonly dockIconFileName: string;
   public static readonly windowsPlatform: "win32";
   public static readonly macPlatform: "darwin";
+  public static readonly linuxPlatform: "linux";
+  /**
+   * The platform segment used for Windows in local update feed directories.
+   */
+  public static readonly windowsTargetName: string;
   public static readonly themeUpdatedEvent: "updated";
   public static readonly closedEvent: "closed";
   public static readonly repositoryRootSegments: readonly string[];
@@ -1116,11 +1122,12 @@ export declare class Resources {
   public static readonly clientNameParameterName: string;
 
   /**
-   * Names the architecture-specific subdirectory in a local update feed.
+   * Names the target-specific subdirectory in a local update feed.
+   * @param platform Validated Node platform, win32 or linux.
    * @param architecture Validated x64 or arm64 architecture.
-   * @returns The Windows target directory name.
+   * @returns The target directory name, such as windows-x64 or linux-arm64.
    */
-  public static formatUpdateTarget(architecture: string): string;
+  public static formatUpdateTarget(platform: string, architecture: string): string;
 
   /**
    * Formats the message of a failed runtime call.
