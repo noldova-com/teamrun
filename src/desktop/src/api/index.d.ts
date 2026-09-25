@@ -787,6 +787,31 @@ export declare class Resources {
    */
   public static readonly updateErrorEvent: "error";
   /**
+   * Updater event reporting the new path when an AppImage update is saved under a different file name.
+   */
+  public static readonly appImageRenamedEvent: "appimage-filename-updated";
+  /**
+   * Shell that restarts an updated AppImage from outside the old version's mount.
+   */
+  public static readonly appImageRestartShell: string;
+  /**
+   * Shell option that runs {@link Resources.appImageRestartScript}.
+   */
+  public static readonly appImageRestartShellOption: string;
+  /**
+   * Process name the restart shell reports while it waits.
+   */
+  public static readonly appImageRestartName: string;
+  /**
+   * Number of 0.1-second checks the restart waits for the old process to exit before starting the new version anyway.
+   */
+  public static readonly appImageRestartPolls: number;
+  /**
+   * Restart script: closes descriptors above standard error, waits up to `$3` checks for process `$2` to exit, then replaces
+   * itself with the AppImage `$1`. Arguments are passed as positional parameters, never inserted into the script.
+   */
+  public static readonly appImageRestartScript: string;
+  /**
    * update client name used by update preparation and recovery.
    */
   public static readonly updateClientName: string;
@@ -1194,6 +1219,15 @@ export declare class Resources {
    * @returns The file name, such as latest-windows-x64.yml.
    */
   public static formatUpdateInfoName(target: string): string;
+
+  /**
+   * Builds the shell arguments that restart an updated AppImage after the current process exits.
+   * @param appImage Path of the installed AppImage to start.
+   * @param processId Process that must exit before the AppImage starts.
+   * @param polls Number of 0.1-second checks before starting the AppImage anyway.
+   * @returns The arguments for {@link Resources.appImageRestartShell}.
+   */
+  public static formatAppImageRestartArguments(appImage: string, processId: number, polls: number): readonly string[];
 
   /**
    * Formats the message of a failed runtime call.

@@ -22,6 +22,13 @@ export class Resources {
   public static readonly updateIgnoredStdio: "ignore" = "ignore";
   public static readonly updateSpawnEvent: "spawn" = "spawn";
   public static readonly updateErrorEvent: "error" = "error";
+  public static readonly appImageRenamedEvent: "appimage-filename-updated" = "appimage-filename-updated";
+  public static readonly appImageRestartShell: string = "bash";
+  public static readonly appImageRestartShellOption: string = "-c";
+  public static readonly appImageRestartName: string = "teamrun-restart";
+  public static readonly appImageRestartPolls: number = 150;
+  public static readonly appImageRestartScript: string = 'for fd in /proc/$$/fd/*; do fd=${fd##*/}; [ "$fd" -gt 2 ] && exec {fd}>&-; done; ' +
+    'for ((i = 0; i < $3; i++)); do kill -0 "$2" 2>/dev/null || break; sleep 0.1; done; exec "$1"';
   public static readonly updateClientName: string = "teamrun-updater";
   public static readonly updatePreparationLeaseMilliseconds: number = 30_000;
   public static readonly updateRenewMilliseconds: number = 5000;
@@ -79,6 +86,10 @@ export class Resources {
 
   public static formatUpdateInfoName(target: string): string {
     return `latest-${target}.yml`;
+  }
+
+  public static formatAppImageRestartArguments(appImage: string, processId: number, polls: number): readonly string[] {
+    return [Resources.appImageRestartShellOption, Resources.appImageRestartScript, Resources.appImageRestartName, appImage, String(processId), String(polls)];
   }
   public static readonly imageReadMode: string = "r";
   public static readonly connectionClosed: string = "The desktop runtime connection is closed.";

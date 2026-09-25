@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -64,19 +65,28 @@ export class ElectronUpdateBackend implements IUpdateBackend {
     if (!this.settings.allowInstallation)
       throw new Error(Resources.updateInstallDeferred);
     const updater = await this.getUpdater();
+    let appImage = process.platform === Resources.windowsPlatform ? undefined : process.env[Resources.appImageVariable];
     return new Promise((resolve, reject) => {
       const cleanup = (): void => {
         clearTimeout(timer);
         updater.removeListener(Resources.updateErrorEvent, failed);
+        updater.removeListener(Resources.appImageRenamedEvent, renamed);
         app.removeListener(Resources.beforeQuitEvent, quitting);
       };
       const failed = (): void => { cleanup(); reject(new Error(Resources.updateInstallerFailed)); };
-      const quitting = (): void => { cleanup(); resolve(); };
+      const renamed = (path: string): void => { appImage = path; };
+      const quitting = (): void => {
+        cleanup();
+        if (!Object.isUndefined(appImage))
+          ElectronUpdateBackend.restartAppImage(appImage);
+        resolve();
+      };
       const timer = setTimeout(failed, Resources.updateExitMilliseconds);
       updater.once(Resources.updateErrorEvent, failed);
+      updater.on(Resources.appImageRenamedEvent, renamed);
       app.once(Resources.beforeQuitEvent, quitting);
       try {
-        updater.quitAndInstall(true, true);
+        updater.quitAndInstall(true, Object.isUndefined(appImage));
       }
       catch {
         failed();
@@ -117,5 +127,12 @@ export class ElectronUpdateBackend implements IUpdateBackend {
     const updater = new electronUpdater.NsisUpdater();
     updater.installDirectory = dirname(process.execPath);
     return updater;
+  }
+
+  private static restartAppImage(appImage: string): void {
+    const child = spawn(Resources.appImageRestartShell, Resources.formatAppImageRestartArguments(appImage, process.pid,
+      Resources.appImageRestartPolls), { detached: true, stdio: Resources.updateIgnoredStdio });
+    child.once(Resources.updateErrorEvent, () => undefined);
+    child.unref();
   }
 }

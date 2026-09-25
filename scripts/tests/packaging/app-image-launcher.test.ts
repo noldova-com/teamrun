@@ -51,6 +51,16 @@ class AppImageLauncherTests {
       await assert.rejects(fixture.readProbe(), { code: "ENOENT" });
       assert.doesNotMatch(await readFile(fixture.launcherPath, "utf8"), /--no-sandbox|--disable.*sandbox/);
     });
+
+    test("launcher exits without starting the application when the updater runs a replaced AppImage", async () => {
+      await using fixture = await AppImageLauncherFixture.create();
+      const result = await fixture.run(["--flag"], 73, "", { APPIMAGE_EXIT_AFTER_INSTALL: "true" });
+      assert.equal(result.status, 0, result.stderr);
+      await assert.rejects(fixture.readRecord(), { code: "ENOENT" });
+      const started = await fixture.run([], 73, "", { APPIMAGE_EXIT_AFTER_INSTALL: "" });
+      assert.equal(started.status, 73, started.stderr);
+      assert.equal((await fixture.readRecord())[0], "0");
+    });
   }
 }
 

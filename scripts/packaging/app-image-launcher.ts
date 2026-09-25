@@ -19,6 +19,8 @@ export default class AppImageLauncher {
     "# LICENSE file in the root directory of this source tree.",
     "",
     "set -e",
+    "# electron-updater runs a replaced AppImage once with this variable set; TeamRun then restarts itself.",
+    '[ -z "${APPIMAGE_EXIT_AFTER_INSTALL:-}" ] || exit 0',
     'APPDIR="$(dirname "$(readlink -f "$0")")"',
     "export APPDIR",
     'export PATH="${APPDIR}:${APPDIR}/usr/sbin${PATH:+:${PATH}}"',
