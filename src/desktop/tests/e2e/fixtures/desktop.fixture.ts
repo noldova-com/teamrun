@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import { _electron, type CDPSession, type ElectronApplication, expect, type Page, type TestInfo } from "@playwright/test";
 import { ProviderRegistry } from "@noldova/teamrun-core";
+import { Resources } from "@noldova/teamrun-desktop";
 import { ConversationCreateParams, MethodName, Project, ProjectOpenParams } from "@noldova/teamrun-protocol";
 import { ProcessInspector, ProcessProbe, ProcessRegistry, RuntimeClient, RuntimeService, RuntimeSettings, RuntimeTimings } from "@noldova/teamrun-runtime";
 
@@ -54,7 +55,7 @@ export class DesktopFixture {
     this.directory = await mkdtemp(path.join(tmpdir(), "teamrun-ui-"));
     const projectPath = path.join(this.directory, "project");
     await mkdir(projectPath);
-    const settings = RuntimeSettings.forPlatform(process.platform, path.join(this.directory, "data"), "0.0.1", null);
+    const settings = RuntimeSettings.forPlatform(process.platform, path.join(this.directory, "data"), Resources.productVersion, null);
     const processes = new ProcessRegistry(settings.processesPath, process.pid, new ProcessProbe(), ProcessInspector.fromPlatform(process.platform));
     const providers = new ProviderRegistry();
     providers.register(this.provider);
