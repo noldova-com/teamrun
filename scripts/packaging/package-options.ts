@@ -43,11 +43,19 @@ export default class PackageOptions {
     ["APPLE_KEYCHAIN_PROFILE"]
   ];
   private static readonly MISSING_NOTARIZATION: string = "Signed macOS packages require a complete Apple notarization environment.";
+  private static readonly WINDOWS_SIGNING_ENVIRONMENT: readonly string[] = ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET"];
+  private static readonly MISSING_WINDOWS_SIGNING: string = "Signed Windows packages require AZURE_TENANT_ID, AZURE_CLIENT_ID and AZURE_CLIENT_SECRET.";
   private static readonly BUILDER_CONFIG_ARGUMENTS: readonly string[] = ["--config", "electron-builder.json"];
   private static readonly NEVER_PUBLISH_ARGUMENTS: readonly string[] = ["--publish", "never"];
   private static readonly DIRECTORY_OPTION: string = "--dir";
   private static readonly SIGNED_OPTIONS: readonly string[] = ["--config.forceCodeSigning=true"];
-  private static readonly SIGNED_WINDOWS_OPTION: string = "--config.win.signExecutable=true";
+  private static readonly SIGNED_WINDOWS_OPTIONS: readonly string[] = [
+    "--config.win.signExecutable=true",
+    "--config.win.azureSignOptions.publisherName=Rostislav Rotaru",
+    "--config.win.azureSignOptions.endpoint=https://wus3.codesigning.azure.net/",
+    "--config.win.azureSignOptions.codeSigningAccountName=noldova-signing",
+    "--config.win.azureSignOptions.certificateProfileName=TeamRun"
+  ];
   private static readonly SIGNED_MAC_OPTION: string = "--config.mac.notarize=true";
   private static readonly UNSIGNED_WINDOWS_OPTION: string = "--config.win.signExecutable=false";
   private static readonly UNSIGNED_MAC_OPTIONS: readonly string[] = ["--config.mac.identity=null", "--config.mac.notarize=false"];
@@ -120,9 +128,12 @@ export default class PackageOptions {
   }
 
   public assertSigningEnvironment(environment: NodeJS.ProcessEnv): void {
-    if (!this.signed || this.platform !== PackageOptions.MAC_PLATFORM)
+    if (!this.signed)
       return;
-    if (!PackageOptions.NOTARIZATION_ENVIRONMENT_GROUPS.some(t => t.every(t => (environment[t]?.trim().length ?? 0) > 0)))
+    if (this.platform === PackageOptions.WINDOWS_PLATFORM && !PackageOptions.WINDOWS_SIGNING_ENVIRONMENT.every(t => (environment[t]?.trim().length ?? 0) > 0))
+      throw new PackageException(PackageOptions.MISSING_WINDOWS_SIGNING);
+    if (this.platform === PackageOptions.MAC_PLATFORM
+      && !PackageOptions.NOTARIZATION_ENVIRONMENT_GROUPS.some(t => t.every(t => (environment[t]?.trim().length ?? 0) > 0)))
       throw new PackageException(PackageOptions.MISSING_NOTARIZATION);
   }
 
@@ -143,7 +154,10 @@ export default class PackageOptions {
       argumentsList.push(PackageOptions.formatLinuxArtifactNameOption(this.architecture));
     if (this.signed) {
       argumentsList.push(...PackageOptions.SIGNED_OPTIONS);
-      argumentsList.push(this.platform === PackageOptions.WINDOWS_PLATFORM ? PackageOptions.SIGNED_WINDOWS_OPTION : PackageOptions.SIGNED_MAC_OPTION);
+      if (this.platform === PackageOptions.WINDOWS_PLATFORM)
+        argumentsList.push(...PackageOptions.SIGNED_WINDOWS_OPTIONS);
+      else
+        argumentsList.push(PackageOptions.SIGNED_MAC_OPTION);
     }
     else if (this.platform === PackageOptions.WINDOWS_PLATFORM)
       argumentsList.push(PackageOptions.UNSIGNED_WINDOWS_OPTION);

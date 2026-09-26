@@ -125,7 +125,7 @@ class ReleaseCommandsTests {
       assert.ok(packaging.includes("retention-days: 7"));
     });
 
-    test("signing secrets reach only signed macOS packaging, and the release declares its signed platforms once", async () => {
+    test("signing secrets reach only signed packaging for their platform, and the release declares its signed platforms once", async () => {
       const release = await readFile(".github/workflows/release.yml", "utf8");
       const packaging = await readFile(".github/workflows/package-target.yml", "utf8");
       const manual = await readFile(".github/workflows/package.yml", "utf8");
@@ -134,11 +134,12 @@ class ReleaseCommandsTests {
         assert.doesNotMatch(workflow, /secrets\.|environment:/);
       assert.equal((packaging.match(/environment:/g) ?? []).length, 1);
       assert.ok(packaging.includes("environment: ${{ inputs.signed && 'release' || '' }}"));
-      const secrets = ["MAC_CERTIFICATE", "MAC_CERTIFICATE_PASSWORD", "APPLE_API_KEY_P8", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"];
+      const secrets = [["mac", "MAC_CERTIFICATE"], ["mac", "MAC_CERTIFICATE_PASSWORD"], ["mac", "APPLE_API_KEY_P8"], ["mac", "APPLE_API_KEY_ID"],
+        ["mac", "APPLE_API_ISSUER"], ["windows", "AZURE_TENANT_ID"], ["windows", "AZURE_CLIENT_ID"], ["windows", "AZURE_CLIENT_SECRET"]] as const;
       assert.equal((packaging.match(/secrets\./g) ?? []).length, secrets.length);
-      for (const secret of secrets)
-        assert.ok(packaging.includes(`\${{ inputs.signed && inputs.platform == 'mac' && secrets.${secret} || '' }}`), secret);
-      assert.ok(manual.includes("signed: ${{ inputs.signed && matrix.platform == 'mac' }}"));
+      for (const [platform, secret] of secrets)
+        assert.ok(packaging.includes(`\${{ inputs.signed && inputs.platform == '${platform}' && secrets.${secret} || '' }}`), secret);
+      assert.ok(manual.includes("signed: ${{ inputs.signed && matrix.platform != 'linux' }}"));
       assert.equal((release.match(/RELEASE_SIGNED_PLATFORMS: '/g) ?? []).length, 1);
       assert.ok(release.includes("RELEASE_SIGNED_PLATFORMS: ${{ needs.validate.outputs.signed-platforms }}"));
       assert.equal((release.match(/signed: /g) ?? []).length, 4);
