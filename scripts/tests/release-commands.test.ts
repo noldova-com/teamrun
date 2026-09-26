@@ -145,6 +145,15 @@ class ReleaseCommandsTests {
       assert.equal((release.match(/signed: /g) ?? []).length, 4);
       for (const platform of ["windows", "mac"])
         assert.equal(release.split(`signed: \${{ contains(fromJSON(needs.validate.outputs.signed-platforms), '${platform}') }}`).length - 1, 2);
+      assert.doesNotMatch(checks, /secrets:/);
+      assert.equal((manual.match(/secrets: inherit/g) ?? []).length, 1);
+      assert.equal((release.match(/secrets: inherit/g) ?? []).length, 4);
+      for (const platform of ["windows", "mac", "linux"])
+        for (const architecture of ["x64", "arm64"]) {
+          const start = release.indexOf(`\n  ${platform}-${architecture}:\n`);
+          const job = release.slice(start, release.indexOf("\n\n", start));
+          assert.equal(job.includes("\n    secrets: inherit"), platform !== "linux", `${platform}-${architecture}`);
+        }
     });
   }
 }
