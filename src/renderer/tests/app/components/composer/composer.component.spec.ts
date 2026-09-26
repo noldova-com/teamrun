@@ -9,9 +9,10 @@
 import { TestBed } from "@angular/core/testing";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 
-import { AttachmentInput, AuthStatus, ErrorCode, MessageAttachment, MessageSendParams, MessageSendResult, MessageStatus, MethodName,
-  ProviderAccount, ProviderListModelsParams, ProviderModel } from "@noldova/teamrun-protocol";
+import { AttachmentInput, AuthStatus, Conversation, ConversationMember, ErrorCode, MessageAttachment, MessageSendParams, MessageSendResult, MessageStatus,
+  MethodName, ProviderAccount, ProviderListModelsParams, ProviderModel } from "@noldova/teamrun-protocol";
 
+import { MemoryStorage } from "../../../fixtures/memory-storage";
 import { SampleData } from "../../../fixtures/sample-data";
 import { TeammateFixture } from "../../../fixtures/teammate-fixture";
 import { PreferencesService } from "../../../../src/app/services/preferences.service";
@@ -22,6 +23,8 @@ import { DraftService } from "../../../../src/app/services/draft.service";
 import { ComposerComponent } from "../../../../src/app/components/composer/composer.component";
 
 describe("ComposerComponent", () => {
+  beforeEach(() => MemoryStorage.install(window));
+
   it("filters accounts by provider and sends with the selected local account", async () => {
     const second = new ProviderAccount("a2", "claude", "Home", "D:/home", AuthStatus.LoggedIn, null, null, null, null, "t");
     const bridge = SampleData.createBridge().answer(MethodName.MessageList, () => []).answer(MethodName.ApprovalList, () => [])
@@ -93,9 +96,12 @@ describe("ComposerComponent", () => {
     expect(preferences.composerFor("c1")?.responderTeammateId).toBeNull();
     expect(root.querySelector(".tr-settings-trigger")?.textContent).toContain("gpt-5");
   });
-  it("completes members first without sending, resolves mentions and persists the chosen responder", async () => {
+  it("completes members first without sending, resolves mentions and continues with the mentioned teammate", async () => {
     const data = new TeammateFixture();
-    data.bridge.answer(MethodName.MessageSend, () => new MessageSendResult(SampleData.userMessage, []).toJson());
+    data.bridge.answer(MethodName.MessageSend, () => {
+      data.members.push(new ConversationMember("c1", "bob", "t", null, false));
+      return new MessageSendResult(SampleData.userMessage, []).toJson();
+    });
     TestBed.configureTestingModule({ providers: [{ provide: TEAMRUN_BRIDGE, useValue: data.bridge }] });
     const store = TestBed.inject(ChatStore);
     await store.initialize();
@@ -128,13 +134,95 @@ describe("ComposerComponent", () => {
     expect(params.mentionedTeammateIds).toEqual(["bob"]);
     expect(params.responderTeammateId).toBe("alice");
     expect(params.requested).toBeNull();
-    expect(preferences.composerFor("c1")?.responderTeammateId).toBe("alice");
+    expect(preferences.composerFor("c1")?.responderTeammateId).toBe("bob");
     expect(input.value).toBe("");
     fixture.destroy();
     const reopened = TestBed.createComponent(ComposerComponent);
     await reopened.whenStable();
-    expect((reopened.nativeElement as HTMLElement).querySelector(".tr-settings-trigger")?.textContent).toContain("Alice");
+    expect((reopened.nativeElement as HTMLElement).querySelector(".tr-settings-trigger")?.textContent).toContain("Bob");
   });
+
+  it("continues with the last mentioned teammate only after a successful send, in the conversation that sent it", async () => {
+    const data = new TeammateFixture();
+    let store: ChatStore | null = null;
+    let switchDuringSend = false;
+    const sent = async (): Promise<JsonValue> => {
+      if (!data.members.some(t => t.teammateId === "bob"))
+        data.members.push(new ConversationMember("c1", "bob", "t", null, false));
+      if (switchDuringSend)
+        await store?.selectConversation("c2");
+      return new MessageSendResult(SampleData.userMessage, []).toJson();
+    };
+    const second = new Conversation("c2", "p1", "Second", SampleData.timestamp, SampleData.timestamp);
+    data.members.push(new ConversationMember("c2", "alice", "t", null, false));
+    data.bridge.answer(MethodName.MessageSend, sent)
+      .answer(MethodName.ConversationList, () => [SampleData.conversation.toJson(), second.toJson()]);
+    TestBed.configureTestingModule({ providers: [{ provide: TEAMRUN_BRIDGE, useValue: data.bridge }] });
+    store = TestBed.inject(ChatStore);
+    await store.initialize();
+    await store.selectConversation("c1");
+    const preferences = TestBed.inject(PreferencesService);
+    preferences.rememberComposer("c1", new ComposerSettings("codex", null, null, null));
+    const fixture = TestBed.createComponent(ComposerComponent);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    const input = root.querySelector<HTMLTextAreaElement>("textarea")!;
+    const send = async (text: string): Promise<void> => {
+      input.value = text;
+      input.dispatchEvent(new Event("input"));
+      await fixture.whenStable();
+      root.querySelector<HTMLButtonElement>(".tr-send")!.click();
+      await fixture.whenStable();
+    };
+
+    await send("@Alice and @Bob, please review");
+    const first = MessageSendParams.fromJson(data.bridge.requests.filter(t => t.method === MethodName.MessageSend).at(-1)!.payload);
+    expect(first.mentionedTeammateIds).toEqual(["alice", "bob"]);
+    expect(preferences.composerFor("c1")?.responderTeammateId).toBe("bob");
+    expect(root.querySelector(".tr-settings-trigger")?.textContent).toContain("Bob");
+
+    data.bridge.fail(MethodName.MessageSend, ErrorCode.Unavailable, "Disconnected");
+    await send("@Alice, once more");
+    expect(store.error()).toBe("Disconnected");
+    expect(preferences.composerFor("c1")?.responderTeammateId).toBe("bob");
+
+    data.bridge.answer(MethodName.MessageSend, sent);
+    switchDuringSend = true;
+    await send("@Alice, back to you");
+    expect(store.selectedConversationId()).toBe("c2");
+    expect(preferences.composerFor("c1")?.responderTeammateId).toBe("alice");
+    expect(preferences.composerFor("c2")?.responderTeammateId ?? null).toBeNull();
+    store.dispose();
+  });
+
+  it("answers with the default responder while the chosen teammate is unavailable, and keeps the choice", async () => {
+    const data = new TeammateFixture();
+    data.members.push(new ConversationMember("c1", "offline", "t", null, false));
+    data.bridge.answer(MethodName.MessageSend, () => new MessageSendResult(SampleData.userMessage, []).toJson());
+    TestBed.configureTestingModule({ providers: [{ provide: TEAMRUN_BRIDGE, useValue: data.bridge }] });
+    const store = TestBed.inject(ChatStore);
+    await store.initialize();
+    await store.selectConversation("c1");
+    const preferences = TestBed.inject(PreferencesService);
+    preferences.rememberComposer("c1", new ComposerSettings("codex", "gpt-5", "high", null, "offline"));
+    const fixture = TestBed.createComponent(ComposerComponent);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector(".tr-settings-trigger")?.textContent).not.toContain("Offline");
+    const input = root.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = "Any news?";
+    input.dispatchEvent(new Event("input"));
+    await fixture.whenStable();
+    root.querySelector<HTMLButtonElement>(".tr-send")!.click();
+    await fixture.whenStable();
+    const params = MessageSendParams.fromJson(data.bridge.requests.find(t => t.method === MethodName.MessageSend)!.payload);
+    expect(params.responderTeammateId).toBeNull();
+    expect(params.mentionedTeammateIds).toEqual([]);
+    expect(params.requested?.provider).toBe("codex");
+    expect(preferences.composerFor("c1")?.responderTeammateId).toBe("offline");
+    store.dispose();
+  });
+
   it("uses each model's image and effort capabilities", async () => {
     const bridge = SampleData.createBridge().answer(MethodName.MessageList, () => []).answer(MethodName.ApprovalList, () => [])
       .answer(MethodName.ProviderModelCatalog, () => [

@@ -526,6 +526,8 @@ export class ChatStore {
         this.snapshots.delete(events);
       }
     });
+    if (succeeded && mentionedTeammateIds.length > 0)
+      await this.perform(() => this.loadMembers(conversationId));
     if (succeeded && isFirst && this.findConversation(conversationId)?.title === Resources.newConversationTitle)
       await this.renameConversation(conversationId, this.formatter.conversationTitle(text || attachments[0]?.name || Resources.newConversationTitle));
     return succeeded;

@@ -73,7 +73,11 @@ export class ComposerComponent {
   protected readonly effort: WritableSignal<string | null> = signal(null);
   protected readonly accountId: WritableSignal<string | null> = signal(null);
   protected readonly responderId = signal<string | null>(null);
-  protected readonly responder = computed(() => this.store.teammate(this.responderId()));
+  protected readonly activeResponderId = computed(() => {
+    const id = this.responderId();
+    return !Object.isNull(id) && this.store.isTeammateUnavailable(id) ? null : id;
+  });
+  protected readonly responder = computed(() => this.store.teammate(this.activeResponderId()));
   protected readonly memberTeammates = computed(() => this.store.membersOf(this.store.selectedConversationId())
     .map(t => this.store.teammate(t.teammateId)).filter((t): t is Teammate => !Object.isNull(t)));
   protected readonly chosenModel = computed(() => this.responder() ? this.responder()!.model : this.model());
@@ -343,7 +347,10 @@ export class ComposerComponent {
       }
       this.preferences.rememberComposer(conversationId, settings);
       await this.documents.keepOpen(conversationId);
-      if (await this.store.send(text, settings, conversationId, attachments, mentions.map(t => t.teammateId), settings.responderTeammateId)) {
+      if (await this.store.send(text, settings, conversationId, attachments, mentions.map(t => t.teammateId), this.activeResponderId())) {
+        const lastMention = mentions.at(-1);
+        if (!Object.isUndefined(lastMention))
+          this.continueWith(conversationId, lastMention.teammateId);
         this.closeCompletion();
         await this.savedDrafts.sent(conversationId, draft, draftAttachments);
       }
@@ -398,6 +405,17 @@ export class ComposerComponent {
     const provider = this.provider();
     if (!Object.isNull(conversation) && !Object.isNull(provider))
       this.preferences.rememberComposer(conversation, new ComposerSettings(provider, this.model(), this.effort(), this.accountId(), id));
+  }
+
+  private continueWith(conversationId: string, teammateId: string): void {
+    if (conversationId === this.store.selectedConversationId()) {
+      this.selectResponder(teammateId);
+      return;
+    }
+    const remembered = this.preferences.composerFor(conversationId);
+    if (!Object.isNull(remembered))
+      this.preferences.rememberComposer(conversationId, new ComposerSettings(remembered.provider, remembered.model, remembered.effort,
+        remembered.providerAccountId, teammateId));
   }
 
   protected selectAccount(choice: AccountChoice): void {
