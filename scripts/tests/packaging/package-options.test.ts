@@ -84,12 +84,20 @@ class PackageOptionsTests {
       assert.ok(!args.includes("--config.win.signAndEditExecutable=false"));
     });
 
-    test("signed installers require signing and signed macOS requires notarization", () => {
+    test("signed installers require signing, signed Windows uses Azure Artifact Signing and signed macOS requires notarization", () => {
       const windows = new PackageOptions(["--signed"], "win32", "x64");
-      windows.assertSigningEnvironment({});
+      const azure = { AZURE_TENANT_ID: "fixture", AZURE_CLIENT_ID: "fixture", AZURE_CLIENT_SECRET: "fixture" };
+      assert.throws(() => windows.assertSigningEnvironment({}), /AZURE_TENANT_ID, AZURE_CLIENT_ID and AZURE_CLIENT_SECRET/);
+      assert.throws(() => windows.assertSigningEnvironment({ ...azure, AZURE_CLIENT_SECRET: " " }), PackageException);
+      windows.assertSigningEnvironment(azure);
+      new PackageOptions([], "win32", "x64").assertSigningEnvironment({});
       new PackageOptions([], "darwin", "arm64").assertSigningEnvironment({});
       assert.ok(windows.createBuilderArguments().includes("--config.forceCodeSigning=true"));
       assert.ok(windows.createBuilderArguments().includes("--config.win.signExecutable=true"));
+      for (const option of ["publisherName=Rostislav Rotaru", "endpoint=https://wus3.codesigning.azure.net/", "codeSigningAccountName=noldova-signing",
+        "certificateProfileName=TeamRun"])
+        assert.ok(windows.createBuilderArguments().includes(`--config.win.azureSignOptions.${option}`), option);
+      assert.ok(!new PackageOptions([], "win32", "x64").createBuilderArguments().some(t => t.includes("azureSignOptions")));
       const mac = new PackageOptions(["--signed"], "darwin", "arm64");
       assert.ok(mac.createBuilderArguments().includes("--config.mac.notarize=true"));
       assert.ok(!mac.createBuilderArguments().includes("--config.mac.identity=null"));

@@ -22,7 +22,7 @@ on:
         default: all
         required: true
       signed:
-        description: Sign and notarize the macOS builds with the release environment's credentials
+        description: Sign the Windows and macOS builds with the release environment's credentials; macOS builds are also notarized
         type: boolean
         default: false
         required: false
@@ -48,4 +48,4 @@ jobs:
       platform: ${{ matrix.platform }}
       architecture: ${{ matrix.architecture }}
       revision: ${{ github.sha }}
-      signed: ${{ inputs.signed && matrix.platform == 'mac' }}
+      signed: ${{ inputs.signed && matrix.platform != 'linux' }}
