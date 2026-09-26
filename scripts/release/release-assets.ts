@@ -15,6 +15,7 @@ import ReleaseFile from "./release-file.ts";
 
 export default class ReleaseAssets {
   private static readonly PLATFORMS: readonly string[] = ["windows", "mac", "linux"];
+  private static readonly SIGNABLE_PLATFORMS: readonly string[] = ["windows", "mac"];
   private static readonly ARCHITECTURES: readonly string[] = ["x64", "arm64"];
   private static readonly CHECKSUMS_FILE: string = "SHA256SUMS";
   private static readonly REPORT_PATTERN: RegExp = /^package-report-(windows|mac|linux)-(x64|arm64)\.json$/;
@@ -25,16 +26,39 @@ export default class ReleaseAssets {
   private static readonly STAGING_NOT_EMPTY: string = "Release staging must be empty.";
   private static readonly INVALID_INPUT: string = "Release input must contain artifact directories.";
   private static readonly REPORT_REQUIRED: string = "Each artifact must contain one package report.";
-  private static readonly REPORT_MISMATCH: string = "The package report does not match the unsigned native release candidate.";
+  private static readonly REPORT_MISMATCH: string = "The package report does not match the native release candidate.";
+  private static readonly SIGNED_PLATFORMS_INVALID: string = "Signed platforms must be a JSON array naming windows or mac at most once each.";
+  private static readonly SIGNING_MISMATCH: string = "The package signing does not match the release's signed platforms.";
   private static readonly DUPLICATE_TARGET: string = "Duplicate target or mismatched package report name.";
   private static readonly INVALID_PAYLOAD: string = "Invalid or duplicated release payload in package report.";
   private static readonly MISSING_UPDATE: string = "Missing update payload.";
   private static readonly INVALID_FILES: string = "Missing required payloads or unexpected files in build artifact.";
 
   private readonly candidate: ReleaseCandidate;
+  private readonly signedPlatforms: readonly string[];
 
-  public constructor(candidate: ReleaseCandidate) {
+  public constructor(candidate: ReleaseCandidate, signedPlatforms: readonly string[]) {
     this.candidate = candidate;
+    this.signedPlatforms = signedPlatforms;
+  }
+
+  public static parseSignedPlatforms(text: string | undefined): readonly string[] {
+    let value: unknown;
+    try {
+      value = JSON.parse(text ?? "");
+    }
+    catch {
+      throw new PackageException(ReleaseAssets.SIGNED_PLATFORMS_INVALID);
+    }
+    if (!Array.isArray(value))
+      throw new PackageException(ReleaseAssets.SIGNED_PLATFORMS_INVALID);
+    const platforms: string[] = [];
+    for (const platform of value) {
+      if (typeof platform !== "string" || !ReleaseAssets.SIGNABLE_PLATFORMS.includes(platform) || platforms.includes(platform))
+        throw new PackageException(ReleaseAssets.SIGNED_PLATFORMS_INVALID);
+      platforms.push(platform);
+    }
+    return platforms;
   }
 
   public async prepare(input: string, output: string): Promise<readonly ReleaseFile[]> {
@@ -63,8 +87,10 @@ export default class ReleaseAssets {
         || !("targetArchitecture" in report) || typeof report.targetArchitecture !== "string" || !ReleaseAssets.ARCHITECTURES.includes(report.targetArchitecture)
         || !("hostArchitecture" in report) || report.hostArchitecture !== report.targetArchitecture
         || !("hostPlatform" in report) || report.hostPlatform !== (report.targetPlatform === "windows" ? "win32" : report.targetPlatform === "mac" ? "darwin" : "linux")
-        || !("signingRequested" in report) || report.signingRequested !== false || !("files" in report) || !Array.isArray(report.files))
+        || !("signingRequested" in report) || typeof report.signingRequested !== "boolean" || !("files" in report) || !Array.isArray(report.files))
         throw new PackageException(ReleaseAssets.REPORT_MISMATCH);
+      if (report.signingRequested !== this.signedPlatforms.includes(report.targetPlatform))
+        throw new PackageException(ReleaseAssets.SIGNING_MISMATCH);
       const target = `${report.targetPlatform}-${report.targetArchitecture}`;
       if (targets.has(target) || reportName !== `package-report-${target}.json`)
         throw new PackageException(ReleaseAssets.DUPLICATE_TARGET);

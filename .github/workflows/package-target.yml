@@ -18,6 +18,11 @@ on:
       revision:
         required: true
         type: string
+      signed:
+        description: Sign the installers with the release environment's credentials; macOS builds are also notarized
+        required: false
+        type: boolean
+        default: false
     outputs:
       artifact-id:
         description: Exact installer artifact from this successful build
@@ -33,6 +38,7 @@ defaults:
 jobs:
   package:
     name: Package ${{ inputs.platform }} ${{ inputs.architecture }}
+    environment: ${{ inputs.signed && 'release' || '' }}
     outputs:
       artifact-id: ${{ steps.installers.outputs.artifact-id }}
     runs-on: >-
@@ -114,10 +120,29 @@ jobs:
             fi
           } > "$RUNNER_TEMP/teamrun-package/tests.stdout.log" 2> "$RUNNER_TEMP/teamrun-package/tests.stderr.log"
 
-      - name: Build unsigned installers and integrity report
+      - name: Build installers and integrity report
+        env:
+          PACKAGE_SIGNED: ${{ inputs.signed }}
+          MAC_CERTIFICATE: ${{ inputs.signed && inputs.platform == 'mac' && secrets.MAC_CERTIFICATE || '' }}
+          MAC_CERTIFICATE_PASSWORD: ${{ inputs.signed && inputs.platform == 'mac' && secrets.MAC_CERTIFICATE_PASSWORD || '' }}
+          APPLE_API_KEY_P8: ${{ inputs.signed && inputs.platform == 'mac' && secrets.APPLE_API_KEY_P8 || '' }}
+          APPLE_API_KEY_ID: ${{ inputs.signed && inputs.platform == 'mac' && secrets.APPLE_API_KEY_ID || '' }}
+          APPLE_API_ISSUER: ${{ inputs.signed && inputs.platform == 'mac' && secrets.APPLE_API_ISSUER || '' }}
         run: |
-          trap 'cat "$RUNNER_TEMP/teamrun-package/package.stdout.log"; cat "$RUNNER_TEMP/teamrun-package/package.stderr.log" >&2' EXIT
-          npm run package -- --platform "$PACKAGE_PLATFORM" --arch "$PACKAGE_ARCHITECTURE" > "$RUNNER_TEMP/teamrun-package/package.stdout.log" 2> "$RUNNER_TEMP/teamrun-package/package.stderr.log"
+          signing="$RUNNER_TEMP/teamrun-signing"
+          trap 'rm -rf "$signing"; cat "$RUNNER_TEMP/teamrun-package/package.stdout.log"; cat "$RUNNER_TEMP/teamrun-package/package.stderr.log" >&2' EXIT
+          arguments=(--platform "$PACKAGE_PLATFORM" --arch "$PACKAGE_ARCHITECTURE")
+          if [ "$PACKAGE_SIGNED" = true ]; then
+            arguments+=(--signed)
+            if [ "$PACKAGE_PLATFORM" = mac ]; then
+              export CSC_LINK="$MAC_CERTIFICATE" CSC_KEY_PASSWORD="$MAC_CERTIFICATE_PASSWORD"
+              if [ -n "$APPLE_API_KEY_P8" ]; then
+                (umask 077 && mkdir "$signing" && printf '%s' "$APPLE_API_KEY_P8" > "$signing/api-key.p8")
+                export APPLE_API_KEY="$signing/api-key.p8"
+              fi
+            fi
+          fi
+          npm run package -- "${arguments[@]}" > "$RUNNER_TEMP/teamrun-package/package.stdout.log" 2> "$RUNNER_TEMP/teamrun-package/package.stderr.log"
           if [ "$RUNNER_OS" = Linux ]; then
             appimages=("$GITHUB_WORKSPACE/_build/package/linux-$PACKAGE_ARCHITECTURE/"*.AppImage)
             test "${#appimages[@]}" -eq 1
@@ -129,6 +154,18 @@ jobs:
               cmp "$GITHUB_WORKSPACE/_build/appimage/$PACKAGE_ARCHITECTURE/AppRun" squashfs-root/AppRun
               grep -Fx 'Exec=AppRun %U' squashfs-root/*.desktop
             ) >> "$RUNNER_TEMP/teamrun-package/package.stdout.log" 2>> "$RUNNER_TEMP/teamrun-package/package.stderr.log"
+          fi
+          if [ "$PACKAGE_SIGNED" = true ] && [ "$PACKAGE_PLATFORM" = mac ]; then
+            apps=("$GITHUB_WORKSPACE/_build/package/mac-$PACKAGE_ARCHITECTURE/"*/TeamRun.app)
+            test "${#apps[@]}" -eq 1 && test -d "${apps[0]}"
+            assessment="$RUNNER_TEMP/teamrun-package/gatekeeper.log"
+            {
+              codesign --verify --deep --strict --verbose=2 "${apps[0]}"
+              spctl --assess --type execute --verbose=2 "${apps[0]}" 2> "$assessment"
+              xcrun stapler validate "${apps[0]}"
+            } >> "$RUNNER_TEMP/teamrun-package/package.stdout.log" 2>> "$RUNNER_TEMP/teamrun-package/package.stderr.log"
+            cat "$assessment" >> "$RUNNER_TEMP/teamrun-package/package.stdout.log"
+            grep -qF 'source=Notarized Developer ID' "$assessment"
           fi
 
       - name: Retain installers and reports

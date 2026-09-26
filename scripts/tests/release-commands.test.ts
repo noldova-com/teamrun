@@ -47,7 +47,7 @@ class ReleaseCommandsTests {
     test("the validation and publication commands require their environment and publish only verified assets", async t => {
       const fixture = await ReleaseFixture.create();
       const originalDirectory = process.cwd();
-      const variables = ["GITHUB_OUTPUT", "GITHUB_REPOSITORY", "RELEASE_REVISION", "RELEASE_TAG", "GH_TOKEN"];
+      const variables = ["GITHUB_OUTPUT", "GITHUB_REPOSITORY", "RELEASE_REVISION", "RELEASE_TAG", "GH_TOKEN", "RELEASE_SIGNED_PLATFORMS"];
       const saved = new Map(variables.map(t => [t, process.env[t]]));
       t.after(async () => {
         process.chdir(originalDirectory);
@@ -60,10 +60,14 @@ class ReleaseCommandsTests {
       process.chdir(fixture.directory);
       assert.throws(() => new ValidateRelease().run({}), /GITHUB_OUTPUT/);
       process.env["GITHUB_OUTPUT"] = path.join(fixture.directory, "outputs");
+      assert.throws(() => new ValidateRelease().run(), /Signed platforms/);
+      process.env["RELEASE_SIGNED_PLATFORMS"] = "[\"mac\"]";
       assert.throws(() => new ValidateRelease().run(), /start with v/);
       process.env["RELEASE_TAG"] = fixture.candidate.tag;
       new ValidateRelease().run();
-      assert.match(await readFile(process.env["GITHUB_OUTPUT"], "utf8"), /version=1.2.3/);
+      const outputs = await readFile(process.env["GITHUB_OUTPUT"], "utf8");
+      assert.match(outputs, /version=1.2.3/);
+      assert.match(outputs, /signed-platforms=\["mac"\]/);
       await assert.rejects(new PublishRelease().runAsync({}), /publication repository/);
       process.env["GITHUB_REPOSITORY"] = "noldova-com/teamrun";
       await assert.rejects(new PublishRelease().runAsync(), /validated revision/);
@@ -75,6 +79,9 @@ class ReleaseCommandsTests {
       await cp(fixture.input, "_build/release-input", { recursive: true });
       await mkdir(".github");
       await writeFile(".github/RELEASE-NOTES.md", "Fixture notes");
+      await assert.rejects(new PublishRelease().runAsync(), /signing does not match/);
+      await rm("_build/release", { recursive: true });
+      process.env["RELEASE_SIGNED_PLATFORMS"] = "[]";
       await assert.rejects(new PublishRelease().runAsync(), /publication token/);
       await rm("_build/release", { recursive: true });
       process.env["GH_TOKEN"] = "fixture-token";
@@ -116,6 +123,27 @@ class ReleaseCommandsTests {
       assert.ok(packaging.includes("npm run test:ui"));
       assert.ok(packaging.includes("npm run test:release"));
       assert.ok(packaging.includes("retention-days: 7"));
+    });
+
+    test("signing secrets reach only signed macOS packaging, and the release declares its signed platforms once", async () => {
+      const release = await readFile(".github/workflows/release.yml", "utf8");
+      const packaging = await readFile(".github/workflows/package-target.yml", "utf8");
+      const manual = await readFile(".github/workflows/package.yml", "utf8");
+      const checks = await readFile(".github/workflows/build-and-test.yml", "utf8");
+      for (const workflow of [release, manual, checks])
+        assert.doesNotMatch(workflow, /secrets\.|environment:/);
+      assert.equal((packaging.match(/environment:/g) ?? []).length, 1);
+      assert.ok(packaging.includes("environment: ${{ inputs.signed && 'release' || '' }}"));
+      const secrets = ["MAC_CERTIFICATE", "MAC_CERTIFICATE_PASSWORD", "APPLE_API_KEY_P8", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"];
+      assert.equal((packaging.match(/secrets\./g) ?? []).length, secrets.length);
+      for (const secret of secrets)
+        assert.ok(packaging.includes(`\${{ inputs.signed && inputs.platform == 'mac' && secrets.${secret} || '' }}`), secret);
+      assert.ok(manual.includes("signed: ${{ inputs.signed && matrix.platform == 'mac' }}"));
+      assert.equal((release.match(/RELEASE_SIGNED_PLATFORMS: '/g) ?? []).length, 1);
+      assert.ok(release.includes("RELEASE_SIGNED_PLATFORMS: ${{ needs.validate.outputs.signed-platforms }}"));
+      assert.equal((release.match(/signed: /g) ?? []).length, 4);
+      for (const platform of ["windows", "mac"])
+        assert.equal(release.split(`signed: \${{ contains(fromJSON(needs.validate.outputs.signed-platforms), '${platform}') }}`).length - 1, 2);
     });
   }
 }

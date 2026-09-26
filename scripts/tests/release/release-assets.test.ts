@@ -21,7 +21,7 @@ class ReleaseAssetsTests {
         const fixture = await ReleaseFixture.create(version);
         t.after(() => fixture.close());
         await fixture.seed();
-        const files = await new ReleaseAssets(fixture.candidate).prepare(fixture.input, fixture.output);
+        const files = await new ReleaseAssets(fixture.candidate, []).prepare(fixture.input, fixture.output);
         assert.equal(files.length, 25);
         assert.equal(new Set(files.map(t => t.name)).size, files.length);
         const checksums = await readFile(path.join(fixture.output, "SHA256SUMS"), "utf8");
@@ -38,14 +38,14 @@ class ReleaseAssetsTests {
             version, files: [{ url, sha512: update.sha512, size: update.size }], path: url, sha512: update.sha512, releaseDate: fixture.candidate.releaseDate
           });
         }
-        await assert.rejects(new ReleaseAssets(fixture.candidate).prepare(fixture.input, fixture.output), /staging must be empty/);
+        await assert.rejects(new ReleaseAssets(fixture.candidate, []).prepare(fixture.input, fixture.output), /staging must be empty/);
       }
     });
 
     test("rejects mismatched reports, targets, corrupt bytes, unexpected files and unsafe paths", async t => {
       const fixture = await ReleaseFixture.create();
       t.after(() => fixture.close());
-      const prepare = (): Promise<unknown> => new ReleaseAssets(fixture.candidate).prepare(fixture.input, fixture.output);
+      const prepare = (): Promise<unknown> => new ReleaseAssets(fixture.candidate, []).prepare(fixture.input, fixture.output);
       await fixture.seed();
       const valid = await fixture.readReport();
       const malformed: unknown[] = [null, 1];
@@ -56,7 +56,7 @@ class ReleaseAssetsTests {
       }
       for (const [key, value] of [["version", "wrong"], ["sourceRevision", "wrong"], ["targetPlatform", 2], ["targetPlatform", "invalid"],
         ["targetArchitecture", 2], ["targetArchitecture", "ia32"], ["hostPlatform", "linux"], ["hostArchitecture", "arm64"],
-        ["signingRequested", true], ["files", {}]] as const)
+        ["signingRequested", "yes"], ["files", {}]] as const)
         malformed.push({ ...valid, [key]: value });
       for (const report of malformed) {
         await fixture.seed();
@@ -116,6 +116,25 @@ class ReleaseAssetsTests {
       await mkdir(fixture.output);
       await writeFile(path.join(fixture.output, "keep"), "do not overwrite");
       await assert.rejects(prepare(), /staging must be empty/);
+    });
+
+    test("publishes only packages whose signing matches the release's signed platforms", async t => {
+      const fixture = await ReleaseFixture.create();
+      t.after(() => fixture.close());
+      await fixture.seed(["mac"]);
+      assert.equal((await new ReleaseAssets(fixture.candidate, ["mac"]).prepare(fixture.input, fixture.output)).length, 25);
+      for (const [seeded, signed] of [[["mac"], []], [[], ["mac"]], [["mac"], ["windows", "mac"]], [["windows"], ["mac"]]] as const) {
+        await fixture.seed(seeded);
+        await assert.rejects(new ReleaseAssets(fixture.candidate, signed).prepare(fixture.input, fixture.output), /signing does not match/);
+      }
+    });
+
+    test("reads the signed platforms as a JSON array of distinct signable platforms", () => {
+      assert.deepEqual(ReleaseAssets.parseSignedPlatforms("[]"), []);
+      assert.deepEqual(ReleaseAssets.parseSignedPlatforms("[\"mac\"]"), ["mac"]);
+      assert.deepEqual(ReleaseAssets.parseSignedPlatforms("[\"windows\", \"mac\"]"), ["windows", "mac"]);
+      for (const text of [undefined, "", "mac", "{}", "[1]", "[\"linux\"]", "[\"ios\"]", "[\"mac\", \"mac\"]"])
+        assert.throws(() => ReleaseAssets.parseSignedPlatforms(text), /Signed platforms must be a JSON array/);
     });
   }
 }
