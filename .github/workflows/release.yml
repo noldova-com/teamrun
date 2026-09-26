@@ -62,6 +62,7 @@ jobs:
       architecture: x64
       revision: ${{ needs.validate.outputs.revision }}
       signed: ${{ contains(fromJSON(needs.validate.outputs.signed-platforms), 'windows') }}
+    secrets: inherit
 
   windows-arm64:
     needs: validate
@@ -71,6 +72,7 @@ jobs:
       architecture: arm64
       revision: ${{ needs.validate.outputs.revision }}
       signed: ${{ contains(fromJSON(needs.validate.outputs.signed-platforms), 'windows') }}
+    secrets: inherit
 
   mac-x64:
     needs: validate
@@ -80,6 +82,7 @@ jobs:
       architecture: x64
       revision: ${{ needs.validate.outputs.revision }}
       signed: ${{ contains(fromJSON(needs.validate.outputs.signed-platforms), 'mac') }}
+    secrets: inherit
 
   mac-arm64:
     needs: validate
@@ -89,6 +92,7 @@ jobs:
       architecture: arm64
       revision: ${{ needs.validate.outputs.revision }}
       signed: ${{ contains(fromJSON(needs.validate.outputs.signed-platforms), 'mac') }}
+    secrets: inherit
 
   linux-x64:
     needs: validate

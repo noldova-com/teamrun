@@ -49,3 +49,4 @@ jobs:
       architecture: ${{ matrix.architecture }}
       revision: ${{ github.sha }}
       signed: ${{ inputs.signed && matrix.platform != 'linux' }}
+    secrets: inherit
