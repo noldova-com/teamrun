@@ -73,8 +73,7 @@ LICENSE file in the root directory of this source tree.
       </button>
       <span class="flex-1"></span>
       <button mat-button type="button" class="tr-settings-trigger min-w-0" [matMenuTriggerFor]="settingsMenu" [matTooltip]="resources.settingsLabel">
-        <tr-teammate-avatar [teammateId]="responderId()" [name]="responder()?.name ?? resources.defaultTeammateLabel" [description]="summary()"
-          [unavailable]="responderId() !== null && store.isTeammateUnavailable(responderId()!)" />
+        <tr-teammate-avatar [teammateId]="activeResponderId()" [name]="responder()?.name ?? resources.defaultTeammateLabel" [description]="summary()" />
         <span class="truncate">{{ summary() }}</span>
         <mat-icon iconPositionEnd>{{ resources.icons["expandMore"] }}</mat-icon>
       </button>

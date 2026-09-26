@@ -81,6 +81,27 @@ describe("ChatStore", () => {
     await vi.waitFor(() => expect(store.membersOf("c1").map(t => t.teammateId)).toEqual(["bob"]));
   });
 
+  it("reloads the selected conversation's members after a send whose mentions can add teammates", async () => {
+    const data = new TeammateFixture();
+    for (const [method, handler] of data.bridge.handlers)
+      bridge.answer(method, handler);
+    bridge.answer(MethodName.MessageSend, () => new MessageSendResult(SampleData.userMessage, []).toJson());
+    await store.initialize();
+    await store.selectConversation("c1");
+    const settings = new ComposerSettings("codex", null, null, null);
+    const listed = (): number => bridge.methods.filter(t => t === MethodName.ConversationListMembers).length;
+    const before = listed();
+    expect(await store.send("No mention", settings, "c1")).toBe(true);
+    expect(listed()).toBe(before);
+    data.members.push(new ConversationMember("c1", "bob", "t", null, false));
+    expect(await store.send("@Bob, have a look", settings, "c1", [], ["bob"])).toBe(true);
+    expect(listed()).toBe(before + 1);
+    expect(store.membersOf("c1").map(t => t.teammateId)).toEqual(["alice", "bob"]);
+    bridge.fail(MethodName.ConversationListMembers, ErrorCode.Unavailable, "Disconnected");
+    expect(await store.send("@Alice, and you", settings, "c1", [], ["alice"])).toBe(true);
+    expect(store.error()).toBe("Disconnected");
+  });
+
   it("keeps a conversation busy across queued replies and follows their terminal updates", async () => {
     const first = SampleData.withStatus(SampleData.reply, MessageStatus.Pending);
     const second = new Message("second", "c1", 3, MessageAuthor.Provider, SampleData.userMessage.id,
