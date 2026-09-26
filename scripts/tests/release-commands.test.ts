@@ -134,6 +134,7 @@ class ReleaseCommandsTests {
         assert.doesNotMatch(workflow, /secrets\.|environment:/);
       assert.equal((packaging.match(/environment:/g) ?? []).length, 1);
       assert.ok(packaging.includes("environment: ${{ inputs.signed && 'release' || '' }}"));
+      assert.ok(packaging.includes("timeout-minutes: ${{ inputs.signed && 90 || 45 }}"));
       const secrets = [["mac", "MAC_CERTIFICATE"], ["mac", "MAC_CERTIFICATE_PASSWORD"], ["mac", "APPLE_API_KEY_P8"], ["mac", "APPLE_API_KEY_ID"],
         ["mac", "APPLE_API_ISSUER"], ["windows", "AZURE_TENANT_ID"], ["windows", "AZURE_CLIENT_ID"], ["windows", "AZURE_CLIENT_SECRET"]] as const;
       assert.equal((packaging.match(/secrets\./g) ?? []).length, secrets.length);

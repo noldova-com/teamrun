@@ -38,7 +38,7 @@ jobs:
       signed-platforms: ${{ steps.candidate.outputs.signed-platforms }}
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-      RELEASE_SIGNED_PLATFORMS: '[]'
+      RELEASE_SIGNED_PLATFORMS: '["windows", "mac"]'
     steps:
       - name: Check out release validation from main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -45,7 +45,7 @@ jobs:
       ${{ fromJSON('{"windows-x64":"windows-2025","windows-arm64":"windows-11-arm",
       "linux-x64":"ubuntu-24.04","linux-arm64":"ubuntu-24.04-arm",
       "mac-x64":"macos-15-intel","mac-arm64":"macos-15"}')[format('{0}-{1}', inputs.platform, inputs.architecture)] }}
-    timeout-minutes: 45
+    timeout-minutes: ${{ inputs.signed && 90 || 45 }}
     env:
       CI: 'true'
       PACKAGE_PLATFORM: ${{ inputs.platform }}
