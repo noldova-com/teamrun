@@ -35,8 +35,10 @@ jobs:
     timeout-minutes: 5
     outputs:
       revision: ${{ steps.candidate.outputs.revision }}
+      signed-platforms: ${{ steps.candidate.outputs.signed-platforms }}
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      RELEASE_SIGNED_PLATFORMS: '[]'
     steps:
       - name: Check out release validation from main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,6 +61,7 @@ jobs:
       platform: windows
       architecture: x64
       revision: ${{ needs.validate.outputs.revision }}
+      signed: ${{ contains(fromJSON(needs.validate.outputs.signed-platforms), 'windows') }}
 
   windows-arm64:
     needs: validate
@@ -67,6 +70,7 @@ jobs:
       platform: windows
       architecture: arm64
       revision: ${{ needs.validate.outputs.revision }}
+      signed: ${{ contains(fromJSON(needs.validate.outputs.signed-platforms), 'windows') }}
 
   mac-x64:
     needs: validate
@@ -75,6 +79,7 @@ jobs:
       platform: mac
       architecture: x64
       revision: ${{ needs.validate.outputs.revision }}
+      signed: ${{ contains(fromJSON(needs.validate.outputs.signed-platforms), 'mac') }}
 
   mac-arm64:
     needs: validate
@@ -83,6 +88,7 @@ jobs:
       platform: mac
       architecture: arm64
       revision: ${{ needs.validate.outputs.revision }}
+      signed: ${{ contains(fromJSON(needs.validate.outputs.signed-platforms), 'mac') }}
 
   linux-x64:
     needs: validate
@@ -110,6 +116,7 @@ jobs:
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
       RELEASE_REVISION: ${{ needs.validate.outputs.revision }}
+      RELEASE_SIGNED_PLATFORMS: ${{ needs.validate.outputs.signed-platforms }}
     steps:
       - name: Check out the validated publication revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -18,6 +18,7 @@ export default class PublishRelease {
   private static readonly REVISION_VARIABLE: string = "RELEASE_REVISION";
   private static readonly TAG_VARIABLE: string = "RELEASE_TAG";
   private static readonly TOKEN_VARIABLE: string = "GH_TOKEN";
+  private static readonly SIGNED_PLATFORMS_VARIABLE: string = "RELEASE_SIGNED_PLATFORMS";
   private static readonly INPUT_DIRECTORY: string = "_build/release-input";
   private static readonly OUTPUT_DIRECTORY: string = "_build/release";
   private static readonly NOTES_FILE: string = ".github/RELEASE-NOTES.md";
@@ -27,7 +28,8 @@ export default class PublishRelease {
     if (environment[PublishRelease.REPOSITORY_VARIABLE] !== ReleaseCandidate.REPOSITORY || !environment[PublishRelease.REVISION_VARIABLE])
       throw new PackageException(PublishRelease.ENVIRONMENT_REQUIRED);
     const candidate = new ReleaseCandidate(environment[PublishRelease.TAG_VARIABLE] ?? "", process.cwd(), environment[PublishRelease.REVISION_VARIABLE]);
-    const files = await new ReleaseAssets(candidate).prepare(PublishRelease.INPUT_DIRECTORY, PublishRelease.OUTPUT_DIRECTORY);
+    const signedPlatforms = ReleaseAssets.parseSignedPlatforms(environment[PublishRelease.SIGNED_PLATFORMS_VARIABLE]);
+    const files = await new ReleaseAssets(candidate, signedPlatforms).prepare(PublishRelease.INPUT_DIRECTORY, PublishRelease.OUTPUT_DIRECTORY);
     await new ReleasePublisher(candidate, environment[PublishRelease.TOKEN_VARIABLE] ?? "").publish(files, await readFile(PublishRelease.NOTES_FILE, "utf8"));
   }
 }

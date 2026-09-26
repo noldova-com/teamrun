@@ -21,6 +21,11 @@ on:
         options: [all, x64, arm64]
         default: all
         required: true
+      signed:
+        description: Sign and notarize the macOS builds with the release environment's credentials
+        type: boolean
+        default: false
+        required: false
 
 permissions:
   contents: read
@@ -43,3 +48,4 @@ jobs:
       platform: ${{ matrix.platform }}
       architecture: ${{ matrix.architecture }}
       revision: ${{ github.sha }}
+      signed: ${{ inputs.signed && matrix.platform == 'mac' }}

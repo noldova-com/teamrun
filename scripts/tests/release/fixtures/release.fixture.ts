@@ -47,7 +47,7 @@ export default class ReleaseFixture {
     return execFileSync("git", [...args], { cwd: this.directory, encoding: "utf8", timeout: 10_000 }).trim();
   }
 
-  public async seed(): Promise<void> {
+  public async seed(signedPlatforms: readonly string[] = []): Promise<void> {
     await rm(this.input, { recursive: true, force: true });
     await rm(this.output, { recursive: true, force: true });
     const version = this.candidate.version.value;
@@ -67,7 +67,7 @@ export default class ReleaseFixture {
         await writeFile(path.join(directory, `package-report-${target}.json`), JSON.stringify({ version,
           sourceRevision: this.candidate.revision, targetPlatform: platform, targetArchitecture: architecture,
           hostPlatform: platform === "windows" ? "win32" : platform === "mac" ? "darwin" : "linux", hostArchitecture: architecture,
-          signingRequested: false, files }));
+          signingRequested: signedPlatforms.includes(platform), files }));
       }
     }
   }
