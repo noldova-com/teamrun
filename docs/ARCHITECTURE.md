@@ -50,6 +50,8 @@ Four rules keep the shell empty:
 
 Everything that belongs to a module lives in its folder, `src/modules/<id>`: its parts and their tests, end-to-end tests, styles, assets, migrations and its document. Adding a module adds its folder and a line in the build's module list; removing it removes both. Its data has its own folder in the data directory (section 3).
 
+The Angular parts, `src/shell/ui`, `src/shell/window` and modules' window parts, are not packages. The Angular project in `src/`, with its own manifest and lockfile, compiles them from source into one application. The kit's published API is its `src/api/index.ts`, which other Angular parts import as `@noldova/teamrun-shell-ui`.
+
 Fixture modules exist only for tests. They live with the tests that use them, in the `fixtures` beside those workflows under the [coding standards](CODING-STANDARDS.md#13-tests), and enter only a test build's module list.
 
 The window and its parts never import runtime code. Clients share connection facilities without embedding another runtime. Sections 6 and 8 define their access to privileged operations.
@@ -241,6 +243,7 @@ Closing TeamRun waits for each window to save its unsaved state. A window part t
 - The root manifest declares the product version and, separately, the protocol version. The build stamps the product version into sibling packages consistently.
 - The build also stamps the runtime with the fingerprint of the inputs it was compiled from. The fingerprint identifies the runtime's build: the same inputs give the same build, and any change gives another.
 - Compile, package and install through one reproducible path. Tests and the window consume fresh installed artifacts, detecting stale inputs. The coding standards own public declarations and documentation.
+- The Angular project in `src/` pins its own toolchain, including the TypeScript version Angular requires. The build installs it from its lockfile, separately from the packages, and the Angular CLI builds and tests the Angular parts. A package never imports from the Angular project's dependencies; it imports only what its own manifest declares.
 
 ### Modules and versions
 

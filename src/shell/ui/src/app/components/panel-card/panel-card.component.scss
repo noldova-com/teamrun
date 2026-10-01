@@ -1,0 +1,24 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: var(--tr-border-width) solid var(--tr-card-border);
+  border-radius: var(--tr-radius-large);
+  background-color: var(--tr-panel);
+  color: var(--tr-text);
+}
+
+:host(.tr-panel-card-shell) {
+  background-color: var(--tr-window);
+}

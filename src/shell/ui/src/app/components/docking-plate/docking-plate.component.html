@@ -1,0 +1,3 @@
+@for (direction of directions; track direction) {
+  <tr-docking-guide [direction]="direction" [chosen]="direction === chosen()" [class]="'tr-docking-plate-' + direction" />
+}
