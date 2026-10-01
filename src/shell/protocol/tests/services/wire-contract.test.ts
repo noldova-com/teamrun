@@ -16,6 +16,13 @@ export class WireContractTests {
   private readonly reader: JsonReader = JsonReader.fromValue({ name: "x" }, "$.item");
 
   @TestMethod
+  public acceptsOnlyKnownFields(): void {
+    WireContract.requireKnownFields(this.reader, ["name", "other"]);
+
+    Assert.areEqual("$.item.name", Assert.throws(() => WireContract.requireKnownFields(this.reader, ["other"]), JsonException).path);
+  }
+
+  @TestMethod
   public returnsTheCreatedModel(): void {
     Assert.areEqual("x", WireContract.create(this.reader, () => this.reader.readString("name")));
   }

@@ -256,8 +256,9 @@ export declare class BuildIdentity {
    * @param value The untrusted value.
    * @param path The path a failure reports; `$` by default.
    * @returns The identity.
-   * @throws JsonException synchronously when a field is missing, has the
-   * wrong type or breaks the constructor's rules; its path names the field.
+   * @throws JsonException synchronously when a field is unknown, missing, has
+   * the wrong type or breaks the constructor's rules; its path names the
+   * field.
    */
   public static fromJson(value: unknown, path?: string): BuildIdentity;
 
@@ -326,7 +327,8 @@ export declare class Failure {
 /**
  * A message of the local protocol. Its wire form is a JSON object whose
  * `kind` field names the message kind. Fields a message does not know are
- * ignored when it is read.
+ * ignored when it is read, except in a handshake, which carries the
+ * capability token and accepts no unknown fields.
  */
 export declare abstract class WireMessage {
   /**
@@ -405,8 +407,9 @@ export declare class Handshake extends WireMessage {
    * @param value The untrusted value.
    * @param path The path a failure reports; `$` by default.
    * @returns The handshake.
-   * @throws JsonException synchronously when a field is missing, has the
-   * wrong type or breaks the constructor's rules; its path names the field.
+   * @throws JsonException synchronously when a field is unknown, missing, has
+   * the wrong type or breaks the constructor's rules, in the handshake or its
+   * identity; its path names the field.
    */
   public static fromJson(value: unknown, path?: string): Handshake;
 
@@ -659,6 +662,17 @@ export declare class Cancel extends WireMessage {
  */
 export declare class WireContract {
   /**
+   * Rejects fields a security-sensitive message does not define.
+   *
+   * @param reader The reader of the message's object.
+   * @param fields Every field the message defines, including `kind` when it
+   * is a whole message.
+   * @throws JsonException synchronously when the object has another field;
+   * its path names the first such field.
+   */
+  public static requireKnownFields(reader: JsonReader, fields: readonly string[]): void;
+
+  /**
    * Runs a model's factory and translates its argument failures.
    *
    * @param reader The reader of the object the model is read from; its path
@@ -694,6 +708,10 @@ export declare class WireDecoder {
  * Splits a connection's text into frames: one message per line. Text after
  * the last line break is kept until the rest of its frame arrives. After it
  * throws, the reader must not be used again and the connection closes.
+ *
+ * The reader works on text: the transport decodes UTF-8 and sets its own
+ * limit in bytes. The frame limit here counts characters, which are UTF-16
+ * code units.
  */
 export declare class FrameReader {
   /**
@@ -719,7 +737,8 @@ export declare class FrameReader {
 }
 
 /**
- * Turns messages into frames.
+ * Turns messages into frames. The frame limit counts characters, which are
+ * UTF-16 code units; the transport encodes the text as UTF-8.
  */
 export declare class FrameWriter {
   /**

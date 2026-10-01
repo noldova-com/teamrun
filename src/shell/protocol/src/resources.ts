@@ -42,6 +42,7 @@ export class Resources {
   public static readonly maximumFrameLengthInvalid: string = "The maximum frame length must be a positive integer.";
   public static readonly responseOutcomeMissing: string = "A response must carry a payload or a failure.";
   public static readonly responseOutcomeAmbiguous: string = "A response cannot carry both a payload and a failure.";
+  public static readonly unknownField: string = "The field is not part of this message, which accepts no unknown fields.";
 
   public static formatFrameTooLarge(maximumFrameLength: number): string {
     return `A frame exceeds the maximum length of ${maximumFrameLength} characters.`;

@@ -36,6 +36,16 @@ export class HandshakeTests {
   }
 
   @TestMethod
+  @TestData("{\"kind\":\"Handshake\",\"id\":\"h1\",\"identity\":{\"productVersion\":\"0.0.1\",\"protocolVersion\":1,\"fingerprint\":\"abc\"},\"token\":\"t\",\"client\":\"cli\",\"scope\":\"all\"}", "$.scope")
+  @TestData("{\"id\":\"h1\",\"identity\":{\"productVersion\":\"0.0.1\",\"protocolVersion\":1,\"fingerprint\":\"abc\",\"admin\":true},\"token\":\"t\",\"client\":\"cli\"}", "$.identity.admin")
+  public rejectsUnknownFields(text: string, path: string): void {
+    const failure = Assert.throws(() => Handshake.fromJson(JSON.parse(text)), JsonException);
+
+    Assert.areEqual(path, failure.path);
+    Assert.isTrue(failure.message.includes("accepts no unknown fields"), failure.message);
+  }
+
+  @TestMethod
   public namesTheInvalidFieldOnTheWire(): void {
     const identity = { productVersion: "0.0.1", protocolVersion: 1, fingerprint: "abc" };
 

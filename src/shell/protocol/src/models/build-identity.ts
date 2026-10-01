@@ -14,6 +14,8 @@ import { Resources } from "../resources.js";
 import { WireContract } from "../services/wire-contract.js";
 
 export class BuildIdentity {
+  private static readonly FIELDS: readonly string[] = [Resources.productVersionField, Resources.protocolVersionField, Resources.fingerprintField];
+
   public static readonly supportedProtocolVersion: number = BuildIdentity.parseProtocolVersion(Resources.protocolVersion);
 
   public readonly productVersion: string;
@@ -40,6 +42,7 @@ export class BuildIdentity {
 
   public static fromJson(value: unknown, path?: string): BuildIdentity {
     const reader = JsonReader.fromValue(value, path);
+    WireContract.requireKnownFields(reader, BuildIdentity.FIELDS);
     return WireContract.create(reader, () => new BuildIdentity(
       reader.readString(Resources.productVersionField),
       reader.readInteger(Resources.protocolVersionField),

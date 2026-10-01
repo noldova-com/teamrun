@@ -16,6 +16,8 @@ import { BuildIdentity } from "./build-identity.js";
 import { WireMessage } from "./wire-message.js";
 
 export class Handshake extends WireMessage {
+  private static readonly FIELDS: readonly string[] = [Resources.kindField, Resources.idField, Resources.identityField, Resources.tokenField, Resources.clientField];
+
   public override readonly kind: WireMessageKind = WireMessageKind.Handshake;
   public readonly id: string;
   public readonly identity: BuildIdentity;
@@ -36,6 +38,7 @@ export class Handshake extends WireMessage {
 
   public static fromJson(value: unknown, path?: string): Handshake {
     const reader = JsonReader.fromValue(value, path);
+    WireContract.requireKnownFields(reader, Handshake.FIELDS);
     const identity = reader.readObject(Resources.identityField);
     return WireContract.create(reader, () => new Handshake(
       reader.readString(Resources.idField),
