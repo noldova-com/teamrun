@@ -80,7 +80,7 @@ class ApiServerTests {
       const command = [process.execPath, "-e", "process.stderr.write('not listening'); setTimeout(() => {}, 300)", "--"];
 
       await assert.rejects(ApiServer.useAsync(command, SourceTreeFixture.root, "unused.json", ApiServerTests.TIMEOUT, () => Promise.resolve(1)),
-        (t: unknown) => t instanceof ApiException && t.message === "The TypeScript API server could not open unused.json.\nnot listening");
+        (t: unknown) => t instanceof ApiException && /^The TypeScript API server could not open unused\.json; after \d+ ms it had stopped\.\nnot listening$/.test(t.message));
     });
 
     test("a project file that names no project fails and keeps the cause", async t => {
@@ -89,7 +89,8 @@ class ApiServerTests {
       const missing = `${fixture.directory}/missing.json`;
 
       await assert.rejects(ApiServer.useAsync([ApiServer.locateCompiler()], fixture.directory, missing, ApiServerTests.TIMEOUT, () => Promise.resolve(1)),
-        (t: unknown) => t instanceof ApiException && t.message === `The TypeScript API server could not open ${missing}.` &&
+        (t: unknown) => t instanceof ApiException && t.message.startsWith(`The TypeScript API server could not open ${missing}; after `) &&
+          t.message.endsWith(" ms it was running.") &&
           t.cause instanceof ApiException && t.cause.message === `The TypeScript API found no project in ${missing}.`);
     });
   }

@@ -111,12 +111,16 @@ export default class ApiServer {
       catch (error) {
         await api.close();
         const isConnectionFailure = error instanceof Error && error.message.startsWith(ApiServer.CONNECTION_FAILURE);
-        if (!isConnectionFailure || hasExited || Date.now() - started >= ApiServer.START_TIMEOUT) {
+        const elapsed = Date.now() - started;
+        if (!isConnectionFailure || hasExited || elapsed >= ApiServer.START_TIMEOUT) {
+          const state = hasExited ? "had stopped" : "was running";
           child.kill();
           await exited;
           await pipe.removeAsync();
           const detail = errorOutput.trim();
-          throw new ApiException(`The TypeScript API server could not open ${projectFile}.${detail === "" ? "" : `\n${detail}`}`, { cause: error });
+          throw new ApiException(
+            `The TypeScript API server could not open ${projectFile}; after ${elapsed} ms it ${state}.${detail === "" ? "" : `\n${detail}`}`,
+            { cause: error });
         }
       }
       await new Promise(resolve => setTimeout(resolve, ApiServer.CONNECT_INTERVAL));
