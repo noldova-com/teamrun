@@ -1,0 +1,67 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "cli": {
+    "analytics": false,
+    "cache": {
+      "enabled": false
+    }
+  },
+  "projects": {
+    "teamrun": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": ".",
+      "prefix": "tr",
+      "architect": {
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "tsconfig.spec.json",
+            "runner": "vitest",
+            "browsers": [
+              "chromiumHeadless"
+            ],
+            "browserViewport": "1280x800",
+            "include": [
+              "shell/*/tests/**/*.spec.ts"
+            ],
+            "providersFile": "shell/ui/tests/test-providers.ts",
+            "watch": false,
+            "coverage": true,
+            "coverageInclude": [
+              "shell/*/src/**/*.ts"
+            ],
+            "coverageReporters": [
+              "text"
+            ],
+            "coverageThresholds": {
+              "statements": 100,
+              "branches": 100,
+              "functions": 100,
+              "lines": 100
+            },
+            "coverageExclude": [
+              "shell/*/src/app/enums/**"
+            ]
+          }
+        },
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "tsConfig": "tsconfig.spec.json",
+            "styles": [
+              "shell/ui/src/styles/kit.scss"
+            ]
+          },
+          "configurations": {
+            "development": {
+              "optimization": false,
+              "sourceMap": true
+            }
+          }
+        }
+      }
+    }
+  }
+}

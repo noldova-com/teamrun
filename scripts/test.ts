@@ -9,6 +9,9 @@
 import { appendFile } from "node:fs/promises";
 import type { Writable } from "node:stream";
 
+import AngularProject from "./angular/angular-project.ts";
+import AngularTestCheck from "./checks/angular-test-check.ts";
+import DeclaredDependencyCheck from "./checks/declared-dependency-check.ts";
 import DocumentCheck from "./checks/document-check.ts";
 import type ICheck from "./checks/interfaces/check.ts";
 import ModuleFolderCheck from "./checks/module-folder-check.ts";
@@ -24,6 +27,7 @@ import ProcessRunner from "./processes/process-runner.ts";
 import Git from "./repository/git.ts";
 import RepositoryFiles from "./repository/repository-files.ts";
 import SourceTree from "./structure/source-tree.ts";
+import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Test {
   private static readonly DOCUMENTS_SELECTION: string = "documents";
@@ -83,10 +87,12 @@ export default class Test {
         new ShellIndependenceCheck(tree),
         new ModuleImportCheck(tree),
         new NameUniquenessCheck(tree),
+        new DeclaredDependencyCheck(tree),
         new PackageCheck(build),
         new PackageTestCheck(this.root, build, this.runner, this.environment),
         new TypeCheck(this.root, this.runner),
-        new ScriptTestCheck(this.root, this.runner)
+        new ScriptTestCheck(this.root, this.runner),
+        new AngularTestCheck(new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment)))
       ];
     return selection.length === 1 && selection[0] === Test.DOCUMENTS_SELECTION ? [documents] : null;
   }

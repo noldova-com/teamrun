@@ -87,7 +87,7 @@ A package's `package.json` sits at the package root, with the `src/` and `tests/
 
 Package source trees use the concept categories `api`, `decorators`, `enums`, `exceptions`, `extensions`, `interfaces`, `intrinsics`, `models`, `services`, and `types`; create only those the package uses. Domain subfolders are optional and added only when they make current navigation clearer. Models hold state, identities, options, and results; services own operations such as tracking, supervising, dispatching, parsing, reading, writing, and verifying. Decorators hold TypeScript decorators, extensions hold foundation's additions to existing types, and intrinsics hold language-level primitives such as `nameof`. The [architecture](ARCHITECTURE.md#2-components-and-dependency-direction) owns which packages the shell and a module consist of.
 
-Angular packages (the shell's `window`/`ui` and module window parts) place services and models under `src/app`. Components pair `<name>.component.ts` and `<name>.component.html` through `templateUrl`; `<Name>Component` lives under `src/app/components/<name>/`. Services end in `.service.ts`. Shell selectors start with `tr-`, module selectors with `tr-<module id>-`; the architecture's [identity check](ARCHITECTURE.md#3-vocabulary-and-identity) enforces complete-name uniqueness. Each package owns `resources.ts`; templates access its text through a `resources` field. Section 13 owns test placement.
+The Angular parts (the shell's `window`/`ui` and module window parts) keep `src/` and `tests/` without a `package.json`, because the Angular project in `src/` compiles them from source ([architecture](ARCHITECTURE.md#2-components-and-dependency-direction)). They place services and models under `src/app`. Components pair `<name>.component.ts` and `<name>.component.html` through `templateUrl`; `<Name>Component` lives under `src/app/components/<name>/`. Services end in `.service.ts`. Shell selectors start with `tr-`, module selectors with `tr-<module id>-`; the architecture's [identity check](ARCHITECTURE.md#3-vocabulary-and-identity) enforces complete-name uniqueness. Each package owns `resources.ts`; templates access its text through a `resources` field. Section 13 owns test placement.
 
 ## 6. Methods and control flow
 
@@ -148,6 +148,8 @@ Node's [child-process documentation](https://nodejs.org/api/child_process.html) 
 ## 9. Documentation and comments
 
 Each package exposes its API through `src/api/index.ts` and declares/documents it in handwritten `src/api/index.d.ts`. Every public type, member and overload has original JSDoc sufficient for use without reading implementation. IntelliSense and reference pages derive from these declarations using compiler-aware tooling, never text/regex extraction or a second documentation copy; private details are excluded. Shell declarations are the module contract; module declarations are its published API.
+
+The Angular parts are not packages, so this section's declaration and JSDoc rules do not apply to them: their `src/api/index.ts` lists the public API, and the Angular compiler checks its use. They carry no JSDoc and no comments.
 
 Every public callable signature documents:
 

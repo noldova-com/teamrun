@@ -1,0 +1,77 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@use "@angular/material" as mat;
+
+:root {
+  @include mat.menu-overrides((
+    container-shape: var(--tr-radius-large),
+    container-color: var(--tr-menu),
+    container-elevation-shadow: var(--tr-shadow-large),
+    divider-color: var(--tr-menu-separator),
+    divider-top-spacing: var(--tr-menu-separator-spacing),
+    divider-bottom-spacing: var(--tr-menu-separator-spacing),
+    item-label-text-color: var(--tr-menu-text),
+    item-label-text-font: var(--tr-font-sans),
+    item-label-text-size: var(--tr-text-panel),
+    item-label-text-line-height: var(--tr-line-panel),
+    item-label-text-weight: 400,
+    item-label-text-tracking: normal,
+    item-icon-color: var(--tr-menu-text),
+    item-icon-size: var(--tr-icon),
+    item-hover-state-layer-color: var(--tr-hover),
+    item-focus-state-layer-color: var(--tr-hover),
+    item-spacing: var(--tr-menu-item-padding),
+    item-leading-spacing: var(--tr-menu-item-padding),
+    item-trailing-spacing: var(--tr-menu-item-padding),
+    item-with-icon-leading-spacing: var(--tr-menu-item-padding),
+    item-with-icon-trailing-spacing: var(--tr-menu-item-padding)
+  ));
+  @include mat.tooltip-overrides((
+    container-shape: var(--tr-radius-hover),
+    container-color: var(--tr-hover-widget),
+    supporting-text-color: var(--tr-text),
+    supporting-text-font: var(--tr-font-sans),
+    supporting-text-size: var(--tr-text-label),
+    supporting-text-line-height: var(--tr-line-tooltip),
+    supporting-text-weight: 400,
+    supporting-text-tracking: normal
+  ));
+}
+
+.mat-mdc-menu-panel.mat-mdc-menu-panel {
+  border: var(--tr-border-width) solid var(--tr-menu-border);
+}
+
+.mat-mdc-menu-panel .mat-mdc-menu-content {
+  padding-block: var(--tr-menu-padding);
+}
+
+.mat-mdc-menu-panel .mat-mdc-menu-item {
+  min-height: var(--tr-menu-item-height);
+  margin-inline: var(--tr-menu-item-inset);
+  border-radius: var(--tr-radius-medium);
+}
+
+.mat-mdc-menu-panel .mat-mdc-menu-item[disabled] {
+  cursor: default;
+}
+
+.mat-mdc-menu-panel .tr-menu-label {
+  padding: var(--tr-menu-label-padding);
+  color: var(--tr-text-muted);
+  font-size: var(--tr-text-panel);
+  line-height: var(--tr-line-panel);
+}
+
+.mat-mdc-tooltip .mat-mdc-tooltip-surface {
+  max-width: min(var(--tr-tooltip-width), calc(100vw - var(--tr-space-4)));
+  padding: var(--tr-tooltip-padding);
+  border: var(--tr-border-width) solid var(--tr-hover-widget-border);
+  box-shadow: var(--tr-shadow-large);
+}

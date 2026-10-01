@@ -1,0 +1,40 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: grid;
+  grid-template-areas:
+    ". Top ."
+    "Left Center Right"
+    ". Bottom .";
+  gap: var(--tr-docking-plate-gap);
+  padding: var(--tr-docking-plate-gap);
+  border-radius: var(--tr-radius-medium);
+  background-color: var(--tr-raised);
+  box-shadow: var(--tr-shadow-large);
+}
+
+.tr-docking-plate-Top {
+  grid-area: Top;
+}
+
+.tr-docking-plate-Left {
+  grid-area: Left;
+}
+
+.tr-docking-plate-Center {
+  grid-area: Center;
+}
+
+.tr-docking-plate-Right {
+  grid-area: Right;
+}
+
+.tr-docking-plate-Bottom {
+  grid-area: Bottom;
+}
