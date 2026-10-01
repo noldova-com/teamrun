@@ -45,7 +45,7 @@ Four rules keep the shell empty:
 
 - **The shell names no module.** No production source under `src/shell` or `src/foundation` imports a module or contains an identifier, text or special case that belongs to one. Tests and their fixtures are not production source.
 - **A module uses only published APIs.** It imports its own packages, foundation, the shell's published APIs and the published APIs of the modules it declares as dependencies.
-- **The build's module list names the modules an application build includes.** It lives outside `src/shell`. Adding a module changes that list and no shell source.
+- **The build's module list names the modules an application build includes.** It lives in the root `package.json`, outside `src/shell`. Adding a module changes that list and no shell source. The build generates the file that brings the listed modules' window parts into the window, and a test build adds the fixture modules.
 - **Automated checks enforce the first two rules and the unique names of section 3 on every change.**
 
 Everything that belongs to a module lives in its folder, `src/modules/<id>`: its parts and their tests, end-to-end tests, styles, assets, migrations and its document. Adding a module adds its folder and a line in the build's module list; removing it removes both. Its data has its own folder in the data directory (section 3).
@@ -128,7 +128,7 @@ The shell owns registration, collisions, user overrides, persistence and removal
 | Shortcuts | A default key for a command | Reports collisions and applies the person's bindings |
 | Top bar | Actions for the window's top row | Shows them in declared order beside the window controls and the active document's breadcrumb |
 | Status bar | Items for its left or right side: text and icon, a tooltip and a command | Shows them along the bottom of the window, by side and declared order |
-| Main menu | Items for the application menus (File, Edit, View, Help) or a menu of its own | Builds the menus and shows them in the macOS menu bar; their items are also reachable through command search |
+| Main menu | Items for the application menus (File, Edit, View, Help) or a menu of its own | Builds the menus and shows them in the macOS menu bar; their items are also reachable through command search. Without contributed menus, macOS shows a standard application, Edit and Window menu, so Quit, Copy and Paste work |
 | Context menus | Items for the shell's context and panel menus and for its own | Shows them in declared order |
 | Notifications | Operating-system notifications: a title, text and the command that opening one runs | Shows them through the operating system's notification service when the person's settings allow it |
 | Settings | Settings with defaults and the scopes that may override them, their pages, and setting scopes for the objects it owns | Stores the values per scope, resolves the effective value, shows the pages and reports changes |
@@ -151,7 +151,7 @@ A module decides when something deserves a notification; muting, for example for
 
 ### Ownership
 
-- One runtime owns each canonical data directory. The default location is `~/.noldova/teamrun`; an explicit data directory allows an isolated workspace.
+- One runtime owns each canonical data directory. The default location is `~/.noldova/teamrun`; an explicit data directory allows an isolated workspace. Development and test runs never default to the person's data directory: each checkout uses its own unless one is given.
 - The runtime acquires exclusive ownership before opening a database, activating a module, cleaning up owned processes or publishing an endpoint.
 - Ownership uses a process-held exclusive transaction in a separate SQLite ownership database. Do not delete the ownership database to break a live lock.
 - Discovery metadata is published atomically and identifies the endpoint, the owner process and the program it runs from, the product and protocol versions and the runtime's build.
@@ -174,7 +174,7 @@ A module decides when something deserves a notification; muting, for example for
 ### Builds and lifetime
 
 - The first client may start a runtime; later clients attach only to their own build, carrying the same modules without separate module-protocol negotiation.
-- If another build owns the directory, neither connect nor start another runtime: identify the owner and how to quit it before opening a desktop window.
+- A newer build takes over a directory an older build's runtime owns by itself. It asks the older runtime to stop; if work is in progress, the person makes section 9's choice to wait for it or stop it; then the older runtime exits and the newer one starts. An older build that finds a newer runtime hands the person over to the newer build instead of starting. The person is never asked to find and quit another TeamRun.
 - Work may outlive clients until the idle policy permits shutdown.
 - Explicit shutdown cancels owned work, resolves waiters, flushes state and closes resources; acknowledgement does not prove process exit.
 - Reconnect from durable records, allowing for missed events.
@@ -199,7 +199,7 @@ SQLite is the authority for durable records. The shell and each module that keep
 |---|---|
 | Migration history and change records | Each database's owner, in that database |
 | Shortcuts, settings and their values per scope | The shell, in its database |
-| Layout, window bounds and a window part's view state | The shell for its own and the owning module for a part's, in the data directory. State tied to a display or a window is kept for the device and window that recorded it; transient state stays in memory |
+| Layout, window bounds and a window part's view state | The shell keeps layout and window bounds in its database, written through the runtime; the owning module keeps a part's view state in the data directory. State tied to a display or a window is kept for the device and window that recorded it; transient state stays in memory |
 | Drafts and other content the person wrote but did not send | The owning module's database, saved through its runtime part |
 | Credentials an external tool manages | That tool, accessed only through its supported interfaces |
 | Caches | Bounded and transient; never the durable source of truth |
@@ -228,7 +228,7 @@ Persisted tabs and layout restore the person's saved workspace without opening u
 
 ## 9. Active work, closing and shutdown
 
-A part reports the work it has in progress, such as a running reply or command, to its host. Before TeamRun quits or restarts for an update while work is in progress, it asks the person whether to wait for the work or to stop it, and never interrupts it without that choice.
+A part reports the work it has in progress, such as a running reply or command, to its host. Before TeamRun quits, restarts for an update or stops for a newer build (section 6) while work is in progress, it asks the person whether to wait for the work or to stop it, and never interrupts it without that choice.
 
 Closing TeamRun waits for each window to save its unsaved state. A window part that reports a failed save keeps TeamRun open with the error, while a window that is gone or does not answer before the timeout does not block closing.
 

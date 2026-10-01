@@ -83,7 +83,9 @@ Application icons and fonts live in `assets/icons` and `assets/fonts`, with thei
 
 Mode-specific icons use `dark` or `light` for the intended background. PNG names include their square pixel size, such as `icon-dark-128.png` or `icon-light-512.png`. Purpose-specific icons use a descriptive variant, such as `icon-dock-512.png`; ICO files contain multiple resolutions and omit a single-size suffix.
 
-Package source trees use the concept categories `api`, `enums`, `exceptions`, `interfaces`, `models`, `services`, and `types`; create only those the package uses. Domain subfolders are optional and added only when they make current navigation clearer. Models hold state, identities, options, and results; services own operations such as tracking, supervising, dispatching, parsing, reading, writing, and verifying. The package manifest, TypeScript configuration, and `resources.ts` stay at the source root; tests mirror the full path. The [architecture](ARCHITECTURE.md#2-components-and-dependency-direction) owns which packages the shell and a module consist of.
+A package's `package.json` sits at the package root, with the `src/` and `tests/` folders beside it. Each folder has its own TypeScript configuration at its root, and `resources.ts` sits at the root of `src/`; tests mirror the full path.
+
+Package source trees use the concept categories `api`, `decorators`, `enums`, `exceptions`, `extensions`, `interfaces`, `intrinsics`, `models`, `services`, and `types`; create only those the package uses. Domain subfolders are optional and added only when they make current navigation clearer. Models hold state, identities, options, and results; services own operations such as tracking, supervising, dispatching, parsing, reading, writing, and verifying. Decorators hold TypeScript decorators, extensions hold foundation's additions to existing types, and intrinsics hold language-level primitives such as `nameof`. The [architecture](ARCHITECTURE.md#2-components-and-dependency-direction) owns which packages the shell and a module consist of.
 
 Angular packages (the shell's `window`/`ui` and module window parts) place services and models under `src/app`. Components pair `<name>.component.ts` and `<name>.component.html` through `templateUrl`; `<Name>Component` lives under `src/app/components/<name>/`. Services end in `.service.ts`. Shell selectors start with `tr-`, module selectors with `tr-<module id>-`; the architecture's [identity check](ARCHITECTURE.md#3-vocabulary-and-identity) enforces complete-name uniqueness. Each package owns `resources.ts`; templates access its text through a `resources` field. Section 13 owns test placement.
 
@@ -152,7 +154,7 @@ Every public callable signature documents:
 - `@param` for each parameter: purpose, accepted inputs, constraints, units, defaults and callback obligations as applicable, beyond its name/type.
 - `@returns` for non-void results: meaning, ownership, ordering, absence and asynchronous completion as applicable; omitted for constructors.
 - `@throws` for contractual failures: type, trigger and synchronous throw versus promise rejection; no invented contracts or empty tags.
-- `@example` for normal and boundary usage. Related signatures may link to a shared example; examples compile or run during verification.
+- `@example` for normal and boundary usage. Related signatures may link to a shared example; examples compile or run during verification. An imported package may arrive without `@example` blocks; a separate change adds them together with the check that compiles them, and the missing examples count as incomplete verification until it does.
 
 Document relevant generic roles, property meaning, mutation, lifecycle, performance and deprecation. Use `@remarks` and symbol links where useful; keep conceptual guides separate and linked. Avoid repetitive prose without omitting argument documentation.
 
@@ -231,7 +233,7 @@ YAML configuration uses `#` comments containing the same license notice; it cann
 
 ## 13. Tests
 
-Foundation-tested packages keep separately compiled `src/` and `tests/` siblings. Tests mirror source paths, replacing `.ts` with `.test.ts` and preserving role suffixes:
+Foundation-tested packages keep separately compiled `src/` and `tests/` siblings beside the package's `package.json` (section 5). Tests mirror source paths, replacing `.ts` with `.test.ts` and preserving role suffixes:
 
 ```text
 src/services/snapshot-tracker.ts
