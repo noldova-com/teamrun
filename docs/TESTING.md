@@ -66,7 +66,7 @@ The coverage and configuration requirements are:
 | Repository-owned executable automation, including build, test, packaging and release logic | 100% executable-code coverage, with behavior and process-boundary checks appropriate to the operation |
 | YAML and other non-executable configuration | Applicable schema/configuration validation and workflow checks; no executable-code coverage percentage |
 | A module's `protocol`, `runtime` and `cli` | 100% of executable production code. Where a part drives an external tool, doubles cover parsing, routing and lifecycle; behavior only the real tool can exercise needs separately authorized live verification and explicit accounting of uncovered lines |
-| Angular packages: the shell's `window` and `ui`, and a module's `window` | Component and service verification through the framework's testing surface, plus the desktop UI workflow gate in section 6 |
+| Angular packages: the shell's `window` and `ui`, and a module's `window` | 100% of executable production code, measured like the other packages, through component and service tests on the framework's testing surface, plus the desktop UI workflow gate in section 6 |
 | `src/shell/desktop` | Application-launch verification, process-boundary tests through appropriate doubles and real-process checks, and the desktop UI workflow gate in section 6 |
 
 Define additional packages' coverage and scope before claiming a complete gate. Non-executable definitions need no artificial tests; other exclusions are explicit, justified and reported, including behavior requiring live services. Executable scripts retain their coverage obligations. Inline workflow scripts stay small and carry no coverage percentage; their tests run the exact text from the workflow against doubles of the tools it calls.
@@ -94,6 +94,7 @@ Before pushing for review:
 - Merge the current `main` into the branch and run the gate on the result.
 - Run a new or changed test of processes, timing or platform behavior 10 times in a row on Windows and Linux; one pass does not show it is stable.
 - Check a configuration change, such as a workflow, with the tool that reads it.
+- Run the UI workflows a change affects natively on Windows, Linux and macOS, and name each machine's OS and CPU in the report. A change that does not touch the UI skips this step.
 
 Name additional evidence according to the claim:
 
@@ -110,7 +111,7 @@ Performance claims require representative workloads, recorded conditions and rep
 
 Required Playwright workflows drive the actual Electron window, preload and runtime using generated data and service fixtures. They complement package/Angular tests; a browser page with a mocked bridge is insufficient. [UI-STANDARDS.md](UI-STANDARDS.md) owns appearance, behavior and accessibility.
 
-The complete UI gate runs shared critical workflows natively on every target in the architecture's [delivery matrix](ARCHITECTURE.md#10-build-installation-and-updates).
+Every user workflow is an end-to-end test of the real application and runs natively on every target in the architecture's [delivery matrix](ARCHITECTURE.md#10-build-installation-and-updates). CI runs the complete UI suite on all of them.
 
 Use one shared suite with explicit platform-specific launch, path, keyboard and display behavior. Record OS, CPU, runner image/environment, application revision, Playwright, Electron and host Node versions; distinguish Electron's embedded Node. Cross-compilation, emulation and another architecture's pass do not certify a native target. Section 4's gate rules apply to every required target; targeted runs establish only their scope.
 
@@ -118,19 +119,19 @@ Pin the test dependencies when tooling is introduced. Verify the exact Playwrigh
 
 Keep the application's sandbox, context isolation, web security and content security policy intact. Inspect packaging and debugger/fuse requirements explicitly; do not weaken a production binary merely to let automation attach. If an automation-specific launch configuration or test build is required, record its differences and retain separate acceptance checks for the actual distributed binary. The shared suite launches with GPU acceleration and software GL turned off, so WebGL is unavailable; drawing with WebGL needs its own check in the application with GPU acceleration. Native OS dialogs, clipboard integration, installers and updates need their own applicable checks; substituting a fixture for one of those operations does not verify the OS behavior.
 
-The shell's workflows cover starting with no module, docking and arranging tabs, layout restoration, Settings transitions, commands and shortcuts, and relevant focus, keyboard and popup behavior; they exercise contributions through fixture modules that exist only for tests, live in the `fixtures` beside the workflows and enter only a test build's module list under the [architecture](ARCHITECTURE.md#2-components-and-dependency-direction). Each module adds the workflows of its own capabilities, run in the application with the modules it depends on. Extend them when an accepted UI capability adds a distinct user workflow. Assert meaningful application results, not merely that a click succeeded. Use stable accessible roles and names where possible, wait for observable state rather than arbitrary sleeps, and collect unexpected main-process, preload and renderer failures as part of the result.
+The shell's workflows cover starting with no module, docking and arranging tabs, layout restoration, Settings transitions, commands and shortcuts, and relevant focus, keyboard and popup behavior; they exercise contributions through fixture modules that exist only for tests, live in the `fixtures` beside the workflows and enter only a test build's module list under the [architecture](ARCHITECTURE.md#2-components-and-dependency-direction). Each module adds the workflows of its own capabilities, run in the application with the modules it depends on. Extend them when an accepted UI capability adds a distinct user workflow. Assert meaningful application results, not merely that a click succeeded. Assert the sizes, spacing, colors and contrast the UI standards specify from computed styles in the running application, on every target. Use stable accessible roles and names where possible, wait for observable state rather than arbitrary sleeps, and collect unexpected main-process, preload and renderer failures as part of the result.
 
 Verify normal closure, interruption and failure cleanup, including child processes, under section 3's isolation rules. Disable retries for qualification; diagnostic retries preserve failures and do not turn flaky behavior into an unqualified pass.
 
 ### UI screenshots and reports
 
-Name screenshot checkpoints and attach relevant page/component captures to their test/step, including passing runs. On failure, retain a trace and capture any usable window. Report capture failure without replacing the original failure.
+Each workflow captures named screenshot checkpoints on every target and attaches relevant page/component captures to their test/step, including passing runs, keeping them with the run. On failure, retain a trace and capture any usable window. Report capture failure without replacing the original failure.
 
 Capture established UI state using declared animation policy and framework stabilization; generic waits must not misread animation cancellation as failure. Test animations explicitly when relevant. Record platform, viewport, scale, theme, mode and font settings.
 
 The shared desktop UI suite uses a 1920 × 1080 renderer viewport at one device pixel per CSS pixel at normal zoom. Captures remain 1920 × 1080 pixels during zoom tests; the recorded CSS viewport and pixel ratio reflect the zoom. Verify the actual viewport and PNG dimensions so host display defaults cannot silently reduce the evidence resolution.
 
-Screenshots are review evidence. Pixel assertions require a reviewed baseline, controlled rendering and appropriate platform expectations; baseline changes require review, never automatic acceptance of differences. Retain behavior, computed-style, contrast and accessibility checks.
+Screenshots are review evidence only. They are not compared pixel by pixel, and there are no screenshot baselines; behavior, computed-style, contrast and accessibility checks prove the UI. A PR that changes the appearance links its before and after screenshots.
 
 CI reports expose identities, steps, outcomes, screenshots and traces under an explicit artifact-retention policy. Preserve startup, execution, capture and cleanup failures. Section 8 governs committed evidence; results apply only to the recorded build/environment.
 
@@ -148,6 +149,6 @@ Record scope, revision/snapshot, toolchain, platform, commands, outcomes and lim
 
 Retain each attempt's stdout/stderr separately under the retention policy. Keep redacted reproduction steps and relevant assertion/stack details in the issue/PR after artifacts expire; link full logs, screenshots and traces. A passing rerun does not erase unexplained failure.
 
-Commit only reviewed evidence with lasting regression/reference value, including baselines and fixtures; keep routine logs out of source control. All evidence follows the coding standards' redaction rules.
+Commit only reviewed evidence with lasting regression/reference value, such as fixtures; keep routine logs out of source control. All evidence follows the coding standards' redaction rules.
 
 If a required check could not run, state the missing claim plainly. Old evidence, a copied package, user-reported success or a fixture-only run must not be presented as newly verified implementation.
