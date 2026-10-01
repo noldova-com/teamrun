@@ -9,6 +9,7 @@ The [coding standards](CODING-STANDARDS.md) own test authoring, placement, API c
 | Boundary | Responsibility |
 |---|---|
 | Foundation Testing (`src/foundation/testing`) | Package-test discovery, execution, assertions, structured results, reporting and coverage measurement/enforcement |
+| Node.js's built-in test runner | The tests of the repository's scripts under `scripts/tests` and their coverage, because scripts run before foundation is built |
 | Angular test configuration | Component and service execution through Angular's supported testing surface, including framework error propagation and DOM-state isolation |
 | Playwright desktop UI suite | User workflows through the running Electron application, named screenshot checkpoints, traces and cross-platform results |
 | Tests of the owning package | Its domain, protocol, persistence and process behavior through the boundary being verified |

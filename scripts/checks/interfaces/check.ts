@@ -1,0 +1,15 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import type { Writable } from "node:stream";
+
+export default interface ICheck {
+  readonly title: string;
+
+  runAsync(output: Writable): Promise<boolean>;
+}
