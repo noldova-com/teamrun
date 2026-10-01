@@ -31,7 +31,7 @@ class TestTests {
 
       assert.equal(exitCode, 0, output.text);
       const titles = [
-        "Documents", "Module folders", "Shell names no module", "Module imports", "Unique names", "Declared dependencies", "Packages", "Package tests",
+        "Documents", "Module folders", "Shell names no module", "Module imports", "Unique names", "Declared dependencies", "Packages", "Package tests and coverage",
         "Script types", "API declarations", "API examples",
         "Script tests and coverage", "Angular tests and coverage"
       ];

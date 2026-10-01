@@ -47,6 +47,8 @@ export class Resources {
   public static readonly durationInvalid: string = "The duration must be a non-negative finite number of milliseconds.";
   public static readonly methodResultIdentityInvalid: string = "Every method result must belong to this package and class.";
   public static readonly timeoutInvalid: string = "The timeout must be a positive integer of milliseconds.";
+  public static readonly coverageDirectoryRequired: string = "The coverage run requires the folder of the V8 coverage reports.";
+  public static readonly coverageProjectTripleRequired: string = "Each coverage project requires a package name, a production folder and a source folder.";
   public static readonly testProjectPairRequired: string = "Each test project requires a package name and a root directory.";
   public static readonly testFiltersInvalid: string = "The test filters must be a JSON array of strings.";
   public static readonly categoryFilterPrefix: string = "category:";
