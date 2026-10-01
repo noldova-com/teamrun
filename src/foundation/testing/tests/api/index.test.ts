@@ -15,9 +15,11 @@ export class TestingApiTests {
   @TestMethod
   public exportsTheCompleteCatalog(): void {
     const exportNames = [
-      "Assert", "AssertFailedException", "Category", "DiscoveredTestClass", "DiscoveredTestMethod", "GitHubSummaryWriter",
-      "Skip", "TestClass", "TestClassResult", "TestData", "TestDiscovery", "TestExecutor", "TestingException", "TestMethod",
-      "TestMethodResult", "TestOutcome", "TestProject", "TestReportWriter", "TestRunner", "TestRunResult", "TestTimeoutException"
+      "Assert", "AssertFailedException", "BlockCoverage", "Category", "CoverageAnalyzer", "CoverageEnvironment", "CoverageProject", "CoverageReportWriter",
+      "CoverageResult", "DiscoveredTestClass", "DiscoveredTestMethod", "FileCoverage", "GitHubSummaryWriter", "LineRange",
+      "Skip", "SourceMap", "SourcePosition", "TestClass", "TestClassResult", "TestData", "TestDiscovery",
+      "TestExecutor", "TestingException", "TestMethod", "TestMethodResult", "TestOutcome",
+      "TestProject", "TestReportWriter", "TestRunner", "TestRunResult", "TestTimeoutException"
     ];
 
     Assert.areEqual(exportNames.sort().join(","), Object.keys(api).sort().join(","));

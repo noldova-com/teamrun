@@ -11,7 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  Assert, AssertFailedException, GitHubSummaryWriter, TestClass, TestClassResult, TestMethod, TestMethodResult, TestOutcome, TestRunResult
+  Assert, AssertFailedException, BlockCoverage, CoverageResult, FileCoverage, GitHubSummaryWriter, LineRange, TestClass, TestClassResult, TestMethod, TestMethodResult,
+  TestOutcome, TestRunResult
 } from "@noldova/teamrun-foundation-testing";
 
 @TestClass
@@ -72,6 +73,34 @@ export class GitHubSummaryWriterTests {
       report = readFileSync(path, "utf8");
       Assert.isTrue(report.includes("| Unreached: | 1 |"));
       Assert.isTrue(report.includes("waits — not run"));
+    }
+    finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public reportsCompleteAndIncompleteCoverage(): void {
+    const directory = mkdtempSync(join(tmpdir(), "teamrun-summary-"));
+    try {
+      const path = join(directory, "summary.md");
+      const writer = new GitHubSummaryWriter(path);
+      writer.writeCoverage(new CoverageResult([new FileCoverage("Package", "covered.ts", [], 100, 0, [new BlockCoverage(1, true)])]));
+      let report = readFileSync(path, "utf8");
+      Assert.isTrue(report.includes("| Coverage gate | Passed |"));
+      Assert.isTrue(report.includes("| Fully covered executable files | 1/1 |"));
+      Assert.isTrue(report.includes("| Coverage | 100.0% |"));
+      Assert.isTrue(report.includes("| Blocks | 1/1 |"));
+      Assert.isFalse(report.includes("<details>"));
+
+      writer.writeCoverage(new CoverageResult([new FileCoverage("Package", "<partial>.ts", [new LineRange(1, 2)], 100, 50, [new BlockCoverage(1, false)])]));
+      writer.writeCoverage(new CoverageResult([]));
+      report = readFileSync(path, "utf8");
+      Assert.isTrue(report.includes("| Coverage gate | Failed |"));
+      Assert.isTrue(report.includes("| Coverage | 50.0% |"));
+      Assert.isTrue(report.includes("| Coverage | - |"));
+      Assert.isTrue(report.includes("&lt;partial&gt;.ts"));
+      Assert.isTrue(report.includes("uncovered lines 1-2"));
     }
     finally {
       rmSync(directory, { recursive: true, force: true });

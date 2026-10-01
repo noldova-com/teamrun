@@ -14,7 +14,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
+import { Assert, CoverageEnvironment, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 
 import { EntryRun } from "../../fixtures/execution/entry-run.fixture.js";
 import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
@@ -23,6 +23,7 @@ import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.j
 export class TestRunEntryTests {
   @TestMethod
   @TestData("finishesCleanly", 0, null)
+  @TestData("keepsTheCoverageFolderOutOfItsEnvironment", 0, null)
   @TestData("passesButLeaksATimer", 1, "resources remain open: Timeout")
   @TestData("failsAndLeaksATimer", 1, "resources remain open: Timeout")
   @TestData("passesButLeaksAWorkerThread", 1, "Node names no open resource; a worker thread or a native handle keeps it alive")
@@ -216,7 +217,7 @@ export class TestRunEntryTests {
   }
 
   private async runEntryArgumentsAsync(arguments_: readonly string[], filters: string | null = "[]", summaryPath?: string, variables: Readonly<Record<string, string>> = {}): Promise<EntryRun> {
-    const environment: NodeJS.ProcessEnv = { ...process.env };
+    const environment = CoverageEnvironment.forChild(process.env);
     delete environment["GITHUB_STEP_SUMMARY"];
     if (!Object.isUndefined(summaryPath))
       environment["GITHUB_STEP_SUMMARY"] = summaryPath;
@@ -229,6 +230,7 @@ export class TestRunEntryTests {
       environment["TEAMRUN_TEST_FILTERS"] = filters;
 
     const directory = await mkdtemp(join(tmpdir(), "teamrun-entry-output-"));
+    environment["NODE_V8_COVERAGE"] ??= join(directory, "coverage");
     const errorPath = join(directory, "stderr.log");
     const errorFile = openSync(errorPath, "w");
     try {

@@ -1264,6 +1264,14 @@ export declare class GitHubSummaryWriter {
   public writeTests(result: TestRunResult): void;
 
   /**
+   * Appends the coverage gate's result, the coverage totals and bounded,
+   * escaped details of files that are not fully covered.
+   *
+   * @param result The run's coverage.
+   */
+  public writeCoverage(result: CoverageResult): void;
+
+  /**
    * Appends a failure of the run itself. A failure to write is reported on
    * the console and does not change the run's verdict.
    *
@@ -1276,4 +1284,378 @@ export declare class GitHubSummaryWriter {
    * ```
    */
   public writeFailure(message: string): void;
+}
+
+/**
+ * A span of source lines, numbered from 1, both ends included.
+ */
+export declare class LineRange {
+  /**
+   * The first line.
+   */
+  public readonly startLine: number;
+
+  /**
+   * The last line.
+   */
+  public readonly endLine: number;
+
+  /**
+   * The range as `start`, or `start-end` when it spans several lines.
+   */
+  public readonly displayText: string;
+
+  /**
+   * Creates the range.
+   *
+   * @param startLine The first line; a positive integer.
+   * @param endLine The last line; an integer no smaller than the first.
+   * @throws ArgumentOutOfRangeException synchronously when a line is invalid.
+   */
+  public constructor(startLine: number, endLine: number);
+}
+
+/**
+ * One block V8 instruments, other than a function's root, and whether a test
+ * entered it.
+ */
+export declare class BlockCoverage {
+  /**
+   * The source line where the block starts, numbered from 1.
+   */
+  public readonly line: number;
+
+  /**
+   * True when at least one test entered the block.
+   */
+  public readonly isTaken: boolean;
+
+  /**
+   * Creates the block coverage.
+   *
+   * @param line The source line where the block starts; a positive integer.
+   * @param isTaken Whether a test entered the block.
+   * @throws ArgumentOutOfRangeException synchronously when the line is not a
+   * positive integer.
+   */
+  public constructor(line: number, isTaken: boolean);
+}
+
+/**
+ * A version 3 source map as the TypeScript compiler writes it, without
+ * sections.
+ */
+export declare interface ISourceMapData {
+  /**
+   * The source map version; only 3 is accepted.
+   */
+  readonly version: number;
+
+  /**
+   * The original sources the mappings refer to, in order.
+   */
+  readonly sources: readonly string[];
+
+  /**
+   * The Base64 VLQ mappings from compiled positions to original positions.
+   */
+  readonly mappings: string;
+
+  /**
+   * A prefix for the source paths, when the map has one.
+   */
+  readonly sourceRoot?: string;
+
+  /**
+   * The symbol names that five-field segments refer to, when the map has
+   * them.
+   */
+  readonly names?: readonly string[];
+}
+
+/**
+ * A position in an original source file.
+ */
+export declare class SourcePosition {
+  /**
+   * The resolved path of the original source file.
+   */
+  public readonly sourcePath: string;
+
+  /**
+   * The line in the original source, numbered from 1.
+   */
+  public readonly line: number;
+
+  /**
+   * Creates the position.
+   *
+   * @param sourcePath The original source file's path; not whitespace only.
+   * @param line The original line; a positive integer.
+   * @throws ArgumentException synchronously when the path is empty or
+   * whitespace only.
+   * @throws ArgumentOutOfRangeException synchronously when the line is not a
+   * positive integer.
+   */
+  public constructor(sourcePath: string, line: number);
+}
+
+/**
+ * A decoded version 3 source map that maps compiled positions back to the
+ * original sources. Source paths resolve against the map's folder.
+ */
+export declare class SourceMap {
+  /**
+   * Decodes a source map.
+   *
+   * @param data The parsed source map.
+   * @param mapDirectory The folder that holds the map file; not whitespace
+   * only.
+   * @throws ArgumentException synchronously when the folder is empty or
+   * whitespace only.
+   * @throws TestingException synchronously when the map is not a valid
+   * version 3 map without sections, such as an unknown version, a malformed
+   * mapping or a reference to a missing source or name.
+   */
+  public constructor(data: ISourceMapData, mapDirectory: string);
+
+  /**
+   * Maps a compiled position to its original position, using the nearest
+   * segment before it on the same compiled line.
+   *
+   * @param generatedLine The compiled line, numbered from 1.
+   * @param generatedColumn The compiled column, numbered from 0.
+   * @returns The original position, or `undefined` when no segment maps the
+   * position.
+   * @throws ArgumentOutOfRangeException synchronously for a line that is not
+   * a positive integer or a column that is not a non-negative integer.
+   */
+  public mapToSource(generatedLine: number, generatedColumn: number): SourcePosition | undefined;
+}
+
+/**
+ * A package whose installed files a coverage run measures.
+ */
+export declare class CoverageProject {
+  /**
+   * The package name shown in coverage reports.
+   */
+  public readonly name: string;
+
+  /**
+   * The folder of the installed JavaScript files.
+   */
+  public readonly productionDirectory: string;
+
+  /**
+   * The folder that mapped source paths are reported relative to.
+   */
+  public readonly sourceDirectory: string;
+
+  /**
+   * Creates the project.
+   *
+   * @param name The package name; not whitespace only.
+   * @param productionDirectory The installed files' folder; not whitespace
+   * only.
+   * @param sourceDirectory The source folder; not whitespace only.
+   * @throws ArgumentException synchronously when any is empty or whitespace
+   * only.
+   */
+  public constructor(name: string, productionDirectory: string, sourceDirectory: string);
+}
+
+/**
+ * The coverage of one production file. Lengths count the compiled file's
+ * characters, as V8 reports them.
+ */
+export declare class FileCoverage {
+  /**
+   * The name of the file's package.
+   */
+  public readonly projectName: string;
+
+  /**
+   * The file's source path relative to its package's source folder.
+   */
+  public readonly relativePath: string;
+
+  /**
+   * The source lines no test executed.
+   */
+  public readonly uncoveredLineRanges: readonly LineRange[];
+
+  /**
+   * The length of the file's executable text.
+   */
+  public readonly totalLength: number;
+
+  /**
+   * The length of the executable text no test executed.
+   */
+  public readonly uncoveredLength: number;
+
+  /**
+   * The file's instrumented blocks.
+   */
+  public readonly blockCoverages: readonly BlockCoverage[];
+
+  /**
+   * True when the file is executable and nothing in it is uncovered.
+   */
+  public readonly isFullyCovered: boolean;
+
+  /**
+   * True when the file has executable text. A file of types only stays in
+   * the inventory but does not count towards the totals.
+   */
+  public readonly isExecutable: boolean;
+
+  /**
+   * How many blocks the file has.
+   */
+  public readonly blockCount: number;
+
+  /**
+   * How many of the file's blocks a test entered.
+   */
+  public readonly takenBlockCount: number;
+
+  /**
+   * Creates the file coverage.
+   *
+   * @param projectName The package name; not whitespace only.
+   * @param relativePath The source path; not whitespace only.
+   * @param uncoveredLineRanges The uncovered lines; empty exactly when the
+   * uncovered length is zero. The coverage keeps its own copy.
+   * @param totalLength The executable length; a non-negative integer.
+   * @param uncoveredLength The uncovered length; a non-negative integer no
+   * larger than the total.
+   * @param blockCoverages The instrumented blocks; none when the total length
+   * is zero. The coverage keeps its own copy.
+   * @throws ArgumentException synchronously for an empty name or path,
+   * uncovered lines and length that disagree, or blocks in a file without
+   * executable text.
+   * @throws ArgumentOutOfRangeException synchronously for an invalid length.
+   */
+  public constructor(
+    projectName: string,
+    relativePath: string,
+    uncoveredLineRanges: readonly LineRange[],
+    totalLength: number,
+    uncoveredLength: number,
+    blockCoverages: readonly BlockCoverage[]);
+}
+
+/**
+ * The coverage of a whole run.
+ */
+export declare class CoverageResult {
+  /**
+   * The coverage of every production file in the inventory.
+   */
+  public readonly fileCoverages: readonly FileCoverage[];
+
+  /**
+   * True when every executable file is fully covered.
+   */
+  public readonly isComplete: boolean;
+
+  /**
+   * The files that have executable text.
+   */
+  public readonly executableFileCoverages: readonly FileCoverage[];
+
+  /**
+   * The files that are not fully covered.
+   */
+  public readonly incompleteFileCoverages: readonly FileCoverage[];
+
+  /**
+   * The summed executable length of every file.
+   */
+  public readonly totalLength: number;
+
+  /**
+   * The summed uncovered length of every file.
+   */
+  public readonly uncoveredLength: number;
+
+  /**
+   * The summed block count of every file.
+   */
+  public readonly blockCount: number;
+
+  /**
+   * The summed count of blocks a test entered.
+   */
+  public readonly takenBlockCount: number;
+
+  /**
+   * Creates the result and computes its totals.
+   *
+   * @param fileCoverages The coverage of every file. The result keeps its own
+   * copy.
+   */
+  public constructor(fileCoverages: readonly FileCoverage[]);
+}
+
+/**
+ * Formats a coverage result for the console: a percentage per executable
+ * file, a marker for files without executable text, the uncovered lines and
+ * the overall total. The structured result remains the authority; nothing
+ * parses this output.
+ */
+export declare class CoverageReportWriter {
+  /**
+   * Formats the report without writing it.
+   *
+   * @param result The coverage to report.
+   * @param skipCoveredDetails Whether to leave out fully covered files.
+   * @returns The report lines, with terminal color sequences.
+   */
+  public formatLines(result: CoverageResult, skipCoveredDetails: boolean): string[];
+}
+
+/**
+ * Hands the run's coverage folder to child processes a test starts. The run
+ * keeps the folder out of `process.env`, under `TEAMRUN_COVERAGE_DIRECTORY`,
+ * because a child killed while writing its report would corrupt the
+ * coverage; only a test that waits for its child to exit on its own hands
+ * the folder back.
+ */
+export declare class CoverageEnvironment {
+  /**
+   * Builds the environment for a child process whose coverage counts.
+   *
+   * @param base The environment to copy, usually `process.env`; it is not
+   * modified.
+   * @returns A copy of the environment with `NODE_V8_COVERAGE` set to the
+   * run's coverage folder, or without it when the run measures no coverage.
+   */
+  public static forChild(base: Readonly<Record<string, string | undefined>>): Record<string, string | undefined>;
+}
+
+/**
+ * Measures the coverage of installed packages from the V8 coverage reports
+ * of a run.
+ */
+export declare class CoverageAnalyzer {
+  /**
+   * Analyzes every report in a folder against every `.js` file of the
+   * packages, merging the coverage of all processes. A file no report
+   * mentions counts as entirely uncovered unless it has no executable text,
+   * and a position no report covers counts as uncovered.
+   *
+   * @param coverageDirectory The folder of V8 coverage reports; not
+   * whitespace only.
+   * @param projects The packages to measure; at least one.
+   * @returns A promise of the run's coverage.
+   * @throws ArgumentException synchronously for an empty folder name or no
+   * packages.
+   * @throws TestingException as a rejection when the packages have no
+   * JavaScript files, or when a report or source map is missing, malformed
+   * or refers to a file outside its package.
+   */
+  public analyzeAsync(coverageDirectory: string, projects: readonly CoverageProject[]): Promise<CoverageResult>;
 }
