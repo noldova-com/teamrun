@@ -1,0 +1,84 @@
+# Contributing to TeamRun
+
+The [README](../README.md) introduces TeamRun. Contributions follow this issue and PR workflow.
+
+## Issues and support
+
+Use [GitHub Issues](https://github.com/noldova-com/teamrun/issues) for bugs, changes, tasks and questions. Search first and extend relevant reports. Security concerns follow [SECURITY.md](SECURITY.md) before any public issue/PR.
+
+Describe the problem; maintainers handle triage, missing information, labels, milestones and sub-issues. An issue does not promise implementation. No separate board or roadmap needs updating.
+
+For a bug, include:
+
+- The expected behavior, actual behavior and smallest reliable reproduction.
+- The TeamRun version or commit and where the build came from, when reporting application behavior.
+- The operating system, CPU architecture and installation format, where relevant.
+- The relevant provider and harness version, without credentials or provider profile files.
+- A short redacted log excerpt or screenshot if it helps explain the failure.
+
+Changes describe the use case, outcome and workaround; questions explain the goal and difficulty; documentation reports name the passage. Use the matching form or a plain issue with the same information.
+
+Reproduce with synthetic data and a disposable project. Redact logs, screenshots and attachments; never upload real conversations, provider profiles or data directories. Support is best-effort without a response-time commitment.
+
+### Labels and triage
+
+Submit without labels or milestones if needed; maintainers manage them:
+
+- `needs triage` marks a report awaiting assessment; remove it after that assessment.
+- `needs information` marks missing details and stays until the required information is supplied.
+- `good first issue` identifies clearly scoped work suitable for newcomers, with enough guidance to get started.
+- `in progress` marks an issue someone is working on; see [Before making a change](#before-making-a-change).
+
+The [labels page](https://github.com/noldova-com/teamrun/labels) describes each label's meaning.
+
+## Before making a change
+
+Every change—including docs, small fixes, dependencies and agent work—needs a repository issue. Discuss substantial product/architecture changes before implementation. Agree on bounded scope and observable acceptance criteria; split larger work into linked issues.
+
+Start only if the issue has no `in progress` label or open PR, then label your issue/sub-issue. The **Clear in-progress label** workflow removes it on closure; remove it yourself when ending work on an open issue. If unable to label, comment that you are working on it.
+
+Follow the [coding standards](../docs/CODING-STANDARDS.md), [UI standards](../docs/UI-STANDARDS.md) for visual/interaction changes, [architecture](../docs/ARCHITECTURE.md) for boundary changes, and affected module documents. Update each rule's owner rather than adding competing rules.
+
+Propose and review dependency updates manually through this workflow, checking compatibility, installation and verification under the coding standards.
+
+## Pull requests
+
+Use a focused fork or authorized repository branch; target `main`. Work inside one follows [AGENTS.md](../AGENTS.md).
+
+Each PR description includes a standalone line with its actual tracking issue. Use either form when the issue should stay open:
+
+```text
+Issue: #123
+Issue #123
+```
+
+When the PR completes the issue, a GitHub closing reference such as `Closes #123` is sufficient on its own; no separate `Issue` line is needed. Accepted closing keywords are `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves` and `resolved`. Matching is case-insensitive and the colon is optional, for example `FIXES: #123`. Closing references close the issue when the PR merges into `main`; use an `Issue` reference for partial work.
+
+Replace `123` with an existing issue from this repository, not a PR or another repository's issue. The first such line counts; references in HTML comments do not. Link additional issues as needed; reviewers verify relevance.
+
+Use the [PR template](PULL_REQUEST_TEMPLATE.md). Fill `## Summary` with what changed and why, and `## Testing` with the checks run, results and remaining limitations; explain relevant checks that were not run or do not apply. These sections and a valid issue reference are required; `## Notes` is optional. An automated check verifies the issue reference; reviewers check the sections.
+
+Keep the change small enough to review coherently. Include before/after screenshots for visual changes when useful, using disposable data. Commit messages describe the concrete change.
+
+An authorized human reviews and merges changes after the applicable requirements are met. A passing check does not authorize a release or establish that behavior outside the check's scope works.
+
+### AI-assisted changes
+
+Explain material AI involvement and how you reviewed and verified the result. The contributor remains responsible for correctness, security and licensing. Keep discussion constructive and address findings on their merits.
+
+Credit each AI agent that contributed to the changes included in a commit, using its verified GitHub co-author identity. Include all contributing agents. For example:
+
+```text
+Co-authored-by: Claude <noreply@anthropic.com>
+Co-authored-by: Codex <noreply@openai.com>
+```
+
+Keep the human contributor as the primary author. Preserve all applicable co-author trailers when squashing commits; do not credit an agent merely because it created the commit or opened the PR. The squash commit takes the PR's title and description, and GitHub adds the co-author trailers from the branch's commits. Don't repeat them in the PR description.
+
+## Verification
+
+Use the revision's documented toolchain and commands in their required order. Follow [TESTING.md](../docs/TESTING.md#6-verification-scope) for documentation checks, execution, coverage, disposable fixtures and [evidence](../docs/TESTING.md#8-evidence-and-handoff). Report the tested revision, commands, results, unexplained failures and limitations in the issue/PR; never invent commands or claim unimplemented behavior was tested. The coding standards own test authoring.
+
+## Licensing
+
+Contributions to TeamRun's own code and documentation follow the [MIT License](../LICENSE). Introduce third-party material only when you have the necessary rights and have reviewed its license; preserve required notices and record its source. See the coding standards for dependency, source and generated-file requirements.
