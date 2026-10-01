@@ -28,7 +28,7 @@ export default class ApiServer {
   private static readonly PIPE_OPTION: string = "--pipe";
   private static readonly CONNECTION_FAILURE: string = "Socket error:";
   private static readonly CONNECT_INTERVAL: number = 20;
-  private static readonly START_TIMEOUT: number = 10_000;
+  private static readonly START_TIMEOUT: number = 60_000;
   private static readonly ERROR_OUTPUT_LIMIT: number = 4096;
 
   private readonly child: ChildProcessByStdio<null, null, Readable>;
