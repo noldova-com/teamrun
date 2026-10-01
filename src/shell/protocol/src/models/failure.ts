@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
+
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { JsonReader, type JsonObject } from "@noldova/teamrun-foundation-json";
 
@@ -18,20 +20,27 @@ export class Failure {
 
   public readonly code: FailureCode;
   public readonly message: string;
+  public readonly details?: JsonObject;
 
-  public constructor(code: FailureCode, message: string) {
+  public constructor(code: FailureCode, message: string, details?: JsonObject) {
     ArgumentException.throwIfNullOrWhitespace(message, Resources.messageField);
 
     this.code = code;
     this.message = message;
+    if (!Object.isUndefined(details))
+      this.details = details;
   }
 
   public static fromJson(value: unknown, path?: string): Failure {
     const reader = JsonReader.fromValue(value, path);
-    return WireContract.create(reader, () => new Failure(reader.readOneOf(Resources.codeField, Failure.CODES), reader.readString(Resources.messageField)));
+    return WireContract.create(reader, () => new Failure(
+      reader.readOneOf(Resources.codeField, Failure.CODES),
+      reader.readString(Resources.messageField),
+      reader.hasField(Resources.detailsField) ? reader.readObject(Resources.detailsField).toJson() : undefined));
   }
 
   public toJson(): JsonObject {
-    return { [Resources.codeField]: this.code, [Resources.messageField]: this.message };
+    const fields = { [Resources.codeField]: this.code, [Resources.messageField]: this.message };
+    return Object.isUndefined(this.details) ? fields : { ...fields, [Resources.detailsField]: this.details };
   }
 }

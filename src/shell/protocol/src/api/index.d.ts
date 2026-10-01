@@ -113,6 +113,22 @@ export declare enum FailureCode {
 }
 
 /**
+ * How a runtime asked to stop by `shell.stop` treats work in progress.
+ */
+export declare enum StopPolicy {
+  /**
+   * Stop only when no work is in progress; otherwise answer with a
+   * `Conflict` failure whose details are the running work.
+   */
+  IfIdle = "IfIdle",
+
+  /**
+   * Stop the work in progress, then stop.
+   */
+  StopWork = "StopWork"
+}
+
+/**
  * The exception thrown when a connection's frames break the protocol, such
  * as a frame over the maximum length.
  */
@@ -296,14 +312,23 @@ export declare class Failure {
   public readonly message: string;
 
   /**
+   * Structured data a failure defines, such as the runtime handover of a
+   * `BuildMismatch` or the running work of a `Conflict` answer to
+   * `shell.stop`; absent when the failure defines none.
+   */
+  public readonly details?: JsonObject;
+
+  /**
    * Creates the failure.
    *
    * @param code The kind of failure.
    * @param message A sentence describing it; not whitespace only.
+   * @param details The failure's structured data; omit it when the failure
+   * defines none.
    * @throws ArgumentException synchronously when the message is empty or
    * whitespace only.
    */
-  public constructor(code: FailureCode, message: string);
+  public constructor(code: FailureCode, message: string, details?: JsonObject);
 
   /**
    * Reads a failure from its wire form.
@@ -311,15 +336,142 @@ export declare class Failure {
    * @param value The untrusted value.
    * @param path The path a failure to read reports; `$` by default.
    * @returns The failure.
-   * @throws JsonException synchronously when the code is unknown or the
-   * message is missing or blank; its path names the field.
+   * @throws JsonException synchronously when the code is unknown, the
+   * message is missing or blank, or `details` is present but not an object;
+   * its path names the field.
    */
   public static fromJson(value: unknown, path?: string): Failure;
 
   /**
    * Returns the wire form.
    *
-   * @returns The `code` and `message` fields.
+   * @returns The `code` and `message` fields, and `details` when the
+   * failure has them.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * Where to find the runtime that owns a data directory: its build and the
+ * program it runs from. A `BuildMismatch` failure carries it as its
+ * details, so a client of another build can hand the person over to the
+ * owner. Its wire form never changes after protocol version 1.
+ */
+export declare class RuntimeHandover {
+  /**
+   * The owning runtime's build.
+   */
+  public readonly identity: BuildIdentity;
+
+  /**
+   * The full path of the program the owning runtime runs from.
+   */
+  public readonly executablePath: string;
+
+  /**
+   * Creates the handover.
+   *
+   * @param identity The owning runtime's build.
+   * @param executablePath The program's full path; not whitespace only.
+   * @throws ArgumentException synchronously when the path is empty or
+   * whitespace only.
+   */
+  public constructor(identity: BuildIdentity, executablePath: string);
+
+  /**
+   * Reads a handover from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The handover.
+   * @throws JsonException synchronously when a field is missing, has the
+   * wrong type or breaks the rules, or the identity has an unknown field;
+   * its path names the field.
+   */
+  public static fromJson(value: unknown, path?: string): RuntimeHandover;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `identity` and `executablePath` fields.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The payload of `shell.stop`, which asks a runtime to stop. Its wire form
+ * never changes after protocol version 1.
+ */
+export declare class StopRequest {
+  /**
+   * How the runtime treats work in progress.
+   */
+  public readonly policy: StopPolicy;
+
+  /**
+   * Creates the request.
+   *
+   * @param policy How the runtime treats work in progress.
+   */
+  public constructor(policy: StopPolicy);
+
+  /**
+   * Reads a request from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The request.
+   * @throws JsonException synchronously when the policy is missing or
+   * unknown; its path names the field.
+   */
+  public static fromJson(value: unknown, path?: string): StopRequest;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `policy` field.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The work in progress that keeps a runtime from stopping, as a `Conflict`
+ * answer to `shell.stop` carries it in its details. Its wire form never
+ * changes after protocol version 1.
+ */
+export declare class RunningWork {
+  /**
+   * Sentences describing each piece of work, in the order the runtime lists
+   * them.
+   */
+  public readonly descriptions: readonly string[];
+
+  /**
+   * Creates the list.
+   *
+   * @param descriptions At least one description, none whitespace only. The
+   * list keeps its own copy.
+   * @throws ArgumentException synchronously when the list is empty or a
+   * description is empty or whitespace only.
+   */
+  public constructor(descriptions: readonly string[]);
+
+  /**
+   * Reads the list from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The list.
+   * @throws JsonException synchronously when `descriptions` is missing, not
+   * an array of strings, empty or holds a blank description; its path names
+   * the field or item.
+   */
+  public static fromJson(value: unknown, path?: string): RunningWork;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `descriptions` field.
    */
   public toJson(): JsonObject;
 }

@@ -32,6 +32,10 @@ export class Resources {
   public static readonly productVersionField: string = "productVersion";
   public static readonly protocolVersionField: string = "protocolVersion";
   public static readonly fingerprintField: string = "fingerprint";
+  public static readonly detailsField: string = "details";
+  public static readonly executablePathField: string = "executablePath";
+  public static readonly policyField: string = "policy";
+  public static readonly descriptionsField: string = "descriptions";
   public static readonly textParameterName: string = "text";
   public static readonly maximumFrameLengthParameterName: string = "maximumFrameLength";
 

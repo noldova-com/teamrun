@@ -15,7 +15,7 @@ export class ProtocolApiTests {
   public exportsTheCompleteCatalog(): void {
     const exportNames = [
       "BuildIdentity", "Cancel", "Event", "Failure", "FailureCode", "FrameReader", "FrameWriter", "Handshake",
-      "ProtocolException", "QualifiedName", "Request", "Response", "WireContract", "WireDecoder", "WireMessage", "WireMessageKind"
+      "ProtocolException", "QualifiedName", "Request", "Response", "RunningWork", "RuntimeHandover", "StopPolicy", "StopRequest", "WireContract", "WireDecoder", "WireMessage", "WireMessageKind"
     ];
 
     Assert.areEqual(exportNames.sort().join(","), Object.keys(api).sort().join(","));

@@ -19,7 +19,21 @@ export class FailureTests {
 
     Assert.areEqual(FailureCode.NotFound, failure.code);
     Assert.areEqual("Nothing here.", failure.message);
+    Assert.isUndefined(failure.details);
     Assert.areEqual("{\"code\":\"NotFound\",\"message\":\"Nothing here.\"}", JSON.stringify(failure.toJson()));
+  }
+
+  @TestMethod
+  public roundTripsDetails(): void {
+    const failure = Failure.fromJson(new Failure(FailureCode.Conflict, "Work is running.", { descriptions: ["A reply"] }).toJson());
+
+    Assert.areEqual("{\"descriptions\":[\"A reply\"]}", JSON.stringify(failure.details));
+    Assert.areEqual("{\"code\":\"Conflict\",\"message\":\"Work is running.\",\"details\":{\"descriptions\":[\"A reply\"]}}", JSON.stringify(failure.toJson()));
+  }
+
+  @TestMethod
+  public rejectsDetailsThatAreNotAnObject(): void {
+    Assert.areEqual("$.details", Assert.throws(() => Failure.fromJson({ code: "Conflict", message: "Text.", details: [1] }), JsonException).path);
   }
 
   @TestMethod

@@ -7,6 +7,7 @@
  */
 
 export { FailureCode } from "../enums/failure-code.js";
+export { StopPolicy } from "../enums/stop-policy.js";
 export { WireMessageKind } from "../enums/wire-message-kind.js";
 export { ProtocolException } from "../exceptions/protocol.exception.js";
 export { BuildIdentity } from "../models/build-identity.js";
@@ -17,6 +18,9 @@ export { Handshake } from "../models/handshake.js";
 export { QualifiedName } from "../models/qualified-name.js";
 export { Request } from "../models/request.js";
 export { Response } from "../models/response.js";
+export { RunningWork } from "../models/running-work.js";
+export { RuntimeHandover } from "../models/runtime-handover.js";
+export { StopRequest } from "../models/stop-request.js";
 export { WireMessage } from "../models/wire-message.js";
 export { FrameWriter } from "../services/frame-writer.js";
 export { FrameReader } from "../services/frame.reader.js";
