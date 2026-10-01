@@ -15,7 +15,6 @@ import type ICheck from "./interfaces/check.ts";
 
 export default class PackageCheck implements ICheck {
   private static readonly NO_PACKAGES: string = "No packages under src/.\n";
-  private static readonly TESTS_NOT_RUN: string = "Package tests are not run yet; they need the test framework.\n";
 
   private readonly build: PackageBuild;
 
@@ -28,7 +27,7 @@ export default class PackageCheck implements ICheck {
   public async runAsync(output: Writable): Promise<boolean> {
     try {
       const packages = await this.build.buildAsync(output);
-      output.write(packages.length === 0 ? PackageCheck.NO_PACKAGES : `Packages built and installed: ${packages.length}. ${PackageCheck.TESTS_NOT_RUN}`);
+      output.write(packages.length === 0 ? PackageCheck.NO_PACKAGES : `Packages built and installed: ${packages.length}.\n`);
       return true;
     }
     catch (error) {

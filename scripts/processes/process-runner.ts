@@ -46,9 +46,9 @@ export default class ProcessRunner {
     });
   }
 
-  public runAsync(command: string, commandArguments: readonly string[], directory: string): Promise<number | null> {
+  public runAsync(command: string, commandArguments: readonly string[], directory: string, environment?: NodeJS.ProcessEnv): Promise<number | null> {
     return new Promise<number | null>((resolve, reject) => {
-      const child = spawn(command, [...commandArguments], { cwd: directory, shell: false, stdio: "inherit" });
+      const child = spawn(command, [...commandArguments], { cwd: directory, shell: false, stdio: "inherit", env: environment ?? process.env });
       child.on("error", t => reject(new ProcessException(`"${command}" could not start.`, { cause: t })));
       child.on("close", t => resolve(t));
     });
