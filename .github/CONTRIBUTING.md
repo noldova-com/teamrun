@@ -60,7 +60,7 @@ Use the [PR template](PULL_REQUEST_TEMPLATE.md). Fill `## Summary` with what cha
 
 Keep the change small enough to review coherently. A PR that changes the appearance links its before and after [screenshots](../docs/TESTING.md#ui-screenshots-and-reports), using disposable data. Commit messages describe the concrete change.
 
-An authorized human reviews and merges changes after the applicable requirements are met. A passing check does not authorize a release or establish that behavior outside the check's scope works.
+An authorized maintainer, or an agent the maintainer designates, reviews and merges changes after the applicable requirements are met. A passing check does not authorize a release or establish that behavior outside the check's scope works.
 
 ### AI-assisted changes
 
