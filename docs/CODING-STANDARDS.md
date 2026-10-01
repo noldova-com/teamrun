@@ -56,7 +56,7 @@ Methods return concrete classes, primitives, enums or concrete runtime collectio
 
 Each protocol message/model owns its wire form: its constructor validates invariants, `toJson()` returns explicitly typed plain JSON, and `static fromJson(value: unknown)` uses `JsonReader` and names invalid fields in a protocol error. Required fields and known values are validated; optional fields define absence/default semantics. Plain JSON is confined to serialization/deserialization, without wrappers added solely to satisfy the result-type rule. Domain operations use validated instances. Each table's owner provides one row-mapping class producing those same domain classes.
 
-Declare supported versions and any capability negotiation. Reject incompatible versions and unsupported operations before execution. Ignore additional informational fields only where explicitly allowed. Security-sensitive schemas reject unsupported authorization options. Test supported older/newer peers, required fields, optional additions and incompatible changes; round trips alone do not prove compatibility.
+Declare supported versions and any capability negotiation. Reject incompatible versions and unsupported operations before execution. Ignore additional informational fields only where explicitly allowed. Security-sensitive schemas reject unsupported authorization options. Test that an unsupported version is refused, and test required fields, optional additions and incompatible changes. Data that outlives a build, such as persisted records, keeps compatibility tests with its older and newer forms; round trips alone do not prove compatibility.
 
 ## 4. Types and APIs
 
@@ -171,7 +171,7 @@ Automated checks compare packaged declarations with implementation: exports, con
 ## 10. Naming and formatting
 
 - Package names are `@noldova/teamrun-<name>`, joining the lowercase kebab-case package path beneath `src/` with hyphens: `src/modules/terminal/window` becomes `@noldova/teamrun-modules-terminal-window`. Paths must not produce colliding names.
-- The root manifest's application version owns TeamRun product and package versions. Package manifests under `src/` use `__VERSION__` for their own version and references to other TeamRun packages; the build stamps them consistently. External dependency versions are exact pins. Protocol and data-format versions remain independently declared contracts, not copies of the application version.
+- The root manifest's application version owns TeamRun product and package versions. Package manifests under `src/` use `__VERSION__` for their own version and references to other TeamRun packages; the build stamps them consistently. External dependency versions are exact pins. The root manifest declares the protocol version separately from the application version, and each data format's owner declares that format's version; neither copies the application version.
 - Concept directories use lowercase kebab-case. A type's filename preserves the words in its name: neither adds a word the other lacks.
 - Use a dot before a final role word in a type's filename: `node`, `parser`, `lexer`, `reader`, `validator`, `exception`, or `service`. For example, `ArgumentException` lives in `argument.exception.ts`, `SourceReader` in `source.reader.ts`, and `BinarySearchService` in `binary-search.service.ts`. Other words remain lowercase kebab-case, as in `snapshot-tracker.ts` for `SnapshotTracker`. A single-word type keeps its name, such as `exception.ts` for `Exception`; do not add `.model`, `.enum`, or `.interface` markers.
 - Supporting files use their kind suffix: `.test.ts`, `.extensions.ts`, `.fixture.ts`, and `.d.ts`. `.extensions.ts` marks foundation's additions to existing types. Package entry points (`api/index.ts`), `resources.ts`, manifests, TypeScript configuration and scripts keep their fixed names. Angular filenames follow section 5.
@@ -205,7 +205,7 @@ Keep runnable entry points and bootstrap configuration directly in `scripts/`. G
 
 Standalone automation uses TypeScript for builds, tests, packaging, generation, fixtures, live checks and developer tools; no other-language scripts or wrappers. These standards apply to scripts. npm commands expose TypeScript entry points with arguments, not inline shell. Spawn subprocesses without a shell using argument arrays; validate the executable, arguments, working directory and environment. Section 7 governs deadlines, retries and shutdown. Dependencies need an explicit decision, exact pins and a present need. Scripts use native value checks so they can run before foundation is built.
 
-GitHub configuration uses YAML under `.github`. Files in `.github/workflows` may use inline scripts, toolchain commands and existing npm entry points under the same security, failure and verification rules. Pass untrusted event data through environment variables or API responses, never script interpolation. Pin Actions to full commit SHAs and record release versions.
+GitHub configuration uses YAML under `.github`. Files in `.github/workflows` may use small inline scripts, toolchain commands and existing npm entry points under the same security and failure rules; [TESTING.md](TESTING.md#5-coverage-requirements) owns how inline scripts are tested. Pass untrusted event data through environment variables or API responses, never script interpolation. Pin Actions to full commit SHAs and record release versions.
 
 Linux runtime startup and AppImage restart may use fixed Bash programs under their launch owner to close inherited descriptors. Pass paths/arguments positionally, never as interpolated code. Runtime startup disables Bash startup files and inherited shell options. This exception permits no general shell-based execution or standalone shell scripts.
 
@@ -244,7 +244,7 @@ Every executable production file has a corresponding test file. Foundation test 
 
 Angular specs mirror paths relative to `src` beneath sibling `tests`, replacing `.ts` with `.spec.ts`: `src/app/services/layout-store.service.ts` maps to `tests/app/services/layout-store.service.spec.ts`. Shared fixtures use `tests/fixtures`; environment configuration lives directly under `tests`.
 
-Playwright workflows use `src/shell/desktop/tests/e2e` or `src/modules/<id>/e2e`, with adjacent `fixtures`. Their `.spec.ts` files have descriptive titles, no test classes or one-to-one production mapping, and a separate TypeScript project and runner.
+Playwright workflows use `src/shell/desktop/tests/e2e` or `src/modules/<id>/e2e`, with adjacent `fixtures` that also hold any fixture modules the workflows use. Their `.spec.ts` files have descriptive titles, no test classes or one-to-one production mapping, and a separate TypeScript project and runner.
 
 Tests exercise observable behavior, branches, boundaries and failures through the owning public API. Doubles of external tools are named fakes with scripted behavior. Regression tests record required behavior; tests against a live external service are labelled and excluded from the default gate.
 

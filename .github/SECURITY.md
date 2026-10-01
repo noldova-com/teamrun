@@ -4,9 +4,7 @@ No released version currently has a security-support commitment. Supported versi
 
 ## Report privately
 
-GitHub private vulnerability reporting is the selected reporting channel for the public repository. Once it is enabled, use **Report a vulnerability** on the repository's Security page, or [start a private report](https://github.com/noldova-com/teamrun/security/advisories/new).
-
-The reporting channel has not been verified as available for this new repository. GitHub provides this feature for public repositories, and publishing this file does not enable it. As part of public launch, maintainers must enable reporting, verify the reporting path and arrange to receive its notifications. See [GitHub's configuration guidance](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configure-for-a-repository).
+Report vulnerabilities through GitHub private vulnerability reporting. Use **Report a vulnerability** on the repository's [Security page](https://github.com/noldova-com/teamrun/security), or [start a private report](https://github.com/noldova-com/teamrun/security/advisories/new) directly.
 
 If the private reporting option is unavailable, ask maintainers for a secure reporting channel. An issue may ask for a security contact, but must not include vulnerability details, affected private data or a proof of concept. Wait for a confirmed private channel before sending those details. No alternative email address is designated by this policy.
 
