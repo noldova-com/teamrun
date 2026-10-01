@@ -9,9 +9,6 @@
 import { appendFile } from "node:fs/promises";
 import type { Writable } from "node:stream";
 
-import ApiServer from "./api/api-server.ts";
-import ApiDeclarationCheck from "./checks/api-declaration-check.ts";
-import ApiExampleCheck from "./checks/api-example-check.ts";
 import DocumentCheck from "./checks/document-check.ts";
 import type ICheck from "./checks/interfaces/check.ts";
 import ModuleFolderCheck from "./checks/module-folder-check.ts";
@@ -51,7 +48,7 @@ export default class Test {
   }
 
   public async runAsync(selection: readonly string[]): Promise<number> {
-    const checks = this.selectChecks(selection);
+    const checks = await this.selectChecksAsync(selection);
     if (checks === null) {
       this.output.write(Test.USAGE);
       return Test.USAGE_EXIT_CODE;
@@ -77,29 +74,33 @@ export default class Test {
     return failures === 0 ? 0 : 1;
   }
 
-  private selectChecks(selection: readonly string[]): readonly ICheck[] | null {
+  private async selectChecksAsync(selection: readonly string[]): Promise<readonly ICheck[] | null> {
     const files = new RepositoryFiles(this.root, new Git(this.root, this.runner));
     const documents = new DocumentCheck(this.root, files);
+    if (selection.length > 0)
+      return selection.length === 1 && selection[0] === Test.DOCUMENTS_SELECTION ? [documents] : null;
+
+    const { default: ApiServer } = await import("./api/api-server.ts");
+    const { default: ApiDeclarationCheck } = await import("./checks/api-declaration-check.ts");
+    const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
+    const tree = new SourceTree(this.root, files);
+    const build = new PackageBuild(this.root, this.runner, this.environment);
     const catalog = new PackageCatalog(this.root);
     const layout = new BuildLayout(this.root);
     const server = [ApiServer.locateCompiler()];
-    const tree = new SourceTree(this.root, files);
-    const build = new PackageBuild(this.root, this.runner, this.environment);
-    if (selection.length === 0)
-      return [
-        documents,
-        new ModuleFolderCheck(this.root),
-        new ShellIndependenceCheck(tree),
-        new ModuleImportCheck(tree),
-        new NameUniquenessCheck(tree),
-        new PackageCheck(build),
-        new PackageTestCheck(this.root, build, this.runner, this.environment),
-        new TypeCheck(this.root, this.runner),
-        new ApiDeclarationCheck(this.root, catalog, layout, server, Test.API_TIMEOUT),
-        new ApiExampleCheck(this.root, catalog, layout, this.runner, server, Test.API_TIMEOUT),
-        new ScriptTestCheck(this.root, this.runner)
-      ];
-    return selection.length === 1 && selection[0] === Test.DOCUMENTS_SELECTION ? [documents] : null;
+    return [
+      documents,
+      new ModuleFolderCheck(this.root),
+      new ShellIndependenceCheck(tree),
+      new ModuleImportCheck(tree),
+      new NameUniquenessCheck(tree),
+      new PackageCheck(build),
+      new PackageTestCheck(this.root, build, this.runner, this.environment),
+      new TypeCheck(this.root, this.runner),
+      new ApiDeclarationCheck(this.root, catalog, layout, server, Test.API_TIMEOUT),
+      new ApiExampleCheck(this.root, catalog, layout, this.runner, server, Test.API_TIMEOUT),
+      new ScriptTestCheck(this.root, this.runner)
+    ];
   }
 }
 
