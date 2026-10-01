@@ -23,8 +23,8 @@ The package layout has the following owners and dependency boundaries.
 | `src/shell/runtime` | Own a data directory, authenticate local clients, host the runtime parts of modules, route their requests and events, provide storage and run migrations | Shell protocol and foundation; also supplies client connection/launch facilities |
 | `src/shell/cli` | Command-line client; hosts the CLI parts of modules | Shell protocol and the runtime's client facilities; no direct database writes |
 | `src/shell/desktop` | Electron main process, preload, OS integration, the macOS menu bar, notifications and update coordination | Shell protocol and the runtime's client facilities; Electron remains confined to this boundary |
-| `src/shell/ui` | The shared kit: tokens, styles, controls and the default theme | Angular and browser-safe foundation; no shell mechanism and no module |
-| `src/shell/window` | The Angular window: docking, tabs, the top bar, the status bar, Settings and the mechanisms of section 5; hosts the window parts of modules | Shell protocol, the kit and browser-safe foundation; privileged operations go through the preload bridge |
+| `src/shell/ui` | The shared kit: tokens, styles, controls, the default theme and the Gallery, which shows each control in every theme and mode | Angular and browser-safe foundation; no shell mechanism and no module |
+| `src/shell/window` | The Angular window: docking, tabs, the top bar, the status bar, Settings and the mechanisms of section 5; shows the kit's Gallery as a Settings page in development builds only; hosts the window parts of modules | Shell protocol, the kit and browser-safe foundation; privileged operations go through the preload bridge |
 | `src/modules/<id>` | One module, in a package for each part it has: `protocol`, `runtime`, `window` and `cli` | Foundation, the shell's published APIs and the published APIs of the modules it declares |
 
 Runtime calls and data flow are shown below; these arrows are not package-import permissions.
@@ -43,12 +43,14 @@ flowchart LR
 
 Four rules keep the shell empty:
 
-- **The shell names no module.** Nothing under `src/shell` or `src/foundation` imports a module or contains an identifier, text or special case that belongs to one.
+- **The shell names no module.** No production source under `src/shell` or `src/foundation` imports a module or contains an identifier, text or special case that belongs to one. Tests and their fixtures are not production source.
 - **A module uses only published APIs.** It imports its own packages, foundation, the shell's published APIs and the published APIs of the modules it declares as dependencies.
 - **The build's module list names the modules an application build includes.** It lives outside `src/shell`. Adding a module changes that list and no shell source.
 - **Automated checks enforce the first two rules and the unique names of section 3 on every change.**
 
 Everything that belongs to a module lives in its folder, `src/modules/<id>`: its parts and their tests, end-to-end tests, styles, assets, migrations and its document. Adding a module adds its folder and a line in the build's module list; removing it removes both. Its data has its own folder in the data directory (section 3).
+
+Fixture modules exist only for tests. They live with the tests that use them, in the `fixtures` beside those workflows under the [coding standards](CODING-STANDARDS.md#13-tests), and enter only a test build's module list.
 
 The window and its parts never import runtime code. Clients share connection facilities without embedding another runtime. Sections 6 and 8 define their access to privileged operations.
 
@@ -61,7 +63,7 @@ The window and its parts never import runtime code. Clients share connection fac
 | Host | A process that runs parts: the runtime, the window or the CLI |
 | Part | The code of a module that runs in one host: a runtime part, a window part or a CLI part |
 | Contribution | An entry a module adds to a shell mechanism, such as a view, a command or a protocol method |
-| View | Contributed content for a panel in a dock |
+| View | Contributed content for a panel, in a dock or in the middle |
 | Document | Contributed content for a tab in the middle of the window |
 | Setting scope | A level at which a setting can have its own value, such as the application or one object a module owns |
 | Theme | An appearance the person chooses: colors for the light and dark modes and a look, defined by the [UI standards](UI-STANDARDS.md#2-themes-and-color) |
@@ -74,7 +76,7 @@ Everything a module adds carries its id:
 
 - Names the shell registers have the form `<id>.<name>`: protocol methods and events, commands, menus, settings, setting scopes, views, documents, status bar items, notifications and themes. An id contains no dot, so two owners cannot form the same name.
 - Selectors and style tokens contain no dot and use the id as a prefix under the [coding](CODING-STANDARDS.md#package-organization) and [UI](UI-STANDARDS.md#9-the-shared-kit-and-modules) rules. Prefixes alone do not ensure uniqueness: an automated check rejects duplicate complete names across the shell and all modules.
-- A module's folder in the data directory is named by its id and holds its database and files.
+- A module's folder in the data directory is `modules/<id>` and holds its database and files, so no id collides with the shell's own folders, such as `work` and `logs`.
 
 ## 4. Modules
 
@@ -120,7 +122,7 @@ The shell owns registration, collisions, user overrides, persistence and removal
 
 | Mechanism | A module contributes | The shell |
 |---|---|---|
-| Views | Content for a dock panel, with its title and icon | Docks, splits, hides and restores it |
+| Views | Content for a panel, in a dock or in the middle, with its title and icon | Docks, splits, hides and restores it |
 | Documents | Content for a tab in the middle, with its title and the breadcrumb the top bar shows for it | Opens, arranges, previews and restores tabs |
 | Commands | Named actions | Runs them from menus, shortcuts, the top bar, the status bar and search |
 | Shortcuts | A default key for a command | Reports collisions and applies the person's bindings |
@@ -189,7 +191,7 @@ SQLite is the authority for durable records. The shell and each module that keep
 - Each owner provides ordered migrations for its database. The shell runs its own first, then each module's in dependency order.
 - No transaction spans two databases. A module reaches another module's data only through that module's published API. It keeps references to another module's records as that module's stable identities and handles a record that no longer exists.
 - Modules keep all durable data in the data directory: records in their database and referenced files in their own folder. They add no storage files or folders to projects.
-- A working folder, where the person's and the agents' files live, is not module data. A project's folder is wherever the person keeps it. A folder TeamRun creates for work outside any project, such as a conversation without one, lives in the data directory's `work` folder beside the module folders, under a name that carries its owner's id (section 3). The owner creates and removes it, and any module may work in it as in a project folder.
+- A working folder, where the person's and the agents' files live, is not module data. A project's folder is wherever the person keeps it. A folder TeamRun creates for work outside any project, such as a conversation without one, lives in the data directory's `work` folder beside the `modules` folder, under a name that carries its owner's id (section 3). The owner creates and removes it, and any module may work in it as in a project folder.
 - Records reference filesystem locations by stable, owner-defined identities mapped to paths per device. Moving the data directory preserves records; owners report missing paths for reconnection, never treating them as empty.
 - Removing a module from a build preserves its database and files; deleting them requires a separate user request.
 
@@ -236,7 +238,7 @@ Closing TeamRun waits for each window to save its unsaved state. A window part t
 
 - The repository is self-contained. Reviewed foundation source is built here; no sibling checkout, copied installation directory or private reference repository is a build dependency.
 - Exact external dependency versions and lockfiles describe the install inputs.
-- The root manifest owns product and protocol versions, and the build stamps sibling package versions consistently.
+- The root manifest declares the product version and, separately, the protocol version. The build stamps the product version into sibling packages consistently.
 - The build also stamps the runtime with the fingerprint of the inputs it was compiled from. The fingerprint identifies the runtime's build: the same inputs give the same build, and any change gives another.
 - Compile, package and install through one reproducible path. Tests and the window consume fresh installed artifacts, detecting stale inputs. The coding standards own public declarations and documentation.
 
@@ -271,7 +273,7 @@ Modules have no versions of their own. A release contains the shell and every mo
 
 Before replacing application files, coordinate every runtime and desktop using that installation, across data directories:
 
-1. Refuse active work, block new launches and requests, and freeze editing.
+1. Confirm that no work is in progress, which the person's choice under section 9 ensures; then block new launches and requests, and freeze editing.
 2. Acknowledge durable unsaved state and preferences.
 3. Stop the processes modules own, flush and close databases, and verify process exit.
 4. Create verified recovery backups.
