@@ -30,9 +30,11 @@ class TestTests {
       const exitCode = await new Test(SourceTreeFixture.root, runner, output, { GITHUB_STEP_SUMMARY: summaryPath }).runAsync([]);
 
       assert.equal(exitCode, 0, output.text);
-      const titles = ["Documents", "Module folders", "Packages", "Script types", "Script tests and coverage"];
+      const titles = [
+        "Documents", "Module folders", "Shell names no module", "Module imports", "Unique names", "Packages", "Script types", "Script tests and coverage"
+      ];
       assert.deepEqual([...output.text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`), titles.map(t => `${t}: passed`));
-      assert.ok(output.text.endsWith("\n5 of 5 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n8 of 8 checks passed.\n"));
       assert.equal(runner.runs.length, 2);
       assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
     });
@@ -46,7 +48,7 @@ class TestTests {
       assert.equal(exitCode, 1);
       assert.ok(output.text.includes("\nScript types: failed\n"));
       assert.ok(output.text.includes("\nScript tests and coverage: passed\n"));
-      assert.ok(output.text.endsWith("\n4 of 5 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n7 of 8 checks passed.\n"));
       assert.equal(runner.runs.length, 2);
     });
 
