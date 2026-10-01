@@ -1,0 +1,152 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Build and test
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  changes:
+    name: Classify changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      run-code: ${{ steps.scope.outputs.run-code }}
+    steps:
+      - name: Check out the change history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Check the documents
+        run: npm test -- documents
+
+      - name: Select the verification scope
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+        run: node scripts/classify-changes.ts
+
+  validate:
+    name: Build and test (${{ matrix.target }})
+    needs: changes
+    if: needs.changes.outputs.run-code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: Linux x64
+            runner: ubuntu-24.04
+            architecture: x64
+          - target: Linux ARM64
+            runner: ubuntu-24.04-arm
+            architecture: arm64
+          - target: Windows x64
+            runner: windows-2025
+            architecture: x64
+          - target: Windows ARM64
+            runner: windows-11-arm
+            architecture: arm64
+          - target: macOS x64
+            runner: macos-15-intel
+            architecture: x64
+          - target: macOS ARM64
+            runner: macos-15
+            architecture: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - name: Stop Spotlight indexing
+        if: runner.os == 'macOS'
+        run: sudo mdutil -a -i off
+
+      - name: Check out the revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          architecture: ${{ matrix.architecture }}
+          package-manager-cache: false
+
+      - name: Verify the toolchain
+        env:
+          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          node --version
+          npm --version
+          node --print "process.platform + '/' + process.arch"
+          test "$(node --version)" = v26.7.0
+          test "$(npm --version)" = 11.19.0
+          test "$(node --print process.arch)" = "$EXPECTED_ARCHITECTURE"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+  result:
+    name: Build and test (all targets)
+    needs: [changes, validate]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require the selected verification to pass
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          RUN_CODE: ${{ needs.changes.outputs.run-code }}
+          VALIDATION_RESULT: ${{ needs.validate.result }}
+        run: |
+          set -euo pipefail
+          case "$CHANGES_RESULT:$RUN_CODE:$VALIDATION_RESULT" in
+            success:false:skipped)
+              echo 'Only Markdown documentation changed: the document checks passed, and the build and test targets were skipped.' >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            success:true:success)
+              echo 'The document checks passed, and the build and tests passed on every target.' >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo '::error::The document checks, the change classification or a build and test target did not complete successfully.'
+              exit 1
+              ;;
+          esac

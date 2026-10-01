@@ -19,6 +19,18 @@ Conversations, providers, terminals, editors and diffs are modules. Every module
 
 TeamRun targets Windows, macOS and Linux on x64 and ARM64.
 
+## Build from source
+
+You need Git, Node.js 26.7.0 or a later 26.x release, and npm 11.19.0. In a clone of the repository, run:
+
+```bash
+npm ci
+npm run build
+npm test
+```
+
+`npm ci` installs the exact tool versions the repository pins and warns when your Node.js or npm version differs from the required one. `npm run build` builds the packages under `src/`. `npm test` runs the complete set of checks: the documents' format and links, the folder structure, and the type check and tests of the repository's scripts with full coverage. `npm test -- documents` runs only the document checks.
+
 ## Questions, ideas and contributions
 
 Have a question, found a bug or want to suggest a feature? Search [GitHub Issues](https://github.com/noldova-com/teamrun/issues), then open an issue describing what you need. For security concerns, follow the [private reporting guidance](.github/SECURITY.md).
