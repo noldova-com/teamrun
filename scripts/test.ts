@@ -9,6 +9,9 @@
 import { appendFile } from "node:fs/promises";
 import type { Writable } from "node:stream";
 
+import ApiServer from "./api/api-server.ts";
+import ApiDeclarationCheck from "./checks/api-declaration-check.ts";
+import ApiExampleCheck from "./checks/api-example-check.ts";
 import DocumentCheck from "./checks/document-check.ts";
 import type ICheck from "./checks/interfaces/check.ts";
 import ModuleFolderCheck from "./checks/module-folder-check.ts";
@@ -30,6 +33,7 @@ export default class Test {
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly SUMMARY_HEADER: string = "| Check | Result |\n|---|---|\n";
   private static readonly SUMMARY_VARIABLE: string = "GITHUB_STEP_SUMMARY";
+  private static readonly API_TIMEOUT: number = 300_000;
 
   private readonly root: string;
   private readonly runner: ProcessRunner;
@@ -83,6 +87,8 @@ export default class Test {
         new NameUniquenessCheck(tree),
         new PackageCheck(new PackageCatalog(this.root)),
         new TypeCheck(this.root, this.runner),
+        new ApiDeclarationCheck(this.root, new PackageCatalog(this.root), [ApiServer.locateCompiler()], Test.API_TIMEOUT),
+        new ApiExampleCheck(this.root, new PackageCatalog(this.root), this.runner, [ApiServer.locateCompiler()], Test.API_TIMEOUT),
         new ScriptTestCheck(this.root, this.runner)
       ];
     return selection.length === 1 && selection[0] === Test.DOCUMENTS_SELECTION ? [documents] : null;

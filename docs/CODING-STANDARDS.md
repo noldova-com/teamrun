@@ -154,7 +154,7 @@ Every public callable signature documents:
 - `@param` for each parameter: purpose, accepted inputs, constraints, units, defaults and callback obligations as applicable, beyond its name/type.
 - `@returns` for non-void results: meaning, ownership, ordering, absence and asynchronous completion as applicable; omitted for constructors.
 - `@throws` for contractual failures: type, trigger and synchronous throw versus promise rejection; no invented contracts or empty tags.
-- `@example` for normal and boundary usage. Related signatures may link to a shared example; examples compile or run during verification. An imported package may arrive without `@example` blocks; a separate change adds them together with the check that compiles them, and the missing examples count as incomplete verification until it does.
+- `@example` for normal and boundary usage. Overloads of one callable share their examples; examples compile or run during verification. Each `@example` is a ```` ```ts ```` code block that imports the package by name, as a consumer does; an expected-error example marks the line that must fail with `// @ts-expect-error`. An imported package may arrive without `@example` blocks; a separate change adds them together with the check that compiles them, and the missing examples count as incomplete verification until it does.
 
 Document relevant generic roles, property meaning, mutation, lifecycle, performance and deprecation. Use `@remarks` and symbol links where useful; keep conceptual guides separate and linked. Avoid repetitive prose without omitting argument documentation.
 
