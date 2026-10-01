@@ -14,6 +14,7 @@ export default class ProcessRunnerFixture extends ProcessRunner {
   private readonly captures: ProcessResult[];
 
   public readonly runs: (readonly string[])[] = [];
+  public readonly environments: (NodeJS.ProcessEnv | undefined)[] = [];
   public readonly captured: (readonly string[])[] = [];
 
   public constructor(exitCodes: readonly (number | null)[] = [], captures: readonly ProcessResult[] = []) {
@@ -31,8 +32,9 @@ export default class ProcessRunnerFixture extends ProcessRunner {
     return capture;
   }
 
-  public override async runAsync(command: string, commandArguments: readonly string[], directory: string): Promise<number | null> {
+  public override async runAsync(command: string, commandArguments: readonly string[], directory: string, environment?: NodeJS.ProcessEnv): Promise<number | null> {
     this.runs.push([command, directory, ...commandArguments]);
+    this.environments.push(environment);
     return this.exitCodes.length === 0 ? 0 : this.exitCodes.shift() ?? null;
   }
 }

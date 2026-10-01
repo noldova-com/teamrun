@@ -31,7 +31,7 @@ class PackageCheckTests {
       assert.equal(check.title, "Packages");
     });
 
-    test("packages are built and installed, and the check says plainly that their tests are not run yet", async t => {
+    test("packages are built and installed", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await PackageTreeFixture.writeRootAsync(repository);
@@ -41,7 +41,7 @@ class PackageCheckTests {
       assert.equal(await PackageCheckTests.create(repository.directory).runAsync(output), true);
       assert.equal(output.text, [
         "@noldova/teamrun-foundation-alpha: built",
-        "Packages built and installed: 1. Package tests are not run yet; they need the test framework.",
+        "Packages built and installed: 1.",
         ""
       ].join("\n"));
     });

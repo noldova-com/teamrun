@@ -18,6 +18,7 @@ import ModuleFolderCheck from "./checks/module-folder-check.ts";
 import ModuleImportCheck from "./checks/module-import-check.ts";
 import NameUniquenessCheck from "./checks/name-uniqueness-check.ts";
 import PackageCheck from "./checks/package-check.ts";
+import PackageTestCheck from "./checks/package-test-check.ts";
 import ScriptTestCheck from "./checks/script-test-check.ts";
 import ShellIndependenceCheck from "./checks/shell-independence-check.ts";
 import TypeCheck from "./checks/type-check.ts";
@@ -78,6 +79,7 @@ export default class Test {
     const files = new RepositoryFiles(this.root, new Git(this.root, this.runner));
     const documents = new DocumentCheck(this.root, files);
     const tree = new SourceTree(this.root, files);
+    const build = new PackageBuild(this.root, this.runner, this.environment);
     if (selection.length === 0)
       return [
         documents,
@@ -86,7 +88,8 @@ export default class Test {
         new ModuleImportCheck(tree),
         new NameUniquenessCheck(tree),
         new DeclaredDependencyCheck(tree),
-        new PackageCheck(new PackageBuild(this.root, this.runner, this.environment)),
+        new PackageCheck(build),
+        new PackageTestCheck(this.root, build, this.runner, this.environment),
         new TypeCheck(this.root, this.runner),
         new ScriptTestCheck(this.root, this.runner),
         new AngularTestCheck(new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment)))

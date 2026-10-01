@@ -58,6 +58,13 @@ class ProcessRunnerTests {
       assert.equal(await new ProcessRunner().runAsync(process.execPath, ["-e", "process.exitCode = 4"], tmpdir()), 4);
       assert.equal(await new ProcessRunner().runAsync(process.execPath, ["-e", ""], tmpdir()), 0);
     });
+
+    test("running passes the given environment instead of the process's own", async () => {
+      const script = "process.exitCode = process.env.TEAMRUN_FIXTURE_VALUE === \"given\" ? 0 : 3";
+
+      assert.equal(await new ProcessRunner().runAsync(process.execPath, ["-e", script], tmpdir(), { ...process.env, TEAMRUN_FIXTURE_VALUE: "given" }), 0);
+      assert.equal(await new ProcessRunner().runAsync(process.execPath, ["-e", script], tmpdir()), 3);
+    });
   }
 }
 
