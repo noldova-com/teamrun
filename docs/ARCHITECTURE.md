@@ -216,7 +216,7 @@ Migrations are ordered, explicit and transactional:
 - Refuse unknown or newer schemas rather than resetting them.
 - Destructive rollback, backup retention and cleanup of owned files require explicit policies; no automatic deletion is assumed.
 
-TeamRun does not open data written by a release that predates the shell. The runtime refuses such a data directory, as it refuses an unknown schema, and neither migrates nor resets it. The window explains the refusal and offers to move that data aside: at the person's request, the runtime renames its folder, deletes nothing, and starts with an empty data directory.
+TeamRun does not open data written by a release that predates the shell. The runtime refuses such a data directory, as it refuses an unknown schema, and neither migrates nor resets it. The window explains the refusal and offers to move that data aside: at the person's request, the runtime moves every entry except its ownership database into a new sibling folder named for the move and its date, deletes and overwrites nothing, and starts with an empty data directory. It moves entries rather than renaming the directory, because Windows cannot rename a folder while the ownership database inside it is open.
 
 ## 8. Window
 
