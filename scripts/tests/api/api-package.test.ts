@@ -7,39 +7,23 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
 import ApiPackage from "../../api/api-package.ts";
-import ApiException from "../../api/api.exception.ts";
-import ApiPackageFixture from "../fixtures/api-package.fixture.ts";
+import BuildLayout from "../../packages/build-layout.ts";
+import PackageManifest from "../../packages/package-manifest.ts";
 
 class ApiPackageTests {
   public static register(): void {
-    test("a manifest names the package, its id, its project, its API source and its installed declarations", async t => {
-      const fixture = await ApiPackageFixture.createAsync();
-      t.after(() => fixture.disposeAsync());
-      const manifest = await fixture.writePackageAsync("json", {}, null);
-      const found = await ApiPackage.readAsync(fixture.directory, manifest);
+    test("a package's API is its directory, id, source project, API source and installed declarations", () => {
+      const root = path.resolve("repository");
+      const found = new ApiPackage(new BuildLayout(root), new PackageManifest("src/foundation/json", "@noldova/teamrun-foundation-json", []));
 
-      assert.deepEqual([found.name, found.id], ["@noldova/teamrun-foundation-json", "teamrun-foundation-json"]);
-      assert.equal(found.project, path.join(fixture.directory, "src/foundation/json/src/tsconfig.json"));
-      assert.equal(found.implementation, path.join(fixture.directory, "src/foundation/json/src/api/index.ts"));
-      assert.equal(found.declarations, path.join(fixture.directory, "node_modules/@noldova/teamrun-foundation-json/api/index.d.ts"));
-    });
-
-    test("a manifest without a scoped name and a types entry is refused", async t => {
-      const fixture = await ApiPackageFixture.createAsync();
-      t.after(() => fixture.disposeAsync());
-      await mkdir(path.join(fixture.directory, "src"), { recursive: true });
-      const manifests = ["null", "[]", "{ \"name\": \"json\", \"types\": \"api/index.d.ts\" }", "{ \"name\": \"@noldova/teamrun-json\" }", "{ \"name\": 3, \"types\": 3 }"];
-      for (const [index, text] of manifests.entries()) {
-        await writeFile(path.join(fixture.directory, "src", `${index}.json`), text);
-
-        await assert.rejects(ApiPackage.readAsync(fixture.directory, `src/${index}.json`),
-          new ApiException(`src/${index}.json needs a scoped "name" and a "types" entry.`));
-      }
+      assert.deepEqual([found.directory, found.id], ["src/foundation/json", "foundation-json"]);
+      assert.equal(found.project, path.join(root, "src/foundation/json/src/tsconfig.json"));
+      assert.equal(found.implementation, path.join(root, "src/foundation/json/src/api/index.ts"));
+      assert.equal(found.declarations, path.join(root, "node_modules/@noldova/teamrun-foundation-json/api/index.d.ts"));
     });
   }
 }

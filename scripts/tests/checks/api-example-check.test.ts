@@ -11,6 +11,7 @@ import { test, type TestContext } from "node:test";
 
 import ApiServer from "../../api/api-server.ts";
 import ApiExampleCheck from "../../checks/api-example-check.ts";
+import BuildLayout from "../../packages/build-layout.ts";
 import PackageCatalog from "../../packages/package-catalog.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
 import ApiPackageFixture from "../fixtures/api-package.fixture.ts";
@@ -101,18 +102,18 @@ class ApiExampleCheckTests {
     });
 
     test("examples that compile, and expected errors that occur, pass", async t => {
-      assert.equal(await ApiExampleCheckTests.runAsync(t, ApiExampleCheckTests.DECLARATIONS, true), "src/foundation/counter/package.json: every example compiles\n");
+      assert.equal(await ApiExampleCheckTests.runAsync(t, ApiExampleCheckTests.DECLARATIONS, true), "src/foundation/counter: every example compiles\n");
     });
 
     test("a package without callables has no examples to compile and passes", async t => {
-      assert.equal(await ApiExampleCheckTests.runAsync(t, "export type Unit = \"cm\";\n", true), "src/foundation/counter/package.json: every example compiles\n");
+      assert.equal(await ApiExampleCheckTests.runAsync(t, "export type Unit = \"cm\";\n", true), "src/foundation/counter: every example compiles\n");
     });
 
     test("a callable without an @example fails", async t => {
       const declarations = ApiExampleCheckTests.DECLARATIONS.replace(/\/\*\*\n \* Doubles[\s\S]*? \*\/\n/, "");
       const output = await ApiExampleCheckTests.runAsync(t, declarations, false);
 
-      assert.equal(output, "src/foundation/counter/package.json:\n  double has no @example\n");
+      assert.equal(output, "src/foundation/counter:\n  double has no @example\n");
     });
 
     test("an example that does not compile fails with its owner, number and line", async t => {
@@ -145,7 +146,7 @@ class ApiExampleCheckTests {
     test("an example that is not a fenced TypeScript block fails", async t => {
       const output = await ApiExampleCheckTests.runAsync(t, ApiExampleCheckTests.DECLARATIONS.replace(" * ```ts\n * import { double }", " * import { double }"), false);
 
-      assert.equal(output, "src/foundation/counter/package.json:\n  An @example of double must start with a ```ts code block on its next line.\n");
+      assert.equal(output, "src/foundation/counter:\n  An @example of double must start with a ```ts code block on its next line.\n");
     });
 
     test("a package without installed declarations fails and asks for a build", async t => {
@@ -160,7 +161,7 @@ class ApiExampleCheckTests {
   }
 
   private static createCheck(fixture: ApiPackageFixture): ApiExampleCheck {
-    return new ApiExampleCheck(fixture.directory, new PackageCatalog(fixture.directory), new ProcessRunner(), [ApiServer.locateCompiler()],
+    return new ApiExampleCheck(fixture.directory, new PackageCatalog(fixture.directory), new BuildLayout(fixture.directory), new ProcessRunner(), [ApiServer.locateCompiler()],
       ApiExampleCheckTests.TIMEOUT);
   }
 

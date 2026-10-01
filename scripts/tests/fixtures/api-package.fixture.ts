@@ -32,7 +32,7 @@ export default class ApiPackageFixture {
     const source = `src/foundation/${id}`;
     const project = { extends: path.join(SourceTreeFixture.root, "tsconfig.base.json"), compilerOptions: { types: [] } };
     const files: Record<string, string> = {
-      [`${source}/package.json`]: `${JSON.stringify({ name: `${ApiPackageFixture.SCOPE}/${name}`, type: "module", types: "api/index.d.ts" }, null, 2)}\n`,
+      [`${source}/package.json`]: `${JSON.stringify({ name: `${ApiPackageFixture.SCOPE}/${name}`, version: "__VERSION__", type: "module", types: "api/index.d.ts" }, null, 2)}\n`,
       [`${source}/src/tsconfig.json`]: `${JSON.stringify(project, null, 2)}\n`,
       ...Object.fromEntries(Object.entries(implementation).map(([file, text]) => [`${source}/src/${file}`, text]))
     };

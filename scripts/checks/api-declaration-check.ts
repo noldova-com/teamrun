@@ -16,6 +16,7 @@ import ApiProject from "../api/api-project.ts";
 import ApiServer from "../api/api-server.ts";
 import ApiSurfaceReader from "../api/api-surface.reader.ts";
 import ApiException from "../api/api.exception.ts";
+import type BuildLayout from "../packages/build-layout.ts";
 import type PackageCatalog from "../packages/package-catalog.ts";
 import type ICheck from "./interfaces/check.ts";
 
@@ -25,20 +26,22 @@ export default class ApiDeclarationCheck implements ICheck {
 
   private readonly root: string;
   private readonly catalog: PackageCatalog;
+  private readonly layout: BuildLayout;
   private readonly server: readonly string[];
   private readonly timeout: number;
 
   public readonly title: string = "API declarations";
 
-  public constructor(root: string, catalog: PackageCatalog, server: readonly string[], timeout: number) {
+  public constructor(root: string, catalog: PackageCatalog, layout: BuildLayout, server: readonly string[], timeout: number) {
     this.root = root;
     this.catalog = catalog;
+    this.layout = layout;
     this.server = [...server];
     this.timeout = timeout;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
-    const manifests = await this.catalog.listManifestsAsync();
+    const manifests = await this.catalog.listPackagesAsync();
     if (manifests.length === 0) {
       output.write(ApiDeclarationCheck.NO_PACKAGES);
       return true;
@@ -46,8 +49,8 @@ export default class ApiDeclarationCheck implements ICheck {
 
     let passed = true;
     for (const manifest of manifests) {
-      const problems = await this.inspectAsync(await ApiPackage.readAsync(this.root, manifest));
-      output.write(problems.length === 0 ? `${manifest}: matches its declarations\n` : `${manifest}:\n${problems.map(t => `  ${t}\n`).join("")}`);
+      const problems = await this.inspectAsync(new ApiPackage(this.layout, manifest));
+      output.write(problems.length === 0 ? `${manifest.directory}: matches its declarations\n` : `${manifest.directory}:\n${problems.map(t => `  ${t}\n`).join("")}`);
       passed &&= problems.length === 0;
     }
     return passed;

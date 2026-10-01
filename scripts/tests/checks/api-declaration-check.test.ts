@@ -11,6 +11,7 @@ import { test } from "node:test";
 
 import ApiServer from "../../api/api-server.ts";
 import ApiDeclarationCheck from "../../checks/api-declaration-check.ts";
+import BuildLayout from "../../packages/build-layout.ts";
 import PackageCatalog from "../../packages/package-catalog.ts";
 import ApiPackageFixture from "../fixtures/api-package.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
@@ -118,7 +119,7 @@ class ApiDeclarationCheckTests {
     test("declarations that match the implementation pass", async t => {
       const output = await ApiDeclarationCheckTests.runAsync(t, ApiDeclarationCheckTests.DECLARATIONS, true);
 
-      assert.equal(output, "src/foundation/shapes/package.json: matches its declarations\n");
+      assert.equal(output, "src/foundation/shapes: matches its declarations\n");
     });
 
     const drifts: readonly (readonly [string, string, string, string])[] = [
@@ -148,7 +149,7 @@ class ApiDeclarationCheckTests {
         assert.ok(ApiDeclarationCheckTests.DECLARATIONS.includes(from), kind);
         const output = await ApiDeclarationCheckTests.runAsync(t, ApiDeclarationCheckTests.DECLARATIONS.replace(from, to), false);
 
-        assert.ok(output.startsWith("src/foundation/shapes/package.json:\n"), output);
+        assert.ok(output.startsWith("src/foundation/shapes:\n"), output);
         assert.ok(output.includes(expected), output);
       });
 
@@ -173,7 +174,7 @@ class ApiDeclarationCheckTests {
       t.after(() => fixture.disposeAsync());
       await fixture.writePackageAsync("shapes", ApiDeclarationCheckTests.IMPLEMENTATION, ApiDeclarationCheckTests.DECLARATIONS);
       const output = new TextOutputFixture();
-      const check = new ApiDeclarationCheck(fixture.directory, new PackageCatalog(fixture.directory), [process.execPath, "-e", "process.exit(3)", "--"],
+      const check = new ApiDeclarationCheck(fixture.directory, new PackageCatalog(fixture.directory), new BuildLayout(fixture.directory), [process.execPath, "-e", "process.exit(3)", "--"],
         ApiDeclarationCheckTests.TIMEOUT);
 
       assert.equal(await check.runAsync(output), false);
@@ -182,7 +183,7 @@ class ApiDeclarationCheckTests {
   }
 
   private static createCheck(fixture: ApiPackageFixture): ApiDeclarationCheck {
-    return new ApiDeclarationCheck(fixture.directory, new PackageCatalog(fixture.directory), [ApiServer.locateCompiler()], ApiDeclarationCheckTests.TIMEOUT);
+    return new ApiDeclarationCheck(fixture.directory, new PackageCatalog(fixture.directory), new BuildLayout(fixture.directory), [ApiServer.locateCompiler()], ApiDeclarationCheckTests.TIMEOUT);
   }
 
   private static async runAsync(context: { after: (callback: () => Promise<void>) => void }, declarations: string, expected: boolean): Promise<string> {

@@ -21,7 +21,9 @@ import PackageCheck from "./checks/package-check.ts";
 import ScriptTestCheck from "./checks/script-test-check.ts";
 import ShellIndependenceCheck from "./checks/shell-independence-check.ts";
 import TypeCheck from "./checks/type-check.ts";
+import BuildLayout from "./packages/build-layout.ts";
 import PackageBuild from "./packages/package-build.ts";
+import PackageCatalog from "./packages/package-catalog.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import Git from "./repository/git.ts";
 import RepositoryFiles from "./repository/repository-files.ts";
@@ -77,6 +79,9 @@ export default class Test {
   private selectChecks(selection: readonly string[]): readonly ICheck[] | null {
     const files = new RepositoryFiles(this.root, new Git(this.root, this.runner));
     const documents = new DocumentCheck(this.root, files);
+    const catalog = new PackageCatalog(this.root);
+    const layout = new BuildLayout(this.root);
+    const server = [ApiServer.locateCompiler()];
     const tree = new SourceTree(this.root, files);
     if (selection.length === 0)
       return [
@@ -87,8 +92,8 @@ export default class Test {
         new NameUniquenessCheck(tree),
         new PackageCheck(new PackageBuild(this.root, this.runner, this.environment)),
         new TypeCheck(this.root, this.runner),
-        new ApiDeclarationCheck(this.root, new PackageCatalog(this.root), [ApiServer.locateCompiler()], Test.API_TIMEOUT),
-        new ApiExampleCheck(this.root, new PackageCatalog(this.root), this.runner, [ApiServer.locateCompiler()], Test.API_TIMEOUT),
+        new ApiDeclarationCheck(this.root, catalog, layout, server, Test.API_TIMEOUT),
+        new ApiExampleCheck(this.root, catalog, layout, this.runner, server, Test.API_TIMEOUT),
         new ScriptTestCheck(this.root, this.runner)
       ];
     return selection.length === 1 && selection[0] === Test.DOCUMENTS_SELECTION ? [documents] : null;
