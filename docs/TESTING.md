@@ -35,7 +35,7 @@ Document markers, data-row rules and filters as public runner contracts. Add onl
 
 Each foundation method/data row gets a fresh test-class instance; Angular/Playwright use their fixture lifecycles. Tests establish and release state independently of order. Observe methods and returned promises to completion. Failed assertions, throws, rejections and unexpected errors fail the test, or the enclosing run when attribution is impossible.
 
-The execution boundary owns deadlines, cancellation and cleanup. A timeout fails the test and stops or contains its work; rejecting a wait alone does neither. Forced interruption requires a separately terminable process/worker with descendants and resources accounted for. Verify that isolation mechanism before claiming it works; uncontained timed-out work invalidates subsequent isolation/success claims.
+The execution boundary owns deadlines, cancellation and cleanup. A test that exceeds its time limit fails, and the run ends after reporting it, so no uncontained work continues; rejecting a wait alone stops nothing. Forced interruption requires a separately terminable process/worker with descendants and resources accounted for. Verify that mechanism before claiming it works.
 
 Observe pending and late failures before completion; unassignable errors fail the run. Crashes, forced termination, cancellation and incomplete cleanup remain explicit unsuccessful/incomplete outcomes. One-shot commands must terminate with the appropriate status under the coding standards' process-lifetime rules.
 
@@ -67,7 +67,7 @@ The coverage and configuration requirements are:
 | Repository-owned executable automation, including build, test, packaging and release logic | 100% executable-code coverage, with behavior and process-boundary checks appropriate to the operation |
 | YAML and other non-executable configuration | Applicable schema/configuration validation and workflow checks; no executable-code coverage percentage |
 | A module's `protocol`, `runtime` and `cli` | 100% of executable production code. Where a part drives an external tool, doubles cover parsing, routing and lifecycle; behavior only the real tool can exercise needs separately authorized live verification and explicit accounting of uncovered lines |
-| Angular packages: the shell's `window` and `ui`, and a module's `window` | 100% of executable production code, measured like the other packages, through component and service tests on the framework's testing surface, plus the desktop UI workflow gate in section 6 |
+| Angular packages: the shell's `window` and `ui`, and a module's `window` | 100% of executable production code through component and service tests on the framework's testing surface, measured with Vitest's V8 coverage through the Angular unit-test builder and fed into the same report and gate as the other packages, plus the desktop UI workflow gate in section 6 |
 | `src/shell/desktop` | Application-launch verification, process-boundary tests through appropriate doubles and real-process checks, and the desktop UI workflow gate in section 6 |
 
 Define additional packages' coverage and scope before claiming a complete gate. Non-executable definitions need no artificial tests; other exclusions are explicit, justified and reported, including behavior requiring live services. Executable scripts retain their coverage obligations. Inline workflow scripts stay small and carry no coverage percentage; their tests run the exact text from the workflow against doubles of the tools it calls.
