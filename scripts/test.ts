@@ -21,7 +21,7 @@ import PackageCheck from "./checks/package-check.ts";
 import ScriptTestCheck from "./checks/script-test-check.ts";
 import ShellIndependenceCheck from "./checks/shell-independence-check.ts";
 import TypeCheck from "./checks/type-check.ts";
-import PackageCatalog from "./packages/package-catalog.ts";
+import PackageBuild from "./packages/package-build.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import Git from "./repository/git.ts";
 import RepositoryFiles from "./repository/repository-files.ts";
@@ -85,7 +85,7 @@ export default class Test {
         new ShellIndependenceCheck(tree),
         new ModuleImportCheck(tree),
         new NameUniquenessCheck(tree),
-        new PackageCheck(new PackageCatalog(this.root)),
+        new PackageCheck(new PackageBuild(this.root, this.runner, this.environment)),
         new TypeCheck(this.root, this.runner),
         new ApiDeclarationCheck(this.root, new PackageCatalog(this.root), [ApiServer.locateCompiler()], Test.API_TIMEOUT),
         new ApiExampleCheck(this.root, new PackageCatalog(this.root), this.runner, [ApiServer.locateCompiler()], Test.API_TIMEOUT),

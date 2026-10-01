@@ -8,10 +8,14 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { rm } from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 
 import Build from "../build.ts";
-import PackageCatalog from "../packages/package-catalog.ts";
+import PackageBuild from "../packages/package-build.ts";
+import ProcessRunner from "../processes/process-runner.ts";
+import PackageTreeFixture from "./fixtures/package-tree.fixture.ts";
 import RepositoryFixture from "./fixtures/repository.fixture.ts";
 import SourceTreeFixture from "./fixtures/source-tree.fixture.ts";
 import TextOutputFixture from "./fixtures/text-output.fixture.ts";
@@ -24,24 +28,45 @@ class BuildTests {
       await repository.writeAsync({ "src/modules/checkpoints/README.md": "# Checkpoints\n" });
       const output = new TextOutputFixture();
 
-      assert.equal(await new Build(new PackageCatalog(repository.directory), output).runAsync([]), 0);
+      assert.equal(await BuildTests.create(repository.directory, output, process.env).runAsync([]), 0);
       assert.equal(output.text, "No packages under src/; there is nothing to build.\n");
     });
 
-    test("a package manifest fails the build until package builds exist", async t => {
+    test("packages are built and installed, and the build says how many", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
-      await repository.writeAsync({ "src/foundation/core/package.json": "{}\n" });
+      await PackageTreeFixture.writeRootAsync(repository);
+      await PackageTreeFixture.writePackageAsync(repository, "foundation-alpha", [], false);
       const output = new TextOutputFixture();
 
-      assert.equal(await new Build(new PackageCatalog(repository.directory), output).runAsync([]), 1);
-      assert.equal(output.text, "The build cannot build packages yet. Found:\n  src/foundation/core/package.json\n");
+      assert.equal(await BuildTests.create(repository.directory, output, process.env).runAsync([]), 0);
+      assert.equal(output.text, "@noldova/teamrun-foundation-alpha: built\nPackages built and installed: 1.\n");
+    });
+
+    test("invalid packages and a missing npm fail with the reason, and other errors are not hidden", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await PackageTreeFixture.writeRootAsync(repository);
+      await repository.writeAsync({ "src/shell/ui/package.json": "{ \"name\": \"@noldova/teamrun-ui\", \"version\": \"__VERSION__\" }\n" });
+      const invalid = new TextOutputFixture();
+      assert.equal(await BuildTests.create(repository.directory, invalid, process.env).runAsync([]), 1);
+
+      await rm(path.join(repository.directory, "src", "shell"), { recursive: true });
+      await PackageTreeFixture.writePackageAsync(repository, "foundation-alpha", [], false);
+      const withoutNpm = new TextOutputFixture();
+      assert.equal(await BuildTests.create(repository.directory, withoutNpm, {}).runAsync([]), 1);
+
+      await rm(path.join(repository.directory, "package-lock.json"));
+      await assert.rejects(BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync([]), /ENOENT/);
+
+      assert.equal(invalid.text, "src/shell/ui/package.json must be named \"@noldova/teamrun-shell-ui\", the package's path below src/ joined with hyphens.\n");
+      assert.equal(withoutNpm.text, "npm_execpath is not set; run this through npm, such as npm run build or npm test.\n");
     });
 
     test("arguments are refused with the usage", async () => {
       const output = new TextOutputFixture();
 
-      assert.equal(await new Build(new PackageCatalog("unused"), output).runAsync(["foundation-core"]), 2);
+      assert.equal(await BuildTests.create("unused", output, process.env).runAsync(["foundation-core"]), 2);
       assert.equal(output.text, "Usage: npm run build\n");
     });
 
@@ -54,14 +79,19 @@ class BuildTests {
 
       const empty = run([]);
       await repository.writeAsync({ "src/shell/runtime/package.json": "{}\n" });
-      const withPackage = run([]);
+      const invalid = run([]);
       const withArgument = run(["--watch"]);
 
       assert.equal(empty.status, 0);
       assert.equal(empty.stdout, "No packages under src/; there is nothing to build.\n");
-      assert.equal(withPackage.status, 1);
+      assert.equal(invalid.status, 1);
+      assert.equal(invalid.stdout, "src/shell/runtime/package.json must have a name.\n");
       assert.equal(withArgument.status, 2);
     });
+  }
+
+  private static create(root: string, output: TextOutputFixture, environment: NodeJS.ProcessEnv): Build {
+    return new Build(new PackageBuild(root, new ProcessRunner(), environment), output);
   }
 }
 
