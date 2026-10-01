@@ -6,16 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { createRequire } from "node:module";
-import path from "node:path";
-
 import type ProcessRunner from "../processes/process-runner.ts";
+import TypeScriptCompiler from "../toolchain/typescript-compiler.ts";
 import type ICheck from "./interfaces/check.ts";
 
 export default class TypeCheck implements ICheck {
-  private static readonly ROOT_MANIFEST: string = "package.json";
-  private static readonly COMPILER_MANIFEST: string = "typescript/package.json";
-  private static readonly COMPILER_PATH: string = "bin/tsc";
   private static readonly PROJECT_ARGUMENTS: readonly string[] = ["--project", "scripts/tsconfig.json"];
 
   private readonly root: string;
@@ -29,8 +24,6 @@ export default class TypeCheck implements ICheck {
   }
 
   public async runAsync(): Promise<boolean> {
-    const manifest = createRequire(path.join(this.root, TypeCheck.ROOT_MANIFEST)).resolve(TypeCheck.COMPILER_MANIFEST);
-    const compiler = path.join(path.dirname(manifest), TypeCheck.COMPILER_PATH);
-    return await this.runner.runAsync(process.execPath, [compiler, ...TypeCheck.PROJECT_ARGUMENTS], this.root) === 0;
+    return await this.runner.runAsync(process.execPath, [TypeScriptCompiler.locate(), ...TypeCheck.PROJECT_ARGUMENTS], this.root) === 0;
   }
 }
