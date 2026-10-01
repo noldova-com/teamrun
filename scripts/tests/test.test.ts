@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 
 import Test from "../test.ts";
 import ProcessRunnerFixture from "./fixtures/process-runner.fixture.ts";
@@ -21,13 +21,12 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 class TestTests {
   public static register(): void {
     test("the complete gate runs every check in order and writes the step summary", async t => {
-      const summary = await RepositoryFixture.createAsync();
-      t.after(() => summary.disposeAsync());
-      const summaryPath = path.join(summary.directory, "summary.md");
+      const repository = await TestTests.createRepositoryAsync(t);
+      const summaryPath = path.join(repository.directory, "summary.md");
       const runner = new ProcessRunnerFixture([0, 0]);
       const output = new TextOutputFixture();
 
-      const exitCode = await new Test(SourceTreeFixture.root, runner, output, { GITHUB_STEP_SUMMARY: summaryPath }).runAsync([]);
+      const exitCode = await new Test(repository.directory, runner, output, { GITHUB_STEP_SUMMARY: summaryPath }).runAsync([]);
 
       assert.equal(exitCode, 0, output.text);
       const titles = [
@@ -39,11 +38,12 @@ class TestTests {
       assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
     });
 
-    test("a failing check fails the gate after the remaining checks have run", async () => {
+    test("a failing check fails the gate after the remaining checks have run", async t => {
+      const repository = await TestTests.createRepositoryAsync(t);
       const runner = new ProcessRunnerFixture([1, 0]);
       const output = new TextOutputFixture();
 
-      const exitCode = await new Test(SourceTreeFixture.root, runner, output, {}).runAsync([]);
+      const exitCode = await new Test(repository.directory, runner, output, {}).runAsync([]);
 
       assert.equal(exitCode, 1);
       assert.ok(output.text.includes("\nScript types: failed\n"));
@@ -104,6 +104,13 @@ class TestTests {
       assert.match(String(failing.stdout), /README\.md:3: the link "missing\.md" points to a missing file\./);
       assert.equal(refused.status, 2);
     });
+  }
+
+  private static async createRepositoryAsync(t: TestContext): Promise<RepositoryFixture> {
+    const repository = await RepositoryFixture.createAsync();
+    t.after(() => repository.disposeAsync());
+    await repository.writeAsync({ "README.md": "# TeamRun\n", "src/modules/checkpoints/README.md": "# Checkpoints\n" });
+    return repository;
   }
 }
 
