@@ -7,7 +7,7 @@
  */
 
 import assert from "node:assert/strict";
-import { appendFile, rm } from "node:fs/promises";
+import { appendFile, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
@@ -79,6 +79,30 @@ class PackageBuildTests {
 
       assert.deepEqual(first, PackageBuildTests.ALL_BUILT);
       assert.deepEqual(changed, PackageBuildTests.ALL_BUILT);
+    });
+
+    test("one application fingerprint is stamped, and any source change rebuilds the packages that stamp it but not unchanged ones", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
+      const repository = await PackageBuildTests.createAsync(t);
+      await PackageTreeFixture.writePackageAsync(repository, "shell-gamma", [], false, false);
+      await repository.writeAsync({ "src/shell/gamma/src/resources.ts": "export default class Resources {\n  public static readonly build: string = \"__BUILD__\";\n}\n" });
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const stamped = async (): Promise<string> => (await readFile(path.join(repository.directory, "node_modules", "@noldova", "teamrun-shell-gamma", "resources.js"), "utf8")).match(/build = "([0-9a-f]+)";/)?.[1] ?? "";
+      await PackageBuildTests.buildAsync(build);
+      const first = await stamped();
+
+      await repository.writeAsync({ "src/shell/beta/src/resources.ts": "export default class Resources {\n  public static readonly version: string = \"changed\";\n  public static readonly protocol: string = \"\";\n}\n" });
+      const changed = await PackageBuildTests.buildAsync(build);
+      await build.requireCurrentAsync();
+
+      assert.match(first, /^[0-9a-f]{64}$/);
+      assert.notEqual(await stamped(), first);
+      assert.deepEqual(changed, [
+        `${PackageBuildTests.ALPHA}: reused`,
+        `${PackageBuildTests.GAMMA}: built`,
+        `${PackageBuildTests.BETA}: built`,
+        `${PackageBuildTests.ALPHA} tests: compiled`,
+        `${PackageBuildTests.BETA} tests: compiled`
+      ]);
     });
 
     test("a changed test recompiles only that package's tests", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
