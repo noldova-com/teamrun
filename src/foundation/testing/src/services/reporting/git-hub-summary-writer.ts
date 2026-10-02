@@ -18,10 +18,11 @@ import { CoverageReportWriter } from "./coverage-report-writer.js";
 import { TestReportWriter } from "./test-report-writer.js";
 
 export class GitHubSummaryWriter {
-  private readonly path: string | undefined;
+  private readonly path?: string;
 
-  public constructor(path: string | undefined) {
-    this.path = path;
+  public constructor(path?: string) {
+    if (!Object.isUndefined(path))
+      this.path = path;
   }
 
   public writeTests(result: TestRunResult): void {

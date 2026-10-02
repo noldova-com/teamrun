@@ -15,10 +15,14 @@ import { pathToFileURL } from "node:url";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 
 import { TestingException } from "../../exceptions/testing.exception.js";
+import type { IDiscoveredTestMethodOptions } from "../../interfaces/discovery/i-discovered-test-method-options.js";
 import { TestDataEntry } from "../../models/decorators/test-data-entry.js";
 import { TestMarks } from "../../models/decorators/test-marks.js";
 import { DiscoveredTestClass } from "../../models/discovery/discovered-test-class.js";
+import { DiscoveredTestClassOptions } from "../../models/discovery/discovered-test-class-options.js";
 import { DiscoveredTestMethod } from "../../models/discovery/discovered-test-method.js";
+import { DiscoveredTestMethodOptions } from "../../models/discovery/discovered-test-method-options.js";
+import { TestDataRow } from "../../models/discovery/test-data-row.js";
 import type { TestProject } from "../../models/discovery/test-project.js";
 import { Resources } from "../../resources.js";
 
@@ -122,11 +126,12 @@ export class TestDiscovery {
 
       const skipReason = this.getSkipReason(member);
       const categories = [...classCategories, ...methodCategories];
+      const methodOptions: IDiscoveredTestMethodOptions = Object.isUndefined(skipReason) ? { categories } : { skipReason, categories };
       if (Object.isUndefined(testDataEntries)) {
         if (member.length > 0)
           throw new TestingException(Resources.formatTestMethodRequiresData(memberName, className, filePath));
 
-        methods.push(new DiscoveredTestMethod(memberName, undefined, [], skipReason, categories));
+        methods.push(new DiscoveredTestMethod(memberName, new DiscoveredTestMethodOptions(methodOptions)));
         continue;
       }
 
@@ -143,14 +148,18 @@ export class TestDiscovery {
             member.length,
             testDataEntry.values.length));
 
-        methods.push(new DiscoveredTestMethod(memberName, index, testDataEntry.values, skipReason, categories));
+        methods.push(new DiscoveredTestMethod(memberName, new DiscoveredTestMethodOptions({ ...methodOptions, testDataRow: new TestDataRow(index, testDataEntry.values) })));
       }
     }
 
     if (methods.length === 0)
       throw new TestingException(Resources.formatTestClassWithoutTestMethod(className, filePath));
 
-    return new DiscoveredTestClass(packageName, className, filePath, testClassConstructor, this.getSkipReason(testClassConstructor), methods, classCategories);
+    const classSkipReason = this.getSkipReason(testClassConstructor);
+    const classOptions = new DiscoveredTestClassOptions(Object.isUndefined(classSkipReason)
+      ? { categories: classCategories }
+      : { skipReason: classSkipReason, categories: classCategories });
+    return new DiscoveredTestClass(packageName, className, filePath, testClassConstructor, methods, classOptions);
   }
 
   private async findTestFilesAsync(rootDirectory: string): Promise<string[]> {
