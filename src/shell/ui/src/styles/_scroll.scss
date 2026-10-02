@@ -1,0 +1,51 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+::-webkit-scrollbar {
+  width: var(--tr-scrollbar-size);
+  height: var(--tr-scrollbar-size);
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background-color: transparent;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: var(--tr-scrollbar-size);
+  background-color: transparent;
+}
+
+:is(.tr-scroll-reveal, .mat-mdc-menu-panel) {
+  color: transparent;
+  transition: color 150ms linear;
+}
+
+:is(.tr-scroll-reveal, .mat-mdc-menu-panel):hover {
+  color: var(--tr-scrollbar);
+}
+
+:is(.tr-scroll-reveal, .mat-mdc-menu-panel)::-webkit-scrollbar-thumb {
+  box-shadow: inset 0 0 0 var(--tr-scrollbar-size) currentColor;
+}
+
+:is(.tr-scroll-reveal, .mat-mdc-menu-panel)::-webkit-scrollbar-thumb:active {
+  box-shadow: inset 0 0 0 var(--tr-scrollbar-size) var(--tr-scrollbar-active);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.tr-scroll-reveal, .mat-mdc-menu-panel) {
+    transition: none;
+  }
+}

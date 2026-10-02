@@ -55,6 +55,37 @@ describe("kit styles", () => {
     expect([sans.length, sansItalic.length, mono.length, symbols.length].every(t => t > 0)).toBe(true);
   });
 
+  for (const theme of AppearanceFixture.themes)
+    it(`give scroll areas thin scrollbars without arrows whose thumb shows on hover, with the ${theme.id} theme`, async () => {
+      AppearanceFixture.apply(theme, ThemeMode.Light);
+      const area = document.createElement("div");
+      area.className = "tr-scroll-reveal";
+      area.style.cssText = "position: fixed; top: 0; left: 0; width: 200px; height: 120px; overflow: scroll;";
+      const content = document.createElement("div");
+      content.style.cssText = "width: 600px; height: 600px;";
+      area.append(content);
+      document.body.append(area);
+
+      try {
+        const scrollbar = getComputedStyle(area, "::-webkit-scrollbar");
+        AppearanceFixture.expectLook(scrollbar.width, theme, "scrollbar-size", "width");
+        AppearanceFixture.expectLook(scrollbar.height, theme, "scrollbar-size", "height");
+        expect(getComputedStyle(area, "::-webkit-scrollbar-button").display).toBe("none");
+        expect(getComputedStyle(area).color).toBe("rgba(0, 0, 0, 0)");
+        await userEvent.hover(area);
+        const probe = document.createElement("div");
+        probe.style.color = "var(--tr-scrollbar)";
+        document.body.append(probe);
+        const thumb = getComputedStyle(probe).color;
+        probe.remove();
+        expect(thumb).not.toBe("rgba(0, 0, 0, 0)");
+        await vi.waitFor(() => expect(getComputedStyle(area).color).toBe(thumb));
+      }
+      finally {
+        area.remove();
+      }
+    });
+
   for (const mode of AppearanceFixture.modes)
     for (const theme of AppearanceFixture.themes)
       it(`style the page and menus with the ${theme.id} theme in ${mode} mode`, async () => {

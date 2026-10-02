@@ -12,4 +12,10 @@
   flex-direction: column;
   min-height: 0;
   overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.tr-tab-content-text {
+  display: contents;
+  color: var(--tr-text);
 }

@@ -30,7 +30,7 @@
   align-items: stretch;
   min-width: 0;
   padding-inline-start: var(--tr-tab-inset);
-  overflow-x: auto;
+  overflow-x: scroll;
   overflow-y: hidden;
   scroll-padding-inline-start: var(--tr-space-2);
 }

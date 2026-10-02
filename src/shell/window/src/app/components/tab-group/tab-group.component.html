@@ -8,7 +8,7 @@ LICENSE file in the root directory of this source tree.
 
 <tr-panel-card class="tr-tab-group-card" [surface]="surface()" [attr.data-drop-group]="group().id">
   <div class="tr-tab-group-bar">
-    <div #scroller class="tr-tab-group-scroller" (wheel)="scrollAcross($event, scroller)">
+    <div #scroller class="tr-tab-group-scroller tr-scroll-reveal" (wheel)="scrollAcross($event, scroller)">
     <div class="tr-tab-group-strip" role="tablist" data-drop-tabs (keydown)="onStripKey($event)">
       @for (tab of group().tabs; track tab.key; let index = $index) {
         @let label = labels.of(tab);

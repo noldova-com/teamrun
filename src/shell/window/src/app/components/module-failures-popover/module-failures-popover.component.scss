@@ -25,6 +25,10 @@
   line-height: var(--tr-line-panel);
 }
 
+:host > * {
+  color: var(--tr-menu-text);
+}
+
 :host(:focus) {
   outline: none;
 }
