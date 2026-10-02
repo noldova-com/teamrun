@@ -436,11 +436,36 @@ class BuildAndTestTests {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
       const text = workflow.text;
 
-      assert.equal(workflow.readStepScript("Install Electron"), "node node_modules/electron/install.js\n");
+      assert.ok(workflow.readStepScript("Install Electron").includes("node node_modules/electron/install.js"));
       assert.ok(text.includes("      - name: Install Electron\n        run: "));
       assert.ok(text.indexOf("      - name: Install dependencies\n") < text.indexOf("      - name: Install Electron\n"));
       assert.ok(text.indexOf("      - name: Install Electron to save\n") < text.indexOf("      - name: Save the installed dependencies\n"));
     });
+
+    for (const [name, exitCodes, status, sleeps] of [
+      ["a download that fails and then succeeds passes after one pause", [1, 0], 0, 1],
+      ["a download that succeeds at once does not wait", [0], 0, 0],
+      ["a download that fails every attempt fails the step after three pauses", [1], 1, 3]
+    ] as const)
+      test(`Electron's binary download is retried a bounded number of times: ${name}`, { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+        const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+        const doubles = await CommandDoublesFixture.createAsync();
+        t.after(() => doubles.disposeAsync());
+        doubles.respondInTurn("node", "node_modules/electron/install.js", exitCodes, "HTTPError: Response code 500");
+        const stoppedSleep = "sleep() { echo \"sleep $*\" >> sleeps.log; }\n";
+
+        const result = await doubles.runAsync(stoppedSleep + workflow.readStepScript("Install Electron"));
+
+        const calls = await doubles.readCallsAsync();
+        const waits = (await doubles.readFileAsync("sleeps.log").catch(() => "")).split("\n").filter(t => t.length > 0);
+        assert.equal(result.status, status, result.stderr);
+        assert.deepEqual(waits, Array<string>(sleeps).fill("sleep 15"));
+        assert.equal(calls.filter(t => t.startsWith("node ")).length, status === 0 ? exitCodes.length : 4);
+        if (status !== 0) {
+          assert.match(result.stderr, /HTTPError: Response code 500/);
+          assert.match(result.stdout, /^::error::Electron's binary could not be downloaded in 4 attempts\.$/m);
+        }
+      });
 
     test("the UI workflows run after the tests, under Xvfb on Linux, and their results are kept from every run", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);

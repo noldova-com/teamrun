@@ -223,7 +223,18 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Install Electron
-        run: node node_modules/electron/install.js
+        run: |
+          for attempt in 1 2 3 4; do
+            if node node_modules/electron/install.js; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 4 ]; then
+              echo "Electron's binary download failed (attempt $attempt of 4); trying again in 15 seconds."
+              sleep 15
+            fi
+          done
+          echo "::error::Electron's binary could not be downloaded in 4 attempts."
+          exit 1
 
       - name: Build
         run: npm run build
@@ -376,7 +387,18 @@ jobs:
 
       - name: Install Electron to save
         if: steps.root-dependencies.outputs.cache-hit != 'true'
-        run: node node_modules/electron/install.js
+        run: |
+          for attempt in 1 2 3 4; do
+            if node node_modules/electron/install.js; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 4 ]; then
+              echo "Electron's binary download failed (attempt $attempt of 4); trying again in 15 seconds."
+              sleep 15
+            fi
+          done
+          echo "::error::Electron's binary could not be downloaded in 4 attempts."
+          exit 1
 
       - name: Save the installed dependencies
         if: steps.root-dependencies.outputs.cache-hit != 'true'

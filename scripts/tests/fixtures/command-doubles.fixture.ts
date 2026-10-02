@@ -56,6 +56,22 @@ export default class CommandDoublesFixture {
     this.responses.set(command, responses);
   }
 
+  public respondInTurn(command: string, commandArguments: string, exitCodes: readonly number[], errorText: string = ""): void {
+    const counter = CommandDoublesFixture.quote(CommandDoublesFixture.toShellPath(path.join(this.root, `${command}.turn`)));
+    const body = [
+      `n=$(cat ${counter} 2>/dev/null || echo 0)`,
+      "n=$((n + 1))",
+      `echo "$n" > ${counter}`,
+      `set -- ${exitCodes.join(" ")}`,
+      "i=0; code=0; for c in \"$@\"; do i=$((i + 1)); code=$c; if [ \"$i\" -ge \"$n\" ]; then break; fi; done",
+      `if [ "$code" -ne 0 ]; then printf '%s\n' ${CommandDoublesFixture.quote(errorText)} >&2; fi`,
+      "exit \"$code\""
+    ].join("; ");
+    const responses = this.responses.get(command) ?? [];
+    responses.push(`  ${CommandDoublesFixture.quote(commandArguments)}) ${body} ;;`);
+    this.responses.set(command, responses);
+  }
+
   public forward(command: string): void {
     this.forwarded.add(command);
   }
