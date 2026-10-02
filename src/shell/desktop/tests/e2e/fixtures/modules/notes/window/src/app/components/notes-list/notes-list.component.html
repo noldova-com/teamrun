@@ -7,3 +7,8 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <p class="tr-notes-list-text" data-fixture-content="notes-list">The notes list</p>
+<ul class="tr-notes-list-items">
+  @for (note of notes; track $index) {
+    <li>{{ note }}</li>
+  }
+</ul>
