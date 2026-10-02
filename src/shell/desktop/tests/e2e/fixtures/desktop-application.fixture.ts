@@ -13,7 +13,7 @@ import path from "node:path";
 
 import { type ElectronApplication, type Page, type TestInfo, _electron, expect } from "@playwright/test";
 
-import { DataDirectory, DiscoveryReader } from "@noldova/teamrun-shell-runtime";
+import { DataDirectory, DiscoveryReader, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
 export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
@@ -178,6 +178,8 @@ export default class DesktopApplicationFixture {
     this.page = window;
     this.childProcess = application.process();
     await expect.poll(() => this.isVisibleAsync()).toBe(true);
+    await expect.poll(async () => (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.productVersion)
+      .toBe(RuntimeBuild.identity.productVersion);
   }
 
   private requireProcess(): ChildProcess {
