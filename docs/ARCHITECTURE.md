@@ -187,6 +187,11 @@ A module decides when something deserves a notification; muting, for example for
 
 - The first client may start a runtime; later clients attach only to their own build, carrying the same modules without separate module-protocol negotiation.
 - A newer build takes over a directory an older build's runtime owns by itself. It asks the older runtime to stop; if work is in progress, the person makes section 9's choice to wait for it or stop it; then the older runtime exits and the newer one starts. An older build that finds a newer runtime hands the person over to the newer build instead of starting. The person is never asked to find and quit another TeamRun.
+- A build is newer when its product version is higher. Between two builds of the same product version, such as successive development builds, the build that is starting takes over.
+- Every build keeps this exchange from protocol version 1, so any build can stop any earlier one:
+  - A handshake from another build, of any protocol version, is answered with a `BuildMismatch` failure whose details are the runtime's build identity and the program it runs from.
+  - The connection stays open, and the only request it accepts is `shell.stop`, with the policy "only if idle" or "stop the work". Any other request is answered with `BuildMismatch`.
+  - When the policy is "only if idle" and work is in progress, `shell.stop` is answered with a `Conflict` failure whose details list the work in progress. Otherwise the runtime answers, cancels its work and stops.
 - Work may outlive clients until the idle policy permits shutdown.
 - Explicit shutdown cancels owned work, resolves waiters, flushes state and closes resources; acknowledgement does not prove process exit.
 - Reconnect from durable records, allowing for missed events.
@@ -226,7 +231,7 @@ Migrations are ordered, explicit and transactional:
 - Refuse unknown or newer schemas rather than resetting them.
 - Destructive rollback, backup retention and cleanup of owned files require explicit policies; no automatic deletion is assumed.
 
-TeamRun does not open data written by a release that predates the shell. The runtime refuses such a data directory, as it refuses an unknown schema, and neither migrates nor resets it. The window explains the refusal and offers to move that data aside: at the person's request, the runtime moves every entry except its ownership database into a new sibling folder named for the move and its date, deletes and overwrites nothing, and starts with an empty data directory. It moves entries rather than renaming the directory, because Windows cannot rename a folder while the ownership database inside it is open.
+TeamRun does not open data written by a release that predates the shell. The runtime refuses such a data directory, as it refuses an unknown schema, and neither migrates nor resets it. The window explains the refusal and offers to move that data aside: at the person's request, the runtime renames its folder, deletes nothing, and starts with an empty data directory.
 
 ## 8. Window
 
