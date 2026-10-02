@@ -25,14 +25,16 @@
             "browserViewport": "1280x800",
             "include": [
               "shell/ui/tests/**/*.spec.ts",
-              "shell/window/tests/**/*.spec.ts"
+              "shell/window/tests/**/*.spec.ts",
+              "modules/*/window/tests/**/*.spec.ts"
             ],
             "providersFile": "shell/ui/tests/test-providers.ts",
             "watch": false,
             "coverage": true,
             "coverageInclude": [
               "shell/ui/src/**/*.ts",
-              "shell/window/src/**/*.ts"
+              "shell/window/src/**/*.ts",
+              "modules/*/window/src/**/*.ts"
             ],
             "coverageReporters": [
               "text"
@@ -45,24 +47,42 @@
             },
             "coverageExclude": [
               "shell/ui/src/app/enums/**",
-              "shell/window/src/app/enums/**"
+              "shell/window/src/app/enums/**",
+              "modules/*/window/src/app/enums/**"
             ]
           }
         },
         "build": {
           "builder": "@angular/build:application",
           "options": {
+            "outputPath": "../_build/window",
+            "index": "shell/window/src/index.html",
+            "browser": "shell/window/src/main.ts",
             "tsConfig": "tsconfig.spec.json",
+            "baseHref": "./",
             "styles": [
               "shell/ui/src/styles/kit.scss"
             ]
           },
           "configurations": {
+            "production": {
+              "tsConfig": "tsconfig.app.json",
+              "outputHashing": "none",
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": false
+              }
+            },
             "development": {
               "optimization": false,
               "sourceMap": true
             }
-          }
+          },
+          "defaultConfiguration": "production"
         }
       }
     }

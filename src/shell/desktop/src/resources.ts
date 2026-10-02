@@ -55,9 +55,6 @@ export class Resources {
   public static readonly invalidAppearance: string = "The window appearance is not valid.";
   public static readonly invalidColor: string = "A window color is a hexadecimal color or an rgb() or rgba() color.";
   public static readonly colorPattern: RegExp = /^(?:#[0-9A-Fa-f]{3,8}|rgba?\([0-9., %/]+\))$/;
-  public static readonly contentSecurityPolicy: string =
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'none'; " +
-    "object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'";
 
   public static formatAppearanceRejected(reason: string): string {
     return `The window reported an appearance that is not valid, so it is shown without it: ${reason}`;
