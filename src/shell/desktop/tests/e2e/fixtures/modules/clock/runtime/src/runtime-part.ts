@@ -9,16 +9,25 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-import type { IRuntimePart, IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+import { type IRuntimePart, type IRuntimePartContext, Migration } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "./resources.js";
 
 export class RuntimePart implements IRuntimePart {
+  public readonly migrations: readonly Migration[] = [new Migration(Resources.readingsMigration, [Resources.createReadingsStatement])];
+
   public async activateAsync(context: IRuntimePartContext): Promise<void> {
     if (existsSync(path.join(context.moduleFolder, Resources.failureMarker)))
       throw new Error(Resources.failureMessage);
 
     context.registerMethod(Resources.timeMethod, { handleAsync: async () => ({ time: new Date().toISOString() }) });
+    const database = context.database;
+    context.registerMethod(Resources.recordMethod, {
+      handleAsync: async () => {
+        database.run(Resources.insertReadingStatement, new Date().toISOString());
+        return { readings: Number(database.read(Resources.countReadingsStatement)?.[Resources.countColumn]) };
+      }
+    });
   }
 
   public async deactivateAsync(): Promise<void> {

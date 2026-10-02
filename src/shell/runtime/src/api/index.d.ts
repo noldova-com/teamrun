@@ -7,7 +7,7 @@
  */
 
 import type { EventEmitter } from "node:events";
-import type { DatabaseSync, SQLInputValue, SQLOutputValue } from "node:sqlite";
+import type { DatabaseSync, SQLInputValue, SQLOutputValue, StatementResultingChanges } from "node:sqlite";
 import type { Writable } from "node:stream";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
@@ -108,8 +108,8 @@ export declare class DiscoveryFormatException extends Exception {
 }
 
 /**
- * The exception thrown when a shell database migration fails. Its changes and
- * its history row were rolled back together.
+ * The exception thrown when a migration of the shell's or a module's database
+ * fails. Its changes and its history row were rolled back together.
  */
 export declare class MigrationException extends Exception {
   /**
@@ -120,6 +120,7 @@ export declare class MigrationException extends Exception {
   /**
    * Creates the exception.
    *
+   * @param database The database's name in the message, such as `shell database`.
    * @param migrationId The id of the failed migration.
    * @param options The SQLite failure, if any.
    * @example
@@ -127,11 +128,30 @@ export declare class MigrationException extends Exception {
    * import { MigrationException } from "@noldova/teamrun-shell-runtime";
    *
    * export function fail(): never {
-   *   throw new MigrationException("create-settings");
+   *   throw new MigrationException("shell database", "create-settings");
    * }
    * ```
    */
-  public constructor(migrationId: string, options?: ExceptionOptions);
+  public constructor(database: string, migrationId: string, options?: ExceptionOptions);
+}
+
+/**
+ * The exception thrown when a module's runtime part uses a database it does not
+ * have, because it declares no migrations.
+ */
+export declare class ModuleDatabaseException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @example
+   * ```ts
+   * import { ModuleDatabaseException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const failure: ModuleDatabaseException = new ModuleDatabaseException("The module notes has no database.");
+   * ```
+   */
+  public constructor(message: string);
 }
 
 /**
@@ -595,6 +615,23 @@ export declare class DataDirectory {
    * ```
    */
   public locateModuleFolder(id: string): string;
+
+  /**
+   * Returns the path of a module's database, `modules/<id>/<id>.sqlite`.
+   *
+   * @param id The module's id: lowercase kebab-case and not `shell`.
+   * @returns The database's path; nothing is created.
+   * @throws {ArgumentException} When the id is not a module id.
+   * @example
+   * ```ts
+   * import type { DataDirectory } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function locateNotesDatabase(directory: DataDirectory): string {
+   *   return directory.locateModuleDatabase("notes");
+   * }
+   * ```
+   */
+  public locateModuleDatabase(id: string): string;
 }
 
 /**
@@ -698,17 +735,154 @@ export declare class DatabaseBackup {
 }
 
 /**
- * The shell's own database, `shell.sqlite`, opened in write-ahead-log mode with
- * its migrations applied.
+ * A SQLite database opened in write-ahead-log mode with its owner's migrations applied: the shell's, or a module's.
+ * Its migration history lives in the database itself.
  */
-export declare class ShellDatabase implements Disposable {
+export declare class MigratedDatabase implements Disposable {
   /**
    * The ids of the migrations the database holds after opening, in order.
    */
   public readonly appliedMigrations: readonly string[];
 
-  private constructor();
+  /**
+   * Wraps an open connection; the subclasses' `openAsync` methods create it.
+   *
+   * @param connection The open connection.
+   * @param appliedMigrations The ids of the applied migrations, in order.
+   */
+  protected constructor(connection: DatabaseSync, appliedMigrations: readonly string[]);
 
+  /**
+   * Runs a query and returns its first row.
+   *
+   * @param statement The SQL statement, with `?` placeholders.
+   * @param values The placeholders' values, in order.
+   * @returns The first row, or `undefined` when there is none.
+   * @throws Error synchronously when the statement fails or the database is closed.
+   * @example
+   * ```ts
+   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readBounds(database: ShellDatabase): unknown {
+   *   return database.read("SELECT bounds AS value FROM window_states WHERE device = ? AND window = ?", "device-1", "main")?.["value"];
+   * }
+   * ```
+   */
+  public read(statement: string, ...values: SQLInputValue[]): Record<string, SQLOutputValue> | undefined;
+
+  /**
+   * Runs a query and returns all its rows.
+   *
+   * @param statement The SQL statement, with `?` placeholders.
+   * @param values The placeholders' values, in order.
+   * @returns The rows, in the query's order.
+   * @throws Error synchronously when the statement fails or the database is closed.
+   * @example
+   * ```ts
+   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function countDevices(database: ShellDatabase): number {
+   *   return database.readAll("SELECT DISTINCT device FROM window_states").length;
+   * }
+   * ```
+   */
+  public readAll(statement: string, ...values: SQLInputValue[]): Record<string, SQLOutputValue>[];
+
+  /**
+   * Runs a statement that changes the database.
+   *
+   * @param statement The SQL statement, with `?` placeholders.
+   * @param values The placeholders' values, in order.
+   * @returns How many rows changed and the last inserted row id.
+   * @throws Error synchronously when the statement fails or the database is closed.
+   * @example
+   * ```ts
+   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function forget(database: ShellDatabase): number {
+   *   return Number(database.run("DELETE FROM window_states WHERE device = ?", "device-1").changes);
+   * }
+   * ```
+   */
+  public run(statement: string, ...values: SQLInputValue[]): StatementResultingChanges;
+
+  /**
+   * Runs an action in one transaction: it commits when the action returns and rolls back when it throws. The action
+   * must finish synchronously; an action that returns a promise does not compile, and one that returns a thenable at
+   * run time is rolled back and refused, because an awaited step would run after the commit.
+   *
+   * @param action The work; it may read and change the database.
+   * @returns What the action returned.
+   * @throws {ArgumentException} When the action returned a thenable; nothing was committed.
+   * @throws Error synchronously as the action threw it, after rolling back.
+   * @example
+   * ```ts
+   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function moveDevice(database: ShellDatabase, from: string, to: string): number {
+   *   return database.transaction(() => Number(database.run("UPDATE window_states SET device = ? WHERE device = ?", to, from).changes));
+   * }
+   * ```
+   * @example
+   * ```ts
+   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function refuseAsync(database: ShellDatabase): void {
+   *   // @ts-expect-error
+   *   database.transaction(async () => 1);
+   * }
+   * ```
+   */
+  public transaction<T>(action: () => T & ([T] extends [PromiseLike<unknown>] ? never : unknown)): T;
+
+  /**
+   * Closes the database; closing again does nothing.
+   *
+   * @example
+   * ```ts
+   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function closeDatabase(database: ShellDatabase): void {
+   *   database.close();
+   * }
+   * ```
+   */
+  public close(): void;
+
+  /**
+   * Closes the database.
+   */
+  public [Symbol.dispose](): void;
+
+  /**
+   * Opens a database file and applies its pending migrations, each with its history row in one transaction. The
+   * history must be a prefix of the given migrations. Before changing a database that already has migrations, it
+   * publishes a verified backup named `<backupOwner>-before-migration-<position>-<time>.sqlite`.
+   *
+   * @param file The database file.
+   * @param name The database's name in messages, such as `shell database`.
+   * @param migrations Every migration its owner knows, in order.
+   * @param backupsFolder The folder for backups.
+   * @param backupOwner The backup names' prefix: `shell` or the module's id.
+   * @param moment The time that names a backup.
+   * @returns A promise of the open connection and the applied migrations' ids.
+   * @throws {UnknownSchemaException} The promise rejects when the schema is not one the migrations recognize.
+   * @throws {BackupVerificationException} The promise rejects when the backup fails verification; no migration has run.
+   * @throws {MigrationException} The promise rejects when a migration fails; earlier migrations stay applied.
+   */
+  protected static migrateAsync(
+    file: string,
+    name: string,
+    migrations: readonly Migration[],
+    backupsFolder: string,
+    backupOwner: string,
+    moment: Date): Promise<[DatabaseSync, readonly string[]]>;
+}
+
+/**
+ * The shell's own database, `shell.sqlite`, which serves the shell's facilities.
+ */
+export declare class ShellDatabase extends MigratedDatabase {
   /**
    * Opens the shell database of an owned data directory and applies the
    * pending migrations, each with its history row in one transaction. Before
@@ -739,60 +913,37 @@ export declare class ShellDatabase implements Disposable {
    * ```
    */
   public static openAsync(lock: OwnershipLock, migrations: readonly Migration[], moment?: Date): Promise<ShellDatabase>;
+}
 
+/**
+ * A module's own database, `modules/<id>/<id>.sqlite` in the data directory. The runtime opens and migrates it before
+ * the module's runtime part activates and closes it when the part deactivates; the part reaches it only through its
+ * context, as an {@link IModuleDatabase}.
+ */
+export declare class ModuleDatabase extends MigratedDatabase implements IModuleDatabase {
   /**
-   * Runs a query of the shell's own facilities and returns its first row.
+   * Opens a module's database, creating its folder and file when missing, and applies its pending migrations as
+   * {@link ShellDatabase.openAsync} does; a backup is named after the module.
    *
-   * @param statement The SQL statement, with `?` placeholders.
-   * @param values The placeholders' values, in order.
-   * @returns The first row, or `undefined` when there is none.
-   * @throws Error synchronously when the statement fails or the database is closed.
+   * @param directory The owned data directory.
+   * @param moduleId The module's id.
+   * @param migrations Every migration the module's runtime part declares, in order.
+   * @param moment The time that names a backup; now by default.
+   * @returns A promise of the open database.
+   * @throws {ArgumentException} When the id is not a module id.
+   * @throws {UnknownSchemaException} The promise rejects when the schema is not one the migrations recognize.
+   * @throws {BackupVerificationException} The promise rejects when the backup fails verification; no migration has run.
+   * @throws {MigrationException} The promise rejects when a migration fails; earlier migrations stay applied.
    * @example
    * ```ts
-   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   * import { Migration, ModuleDatabase, type DataDirectory } from "@noldova/teamrun-shell-runtime";
    *
-   * export function readBounds(database: ShellDatabase): unknown {
-   *   return database.read("SELECT bounds AS value FROM window_states WHERE device = ? AND window = ?", "device-1", "main")?.["value"];
+   * export async function openNotesAsync(directory: DataDirectory): Promise<ModuleDatabase> {
+   *   return ModuleDatabase.openAsync(directory, "notes", [new Migration("create-notes", ["CREATE TABLE notes (id TEXT PRIMARY KEY) STRICT"])]);
    * }
    * ```
    */
-  public read(statement: string, ...values: SQLInputValue[]): Record<string, SQLOutputValue> | undefined;
-
-  /**
-   * Runs a statement that changes the shell's own facilities.
-   *
-   * @param statement The SQL statement, with `?` placeholders.
-   * @param values The placeholders' values, in order.
-   * @throws Error synchronously when the statement fails or the database is closed.
-   * @example
-   * ```ts
-   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
-   *
-   * export function forget(database: ShellDatabase): void {
-   *   database.run("DELETE FROM window_states WHERE device = ?", "device-1");
-   * }
-   * ```
-   */
-  public run(statement: string, ...values: SQLInputValue[]): void;
-
-  /**
-   * Closes the database; closing again does nothing.
-   *
-   * @example
-   * ```ts
-   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
-   *
-   * export function closeDatabase(database: ShellDatabase): void {
-   *   database.close();
-   * }
-   * ```
-   */
-  public close(): void;
-
-  /**
-   * Closes the database.
-   */
-  public [Symbol.dispose](): void;
+  public static openAsync(directory: DataDirectory, moduleId: string, migrations: readonly Migration[], moment?: Date): Promise<ModuleDatabase>;
 }
 
 /**
@@ -1425,9 +1576,19 @@ export interface IMethodHandler {
 
 /**
  * A module's runtime part. A module's runtime package exports it as the class
- * `RuntimePart`, which the runtime constructs without arguments.
+ * `RuntimePart`, which the runtime constructs without arguments. Its
+ * constructor only sets fields: the runtime constructs it before migrating the
+ * module's database, so work belongs in {@link IRuntimePart.activateAsync}.
  */
 export interface IRuntimePart {
+  /**
+   * The migrations of the module's database, in order: a fixed list the part
+   * declares, never computed from data. The runtime applies the pending ones
+   * before activating the part and gives the part the open database through its
+   * context. A part without migrations has no database.
+   */
+  readonly migrations?: readonly Migration[];
+
   /**
    * Activates the part once, after the modules it depends on: it registers its
    * methods and events, publishes its services and keeps heavy work for later.
@@ -1469,6 +1630,89 @@ export interface IRuntimePart {
 }
 
 /**
+ * A module's own database as its runtime part uses it: queries, changes and
+ * transactions. The runtime owns its lifetime.
+ */
+export interface IModuleDatabase {
+  /**
+   * Runs a query and returns its first row.
+   *
+   * @param statement The SQL statement, with `?` placeholders.
+   * @param values The placeholders' values, in order.
+   * @returns The first row, or `undefined` when there is none.
+   * @throws Error synchronously when the statement fails.
+   * @example
+   * ```ts
+   * import type { IModuleDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readTitle(database: IModuleDatabase, id: string): unknown {
+   *   return database.read("SELECT title FROM notes WHERE id = ?", id)?.["title"];
+   * }
+   * ```
+   */
+  read(statement: string, ...values: SQLInputValue[]): Record<string, SQLOutputValue> | undefined;
+
+  /**
+   * Runs a query and returns all its rows.
+   *
+   * @param statement The SQL statement, with `?` placeholders.
+   * @param values The placeholders' values, in order.
+   * @returns The rows, in the query's order.
+   * @throws Error synchronously when the statement fails.
+   * @example
+   * ```ts
+   * import type { IModuleDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function countNotes(database: IModuleDatabase): number {
+   *   return database.readAll("SELECT id FROM notes").length;
+   * }
+   * ```
+   */
+  readAll(statement: string, ...values: SQLInputValue[]): Record<string, SQLOutputValue>[];
+
+  /**
+   * Runs a statement that changes the database.
+   *
+   * @param statement The SQL statement, with `?` placeholders.
+   * @param values The placeholders' values, in order.
+   * @returns How many rows changed and the last inserted row id.
+   * @throws Error synchronously when the statement fails.
+   * @example
+   * ```ts
+   * import type { IModuleDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function addNote(database: IModuleDatabase, id: string): void {
+   *   database.run("INSERT INTO notes (id) VALUES (?)", id);
+   * }
+   * ```
+   */
+  run(statement: string, ...values: SQLInputValue[]): StatementResultingChanges;
+
+  /**
+   * Runs an action in one transaction, as {@link MigratedDatabase.transaction}
+   * does: the action finishes synchronously, and one that returns a promise
+   * does not compile.
+   *
+   * @param action The work.
+   * @returns What the action returned.
+   * @throws {ArgumentException} When the action returned a thenable; nothing was committed.
+   * @throws Error synchronously as the action threw it, after rolling back.
+   * @example
+   * ```ts
+   * import type { IModuleDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function renameNote(database: IModuleDatabase, from: string, to: string): void {
+   *   database.transaction(() => {
+   *     database.run("INSERT INTO notes (id) VALUES (?)", to);
+   *     database.run("DELETE FROM notes WHERE id = ?", from);
+   *   });
+   * }
+   * ```
+   */
+  transaction<T>(action: () => T & ([T] extends [PromiseLike<unknown>] ? never : unknown)): T;
+}
+
+/**
  * What a module's runtime part may register and use. The runtime withdraws
  * everything registered through it when the part deactivates or fails to
  * activate.
@@ -1484,6 +1728,16 @@ export interface IRuntimePartContext {
    * database and files; the module creates it when it needs it.
    */
   readonly moduleFolder: string;
+
+  /**
+   * The module's own database, migrated and open. Its calls are synchronous
+   * and every client shares one runtime, so queries stay short and long work
+   * happens outside a database call. The runtime closes it when the part
+   * deactivates.
+   *
+   * @throws {ModuleDatabaseException} When the part declares no migrations.
+   */
+  readonly database: IModuleDatabase;
 
   /**
    * Registers a handler for one of the methods the module's declaration
@@ -2969,6 +3223,7 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * @param methods The registry its methods join.
    * @param events The registry its events join.
    * @param services The registry its services join.
+   * @param database The module's open database, when its runtime part declares migrations.
    * @example
    * ```ts
    * import { DataDirectory, EventRegistry, MethodRegistry, ModuleContext, ModuleDeclaration, ServiceRegistry } from "@noldova/teamrun-shell-runtime";
@@ -2979,12 +3234,25 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * }
    * ```
    */
-  public constructor(declaration: ModuleDeclaration, dataDirectory: DataDirectory, methods: MethodRegistry, events: EventRegistry, services: ServiceRegistry);
+  public constructor(
+    declaration: ModuleDeclaration,
+    dataDirectory: DataDirectory,
+    methods: MethodRegistry,
+    events: EventRegistry,
+    services: ServiceRegistry,
+    database?: IModuleDatabase);
 
   /**
    * The module's id.
    */
   public get moduleId(): string;
+
+  /**
+   * The module's own database.
+   *
+   * @throws {ModuleDatabaseException} When the module's runtime part declares no migrations.
+   */
+  public get database(): IModuleDatabase;
 
   /**
    * See {@link IRuntimePartContext.registerMethod}.

@@ -8,6 +8,12 @@
 
 export class Resources {
   public static readonly timeMethod: string = "clock.time";
+  public static readonly recordMethod: string = "clock.record";
+  public static readonly readingsMigration: string = "create-readings";
+  public static readonly createReadingsStatement: string = "CREATE TABLE readings (time TEXT NOT NULL) STRICT";
+  public static readonly insertReadingStatement: string = "INSERT INTO readings (time) VALUES (?)";
+  public static readonly countReadingsStatement: string = "SELECT count(*) AS count FROM readings";
+  public static readonly countColumn: string = "count";
   public static readonly failureMarker: string = "fail-activation";
   public static readonly failureMessage: string = "The clock fixture was asked to fail its activation.";
 }

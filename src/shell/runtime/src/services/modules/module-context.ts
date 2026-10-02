@@ -9,9 +9,11 @@
 import "@noldova/teamrun-foundation-core";
 import { QualifiedName } from "@noldova/teamrun-shell-protocol";
 
+import { ModuleDatabaseException } from "../../exceptions/module-database.exception.js";
 import { RegistrationException } from "../../exceptions/registration.exception.js";
 import { ServiceAccessException } from "../../exceptions/service-access.exception.js";
 import type { IMethodHandler } from "../../interfaces/method-handler.js";
+import type { IModuleDatabase } from "../../interfaces/module-database.js";
 import type { IRuntimePartContext } from "../../interfaces/runtime-part-context.js";
 import type { EventChannel } from "../../models/event-channel.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
@@ -27,11 +29,20 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
   private readonly events: EventRegistry;
   private readonly services: ServiceRegistry;
   private readonly registrations: Disposable[] = [];
+  private readonly moduleDatabase?: IModuleDatabase;
 
   public readonly moduleFolder: string;
 
-  public constructor(declaration: ModuleDeclaration, dataDirectory: DataDirectory, methods: MethodRegistry, events: EventRegistry, services: ServiceRegistry) {
+  public constructor(
+    declaration: ModuleDeclaration,
+    dataDirectory: DataDirectory,
+    methods: MethodRegistry,
+    events: EventRegistry,
+    services: ServiceRegistry,
+    database?: IModuleDatabase) {
     this.declaration = declaration;
+    if (!Object.isUndefined(database))
+      this.moduleDatabase = database;
     this.methods = methods;
     this.events = events;
     this.services = services;
@@ -40,6 +51,12 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
 
   public get moduleId(): string {
     return this.declaration.id;
+  }
+
+  public get database(): IModuleDatabase {
+    if (Object.isUndefined(this.moduleDatabase))
+      throw new ModuleDatabaseException(Resources.formatNoModuleDatabase(this.declaration.id));
+    return this.moduleDatabase;
   }
 
   public registerMethod(name: string, handler: IMethodHandler): void {

@@ -8,10 +8,12 @@
 
 import type { EventChannel } from "../models/event-channel.js";
 import type { IMethodHandler } from "./method-handler.js";
+import type { IModuleDatabase } from "./module-database.js";
 
 export interface IRuntimePartContext {
   readonly moduleId: string;
   readonly moduleFolder: string;
+  readonly database: IModuleDatabase;
 
   registerMethod(name: string, handler: IMethodHandler): void;
 

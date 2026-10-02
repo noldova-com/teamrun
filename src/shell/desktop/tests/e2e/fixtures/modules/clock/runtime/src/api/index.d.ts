@@ -6,9 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { IRuntimePart, IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+import type { IRuntimePart, IRuntimePartContext, Migration } from "@noldova/teamrun-shell-runtime";
 
 export declare class RuntimePart implements IRuntimePart {
+  public readonly migrations: readonly Migration[];
+
   public activateAsync(context: IRuntimePartContext): Promise<void>;
 
   public deactivateAsync(): Promise<void>;
