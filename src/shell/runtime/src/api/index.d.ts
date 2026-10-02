@@ -16,11 +16,12 @@ import type { BuildIdentity, Event, Failure, ModuleStatusList, PreShellData, Qua
 
 /**
  * What a data directory holds, judged from its top-level entries other than the
- * runtime's own ownership database and discovery folder.
+ * shell's own: the ownership database and the discovery, backups, desktop,
+ * modules, work and logs folders.
  */
 export declare enum DataDirectoryState {
   /**
-   * The directory is missing or holds nothing but the runtime's own entries.
+   * The directory is missing or holds nothing but the shell's own entries.
    */
   Empty = "Empty",
 
@@ -544,8 +545,7 @@ export declare class DataDirectory {
   public get discoveryFile(): string;
 
   /**
-   * The path of the desktop's Electron profile folder, `desktop`. Like the ownership database and the discovery
-   * folder, it is the shell's own and never counts as data from before the shell.
+   * The path of the desktop's Electron profile folder, `desktop`.
    */
   public get profileFolder(): string;
 
@@ -558,6 +558,16 @@ export declare class DataDirectory {
    * The path of the folder that holds every module's folder, `modules`.
    */
   public get modulesFolder(): string;
+
+  /**
+   * The path of the folder for work outside any project, `work`.
+   */
+  public get workFolder(): string;
+
+  /**
+   * The path of the logs folder, `logs`.
+   */
+  public get logsFolder(): string;
 
   /**
    * Returns the path of a module's folder, `modules/<id>`.
@@ -582,8 +592,8 @@ export declare class DataDirectory {
  */
 export declare class DataDirectoryInspector {
   /**
-   * Inspects the directory's top-level entries, ignoring the runtime's
-   * ownership database and discovery folder.
+   * Inspects the directory's top-level entries, ignoring the shell's own
+   * entries.
    *
    * @param dataDirectory The directory to inspect; it need not exist.
    * @returns A promise of the directory's state and entries.

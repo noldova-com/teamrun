@@ -32,13 +32,19 @@ export class Resources {
   public static readonly discoveryFileName: string = "runtime.json";
   public static readonly backupsFolderName: string = "backups";
   public static readonly profileFolderName: string = "desktop";
+  public static readonly modulesFolderName: string = "modules";
+  public static readonly workFolderName: string = "work";
+  public static readonly logsFolderName: string = "logs";
   public static readonly runtimeEntries: readonly string[] = [
     Resources.ownershipDatabaseFileName,
     `${Resources.ownershipDatabaseFileName}-journal`,
     Resources.discoveryFolderName,
-    Resources.profileFolderName
+    Resources.backupsFolderName,
+    Resources.profileFolderName,
+    Resources.modulesFolderName,
+    Resources.workFolderName,
+    Resources.logsFolderName
   ];
-  public static readonly modulesFolderName: string = "modules";
   public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   public static readonly migrationIdPattern: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
   public static readonly reservedModuleId: string = "shell";

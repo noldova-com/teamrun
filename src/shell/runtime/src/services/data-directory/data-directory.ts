@@ -51,6 +51,14 @@ export class DataDirectory {
     return path.join(this.root, Resources.modulesFolderName);
   }
 
+  public get workFolder(): string {
+    return path.join(this.root, Resources.workFolderName);
+  }
+
+  public get logsFolder(): string {
+    return path.join(this.root, Resources.logsFolderName);
+  }
+
   public locateModuleFolder(id: string): string {
     if (!Resources.moduleIdPattern.test(id) || id === Resources.reservedModuleId)
       throw new ArgumentException(Resources.moduleIdInvalid, Resources.idParameterName);
