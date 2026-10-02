@@ -9,11 +9,11 @@
 import { SystemCommand } from "@noldova/teamrun-shell-runtime";
 
 export class SystemCommandFixture extends SystemCommand {
-  private readonly outputs: (string | Error)[];
+  private readonly outputs: (string | Error | ((commandArguments: readonly string[]) => Promise<string>))[];
 
   public readonly calls: (readonly string[])[] = [];
 
-  public constructor(outputs: readonly (string | Error)[]) {
+  public constructor(outputs: readonly (string | Error | ((commandArguments: readonly string[]) => Promise<string>))[]) {
     super();
 
     this.outputs = [...outputs];
@@ -24,6 +24,6 @@ export class SystemCommandFixture extends SystemCommand {
     const output = this.outputs.shift() ?? "";
     if (output instanceof Error)
       throw output;
-    return output;
+    return typeof output === "function" ? await output(commandArguments) : output;
   }
 }

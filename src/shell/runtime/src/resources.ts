@@ -77,6 +77,14 @@ export class Resources {
   public static readonly accessCommandName: string = "icacls.exe";
   public static readonly removeInheritanceArgument: string = "/inheritance:r";
   public static readonly replaceGrantArgument: string = "/grant:r";
+  public static readonly resetAccessArgument: string = "/reset";
+  public static readonly saveAccessArgument: string = "/save";
+  public static readonly accessFileName: string = "access.sddl";
+  public static readonly accessFileEncoding: BufferEncoding = "utf16le";
+  public static readonly accessEntryPattern: RegExp = /\((?:[^;()]*;){5}([^;()]+)[^()]*\)/g;
+  public static readonly protectedAccessPattern: RegExp = /\bD:[A-Z]*P/;
+  public static readonly administratorSuffix: string = "-500";
+  public static readonly administratorAlias: string = "LA";
   public static readonly securityIdentifierPattern: RegExp = /"(S-1-[0-9-]+)"\s*$/;
   public static readonly commandTimeoutMilliseconds: number = 30_000;
   public static readonly commandOutputLimit: number = 1024 * 1024;
@@ -114,6 +122,10 @@ export class Resources {
 
   public static formatAccessGrant(securityIdentifier: string): string {
     return `*${securityIdentifier}:(OI)(CI)F`;
+  }
+
+  public static formatFolderNotPrivate(folder: string, access: string): string {
+    return `The folder ${folder} is still open to others: ${access}`;
   }
 
   public static formatCommandFailed(command: string, output: string): string {

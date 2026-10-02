@@ -883,12 +883,15 @@ export declare class WindowsFolderProtector implements IFolderProtector {
 
   /**
    * Reads the current user's security identifier and replaces the folder's
-   * permissions with full control for that user alone.
+   * permissions with full control for that user alone: it resets the folder
+   * to the permissions it inherits, which drops every explicit entry, stops
+   * inheriting, grants the user full control and reads the result back.
    *
    * @param folder The absolute path of an existing folder.
-   * @returns A promise that resolves once the permissions are replaced.
+   * @returns A promise that resolves once only the current user has access.
    * @throws {SystemCommandException} The promise rejects when `SystemRoot` is
-   * not set, a tool fails or the identifier cannot be read.
+   * not set, a tool fails, the identifier cannot be read or the folder is
+   * still open to anyone else afterwards.
    * @example
    * ```ts
    * import type { WindowsFolderProtector } from "@noldova/teamrun-shell-runtime";

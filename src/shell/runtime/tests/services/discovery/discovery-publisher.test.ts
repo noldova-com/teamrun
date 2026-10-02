@@ -23,6 +23,8 @@ import {
   SystemCommand
 } from "@noldova/teamrun-shell-runtime";
 
+import { AccessControlFixture } from "../../fixtures/access-control.fixture.js";
+import { AccessRecordingProtectorFixture } from "../../fixtures/access-recording-protector.fixture.js";
 import { FolderProtectorFixture } from "../../fixtures/folder-protector.fixture.js";
 import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
 
@@ -80,13 +82,14 @@ export class DiscoveryPublisherTests {
   public async leavesTheDiscoveryReadableByTheCurrentUserAlone(): Promise<void> {
     await using folder = await TemporaryFolderFixture.createAsync();
     using lock = OwnershipLock.acquire(new DataDirectory(folder.path));
-    const protector = FolderProtectorFactory.create(process.platform, new SystemCommand(), process.env);
+    const protector = new AccessRecordingProtectorFixture(FolderProtectorFactory.create(process.platform, new SystemCommand(), process.env));
 
     const file = await new DiscoveryPublisher(lock, protector).publishAsync(DiscoveryPublisherTests.DISCOVERY);
 
     if (process.platform === "win32") {
-      DiscoveryPublisherTests.assertOwnerOnlyAccess(lock.dataDirectory.discoveryFolder, "(OI)(CI)(F)");
-      DiscoveryPublisherTests.assertOwnerOnlyAccess(file, "(I)(F)");
+      const access = `before: ${protector.before}; after: ${AccessControlFixture.readSddl(lock.dataDirectory.discoveryFolder)}`;
+      DiscoveryPublisherTests.assertOwnerOnlyAccess(lock.dataDirectory.discoveryFolder, "(OI)(CI)(F)", access);
+      DiscoveryPublisherTests.assertOwnerOnlyAccess(file, "(I)(F)", access);
     }
     else {
       Assert.areEqual(0o700, (await stat(lock.dataDirectory.discoveryFolder)).mode & 0o777);
@@ -108,7 +111,7 @@ export class DiscoveryPublisherTests {
     Assert.areEqual("note.txt,runtime.json", (await readdir(lock.dataDirectory.discoveryFolder)).sort().join(","));
   }
 
-  private static assertOwnerOnlyAccess(target: string, rights: string): void {
+  private static assertOwnerOnlyAccess(target: string, rights: string, access: string): void {
     const user = execFileSync(path.join(process.env["SystemRoot"] ?? "", "System32", "whoami.exe"), { encoding: "utf8" }).trim().toLowerCase();
     const entries = execFileSync(path.join(process.env["SystemRoot"] ?? "", "System32", "icacls.exe"), [target], { encoding: "utf8" })
       .replace(target, "")
@@ -116,7 +119,7 @@ export class DiscoveryPublisherTests {
       .map(t => t.trim())
       .filter(t => t.includes(":("));
 
-    Assert.areEqual(1, entries.length, entries.join(" | "));
-    Assert.areEqual(`${user}:${rights}`.toLowerCase(), entries[0]?.toLowerCase());
+    Assert.areEqual(1, entries.length, `${entries.join(" | ")}; ${access}`);
+    Assert.areEqual(`${user}:${rights}`.toLowerCase(), entries[0]?.toLowerCase(), access);
   }
 }

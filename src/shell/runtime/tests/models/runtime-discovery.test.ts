@@ -64,6 +64,7 @@ export class RuntimeDiscoveryTests {
     const cases: readonly (readonly [object, string])[] = [
       [{ ...valid, endpoint: undefined }, "endpoint"],
       [{ ...valid, endpoint: 1 }, "endpoint"],
+      [{ ...valid, token: undefined }, "token"],
       [{ ...valid, token: " " }, "token"],
       [{ ...valid, processId: undefined }, "processId"],
       [{ ...valid, processId: "1" }, "processId"],
