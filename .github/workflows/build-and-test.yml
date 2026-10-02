@@ -93,7 +93,7 @@ jobs:
   validate:
     name: Build and test (${{ matrix.target }})
     needs: changes
-    if: needs.changes.outputs.run-code == 'true'
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}
     strategy:
       fail-fast: false
       matrix:

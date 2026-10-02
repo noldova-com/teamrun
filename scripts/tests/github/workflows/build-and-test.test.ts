@@ -131,7 +131,7 @@ class BuildAndTestTests {
       assert.equal(workflow.readStepScript("Check the documents"), "npm test -- documents\n");
       assert.equal(workflow.readStepScript("Select the verification scope"), "node scripts/classify-changes.ts\n");
       assert.ok(text.indexOf("Check the documents") < text.indexOf("Select the verification scope"));
-      assert.ok(text.includes("    if: needs.changes.outputs.run-code == 'true'\n"));
+      assert.ok(text.includes("    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}\n"));
       for (const target of ["Linux x64", "Linux ARM64", "Windows x64", "Windows ARM64", "macOS x64", "macOS ARM64"])
         assert.ok(text.includes(`          - target: ${target}\n`), target);
       assert.equal(workflow.readStepScript("Install dependencies"), "npm ci --no-audit --no-fund\n");
@@ -177,6 +177,23 @@ class BuildAndTestTests {
       assert.ok(text.includes("    name: Classify changes\n    needs: tested\n" +
         "    if: ${{ !cancelled() && (needs.tested.result == 'skipped' || (needs.tested.result == 'success' && needs.tested.outputs.verified != 'true')) }}\n"));
       assert.ok(text.includes("      verified: ${{ steps.proof.outputs.verified }}\n      run: ${{ steps.proof.outputs.run }}\n"));
+    });
+
+    test("every job that depends on the merge group lookup, directly or through another job, states its own status condition", async () => {
+      const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
+      const jobs = new Map<string, { readonly needs: readonly string[]; readonly condition: string }>();
+      for (const block of text.slice(text.indexOf("\njobs:\n")).split(/\n(?= {2}[a-z-]+:\n)/).slice(1)) {
+        const name = /^ {2}([a-z-]+):\n/.exec(block)?.[1] ?? "";
+        const needs = /^ {4}needs: (?:\[(.+)\]|(.+))$/m.exec(block);
+        jobs.set(name, { needs: (needs?.[1] ?? needs?.[2] ?? "").split(",").map(t => t.trim()).filter(t => t.length > 0), condition: /^ {4}if: (.+)$/m.exec(block)?.[1] ?? "" });
+      }
+      const dependsOnLookup = (name: string): boolean => (jobs.get(name)?.needs ?? []).some(t => t === "tested" || dependsOnLookup(t));
+      const dependents = [...jobs.keys()].filter(dependsOnLookup);
+
+      assert.deepEqual([...jobs.keys()], ["tested", "changes", "validate", "cache-plan", "cache", "caches", "result"]);
+      assert.deepEqual(dependents, ["changes", "validate", "result"]);
+      for (const name of dependents)
+        assert.match(jobs.get(name)?.condition ?? "", /!cancelled\(\)|always\(\)/, name);
     });
 
     test("the lookup cites the first successful merge group run that tested the commit, and finds none on an empty or failed answer", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
