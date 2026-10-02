@@ -20,18 +20,24 @@
 .tr-tab-group-bar {
   display: flex;
   flex-shrink: 0;
-  align-items: center;
   min-height: var(--tr-tab-height);
-  padding-inline-start: var(--tr-space-1);
+  padding-inline: var(--tr-radius-large);
+}
+
+.tr-tab-group-scroller {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  min-width: 0;
+  padding-inline-start: var(--tr-tab-inset);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-padding-inline-start: var(--tr-space-2);
 }
 
 .tr-tab-group-strip {
   display: flex;
-  flex: 1;
-  align-self: stretch;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  flex: 1 0 auto;
 }
 
 .tr-tab-group-strip > tr-tab {
@@ -51,11 +57,17 @@
 }
 
 .tr-tab-group-actions {
+  position: sticky;
+  inset-inline-end: 0;
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: var(--tr-space-1);
   padding-inline: var(--tr-space-1);
+  background-color: var(--tr-panel);
+}
+
+.tr-tab-group-actions-shell {
+  background-color: var(--tr-window);
 }
 
 .tr-tab-group-body {

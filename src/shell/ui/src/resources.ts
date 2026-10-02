@@ -90,6 +90,7 @@ export class Resources {
     "tab-height",
     "tab-pill",
     "tab-inset",
+    "tab-max-width",
     "tab-label-inset",
     "tab-action-allowance",
     "tab-action-slot",

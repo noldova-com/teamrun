@@ -75,7 +75,6 @@ export class Resources {
   public static readonly tabKeyData: string = "tabKey";
   public static readonly tabCloseSelector: string = ".tr-tab-close";
   public static readonly selectedTabSelector: string = ".tr-tab-selected";
-  public static readonly tabStripSelector: string = ".tr-tab-group-strip";
   public static readonly revealOptions: ScrollIntoViewOptions = { block: "nearest", inline: "nearest" };
   public static readonly arrowLeftKey: string = "ArrowLeft";
   public static readonly arrowRightKey: string = "ArrowRight";

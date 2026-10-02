@@ -143,6 +143,7 @@ export class DefaultTheme {
       ["tab-height", "2rem"],
       ["tab-pill", "1.5rem"],
       ["tab-inset", "0.125rem"],
+      ["tab-max-width", "16rem"],
       ["tab-label-inset", "0.5rem"],
       ["tab-action-allowance", "1.75rem"],
       ["tab-action-slot", "1.5rem"],

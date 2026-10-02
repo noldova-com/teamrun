@@ -145,6 +145,7 @@ export class FixtureTheme {
     ["tab-height", "2.25rem"],
     ["tab-pill", "1.75rem"],
     ["tab-inset", "0.25rem"],
+    ["tab-max-width", "18rem"],
     ["tab-label-inset", "0.625rem"],
     ["tab-action-allowance", "2rem"],
     ["tab-action-slot", "1.625rem"],

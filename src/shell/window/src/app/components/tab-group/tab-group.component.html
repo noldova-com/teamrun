@@ -8,6 +8,7 @@ LICENSE file in the root directory of this source tree.
 
 <tr-panel-card class="tr-tab-group-card" [surface]="surface()" [attr.data-drop-group]="group().id">
   <div class="tr-tab-group-bar">
+    <div #scroller class="tr-tab-group-scroller" (wheel)="scrollAcross($event, scroller)">
     <div class="tr-tab-group-strip" role="tablist" data-drop-tabs (keydown)="onStripKey($event)">
       @for (tab of group().tabs; track tab.key; let index = $index) {
         @let label = labels.of(tab);
@@ -19,7 +20,7 @@ LICENSE file in the root directory of this source tree.
       }
       <span class="tr-tab-group-end" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, group().tabs.length)"></span>
     </div>
-    <div class="tr-tab-group-actions">
+    <div #actions class="tr-tab-group-actions" [class.tr-tab-group-actions-shell]="isShell()">
       @if (isOverflowing()) {
         <button type="button" tr-icon-button class="tr-tab-group-overflow" [icon]="resources.overflowGlyph" [label]="resources.overflowLabel"
           [matMenuTriggerFor]="overflow" [matMenuTriggerRestoreFocus]="false"></button>
@@ -38,6 +39,7 @@ LICENSE file in the root directory of this source tree.
         <button type="button" tr-icon-button class="tr-tab-group-hide" [icon]="resources.hideDockGlyphs[side]" [label]="resources.hideDockLabels[side]"
           (click)="layout.toggleDock(side)"></button>
       }
+    </div>
     </div>
   </div>
   <div class="tr-tab-group-body" role="tabpanel">
