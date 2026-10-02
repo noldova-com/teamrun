@@ -1,13 +1,23 @@
-@for (frame of geometry().frames; track frame.group.id) {
-  <tr-panel-card
-    class="tr-workspace-group"
-    [surface]="surfaceOf(frame)"
-    [style.left.rem]="frame.bounds.x"
-    [style.top.rem]="frame.bounds.y"
-    [style.width.rem]="frame.bounds.width"
-    [style.height.rem]="frame.bounds.height">
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@let geometry = layout.geometry();
+@for (side of sides; track side) {
+  <tr-dock [side]="side" />
+}
+@for (frame of geometry.frames; track frame.group.id) {
+  <tr-tab-group [frame]="frame">
     @if (isEmptyDocuments(frame)) {
       <tr-empty-window />
     }
-  </tr-panel-card>
+  </tr-tab-group>
 }
+@for (handle of geometry.handles; track handle.split.id + "/" + handle.index) {
+  <tr-split-sash [handle]="handle" />
+}
+<tr-docking-guides />

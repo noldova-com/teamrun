@@ -165,6 +165,7 @@ export class Resources {
   public static readonly documentField: string = "document";
   public static readonly instanceField: string = "instance";
   public static readonly keySeparator: string = "/";
+  public static readonly contributionSeparator: string = ".";
   public static readonly invalidContributionName: string = "A contribution name has the form <module id>.<name>.";
   public static readonly invalidInstance: string = "An instance is a string that is not blank.";
   public static readonly invalidBounds: string = "Bounds need finite coordinates and a width and height that are not negative.";
@@ -198,6 +199,14 @@ export class Resources {
 
   public static formatUnsupportedVersion(version: number): string {
     return `Layout format version ${version} is not supported; this build reads version ${Resources.layoutFormatVersion}.`;
+  }
+
+  public static formatForeignDocument(moduleId: string, name: string): string {
+    return `The module "${moduleId}" can open only its own documents, not "${name}".`;
+  }
+
+  public static formatUnregisteredDocument(name: string): string {
+    return `No document named "${name}" is registered.`;
   }
 
   public static formatDraggedTab(label: string): string {

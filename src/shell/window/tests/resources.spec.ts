@@ -13,6 +13,8 @@ describe("Resources", () => {
     expect(Resources.formatUnregisteredView("files.tree")).toBe("No view named \"files.tree\" is registered.");
     expect(Resources.formatUnsupportedVersion(2)).toBe("Layout format version 2 is not supported; this build reads version 1.");
     expect(Resources.formatDraggedTab("Files")).toBe("Moving Files");
+    expect(Resources.formatForeignDocument("notes", "clock.face")).toBe("The module \"notes\" can open only its own documents, not \"clock.face\".");
+    expect(Resources.formatUnregisteredDocument("notes.page")).toBe("No document named \"notes.page\" is registered.");
   });
 
   it("accepts contribution names of the form <module id>.<name> only", () => {
