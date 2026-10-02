@@ -153,6 +153,13 @@ export declare class ProtocolException extends Exception {
    * @param code Why the protocol was broken.
    * @param message A sentence describing the failure.
    * @param options The preceding failure, if any.
+   *
+   * @example
+   * ```ts
+   * import { FailureCode, ProtocolException } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const failure: ProtocolException = new ProtocolException(FailureCode.FrameTooLarge, "A frame exceeds the maximum length.");
+   * ```
    */
   public constructor(code: FailureCode, message: string, options?: ExceptionOptions);
 }
@@ -193,6 +200,13 @@ export declare class QualifiedName {
    * default.
    * @throws ArgumentException synchronously when the owner or member is not
    * valid.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const capture: QualifiedName = new QualifiedName("checkpoints", "capture");
+   * ```
    */
   public constructor(owner: string, member: string, parameterName?: string);
 
@@ -205,6 +219,15 @@ export declare class QualifiedName {
    * @returns The name.
    * @throws ArgumentException synchronously when the text has no dot or its
    * owner or member is not valid, including a member with another dot.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function readMethod(text: string): QualifiedName {
+   *   return QualifiedName.parse(text, "method");
+   * }
+   * ```
    */
   public static parse(text: string, parameterName?: string): QualifiedName;
 
@@ -213,6 +236,13 @@ export declare class QualifiedName {
    *
    * @param other The other name.
    * @returns True when both have the same text.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const isStop: boolean = QualifiedName.parse("shell.stop").equals(new QualifiedName("shell", "stop"));
+   * ```
    */
   public equals(other: QualifiedName): boolean;
 
@@ -220,6 +250,13 @@ export declare class QualifiedName {
    * Returns the full name.
    *
    * @returns `owner.member`.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const text: string = QualifiedName.parse("checkpoints.capture").toString();
+   * ```
    */
   public toString(): string;
 }
@@ -261,6 +298,13 @@ export declare class BuildIdentity {
    * fingerprint is empty or whitespace only.
    * @throws ArgumentOutOfRangeException synchronously when the protocol
    * version is not a positive integer.
+   *
+   * @example
+   * ```ts
+   * import { BuildIdentity } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const identity: BuildIdentity = new BuildIdentity("0.0.1", BuildIdentity.supportedProtocolVersion, "9f2c41");
+   * ```
    */
   public constructor(productVersion: string, protocolVersion: number, fingerprint: string);
 
@@ -272,6 +316,13 @@ export declare class BuildIdentity {
    * @returns The protocol version.
    * @throws ArgumentException synchronously when the text is not a positive
    * integer, such as an unstamped placeholder.
+   *
+   * @example
+   * ```ts
+   * import { BuildIdentity } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const version: number = BuildIdentity.parseProtocolVersion("1");
+   * ```
    */
   public static parseProtocolVersion(text: string): number;
 
@@ -284,6 +335,13 @@ export declare class BuildIdentity {
    * @throws JsonException synchronously when a field is unknown, missing, has
    * the wrong type or breaks the constructor's rules; its path names the
    * field.
+   *
+   * @example
+   * ```ts
+   * import { BuildIdentity } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const identity: BuildIdentity = BuildIdentity.fromJson({ productVersion: "0.0.1", protocolVersion: 1, fingerprint: "9f2c41" });
+   * ```
    */
   public static fromJson(value: unknown, path?: string): BuildIdentity;
 
@@ -294,6 +352,16 @@ export declare class BuildIdentity {
    * @returns `UnsupportedVersion` when the protocol versions differ,
    * `BuildMismatch` when the fingerprints or product versions differ, and
    * `null` when the client is served.
+   *
+   * @example
+   * ```ts
+   * import { type BuildIdentity, FailureCode } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function canServe(runtime: BuildIdentity, client: BuildIdentity): boolean {
+   *   const mismatch: FailureCode | null = runtime.findMismatch(client);
+   *   return mismatch === null;
+   * }
+   * ```
    */
   public findMismatch(other: BuildIdentity): FailureCode | null;
 
@@ -302,6 +370,14 @@ export declare class BuildIdentity {
    *
    * @returns The `productVersion`, `protocolVersion` and `fingerprint`
    * fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { BuildIdentity } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new BuildIdentity("0.0.1", 1, "9f2c41").toJson();
+   * ```
    */
   public toJson(): JsonObject;
 }
@@ -336,6 +412,13 @@ export declare class Failure {
    * defines none.
    * @throws ArgumentException synchronously when the message is empty or
    * whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { Failure, FailureCode } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const failure: Failure = new Failure(FailureCode.NotFound, "The conversation does not exist.");
+   * ```
    */
   public constructor(code: FailureCode, message: string, details?: JsonObject);
 
@@ -348,6 +431,13 @@ export declare class Failure {
    * @throws JsonException synchronously when the code is unknown, the
    * message is missing or blank, or `details` is present but not an object;
    * its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { Failure } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const failure: Failure = Failure.fromJson({ code: "Conflict", message: "Work is running.", details: { descriptions: ["A reply"] } });
+   * ```
    */
   public static fromJson(value: unknown, path?: string): Failure;
 
@@ -356,6 +446,14 @@ export declare class Failure {
    *
    * @returns The `code` and `message` fields, and `details` when the
    * failure has them.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { Failure, FailureCode } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new Failure(FailureCode.Unavailable, "The runtime is shutting down.").toJson();
+   * ```
    */
   public toJson(): JsonObject;
 }
@@ -384,6 +482,13 @@ export declare class RuntimeHandover {
    * @param executablePath The program's full path; not whitespace only.
    * @throws ArgumentException synchronously when the path is empty or
    * whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { BuildIdentity, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const handover: RuntimeHandover = new RuntimeHandover(new BuildIdentity("0.0.2", 1, "7a10be"), "/Applications/TeamRun.app/Contents/MacOS/TeamRun");
+   * ```
    */
   public constructor(identity: BuildIdentity, executablePath: string);
 
@@ -396,6 +501,15 @@ export declare class RuntimeHandover {
    * @throws JsonException synchronously when a field is unknown, missing, has
    * the wrong type or breaks the rules, in the handover or its identity; its
    * path names the field.
+   *
+   * @example
+   * ```ts
+   * import { type Failure, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function readHandover(failure: Failure): RuntimeHandover | undefined {
+   *   return failure.details === undefined ? undefined : RuntimeHandover.fromJson(failure.details, "$.failure.details");
+   * }
+   * ```
    */
   public static fromJson(value: unknown, path?: string): RuntimeHandover;
 
@@ -403,6 +517,14 @@ export declare class RuntimeHandover {
    * Returns the wire form.
    *
    * @returns The `identity` and `executablePath` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { BuildIdentity, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const details: JsonObject = new RuntimeHandover(new BuildIdentity("0.0.2", 1, "7a10be"), "C:\\Program Files\\TeamRun\\TeamRun.exe").toJson();
+   * ```
    */
   public toJson(): JsonObject;
 }
@@ -421,6 +543,13 @@ export declare class StopRequest {
    * Creates the request.
    *
    * @param policy How the runtime treats work in progress.
+   *
+   * @example
+   * ```ts
+   * import { StopPolicy, StopRequest } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const request: StopRequest = new StopRequest(StopPolicy.IfIdle);
+   * ```
    */
   public constructor(policy: StopPolicy);
 
@@ -432,6 +561,13 @@ export declare class StopRequest {
    * @returns The request.
    * @throws JsonException synchronously when the policy is missing or
    * unknown, or another field is present; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { StopRequest } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const request: StopRequest = StopRequest.fromJson({ policy: "StopWork" });
+   * ```
    */
   public static fromJson(value: unknown, path?: string): StopRequest;
 
@@ -439,6 +575,13 @@ export declare class StopRequest {
    * Returns the wire form.
    *
    * @returns The `policy` field.
+   *
+   * @example
+   * ```ts
+   * import { Request, ShellMethods, StopPolicy, StopRequest } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const stop: Request = new Request("r1", ShellMethods.stop, new StopRequest(StopPolicy.IfIdle).toJson());
+   * ```
    */
   public toJson(): JsonObject;
 }
@@ -462,6 +605,13 @@ export declare class RunningWork {
    * list keeps its own copy.
    * @throws ArgumentException synchronously when the list is empty or a
    * description is empty or whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { RunningWork } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const work: RunningWork = new RunningWork(["A reply in Planning", "A command in a terminal"]);
+   * ```
    */
   public constructor(descriptions: readonly string[]);
 
@@ -474,6 +624,13 @@ export declare class RunningWork {
    * @throws JsonException synchronously when `descriptions` is missing, not
    * an array of strings, empty or holds a blank description, or another
    * field is present; its path names the field or item.
+   *
+   * @example
+   * ```ts
+   * import { RunningWork } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const work: RunningWork = RunningWork.fromJson({ descriptions: ["A reply in Planning"] });
+   * ```
    */
   public static fromJson(value: unknown, path?: string): RunningWork;
 
@@ -481,6 +638,13 @@ export declare class RunningWork {
    * Returns the wire form.
    *
    * @returns The `descriptions` field.
+   *
+   * @example
+   * ```ts
+   * import { Failure, FailureCode, RunningWork } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const conflict: Failure = new Failure(FailureCode.Conflict, "Work is in progress.", new RunningWork(["A reply in Planning"]).toJson());
+   * ```
    */
   public toJson(): JsonObject;
 }
@@ -502,6 +666,13 @@ export declare class PreShellData {
    * @param location The data directory's full path; not whitespace only.
    * @throws ArgumentException synchronously when the location is empty or
    * whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { PreShellData } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const data: PreShellData = new PreShellData("/home/person/.noldova/teamrun");
+   * ```
    */
   public constructor(location: string);
 
@@ -513,6 +684,13 @@ export declare class PreShellData {
    * @returns The details.
    * @throws JsonException synchronously when `location` is missing, not a
    * string or blank, or another field is present; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { PreShellData } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const data: PreShellData = PreShellData.fromJson({ location: "/home/person/.noldova/teamrun" });
+   * ```
    */
   public static fromJson(value: unknown, path?: string): PreShellData;
 
@@ -520,6 +698,13 @@ export declare class PreShellData {
    * Returns the wire form.
    *
    * @returns The `location` field.
+   *
+   * @example
+   * ```ts
+   * import { Failure, FailureCode, PreShellData } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const failure: Failure = new Failure(FailureCode.PreShellData, "This data folder holds data of an older TeamRun.", new PreShellData("/home/person/.noldova/teamrun").toJson());
+   * ```
    */
   public toJson(): JsonObject;
 }
@@ -557,6 +742,14 @@ export declare abstract class WireMessage {
    * Returns the wire form.
    *
    * @returns The `kind` field followed by the message's own fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { Cancel } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new Cancel("r1").toJson();
+   * ```
    */
   public toJson(): JsonObject;
 
@@ -564,6 +757,13 @@ export declare abstract class WireMessage {
    * Returns the wire form as JSON text, without line breaks.
    *
    * @returns The JSON text.
+   *
+   * @example
+   * ```ts
+   * import { Cancel } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const text: string = new Cancel("r1").toText();
+   * ```
    */
   public toText(): string;
 
@@ -571,6 +771,20 @@ export declare abstract class WireMessage {
    * Returns the message's own fields, without `kind`.
    *
    * @returns The fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { WireMessage, WireMessageKind } from "@noldova/teamrun-shell-protocol";
+   *
+   * export class Notice extends WireMessage {
+   *   public readonly kind: WireMessageKind = WireMessageKind.Event;
+   *
+   *   protected toJsonFields(): JsonObject {
+   *     return { name: "shell.notice", payload: null };
+   *   }
+   * }
+   * ```
    */
   protected abstract toJsonFields(): JsonObject;
 }
@@ -615,6 +829,15 @@ export declare class Handshake extends WireMessage {
    * @param client The kind of client; not whitespace only.
    * @throws ArgumentException synchronously when the id, token or client is
    * empty or whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { BuildIdentity, Handshake } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function greet(identity: BuildIdentity, token: string): Handshake {
+   *   return new Handshake("h1", identity, token, "cli");
+   * }
+   * ```
    */
   public constructor(id: string, identity: BuildIdentity, token: string, client: string);
 
@@ -627,6 +850,15 @@ export declare class Handshake extends WireMessage {
    * @throws JsonException synchronously when a field is unknown, missing, has
    * the wrong type or breaks the constructor's rules, in the handshake or its
    * identity; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { Handshake } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function readHandshake(value: unknown): Handshake {
+   *   return Handshake.fromJson(value);
+   * }
+   * ```
    */
   public static fromJson(value: unknown, path?: string): Handshake;
 
@@ -634,6 +866,13 @@ export declare class Handshake extends WireMessage {
    * Returns the handshake's own fields.
    *
    * @returns The `id`, `identity`, `token` and `client` fields.
+   *
+   * @example
+   * ```ts
+   * import { BuildIdentity, Handshake } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const text: string = new Handshake("h1", new BuildIdentity("0.0.1", 1, "9f2c41"), "token", "desktop").toText();
+   * ```
    */
   protected override toJsonFields(): JsonObject;
 }
@@ -683,6 +922,13 @@ export declare class Request extends WireMessage {
    * whitespace only.
    * @throws ArgumentOutOfRangeException synchronously when the time limit is
    * not a positive integer.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName, Request } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const capture: Request = new Request("r7", QualifiedName.parse("checkpoints.capture"), { folder: "f1" }, 30_000);
+   * ```
    */
   public constructor(id: string, method: QualifiedName, payload: JsonValue, timeoutMilliseconds?: number);
 
@@ -695,6 +941,13 @@ export declare class Request extends WireMessage {
    * @throws JsonException synchronously when a field is missing, has the
    * wrong type or breaks the constructor's or the name's rules; its path
    * names the field.
+   *
+   * @example
+   * ```ts
+   * import { Request } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const request: Request = Request.fromJson({ id: "r7", method: "checkpoints.capture", payload: null });
+   * ```
    */
   public static fromJson(value: unknown, path?: string): Request;
 
@@ -703,6 +956,13 @@ export declare class Request extends WireMessage {
    *
    * @returns The `id`, `method` and `payload` fields, and
    * `timeoutMilliseconds` when the request has a time limit.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName, Request } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const text: string = new Request("r7", QualifiedName.parse("shell.ping"), null).toText();
+   * ```
    */
   protected override toJsonFields(): JsonObject;
 }
@@ -737,6 +997,8 @@ export declare class Response extends WireMessage {
    */
   public get hasFailed(): boolean;
 
+  private constructor();
+
   /**
    * Creates a successful response.
    *
@@ -745,6 +1007,13 @@ export declare class Response extends WireMessage {
    * @returns The response.
    * @throws ArgumentException synchronously when the id is empty or
    * whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { Response } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const response: Response = Response.success("r7", { captured: true });
+   * ```
    */
   public static success(id: string, payload: JsonValue): Response;
 
@@ -757,6 +1026,13 @@ export declare class Response extends WireMessage {
    * @returns The response.
    * @throws ArgumentException synchronously when the id is empty or
    * whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { Failure, FailureCode, Response } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const response: Response = Response.failure("r7", new Failure(FailureCode.UnknownMethod, "No part registered checkpoints.capture."));
+   * ```
    */
   public static failure(id: string | null, failure: Failure): Response;
 
@@ -769,6 +1045,15 @@ export declare class Response extends WireMessage {
    * @throws JsonException synchronously when it carries neither or both of
    * `payload` and `failure`, or when a field is missing, has the wrong type
    * or breaks the rules; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { Response } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function isSuccessful(value: unknown): boolean {
+   *   return !Response.fromJson(value).hasFailed;
+   * }
+   * ```
    */
   public static fromJson(value: unknown, path?: string): Response;
 
@@ -776,6 +1061,13 @@ export declare class Response extends WireMessage {
    * Returns the response's own fields.
    *
    * @returns The `id` field and either `payload` or `failure`.
+   *
+   * @example
+   * ```ts
+   * import { Response } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const text: string = Response.success("r7", null).toText();
+   * ```
    */
   protected override toJsonFields(): JsonObject;
 }
@@ -805,6 +1097,13 @@ export declare class Event extends WireMessage {
    *
    * @param name The event's name.
    * @param payload The event's data.
+   *
+   * @example
+   * ```ts
+   * import { Event, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const changed: Event = new Event(QualifiedName.parse("checkpoints.captured"), { folder: "f1" });
+   * ```
    */
   public constructor(name: QualifiedName, payload: JsonValue);
 
@@ -816,6 +1115,13 @@ export declare class Event extends WireMessage {
    * @returns The event.
    * @throws JsonException synchronously when a field is missing, has the
    * wrong type or the name breaks its rules; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { Event } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const event: Event = Event.fromJson({ name: "checkpoints.captured", payload: null });
+   * ```
    */
   public static fromJson(value: unknown, path?: string): Event;
 
@@ -823,6 +1129,13 @@ export declare class Event extends WireMessage {
    * Returns the event's own fields.
    *
    * @returns The `name` and `payload` fields.
+   *
+   * @example
+   * ```ts
+   * import { Event, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const text: string = new Event(QualifiedName.parse("shell.changed"), null).toText();
+   * ```
    */
   protected override toJsonFields(): JsonObject;
 }
@@ -849,6 +1162,13 @@ export declare class Cancel extends WireMessage {
    * @param id The id of the request to stop; not whitespace only.
    * @throws ArgumentException synchronously when the id is empty or
    * whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { Cancel } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const cancel: Cancel = new Cancel("r7");
+   * ```
    */
   public constructor(id: string);
 
@@ -860,6 +1180,13 @@ export declare class Cancel extends WireMessage {
    * @returns The cancellation.
    * @throws JsonException synchronously when the id is missing, not a string
    * or blank.
+   *
+   * @example
+   * ```ts
+   * import { Cancel } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const cancel: Cancel = Cancel.fromJson({ id: "r7" });
+   * ```
    */
   public static fromJson(value: unknown, path?: string): Cancel;
 
@@ -867,6 +1194,13 @@ export declare class Cancel extends WireMessage {
    * Returns the cancellation's own fields.
    *
    * @returns The `id` field.
+   *
+   * @example
+   * ```ts
+   * import { Cancel } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const text: string = new Cancel("r7").toText();
+   * ```
    */
   protected override toJsonFields(): JsonObject;
 }
@@ -886,6 +1220,18 @@ export declare class WireContract {
    * is a whole message.
    * @throws JsonException synchronously when the object has another field;
    * its path names the first such field.
+   *
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   * import { WireContract } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function readStrict(value: unknown): JsonReader {
+   *   const reader = JsonReader.fromValue(value);
+   *   WireContract.requireKnownFields(reader, ["name"]);
+   *   return reader;
+   * }
+   * ```
    */
   public static requireKnownFields(reader: JsonReader, fields: readonly string[]): void;
 
@@ -901,6 +1247,17 @@ export declare class WireContract {
    * exception's parameter name, or the reader's path alone when it has
    * none, and the exception is its cause. Any other failure propagates
    * unchanged.
+   *
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   * import { QualifiedName, WireContract } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function readName(value: unknown): QualifiedName {
+   *   const reader = JsonReader.fromValue(value);
+   *   return WireContract.create(reader, () => QualifiedName.parse(reader.readString("name"), "name"));
+   * }
+   * ```
    */
   public static create<T>(reader: JsonReader, factory: () => T): T;
 }
@@ -917,6 +1274,16 @@ export declare class WireDecoder {
    * @throws JsonException synchronously when the text is not JSON, not an
    * object, has an unknown kind or is not a valid message of its kind; its
    * path names the field.
+   *
+   * @example
+   * ```ts
+   * import { WireDecoder, type WireMessage } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function decodeAll(frames: readonly string[]): readonly WireMessage[] {
+   *   const decoder = new WireDecoder();
+   *   return frames.map(t => decoder.decode(t));
+   * }
+   * ```
    */
   public decode(text: string): WireMessage;
 }
@@ -938,6 +1305,13 @@ export declare class FrameReader {
    * positive integer, 16 MiB by default.
    * @throws ArgumentOutOfRangeException synchronously when the maximum is not
    * a positive integer.
+   *
+   * @example
+   * ```ts
+   * import { FrameReader } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const reader: FrameReader = new FrameReader(1024 * 1024);
+   * ```
    */
   public constructor(maximumFrameLength?: number);
 
@@ -949,6 +1323,13 @@ export declare class FrameReader {
    * blank lines are skipped.
    * @throws ProtocolException synchronously with `FrameTooLarge` when a
    * frame, complete or not, exceeds the maximum length.
+   *
+   * @example
+   * ```ts
+   * import { FrameReader } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const frames: string[] = new FrameReader().read("{\"kind\":\"Cancel\",\"id\":\"r1\"}\n{\"kind\"");
+   * ```
    */
   public read(chunk: string): string[];
 }
@@ -965,6 +1346,13 @@ export declare class FrameWriter {
    * positive integer, 16 MiB by default.
    * @throws ArgumentOutOfRangeException synchronously when the maximum is not
    * a positive integer.
+   *
+   * @example
+   * ```ts
+   * import { FrameWriter } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const writer: FrameWriter = new FrameWriter(1024 * 1024);
+   * ```
    */
   public constructor(maximumFrameLength?: number);
 
@@ -975,6 +1363,13 @@ export declare class FrameWriter {
    * @returns The message's JSON text followed by a line break.
    * @throws ProtocolException synchronously with `FrameTooLarge` when the
    * text exceeds the maximum length.
+   *
+   * @example
+   * ```ts
+   * import { Cancel, FrameWriter } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const frame: string = new FrameWriter().write(new Cancel("r7"));
+   * ```
    */
   public write(message: WireMessage): string;
 }
