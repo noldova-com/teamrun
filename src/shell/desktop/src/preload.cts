@@ -38,8 +38,8 @@ contextBridge.exposeInMainWorld("teamrun", {
   readLayout(): Promise<unknown> {
     return ipcRenderer.invoke("teamrun:readLayout");
   },
-  writeLayout(layout: unknown): Promise<boolean> {
-    return ipcRenderer.invoke("teamrun:writeLayout", layout) as Promise<boolean>;
+  writeLayout(layout: unknown): Promise<unknown> {
+    return ipcRenderer.invoke("teamrun:writeLayout", layout);
   },
   request(method: string, payload: unknown): Promise<unknown> {
     return ipcRenderer.invoke("teamrun:request", method, payload);

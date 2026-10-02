@@ -28,7 +28,7 @@ describe("DesktopBridgeService", () => {
     onStartup: (): (() => void) => () => undefined,
     actOnStartup: (): Promise<boolean> => Promise.resolve(true),
     readLayout: (): Promise<unknown> => Promise.resolve(null),
-    writeLayout: (): Promise<boolean> => Promise.resolve(true),
+    writeLayout: (): Promise<unknown> => Promise.resolve({ payload: null }),
     request: (): Promise<unknown> => Promise.resolve(null),
     onEvent: (): (() => void) => () => undefined,
     readBuild: (): Promise<unknown> => Promise.resolve(null),
@@ -119,11 +119,21 @@ describe("DesktopBridgeService", () => {
     const service = TestBed.inject(DesktopBridgeService);
 
     const before = await service.readLayoutAsync();
-    const isKept = await service.writeLayoutAsync({ version: 1 });
+    await service.writeLayoutAsync({ version: 1 });
 
     expect(before).toBeNull();
-    expect(isKept).toBe(true);
     expect(await service.readLayoutAsync()).toEqual({ version: 1 });
+  });
+
+  it("rejects a layout the desktop could not read or write with the runtime's failure", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const service = TestBed.inject(DesktopBridgeService);
+    const failure = { failure: { code: "Unavailable", message: "TeamRun is not connected to its runtime." } };
+    vi.spyOn(bridge, "readLayout").mockResolvedValue(failure);
+    vi.spyOn(bridge, "writeLayout").mockResolvedValue(failure);
+
+    await expect(service.readLayoutAsync()).rejects.toThrow(new RuntimeRequestException("Unavailable", "TeamRun is not connected to its runtime."));
+    await expect(service.writeLayoutAsync({ version: 1 })).rejects.toThrow(new RuntimeRequestException("Unavailable", "TeamRun is not connected to its runtime."));
   });
 
   it("passes a request on and resolves the runtime's payload", async () => {

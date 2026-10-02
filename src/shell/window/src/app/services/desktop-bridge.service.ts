@@ -52,23 +52,16 @@ export class DesktopBridgeService {
   }
 
   public async readLayoutAsync(): Promise<JsonObject | null> {
-    const layout = await this.bridge.readLayout();
+    const layout = DesktopBridgeService.readAnswer(await this.bridge.readLayout());
     return Object.isNull(layout) ? null : JsonReader.fromValue(layout).toJson();
   }
 
-  public writeLayoutAsync(layout: JsonObject): Promise<boolean> {
-    return this.bridge.writeLayout(layout);
+  public async writeLayoutAsync(layout: JsonObject): Promise<void> {
+    DesktopBridgeService.readAnswer(await this.bridge.writeLayout(layout));
   }
 
   public async requestAsync(method: string, payload: JsonValue): Promise<JsonValue> {
-    const answer = JsonReader.fromValue(await this.bridge.request(method, payload));
-    if (!answer.hasField(Resources.failureField))
-      return answer.readValue(Resources.payloadField);
-    const failure = answer.readObject(Resources.failureField);
-    throw new RuntimeRequestException(
-      failure.readString(Resources.codeField),
-      failure.readString(Resources.messageField),
-      failure.hasField(Resources.detailsField) ? failure.readObject(Resources.detailsField).toJson() : undefined);
+    return DesktopBridgeService.readAnswer(await this.bridge.request(method, payload));
   }
 
   public onEvent(listener: (name: string, payload: JsonValue) => void): () => void {
@@ -85,6 +78,17 @@ export class DesktopBridgeService {
 
   public openLogFolderAsync(): Promise<boolean> {
     return this.bridge.openLogFolder();
+  }
+
+  private static readAnswer(value: unknown): JsonValue {
+    const answer = JsonReader.fromValue(value);
+    if (!answer.hasField(Resources.failureField))
+      return answer.readValue(Resources.payloadField);
+    const failure = answer.readObject(Resources.failureField);
+    throw new RuntimeRequestException(
+      failure.readString(Resources.codeField),
+      failure.readString(Resources.messageField),
+      failure.hasField(Resources.detailsField) ? failure.readObject(Resources.detailsField).toJson() : undefined);
   }
 
   private static find(): IDesktopBridge {

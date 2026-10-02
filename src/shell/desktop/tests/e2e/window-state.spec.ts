@@ -39,12 +39,12 @@ test.describe("window state", () => {
 
   test("the window's layout outlives a restart, kept through the bridge", async ({ desktop }) => {
     await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
-    expect(await readLayout(desktop)).toBeNull();
-    expect(await desktop.window.evaluate(value => (Reflect.get(globalThis, "teamrun") as { writeLayout(layout: unknown): Promise<boolean> }).writeLayout(value), layout)).toBe(true);
+    expect(await readLayout(desktop)).toEqual({ payload: null });
+    expect(await desktop.window.evaluate(value => (Reflect.get(globalThis, "teamrun") as { writeLayout(layout: unknown): Promise<unknown> }).writeLayout(value), layout)).toEqual({ payload: null });
 
     await desktop.restartAsync();
 
     await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
-    expect(await readLayout(desktop)).toEqual(layout);
+    expect(await readLayout(desktop)).toEqual({ payload: layout });
   });
 });

@@ -48,7 +48,7 @@ export class Resources {
   };
   public static readonly leadingEdges: readonly PanelEdge[] = [PanelEdge.Left, PanelEdge.Top];
   public static readonly layoutSaveDelay: number = 500;
-  public static readonly layoutNotKept: string = "The desktop did not keep the window's layout.";
+  public static readonly unavailableCode: string = "Unavailable";
   public static readonly primaryButton: number = 0;
   public static readonly dragThreshold: number = 4;
   public static readonly escapeKey: string = "Escape";

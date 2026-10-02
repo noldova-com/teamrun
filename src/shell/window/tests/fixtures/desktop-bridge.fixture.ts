@@ -87,12 +87,12 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   }
 
   public readLayout(): Promise<unknown> {
-    return Promise.resolve(this.layout);
+    return Promise.resolve({ payload: this.layout });
   }
 
-  public writeLayout(layout: JsonObject): Promise<boolean> {
+  public writeLayout(layout: JsonObject): Promise<unknown> {
     this.layout = layout;
-    return Promise.resolve(true);
+    return Promise.resolve({ payload: null });
   }
 
   public request(method: string, payload: JsonValue): Promise<unknown> {

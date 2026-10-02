@@ -11,7 +11,7 @@ import { Injectable, inject } from "@angular/core";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 
 import { Resources } from "../../resources";
-import { DesktopBridgeException } from "../exceptions/desktop-bridge.exception";
+import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
 import type { ILayoutStore } from "../interfaces/i-layout-store";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 
@@ -23,8 +23,15 @@ export class LayoutStoreService implements ILayoutStore {
     return this.bridge.readLayoutAsync();
   }
 
-  public async writeAsync(layout: JsonObject): Promise<void> {
-    if (!await this.bridge.writeLayoutAsync(layout))
-      throw new DesktopBridgeException(Resources.layoutNotKept);
+  public async writeAsync(layout: JsonObject): Promise<boolean> {
+    try {
+      await this.bridge.writeLayoutAsync(layout);
+      return true;
+    }
+    catch (error) {
+      if (error instanceof RuntimeRequestException && error.code === Resources.unavailableCode)
+        return false;
+      throw error;
+    }
   }
 }

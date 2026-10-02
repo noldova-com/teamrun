@@ -12,11 +12,10 @@ import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay, setImmediate } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { JsonException } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Event, Failure, FailureCode, PreShellData, QualifiedName, Response, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeBuild, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
-import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent, WindowStateException } from "@noldova/teamrun-shell-desktop";
+import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
 
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import type { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
@@ -431,41 +430,80 @@ export class DesktopApplicationTests {
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopApplicationTests.trustedEvent("linux");
 
-    const before = await (electron.ipcMain.invoke("teamrun:readLayout", event) as Promise<unknown>);
-    const isKept = await (electron.ipcMain.invoke("teamrun:writeLayout", event, { version: 1 }) as Promise<boolean>);
-    const after = await (electron.ipcMain.invoke("teamrun:readLayout", event) as Promise<unknown>);
+    const before = await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", event);
+    const written = await DesktopApplicationTests.invokeAsync(electron, "teamrun:writeLayout", event, { version: 1 });
+    const after = await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", event);
 
-    Assert.isNull(before);
-    Assert.isTrue(isKept);
-    Assert.areEqual(JSON.stringify({ version: 1 }), JSON.stringify(after));
+    Assert.areEqual(JSON.stringify({ payload: null }), JSON.stringify(before));
+    Assert.areEqual(JSON.stringify({ payload: null }), JSON.stringify(written));
+    Assert.areEqual(JSON.stringify({ payload: { version: 1 } }), JSON.stringify(after));
     Assert.areEqual(JSON.stringify({ version: 1 }), JSON.stringify(connection.states.get(`writeWindowLayout:${FakeDeviceIdentity.ID}:main`)));
   }
 
   @TestMethod
-  public async keepsNoLayoutForAnUntrustedSenderOrOneThatIsNotAnObject(): Promise<void> {
+  public async refusesALayoutFromAnUntrustedSenderOrOneThatIsNotAnObject(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const untrusted = { sender: { id: 1 }, senderFrame: null };
+    const trusted = DesktopApplicationTests.trustedEvent("linux");
 
-    Assert.isNull(electron.ipcMain.invoke("teamrun:readLayout", untrusted));
-    Assert.isFalse(electron.ipcMain.invoke("teamrun:writeLayout", untrusted, { version: 1 }) as boolean);
-    await Assert.throwsAsync(() => electron.ipcMain.invoke("teamrun:writeLayout", DesktopApplicationTests.trustedEvent("linux"), [1]) as Promise<boolean>, JsonException);
+    const answers = [
+      await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", untrusted),
+      await DesktopApplicationTests.invokeAsync(electron, "teamrun:writeLayout", untrusted, { version: 1 }),
+      await DesktopApplicationTests.invokeAsync(electron, "teamrun:writeLayout", trusted, [1])
+    ];
+
+    Assert.areEqual(
+      JSON.stringify([
+        { code: "Unauthorized", message: "Only TeamRun's own window may call the runtime." },
+        { code: "Unauthorized", message: "Only TeamRun's own window may call the runtime." },
+        { code: "InvalidMessage", message: "The layout must be a JSON object." }
+      ]),
+      JSON.stringify(answers.map(t => t["failure"])));
     Assert.isFalse(connection.calls.some(t => t.endsWith("Layout")));
   }
 
   @TestMethod
-  public async refusesToKeepALayoutWhenTheDeviceHasNoIdentity(): Promise<void> {
+  public async answersThatItKeepsNoLayoutWhenTheDeviceHasNoIdentity(): Promise<void> {
     const device = new FakeDeviceIdentity();
     device.failure = new Error("The identity file is not JSON.");
     const written = await DesktopApplicationTests.captureErrorsAsync(async () => {
       const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), device);
+      const event = DesktopApplicationTests.trustedEvent("linux");
 
-      const failure = await Assert.throwsAsync(() => electron.ipcMain.invoke("teamrun:readLayout", DesktopApplicationTests.trustedEvent("linux")) as Promise<unknown>, WindowStateException);
+      const read = await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", event);
+      const write = await DesktopApplicationTests.invokeAsync(electron, "teamrun:writeLayout", event, { version: 1 });
 
-      Assert.areEqual("This device has no identity, so the window's layout is not kept.", failure.message);
+      const failure = { code: "Unavailable", message: "This device has no identity, so the window's layout is not kept." };
+      Assert.areEqual(JSON.stringify([failure, failure]), JSON.stringify([read["failure"], write["failure"]]));
     });
 
     Assert.areEqual(1, written.length);
+  }
+
+  @TestMethod
+  public async answersALayoutTheRuntimeCannotKeepAsAFailureAndPassesOnDefects(): Promise<void> {
+    const refused = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new PreShellDataFoundException(new PreShellData("/data/old"))));
+    const connection = new FakeRuntimeConnection();
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const event = DesktopApplicationTests.trustedEvent("linux");
+    await DesktopApplicationTests.waitAsync(() => connection.calls.length > 0);
+
+    const unconnected = await DesktopApplicationTests.invokeAsync(refused, "teamrun:writeLayout", event, { version: 1 });
+    connection.isFailing = true;
+    const busy = await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", event);
+    connection.rejection = new ConnectionException("The connection to the runtime closed.");
+    const closed = await DesktopApplicationTests.invokeAsync(electron, "teamrun:writeLayout", event, { version: 1 });
+    connection.rejection = new TypeError("A defect.");
+
+    await Assert.throwsAsync(() => DesktopApplicationTests.invokeAsync(electron, "teamrun:writeLayout", event, { version: 1 }), TypeError);
+    Assert.areEqual(
+      JSON.stringify([
+        { code: "Unavailable", message: "TeamRun is not connected to its runtime." },
+        { code: "Internal", message: "The database is busy." },
+        { code: "Unavailable", message: "The connection to the runtime closed." }
+      ]),
+      JSON.stringify([unconnected["failure"], busy["failure"], closed["failure"]]));
   }
 
   @TestMethod
@@ -782,6 +820,10 @@ export class DesktopApplicationTests {
     await electron.app.becomeReadyAsync();
     await setImmediate();
     return electron;
+  }
+
+  private static async invokeAsync(electron: FakeElectron, channel: string, event: IIpcEvent, ...values: unknown[]): Promise<Record<string, unknown>> {
+    return await (electron.ipcMain.invoke(channel, event, ...values) as Promise<Record<string, unknown>>);
   }
 
   private static async requestAsync(electron: FakeElectron, event: IIpcEvent, method: unknown, payload: unknown): Promise<Response> {

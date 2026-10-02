@@ -23,6 +23,9 @@ const colors = {
 const tab = (desktop: DesktopApplicationFixture, key: string): ReturnType<DesktopApplicationFixture["window"]["locator"]> =>
   desktop.window.locator(`tr-tab[data-tab-key="${key}"]`);
 
+const readKeptLayoutAsync = async (desktop: DesktopApplicationFixture): Promise<string> =>
+  JSON.stringify(await desktop.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { readLayout(): Promise<unknown> }).readLayout()));
+
 const failClockAsync = async (desktop: DesktopApplicationFixture): Promise<void> => {
   const folder = path.join(desktop.dataDirectory, "modules", "clock");
   await mkdir(folder, { recursive: true });
@@ -61,9 +64,11 @@ test.describe("modules", () => {
     await desktop.useSuiteViewportAsync();
     await expect(desktop.window.locator("[data-fixture-content=clock-face]")).toBeVisible();
 
+    await tab(desktop, "view/notes.outline").click();
     await failClockAsync(desktop);
     const window = desktop.window;
     const item = window.locator("tr-module-failures button.tr-module-failures-item");
+    await expect.poll(() => readKeptLayoutAsync(desktop)).toContain(JSON.stringify({ tabs: [{ view: "notes.list" }, { view: "notes.outline" }], active: 1 }));
 
     await expect(item).toHaveText(/error\s*1 module didn't start/);
     await expect(window.locator("tr-tab-group[data-side=Right] .tr-tab-label")).toHaveText(["Clock"]);

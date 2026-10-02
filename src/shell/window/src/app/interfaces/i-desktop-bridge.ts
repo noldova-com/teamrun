@@ -18,7 +18,7 @@ export interface IDesktopBridge {
   onStartup(listener: (state: unknown) => void): () => void;
   actOnStartup(action: string): Promise<boolean>;
   readLayout(): Promise<unknown>;
-  writeLayout(layout: JsonObject): Promise<boolean>;
+  writeLayout(layout: JsonObject): Promise<unknown>;
   request(method: string, payload: JsonValue): Promise<unknown>;
   onEvent(listener: (name: string, payload: unknown) => void): () => void;
   readBuild(): Promise<unknown>;

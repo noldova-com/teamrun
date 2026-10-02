@@ -22,8 +22,10 @@ import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../fixtures/layout.fixture";
 
 describe("LayoutService", () => {
+  let bridge: DesktopBridgeFixture;
+
   beforeEach(() => {
-    DesktopBridgeFixture.install();
+    bridge = DesktopBridgeFixture.install();
   });
 
   afterEach(() => {
@@ -206,9 +208,9 @@ describe("LayoutService", () => {
     const written: unknown[] = [];
     vi.spyOn(store, "writeAsync").mockImplementation(layout => {
       written.push(layout);
-      return written.length === 1 ? new Promise<void>(resolve => {
-        finishFirst = resolve;
-      }) : Promise.resolve();
+      return written.length === 1 ? new Promise<boolean>(resolve => {
+        finishFirst = (): void => resolve(true);
+      }) : Promise.resolve(true);
     });
 
     service.activate(LayoutFixture.plan);
@@ -235,5 +237,45 @@ describe("LayoutService", () => {
     await service.saveAsync();
 
     expect(write).toHaveBeenCalledTimes(2);
+  });
+
+  it("waits while the runtime is not ready and writes the newest layout once when it is ready again", async () => {
+    await loadAsync(prepared());
+    const write = vi.spyOn(store, "writeAsync");
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    TestBed.tick();
+
+    service.activate(LayoutFixture.plan);
+    await vi.advanceTimersByTimeAsync(Resources.layoutSaveDelay);
+    service.toggleDock(DockSide.Left);
+    await service.saveAsync();
+    expect(write).not.toHaveBeenCalled();
+
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    TestBed.tick();
+    await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(1));
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    TestBed.tick();
+    await service.saveAsync();
+
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write.mock.calls[0]?.[0]).toEqual(service.layout().toJson());
+  });
+
+  it("keeps a layout the runtime was not there to take and writes it when the runtime is ready again", async () => {
+    await loadAsync(prepared());
+    const write = vi.spyOn(store, "writeAsync").mockResolvedValueOnce(false);
+
+    service.activate(LayoutFixture.plan);
+    await service.saveAsync();
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    TestBed.tick();
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    TestBed.tick();
+    await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(2));
+    await service.saveAsync();
+
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(await store.readAsync()).toEqual(service.layout().toJson());
   });
 });

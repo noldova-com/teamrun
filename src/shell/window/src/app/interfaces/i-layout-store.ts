@@ -10,5 +10,5 @@ import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 
 export interface ILayoutStore {
   readAsync(): Promise<JsonValue | null>;
-  writeAsync(layout: JsonObject): Promise<void>;
+  writeAsync(layout: JsonObject): Promise<boolean>;
 }
