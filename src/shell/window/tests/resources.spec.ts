@@ -12,6 +12,7 @@ describe("Resources", () => {
   it("formats the unregistered-view and unsupported-version messages", () => {
     expect(Resources.formatUnregisteredView("files.tree")).toBe("No view named \"files.tree\" is registered.");
     expect(Resources.formatUnsupportedVersion(2)).toBe("Layout format version 2 is not supported; this build reads version 1.");
+    expect(Resources.formatDraggedTab("Files")).toBe("Moving Files");
   });
 
   it("accepts contribution names of the form <module id>.<name> only", () => {

@@ -1,0 +1,56 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<mat-menu #tabMenu="matMenu" class="tr-tab-menu">
+  @if (group(); as group) {
+    @if (tab().isMovable) {
+      <button mat-menu-item class="tr-tab-menu-move" [matMenuTriggerFor]="moveMenu" [disabled]="destinations().length === 0">
+        <span class="material-symbols-rounded" aria-hidden="true">{{ resources.moveToGlyph }}</span><span>{{ resources.moveToLabel }}</span>
+      </button>
+      <button mat-menu-item class="tr-tab-menu-split" [matMenuTriggerFor]="splitMenu" [disabled]="!group.isDocuments && group.tabs.length === 1">
+        <span class="material-symbols-rounded" aria-hidden="true">{{ resources.splitGlyph }}</span><span>{{ resources.splitLabel }}</span>
+      </button>
+      <button mat-menu-item class="tr-tab-menu-dock" [matMenuTriggerFor]="dockMenu">
+        <span class="material-symbols-rounded" aria-hidden="true">{{ resources.dockGlyph }}</span><span>{{ resources.dockLabel }}</span>
+      </button>
+    }
+    <button mat-menu-item class="tr-tab-menu-earlier" [disabled]="indexIn(group) === 0" (click)="shift(group, -1)">
+      <span class="material-symbols-rounded" aria-hidden="true">{{ resources.moveEarlierGlyph }}</span><span>{{ resources.moveEarlierLabel }}</span>
+    </button>
+    <button mat-menu-item class="tr-tab-menu-later" [disabled]="indexIn(group) === group.tabs.length - 1" (click)="shift(group, 1)">
+      <span class="material-symbols-rounded" aria-hidden="true">{{ resources.moveLaterGlyph }}</span><span>{{ resources.moveLaterLabel }}</span>
+    </button>
+    <mat-menu #moveMenu="matMenu">
+      @for (destination of destinations(); track destination.id) {
+        <button mat-menu-item class="tr-tab-menu-destination" [attr.data-group]="destination.id" (click)="moveTo(destination)">{{ labelOf(destination) }}</button>
+      }
+    </mat-menu>
+    <mat-menu #splitMenu="matMenu">
+      @for (edge of edges; track edge) {
+        <button mat-menu-item class="tr-tab-menu-split-edge" [attr.data-edge]="edge" (click)="split(group, edge)">
+          <span class="material-symbols-rounded" aria-hidden="true">{{ resources.splitGlyphs[edge] }}</span><span>{{ resources.splitLabels[edge] }}</span>
+        </button>
+      }
+    </mat-menu>
+    <mat-menu #dockMenu="matMenu">
+      @for (side of sides; track side) {
+        <button mat-menu-item class="tr-tab-menu-dock-side" [attr.data-side]="side" (click)="dock(side)">
+          <span class="material-symbols-rounded" aria-hidden="true">{{ resources.dockGlyphs[side] }}</span><span>{{ resources.dockLabels[side] }}</span>
+        </button>
+      }
+    </mat-menu>
+    <mat-divider />
+  }
+  <button mat-menu-item class="tr-tab-menu-close" (click)="close()">
+    <span class="material-symbols-rounded" aria-hidden="true">{{ resources.closeGlyph }}</span><span>{{ resources.closeTabLabel }}</span>
+  </button>
+  <mat-divider />
+  <button mat-menu-item class="tr-tab-menu-reset" (click)="reset()">
+    <span class="material-symbols-rounded" aria-hidden="true">{{ resources.resetLayoutGlyph }}</span><span>{{ resources.resetLayoutLabel }}</span>
+  </button>
+</mat-menu>

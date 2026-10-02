@@ -1,0 +1,27 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: contents;
+}
+
+.tr-dock-strip {
+  position: absolute;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--tr-space-1);
+  padding: var(--tr-space-1);
+}
+
+.tr-dock-strip-vertical {
+  flex-direction: column;
+}
+
+.tr-dock-sash {
+  position: absolute;
+}

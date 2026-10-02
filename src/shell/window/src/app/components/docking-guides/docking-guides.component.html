@@ -1,0 +1,30 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (drag.dragging(); as tab) {
+  @if (tab.isMovable) {
+    @if (preview(); as box) {
+      <div class="tr-docking-preview" [style.left.rem]="box.x" [style.top.rem]="box.y" [style.width.rem]="box.width" [style.height.rem]="box.height"></div>
+    }
+    @for (side of sides; track side) {
+      @let box = overlay().guide(side);
+      <tr-docking-guide class="tr-docking-side" [direction]="resources.sideDirections[side]" [chosen]="isSide(side)" [attr.data-drop-side]="side"
+        [style.left.rem]="box.x" [style.top.rem]="box.y" />
+    }
+    @if (plateFrame(); as frame) {
+      @let box = overlay().plate(frame);
+      <tr-docking-plate class="tr-docking-group-plate" data-drop-plate [attr.data-drop-group]="frame.group.id" [chosen]="plateChoice(frame)"
+        [style.left.rem]="box.x" [style.top.rem]="box.y" />
+    }
+  }
+  @let label = labels.of(tab);
+  <div class="tr-drag-label" role="status" [style.left.px]="drag.pointerX()" [style.top.px]="drag.pointerY()">
+    <span class="tr-drag-label-icon material-symbols-rounded" aria-hidden="true">{{ label.icon }}</span>
+    <span class="tr-drag-label-text">{{ resources.formatDraggedTab(label.title) }}</span>
+  </div>
+}

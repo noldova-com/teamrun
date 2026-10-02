@@ -1,0 +1,46 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.tr-docking-preview {
+  position: absolute;
+  box-sizing: border-box;
+  border: var(--tr-border-width) solid var(--tr-accent);
+  border-radius: var(--tr-radius-large);
+  background-color: var(--tr-selected);
+}
+
+.tr-docking-side,
+.tr-docking-group-plate {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.tr-drag-label {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  gap: var(--tr-space-1);
+  translate: var(--tr-space-3) var(--tr-space-3);
+  padding: var(--tr-space-1) var(--tr-space-2);
+  border: var(--tr-border-width) solid var(--tr-widget-border);
+  border-radius: var(--tr-radius-small);
+  background-color: var(--tr-raised);
+  box-shadow: var(--tr-shadow-large);
+  color: var(--tr-text);
+  white-space: nowrap;
+}
+
+.tr-drag-label-icon {
+  font-size: var(--tr-icon);
+}

@@ -1,0 +1,139 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import { TestBed } from "@angular/core/testing";
+
+import { DockSide } from "../../../src/app/enums/dock-side";
+import { PanelEdge } from "../../../src/app/enums/panel-edge";
+import { Layout } from "../../../src/app/models/layout/layout";
+import { LayoutReader } from "../../../src/app/models/layout/layout.reader";
+import { SideDropTarget } from "../../../src/app/models/layout/side-drop-target";
+import { SplitDropTarget } from "../../../src/app/models/layout/split-drop-target";
+import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
+import { LayoutService } from "../../../src/app/services/layout.service";
+import { Resources } from "../../../src/resources";
+import { LayoutFixture } from "../../fixtures/layout.fixture";
+
+describe("LayoutService", () => {
+  const registry = LayoutFixture.createRegistry();
+  let service: LayoutService;
+  let store: LayoutStoreService;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    service = TestBed.inject(LayoutService);
+    store = TestBed.inject(LayoutStoreService);
+    service.setRegistry(registry);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  function prepared(): Layout {
+    return Layout.createDefault(registry).openView(LayoutFixture.terminal, registry).openDocument(LayoutFixture.plan).openDocument(LayoutFixture.todo);
+  }
+
+  async function loadAsync(layout: Layout): Promise<void> {
+    await store.writeAsync(layout.toJson());
+    await service.loadAsync();
+  }
+
+  it("starts empty and computes the geometry from the registry and the viewport", () => {
+    expect(service.registry()).toBe(registry);
+    expect(service.layout().groups.map(t => t.id)).toEqual([0]);
+    service.setViewport(120, 60);
+
+    expect(service.geometry().middle.width).toBeGreaterThan(0);
+    expect(service.geometry().frames.map(t => t.group.id)).toEqual([0]);
+  });
+
+  it("loads the saved layout, the default when nothing is saved and the default for an unreadable one", async () => {
+    await service.loadAsync();
+    expect(service.layout().toJson()).toEqual(Layout.createDefault(registry).toJson());
+
+    await loadAsync(prepared());
+    expect(service.layout().toJson()).toEqual(prepared().toJson());
+
+    await store.writeAsync({ version: 99 });
+    await service.loadAsync();
+    expect(service.layout().toJson()).toEqual(Layout.createDefault(registry).toJson());
+  });
+
+  it("passes on a failure other than an unreadable layout", async () => {
+    const failure = new Error("read failed");
+    vi.spyOn(LayoutReader, "read").mockImplementation(() => {
+      throw failure;
+    });
+    await store.writeAsync({ version: 1 });
+
+    await expect(service.loadAsync()).rejects.toBe(failure);
+  });
+
+  it("changes the layout through the model and saves it after a pause", async () => {
+    await loadAsync(prepared());
+    const terminal = LayoutFixture.terminal;
+
+    service.place(terminal, new SideDropTarget(DockSide.Right));
+    expect(service.layout().sideOf(service.layout().groupOf(terminal)?.id ?? -1)).toBe(DockSide.Right);
+    service.activate(LayoutFixture.plan);
+    expect(service.layout().documents.active).toEqual(LayoutFixture.plan);
+    service.close(LayoutFixture.todo);
+    expect(service.layout().isOpen(LayoutFixture.todo)).toBe(false);
+    service.toggleDock(DockSide.Left);
+    expect(service.layout().dock(DockSide.Left).isCollapsed).toBe(true);
+    service.resizeDock(DockSide.Left, 30);
+    expect(service.layout().dock(DockSide.Left).size).toBe(30);
+    expect(await store.readAsync()).toEqual(prepared().toJson());
+
+    vi.advanceTimersByTime(Resources.layoutSaveDelay - 1);
+    expect(await store.readAsync()).toEqual(prepared().toJson());
+    vi.advanceTimersByTime(1);
+    await vi.waitFor(async () => expect(await store.readAsync()).toEqual(service.layout().toJson()));
+  });
+
+  it("resizes a split through its handle", async () => {
+    await loadAsync(prepared());
+    service.setViewport(160, 80);
+    service.place(LayoutFixture.terminal, new SplitDropTarget(0, PanelEdge.Right));
+    const handle = service.geometry().handles[0];
+    if (handle === undefined)
+      throw new Error("The split has no handle.");
+
+    service.resizeSplit(handle, handle.leadingLength + 4);
+
+    expect(service.geometry().handles[0]?.leadingLength).toBeCloseTo(handle.leadingLength + 4);
+  });
+
+  it("resets the layout to the default and keeps open documents", async () => {
+    await loadAsync(prepared().dockOnSide(LayoutFixture.files, DockSide.Right));
+
+    service.reset();
+
+    expect(service.layout().dock(DockSide.Left).root?.groups.flatMap(t => t.tabs)).toEqual([LayoutFixture.files]);
+    expect(service.layout().documents.tabs).toEqual([LayoutFixture.plan, LayoutFixture.todo]);
+  });
+
+  it("saves at once on request, ignores changes that change nothing and stops its timer when destroyed", async () => {
+    await loadAsync(prepared());
+    service.activate(LayoutFixture.plan);
+    await service.saveAsync();
+    expect(await store.readAsync()).toEqual(service.layout().toJson());
+
+    const before = service.layout();
+    service.activate(LayoutFixture.plan);
+    expect(service.layout()).toBe(before);
+
+    service.close(LayoutFixture.todo);
+    const saved = await store.readAsync();
+    TestBed.resetTestingModule();
+    vi.advanceTimersByTime(Resources.layoutSaveDelay);
+    expect(await store.readAsync()).toEqual(saved);
+  });
+});

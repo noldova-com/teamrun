@@ -1,0 +1,27 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (isShown()) {
+  @if (isCollapsed()) {
+    @if (dock().root; as root) {
+      @let box = bounds();
+      <tr-panel-card class="tr-dock-strip" [class.tr-dock-strip-vertical]="isVertical()" [surface]="surface" [attr.data-drop-group]="root.cornerGroup.id" data-drop-tabs
+        [style.left.rem]="box.x" [style.top.rem]="box.y" [style.width.rem]="box.width" [style.height.rem]="box.height">
+        @for (tab of tabsOf(root); track tab.key) {
+          @let label = labels.of(tab);
+          <button type="button" tr-icon-button class="tr-dock-strip-view" [icon]="label.icon" [label]="label.title" (click)="layout.activate(tab)"></button>
+        }
+      </tr-panel-card>
+    }
+  } @else {
+    @let box = sash();
+    <tr-sash class="tr-dock-sash" [orientation]="orientation()" [label]="resources.resizeDockLabels[side()]" [value]="pixels(size())"
+      [minimum]="pixels(dock().minimumSize)" [maximum]="pixels(layout.geometry().maximumSize(side()))" (resize)="resize($event)"
+      [style.left.rem]="box.x" [style.top.rem]="box.y" [style.width.rem]="box.width" [style.height.rem]="box.height" />
+  }
+}
