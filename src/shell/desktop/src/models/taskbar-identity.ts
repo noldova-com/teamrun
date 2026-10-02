@@ -1,0 +1,48 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import type { AppDetailsOptions } from "electron";
+
+import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
+
+import { Resources } from "../resources.js";
+
+export class TaskbarIdentity {
+  public readonly appId: string;
+  public readonly iconPath: string;
+  public readonly relaunchCommand: string;
+
+  public constructor(appId: string, iconPath: string, relaunchCommand: string) {
+    ArgumentException.throwIfNullOrWhitespace(appId, Resources.appIdParameter);
+    ArgumentException.throwIfNullOrWhitespace(iconPath, Resources.iconPathParameter);
+    ArgumentException.throwIfNullOrWhitespace(relaunchCommand, Resources.relaunchCommandParameter);
+
+    this.appId = appId;
+    this.iconPath = iconPath;
+    this.relaunchCommand = relaunchCommand;
+  }
+
+  public static create(isPackaged: boolean, executablePath: string, mainScript: string, argv: readonly string[]): TaskbarIdentity {
+    const kept = argv.filter(t => Resources.relaunchArgumentPrefixes.some(prefix => t.startsWith(prefix)));
+    const parts = isPackaged ? [executablePath, ...kept] : [executablePath, mainScript, ...kept];
+    return new TaskbarIdentity(
+      isPackaged ? Resources.appUserModelId : Resources.developmentAppUserModelId,
+      executablePath,
+      parts.map(t => `"${t}"`).join(" "));
+  }
+
+  public toAppDetails(): AppDetailsOptions {
+    return {
+      appId: this.appId,
+      appIconPath: this.iconPath,
+      appIconIndex: 0,
+      relaunchCommand: this.relaunchCommand,
+      relaunchDisplayName: Resources.applicationName
+    };
+  }
+}

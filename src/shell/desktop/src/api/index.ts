@@ -26,6 +26,7 @@ export type { ISessionHost } from "../interfaces/i-session-host.js";
 export type { IWindowContents } from "../interfaces/i-window-contents.js";
 export type { IWindowStateStore } from "../interfaces/i-window-state-store.js";
 export { DesktopSettings } from "../models/desktop-settings.js";
+export { TaskbarIdentity } from "../models/taskbar-identity.js";
 export { ScreenArea } from "../models/screen-area.js";
 export { SenderInfo } from "../models/sender-info.js";
 export { StartupState } from "../models/startup-state.js";
