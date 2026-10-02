@@ -8,8 +8,7 @@
 
 import { once } from "node:events";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -41,6 +40,7 @@ import {
 } from "@noldova/teamrun-shell-runtime";
 
 import { RuntimeServerFixture } from "../../fixtures/runtime-server.fixture.js";
+import { SocketFolderFixture } from "../../fixtures/socket-folder.fixture.js";
 
 @TestClass
 export class RuntimeServerTests {
@@ -416,12 +416,8 @@ export class RuntimeServerTests {
   }
 
   private static async runInFolderAsync(test: (folder: string) => Promise<void>): Promise<void> {
-    const folder = await mkdtemp(path.join(tmpdir(), "tr-srv-"));
-    try {
-      await test(folder);
-    }
-    finally {
-      await rm(folder, { recursive: true, force: true });
-    }
+    await using folder = await SocketFolderFixture.createAsync("tr-srv-");
+    await test(folder.path);
   }
+
 }

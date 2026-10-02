@@ -31,7 +31,7 @@ import { ClientSettings, ConnectionException, Endpoint, type RequestContext, Ref
 import { ClientListenerFixture } from "../../fixtures/client-listener.fixture.js";
 import { RawServerFixture } from "../../fixtures/raw-server.fixture.js";
 import { RuntimeServerFixture } from "../../fixtures/runtime-server.fixture.js";
-import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
+import { SocketFolderFixture } from "../../fixtures/socket-folder.fixture.js";
 
 @TestClass
 export class RuntimeClientTests {
@@ -68,7 +68,7 @@ export class RuntimeClientTests {
 
   @TestMethod
   public async connectsThroughALocalSocket(): Promise<void> {
-    await using folder = await TemporaryFolderFixture.createAsync();
+    await using folder = await SocketFolderFixture.createAsync("tr-cli-");
     await using fixture = new RuntimeServerFixture();
     const socketPath = process.platform === "win32" ? `\\\\.\\pipe\\teamrun-client-${path.basename(folder.path)}` : path.join(folder.path, "runtime.sock");
     fixture.endpoint = await fixture.server.listenSocketAsync(socketPath);

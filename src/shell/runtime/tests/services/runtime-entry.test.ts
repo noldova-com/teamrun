@@ -61,9 +61,12 @@ export class RuntimeEntryTests {
   @TestMethod
   public stopsOnASignal(): Promise<void> {
     return RuntimeEntryTests.runAsync(async (fixture, signals, error) => {
-      const running = RuntimeEntry.runAsync(["--data-dir", fixture.dataDirectory.root, "--idle-grace", "60000"], process.platform, process.env, signals, error);
-      while (await DiscoveryReader.readAsync(fixture.dataDirectory) === null)
+      let endedWith: number | null = null;
+      const running = RuntimeEntry.runAsync(["--data-dir", fixture.dataDirectory.root, "--idle-grace", "60000"], process.platform, process.env, signals, error)
+        .then(code => endedWith = code);
+      while (endedWith === null && await DiscoveryReader.readAsync(fixture.dataDirectory) === null)
         await delay(10);
+      Assert.isNull(endedWith, `the runtime ended before it published discovery: ${RuntimeEntryTests.read(error)}`);
       Assert.areEqual(1, signals.listenerCount("SIGTERM"));
       Assert.areEqual(1, signals.listenerCount("SIGINT"));
 

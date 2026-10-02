@@ -6,14 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 
 import { type BuildIdentity, Handshake, type Response } from "@noldova/teamrun-shell-protocol";
 import { DataDirectory, DiscoveryReader, Endpoint, type RuntimeDiscovery, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
 
 import { RawConnectionFixture } from "./raw-connection.fixture.js";
+import { SocketFolderFixture } from "./socket-folder.fixture.js";
 
 export class RuntimeHostFixture implements AsyncDisposable {
   private readonly connections: RawConnectionFixture[] = [];
@@ -34,7 +34,7 @@ export class RuntimeHostFixture implements AsyncDisposable {
   }
 
   public static async createAsync(): Promise<RuntimeHostFixture> {
-    return new RuntimeHostFixture(await mkdtemp(path.join(tmpdir(), "tr-host-")));
+    return new RuntimeHostFixture((await SocketFolderFixture.createAsync("tr-host-")).path);
   }
 
   public async startAsync(idleGraceMilliseconds: number = 30_000): Promise<RuntimeHost> {

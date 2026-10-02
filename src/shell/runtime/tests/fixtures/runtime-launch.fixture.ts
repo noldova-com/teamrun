@@ -6,12 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { ClientSettings, DataDirectory, DiscoveryReader, LaunchSettings, OwnershipLock, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+
+import { SocketFolderFixture } from "./socket-folder.fixture.js";
 
 export class RuntimeLaunchFixture implements AsyncDisposable {
   private static readonly EXIT_TIMEOUT: number = 5_000;
@@ -27,7 +28,7 @@ export class RuntimeLaunchFixture implements AsyncDisposable {
   }
 
   public static async createAsync(): Promise<RuntimeLaunchFixture> {
-    return new RuntimeLaunchFixture(await mkdtemp(path.join(tmpdir(), "tr-launch-")));
+    return new RuntimeLaunchFixture((await SocketFolderFixture.createAsync("tr-launch-")).path);
   }
 
   public static isRunning(processId: number): boolean {
