@@ -13,6 +13,7 @@ import { AppearanceService } from "@noldova/teamrun-shell-ui";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { LayoutService } from "../../services/layout.service";
 import { StartupService } from "../../services/startup.service";
+import { WindowPartHostService } from "../../services/window-part-host.service";
 import { StartupComponent } from "../startup/startup.component";
 import { StatusBarComponent } from "../status-bar/status-bar.component";
 import { WindowRowComponent } from "../window-row/window-row.component";
@@ -33,7 +34,7 @@ export class WindowComponent {
 
   public constructor() {
     inject(AppearanceService);
-    void this.layout.loadAsync();
+    inject(WindowPartHostService);
     inject(DestroyRef).onDestroy(this.bridge.onCloseRequest(t => void this.closeAsync(t)));
   }
 

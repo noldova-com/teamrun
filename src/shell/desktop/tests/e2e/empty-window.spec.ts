@@ -6,7 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+
+test.use({ desktopVariant: BuildVariantFixture.noModules });
 
 const colors = {
   light: { window: "rgb(248, 248, 248)", panel: "rgb(255, 255, 255)", cardBorder: "rgb(229, 229, 229)", titleBar: "rgb(248, 248, 248)", titleBarText: "rgb(30, 30, 30)", text: "rgb(59, 59, 59)" },
@@ -34,7 +37,7 @@ test.describe("the empty window", () => {
       bridge: Object.keys(Reflect.get(globalThis, "teamrun") as object).sort()
     }));
 
-    expect(globals).toEqual({ require: "undefined", process: "undefined", module: "undefined", buffer: "undefined", bridge: ["actOnStartup", "answerClose", "notifyReady", "onCloseRequest", "onEvent", "onStartup", "platform", "readLayout", "readStartup", "request", "writeLayout"] });
+    expect(globals).toEqual({ require: "undefined", process: "undefined", module: "undefined", buffer: "undefined", bridge: ["actOnStartup", "answerClose", "copyText", "notifyReady", "onCloseRequest", "onEvent", "onStartup", "openLogFolder", "platform", "readBuild", "readLayout", "readStartup", "request", "writeLayout"] });
   });
 
   test("the window row, status bar and panel card follow the default theme", async ({ desktop }) => {

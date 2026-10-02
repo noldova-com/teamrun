@@ -56,7 +56,8 @@ describe("DefaultTheme", () => {
       ["sash", "0.25rem"],
       ["docking-guide", "2.5rem"],
       ["menu-item-height", "1.625rem"],
-      ["tooltip-width", "43.75rem"]
+      ["tooltip-width", "43.75rem"],
+      ["popover-width", "27.5rem"]
     ];
 
     for (const [name, value] of expected)

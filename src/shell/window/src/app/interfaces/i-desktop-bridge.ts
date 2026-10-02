@@ -21,4 +21,7 @@ export interface IDesktopBridge {
   writeLayout(layout: JsonObject): Promise<boolean>;
   request(method: string, payload: JsonValue): Promise<unknown>;
   onEvent(listener: (name: string, payload: unknown) => void): () => void;
+  readBuild(): Promise<unknown>;
+  copyText(text: string): Promise<boolean>;
+  openLogFolder(): Promise<boolean>;
 }

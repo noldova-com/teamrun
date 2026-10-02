@@ -11,7 +11,10 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 
 import OlderRuntimeFixture from "./fixtures/older-runtime.fixture.ts";
+import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+
+test.use({ desktopVariant: BuildVariantFixture.noModules });
 
 test.describe("data from before the shell", () => {
   test.use({ desktopDataFiles: { "conversations.json": "[]" } });

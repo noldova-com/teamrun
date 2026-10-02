@@ -26,8 +26,9 @@ export default class ModuleArtifacts {
   ].join("\n");
   private static readonly FORMAT_VERSION: number = 1;
   private static readonly SOURCE_PREFIX: string = "src/";
-  private static readonly PART_IMPORT: string = "import type { IWindowPart } from \"@noldova/teamrun-shell-window\";\n";
-  private static readonly LOADER_TYPE: string = "readonly (() => Promise<IWindowPart>)[]";
+  private static readonly VIEWS_KIND: string = "views";
+  private static readonly SOURCE_IMPORT: string = "import { WindowPartSource } from \"@noldova/teamrun-shell-window\";\n";
+  private static readonly OUTPUT_DECLARATIONS_SEGMENTS: readonly string[] = ["modules", "declarations.json"];
 
   private readonly root: string;
 
@@ -43,18 +44,23 @@ export default class ModuleArtifacts {
     return path.join(this.root, ModuleArtifacts.WINDOW_PARTS_FILE);
   }
 
-  public async writeAsync(declarations: readonly ModuleDeclaration[]): Promise<void> {
-    const document = { formatVersion: ModuleArtifacts.FORMAT_VERSION, modules: declarations.map(t => t.toJson()) };
-    await ModuleArtifacts.writeFileAsync(this.declarationsFile, `${JSON.stringify(document, null, 2)}\n`);
+  public locateDeclarations(outputFolder: string | null): string {
+    return outputFolder === null ? this.declarationsFile : path.join(outputFolder, ...ModuleArtifacts.OUTPUT_DECLARATIONS_SEGMENTS);
+  }
 
-    const loaders = declarations
-      .map(t => t.windowEntry)
-      .filter(t => t !== null)
-      .map(t => `  () => import("../${t.slice(ModuleArtifacts.SOURCE_PREFIX.length)}").then(t => t.windowPart)`);
-    const list = loaders.length === 0 ? "[]" : `[\n${loaders.join(",\n")}\n]`;
+  public async writeAsync(declarations: readonly ModuleDeclaration[], outputFolder: string | null): Promise<void> {
+    const document = { formatVersion: ModuleArtifacts.FORMAT_VERSION, modules: declarations.map(t => t.toJson()) };
+    await ModuleArtifacts.writeFileAsync(this.locateDeclarations(outputFolder), `${JSON.stringify(document, null, 2)}\n`);
+
+    const sources = declarations
+      .filter(t => t.windowEntry !== null)
+      .map(t => `  new WindowPartSource(${JSON.stringify(t.id)}, ${JSON.stringify(t.displayName)}, ${JSON.stringify(t.dependencies)}, `
+        + `${JSON.stringify(t.contributions.get(ModuleArtifacts.VIEWS_KIND) ?? [])}, `
+        + `() => import("../${String(t.windowEntry).slice(ModuleArtifacts.SOURCE_PREFIX.length)}").then(t => t.windowPart))`);
+    const list = sources.length === 0 ? "[]" : `[\n${sources.join(",\n")}\n]`;
     await ModuleArtifacts.writeFileAsync(
       this.windowPartsFile,
-      `${ModuleArtifacts.LICENSE_HEADER}\n${ModuleArtifacts.PART_IMPORT}\nexport const windowPartLoaders: ${ModuleArtifacts.LOADER_TYPE} = ${list};\n`);
+      `${ModuleArtifacts.LICENSE_HEADER}\n${ModuleArtifacts.SOURCE_IMPORT}\nexport const windowPartSources: readonly WindowPartSource[] = ${list};\n`);
   }
 
   private static async writeFileAsync(file: string, text: string): Promise<void> {

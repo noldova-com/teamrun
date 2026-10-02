@@ -21,6 +21,10 @@ export class Resources {
   public static readonly writeLayoutChannel: string = "teamrun:writeLayout";
   public static readonly requestChannel: string = "teamrun:request";
   public static readonly runtimeEventChannel: string = "teamrun:runtimeEvent";
+  public static readonly readBuildChannel: string = "teamrun:readBuild";
+  public static readonly copyTextChannel: string = "teamrun:copyText";
+  public static readonly openLogFolderChannel: string = "teamrun:openLogFolder";
+  public static readonly copyTextLimit: number = 65536;
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
   public static readonly windowShellMethods: readonly string[] = [ShellMethods.modules.text];
@@ -138,6 +142,10 @@ export class Resources {
 
   public static formatMethodRefused(method: string): string {
     return `The window may not call ${method}; the desktop calls the shell's methods itself.`;
+  }
+
+  public static formatLogFolderNotOpened(reason: string): string {
+    return `The log folder could not be opened: ${reason}`;
   }
 
   public static formatDeviceUnavailable(reason: string): string {

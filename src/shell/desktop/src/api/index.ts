@@ -7,6 +7,7 @@
  */
 
 export type { IApplicationHost } from "../interfaces/i-application-host.js";
+export type { IClipboardHost } from "../interfaces/i-clipboard-host.js";
 export type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 export type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
 export type { IDisplayHost } from "../interfaces/i-display-host.js";
@@ -21,6 +22,7 @@ export type { IRuntimeConnection } from "../interfaces/i-runtime-connection.js";
 export type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 export type { ISenderFrame } from "../interfaces/i-sender-frame.js";
 export type { ISessionHost } from "../interfaces/i-session-host.js";
+export type { IShellHost } from "../interfaces/i-shell-host.js";
 export type { IUtilityProcessHost } from "../interfaces/i-utility-process-host.js";
 export type { IUtilityProcess } from "../interfaces/i-utility-process.js";
 export type { IWindowContents } from "../interfaces/i-window-contents.js";

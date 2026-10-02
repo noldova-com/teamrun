@@ -25,6 +25,12 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public layout: unknown = null;
   public readonly requests: [string, JsonValue][] = [];
   public answer: unknown = { payload: null };
+  public readonly responses: Map<string, unknown> = new Map([["shell.modules", { payload: { modules: [] } }]]);
+  public build: unknown = { productVersion: "1.2.3", fingerprint: "abc123" };
+  public readonly copied: string[] = [];
+  public isCopyAccepted: boolean = true;
+  public logFolderOpens: number = 0;
+  public logFolderOpened: Promise<boolean> = Promise.resolve(true);
 
   public constructor(platform: string) {
     this.platform = platform;
@@ -91,12 +97,27 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public request(method: string, payload: JsonValue): Promise<unknown> {
     this.requests.push([method, payload]);
-    return Promise.resolve(this.answer);
+    return Promise.resolve(this.responses.has(method) ? this.responses.get(method) : this.answer);
   }
 
   public onEvent(listener: (name: string, payload: unknown) => void): () => void {
     this.eventListeners.add(listener);
     return () => this.eventListeners.delete(listener);
+  }
+
+  public readBuild(): Promise<unknown> {
+    return Promise.resolve(this.build);
+  }
+
+  public copyText(text: string): Promise<boolean> {
+    if (this.isCopyAccepted)
+      this.copied.push(text);
+    return Promise.resolve(this.isCopyAccepted);
+  }
+
+  public openLogFolder(): Promise<boolean> {
+    this.logFolderOpens++;
+    return this.logFolderOpened;
   }
 
   public publishEvent(name: string, payload: unknown): void {

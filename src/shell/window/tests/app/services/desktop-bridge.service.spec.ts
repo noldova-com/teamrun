@@ -30,7 +30,10 @@ describe("DesktopBridgeService", () => {
     readLayout: (): Promise<unknown> => Promise.resolve(null),
     writeLayout: (): Promise<boolean> => Promise.resolve(true),
     request: (): Promise<unknown> => Promise.resolve(null),
-    onEvent: (): (() => void) => () => undefined
+    onEvent: (): (() => void) => () => undefined,
+    readBuild: (): Promise<unknown> => Promise.resolve(null),
+    copyText: (): Promise<boolean> => Promise.resolve(true),
+    openLogFolder: (): Promise<boolean> => Promise.resolve(true)
   };
   const incomplete: readonly [string, unknown][] = [
     ["nothing", undefined],
@@ -45,7 +48,10 @@ describe("DesktopBridgeService", () => {
     ["no readLayout", { ...complete, readLayout: null }],
     ["no writeLayout", { ...complete, writeLayout: null }],
     ["no request", { ...complete, request: null }],
-    ["no onEvent", { ...complete, onEvent: null }]
+    ["no onEvent", { ...complete, onEvent: null }],
+    ["no readBuild", { ...complete, readBuild: null }],
+    ["no copyText", { ...complete, copyText: null }],
+    ["no openLogFolder", { ...complete, openLogFolder: null }]
   ];
 
   for (const [name, value] of incomplete)
@@ -162,6 +168,18 @@ describe("DesktopBridgeService", () => {
     bridge.publishEvent("notes.changed", null);
 
     expect(events).toEqual([["notes.changed", { path: "/notes/a.md" }]]);
+  });
+
+  it("reads the build, copies text and opens the log folder through the desktop", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const service = TestBed.inject(DesktopBridgeService);
+
+    const build = await service.readBuildAsync();
+    const isCopied = await service.copyTextAsync("clock: Failed");
+    const isOpened = await service.openLogFolderAsync();
+
+    expect([build.productVersion, build.fingerprint, isCopied, isOpened]).toEqual(["1.2.3", "abc123", true, true]);
+    expect([bridge.copied, bridge.logFolderOpens]).toEqual([["clock: Failed"], 1]);
   });
 
   it("refuses a kept layout that is not a JSON object", async () => {

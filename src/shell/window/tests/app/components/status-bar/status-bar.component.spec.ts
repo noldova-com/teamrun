@@ -10,9 +10,19 @@ import { TestBed } from "@angular/core/testing";
 
 import { StatusBarComponent } from "../../../../src/app/components/status-bar/status-bar.component";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
+import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
+import { WindowPartHostFixture } from "../../../fixtures/window-part-host.fixture";
 
 describe("StatusBarComponent", () => {
-  afterEach(() => AppearanceFixture.reset());
+  beforeEach(() => {
+    DesktopBridgeFixture.install();
+    TestBed.configureTestingModule({ providers: [WindowPartHostFixture.provide()] });
+  });
+
+  afterEach(() => {
+    AppearanceFixture.reset();
+    DesktopBridgeFixture.remove();
+  });
 
   function render(): HTMLElement {
     const fixture = TestBed.createComponent(StatusBarComponent);

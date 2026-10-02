@@ -107,9 +107,9 @@ The runtime decides which modules are active, and the window and the CLI follow 
 1. The runtime reads the build's declarations and orders modules after their dependencies.
 2. Each runtime part activates once, registering contributions and published services. It receives only shell services and its declared dependencies' published services.
 3. A module is active when its runtime part, if any, and all dependencies have activated. Otherwise the runtime records its failure; the shell and unaffected modules continue.
-4. After handshake and reconnection, window/CLI hosts receive active modules and failures before sending module requests. They activate only active modules' parts, in dependency order.
+4. After handshake and reconnection, window/CLI hosts receive active modules and failures before sending module requests. They activate only active modules' parts, in dependency order. The window restores its saved layout once, after its parts first activate, so documents a part opens while activating appear in it.
 5. Window/CLI activation failure affects that host alone: withdraw the failed part's contributions and do not activate dependent parts there. Runtime parts continue serving other clients.
-6. The window displays each failure and cause; the CLI reports failures needed by the requested command.
+6. The window shows a status-bar item while a module is failed or blocked. Its popover lists each such module with its cause and offers the details to copy, redacted, and the data directory's log folder. A failed module's views keep their places and say why it didn't start. Nothing retries, because modules activate when the runtime starts. A build with a notifications module shows failures there, and the status-bar item remains for builds without one. The CLI reports failures needed by the requested command.
 7. Hosts deactivate parts in reverse order, releasing contributions, subscriptions, timers, files and child processes.
 
 Activation stays light. A part loads heavy code when its first view opens or its first request arrives.

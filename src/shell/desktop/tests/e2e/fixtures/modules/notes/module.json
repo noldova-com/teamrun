@@ -1,0 +1,10 @@
+{
+  "id": "notes",
+  "displayName": "Notes",
+  "parts": ["window"],
+  "dependencies": [],
+  "contributes": {
+    "views": ["notes.list", "notes.outline"],
+    "documents": ["notes.note"]
+  }
+}

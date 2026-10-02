@@ -12,7 +12,9 @@ LICENSE file in the root directory of this source tree.
 }
 @for (frame of geometry.frames; track frame.group.id) {
   <tr-tab-group [frame]="frame">
-    @if (isEmptyDocuments(frame)) {
+    @if (frame.group.active; as active) {
+      <tr-tab-content [tab]="active" />
+    } @else if (isEmptyDocuments(frame)) {
       <tr-empty-window />
     }
   </tr-tab-group>

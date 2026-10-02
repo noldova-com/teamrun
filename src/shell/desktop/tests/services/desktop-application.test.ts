@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { setTimeout as delay, setImmediate } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -13,7 +15,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { JsonException } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Event, Failure, FailureCode, PreShellData, QualifiedName, Response, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
+import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeBuild, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
 import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent, WindowStateException } from "@noldova/teamrun-shell-desktop";
 
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
@@ -637,6 +639,86 @@ export class DesktopApplicationTests {
     await DesktopApplicationTests.waitAsync(() => window.calls.includes("maximize"));
 
     Assert.areEqual(JSON.stringify(["show", "setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}", "maximize"]), JSON.stringify(window.calls));
+  }
+
+  @TestMethod
+  public async tellsOnlyItsOwnWindowWhichBuildItIs(): Promise<void> {
+    const electron = await DesktopApplicationTests.startReadyAsync("linux");
+
+    const build = electron.ipcMain.invoke("teamrun:readBuild", DesktopApplicationTests.trustedEvent("linux"));
+    const refused = electron.ipcMain.invoke("teamrun:readBuild", { sender: { id: 1 }, senderFrame: null });
+
+    Assert.areEqual(JSON.stringify(RuntimeBuild.identity.toJson()), JSON.stringify(build));
+    Assert.isNull(refused);
+  }
+
+  @TestMethod
+  public async copiesOnlyTextFromItsOwnWindowUpToTheLimit(): Promise<void> {
+    const electron = await DesktopApplicationTests.startReadyAsync("linux");
+    const trusted = DesktopApplicationTests.trustedEvent("linux");
+    const longest = "x".repeat(65536);
+
+    const answers = [
+      electron.ipcMain.invoke("teamrun:copyText", trusted, "clock: Failed"),
+      electron.ipcMain.invoke("teamrun:copyText", trusted, longest),
+      electron.ipcMain.invoke("teamrun:copyText", trusted, `${longest}x`),
+      electron.ipcMain.invoke("teamrun:copyText", trusted, 5),
+      electron.ipcMain.invoke("teamrun:copyText", { sender: { id: 1 }, senderFrame: null }, "clock: Failed")
+    ];
+
+    Assert.areEqual(JSON.stringify([true, true, false, false, false]), JSON.stringify(answers));
+    Assert.areEqual(JSON.stringify(["clock: Failed", longest]), JSON.stringify(electron.clipboard.texts));
+  }
+
+  @TestMethod
+  public async opensTheLogFolderForItsOwnWindowAndCreatesItFirst(): Promise<void> {
+    const data = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const electron = new FakeElectron();
+      DesktopApplicationTests.start(electron, new FakeDesktopProcess("linux", [`--data-dir=${data}`]));
+      await electron.app.becomeReadyAsync();
+
+      const refused = await (electron.ipcMain.invoke("teamrun:openLogFolder", { sender: { id: 1 }, senderFrame: null }) as Promise<boolean>);
+      const isOpened = await (electron.ipcMain.invoke("teamrun:openLogFolder", DesktopApplicationTests.trustedEvent("linux")) as Promise<boolean>);
+
+      Assert.isFalse(refused);
+      Assert.isTrue(isOpened);
+      Assert.isTrue((await stat(join(data, "logs"))).isDirectory());
+      Assert.areEqual(JSON.stringify([join(data, "logs")]), JSON.stringify(electron.shell.opened));
+    }
+    finally {
+      await rm(data, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async reportsALogFolderItCannotCreateOrOpen(): Promise<void> {
+    const data = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const blocked = join(data, "blocked");
+      await writeFile(blocked, "");
+      const unopened = new FakeElectron();
+      const uncreated = new FakeElectron();
+      unopened.shell.failure = "There is no file manager.";
+      DesktopApplicationTests.start(unopened, new FakeDesktopProcess("linux", [`--data-dir=${data}`]));
+      DesktopApplicationTests.start(uncreated, new FakeDesktopProcess("linux", [`--data-dir=${blocked}`]));
+      await unopened.app.becomeReadyAsync();
+      await uncreated.app.becomeReadyAsync();
+      const answers: boolean[] = [];
+
+      const written = await DesktopApplicationTests.captureErrorsAsync(async () => {
+        answers.push(await (unopened.ipcMain.invoke("teamrun:openLogFolder", DesktopApplicationTests.trustedEvent("linux")) as Promise<boolean>));
+        answers.push(await (uncreated.ipcMain.invoke("teamrun:openLogFolder", DesktopApplicationTests.trustedEvent("linux")) as Promise<boolean>));
+      });
+
+      Assert.areEqual(JSON.stringify([false, false]), JSON.stringify(answers));
+      Assert.areEqual("The log folder could not be opened: There is no file manager.\n", written[0]);
+      Assert.isTrue(written[1]?.startsWith("The log folder could not be opened: Error:") === true);
+      Assert.areEqual(0, uncreated.shell.opened.length);
+    }
+    finally {
+      await rm(data, { recursive: true, force: true });
+    }
   }
 
   private static async waitAsync(condition: () => boolean, attempts: number = 400): Promise<void> {

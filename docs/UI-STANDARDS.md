@@ -166,6 +166,7 @@ This table assigns geometry and radius tokens under sections 1, 3 and 7, with th
 |---|---|---|---|
 | Window row | 2.1875rem high | Panel; title 600 | Shell; window controls, the active document's breadcrumb and the top bar's actions, with no divider beneath |
 | Status bar | 1.25rem minimum high; 0.5rem side inset; items 0.375rem side padding and 0.25rem apart; hover radius | Label | Shell; items on the left and right, with no divider above; an item with a command is a button with toolbar hover, meeting section 7's target size through its spacing; truncated text keeps its full text in the tooltip and accessible name |
+| Module failures item | Status-bar item; 1rem error icon 0.25rem from its text | Label | Shown at the status bar's right end only while a module is failed or blocked; the error icon with text such as "1 module didn't start", never color alone; opens the module failures popover |
 | Panel card | 1px border; large radius; 0.25rem gaps and outer side/bottom margin | Inherited | Shell for groups in a dock, panel for groups in the middle; meets the window row above |
 | Dock sizing | Default 26rem left, 25rem right and 16.25rem bottom; preferred minimum 10rem on its resize axis; collapsed strip 2.75rem | Inherited | Preserve saved sizes; collapse when necessary to keep the document and controls reachable |
 | Split | Groups at least 10rem wide and 6.25rem high; a 0.25rem sash between them | Inherited | Groups share the rest of the split by their saved proportions and shrink in proportion to their minimums when those cannot fit |
@@ -178,6 +179,7 @@ This table assigns geometry and radius tokens under sections 1, 3 and 7, with th
 | Menu | Large radius; 1px border; 0.25rem vertical padding; section-label padding 0.5rem 0.75rem 0.25rem | Panel; section labels muted | Menu surface and large shadow |
 | Menu item | 1.625rem minimum high; 0.25rem inset; 0.5rem text padding; 1rem icon; medium radius; separator spacing 0.3125rem | Panel | Hover/keyboard-active row; disabled actions are inoperable |
 | Tooltip | Up to 43.75rem wide, viewport-clamped; 0.125rem vertical/0.5rem horizontal padding; hover radius | Label, tooltip line height | Hover-widget surface, 1px border and large shadow; accessible placement/dismissal from section 7 |
+| Popover | Preferred width 27.5rem, viewport-clamped; large radius; 1px border; 0.75rem padding; 0.5rem gaps | Panel; title 600 | Menu surface, border and large shadow; anchored to its control and kept in the viewport; non-modal: focus moves into it, Escape or a click outside closes it, and Escape returns focus to the control. The module failures popover lists each module, its state and cause, then secondary buttons Copy details and Open log folder; a folder that cannot open is reported in a status line |
 | Dialog | Preferred width 27.5rem; large radius; title padding 1.375rem 2rem 0.75rem 1.25rem; body 0 2rem 0 1.25rem; actions 1.25rem 0.5rem 0.5rem with 0.5rem gaps | Panel; title 600 | Dialog surface, 1px border, extra-large shadow and modal backdrop; content/actions reflow |
 | Sash | 0.25rem visual gap; three 0.125rem grip dots spaced 0.3125rem | Accessible resize label | Grip at 30% normal foreground; accent after 300ms hover or during drag; keyboard resize exposes the affected pane and size |
 | Quick input (search) | Preferred width 37.5rem; 0.375rem top margin; padding 0.375rem 0.375rem 0.25rem; hits 0.25rem below field; large radius | Panel | Quick-input surface, border and extra-large shadow; non-modal and viewport-clamped |
@@ -197,6 +199,7 @@ This table assigns geometry and radius tokens under sections 1, 3 and 7, with th
 | Preview tab | Tab geometry | Panel, italic | One temporary preview per strip; explicit keep action available |
 | Tree row while dragged | Tree-row geometry; small radius | Panel | Shell-color ghost, border and large shadow; placeholder may dim; rearrangement animation up to 150ms and disabled for reduced motion |
 | Card | Automatic height; medium radius; 1px border | Message | Raised surface |
+| Module failure card | Card geometry with 0.75rem padding, 0.5rem from the panel's edges; 1rem error icon 0.5rem from the title | Message; title 600 | Raised surface; fills a failed module's view with "<Module> didn't start" and the cause in muted text |
 | Code block | Automatic body height; 1.625rem minimum header; medium radius; 1px border | Code body; Panel/Label header | Separate header/body surfaces and divider; language, wrap and copy controls; horizontal scroll is local to the block |
 | Badge (counts, +1 -0), key chip | 1.25rem visual height; small radius; 1px border | Panel | Count badges unfilled, key chips raised; diff counts use semantic text and signs; failures have an explicit status |
 

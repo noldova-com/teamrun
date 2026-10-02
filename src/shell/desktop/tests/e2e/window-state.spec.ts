@@ -9,7 +9,10 @@
 import type { Rectangle } from "electron";
 
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
+import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+
+test.use({ desktopVariant: BuildVariantFixture.noModules });
 
 test.describe("window state", () => {
   const moved: Rectangle = { x: 40, y: 60, width: 900, height: 640 };

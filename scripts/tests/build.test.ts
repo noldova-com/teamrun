@@ -27,7 +27,7 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 class BuildTests {
   private static readonly BUILD_TIMEOUT: number = 60_000;
   private static readonly ROOT_MANIFEST: string = JSON.stringify({ teamrun: { modules: [] } });
-  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]...]\n";
+  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>]]\n";
 
   public static register(): void {
     test("a tree without packages builds nothing and succeeds", async t => {
@@ -74,14 +74,17 @@ class BuildTests {
       assert.equal(await BuildTests.create(repository.directory, tested, process.env).runAsync(["--test"]), 0);
       const testedParts = await readFile(artifacts.windowPartsFile, "utf8");
       const testedDeclarations = await readFile(artifacts.declarationsFile, "utf8");
-      assert.equal(await BuildTests.create(repository.directory, without, process.env).runAsync(["--test", "--without", "clock"]), 0);
+      const variant = path.join(repository.directory, "_build", "variants", "without-clock");
+      assert.equal(await BuildTests.create(repository.directory, without, process.env).runAsync(["--test", "--output", variant, "--without", "clock"]), 0);
       assert.equal(await BuildTests.create(repository.directory, unknown, process.env).runAsync(["--test", "--without", "weather"]), 1);
 
       assert.match(regular.text, /Modules in the build: 1\./);
       assert.match(tested.text, /Modules in the build: 2\./);
       assert.match(without.text, /Modules in the build: 1\./);
       assert.equal(unknown.text, "The build has no module weather to leave out.\n");
-      assert.match(regularParts, /\[\n {2}\(\) => import\("\.\.\/modules\/notes\/window\/src\/api\/index"\)\.then\(t => t\.windowPart\)\n\];\n$/);
+      assert.equal(await readFile(artifacts.declarationsFile, "utf8"), testedDeclarations);
+      assert.doesNotMatch(await readFile(artifacts.locateDeclarations(variant), "utf8"), /"id": "clock"/);
+      assert.match(regularParts, /\[\n {2}new WindowPartSource\("notes", "Notes", \[\], \["notes\.list"\], \(\) => import\("\.\.\/modules\/notes\/window\/src\/api\/index"\)\.then\(t => t\.windowPart\)\)\n\];\n$/);
       assert.match(testedParts, /import\("\.\.\/shell\/desktop\/tests\/e2e\/fixtures\/modules\/clock\/window\/src\/api\/index"\)/);
       assert.match(testedDeclarations, /"id": "notes"[\s\S]*"id": "clock"/);
     });
@@ -121,7 +124,7 @@ class BuildTests {
     });
 
     test("arguments other than a test build and its exclusions are refused with the usage", async () => {
-      for (const buildArguments of [["foundation-core"], ["--without", "clock"], ["--test", "--without"], ["--test", "clock"], ["--test", "--test"]]) {
+      for (const buildArguments of [["foundation-core"], ["--without", "clock"], ["--output", "variant"], ["--test", "--without"], ["--test", "clock"], ["--test", "--test"], ["--test", "--output", "a", "--output", "b"]]) {
         const output = new TextOutputFixture();
 
         assert.equal(await BuildTests.create("unused", output, process.env).runAsync(buildArguments), 2);

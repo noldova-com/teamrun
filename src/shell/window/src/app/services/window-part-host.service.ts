@@ -1,0 +1,206 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal, inject, signal } from "@angular/core";
+
+import "@noldova/teamrun-foundation-core";
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { ModuleState, ModuleStatus, ModuleStatusList, ShellMethods } from "@noldova/teamrun-shell-protocol";
+
+import { DockSide } from "../enums/dock-side";
+import type { IWindowPart } from "../interfaces/i-window-part";
+import type { IWindowPartHost } from "../interfaces/i-window-part-host";
+import { ContributionMatch } from "../models/contribution-match";
+import { DocumentTab } from "../models/layout/document-tab";
+import type { Tab } from "../models/layout/tab";
+import { TabLabel } from "../models/layout/tab-label";
+import { ViewRegistry } from "../models/layout/view-registry";
+import { ViewTab } from "../models/layout/view-tab";
+import { ViewType } from "../models/layout/view-type";
+import { ModuleFailure } from "../models/module-failure";
+import { PendingDocument } from "../models/pending-document";
+import type { StartupState } from "../models/startup-state";
+import { WindowPartActivation } from "../models/window-part-activation";
+import { WindowPartContext } from "../models/window-part-context";
+import type { WindowPartSource } from "../models/window-part-source";
+import { WindowPartTokens } from "../models/window-part-tokens";
+import { Resources } from "../../resources";
+import { DesktopBridgeService } from "./desktop-bridge.service";
+import { DocumentOpenerService } from "./document-opener.service";
+import { LayoutService } from "./layout.service";
+import { TabLabelService } from "./tab-label.service";
+
+@Injectable({ providedIn: "root" })
+export class WindowPartHostService implements IWindowPartHost {
+  private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
+  private readonly layout: LayoutService = inject(LayoutService);
+  private readonly opener: DocumentOpenerService = inject(DocumentOpenerService);
+  private readonly labels: TabLabelService = inject(TabLabelService);
+  private readonly errors: ErrorHandler = inject(ErrorHandler);
+  private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
+  private readonly activations: WindowPartActivation[] = [];
+  private readonly pendingOpens: PendingDocument[] = [];
+  private readonly failuresValue: WritableSignal<readonly ModuleFailure[]> = signal([]);
+  private readonly generationValue: WritableSignal<number> = signal(0);
+  private isReady: boolean = false;
+  private isLayoutLoaded: boolean = false;
+  private reloading: Promise<void> = Promise.resolve();
+
+  public readonly failures: Signal<readonly ModuleFailure[]> = this.failuresValue.asReadonly();
+  public readonly generation: Signal<number> = this.generationValue.asReadonly();
+
+  public constructor() {
+    inject(DestroyRef).onDestroy(this.bridge.onStartup(t => this.follow(t)));
+    void this.bridge.readStartupAsync().then(t => this.follow(t));
+  }
+
+  public findContribution(tab: Tab): ContributionMatch | null {
+    for (const activation of this.activations) {
+      const contributions = tab instanceof DocumentTab ? activation.context.documents : activation.context.views;
+      const contribution = contributions.find(t => t.name === tab.name);
+      if (!Object.isUndefined(contribution))
+        return new ContributionMatch(contribution.loadComponent, activation.context);
+    }
+    return null;
+  }
+
+  public findFailure(tab: Tab): ModuleFailure | null {
+    return tab instanceof ViewTab ? this.failuresValue().find(t => t.viewNames.includes(tab.name)) ?? null : null;
+  }
+
+  public requestAsync(method: string, payload: JsonValue): Promise<JsonValue> {
+    return this.bridge.requestAsync(method, payload);
+  }
+
+  public onEvent(listener: (name: string, payload: JsonValue) => void): () => void {
+    return this.bridge.onEvent(listener);
+  }
+
+  public openDocument(moduleId: string, name: string, instance: string, title: string): void {
+    if (this.isLayoutLoaded)
+      this.opener.open(moduleId, name, instance, title);
+    else
+      this.pendingOpens.push(new PendingDocument(moduleId, name, instance, title));
+  }
+
+  public refresh(): void {
+    const views = this.activations.flatMap(t => t.context.views);
+    for (const view of views)
+      this.labels.register(view.name, new TabLabel(view.title, view.icon));
+    const failed = this.failuresValue().flatMap(t => t.viewNames.map(u => ({ name: u, failure: t })));
+    for (const view of failed)
+      this.labels.register(view.name, new TabLabel(view.failure.displayName, Resources.moduleFailureGlyph));
+    this.layout.setRegistry(new ViewRegistry(
+      [...views.map(t => new ViewType(t.name, t.defaultSide, t.isShownByDefault)), ...failed.map(t => new ViewType(t.name, DockSide.Left, false))],
+      this.activations.flatMap(t => t.context.documents.map(u => u.name))));
+  }
+
+  private follow(state: StartupState): void {
+    if (state.isReady && !this.isReady)
+      this.reloading = this.reloading.then(() => this.reloadAsync()).catch((error: unknown) => this.errors.handleError(error));
+    this.isReady = state.isReady;
+  }
+
+  private async reloadAsync(): Promise<void> {
+    await this.deactivateAsync();
+    this.failuresValue.set([]);
+    try {
+      await this.activateReportedAsync();
+    }
+    catch (error) {
+      this.errors.handleError(error);
+    }
+    this.refresh();
+    this.generationValue.update(t => t + 1);
+    if (!this.isLayoutLoaded)
+      await this.loadLayoutAsync();
+  }
+
+  private async activateReportedAsync(): Promise<void> {
+    const report = ModuleStatusList.fromJson(await this.bridge.requestAsync(ShellMethods.modules.text, null));
+    const active = new Set<string>();
+    const statuses: ModuleStatus[] = [];
+    for (const status of report.modules) {
+      const result = status.state === ModuleState.Active ? await this.activateAsync(status.id, active) : status;
+      if (result.state === ModuleState.Active)
+        active.add(result.id);
+      statuses.push(result);
+    }
+    this.failuresValue.set(statuses.filter(t => t.state !== ModuleState.Active).map(t => this.describeFailure(t)));
+  }
+
+  private async loadLayoutAsync(): Promise<void> {
+    try {
+      await this.layout.loadAsync();
+    }
+    finally {
+      this.isLayoutLoaded = true;
+      for (const pending of this.pendingOpens.splice(0))
+        this.openPending(pending);
+    }
+  }
+
+  private openPending(pending: PendingDocument): void {
+    try {
+      this.opener.open(pending.moduleId, pending.name, pending.instance, pending.title);
+    }
+    catch (error) {
+      this.errors.handleError(error);
+    }
+  }
+
+  private describeFailure(status: ModuleStatus): ModuleFailure {
+    const source = this.sources.find(t => t.moduleId === status.id);
+    return new ModuleFailure(status.id, source?.displayName ?? status.id, status.state, status.cause, source?.viewNames ?? []);
+  }
+
+  private async activateAsync(moduleId: string, active: ReadonlySet<string>): Promise<ModuleStatus> {
+    const source = this.sources.find(t => t.moduleId === moduleId);
+    if (Object.isUndefined(source))
+      return new ModuleStatus(moduleId, ModuleState.Active, null);
+    const blocker = source.dependencies.find(t => !active.has(t));
+    if (!Object.isUndefined(blocker))
+      return new ModuleStatus(moduleId, ModuleState.Blocked, Resources.formatModuleBlocked(blocker));
+
+    let part: IWindowPart;
+    try {
+      part = await source.load();
+    }
+    catch (error) {
+      this.errors.handleError(error);
+      return new ModuleStatus(moduleId, ModuleState.Failed, Resources.windowPartLoadFailed);
+    }
+
+    const activation = new WindowPartActivation(new WindowPartContext(moduleId, source.dependencies, this), part);
+    this.activations.push(activation);
+    try {
+      await part.activateAsync(activation.context);
+    }
+    catch (error) {
+      this.activations.splice(this.activations.indexOf(activation), 1);
+      activation.context.withdraw();
+      this.errors.handleError(error);
+      return new ModuleStatus(moduleId, ModuleState.Failed, Resources.windowPartActivationFailed);
+    }
+    return new ModuleStatus(moduleId, ModuleState.Active, null);
+  }
+
+  private async deactivateAsync(): Promise<void> {
+    for (const activation of this.activations.splice(0).reverse()) {
+      try {
+        await activation.part.deactivateAsync();
+      }
+      catch (error) {
+        this.errors.handleError(error);
+      }
+      finally {
+        activation.context.withdraw();
+      }
+    }
+  }
+}

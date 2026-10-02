@@ -8,22 +8,35 @@
 
 import { test as base, expect } from "@playwright/test";
 
+import BuildVariantFixture from "./build-variant.fixture.ts";
 import DesktopApplicationFixture from "./desktop-application.fixture.ts";
 
 export const test = base.extend<{
   desktop: DesktopApplicationFixture;
   desktopEnvironment: Readonly<Record<string, string>>;
   desktopDataFiles: Readonly<Record<string, string>>;
+  desktopVariant: string | null;
 }>({
   desktopEnvironment: [{}, { option: true }],
   desktopDataFiles: [{}, { option: true }],
-  desktop: async ({ desktopEnvironment, desktopDataFiles }, use, testInfo) => {
-    const desktop = await DesktopApplicationFixture.launchAsync(testInfo, desktopEnvironment, desktopDataFiles);
+  desktopVariant: [null, { option: true }],
+  desktop: async ({ desktopEnvironment, desktopDataFiles, desktopVariant }, use, testInfo) => {
+    let desktop: DesktopApplicationFixture | null = null;
     try {
+      if (desktopVariant !== null)
+        await BuildVariantFixture.swapInAsync(desktopVariant);
+      desktop = await DesktopApplicationFixture.launchAsync(testInfo, desktopEnvironment, desktopDataFiles);
       await use(desktop);
     }
     finally {
-      await desktop.disposeAsync();
+      try {
+        await desktop?.disposeAsync();
+      }
+      finally {
+        if (desktop !== null)
+          await DesktopApplicationFixture.stopRuntimeAsync(desktop.dataDirectory);
+        await BuildVariantFixture.restoreAsync();
+      }
     }
     expect(desktop.failures).toEqual([]);
   }

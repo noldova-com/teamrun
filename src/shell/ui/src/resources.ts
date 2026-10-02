@@ -110,6 +110,7 @@ export class Resources {
     "menu-separator-spacing",
     "tooltip-width",
     "tooltip-padding",
+    "popover-width",
     "window-row-height",
     "status-bar-height",
     "status-bar-inset",
