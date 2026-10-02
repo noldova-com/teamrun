@@ -83,6 +83,8 @@ class BuildAndTestTests {
         ["success", "false", "", "success", "true", "success", 0, /^The document checks passed, and the build and tests passed on every target/],
         ["success", "true", run, "skipped", "", "skipped", 0,
           /^This commit was built and tested by the merge group run https:\/\/github\.com\/noldova-com\/teamrun\/actions\/runs\/7\/attempts\/2; this run only maintains the dependency caches\.\n$/],
+        ["success", "true", run, "skipped", "", "skipped", 0,
+          /^This merge group's tree was built and tested by the pull request run https:\/\/github\.com\/noldova-com\/teamrun\/actions\/runs\/7\/attempts\/2, so this run reused that result\.\n$/],
         ["success", "true", "", "skipped", "", "skipped", 1, /^$/],
         ["success", "true", run, "success", "true", "success", 1, /^$/],
         ["success", "false", run, "success", "true", "success", 1, /^$/],
@@ -95,13 +97,14 @@ class BuildAndTestTests {
         ["skipped", "", "", "failure", "", "skipped", 1, /^$/],
         ["skipped", "", "", "cancelled", "", "skipped", 1, /^$/]
       ];
-      for (const [tested, verified, mergeGroupRun, changes, runCode, validation, status, summary] of cases) {
+      for (const [index, [tested, verified, testedRun, changes, runCode, validation, status, summary]] of cases.entries()) {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
         await doubles.runAsync("touch summary.md\n");
 
         const result = await doubles.runAsync(script, {
-          TESTED_RESULT: tested, VERIFIED: verified, MERGE_GROUP_RUN: mergeGroupRun, CHANGES_RESULT: changes, RUN_CODE: runCode, VALIDATION_RESULT: validation,
+          TESTED_RESULT: tested, VERIFIED: verified, TESTED_RUN: testedRun, CHANGES_RESULT: changes, RUN_CODE: runCode, VALIDATION_RESULT: validation,
+          EVENT_NAME: index === 5 ? "merge_group" : "push",
           GITHUB_STEP_SUMMARY: "summary.md"
         });
 
@@ -144,11 +147,13 @@ class BuildAndTestTests {
       const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
       assert.ok(text.includes("permissions:\n  contents: read\n"));
       assert.deepEqual(text.match(/^ *\S+: write$/gm), ["      actions: write"]);
-      assert.deepEqual(text.match(/^ *\S+: read$/gm), ["  contents: read", "      actions: read", "      actions: read", "      contents: read", "      contents: read"]);
+      assert.deepEqual(text.match(/^ *\S+: read$/gm), [
+        "  contents: read", "      actions: read", "      contents: read", "      pull-requests: read", "      actions: read", "      contents: read", "      contents: read"
+      ]);
       assert.ok(text.includes("    name: Remove outdated dependency caches\n    needs: [cache-plan, cache]\n" +
         "    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.cache-plan.result == 'success' && " +
         "(needs.cache.result == 'success' || needs.cache.result == 'skipped') }}\n"));
-      assert.equal(text.match(/persist-credentials: false/g)?.length, 5);
+      assert.equal(text.match(/persist-credentials: false/g)?.length, 6);
       assert.ok(text.includes("cancel-in-progress: ${{ github.event_name == 'pull_request' }}"));
       for (const trigger of ["  pull_request:\n    branches: [main]", "  merge_group:\n    types: [checks_requested]", "  push:\n    branches: [main]", "  workflow_dispatch:"])
         assert.ok(text.includes(trigger), trigger);
@@ -173,10 +178,15 @@ class BuildAndTestTests {
 
     test("a push builds and tests only when no successful merge group run of this workflow is found for its exact commit", async () => {
       const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
-      assert.ok(text.includes("  tested:\n    name: Find the merge group run of this commit\n    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n"));
+      assert.ok(text.includes("  tested:\n    name: Find the run that tested this tree\n" +
+        "    if: github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')\n"));
+      for (const step of ["Check out the merge group", "Look up the pull request run"])
+        assert.ok(text.includes("      - name: " + step + "\n        if: github.event_name == 'merge_group'\n"), step);
+      assert.ok(text.includes("      - name: Look up the merge group run\n        if: github.event_name == 'push'\n"));
       assert.ok(text.includes("    name: Classify changes\n    needs: tested\n" +
         "    if: ${{ !cancelled() && (needs.tested.result == 'skipped' || (needs.tested.result == 'success' && needs.tested.outputs.verified != 'true')) }}\n"));
-      assert.ok(text.includes("      verified: ${{ steps.proof.outputs.verified }}\n      run: ${{ steps.proof.outputs.run }}\n"));
+      assert.ok(text.includes("      verified: ${{ steps.proof.outputs.verified || steps.reuse.outputs.verified }}\n" +
+        "      run: ${{ steps.proof.outputs.run || steps.reuse.outputs.run }}\n"));
     });
 
     test("every job that depends on the merge group lookup, directly or through another job, states its own status condition", async () => {
@@ -220,6 +230,120 @@ class BuildAndTestTests {
         assert.equal(result.stdout, message);
         assert.deepEqual((await doubles.readCallsAsync()).filter(call => call.startsWith("gh ")), [`gh ${BuildAndTestTests.RUNS_QUERY}`]);
       }
+    });
+
+    test("a merge group reuses the pull request's result only when its one squash on main has the tree the pull request's last attempt recorded", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript("Look up the pull request run");
+      const pullRequestHead = "d".repeat(40);
+      const runs = "api repos/noldova-com/teamrun/actions/workflows/build-and-test.yml/runs?event=pull_request&head_sha=" + pullRequestHead + "&per_page=100 --jq " +
+        "[.workflow_runs[] | select(.event == \"pull_request\" and .path == \".github/workflows/build-and-test.yml\")] | max_by(.run_number) // empty | " +
+        "\"\\(.id) \\(.run_attempt) \\(.status) \\(.conclusion) \\(.html_url)\"";
+      const runUrl = "https://github.com/noldova-com/teamrun/actions/runs/123";
+      const commit = "git -c user.name=Fixture -c user.email=fixture@example.com commit -q";
+      const histories: Readonly<Record<string, string>> = {
+        squash: `git init -q -b main\n${commit} --allow-empty -m base\ngit update-ref refs/remotes/origin/main HEAD\ngit tag base\necho change > change.txt\ngit add change.txt\n${commit} -m squash\n`,
+        twoCommits: `git init -q -b main\n${commit} --allow-empty -m base\ngit update-ref refs/remotes/origin/main HEAD\ngit tag base\n${commit} --allow-empty -m first\n` +
+          `echo change > change.txt\ngit add change.txt\n${commit} -m second\n`,
+        merge: `git init -q -b main\n${commit} --allow-empty -m base\ngit update-ref refs/remotes/origin/main HEAD\ngit tag base\ngit switch -q -c side\n${commit} --allow-empty -m side\n` +
+          `git switch -q main\n${commit} --allow-empty -m main\ngit -c user.name=Fixture -c user.email=fixture@example.com merge -q --no-ff -m merge side\ngit reset -q --soft HEAD\ngit tag -d base > /dev/null\ngit tag base HEAD^1\n`,
+        offMain: `git init -q -b main\n${commit} --allow-empty -m other\ngit update-ref refs/remotes/origin/main HEAD\ngit checkout -q --orphan pull\n${commit} --allow-empty -m base\ngit tag base\n` +
+          `echo change > change.txt\ngit add change.txt\n${commit} -m squash\n`,
+        none: ""
+      };
+      interface ICase {
+        readonly name: string;
+        readonly history?: string;
+        readonly headRef?: string;
+        readonly pullStatus?: number;
+        readonly latest?: string;
+        readonly runsStatus?: number;
+        readonly downloadStatus?: number;
+        readonly record?: string | null;
+        readonly reason?: string;
+      }
+      const cases: readonly ICase[] = [
+        { name: "a reuse" },
+        { name: "a different tree", record: `${"e".repeat(40)} true`, reason: "The pull request's last run tested a different tree (main moved or the pull request changed)" },
+        { name: "a failed run", latest: `123 1 completed failure ${runUrl}`, reason: "The pull request's last run did not succeed" },
+        { name: "a cancelled run", latest: `123 1 completed cancelled ${runUrl}`, reason: "The pull request's last run did not succeed" },
+        { name: "a run in progress", latest: `123 1 in_progress null ${runUrl}`, reason: "The pull request's last run has not finished" },
+        { name: "a re-run in progress after a success", latest: `123 3 in_progress null ${runUrl}`, reason: "The pull request's last run has not finished" },
+        { name: "a re-run that failed after a success", latest: `123 3 completed failure ${runUrl}`, reason: "The pull request's last run did not succeed" },
+        { name: "no run for the head", latest: "", reason: "The pull request has no run of this workflow for its head" },
+        { name: "a missing record", downloadStatus: 1, reason: "The pull request's last run left no record of the tree it tested" },
+        { name: "an unreadable record", record: null, reason: "The record of the pull request's last run could not be read" },
+        { name: "a malformed record", record: "not-a-tree true", reason: "The record of the pull request's last run is malformed" },
+        { name: "a document-only run", record: "TREE false", reason: "The pull request's last run checked only the documents" },
+        { name: "two commits on the base", history: "twoCommits", reason: "The merge group holds more than one commit on its base" },
+        { name: "a merge commit", history: "merge", reason: "The merge group holds more than one commit on its base" },
+        { name: "a base off main", history: "offMain", reason: "The merge group is built on another merge group, not on main" },
+        { name: "an unparseable branch", headRef: "refs/heads/gh-readonly-queue/main/pr-58", reason: "The merge group's branch names no single pull request" },
+        { name: "no commit to read", history: "none", reason: "The merge group's commit could not be read" },
+        { name: "an unreadable pull request", pullStatus: 1, reason: "The pull request could not be read" },
+        { name: "an unlisted run", runsStatus: 1, reason: "The pull request's runs could not be listed" }
+      ];
+      for (const item of cases) {
+        const doubles = await CommandDoublesFixture.createAsync();
+        t.after(() => doubles.disposeAsync());
+        const prepared = await doubles.runAsync(`${histories[item.history ?? "squash"] ?? ""}touch outputs.txt\n`);
+        assert.equal(prepared.status, 0, `${item.name}: ${prepared.stderr}`);
+        const known = item.history === "none" ? null : (await doubles.runAsync("git rev-parse base 'HEAD^{tree}'\n")).stdout.trim().split("\n");
+        const base = known?.[0] ?? "b".repeat(40);
+        const tree = known?.[1] ?? "a".repeat(40);
+        const record = item.record === undefined ? `${tree} true` : item.record?.replace("TREE", tree) ?? null;
+        if (record !== null)
+          await doubles.runAsync(`mkdir tested-tree\necho '${record}' > tested-tree/tested-tree.txt\n`);
+        doubles.forward("timeout");
+        doubles.respond("gh", "api repos/noldova-com/teamrun/pulls/58 --jq .head.sha", `${pullRequestHead}\n`, item.pullStatus ?? 0);
+        doubles.respond("gh", runs, `${item.latest ?? `123 2 completed success ${runUrl}`}\n`, item.runsStatus ?? 0);
+        doubles.respond("gh", "run download 123 --repo noldova-com/teamrun --name tested-tree-2 --dir tested-tree", "", item.downloadStatus ?? 0);
+
+        const result = await doubles.runAsync(script, {
+          GITHUB_REPOSITORY: "noldova-com/teamrun", GITHUB_OUTPUT: "outputs.txt", BASE_SHA: base,
+          HEAD_REF: item.headRef ?? `refs/heads/gh-readonly-queue/main/pr-58-${base}`
+        });
+
+        assert.equal(result.status, 0, `${item.name}: ${result.stderr}`);
+        if (item.reason === undefined) {
+          assert.equal(await doubles.readFileAsync("outputs.txt"), `verified=true\nrun=${runUrl}/attempts/2\n`, item.name);
+          assert.equal(result.stdout, `The pull request run ${runUrl}/attempts/2 built and tested the tree ${tree}.\n`, item.name);
+        }
+        else {
+          assert.equal(await doubles.readFileAsync("outputs.txt"), "verified=false\n", item.name);
+          assert.equal(result.stdout, `::notice::${item.reason}, so this run builds and tests the merge group.\n`, item.name);
+        }
+        const downloads = (await doubles.readCallsAsync()).filter(call => call.startsWith("gh run download"));
+        const reachesDownload = item.latest === undefined && item.history === undefined && item.headRef === undefined && item.pullStatus === undefined && item.runsStatus === undefined;
+        assert.equal(downloads.length, reachesDownload ? 1 : 0, item.name);
+      }
+    });
+
+    test("a passing pull request run records the tree it tested for its attempt, and an invalid tree fails the record", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const text = workflow.text;
+      const script = workflow.readStepScript("Write the record of the tested tree");
+      const tree = "a".repeat(40);
+      const doubles = await CommandDoublesFixture.createAsync();
+      t.after(() => doubles.disposeAsync());
+
+      const result = await doubles.runAsync(script, { TREE: tree, RUN_CODE: "true" });
+      const written = await doubles.readFileAsync("tested-tree/tested-tree.txt");
+      const empty = await CommandDoublesFixture.createAsync();
+      t.after(() => empty.disposeAsync());
+      const invalid = await empty.runAsync(script, { TREE: "", RUN_CODE: "true" });
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(written, `${tree} true\n`);
+      assert.equal(invalid.status, 1);
+      assert.equal(invalid.stdout, "::error::The classification did not record the tested tree.\n");
+      assert.equal((await empty.runAsync("test -e tested-tree\n")).status, 1);
+      assert.equal(workflow.readStepScript("Record the tested tree"), "set -euo pipefail\ntree=$(git rev-parse 'HEAD^{tree}')\necho \"tree=$tree\" >> \"$GITHUB_OUTPUT\"\n");
+      const resultJob = text.slice(text.indexOf("  result:\n"));
+      const order = ["Require the selected verification to pass", "Write the record of the tested tree", "Keep the record of the tested tree"].map(step => resultJob.indexOf(`      - name: ${step}\n`));
+      assert.ok(order.every((position, index) => position > 0 && (index === 0 || position > (order[index - 1] ?? 0))), order.join(","));
+      for (const step of ["Write the record of the tested tree", "Keep the record of the tested tree"])
+        assert.ok(resultJob.includes(`      - name: ${step}\n        if: github.event_name == 'pull_request'\n`), step);
+      assert.ok(resultJob.includes("          name: tested-tree-${{ github.run_attempt }}\n          path: tested-tree/tested-tree.txt\n          retention-days: 7\n          if-no-files-found: error\n"));
     });
 
     test("the plan lists only the targets that miss a current root or Angular cache", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
