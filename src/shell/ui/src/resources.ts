@@ -1,0 +1,191 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import type { TooltipPosition } from "@angular/material/tooltip";
+
+import { DockingDirection } from "./app/enums/docking-direction";
+import { SashOrientation } from "./app/enums/sash-orientation";
+import { ColorToken } from "./app/models/color-token";
+
+export class Resources {
+  public static readonly colorTokens: readonly ColorToken[] = [
+    new ColorToken("--tr-window", "sideBar.background"),
+    new ColorToken("--tr-panel", "editor.background"),
+    new ColorToken("--tr-raised", "teamrun.raisedBackground", "editorWidget.background"),
+    new ColorToken("--tr-code", "teamrun.codeBackground", "sideBar.background"),
+    new ColorToken("--tr-code-header", "teamrun.codeHeaderBackground", "editorWidget.background"),
+    new ColorToken("--tr-text", "foreground"),
+    new ColorToken("--tr-text-muted", "teamrun.mutedForeground", "descriptionForeground"),
+    new ColorToken("--tr-icon-color", "icon.foreground", "foreground"),
+    new ColorToken("--tr-card-border", "surface.border", "widget.border"),
+    new ColorToken("--tr-border", "sideBarSectionHeader.border"),
+    new ColorToken("--tr-accent", "focusBorder"),
+    new ColorToken("--tr-link", "textLink.foreground"),
+    new ColorToken("--tr-hover", "list.hoverBackground"),
+    new ColorToken("--tr-selected", "list.inactiveSelectionBackground", "list.activeSelectionBackground"),
+    new ColorToken("--tr-toolbar-hover", "toolbar.hoverBackground"),
+    new ColorToken("--tr-scrollbar", "scrollbarSlider.background"),
+    new ColorToken("--tr-title-bar", "titleBar.activeBackground"),
+    new ColorToken("--tr-title-bar-text", "titleBar.activeForeground"),
+    new ColorToken("--tr-input", "input.background"),
+    new ColorToken("--tr-input-border", "input.border"),
+    new ColorToken("--tr-input-text", "input.foreground"),
+    new ColorToken("--tr-placeholder", "input.placeholderForeground"),
+    new ColorToken("--tr-button", "button.background"),
+    new ColorToken("--tr-button-text", "button.foreground"),
+    new ColorToken("--tr-button-hover", "button.hoverBackground"),
+    new ColorToken("--tr-button-secondary", "button.secondaryBackground"),
+    new ColorToken("--tr-button-secondary-text", "button.secondaryForeground"),
+    new ColorToken("--tr-button-secondary-hover", "button.secondaryHoverBackground"),
+    new ColorToken("--tr-dropdown", "dropdown.background", "input.background"),
+    new ColorToken("--tr-dropdown-border", "dropdown.border", "input.border"),
+    new ColorToken("--tr-dropdown-list", "dropdown.listBackground", "input.background"),
+    new ColorToken("--tr-list-active", "list.activeSelectionBackground"),
+    new ColorToken("--tr-list-active-text", "list.activeSelectionForeground"),
+    new ColorToken("--tr-button-border", "button.border"),
+    new ColorToken("--tr-setting-title", "settings.headerForeground", "foreground"),
+    new ColorToken("--tr-hover-widget", "editorHoverWidget.background", "editorWidget.background"),
+    new ColorToken("--tr-hover-widget-border", "editorHoverWidget.border", "widget.border"),
+    new ColorToken("--tr-quick-input", "quickInput.background", "editorWidget.background"),
+    new ColorToken("--tr-menu-separator", "menu.separatorBackground", "widget.border"),
+    new ColorToken("--tr-widget-shadow", "widget.shadow"),
+    new ColorToken("--tr-widget-border", "widget.border", "surface.border"),
+    new ColorToken("--tr-dialog", "dialog.background", "editorWidget.background"),
+    new ColorToken("--tr-menu", "menu.background"),
+    new ColorToken("--tr-menu-text", "menu.foreground"),
+    new ColorToken("--tr-menu-border", "menu.border"),
+    new ColorToken("--tr-checkbox", "checkbox.background"),
+    new ColorToken("--tr-checkbox-border", "checkbox.border"),
+    new ColorToken("--tr-badge", "badge.background"),
+    new ColorToken("--tr-badge-text", "badge.foreground"),
+    new ColorToken("--tr-progress", "progressBar.background", "focusBorder"),
+    new ColorToken("--tr-notification", "notifications.background"),
+    new ColorToken("--tr-notification-border", "notifications.border"),
+    new ColorToken("--tr-error", "errorForeground"),
+    new ColorToken("--tr-removed", "teamrun.removedForeground", "errorForeground"),
+    new ColorToken("--tr-added", "teamrun.addedForeground")
+  ];
+  public static readonly lookTokens: readonly string[] = [
+    "radius-hover",
+    "radius-small",
+    "radius-medium",
+    "radius-large",
+    "space-1",
+    "space-2",
+    "space-3",
+    "space-4",
+    "space-6",
+    "border-width",
+    "shadow-large",
+    "shadow-xlarge",
+    "backdrop",
+    "panel-card-gap",
+    "tab-height",
+    "tab-pill",
+    "tab-inset",
+    "tab-label-inset",
+    "tab-action-allowance",
+    "tab-action-slot",
+    "tab-close",
+    "icon",
+    "icon-button",
+    "sash",
+    "sash-grip",
+    "sash-grip-spacing",
+    "docking-guide",
+    "docking-guide-icon",
+    "docking-plate-gap",
+    "menu-padding",
+    "menu-label-padding",
+    "menu-item-height",
+    "menu-item-inset",
+    "menu-item-padding",
+    "menu-separator-spacing",
+    "tooltip-width",
+    "tooltip-padding"
+  ];
+  public static readonly shapes: ReadonlyMap<string, readonly string[]> = new Map([["tab", ["pill"]]]);
+  public static readonly defaultThemeId: string = "shell.default";
+  public static readonly defaultThemeName: string = "Default";
+  public static readonly colorSchemeProperty: string = "color-scheme";
+  public static readonly lightScheme: string = "light";
+  public static readonly darkScheme: string = "dark";
+  public static readonly darkSchemeQuery: string = "(prefers-color-scheme: dark)";
+  public static readonly changeEvent: "change" = "change";
+  public static readonly defaultRootSize: number = 16;
+  public static readonly defaultPanelSize: number = 13;
+  public static readonly defaultMessageSize: number = 14;
+  public static readonly defaultCodeSize: number = 14;
+  public static readonly minimumTextSize: number = 12;
+  public static readonly maximumTextSize: number = 18;
+  public static readonly panelSizeParameter: string = "panelSize";
+  public static readonly messageSizeParameter: string = "messageSize";
+  public static readonly codeSizeParameter: string = "codeSize";
+  public static readonly fontSizeProperty: string = "font-size";
+  public static readonly messageSizeVariable: string = "--tr-text-message";
+  public static readonly codeSizeVariable: string = "--tr-text-code";
+  public static readonly sansFontVariable: string = "--tr-font-sans";
+  public static readonly monoFontVariable: string = "--tr-font-mono";
+  public static readonly noldovaSansFonts: string = "\"Noldova Sans\", system-ui, \"Segoe UI\", Roboto, sans-serif";
+  public static readonly systemSansFonts: string = "system-ui, \"Segoe UI\", Roboto, sans-serif";
+  public static readonly noldovaMonoFonts: string = "\"Noldova Mono\", ui-monospace, \"Cascadia Mono\", Consolas, monospace";
+  public static readonly systemMonoFonts: string = "ui-monospace, \"Cascadia Mono\", Consolas, monospace";
+  public static readonly closeGlyph: string = "close";
+  public static readonly dockingGlyphs: Readonly<Record<DockingDirection, string>> = {
+    [DockingDirection.Center]: "tab",
+    [DockingDirection.Left]: "arrow_back",
+    [DockingDirection.Right]: "arrow_forward",
+    [DockingDirection.Top]: "arrow_upward",
+    [DockingDirection.Bottom]: "arrow_downward"
+  };
+  public static readonly dockingLabels: Readonly<Record<DockingDirection, string>> = {
+    [DockingDirection.Center]: "Add to this group",
+    [DockingDirection.Left]: "Place on the left",
+    [DockingDirection.Right]: "Place on the right",
+    [DockingDirection.Top]: "Place above",
+    [DockingDirection.Bottom]: "Place below"
+  };
+  public static readonly sashHoverDelay: number = 300;
+  public static readonly sashKeyboardStep: number = 8;
+  public static readonly sashDecreaseKeys: Readonly<Record<SashOrientation, string>> = {
+    [SashOrientation.Vertical]: "ArrowLeft",
+    [SashOrientation.Horizontal]: "ArrowUp"
+  };
+  public static readonly sashIncreaseKeys: Readonly<Record<SashOrientation, string>> = {
+    [SashOrientation.Vertical]: "ArrowRight",
+    [SashOrientation.Horizontal]: "ArrowDown"
+  };
+  public static readonly verticalOrientation: string = "vertical";
+  public static readonly horizontalOrientation: string = "horizontal";
+  public static readonly tooltipPosition: TooltipPosition = "above";
+  public static readonly tooltipShowDelay: number = 0;
+  public static readonly tooltipHideDelay: number = 0;
+  public static readonly tooltipTouchendHideDelay: number = 1500;
+  public static readonly middleButton: number = 1;
+  public static readonly primaryButton: number = 0;
+
+  public static formatLookVariable(name: string): string {
+    return `--tr-${name}`;
+  }
+
+  public static formatShapeAttribute(control: string): string {
+    return `data-tr-${control}-shape`;
+  }
+
+  public static formatMissingThemeValue(themeId: string, name: string): string {
+    return `The theme "${themeId}" has no value for "${name}".`;
+  }
+
+  public static formatTextSizeOutOfRange(parameterName: string, size: number): string {
+    return `The ${parameterName} must be from ${Resources.minimumTextSize} to ${Resources.maximumTextSize} CSS pixels; ${size} is outside that range.`;
+  }
+
+  public static formatCloseTab(label: string): string {
+    return `Close ${label}`;
+  }
+}

@@ -1,0 +1,144 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.tr-tab {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: var(--tr-tab-height);
+  padding-inline: var(--tr-tab-inset);
+  color: var(--tr-text-tab);
+  font-size: var(--tr-text-panel);
+  line-height: var(--tr-line-panel);
+  outline: none;
+  user-select: none;
+}
+
+.tr-tab.tr-tab-selected {
+  color: var(--tr-text);
+}
+
+.tr-tab-pill {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+[data-tr-tab-shape="pill"] .tr-tab-pill {
+  min-height: var(--tr-tab-pill);
+  padding-inline-start: var(--tr-tab-label-inset);
+  padding-inline-end: calc(var(--tr-tab-action-allowance) - var(--tr-tab-action-slot));
+  border-radius: var(--tr-radius-small);
+}
+
+[data-tr-tab-shape="pill"] .tr-tab:hover .tr-tab-pill {
+  background-color: var(--tr-hover);
+}
+
+[data-tr-tab-shape="pill"] .tr-tab.tr-tab-selected .tr-tab-pill {
+  background-color: var(--tr-selected);
+}
+
+.tr-tab:focus-visible .tr-tab-pill {
+  outline: var(--tr-border-width) solid var(--tr-accent);
+  outline-offset: calc(var(--tr-border-width) * -1);
+}
+
+.tr-tab-icon {
+  margin-inline-end: var(--tr-space-1);
+  color: var(--tr-icon-color);
+}
+
+.tr-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-tab.tr-tab-preview .tr-tab-label {
+  font-style: italic;
+}
+
+.tr-tab-action {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--tr-tab-action-slot);
+  height: var(--tr-tab-action-slot);
+}
+
+.tr-tab-action > * {
+  grid-area: 1 / 1;
+}
+
+.tr-tab-close {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--tr-tab-action-slot);
+  height: var(--tr-tab-action-slot);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  visibility: hidden;
+}
+
+.tr-tab-close::before {
+  content: "";
+  grid-area: 1 / 1;
+  width: var(--tr-tab-close);
+  height: var(--tr-tab-close);
+  border-radius: var(--tr-radius-small);
+}
+
+.tr-tab-close > span {
+  grid-area: 1 / 1;
+}
+
+.tr-tab-close:hover::before {
+  background-color: var(--tr-toolbar-hover);
+}
+
+.tr-tab.tr-tab-selected .tr-tab-close,
+.tr-tab:hover .tr-tab-close,
+.tr-tab:focus-visible .tr-tab-close {
+  visibility: visible;
+}
+
+.tr-tab.tr-tab-working:not(:hover, :focus-visible) .tr-tab-close {
+  visibility: hidden;
+}
+
+.tr-tab.tr-tab-working:is(:hover, :focus-visible) .tr-tab-spinner {
+  visibility: hidden;
+}
+
+.tr-tab-spinner {
+  box-sizing: border-box;
+  width: var(--tr-icon);
+  height: var(--tr-icon);
+  border: calc(var(--tr-border-width) * 2) solid color-mix(in srgb, var(--tr-progress) 25%, transparent);
+  border-top-color: var(--tr-progress);
+  border-radius: 50%;
+  animation: tr-tab-spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tr-tab-spinner {
+    animation: none;
+  }
+}
+
+@keyframes tr-tab-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}

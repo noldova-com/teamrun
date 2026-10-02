@@ -31,12 +31,13 @@ class TestTests {
 
       assert.equal(exitCode, 0, output.text);
       const titles = [
-        "Documents", "Module folders", "Shell names no module", "Module imports", "Unique names", "Packages", "Package tests", "Script types",
-        "API declarations", "API examples", "Script tests and coverage"
+        "Documents", "Module folders", "Shell names no module", "Module imports", "Unique names", "Declared dependencies", "Packages", "Package tests",
+        "Script types", "API declarations", "API examples",
+        "Script tests and coverage", "Angular tests and coverage"
       ];
       assert.deepEqual([...output.text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`), titles.map(t => `${t}: passed`));
-      assert.ok(output.text.endsWith("\n11 of 11 checks passed.\n"));
-      assert.equal(runner.runs.length, 2);
+      assert.ok(output.text.endsWith("\n13 of 13 checks passed.\n"));
+      assert.equal(runner.runs.length, 3);
       assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
     });
 
@@ -50,8 +51,8 @@ class TestTests {
       assert.equal(exitCode, 1);
       assert.ok(output.text.includes("\nScript types: failed\n"));
       assert.ok(output.text.includes("\nScript tests and coverage: passed\n"));
-      assert.ok(output.text.endsWith("\n10 of 11 checks passed.\n"));
-      assert.equal(runner.runs.length, 2);
+      assert.ok(output.text.endsWith("\n12 of 13 checks passed.\n"));
+      assert.equal(runner.runs.length, 3);
     });
 
     test("the documents selection runs only the document checks and says it is not the complete gate", async t => {
