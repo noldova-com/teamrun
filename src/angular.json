@@ -19,6 +19,7 @@
           "options": {
             "tsConfig": "tsconfig.spec.json",
             "runner": "vitest",
+            "runnerConfig": "vitest.config.mts",
             "browsers": [
               "chromiumHeadless"
             ],
