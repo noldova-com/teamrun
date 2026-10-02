@@ -15,6 +15,7 @@ import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-founda
 import { SystemCommand, SystemCommandException, WindowsFolderProtector } from "@noldova/teamrun-shell-runtime";
 
 import { AccessControlFixture } from "../../fixtures/access-control.fixture.js";
+import { PlatformFixture } from "../../fixtures/platform.fixture.js";
 import { SystemCommandFixture } from "../../fixtures/system-command.fixture.js";
 import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
 
@@ -130,10 +131,8 @@ export class WindowsFolderProtectorTests {
   }
 
   @TestMethod
+  @PlatformFixture.windowsOnly()
   public async leavesARealFolderWithCopiedEntriesToTheCurrentUserAlone(): Promise<void> {
-    if (process.platform !== "win32")
-      return;
-
     await using folder = await TemporaryFolderFixture.createAsync();
     const target = path.join(folder.path, "discovery");
     await mkdir(target);

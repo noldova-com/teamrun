@@ -10,6 +10,7 @@ import { closeSync, linkSync, openSync, rmSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { backup, DatabaseSync } from "node:sqlite";
+import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
@@ -24,13 +25,16 @@ export class DatabaseBackup {
     const temporary = `${target}${Resources.temporarySuffix}`;
     closeSync(openSync(temporary, Resources.exclusiveWriteFlag, Resources.privateFileMode));
     try {
-      const wake = setInterval(() => undefined, Resources.backupWakeMilliseconds);
-      try {
-        await backup(source, temporary);
-      }
-      finally {
-        clearInterval(wake);
-      }
+      const copying = backup(source, temporary);
+      let isCopying = true;
+      const settle = (): void => {
+        isCopying = false;
+      };
+      copying.then(settle, settle);
+      do
+        await delay(Resources.backupWakeMilliseconds);
+      while (isCopying);
+      await copying;
       const copy = new DatabaseSync(temporary);
       try {
         copy.exec(Resources.rollbackJournalStatement);
