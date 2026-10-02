@@ -21,6 +21,7 @@ import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import { StartupStateKind } from "../enums/startup-state-kind.js";
 import { WindowStateException } from "../exceptions/window-state.exception.js";
 import { DesktopSettings } from "../models/desktop-settings.js";
+import { TaskbarIdentity } from "../models/taskbar-identity.js";
 import { SenderInfo } from "../models/sender-info.js";
 import type { StartupState } from "../models/startup-state.js";
 import { WindowAppearance } from "../models/window-appearance.js";
@@ -38,6 +39,7 @@ export class DesktopApplication {
   private readonly electron: IElectron;
   private readonly process: IDesktopProcess;
   private readonly settings: DesktopSettings;
+  private readonly taskbar: TaskbarIdentity;
   private readonly policy: SenderPolicy;
   private readonly factory: WindowFactory;
   private readonly startup: RuntimeStartup;
@@ -46,13 +48,20 @@ export class DesktopApplication {
   private readonly restored: WeakSet<OpenWindow> = new WeakSet();
   private device: Promise<string | null> = Promise.resolve(null);
 
-  private constructor(electron: IElectron, process: IDesktopProcess, settings: DesktopSettings, launcher: IRuntimeLauncher, readDeviceAsync: (folder: string) => Promise<string>) {
+  private constructor(
+    electron: IElectron,
+    process: IDesktopProcess,
+    settings: DesktopSettings,
+    taskbar: TaskbarIdentity,
+    launcher: IRuntimeLauncher,
+    readDeviceAsync: (folder: string) => Promise<string>) {
     this.electron = electron;
     this.readDeviceAsync = readDeviceAsync;
     this.process = process;
     this.settings = settings;
+    this.taskbar = taskbar;
     this.policy = new SenderPolicy(settings.windowUrl);
-    this.factory = new WindowFactory(settings, this.policy, electron);
+    this.factory = new WindowFactory(settings, this.policy, electron, taskbar);
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t));
   }
 
@@ -77,13 +86,14 @@ export class DesktopApplication {
       RuntimeEntry.entryPath,
       { ...process.env, [Resources.runAsNodeVariable]: Resources.runAsNodeValue },
       process.platform);
-    new DesktopApplication(electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), createLauncher(launchSettings), readDeviceAsync).run();
+    const taskbar = TaskbarIdentity.create(electron.app.isPackaged, process.execPath, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
+    new DesktopApplication(electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, createLauncher(launchSettings), readDeviceAsync).run();
   }
 
   private run(): void {
     const app = this.electron.app;
     app.setName(Resources.applicationName);
-    app.setAppUserModelId(Resources.appUserModelId);
+    app.setAppUserModelId(this.taskbar.appId);
     if (!app.requestSingleInstanceLock()) {
       app.quit();
       return;

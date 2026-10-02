@@ -11,6 +11,11 @@ import { ShellMethods } from "@noldova/teamrun-shell-protocol";
 export class Resources {
   public static readonly applicationName: string = "TeamRun";
   public static readonly appUserModelId: string = "com.noldova.teamrun";
+  public static readonly developmentAppUserModelId: string = "com.noldova.teamrun.development";
+  public static readonly relaunchArgumentPrefixes: readonly string[] = ["--data-dir=", "--user-data-dir=", "--device-dir="];
+  public static readonly appIdParameter: string = "appId";
+  public static readonly iconPathParameter: string = "iconPath";
+  public static readonly relaunchCommandParameter: string = "relaunchCommand";
   public static readonly readyChannel: string = "teamrun:ready";
   public static readonly closeRequestChannel: string = "teamrun:closeRequest";
   public static readonly closeAnswerChannel: string = "teamrun:closeAnswer";

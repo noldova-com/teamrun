@@ -11,6 +11,7 @@ import type { BrowserWindowConstructorOptions } from "electron";
 import type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
 import type { IElectron } from "../interfaces/i-electron.js";
 import type { DesktopSettings } from "../models/desktop-settings.js";
+import type { TaskbarIdentity } from "../models/taskbar-identity.js";
 import type { WindowAppearance } from "../models/window-appearance.js";
 import type { WindowState } from "../models/window-state.js";
 import { Resources } from "../resources.js";
@@ -20,11 +21,13 @@ export class WindowFactory {
   private readonly settings: DesktopSettings;
   private readonly policy: SenderPolicy;
   private readonly electron: IElectron;
+  private readonly taskbar: TaskbarIdentity;
 
-  public constructor(settings: DesktopSettings, policy: SenderPolicy, electron: IElectron) {
+  public constructor(settings: DesktopSettings, policy: SenderPolicy, electron: IElectron, taskbar: TaskbarIdentity) {
     this.settings = settings;
     this.policy = policy;
     this.electron = electron;
+    this.taskbar = taskbar;
   }
 
   public create(state: WindowState): IDesktopWindow {
@@ -51,6 +54,8 @@ export class WindowFactory {
     else
       options.titleBarOverlay = true;
     const window = this.electron.createWindow(options);
+    if (this.settings.platform === Resources.windowsPlatform)
+      window.setAppDetails(this.taskbar.toAppDetails());
     const contents = window.webContents;
     contents.on(Resources.willNavigateEvent, (event, url) => {
       if (!this.policy.isWindowUrl(url))

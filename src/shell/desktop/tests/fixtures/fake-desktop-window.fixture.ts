@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { BrowserWindowConstructorOptions, Rectangle, TitleBarOverlayOptions } from "electron";
+import type { AppDetailsOptions, BrowserWindowConstructorOptions, Rectangle, TitleBarOverlayOptions } from "electron";
 
 import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
 
@@ -23,6 +23,7 @@ export class FakeDesktopWindow implements IDesktopWindow {
   public loadedFile: string | null = null;
   public backgroundColor: string | null = null;
   public overlay: TitleBarOverlayOptions | null = null;
+  public appDetails: AppDetailsOptions | null = null;
   public isShown: boolean = false;
   public isGone: boolean = false;
   public isMinimizedNow: boolean = false;
@@ -41,6 +42,10 @@ export class FakeDesktopWindow implements IDesktopWindow {
 
   public setBackgroundColor(color: string): void {
     this.backgroundColor = color;
+  }
+
+  public setAppDetails(options: AppDetailsOptions): void {
+    this.appDetails = options;
   }
 
   public setTitleBarOverlay(options: TitleBarOverlayOptions): void {

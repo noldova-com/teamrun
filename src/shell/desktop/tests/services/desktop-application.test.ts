@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay, setImmediate } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -35,7 +35,7 @@ export class DesktopApplicationTests {
     DesktopApplicationTests.start(electron, new FakeDesktopProcess("win32"));
 
     Assert.areEqual(
-      JSON.stringify(["setName TeamRun", "setAppUserModelId com.noldova.teamrun", "requestSingleInstanceLock", "enableSandbox"]),
+      JSON.stringify(["setName TeamRun", "setAppUserModelId com.noldova.teamrun.development", "requestSingleInstanceLock", "enableSandbox"]),
       JSON.stringify(electron.app.calls.slice(1)));
     Assert.areEqual(0, electron.windows.length);
   }
@@ -47,7 +47,7 @@ export class DesktopApplicationTests {
     DesktopApplicationTests.start(electron, new FakeDesktopProcess("win32"));
     await electron.app.becomeReadyAsync();
 
-    Assert.areEqual(JSON.stringify(["setName TeamRun", "setAppUserModelId com.noldova.teamrun", "requestSingleInstanceLock", "quit"]), JSON.stringify(electron.app.calls.slice(1)));
+    Assert.areEqual(JSON.stringify(["setName TeamRun", "setAppUserModelId com.noldova.teamrun.development", "requestSingleInstanceLock", "quit"]), JSON.stringify(electron.app.calls.slice(1)));
     Assert.areEqual(0, electron.app.count("window-all-closed"));
     Assert.areEqual(0, electron.windows.length);
   }
@@ -57,6 +57,26 @@ export class DesktopApplicationTests {
     return DesktopApplicationTests.verifyWindowAsync("linux", window => {
       Assert.isTrue(window.options.titleBarOverlay === true);
       Assert.isUndefined(window.options.trafficLightPosition);
+    });
+  }
+
+  @TestMethod
+  public describesItsWindowsToTheWindowsTaskbarAsThisBuild(): Promise<void> {
+    const data = resolve("data");
+    const packaged = new FakeElectron(true, true);
+    DesktopApplicationTests.start(packaged, new FakeDesktopProcess("win32", [`--data-dir=${data}`]));
+    const development = new FakeElectron();
+    DesktopApplicationTests.start(development, new FakeDesktopProcess("win32"));
+    const linux = new FakeElectron();
+    DesktopApplicationTests.start(linux, new FakeDesktopProcess("linux"));
+    return Promise.all([packaged.app.becomeReadyAsync(), development.app.becomeReadyAsync(), linux.app.becomeReadyAsync()]).then(() => {
+      const mainScript = resolve(fileURLToPath(DesktopApplicationTests.MODULE_URL));
+
+      Assert.areEqual(`"/electron/electron" "--data-dir=${data}"`, DesktopApplicationTests.firstWindow(packaged).appDetails?.relaunchCommand);
+      Assert.areEqual("com.noldova.teamrun", DesktopApplicationTests.firstWindow(packaged).appDetails?.appId);
+      Assert.areEqual(`"/electron/electron" "${mainScript}"`, DesktopApplicationTests.firstWindow(development).appDetails?.relaunchCommand);
+      Assert.areEqual("com.noldova.teamrun.development", DesktopApplicationTests.firstWindow(development).appDetails?.appId);
+      Assert.isNull(DesktopApplicationTests.firstWindow(linux).appDetails);
     });
   }
 

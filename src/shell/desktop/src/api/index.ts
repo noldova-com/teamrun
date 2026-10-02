@@ -31,6 +31,7 @@ export { WindowStateException } from "../exceptions/window-state.exception.js";
 export { DesktopSettings } from "../models/desktop-settings.js";
 export { DetachedStartReply } from "../models/detached-start-reply.js";
 export { DetachedStartRequest } from "../models/detached-start-request.js";
+export { TaskbarIdentity } from "../models/taskbar-identity.js";
 export { ScreenArea } from "../models/screen-area.js";
 export { SenderInfo } from "../models/sender-info.js";
 export { StartupState } from "../models/startup-state.js";
