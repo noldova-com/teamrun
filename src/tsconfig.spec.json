@@ -4,5 +4,5 @@
     "outDir": "../_build/angular/spec-tsc",
     "types": ["vitest/globals"]
   },
-  "include": ["shell/*/src/**/*.ts", "shell/*/tests/**/*.ts"]
+  "include": ["shell/ui/src/**/*.ts", "shell/ui/tests/**/*.ts"]
 }
