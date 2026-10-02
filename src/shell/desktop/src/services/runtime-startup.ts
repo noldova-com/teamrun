@@ -30,18 +30,25 @@ export class RuntimeStartup {
   private readonly publish: (state: StartupState) => void;
   private readonly handOver: (handover: RuntimeHandover) => boolean;
   private readonly waitInterval: number;
+  private readonly forward: (event: Event) => void;
   private readonly listener: IRuntimeClientListener;
   private state: StartupState = StartupState.connecting();
   private connectionValue: IRuntimeConnection | null = null;
   private isClosed: boolean = false;
 
-  public constructor(launcher: IRuntimeLauncher, publish: (state: StartupState) => void, handOver: (handover: RuntimeHandover) => boolean, waitInterval: number) {
+  public constructor(
+    launcher: IRuntimeLauncher,
+    publish: (state: StartupState) => void,
+    handOver: (handover: RuntimeHandover) => boolean,
+    waitInterval: number,
+    forward: (event: Event) => void) {
     this.launcher = launcher;
     this.publish = publish;
     this.handOver = handOver;
     this.waitInterval = waitInterval;
+    this.forward = forward;
     this.listener = {
-      onEvent: () => undefined,
+      onEvent: t => this.forward(t),
       onDisconnected: () => this.reconnect()
     };
   }

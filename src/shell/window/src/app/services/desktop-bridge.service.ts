@@ -9,9 +9,10 @@
 import { Injectable } from "@angular/core";
 
 import { nameof } from "@noldova/teamrun-foundation-core";
-import { type JsonObject, JsonReader } from "@noldova/teamrun-foundation-json";
+import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 
 import { DesktopBridgeException } from "../exceptions/desktop-bridge.exception";
+import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
 import type { IDesktopBridge } from "../interfaces/i-desktop-bridge";
 import { StartupState } from "../models/startup-state";
 import type { WindowAppearance } from "../models/window-appearance";
@@ -58,6 +59,21 @@ export class DesktopBridgeService {
     return this.bridge.writeLayout(layout);
   }
 
+  public async requestAsync(method: string, payload: JsonValue): Promise<JsonValue> {
+    const answer = JsonReader.fromValue(await this.bridge.request(method, payload));
+    if (!answer.hasField(Resources.failureField))
+      return answer.readValue(Resources.payloadField);
+    const failure = answer.readObject(Resources.failureField);
+    throw new RuntimeRequestException(
+      failure.readString(Resources.codeField),
+      failure.readString(Resources.messageField),
+      failure.hasField(Resources.detailsField) ? failure.readObject(Resources.detailsField).toJson() : undefined);
+  }
+
+  public onEvent(listener: (name: string, payload: JsonValue) => void): () => void {
+    return this.bridge.onEvent((name, payload) => listener(name, JsonReader.toJsonValue(payload)));
+  }
+
   private static find(): IDesktopBridge {
     const bridge: unknown = Reflect.get(globalThis, Resources.bridgeName);
     if (!DesktopBridgeService.isBridge(bridge))
@@ -75,6 +91,8 @@ export class DesktopBridgeService {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onStartup))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.actOnStartup))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readLayout))) &&
-      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.writeLayout)));
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.writeLayout))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.request))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onEvent)));
   }
 }

@@ -22,6 +22,7 @@ export class RuntimeStartupTests {
 
   private readonly published: string[] = [];
   private readonly handedOver: string[] = [];
+  private readonly events: string[] = [];
 
   @TestMethod
   public async attachesAndReportsTheWindowReady(): Promise<void> {
@@ -159,6 +160,7 @@ export class RuntimeStartupTests {
 
     Assert.areEqual(2, launcher.calls.length);
     Assert.areEqual("Ready", startup.current.kind);
+    Assert.areEqual(JSON.stringify(["notes.changed"]), JSON.stringify(this.events));
   }
 
   @TestMethod
@@ -202,6 +204,7 @@ export class RuntimeStartupTests {
         this.handedOver.push(t.identity.productVersion);
         return handsOver;
       },
-      waitInterval);
+      waitInterval,
+      t => this.events.push(t.name.text));
   }
 }

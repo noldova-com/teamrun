@@ -10,7 +10,7 @@ import type { BrowserWindowConstructorOptions, MenuItemConstructorOptions, Recta
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey } from "@noldova/teamrun-shell-protocol";
+import type { Event, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey } from "@noldova/teamrun-shell-protocol";
 import type { IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
 
 /**
@@ -1557,16 +1557,22 @@ export declare class RuntimeStartup {
    * @param handOver Hands the person over to a newer build; returns `false` when this build cannot, so the window
    * shows {@link StartupStateKind.NewerBuild}.
    * @param waitInterval How long to pause between attempts while waiting for an older build's work, in milliseconds.
+   * @param forward Receives each event the runtime sends on the current connection.
    * @example
    * ```ts
    * import { type IRuntimeLauncher, RuntimeStartup } from "@noldova/teamrun-shell-desktop";
    *
    * export function create(launcher: IRuntimeLauncher): RuntimeStartup {
-   *   return new RuntimeStartup(launcher, state => console.log(state.kind), () => false, 2000);
+   *   return new RuntimeStartup(launcher, state => console.log(state.kind), () => false, 2000, event => console.log(event.name.text));
    * }
    * ```
    */
-  public constructor(launcher: IRuntimeLauncher, publish: (state: StartupState) => void, handOver: (handover: RuntimeHandover) => boolean, waitInterval: number);
+  public constructor(
+    launcher: IRuntimeLauncher,
+    publish: (state: StartupState) => void,
+    handOver: (handover: RuntimeHandover) => boolean,
+    waitInterval: number,
+    forward: (event: Event) => void);
 
   /**
    * The latest state.

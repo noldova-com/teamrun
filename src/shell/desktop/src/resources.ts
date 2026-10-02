@@ -17,6 +17,15 @@ export class Resources {
   public static readonly startupActionChannel: string = "teamrun:startupAction";
   public static readonly readLayoutChannel: string = "teamrun:readLayout";
   public static readonly writeLayoutChannel: string = "teamrun:writeLayout";
+  public static readonly requestChannel: string = "teamrun:request";
+  public static readonly runtimeEventChannel: string = "teamrun:runtimeEvent";
+  public static readonly payloadField: string = "payload";
+  public static readonly failureField: string = "failure";
+  public static readonly shellOwner: string = "shell";
+  public static readonly methodParameter: string = "method";
+  public static readonly windowShellMethods: readonly string[] = [];
+  public static readonly untrustedRequest: string = "Only TeamRun's own window may call the runtime.";
+  public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
   public static readonly clientName: string = "desktop";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly stopWorkAction: string = "stopWork";
@@ -110,6 +119,10 @@ export class Resources {
 
   public static formatBoundsNotRestored(reason: string): string {
     return `The window's saved bounds could not be restored, so it opens with its default bounds: ${reason}`;
+  }
+
+  public static formatMethodRefused(method: string): string {
+    return `The window may not call ${method}; the desktop calls the shell's methods itself.`;
   }
 
   public static formatDeviceUnavailable(reason: string): string {

@@ -193,6 +193,10 @@ export class Resources {
   public static readonly titleBarHeightField: string = "titleBarHeight";
   public static readonly kindField: string = "kind";
   public static readonly detailsField: string = "details";
+  public static readonly payloadField: string = "payload";
+  public static readonly failureField: string = "failure";
+  public static readonly codeField: string = "code";
+  public static readonly messageField: string = "message";
   public static readonly unknownStartupState: string = "The startup state is not one the window knows.";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly waitAction: string = "wait";
