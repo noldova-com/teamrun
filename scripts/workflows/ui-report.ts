@@ -13,6 +13,7 @@ import UiReportException from "./ui-report.exception.ts";
 
 export default class UiReport {
   private static readonly FAILED_STATUS: string = "unexpected";
+  private static readonly PLATFORM_LOG: string = "platform-log";
   private static readonly MAXIMUM_FAILURES: number = 20;
   private static readonly MAXIMUM_MESSAGE_LENGTH: number = 300;
   private static readonly TITLE_SEPARATOR: string = " › ";
@@ -24,14 +25,16 @@ export default class UiReport {
   public readonly skipped: number;
   public readonly durationMs: number;
   public readonly failures: readonly UiFailure[];
+  public readonly platformLogLines: number;
 
-  public constructor(passed: number, failed: number, flaky: number, skipped: number, durationMs: number, failures: readonly UiFailure[]) {
+  public constructor(passed: number, failed: number, flaky: number, skipped: number, durationMs: number, failures: readonly UiFailure[], platformLogLines: number) {
     this.passed = passed;
     this.failed = failed;
     this.flaky = flaky;
     this.skipped = skipped;
     this.durationMs = durationMs;
     this.failures = [...failures];
+    this.platformLogLines = platformLogLines;
   }
 
   public static parse(text: string): UiReport {
@@ -45,24 +48,26 @@ export default class UiReport {
 
     const stats = UiReport.read(report, "stats");
     const failures: UiFailure[] = [];
+    let platformLogLines = 0;
     for (const suite of UiReport.readList(report, "suites"))
-      UiReport.collectFailures(suite, [], failures);
+      platformLogLines += UiReport.collect(suite, [], failures);
     return new UiReport(
       UiReport.readCount(stats, "expected"),
       UiReport.readCount(stats, "unexpected"),
       UiReport.readCount(stats, "flaky"),
       UiReport.readCount(stats, "skipped"),
       UiReport.readCount(stats, "duration"),
-      failures);
+      failures,
+      platformLogLines);
   }
 
   public formatSummary(target: string, screenshotUrl: string | undefined): string {
     const lines = [
       `### UI workflows: ${UiReport.escape(target)}`,
       "",
-      "| Passed | Failed | Flaky | Skipped | Duration |",
-      "|---|---|---|---|---|",
-      `| ${this.passed} | ${this.failed} | ${this.flaky} | ${this.skipped} | ${(this.durationMs / 1000).toFixed(1)} s |`,
+      "| Passed | Failed | Flaky | Skipped | Duration | Platform log lines |",
+      "|---|---|---|---|---|---|",
+      `| ${this.passed} | ${this.failed} | ${this.flaky} | ${this.skipped} | ${(this.durationMs / 1000).toFixed(1)} s | ${this.platformLogLines} |`,
       "",
       screenshotUrl === undefined || screenshotUrl.length === 0 ? "No main-window screenshot was kept." : `[Main window screenshot](${encodeURI(screenshotUrl)})`
     ];
@@ -77,15 +82,25 @@ export default class UiReport {
     return `${lines.join("\n")}\n`;
   }
 
-  private static collectFailures(suite: unknown, titles: readonly string[], failures: UiFailure[]): void {
+  private static collect(suite: unknown, titles: readonly string[], failures: UiFailure[]): number {
     const title = UiReport.readText(suite, "title");
     const path = title.length === 0 ? titles : [...titles, title];
+    let platformLogLines = 0;
     for (const spec of UiReport.readList(suite, "specs"))
-      for (const test of UiReport.readList(spec, "tests"))
+      for (const test of UiReport.readList(spec, "tests")) {
+        platformLogLines += UiReport.countPlatformLog(test);
         if (UiReport.readText(test, "status") === UiReport.FAILED_STATUS)
           failures.push(new UiFailure([...path, UiReport.readText(spec, "title")].join(UiReport.TITLE_SEPARATOR), UiReport.firstError(test)));
+      }
     for (const child of UiReport.readList(suite, "suites"))
-      UiReport.collectFailures(child, path, failures);
+      platformLogLines += UiReport.collect(child, path, failures);
+    return platformLogLines;
+  }
+
+  private static countPlatformLog(test: unknown): number {
+    return UiReport.readList(test, "results").reduce<number>(
+      (sum, result) => sum + UiReport.readList(result, "annotations").filter(t => UiReport.readText(t, "type") === UiReport.PLATFORM_LOG).length,
+      0);
   }
 
   private static firstError(test: unknown): string {

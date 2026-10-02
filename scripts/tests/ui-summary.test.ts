@@ -84,7 +84,7 @@ class UiSummaryTests {
       });
 
       assert.equal(result.status, 0, result.stderr);
-      assert.ok((await readFile(summaryPath, "utf8")).includes("| 5 | 0 | 0 | 0 | 4.0 s |"));
+      assert.ok((await readFile(summaryPath, "utf8")).includes("| 5 | 0 | 0 | 0 | 4.0 s | 0 |"));
     });
   }
 }

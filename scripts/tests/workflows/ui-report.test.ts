@@ -27,13 +27,14 @@ class UiReportTests {
             specs: [
               { title: "starts", tests: [{ status: "expected", results: [] }] },
               { title: "closes", tests: [{ status: "unexpected", results: [{ errors: [] }, { errors: [{ message: "\n\u001b[31mError: expected 0\u001b[39m\nReceived 1" }] }] }] },
+              { title: "logs", tests: [{ status: "expected", results: [{ annotations: [{ type: "platform-log", description: "a" }, { type: "environment", description: "{}" }, { type: "platform-log", description: "b" }] }] }] },
               { title: "is quiet", tests: [{ status: "unexpected", results: [{ errors: [{ message: " " }] }] }] }
             ]
           }]
         }, { title: "", specs: [{ title: "top-level", tests: [{ status: "unexpected" }] }] }]
       }));
 
-      assert.deepEqual([report.passed, report.failed, report.flaky, report.skipped, report.durationMs], [4, 1, 1, 2, 12345.6]);
+      assert.deepEqual([report.passed, report.failed, report.flaky, report.skipped, report.durationMs, report.platformLogLines], [4, 1, 1, 2, 12345.6, 2]);
       assert.deepEqual(report.failures.map(t => [t.title, t.message]), [
         ["empty-window.spec.ts › the empty window › closes", "Error: expected 0"],
         ["empty-window.spec.ts › the empty window › is quiet", "No error message was reported."],
@@ -42,10 +43,10 @@ class UiReportTests {
     });
 
     test("the summary shows the counts, the duration and the screenshot link, or says there is no screenshot", () => {
-      const report = new UiReport(5, 0, 0, 0, 2500, []);
+      const report = new UiReport(5, 0, 0, 0, 2500, [], 3);
 
       assert.equal(report.formatSummary("Linux x64", "https://github.com/noldova-com/teamrun/actions/runs/1/artifacts/2"),
-        "### UI workflows: Linux x64\n\n| Passed | Failed | Flaky | Skipped | Duration |\n|---|---|---|---|---|\n| 5 | 0 | 0 | 0 | 2.5 s |\n\n" +
+        "### UI workflows: Linux x64\n\n| Passed | Failed | Flaky | Skipped | Duration | Platform log lines |\n|---|---|---|---|---|---|\n| 5 | 0 | 0 | 0 | 2.5 s | 3 |\n\n" +
         "[Main window screenshot](https://github.com/noldova-com/teamrun/actions/runs/1/artifacts/2)\n");
       assert.ok(report.formatSummary("Linux x64", undefined).endsWith("\n\nNo main-window screenshot was kept.\n"));
       assert.ok(report.formatSummary("Linux x64", "").endsWith("\n\nNo main-window screenshot was kept.\n"));
@@ -53,7 +54,7 @@ class UiReportTests {
 
     test("the summary lists at most twenty failures, escaped, and counts the rest", () => {
       const failures = Array.from({ length: 22 }, (_, index) => ({ title: `case ${index}`, message: "a <b> & c | `d`" }));
-      const report = new UiReport(0, 22, 0, 0, 0, failures);
+      const report = new UiReport(0, 22, 0, 0, 0, failures, 0);
 
       const summary = report.formatSummary("macOS <ARM64>", undefined);
 
@@ -84,7 +85,8 @@ class UiReportTests {
         JSON.stringify({ stats: UiReportTests.STATS, suites: [1] }),
         JSON.stringify({ stats: UiReportTests.STATS, suites: [{ title: 1 }] }),
         JSON.stringify({ stats: UiReportTests.STATS, suites: [{ title: "a", specs: [null] }] }),
-        JSON.stringify({ stats: UiReportTests.STATS, suites: [{ title: "a", specs: [{ title: "b", tests: [{ status: 2 }] }] }] })
+        JSON.stringify({ stats: UiReportTests.STATS, suites: [{ title: "a", specs: [{ title: "b", tests: [{ status: 2 }] }] }] }),
+        JSON.stringify({ stats: UiReportTests.STATS, suites: [{ title: "a", specs: [{ title: "b", tests: [{ status: "expected", results: [{ annotations: [{ type: 3 }] }] }] }] }] })
       ];
 
       for (const text of malformed)
