@@ -749,6 +749,18 @@ export declare class MigratedDatabase implements Disposable {
    *
    * @param connection The open connection.
    * @param appliedMigrations The ids of the applied migrations, in order.
+   * @example
+   * ```ts
+   * import { MigratedDatabase, Migration } from "@noldova/teamrun-shell-runtime";
+   *
+   * export class ReportsDatabase extends MigratedDatabase {
+   *   public static async openAsync(file: string, backups: string): Promise<ReportsDatabase> {
+   *     const migrations = [new Migration("create-reports", ["CREATE TABLE reports (id TEXT PRIMARY KEY) STRICT"])];
+   *     const [connection, applied] = await MigratedDatabase.migrateAsync(file, "reports database", migrations, backups, "reports", new Date());
+   *     return new ReportsDatabase(connection, applied);
+   *   }
+   * }
+   * ```
    */
   protected constructor(connection: DatabaseSync, appliedMigrations: readonly string[]);
 
@@ -869,6 +881,18 @@ export declare class MigratedDatabase implements Disposable {
    * @throws {UnknownSchemaException} The promise rejects when the schema is not one the migrations recognize.
    * @throws {BackupVerificationException} The promise rejects when the backup fails verification; no migration has run.
    * @throws {MigrationException} The promise rejects when a migration fails; earlier migrations stay applied.
+   * @example
+   * ```ts
+   * import { MigratedDatabase, Migration } from "@noldova/teamrun-shell-runtime";
+   *
+   * export class ReportsDatabase extends MigratedDatabase {
+   *   public static async openAsync(file: string, backups: string): Promise<ReportsDatabase> {
+   *     const migrations = [new Migration("create-reports", ["CREATE TABLE reports (id TEXT PRIMARY KEY) STRICT"])];
+   *     const [connection, applied] = await MigratedDatabase.migrateAsync(file, "reports database", migrations, backups, "reports", new Date());
+   *     return new ReportsDatabase(connection, applied);
+   *   }
+   * }
+   * ```
    */
   protected static migrateAsync(
     file: string,
