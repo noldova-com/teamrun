@@ -8,6 +8,7 @@
 
 import type { BrowserWindowConstructorOptions, MenuItemConstructorOptions, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
 
+import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import type { RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
 import type { IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
@@ -760,6 +761,64 @@ export interface IElectron {
    * ```
    */
   createWindow(options: BrowserWindowConstructorOptions): IDesktopWindow;
+}
+
+/**
+ * The exception thrown when this device's identity file cannot be read or holds no valid identity.
+ */
+export declare class DeviceIdentityException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What is wrong with the file.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { DeviceIdentityException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: DeviceIdentityException = new DeviceIdentityException("The device identity is not valid.");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
+ * This device's identity: a random id the desktop creates once and keeps outside the data directory, so state tied
+ * to a device, such as window bounds, never travels with the data.
+ */
+export declare class DeviceIdentity {
+  /**
+   * The device-local folder that keeps the identity: `%LOCALAPPDATA%\Noldova\TeamRun` on Windows,
+   * `~/Library/Application Support/Noldova/TeamRun` on macOS and `$XDG_STATE_HOME/noldova/teamrun` (by default
+   * `~/.local/state/noldova/teamrun`) on Linux.
+   *
+   * @param platform The operating system, as Node.js names it.
+   * @param environment The environment, which may set `LOCALAPPDATA` or `XDG_STATE_HOME`.
+   * @param homeFolder The person's home folder.
+   * @returns The folder.
+   * @example
+   * ```ts
+   * import { DeviceIdentity } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const folder: string = DeviceIdentity.locateFolder("linux", {}, "/home/person");
+   * ```
+   */
+  public static locateFolder(platform: string, environment: NodeJS.ProcessEnv, homeFolder: string): string;
+
+  /**
+   * Reads the identity from the folder's `device.json`, creating the folder and a new identity when there is none.
+   *
+   * @param folder The folder that keeps the identity.
+   * @returns A promise of the identity, a lowercase UUID.
+   * @throws DeviceIdentityException as a rejection when the file cannot be read or holds no valid identity.
+   * @example
+   * ```ts
+   * import { DeviceIdentity } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const id: string = await DeviceIdentity.readOrCreateAsync("/home/person/.local/state/noldova/teamrun");
+   * ```
+   */
+  public static readOrCreateAsync(folder: string): Promise<string>;
 }
 
 /**

@@ -29,6 +29,20 @@ export class Resources {
   public static readonly runAsNodeVariable: string = "ELECTRON_RUN_AS_NODE";
   public static readonly runAsNodeValue: string = "1";
   public static readonly workWaitInterval: number = 2000;
+  public static readonly deviceDirectoryArgument: string = "--device-dir=";
+  public static readonly windowsPlatform: string = "win32";
+  public static readonly localAppDataVariable: string = "LOCALAPPDATA";
+  public static readonly windowsLocalAppData: readonly string[] = ["AppData", "Local"];
+  public static readonly windowsDeviceFolder: readonly string[] = ["Noldova", "TeamRun"];
+  public static readonly macDeviceFolder: readonly string[] = ["Library", "Application Support", "Noldova", "TeamRun"];
+  public static readonly xdgStateVariable: string = "XDG_STATE_HOME";
+  public static readonly xdgStateDefault: readonly string[] = [".local", "state"];
+  public static readonly linuxDeviceFolder: readonly string[] = ["noldova", "teamrun"];
+  public static readonly deviceFileName: string = "device.json";
+  public static readonly deviceIdField: string = "id";
+  public static readonly createOnlyFlag: string = "wx";
+  public static readonly textEncoding: BufferEncoding = "utf8";
+  public static readonly uuidPattern: RegExp = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   public static readonly hashPrefix: string = "#";
   public static readonly queryPrefix: string = "?";
   public static readonly macPlatform: string = "darwin";
@@ -71,6 +85,10 @@ export class Resources {
   public static readonly invalidAppearance: string = "The window appearance is not valid.";
   public static readonly invalidColor: string = "A window color is a hexadecimal color or an rgb() or rgba() color.";
   public static readonly colorPattern: RegExp = /^(?:#[0-9A-Fa-f]{3,8}|rgba?\([0-9., %/]+\))$/;
+
+  public static formatInvalidDevice(file: string): string {
+    return `The device identity in ${file} is not valid; remove the file to give this device a new identity.`;
+  }
 
   public static formatAppearanceRejected(reason: string): string {
     return `The window reported an appearance that is not valid, so it is shown without it: ${reason}`;

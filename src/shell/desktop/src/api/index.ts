@@ -7,6 +7,7 @@
  */
 
 export { StartupStateKind } from "../enums/startup-state-kind.js";
+export { DeviceIdentityException } from "../exceptions/device-identity.exception.js";
 export type { IApplicationHost } from "../interfaces/i-application-host.js";
 export type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 export type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
@@ -29,5 +30,6 @@ export { WindowAppearance } from "../models/window-appearance.js";
 export { WindowState } from "../models/window-state.js";
 export { CloseCoordinator } from "../services/close-coordinator.js";
 export { DesktopApplication } from "../services/desktop-application.js";
+export { DeviceIdentity } from "../services/device-identity.js";
 export { RuntimeStartup } from "../services/runtime-startup.js";
 export { SenderPolicy } from "../services/sender-policy.js";
