@@ -8,38 +8,38 @@ LICENSE file in the root directory of this source tree.
 
 <tr-panel-card class="tr-tab-group-card" [surface]="surface()" [attr.data-drop-group]="group().id">
   <div class="tr-tab-group-bar">
-    <div #scroller class="tr-tab-group-scroller tr-scroll-reveal" (wheel)="scrollAcross($event, scroller)">
-    <div class="tr-tab-group-strip" role="tablist" data-drop-tabs (keydown)="onStripKey($event)">
-      @for (tab of group().tabs; track tab.key; let index = $index) {
-        @let label = labels.of(tab);
-        <tr-tab-menu #menu [tab]="tab" />
-        <tr-tab [label]="label.title" [icon]="label.icon" [selected]="tab.equals(group().active)" [attr.data-tab-index]="index"
-          [attr.data-tab-key]="tab.key" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, index)" [class.tr-tab-dragged]="tab.equals(drag.dragging())"
-          [matContextMenuTriggerFor]="menu.menu()" (activate)="layout.activate(tab)" (close)="layout.close(tab)" (pointerdown)="drag.begin(tab, $event)"
-          (keydown)="menu.openFromKeyboard($event)" />
-      }
-      <span class="tr-tab-group-end" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, group().tabs.length)"></span>
-    </div>
-    <div #actions class="tr-tab-group-actions" [class.tr-tab-group-actions-shell]="isShell()">
-      @if (isOverflowing()) {
-        <button type="button" tr-icon-button class="tr-tab-group-overflow" [icon]="resources.overflowGlyph" [label]="resources.overflowLabel"
-          [matMenuTriggerFor]="overflow" [matMenuTriggerRestoreFocus]="false"></button>
-        <mat-menu #overflow="matMenu">
-          @for (tab of group().tabs; track tab.key) {
-            <button mat-menu-item class="tr-tab-group-overflow-tab" [attr.data-tab]="tab.key" (click)="choose(tab)">{{ labels.of(tab).title }}</button>
-          }
-        </mat-menu>
-      }
-      @if (group().active; as active) {
-        <tr-tab-menu #actions [tab]="active" />
-        <button type="button" tr-icon-button class="tr-tab-group-menu" [icon]="resources.panelActionsGlyph" [label]="resources.panelActionsLabel"
-          [matMenuTriggerFor]="actions.menu()"></button>
-      }
-      @if (hideSide(); as side) {
-        <button type="button" tr-icon-button class="tr-tab-group-hide" [icon]="resources.hideDockGlyphs[side]" [label]="resources.hideDockLabels[side]"
-          (click)="layout.toggleDock(side)"></button>
-      }
-    </div>
+    <div #scroller="trTabScroller" class="tr-tab-group-scroller tr-scroll-reveal" [trTabScroller]="actionBar" [trTabScrollerFrame]="frame()">
+      <div class="tr-tab-group-strip" role="tablist" data-drop-tabs (keydown)="onStripKey($event)">
+        @for (tab of group().tabs; track tab.key; let index = $index) {
+          @let label = labels.of(tab);
+          <tr-tab-menu #menu [tab]="tab" />
+          <tr-tab [label]="label.title" [icon]="label.icon" [selected]="tab.equals(group().active)" [attr.data-tab-index]="index"
+            [attr.data-tab-key]="tab.key" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, index)" [class.tr-tab-dragged]="tab.equals(drag.dragging())"
+            [matContextMenuTriggerFor]="menu.menu()" (activate)="layout.activate(tab)" (close)="layout.close(tab)" (pointerdown)="drag.begin(tab, $event)"
+            (keydown)="menu.openFromKeyboard($event)" />
+        }
+        <span class="tr-tab-group-end" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, group().tabs.length)"></span>
+      </div>
+      <div #actionBar class="tr-tab-group-actions" [class.tr-tab-group-actions-shell]="isShell()">
+        @if (scroller.isOverflowing()) {
+          <button type="button" tr-icon-button class="tr-tab-group-overflow" [icon]="resources.overflowGlyph" [label]="resources.overflowLabel"
+            [matMenuTriggerFor]="overflow" [matMenuTriggerRestoreFocus]="false"></button>
+          <mat-menu #overflow="matMenu">
+            @for (tab of group().tabs; track tab.key) {
+              <button mat-menu-item class="tr-tab-group-overflow-tab" [attr.data-tab]="tab.key" (click)="choose(tab)">{{ labels.of(tab).title }}</button>
+            }
+          </mat-menu>
+        }
+        @if (group().active; as active) {
+          <tr-tab-menu #actions [tab]="active" />
+          <button type="button" tr-icon-button class="tr-tab-group-menu" [icon]="resources.panelActionsGlyph" [label]="resources.panelActionsLabel"
+            [matMenuTriggerFor]="actions.menu()"></button>
+        }
+        @if (hideSide(); as side) {
+          <button type="button" tr-icon-button class="tr-tab-group-hide" [icon]="resources.hideDockGlyphs[side]" [label]="resources.hideDockLabels[side]"
+            (click)="layout.toggleDock(side)"></button>
+        }
+      </div>
     </div>
   </div>
   <div class="tr-tab-group-body" role="tabpanel">

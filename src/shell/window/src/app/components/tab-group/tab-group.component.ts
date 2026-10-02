@@ -6,13 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import {
-  ChangeDetectionStrategy, Component, ElementRef, type Signal, type WritableSignal, afterRenderEffect, computed, inject, input, signal, viewChild
-} from "@angular/core";
+import { ChangeDetectionStrategy, Component, ElementRef, type Signal, computed, inject, input } from "@angular/core";
 import { MatMenuModule } from "@angular/material/menu";
 
 import "@noldova/teamrun-foundation-core";
-import { AppearanceService, IconButtonComponent, PanelCardComponent, PanelSurface, TabComponent } from "@noldova/teamrun-shell-ui";
+import { IconButtonComponent, PanelCardComponent, PanelSurface, TabComponent } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
 import type { DockSide } from "../../enums/dock-side";
@@ -23,10 +21,11 @@ import { LayoutService } from "../../services/layout.service";
 import { TabDragService } from "../../services/tab-drag.service";
 import { TabLabelService } from "../../services/tab-label.service";
 import { TabMenuComponent } from "../tab-menu/tab-menu.component";
+import { TabScrollerDirective } from "./tab-scroller.directive";
 
 @Component({
   selector: "tr-tab-group",
-  imports: [IconButtonComponent, MatMenuModule, PanelCardComponent, TabComponent, TabMenuComponent],
+  imports: [IconButtonComponent, MatMenuModule, PanelCardComponent, TabComponent, TabMenuComponent, TabScrollerDirective],
   templateUrl: "./tab-group.component.html",
   styleUrl: "./tab-group.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -41,14 +40,11 @@ import { TabMenuComponent } from "../tab-menu/tab-menu.component";
 })
 export class TabGroupComponent {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-  private readonly scroller: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("scroller");
-  private readonly actions: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("actions");
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly layout: LayoutService = inject(LayoutService);
   protected readonly drag: TabDragService = inject(TabDragService);
   protected readonly labels: TabLabelService = inject(TabLabelService);
-  protected readonly isOverflowing: WritableSignal<boolean> = signal(false);
   protected readonly group: Signal<TabGroup> = computed(() => this.frame().group);
   protected readonly surface: Signal<PanelSurface> = computed(() => Object.isNull(this.frame().side) ? PanelSurface.Panel : PanelSurface.Shell);
   protected readonly isShell: Signal<boolean> = computed(() => this.surface() === PanelSurface.Shell);
@@ -59,31 +55,11 @@ export class TabGroupComponent {
 
   public readonly frame = input.required<GroupFrame>();
 
-  public constructor() {
-    const appearance = inject(AppearanceService);
-    afterRenderEffect(() => {
-      this.frame();
-      this.isOverflowing();
-      appearance.typography();
-      const scroller = this.scroller().nativeElement;
-      scroller.style.scrollPaddingInlineEnd = `${this.actions().nativeElement.offsetWidth}px`;
-      scroller.querySelectorAll(Resources.selectedTabSelector).forEach(t => t.scrollIntoView(Resources.revealOptions));
-      this.isOverflowing.set(scroller.scrollWidth > scroller.clientWidth);
-    });
-  }
-
   protected choose(tab: Tab): void {
     this.layout.activate(tab);
     for (const element of this.host.querySelectorAll<HTMLElement>(Resources.tabKeySelector))
       if (element.dataset[Resources.tabKeyData] === tab.key)
         element.focus();
-  }
-
-  protected scrollAcross(event: WheelEvent, scroller: HTMLElement): void {
-    if (event.deltaX !== 0 || event.deltaY === 0 || scroller.scrollWidth <= scroller.clientWidth)
-      return;
-    event.preventDefault();
-    scroller.scrollLeft += event.deltaY;
   }
 
   protected onStripKey(event: KeyboardEvent): void {

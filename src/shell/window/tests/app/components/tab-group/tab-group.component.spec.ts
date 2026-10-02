@@ -227,7 +227,7 @@ describe("TabGroupComponent", () => {
     expect(document.activeElement).toBe(tab(0, 0));
   });
 
-  it("pins the actions at the strip's end, keeps the revealed tab clear of them and scrolls the strip sideways with a vertical wheel", async () => {
+  it("pins the actions at the strip's end and keeps the revealed tab clear of them", async () => {
     const many = Array.from({ length: 12 }, (_, index) => new DocumentTab("notes.note", `note ${index}`));
     await renderAsync(many.reduce((current, t) => current.openDocument(t), Layout.createDefault(registry)), 60);
     update();
@@ -235,22 +235,9 @@ describe("TabGroupComponent", () => {
     update();
     const scroller = group(0).querySelector<HTMLElement>(".tr-tab-group-scroller") ?? host;
     const actions = group(0).querySelector<HTMLElement>(".tr-tab-group-actions") ?? host;
-    const wheel = (init: WheelEventInit, target: HTMLElement = scroller): WheelEvent => {
-      const event = new WheelEvent("wheel", { bubbles: true, cancelable: true, ...init });
-      target.dispatchEvent(event);
-      return event;
-    };
-    scroller.scrollLeft = 0;
 
     expect(getComputedStyle(actions).position).toBe("sticky");
     expect(scroller.style.scrollPaddingInlineEnd).toBe(`${actions.offsetWidth}px`);
-    expect(wheel({ deltaX: 40, deltaY: 40 }).defaultPrevented).toBe(false);
-    expect(wheel({ deltaY: 0 }).defaultPrevented).toBe(false);
-    expect(scroller.scrollLeft).toBe(0);
-    expect(wheel({ deltaY: 80 }).defaultPrevented).toBe(true);
-    expect(scroller.scrollLeft).toBeGreaterThan(0);
-    const quiet = group(1).querySelector<HTMLElement>(".tr-tab-group-scroller") ?? host;
-    expect(wheel({ deltaY: 80 }, quiet).defaultPrevented).toBe(false);
   });
 
   it("drops the overflow list once the group is wide enough", async () => {
