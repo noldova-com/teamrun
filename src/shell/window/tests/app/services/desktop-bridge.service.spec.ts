@@ -142,7 +142,7 @@ describe("DesktopBridgeService", () => {
     expect(failure).toBeInstanceOf(RuntimeRequestException);
     expect([(failure as RuntimeRequestException).code, (failure as RuntimeRequestException).message, (failure as RuntimeRequestException).details])
       .toEqual(["NotFound", "There is no such note.", { path: "/notes/a.md" }]);
-    expect([(bare as RuntimeRequestException).code, Object.hasOwn(bare as object, "details")]).toEqual(["Unavailable", false]);
+    expect([(bare as RuntimeRequestException).code, (bare as RuntimeRequestException).details]).toEqual(["Unavailable", undefined]);
   });
 
   it("refuses an answer that is not a JSON object", async () => {

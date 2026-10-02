@@ -10,9 +10,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import "@noldova/teamrun-foundation-core";
-import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
-import { type JsonObject, JsonException, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
-import { type Event, Failure, FailureCode, QualifiedName, type Response, type RuntimeHandover, ShellMethods, WindowStateKey } from "@noldova/teamrun-shell-protocol";
+import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
+import { type Event, Failure, FailureCode, QualifiedName, Response, type RuntimeHandover, ShellMethods, WindowStateKey } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, DataDirectoryLocator, LaunchSettings, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
@@ -148,36 +147,25 @@ export class DesktopApplication {
   private async requestAsync(event: IIpcEvent, method: unknown, payload: unknown): Promise<JsonObject> {
     if (Object.isNull(this.findTrusted(event)))
       return DesktopApplication.fail(FailureCode.Unauthorized, Resources.untrustedRequest);
-    if (!Object.isString(method))
+    const name = DesktopApplication.readMethod(method);
+    if (Object.isNull(name))
       return DesktopApplication.fail(FailureCode.InvalidMessage, Resources.methodNotText);
-    let name: QualifiedName;
-    let value: JsonValue;
-    try {
-      name = QualifiedName.parse(method, Resources.methodParameter);
-      value = JsonReader.toJsonValue(payload);
-    }
-    catch (error) {
-      if (!(error instanceof ArgumentException || error instanceof JsonException))
-        throw error;
-      return DesktopApplication.fail(FailureCode.InvalidMessage, error.message);
-    }
+    const value = DesktopApplication.readPayload(payload);
+    if (Object.isUndefined(value))
+      return DesktopApplication.fail(FailureCode.InvalidMessage, Resources.payloadNotJson);
     if (name.owner === Resources.shellOwner && !Resources.windowShellMethods.includes(name.text))
       return DesktopApplication.fail(FailureCode.Unauthorized, Resources.formatMethodRefused(name.text));
     const connection = this.startup.connection;
     if (Object.isNull(connection))
       return DesktopApplication.fail(FailureCode.Unavailable, Resources.runtimeNotConnected);
-    let response: Response;
     try {
-      response = await connection.callAsync(name, value);
+      return (await connection.callAsync(name, value)).toJson();
     }
     catch (error) {
       if (!(error instanceof ConnectionException))
         throw error;
       return DesktopApplication.fail(FailureCode.Unavailable, error.message);
     }
-    return Object.isUndefined(response.failure)
-      ? { [Resources.payloadField]: response.payload ?? null }
-      : { [Resources.failureField]: response.failure.toJson() };
   }
 
   private async prepareAsync(open: OpenWindow): Promise<void> {
@@ -256,7 +244,27 @@ export class DesktopApplication {
   }
 
   private static fail(code: FailureCode, message: string): JsonObject {
-    return { [Resources.failureField]: new Failure(code, message).toJson() };
+    return Response.failure(null, new Failure(code, message)).toJson();
+  }
+
+  private static readMethod(method: unknown): QualifiedName | null {
+    if (!Object.isString(method))
+      return null;
+    try {
+      return QualifiedName.parse(method, Resources.methodParameter);
+    }
+    catch {
+      return null;
+    }
+  }
+
+  private static readPayload(payload: unknown): JsonValue | undefined {
+    try {
+      return JsonReader.toJsonValue(payload);
+    }
+    catch {
+      return undefined;
+    }
   }
 
   private static readArgument(argv: readonly string[], prefix: string): string | undefined {

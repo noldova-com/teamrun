@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { ShellMethods } from "@noldova/teamrun-shell-protocol";
+
 export class Resources {
   public static readonly applicationName: string = "TeamRun";
   public static readonly appUserModelId: string = "com.noldova.teamrun";
@@ -19,13 +21,12 @@ export class Resources {
   public static readonly writeLayoutChannel: string = "teamrun:writeLayout";
   public static readonly requestChannel: string = "teamrun:request";
   public static readonly runtimeEventChannel: string = "teamrun:runtimeEvent";
-  public static readonly payloadField: string = "payload";
-  public static readonly failureField: string = "failure";
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
-  public static readonly windowShellMethods: readonly string[] = [];
+  public static readonly windowShellMethods: readonly string[] = [ShellMethods.modules.text];
   public static readonly untrustedRequest: string = "Only TeamRun's own window may call the runtime.";
   public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
+  public static readonly payloadNotJson: string = "The payload must be a JSON value.";
   public static readonly clientName: string = "desktop";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly stopWorkAction: string = "stopWork";

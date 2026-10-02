@@ -9,7 +9,7 @@
 import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
-import { type RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
+import { type Event, type RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
 import {
   ConnectionException,
   type IRuntimeClientListener,

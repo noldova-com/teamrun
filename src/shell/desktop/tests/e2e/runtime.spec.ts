@@ -51,3 +51,18 @@ test.describe("builds", () => {
     }
   });
 });
+
+test.describe("requests from the window", () => {
+  test("the window asks the runtime for its modules and may not stop it", async ({ desktop }) => {
+    await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
+    const request = (method: string, payload: unknown): Promise<unknown> =>
+      desktop.window.evaluate(([name, value]) => (Reflect.get(globalThis, "teamrun") as { request(method: unknown, payload: unknown): Promise<unknown> }).request(name, value), [method, payload] as const);
+
+    const modules = await request("shell.modules", null) as { payload: { modules: unknown[] } };
+    const stop = await request("shell.stop", { policy: "IfIdle" }) as { failure: { code: string } };
+
+    expect(Array.isArray(modules.payload.modules)).toBe(true);
+    expect(stop.failure.code).toBe("Unauthorized");
+    expect(await desktop.readRuntimeProcessIdAsync()).toBeDefined();
+  });
+});

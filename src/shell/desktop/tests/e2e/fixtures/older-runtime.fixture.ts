@@ -17,6 +17,7 @@ import { DataDirectory, DiscoveryReader, RuntimeBuild, RuntimeEntry } from "@nol
 export default class OlderRuntimeFixture {
   private static readonly VERSION: string = "0.0.0";
   private static readonly START_TIMEOUT: number = 20_000;
+  private static readonly DECLARATIONS: readonly string[] = ["_build", "modules", "declarations.json"];
 
   private readonly folder: string;
   private readonly child: ChildProcess;
@@ -34,6 +35,7 @@ export default class OlderRuntimeFixture {
     const folder = path.resolve("_build", "runtime-builds", `${OlderRuntimeFixture.VERSION}-${process.pid}-${Date.now()}`);
     const copy = path.join(folder, "node_modules", "@noldova", "teamrun-shell-runtime");
     await cp(installed, copy, { recursive: true });
+    await cp(path.resolve(...OlderRuntimeFixture.DECLARATIONS), path.join(folder, ...OlderRuntimeFixture.DECLARATIONS));
     const resources = path.join(copy, "resources.js");
     const text = (await readFile(resources, "utf8"))
       .replace(`productVersion = "${RuntimeBuild.identity.productVersion}"`, `productVersion = "${OlderRuntimeFixture.VERSION}"`)

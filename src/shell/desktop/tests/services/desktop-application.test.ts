@@ -12,8 +12,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { JsonException } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, PreShellData, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
-import { DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
+import { BuildIdentity, Event, Failure, FailureCode, PreShellData, QualifiedName, Response, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
+import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
 import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent, WindowStateException } from "@noldova/teamrun-shell-desktop";
 
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
@@ -447,6 +447,79 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async passesItsWindowsRequestsToTheRuntimeAndAnswersAsItDoes(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.answers.set("notes.open", Response.success("r", { title: "Notes" }));
+    connection.answers.set("shell.modules", Response.success("r", { modules: [] }));
+    connection.answers.set("notes.missing", Response.failure("r", new Failure(FailureCode.NotFound, "There is no such note.")));
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    const opened = await DesktopApplicationTests.requestAsync(electron, event, "notes.open", { path: "/notes/a.md" });
+    const modules = await DesktopApplicationTests.requestAsync(electron, event, "shell.modules", null);
+    const missing = await DesktopApplicationTests.requestAsync(electron, event, "notes.missing", null);
+
+    Assert.areEqual(JSON.stringify({ title: "Notes" }), JSON.stringify(opened.payload));
+    Assert.areEqual(JSON.stringify({ modules: [] }), JSON.stringify(modules.payload));
+    Assert.areEqual(JSON.stringify({ code: "NotFound", message: "There is no such note." }), JSON.stringify(missing.failure?.toJson()));
+  }
+
+  @TestMethod
+  public async refusesRequestsItsWindowMayNotMake(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const trusted = DesktopApplicationTests.trustedEvent("linux");
+    const requests: readonly [IIpcEvent, unknown, unknown][] = [
+      [{ sender: { id: 1 }, senderFrame: null }, "notes.open", null],
+      [trusted, 5, null],
+      [trusted, "notes", null],
+      [trusted, "notes.open", { at: (): number => 1 }],
+      [trusted, "shell.stop", { policy: "IfIdle" }],
+      [trusted, "shell.writeWindowLayout", null]
+    ];
+
+    const answers: string[] = [];
+    for (const [event, method, payload] of requests)
+      answers.push(String((await DesktopApplicationTests.requestAsync(electron, event, method, payload)).failure?.code));
+
+    Assert.areEqual(JSON.stringify(["Unauthorized", "InvalidMessage", "InvalidMessage", "InvalidMessage", "Unauthorized", "Unauthorized"]), JSON.stringify(answers));
+    Assert.areEqual(JSON.stringify(["shell.readWindowBounds"]), JSON.stringify(connection.calls));
+  }
+
+  @TestMethod
+  public async answersUnavailableWithoutARuntimeAndPassesOnDefects(): Promise<void> {
+    const refused = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new PreShellDataFoundException(new PreShellData("/data/old"))));
+    const connection = new FakeRuntimeConnection();
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const event = DesktopApplicationTests.trustedEvent("linux");
+    await DesktopApplicationTests.waitAsync(() => connection.calls.length > 0);
+
+    const unconnected = await DesktopApplicationTests.requestAsync(refused, event, "notes.open", null);
+    connection.rejection = new ConnectionException("The connection to the runtime closed.");
+    const closed = await DesktopApplicationTests.requestAsync(electron, event, "notes.open", null);
+    connection.rejection = new TypeError("A defect.");
+
+    await Assert.throwsAsync(() => DesktopApplicationTests.requestAsync(electron, event, "notes.open", null), TypeError);
+    Assert.areEqual(JSON.stringify({ code: "Unavailable", message: "TeamRun is not connected to its runtime." }), JSON.stringify(unconnected.failure?.toJson()));
+    Assert.areEqual(JSON.stringify({ code: "Unavailable", message: "The connection to the runtime closed." }), JSON.stringify(closed.failure?.toJson()));
+  }
+
+  @TestMethod
+  public async passesTheRuntimesEventsToItsWindowsThatRemain(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher();
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher);
+    const window = DesktopApplicationTests.firstWindow(electron);
+
+    launcher.listener?.onEvent(new Event(new QualifiedName("notes", "changed"), { path: "/notes/a.md" }));
+    window.isGone = true;
+    launcher.listener?.onEvent(new Event(new QualifiedName("notes", "changed"), null));
+
+    Assert.areEqual(
+      JSON.stringify([["teamrun:runtimeEvent", "notes.changed", { path: "/notes/a.md" }]]),
+      JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
+  }
+
+  @TestMethod
   public async savesTheBoundsBeforeTheWindowCloses(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
@@ -583,6 +656,10 @@ export class DesktopApplicationTests {
     await electron.app.becomeReadyAsync();
     await setImmediate();
     return electron;
+  }
+
+  private static async requestAsync(electron: FakeElectron, event: IIpcEvent, method: unknown, payload: unknown): Promise<Response> {
+    return Response.fromJson(await (electron.ipcMain.invoke("teamrun:request", event, method, payload) as Promise<unknown>));
   }
 
   private static closeRequests(window: FakeDesktopWindow): unknown[][] {

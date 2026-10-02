@@ -16,10 +16,17 @@ export class FakeRuntimeConnection implements IRuntimeConnection {
   public isClosed: boolean = false;
   public isFailing: boolean = false;
   public onCall?: () => void;
+  public rejection?: Error;
+  public readonly answers: Map<string, Response> = new Map();
 
   public callAsync(method: QualifiedName, payload: JsonValue): Promise<Response> {
     this.calls.push(method.text);
     this.onCall?.();
+    if (!Object.isUndefined(this.rejection))
+      return Promise.reject(this.rejection);
+    const answer = this.answers.get(method.text);
+    if (!Object.isUndefined(answer))
+      return Promise.resolve(answer);
     if (this.isFailing)
       return Promise.resolve(Response.failure("r", new Failure(FailureCode.Internal, "The database is busy.")));
     if (method.text === ShellMethods.writeWindowBounds.text || method.text === ShellMethods.writeWindowLayout.text) {
