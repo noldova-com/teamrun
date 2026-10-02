@@ -24,8 +24,8 @@ export class FakeElectron implements IElectron {
   public readonly menu: FakeMenuHost = new FakeMenuHost();
   public readonly windows: FakeDesktopWindow[] = [];
 
-  public constructor(hasLock: boolean = true) {
-    this.app = new FakeApplicationHost(hasLock);
+  public constructor(hasLock: boolean = true, isPackaged: boolean = false) {
+    this.app = new FakeApplicationHost(hasLock, isPackaged);
   }
 
   public createWindow(options: BrowserWindowConstructorOptions): FakeDesktopWindow {

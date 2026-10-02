@@ -9,6 +9,156 @@
 import type { BrowserWindowConstructorOptions, MenuItemConstructorOptions, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
 
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
+import type { RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
+import type { IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
+
+/**
+ * Where starting or attaching to the runtime stands, as the window shows it.
+ */
+export declare enum StartupStateKind {
+  /**
+   * The desktop is starting or attaching to the runtime.
+   */
+  Connecting = "Connecting",
+
+  /**
+   * The data directory holds data from before the shell; the person may move it aside.
+   */
+  PreShellData = "PreShellData",
+
+  /**
+   * An older build's runtime has work in progress; the person chooses to wait for it or stop it.
+   */
+  WorkInProgress = "WorkInProgress",
+
+  /**
+   * The desktop waits for an older build's work to finish.
+   */
+  WaitingForWork = "WaitingForWork",
+
+  /**
+   * A newer build's runtime owns the data directory and this build cannot start it.
+   */
+  NewerBuild = "NewerBuild",
+
+  /**
+   * The runtime could not be started or reached; the person may try again.
+   */
+  Failed = "Failed",
+
+  /**
+   * The desktop is connected to the runtime.
+   */
+  Ready = "Ready"
+}
+
+/**
+ * The process the desktop runs in: its arguments, environment and platform, and how it starts another program.
+ */
+export interface IDesktopProcess {
+  /**
+   * The command-line arguments, including `--data-dir=` and `--user-data-dir=`.
+   */
+  readonly argv: readonly string[];
+
+  /**
+   * The environment, which a started runtime inherits.
+   */
+  readonly env: NodeJS.ProcessEnv;
+
+  /**
+   * The operating system, as Node.js names it.
+   */
+  readonly platform: string;
+
+  /**
+   * The program the desktop runs from, which also runs the runtime in Node mode.
+   */
+  readonly execPath: string;
+
+  /**
+   * The person's home folder.
+   */
+  readonly homeFolder: string;
+
+  /**
+   * Starts another program, detached, for the hand-over to a newer build.
+   *
+   * @param executablePath The program.
+   * @example
+   * ```ts
+   * import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function handOver(process: IDesktopProcess): void {
+   *   process.startDetached("/opt/teamrun/teamrun");
+   * }
+   * ```
+   */
+  startDetached(executablePath: string): void;
+}
+
+/**
+ * A connection to the runtime, as `RuntimeClient` provides it.
+ */
+export interface IRuntimeConnection {
+  /**
+   * Closes the connection.
+   *
+   * @example
+   * ```ts
+   * import type { IRuntimeConnection } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function disconnect(connection: IRuntimeConnection): void {
+   *   connection.close();
+   * }
+   * ```
+   */
+  close(): void;
+}
+
+/**
+ * Starts or attaches to the runtime of a data directory, as `RuntimeLauncher` does.
+ */
+export interface IRuntimeLauncher {
+  /**
+   * Connects to the data directory's runtime of this build, starting one when none runs.
+   *
+   * @param clientName The client's name.
+   * @param listener Receives events and the disconnection.
+   * @param policy What to do when an older runtime has work in progress.
+   * @returns A promise of the connection.
+   * @throws RuntimeHandoverException, PreShellDataFoundException, WorkInProgressException, LaunchException or ConnectionException
+   * as a rejection, as `RuntimeLauncher.attachAsync` does.
+   * @example
+   * ```ts
+   * import type { IRuntimeConnection, IRuntimeLauncher } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function attachAsync(launcher: IRuntimeLauncher): Promise<IRuntimeConnection> {
+   *   return launcher.attachAsync("desktop", { onEvent: () => undefined, onDisconnected: () => undefined });
+   * }
+   * ```
+   */
+  attachAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy): Promise<IRuntimeConnection>;
+
+  /**
+   * Moves data from before the shell aside, then connects as {@link attachAsync} does.
+   *
+   * @param clientName The client's name.
+   * @param listener Receives events and the disconnection.
+   * @param policy What to do when an older runtime has work in progress.
+   * @returns A promise of the connection, once the data is moved aside.
+   * @throws The rejections of {@link attachAsync}, except PreShellDataFoundException.
+   * @example
+   * ```ts
+   * import type { IRuntimeConnection, IRuntimeLauncher } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function moveAsideAsync(launcher: IRuntimeLauncher): Promise<IRuntimeConnection> {
+   *   return launcher.moveAsideAsync("desktop", { onEvent: () => undefined, onDisconnected: () => undefined });
+   * }
+   * ```
+   */
+  moveAsideAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy): Promise<IRuntimeConnection>;
+}
 
 /**
  * An event whose default action a listener can cancel.
@@ -102,6 +252,11 @@ export interface IIpcHost {
  */
 export interface IApplicationHost {
   /**
+   * Whether this is a packaged build rather than a development run from a checkout.
+   */
+  readonly isPackaged: boolean;
+
+  /**
    * Sets the application's name.
    *
    * @param name The name.
@@ -130,6 +285,22 @@ export interface IApplicationHost {
    * ```
    */
   setAppUserModelId(id: string): void;
+
+  /**
+   * Sets where Electron keeps the application's own data, its caches and Chromium storage.
+   *
+   * @param name The path's name; the desktop sets only `userData`.
+   * @param path The folder.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function keepProfile(app: IApplicationHost): void {
+   *   app.setPath("userData", "/home/person/.noldova/teamrun/desktop");
+   * }
+   * ```
+   */
+  setPath(name: "userData", path: string): void;
 
   /**
    * Claims the single-instance lock.
@@ -190,8 +361,8 @@ export interface IApplicationHost {
   whenReady(): Promise<unknown>;
 
   /**
-   * Listens for a lifecycle event: another instance starting, the last window closing or the application being
-   * activated.
+   * Listens for a lifecycle event: another instance starting, the last window closing, the application being
+   * activated or about to quit.
    *
    * @param event The event's name.
    * @param listener Called on each occurrence.
@@ -208,6 +379,7 @@ export interface IApplicationHost {
   on(event: "second-instance", listener: () => void): unknown;
   on(event: "window-all-closed", listener: () => void): unknown;
   on(event: "activate", listener: () => void): unknown;
+  on(event: "will-quit", listener: () => void): unknown;
 }
 
 /**
@@ -745,6 +917,134 @@ export declare class SenderInfo {
 }
 
 /**
+ * Where starting the runtime stands, with what the window shows for it: the location of data from before the shell,
+ * the descriptions of an older build's work, a newer build's version, or why the runtime could not start.
+ */
+export declare class StartupState {
+  /**
+   * Where starting stands.
+   */
+  public readonly kind: StartupStateKind;
+
+  /**
+   * What the window shows for it; empty for {@link StartupStateKind.Connecting} and {@link StartupStateKind.Ready}.
+   */
+  public readonly details: readonly string[];
+
+  private constructor();
+
+  /**
+   * The state while starting or attaching.
+   *
+   * @returns The state.
+   * @example
+   * ```ts
+   * import { StartupState } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const state: StartupState = StartupState.connecting();
+   * ```
+   */
+  public static connecting(): StartupState;
+
+  /**
+   * The state when data from before the shell must be moved aside first.
+   *
+   * @param location Where the data is.
+   * @returns The state.
+   * @example
+   * ```ts
+   * import { StartupState } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const state: StartupState = StartupState.preShellData("/home/person/.noldova/teamrun");
+   * ```
+   */
+  public static preShellData(location: string): StartupState;
+
+  /**
+   * The state when an older build's runtime has work in progress.
+   *
+   * @param descriptions The work.
+   * @returns The state.
+   * @example
+   * ```ts
+   * import { StartupState } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const state: StartupState = StartupState.workInProgress(["A reply"]);
+   * ```
+   */
+  public static workInProgress(descriptions: readonly string[]): StartupState;
+
+  /**
+   * The state while waiting for an older build's work.
+   *
+   * @param descriptions The work still in progress.
+   * @returns The state.
+   * @example
+   * ```ts
+   * import { StartupState } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const state: StartupState = StartupState.waitingForWork(["A reply"]);
+   * ```
+   */
+  public static waitingForWork(descriptions: readonly string[]): StartupState;
+
+  /**
+   * The state when a newer build's runtime owns the data directory and this build cannot start it.
+   *
+   * @param version The newer build's product version.
+   * @returns The state.
+   * @example
+   * ```ts
+   * import { StartupState } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const state: StartupState = StartupState.newerBuild("2.0.0");
+   * ```
+   */
+  public static newerBuild(version: string): StartupState;
+
+  /**
+   * The state when the runtime could not be started or reached.
+   *
+   * @param message Why.
+   * @returns The state.
+   * @example
+   * ```ts
+   * import { StartupState } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const state: StartupState = StartupState.failed("The runtime did not start in time.");
+   * ```
+   */
+  public static failed(message: string): StartupState;
+
+  /**
+   * The state once connected.
+   *
+   * @returns The state.
+   * @example
+   * ```ts
+   * import { StartupState } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const state: StartupState = StartupState.ready();
+   * ```
+   */
+  public static ready(): StartupState;
+
+  /**
+   * Writes the state for the window.
+   *
+   * @returns The JSON form: `kind` and `details`.
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { StartupState } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const json: JsonObject = StartupState.failed("The runtime did not start in time.").toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
  * The colors and title-bar height the window painted, which the desktop gives its native title bar
  * before it shows the window.
  */
@@ -993,21 +1293,105 @@ export declare class DesktopApplication {
   private constructor();
 
   /**
-   * Starts the desktop: claims the single-instance lock, then opens the window when Electron is ready.
+   * Starts the desktop: chooses the data directory and keeps Electron's profile in its `desktop` folder (unless
+   * `--user-data-dir=` gives one), claims the single-instance lock, then opens the window when Electron is ready and
+   * starts or attaches to the runtime, which runs from the desktop's program in Node mode.
    *
    * @param electron Electron's main-process API.
-   * @param moduleUrl The URL of the desktop's compiled entry point, which locates the window and the preload.
-   * @param platform The operating system, as Node.js names it.
+   * @param process The desktop's process; `--data-dir=` in its arguments gives the data directory.
+   * @param moduleUrl The URL of the desktop's compiled entry point, which locates the window, the preload and, in a
+   * development run, the checkout.
+   * @param createLauncher Creates the runtime launcher for the chosen settings.
    * @example
    * ```ts
-   * import { DesktopApplication, type IElectron } from "@noldova/teamrun-shell-desktop";
+   * import { RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
+   * import { DesktopApplication, type IDesktopProcess, type IElectron } from "@noldova/teamrun-shell-desktop";
    *
-   * export function launch(electron: IElectron): void {
-   *   DesktopApplication.start(electron, "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js", "linux");
+   * export function launch(electron: IElectron, process: IDesktopProcess): void {
+   *   DesktopApplication.start(electron, process, "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js", t => new RuntimeLauncher(t, RuntimeBuild.identity));
    * }
    * ```
    */
-  public static start(electron: IElectron, moduleUrl: string, platform: string): void;
+  public static start(electron: IElectron, process: IDesktopProcess, moduleUrl: string, createLauncher: (settings: LaunchSettings) => IRuntimeLauncher): void;
+}
+
+/**
+ * Starts or attaches to the runtime and turns each refusal into a {@link StartupState} the window shows, then carries
+ * out the person's choice: move data from before the shell aside, wait for or stop an older build's work, or try again.
+ */
+export declare class RuntimeStartup {
+  /**
+   * Creates the startup.
+   *
+   * @param launcher Starts or attaches to the runtime.
+   * @param publish Receives each new state.
+   * @param handOver Hands the person over to a newer build; returns `false` when this build cannot, so the window
+   * shows {@link StartupStateKind.NewerBuild}.
+   * @param waitInterval How long to pause between attempts while waiting for an older build's work, in milliseconds.
+   * @example
+   * ```ts
+   * import { type IRuntimeLauncher, RuntimeStartup } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function create(launcher: IRuntimeLauncher): RuntimeStartup {
+   *   return new RuntimeStartup(launcher, state => console.log(state.kind), () => false, 2000);
+   * }
+   * ```
+   */
+  public constructor(launcher: IRuntimeLauncher, publish: (state: StartupState) => void, handOver: (handover: RuntimeHandover) => boolean, waitInterval: number);
+
+  /**
+   * The latest state.
+   */
+  public get current(): StartupState;
+
+  /**
+   * Starts or attaches to the runtime, stopping an older build's runtime only when it is idle. Reconnects when the
+   * runtime disconnects until {@link close}.
+   *
+   * @returns A promise that settles once the state is ready or shows why not.
+   * @throws Any failure other than the launcher's refusals, as a rejection.
+   * @example
+   * ```ts
+   * import type { RuntimeStartup } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function startAsync(startup: RuntimeStartup): Promise<void> {
+   *   await startup.startAsync();
+   * }
+   * ```
+   */
+  public startAsync(): Promise<void>;
+
+  /**
+   * Carries out the person's choice when it fits the current state: `moveAside` for data from before the shell,
+   * `stopWork` or `wait` for an older build's work, and `retry` after a failure.
+   *
+   * @param action The choice, as the window sends it.
+   * @returns A promise of `true` once the choice is carried out, or `false` when it does not fit the state.
+   * @throws Any failure other than the launcher's refusals, as a rejection.
+   * @example
+   * ```ts
+   * import type { RuntimeStartup } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function moveAsideAsync(startup: RuntimeStartup): Promise<boolean> {
+   *   return startup.actAsync("moveAside");
+   * }
+   * ```
+   */
+  public actAsync(action: unknown): Promise<boolean>;
+
+  /**
+   * Closes the connection and stops reconnecting and waiting.
+   *
+   * @example
+   * ```ts
+   * import type { RuntimeStartup } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function quit(startup: RuntimeStartup): void {
+   *   startup.close();
+   * }
+   * ```
+   */
+  public close(): void;
 }
 
 /**

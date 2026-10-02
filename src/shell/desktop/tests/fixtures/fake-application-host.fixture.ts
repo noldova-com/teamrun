@@ -16,9 +16,11 @@ export class FakeApplicationHost implements IApplicationHost {
   private readonly readiness: PromiseWithResolvers<void> = Promise.withResolvers<void>();
 
   public readonly calls: string[] = [];
+  public readonly isPackaged: boolean;
 
-  public constructor(hasLock: boolean) {
+  public constructor(hasLock: boolean, isPackaged: boolean) {
     this.hasLock = hasLock;
+    this.isPackaged = isPackaged;
   }
 
   public setName(name: string): void {
@@ -27,6 +29,10 @@ export class FakeApplicationHost implements IApplicationHost {
 
   public setAppUserModelId(id: string): void {
     this.calls.push(`setAppUserModelId ${id}`);
+  }
+
+  public setPath(name: string, path: string): void {
+    this.calls.push(`setPath ${name} ${path}`);
   }
 
   public requestSingleInstanceLock(): boolean {
