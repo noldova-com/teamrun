@@ -26,7 +26,8 @@ export default class ModuleArtifacts {
   ].join("\n");
   private static readonly FORMAT_VERSION: number = 1;
   private static readonly SOURCE_PREFIX: string = "src/";
-  private static readonly LOADER_TYPE: string = "readonly (() => Promise<unknown>)[]";
+  private static readonly PART_IMPORT: string = "import type { IWindowPart } from \"@noldova/teamrun-shell-window\";\n";
+  private static readonly LOADER_TYPE: string = "readonly (() => Promise<IWindowPart>)[]";
 
   private readonly root: string;
 
@@ -49,11 +50,11 @@ export default class ModuleArtifacts {
     const loaders = declarations
       .map(t => t.windowEntry)
       .filter(t => t !== null)
-      .map(t => `  () => import("../${t.slice(ModuleArtifacts.SOURCE_PREFIX.length)}")`);
+      .map(t => `  () => import("../${t.slice(ModuleArtifacts.SOURCE_PREFIX.length)}").then(t => t.windowPart)`);
     const list = loaders.length === 0 ? "[]" : `[\n${loaders.join(",\n")}\n]`;
     await ModuleArtifacts.writeFileAsync(
       this.windowPartsFile,
-      `${ModuleArtifacts.LICENSE_HEADER}\nexport const windowPartLoaders: ${ModuleArtifacts.LOADER_TYPE} = ${list};\n`);
+      `${ModuleArtifacts.LICENSE_HEADER}\n${ModuleArtifacts.PART_IMPORT}\nexport const windowPartLoaders: ${ModuleArtifacts.LOADER_TYPE} = ${list};\n`);
   }
 
   private static async writeFileAsync(file: string, text: string): Promise<void> {

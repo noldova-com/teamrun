@@ -81,7 +81,7 @@ class BuildTests {
       assert.match(tested.text, /Modules in the build: 2\./);
       assert.match(without.text, /Modules in the build: 1\./);
       assert.equal(unknown.text, "The build has no module weather to leave out.\n");
-      assert.match(regularParts, /\[\n {2}\(\) => import\("\.\.\/modules\/notes\/window\/src\/api\/index"\)\n\];\n$/);
+      assert.match(regularParts, /\[\n {2}\(\) => import\("\.\.\/modules\/notes\/window\/src\/api\/index"\)\.then\(t => t\.windowPart\)\n\];\n$/);
       assert.match(testedParts, /import\("\.\.\/shell\/desktop\/tests\/e2e\/fixtures\/modules\/clock\/window\/src\/api\/index"\)/);
       assert.match(testedDeclarations, /"id": "notes"[\s\S]*"id": "clock"/);
     });

@@ -26,6 +26,7 @@ class ModuleArtifactsTests {
     " */",
     ""
   ].join("\n");
+  private static readonly PART_IMPORT: string = "import type { IWindowPart } from \"@noldova/teamrun-shell-window\";\n";
 
   public static register(): void {
     test("the declarations and the window parts' loaders are written in build order, or empty without modules", async t => {
@@ -50,7 +51,7 @@ class ModuleArtifactsTests {
       assert.equal(artifacts.declarationsFile, path.join(repository.directory, "_build", "modules", "declarations.json"));
       assert.equal(artifacts.windowPartsFile, path.join(repository.directory, "src", "generated", "window-parts.ts"));
       assert.deepEqual(JSON.parse(emptyDeclarations), { formatVersion: 1, modules: [] });
-      assert.equal(emptyParts, `${ModuleArtifactsTests.LICENSE_HEADER}\nexport const windowPartLoaders: readonly (() => Promise<unknown>)[] = [];\n`);
+      assert.equal(emptyParts, `${ModuleArtifactsTests.LICENSE_HEADER}\n${ModuleArtifactsTests.PART_IMPORT}\nexport const windowPartLoaders: readonly (() => Promise<IWindowPart>)[] = [];\n`);
       assert.deepEqual(JSON.parse(await readFile(artifacts.declarationsFile, "utf8")), {
         formatVersion: 1,
         modules: [
@@ -61,9 +62,10 @@ class ModuleArtifactsTests {
       });
       assert.equal(await readFile(artifacts.windowPartsFile, "utf8"), [
         ModuleArtifactsTests.LICENSE_HEADER,
-        "export const windowPartLoaders: readonly (() => Promise<unknown>)[] = [",
-        "  () => import(\"../shell/desktop/tests/e2e/fixtures/modules/clock/window/src/api/index\"),",
-        "  () => import(\"../modules/notes/window/src/api/index\")",
+        ModuleArtifactsTests.PART_IMPORT,
+        "export const windowPartLoaders: readonly (() => Promise<IWindowPart>)[] = [",
+        "  () => import(\"../shell/desktop/tests/e2e/fixtures/modules/clock/window/src/api/index\").then(t => t.windowPart),",
+        "  () => import(\"../modules/notes/window/src/api/index\").then(t => t.windowPart)",
         "];",
         ""
       ].join("\n"));
