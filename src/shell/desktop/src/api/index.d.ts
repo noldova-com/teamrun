@@ -6,7 +6,589 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { BrowserWindowConstructorOptions, MenuItemConstructorOptions, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
+
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
+
+/**
+ * An event whose default action a listener can cancel.
+ */
+export interface IPreventableEvent {
+  /**
+   * Cancels the event's default action.
+   *
+   * @example
+   * ```ts
+   * import type { IPreventableEvent } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function refuse(event: IPreventableEvent): void {
+   *   event.preventDefault();
+   * }
+   * ```
+   */
+  preventDefault(): void;
+}
+
+/**
+ * The frame an IPC message came from.
+ */
+export interface ISenderFrame {
+  /**
+   * The frame's current URL.
+   */
+  readonly url: string;
+
+  /**
+   * The frame's parent; `null` for a top-level frame.
+   */
+  readonly parent: unknown;
+}
+
+/**
+ * An IPC message's origin: the web contents and the frame that sent it.
+ */
+export interface IIpcEvent {
+  /**
+   * The sending web contents and its id.
+   */
+  readonly sender: { readonly id: number };
+
+  /**
+   * The sending frame; `null` when it is gone.
+   */
+  readonly senderFrame: ISenderFrame | null;
+}
+
+/**
+ * The main process's side of IPC, as Electron's `ipcMain` provides it.
+ */
+export interface IIpcHost {
+  /**
+   * Listens for messages sent on a channel.
+   *
+   * @param channel The channel's name.
+   * @param listener Receives the message's origin and values.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IIpcHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function listen(ipc: IIpcHost, received: unknown[]): void {
+   *   ipc.on("teamrun:ready", (_event, appearance) => received.push(appearance));
+   * }
+   * ```
+   */
+  on(channel: string, listener: (event: IIpcEvent, ...values: unknown[]) => void): unknown;
+
+  /**
+   * Answers invocations on a channel.
+   *
+   * @param channel The channel's name.
+   * @param listener Receives the invocation's origin and values and returns its answer.
+   * @example
+   * ```ts
+   * import type { IIpcHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function answer(ipc: IIpcHost): void {
+   *   ipc.handle("teamrun:closeAnswer", () => false);
+   * }
+   * ```
+   */
+  handle(channel: string, listener: (event: IIpcEvent, ...values: unknown[]) => unknown): void;
+}
+
+/**
+ * The application's lifecycle, as Electron's `app` provides it.
+ */
+export interface IApplicationHost {
+  /**
+   * Sets the application's name.
+   *
+   * @param name The name.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function name(app: IApplicationHost): void {
+   *   app.setName("TeamRun");
+   * }
+   * ```
+   */
+  setName(name: string): void;
+
+  /**
+   * Sets the application user model id that Windows groups the application's windows and notifications by.
+   *
+   * @param id The id.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function identify(app: IApplicationHost): void {
+   *   app.setAppUserModelId("com.noldova.teamrun");
+   * }
+   * ```
+   */
+  setAppUserModelId(id: string): void;
+
+  /**
+   * Claims the single-instance lock.
+   *
+   * @returns `true` when this instance holds the lock; `false` when another instance runs.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function isFirst(app: IApplicationHost): boolean {
+   *   return app.requestSingleInstanceLock();
+   * }
+   * ```
+   */
+  requestSingleInstanceLock(): boolean;
+
+  /**
+   * Runs every renderer in the sandbox.
+   *
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function sandbox(app: IApplicationHost): void {
+   *   app.enableSandbox();
+   * }
+   * ```
+   */
+  enableSandbox(): void;
+
+  /**
+   * Quits the application.
+   *
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function stop(app: IApplicationHost): void {
+   *   app.quit();
+   * }
+   * ```
+   */
+  quit(): void;
+
+  /**
+   * Waits until the application is ready to create windows.
+   *
+   * @returns A promise that settles when the application is ready.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function waitAsync(app: IApplicationHost): Promise<void> {
+   *   await app.whenReady();
+   * }
+   * ```
+   */
+  whenReady(): Promise<unknown>;
+
+  /**
+   * Listens for a lifecycle event: another instance starting, the last window closing or the application being
+   * activated.
+   *
+   * @param event The event's name.
+   * @param listener Called on each occurrence.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function quitWithLastWindow(app: IApplicationHost): void {
+   *   app.on("window-all-closed", () => app.quit());
+   * }
+   * ```
+   */
+  on(event: "second-instance", listener: () => void): unknown;
+  on(event: "window-all-closed", listener: () => void): unknown;
+  on(event: "activate", listener: () => void): unknown;
+}
+
+/**
+ * Decides the permissions web contents ask for, as an Electron session provides it.
+ */
+export interface IPermissionHost {
+  /**
+   * Answers permission requests.
+   *
+   * @param handler Receives each request and grants or denies it through its callback.
+   * @example
+   * ```ts
+   * import type { IPermissionHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function denyRequests(host: IPermissionHost): void {
+   *   host.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+   * }
+   * ```
+   */
+  setPermissionRequestHandler(handler: (contents: unknown, permission: string, callback: (isGranted: boolean) => void) => void): void;
+
+  /**
+   * Answers permission checks.
+   *
+   * @param handler Returns whether a permission is granted.
+   * @example
+   * ```ts
+   * import type { IPermissionHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function denyChecks(host: IPermissionHost): void {
+   *   host.setPermissionCheckHandler(() => false);
+   * }
+   * ```
+   */
+  setPermissionCheckHandler(handler: () => boolean): void;
+}
+
+/**
+ * Electron's `session` module, as far as the desktop uses it.
+ */
+export interface ISessionHost {
+  /**
+   * The session the window's web contents use.
+   */
+  readonly defaultSession: IPermissionHost;
+}
+
+/**
+ * Builds and sets the application menu, as Electron's `Menu` provides it.
+ */
+export interface IMenuHost {
+  /**
+   * Builds a menu from its items.
+   *
+   * @param template The menu's items.
+   * @returns The menu.
+   * @example
+   * ```ts
+   * import type { IMenuHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function buildEditMenu(host: IMenuHost): unknown {
+   *   return host.buildFromTemplate([{ role: "editMenu" }]);
+   * }
+   * ```
+   */
+  buildFromTemplate(template: MenuItemConstructorOptions[]): unknown;
+
+  /**
+   * Sets the application menu.
+   *
+   * @param menu A menu from `buildFromTemplate`, or `null` for none.
+   * @example
+   * ```ts
+   * import type { IMenuHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function removeMenu(host: IMenuHost): void {
+   *   host.setApplicationMenu(null);
+   * }
+   * ```
+   */
+  setApplicationMenu(menu: unknown): void;
+}
+
+/**
+ * A window's web contents, as Electron's `WebContents` provides them.
+ */
+export interface IWindowContents {
+  /**
+   * The web contents' id, which IPC events name as their sender.
+   */
+  readonly id: number;
+
+  /**
+   * Listens for a navigation, a redirect or a webview being attached, each of which the listener may cancel.
+   *
+   * @param event The event's name.
+   * @param listener Receives the cancellable event and, for a navigation or a redirect, the target URL.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function stayOnPage(contents: IWindowContents, page: string): void {
+   *   contents.on("will-navigate", (event, url) => {
+   *     if (url !== page)
+   *       event.preventDefault();
+   *   });
+   * }
+   * ```
+   */
+  on(event: "will-navigate", listener: (event: IPreventableEvent, url: string) => void): unknown;
+  on(event: "will-redirect", listener: (event: IPreventableEvent, url: string) => void): unknown;
+  on(event: "will-attach-webview", listener: (event: IPreventableEvent) => void): unknown;
+
+  /**
+   * Decides what happens when the page asks to open a window.
+   *
+   * @param handler Returns the decision.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function denyWindows(contents: IWindowContents): void {
+   *   contents.setWindowOpenHandler(() => ({ action: "deny" }));
+   * }
+   * ```
+   */
+  setWindowOpenHandler(handler: () => WindowOpenHandlerResponse): void;
+
+  /**
+   * Sends a message to the page.
+   *
+   * @param channel The channel's name.
+   * @param values The message's values.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function askToClose(contents: IWindowContents): void {
+   *   contents.send("teamrun:closeRequest", "request-1");
+   * }
+   * ```
+   */
+  send(channel: string, ...values: unknown[]): void;
+}
+
+/**
+ * A native window, as Electron's `BrowserWindow` provides it.
+ */
+export interface IDesktopWindow {
+  /**
+   * The window's web contents.
+   */
+  readonly webContents: IWindowContents;
+
+  /**
+   * Loads a local page.
+   *
+   * @param filePath The page's file.
+   * @returns A promise that settles when the page has loaded.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function loadAsync(window: IDesktopWindow): Promise<void> {
+   *   await window.loadFile("/repository/_build/window/browser/index.html");
+   * }
+   * ```
+   */
+  loadFile(filePath: string): Promise<void>;
+
+  /**
+   * Sets the color shown behind the page.
+   *
+   * @param color A CSS color.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function darken(window: IDesktopWindow): void {
+   *   window.setBackgroundColor("#181818");
+   * }
+   * ```
+   */
+  setBackgroundColor(color: string): void;
+
+  /**
+   * Sets the colors and height of the native window controls drawn over the page on Windows and Linux.
+   *
+   * @param options The overlay's colors and height.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function paintControls(window: IDesktopWindow): void {
+   *   window.setTitleBarOverlay({ color: "#181818", symbolColor: "#CCCCCC", height: 35 });
+   * }
+   * ```
+   */
+  setTitleBarOverlay(options: TitleBarOverlayOptions): void;
+
+  /**
+   * Whether the window is shown.
+   *
+   * @returns `true` when the window is visible.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function showOnce(window: IDesktopWindow): void {
+   *   if (!window.isVisible())
+   *     window.show();
+   * }
+   * ```
+   */
+  isVisible(): boolean;
+
+  /**
+   * Whether the window has been destroyed.
+   *
+   * @returns `true` when the window is gone.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function closeIfOpen(window: IDesktopWindow): void {
+   *   if (!window.isDestroyed())
+   *     window.close();
+   * }
+   * ```
+   */
+  isDestroyed(): boolean;
+
+  /**
+   * Whether the window is minimized.
+   *
+   * @returns `true` when the window is minimized.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function bringBack(window: IDesktopWindow): void {
+   *   if (window.isMinimized())
+   *     window.restore();
+   * }
+   * ```
+   */
+  isMinimized(): boolean;
+
+  /**
+   * Shows the window.
+   *
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function reveal(window: IDesktopWindow): void {
+   *   window.show();
+   * }
+   * ```
+   */
+  show(): void;
+
+  /**
+   * Restores a minimized window.
+   *
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function unminimize(window: IDesktopWindow): void {
+   *   window.restore();
+   * }
+   * ```
+   */
+  restore(): void;
+
+  /**
+   * Gives the window the keyboard focus.
+   *
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function bringForward(window: IDesktopWindow): void {
+   *   window.focus();
+   * }
+   * ```
+   */
+  focus(): void;
+
+  /**
+   * Asks the window to close, which raises its `close` event first.
+   *
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function dismiss(window: IDesktopWindow): void {
+   *   window.close();
+   * }
+   * ```
+   */
+  close(): void;
+
+  /**
+   * Listens for the window being asked to close; the listener may cancel it.
+   *
+   * @param event The event's name.
+   * @param listener Receives the cancellable event.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function keepOpen(window: IDesktopWindow): void {
+   *   window.on("close", event => event.preventDefault());
+   * }
+   * ```
+   */
+  on(event: "close", listener: (event: IPreventableEvent) => void): unknown;
+
+  /**
+   * Listens once for the window having closed.
+   *
+   * @param event The event's name.
+   * @param listener Called when the window is gone.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function onGone(window: IDesktopWindow, gone: () => void): void {
+   *   window.once("closed", gone);
+   * }
+   * ```
+   */
+  once(event: "closed", listener: () => void): unknown;
+}
+
+/**
+ * The parts of Electron's main-process API the desktop uses, which the real modules satisfy and package tests replace
+ * with fakes.
+ */
+export interface IElectron {
+  /**
+   * The application's lifecycle.
+   */
+  readonly app: IApplicationHost;
+
+  /**
+   * The main process's side of IPC.
+   */
+  readonly ipcMain: IIpcHost;
+
+  /**
+   * The sessions, for their permission handlers.
+   */
+  readonly session: ISessionHost;
+
+  /**
+   * The application menu.
+   */
+  readonly menu: IMenuHost;
+
+  /**
+   * Creates a native window.
+   *
+   * @param options The window's options.
+   * @returns The window.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow, IElectron } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function openHidden(electron: IElectron): IDesktopWindow {
+   *   return electron.createWindow({ width: 1280, height: 800, show: false });
+   * }
+   * ```
+   */
+  createWindow(options: BrowserWindowConstructorOptions): IDesktopWindow;
+}
 
 /**
  * Where the desktop finds the window and its preload, and which platform it runs on.
@@ -401,6 +983,31 @@ export declare class CloseCoordinator {
    * ```
    */
   public release(): void;
+}
+
+/**
+ * The desktop's main process: one sandboxed instance with one window, which it shows once the page has painted its
+ * theme and closes once the page has saved.
+ */
+export declare class DesktopApplication {
+  private constructor();
+
+  /**
+   * Starts the desktop: claims the single-instance lock, then opens the window when Electron is ready.
+   *
+   * @param electron Electron's main-process API.
+   * @param moduleUrl The URL of the desktop's compiled entry point, which locates the window and the preload.
+   * @param platform The operating system, as Node.js names it.
+   * @example
+   * ```ts
+   * import { DesktopApplication, type IElectron } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function launch(electron: IElectron): void {
+   *   DesktopApplication.start(electron, "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js", "linux");
+   * }
+   * ```
+   */
+  public static start(electron: IElectron, moduleUrl: string, platform: string): void;
 }
 
 /**

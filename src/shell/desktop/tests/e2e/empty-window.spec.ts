@@ -39,6 +39,7 @@ test.describe("the empty window", () => {
 
   test("the window row, status bar and panel card follow the default theme", async ({ desktop }) => {
     await desktop.useSuiteViewportAsync();
+    await expect.poll(() => desktop.window.evaluate(() => (document.querySelector("tr-panel-card") as Element).getBoundingClientRect().width)).toBe(1920 - 8);
     const measured = await desktop.window.evaluate(() => {
       const style = (selector: string): CSSStyleDeclaration => getComputedStyle(document.querySelector(selector) as Element);
       const bounds = (selector: string): DOMRect => (document.querySelector(selector) as Element).getBoundingClientRect();

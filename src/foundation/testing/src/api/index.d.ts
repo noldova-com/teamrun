@@ -1265,7 +1265,7 @@ export declare class GitHubSummaryWriter {
 
   /**
    * Appends the coverage gate's result, the coverage totals and bounded,
-   * escaped details of files that are not fully covered.
+   * escaped details of files that are not fully covered or are excluded.
    *
    * @param result The run's coverage.
    * @example
@@ -1474,6 +1474,38 @@ export declare class SourceMap {
 }
 
 /**
+ * A production file that a package leaves out of its coverage gate, with the
+ * reason it gives. The file is still measured and reported.
+ */
+export declare class CoverageExclusion {
+  /**
+   * The file's source path, relative to the project's source folder.
+   */
+  public readonly relativePath: string;
+
+  /**
+   * Why the package's tests cannot run the file.
+   */
+  public readonly reason: string;
+
+  /**
+   * Creates the exclusion.
+   *
+   * @param relativePath The source path; not whitespace only.
+   * @param reason The reason; not whitespace only.
+   * @throws ArgumentException synchronously when either is empty or
+   * whitespace only.
+   * @example
+   * ```ts
+   * import { CoverageExclusion } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const exclusion: CoverageExclusion = new CoverageExclusion("main.ts", "Runs only inside Electron.");
+   * ```
+   */
+  public constructor(relativePath: string, reason: string);
+}
+
+/**
  * A package whose installed files a coverage run measures.
  */
 export declare class CoverageProject {
@@ -1493,14 +1525,21 @@ export declare class CoverageProject {
   public readonly sourceDirectory: string;
 
   /**
+   * The files the project leaves out of its coverage gate.
+   */
+  public readonly exclusions: readonly CoverageExclusion[];
+
+  /**
    * Creates the project.
    *
    * @param name The package name; not whitespace only.
    * @param productionDirectory The installed files' folder; not whitespace
    * only.
    * @param sourceDirectory The source folder; not whitespace only.
-   * @throws ArgumentException synchronously when any is empty or whitespace
-   * only.
+   * @param exclusions The files left out of the coverage gate, each named
+   * once; none by default. The project keeps its own copy.
+   * @throws ArgumentException synchronously when a name or folder is empty or
+   * whitespace only, or when a file is excluded twice.
    * @example
    * ```ts
    * import { CoverageProject } from "@noldova/teamrun-foundation-testing";
@@ -1510,8 +1549,18 @@ export declare class CoverageProject {
    *   "/repository/node_modules/@noldova/teamrun-foundation-json",
    *   "/repository/src/foundation/json/src");
    * ```
+   * @example
+   * ```ts
+   * import { CoverageExclusion, CoverageProject } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const project: CoverageProject = new CoverageProject(
+   *   "@noldova/teamrun-shell-desktop",
+   *   "/repository/node_modules/@noldova/teamrun-shell-desktop",
+   *   "/repository/src/shell/desktop/src",
+   *   [new CoverageExclusion("main.ts", "Runs only inside Electron.")]);
+   * ```
    */
-  public constructor(name: string, productionDirectory: string, sourceDirectory: string);
+  public constructor(name: string, productionDirectory: string, sourceDirectory: string, exclusions?: readonly CoverageExclusion[]);
 }
 
 /**
@@ -1571,6 +1620,17 @@ export declare class FileCoverage {
   public readonly takenBlockCount: number;
 
   /**
+   * Why the package leaves the file out of its coverage gate; `null` when it
+   * does not.
+   */
+  public readonly exclusionReason: string | null;
+
+  /**
+   * True when the package leaves the file out of its coverage gate.
+   */
+  public readonly isExcluded: boolean;
+
+  /**
    * Creates the file coverage.
    *
    * @param projectName The package name; not whitespace only.
@@ -1582,6 +1642,8 @@ export declare class FileCoverage {
    * larger than the total.
    * @param blockCoverages The instrumented blocks; none when the total length
    * is zero. The coverage keeps its own copy.
+   * @param exclusionReason Why the file is left out of the coverage gate;
+   * `null`, the default, when it is not.
    * @throws ArgumentException synchronously for an empty name or path,
    * uncovered lines and length that disagree, or blocks in a file without
    * executable text.
@@ -1592,6 +1654,12 @@ export declare class FileCoverage {
    *
    * export const file: FileCoverage = new FileCoverage("@noldova/teamrun-foundation-json", "services/json-reader.ts", [new LineRange(12, 14)], 900, 60, [new BlockCoverage(12, false)]);
    * ```
+   * @example
+   * ```ts
+   * import { FileCoverage, LineRange } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const file: FileCoverage = new FileCoverage("@noldova/teamrun-shell-desktop", "main.ts", [new LineRange(1, 5)], 300, 300, [], "Runs only inside Electron.");
+   * ```
    */
   public constructor(
     projectName: string,
@@ -1599,7 +1667,8 @@ export declare class FileCoverage {
     uncoveredLineRanges: readonly LineRange[],
     totalLength: number,
     uncoveredLength: number,
-    blockCoverages: readonly BlockCoverage[]);
+    blockCoverages: readonly BlockCoverage[],
+    exclusionReason?: string | null);
 }
 
 /**
@@ -1612,7 +1681,7 @@ export declare class CoverageResult {
   public readonly fileCoverages: readonly FileCoverage[];
 
   /**
-   * True when every executable file is fully covered.
+   * True when every executable file that is not excluded is fully covered.
    */
   public readonly isComplete: boolean;
 
@@ -1622,9 +1691,14 @@ export declare class CoverageResult {
   public readonly executableFileCoverages: readonly FileCoverage[];
 
   /**
-   * The files that are not fully covered.
+   * The executable files that are not fully covered and not excluded.
    */
   public readonly incompleteFileCoverages: readonly FileCoverage[];
+
+  /**
+   * The files the packages leave out of their coverage gates.
+   */
+  public readonly excludedFileCoverages: readonly FileCoverage[];
 
   /**
    * The summed executable length of every file.
@@ -1665,8 +1739,8 @@ export declare class CoverageResult {
 
 /**
  * Formats a coverage result for the console: a percentage per executable
- * file, a marker for files without executable text, the uncovered lines and
- * the overall total. The structured result remains the authority; nothing
+ * file, a marker for files without executable text, the uncovered lines or
+ * the reason a file is excluded, and the overall total. The structured result remains the authority; nothing
  * parses this output.
  */
 export declare class CoverageReportWriter {
@@ -1674,7 +1748,8 @@ export declare class CoverageReportWriter {
    * Formats the report without writing it.
    *
    * @param result The coverage to report.
-   * @param skipCoveredDetails Whether to leave out fully covered files.
+   * @param skipCoveredDetails Whether to leave out fully covered files that
+   * are not excluded.
    * @returns The report lines, with terminal color sequences.
    * @example
    * ```ts

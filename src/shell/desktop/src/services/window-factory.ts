@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { BrowserWindow, type BrowserWindowConstructorOptions } from "electron";
+import type { BrowserWindowConstructorOptions } from "electron";
 
-import "@noldova/teamrun-foundation-core";
-
+import type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
+import type { IElectron } from "../interfaces/i-electron.js";
 import type { DesktopSettings } from "../models/desktop-settings.js";
 import type { WindowAppearance } from "../models/window-appearance.js";
 import type { WindowState } from "../models/window-state.js";
@@ -19,13 +19,15 @@ import type { SenderPolicy } from "./sender-policy.js";
 export class WindowFactory {
   private readonly settings: DesktopSettings;
   private readonly policy: SenderPolicy;
+  private readonly electron: IElectron;
 
-  public constructor(settings: DesktopSettings, policy: SenderPolicy) {
+  public constructor(settings: DesktopSettings, policy: SenderPolicy, electron: IElectron) {
     this.settings = settings;
     this.policy = policy;
+    this.electron = electron;
   }
 
-  public create(state: WindowState): BrowserWindow {
+  public create(state: WindowState): IDesktopWindow {
     const options: BrowserWindowConstructorOptions = {
       width: state.width,
       height: state.height,
@@ -44,17 +46,11 @@ export class WindowFactory {
         spellcheck: false
       }
     };
-    if (!Object.isNull(state.x) && !Object.isNull(state.y)) {
-      options.x = state.x;
-      options.y = state.y;
-    }
     if (this.settings.isMac)
       options.trafficLightPosition = { ...Resources.trafficLightPosition };
     else
       options.titleBarOverlay = true;
-    const window = new BrowserWindow(options);
-    if (state.isMaximized)
-      window.maximize();
+    const window = this.electron.createWindow(options);
     const contents = window.webContents;
     contents.on(Resources.willNavigateEvent, (event, url) => {
       if (!this.policy.isWindowUrl(url))
@@ -70,7 +66,7 @@ export class WindowFactory {
     return window;
   }
 
-  public show(window: BrowserWindow, appearance: WindowAppearance): void {
+  public show(window: IDesktopWindow, appearance: WindowAppearance): void {
     window.setBackgroundColor(appearance.background);
     if (!this.settings.isMac)
       window.setTitleBarOverlay({ color: appearance.titleBar, symbolColor: appearance.titleBarText, height: appearance.titleBarHeight });

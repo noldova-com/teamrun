@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { type ChildProcess, execFileSync } from "node:child_process";
+import { type ChildProcess, spawnSync } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -17,7 +17,7 @@ export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
   private static readonly VIEWPORT_WIDTH: number = 1920;
   private static readonly VIEWPORT_HEIGHT: number = 1080;
-  private static readonly LAUNCH_ARGUMENTS: readonly string[] = ["--force-device-scale-factor=1", "--disable-gpu", "--disable-software-rasterizer"];
+  private static readonly LAUNCH_ARGUMENTS: readonly string[] = ["--disable-gpu", "--disable-software-rasterizer"];
   private static readonly EXPECTED_OUTPUT: readonly RegExp[] = [/^\[\d+:\d+(?:\/\d+)?\.\d+:\w+:/, /^Debugger (?:listening|attached|ending)/, /^For help, see/];
   private static readonly PROFILE_PREFIX: string = "teamrun-ui-";
   private static readonly TRACE_FILE: string = "trace.zip";
@@ -68,14 +68,19 @@ export default class DesktopApplicationFixture {
   }
 
   public async useSuiteViewportAsync(): Promise<void> {
-    await this.application.evaluate(({ BrowserWindow }, [width, height]) => BrowserWindow.getAllWindows()[0]?.setContentSize(width, height),
-      [DesktopApplicationFixture.VIEWPORT_WIDTH, DesktopApplicationFixture.VIEWPORT_HEIGHT] as const);
+    const session = await this.window.context().newCDPSession(this.window);
+    await session.send("Emulation.setDeviceMetricsOverride", {
+      width: DesktopApplicationFixture.VIEWPORT_WIDTH,
+      height: DesktopApplicationFixture.VIEWPORT_HEIGHT,
+      deviceScaleFactor: 1,
+      mobile: false
+    });
     await expect.poll(() => this.window.evaluate(() => [innerWidth, innerHeight, devicePixelRatio]))
       .toEqual([DesktopApplicationFixture.VIEWPORT_WIDTH, DesktopApplicationFixture.VIEWPORT_HEIGHT, 1]);
   }
 
   public async checkpointAsync(name: string): Promise<void> {
-    const image = await this.window.screenshot();
+    const image = await this.window.screenshot({ scale: "css" });
     expect([image.readUInt32BE(16), image.readUInt32BE(20)]).toEqual([DesktopApplicationFixture.VIEWPORT_WIDTH, DesktopApplicationFixture.VIEWPORT_HEIGHT]);
     await this.testInfo.attach(name, { body: image, contentType: "image/png" });
   }
@@ -98,6 +103,11 @@ export default class DesktopApplicationFixture {
     await rm(this.profile, { recursive: true, force: true, maxRetries: 10 });
   }
 
+  private static readRevision(): string {
+    const result = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" });
+    return result.status === 0 ? result.stdout.trim() : "unknown";
+  }
+
   private static unexpectedLines(text: string): string[] {
     return text.split(/\r?\n/).map(t => t.trim()).filter(t => t.length > 0 && !DesktopApplicationFixture.EXPECTED_OUTPUT.some(pattern => pattern.test(t))).map(t => `main: ${t}`);
   }
@@ -108,7 +118,7 @@ export default class DesktopApplicationFixture {
       os: `${os.type()} ${os.release()}`,
       cpu: `${os.arch()} ${os.cpus()[0]?.model ?? "unknown"}`,
       runner: process.env["ImageOS"] ? `${process.env["ImageOS"]} ${process.env["ImageVersion"] ?? ""}`.trim() : "local",
-      revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+      revision: DesktopApplicationFixture.readRevision(),
       playwright: this.testInfo.config.version,
       electron: electron.electron,
       electronNode: electron.node,

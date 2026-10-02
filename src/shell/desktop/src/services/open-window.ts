@@ -6,20 +6,19 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { BrowserWindow } from "electron";
-
 import "@noldova/teamrun-foundation-core";
 
+import type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
 import { Resources } from "../resources.js";
 import { CloseCoordinator } from "./close-coordinator.js";
 
 export class OpenWindow {
   private closing: Promise<void> | null = null;
   private canClose: boolean = false;
-  public readonly window: BrowserWindow;
+  public readonly window: IDesktopWindow;
   public readonly coordinator: CloseCoordinator;
 
-  public constructor(window: BrowserWindow) {
+  public constructor(window: IDesktopWindow) {
     this.window = window;
     this.coordinator = new CloseCoordinator(t => this.sendCloseRequest(t), Resources.closeAnswerTimeout);
     window.on(Resources.closeEvent, event => {

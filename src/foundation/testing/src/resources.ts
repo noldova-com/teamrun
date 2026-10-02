@@ -48,7 +48,11 @@ export class Resources {
   public static readonly methodResultIdentityInvalid: string = "Every method result must belong to this package and class.";
   public static readonly timeoutInvalid: string = "The timeout must be a positive integer of milliseconds.";
   public static readonly coverageDirectoryRequired: string = "The coverage run requires the folder of the V8 coverage reports.";
-  public static readonly coverageProjectTripleRequired: string = "Each coverage project requires a package name, a production folder and a source folder.";
+  public static readonly coverageProjectTripleRequired: string = "Each coverage project requires a package name, a production folder, a source folder and its exclusions.";
+  public static readonly coverageExclusionsInvalid: string = "A coverage project's exclusions must be a JSON array of objects with a file and a reason.";
+  public static readonly repeatedCoverageExclusion: string = "A file is excluded from coverage at most once.";
+  public static readonly exclusionFileField: string = "file";
+  public static readonly exclusionReasonField: string = "reason";
   public static readonly testProjectPairRequired: string = "Each test project requires a package name and a root directory.";
   public static readonly testFiltersInvalid: string = "The test filters must be a JSON array of strings.";
   public static readonly categoryFilterPrefix: string = "category:";
@@ -117,6 +121,7 @@ export class Resources {
   public static readonly uncoveredRangesInvalid: string = "The uncovered line ranges and the uncovered length must agree: both empty or both present.";
   public static readonly summaryCoverageHeading: string = "### Package coverage";
   public static readonly summaryCoveredFilesLabel: string = "Fully covered executable files";
+  public static readonly summaryExcludedFilesLabel: string = "Excluded files";
   public static readonly summaryGateLabel: string = "Coverage gate";
   public static readonly summaryPassed: string = "Passed";
   public static readonly summaryFailed: string = "Failed";
@@ -257,8 +262,9 @@ export class Resources {
     return `${location} must be an object`;
   }
 
-  public static formatOverallCoverage(fullyCovered: number, executableCount: number): string {
-    return `Overall — ${fullyCovered} of ${executableCount} executable files fully covered`;
+  public static formatOverallCoverage(fullyCovered: number, executableCount: number, excludedCount: number): string {
+    const overall = `Overall — ${fullyCovered} of ${executableCount} executable files fully covered`;
+    return excludedCount === 0 ? overall : `${overall}, ${excludedCount} excluded`;
   }
 
   public static formatSourceMapCharacterInvalid(character: string): string {
@@ -283,5 +289,13 @@ export class Resources {
 
   public static formatUncoveredLines(lineRange: string): string {
     return `    uncovered lines ${lineRange}`;
+  }
+
+  public static formatExclusion(reason: string): string {
+    return `    excluded: ${reason}`;
+  }
+
+  public static formatUnknownCoverageExclusions(projectName: string, relativePaths: readonly string[]): string {
+    return `${projectName} excludes files it does not have: ${relativePaths.join(", ")}.`;
   }
 }

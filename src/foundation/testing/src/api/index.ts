@@ -20,6 +20,7 @@ export { TestingException } from "../exceptions/testing.exception.js";
 export type { ISourceMapData } from "../interfaces/coverage/i-source-map-data.js";
 export type { ITestProgressListener } from "../interfaces/i-test-progress-listener.js";
 export { BlockCoverage } from "../models/coverage/block-coverage.js";
+export { CoverageExclusion } from "../models/coverage/coverage-exclusion.js";
 export { CoverageProject } from "../models/coverage/coverage-project.js";
 export { CoverageResult } from "../models/coverage/coverage-result.js";
 export { FileCoverage } from "../models/coverage/file-coverage.js";

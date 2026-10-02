@@ -14,7 +14,7 @@ export class DesktopApiTests {
   @TestMethod
   public exportsTheCompleteRuntimeSurface(): void {
     Assert.areEqual(
-      JSON.stringify(["CloseCoordinator", "DesktopSettings", "ScreenArea", "SenderInfo", "SenderPolicy", "WindowAppearance", "WindowState"]),
+      JSON.stringify(["CloseCoordinator", "DesktopApplication", "DesktopSettings", "ScreenArea", "SenderInfo", "SenderPolicy", "WindowAppearance", "WindowState"]),
       JSON.stringify(Object.keys(api).sort()));
   }
 }

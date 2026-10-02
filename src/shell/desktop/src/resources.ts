@@ -9,7 +9,6 @@
 export class Resources {
   public static readonly applicationName: string = "TeamRun";
   public static readonly appUserModelId: string = "com.noldova.teamrun";
-  public static readonly bridgeName: string = "teamrun";
   public static readonly readyChannel: string = "teamrun:ready";
   public static readonly closeRequestChannel: string = "teamrun:closeRequest";
   public static readonly closeAnswerChannel: string = "teamrun:closeAnswer";
@@ -38,7 +37,6 @@ export class Resources {
   public static readonly windowWidth: number = 1280;
   public static readonly windowHeight: number = 800;
   public static readonly closeAnswerTimeout: number = 5000;
-  public static readonly windowStateSaveDelay: number = 500;
   public static readonly xField: string = "x";
   public static readonly yField: string = "y";
   public static readonly widthField: string = "width";

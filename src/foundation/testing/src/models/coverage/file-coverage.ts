@@ -24,6 +24,8 @@ export class FileCoverage {
   public readonly isExecutable: boolean;
   public readonly blockCount: number;
   public readonly takenBlockCount: number;
+  public readonly exclusionReason: string | null;
+  public readonly isExcluded: boolean;
 
   public constructor(
     projectName: string,
@@ -31,7 +33,8 @@ export class FileCoverage {
     uncoveredLineRanges: readonly LineRange[],
     totalLength: number,
     uncoveredLength: number,
-    blockCoverages: readonly BlockCoverage[]) {
+    blockCoverages: readonly BlockCoverage[],
+    exclusionReason: string | null = null) {
     ArgumentException.throwIfNullOrWhitespace(projectName, nameof<FileCoverage>(t => t.projectName));
     ArgumentException.throwIfNullOrWhitespace(relativePath, nameof<FileCoverage>(t => t.relativePath));
     if (!Number.isInteger(totalLength) || totalLength < 0)
@@ -56,5 +59,7 @@ export class FileCoverage {
     this.isFullyCovered = this.isExecutable && this.uncoveredLineRanges.length === 0;
     this.blockCount = this.blockCoverages.length;
     this.takenBlockCount = this.blockCoverages.filter(t => t.isTaken).length;
+    this.exclusionReason = exclusionReason;
+    this.isExcluded = exclusionReason !== null;
   }
 }

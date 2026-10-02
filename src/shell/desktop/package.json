@@ -13,5 +13,13 @@
   },
   "peerDependencies": {
     "electron": "44.5.1"
+  },
+  "teamrun": {
+    "coverageExclusions": [
+      {
+        "file": "main.ts",
+        "reason": "Composes the desktop from Electron's own modules, which load only inside Electron; the desktop UI workflows run it."
+      }
+    ]
   }
 }

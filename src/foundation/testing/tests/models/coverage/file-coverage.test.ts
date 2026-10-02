@@ -21,6 +21,17 @@ export class FileCoverageTests {
     Assert.isTrue(fileCoverage.isExecutable);
     Assert.areEqual(2, fileCoverage.blockCount);
     Assert.areEqual(1, fileCoverage.takenBlockCount);
+    Assert.isNull(fileCoverage.exclusionReason);
+    Assert.isFalse(fileCoverage.isExcluded);
+  }
+
+  @TestMethod
+  public keepsTheReasonItIsExcluded(): void {
+    const fileCoverage = new FileCoverage("Sample", "main.js", [new LineRange(1, 2)], 100, 100, [], "Runs only inside Electron.");
+
+    Assert.areEqual("Runs only inside Electron.", fileCoverage.exclusionReason);
+    Assert.isTrue(fileCoverage.isExcluded);
+    Assert.isFalse(fileCoverage.isFullyCovered);
   }
 
   @TestMethod

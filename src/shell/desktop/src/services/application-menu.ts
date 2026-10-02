@@ -6,12 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Menu } from "electron";
-
+import type { IMenuHost } from "../interfaces/i-menu-host.js";
 import type { DesktopSettings } from "../models/desktop-settings.js";
 
 export class ApplicationMenu {
-  public static install(settings: DesktopSettings): void {
-    Menu.setApplicationMenu(settings.isMac ? Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }]) : null);
+  public static install(menu: IMenuHost, settings: DesktopSettings): void {
+    menu.setApplicationMenu(settings.isMac ? menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }]) : null);
   }
 }

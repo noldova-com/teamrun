@@ -68,7 +68,7 @@ export default class PackageTestCheck implements ICheck {
       const tests = tested.flatMap(t => [t.name, layout.locateTestOutput(t)]);
       const environment = { ...this.environment, [PackageTestCheck.FILTERS_VARIABLE]: PackageTestCheck.ALL_TESTS, [PackageTestCheck.COVERAGE_VARIABLE]: coverage };
       const testsPassed = await this.runner.runAsync(process.execPath, [PackageTestCheck.SOURCE_MAPS_OPTION, this.locateEntry(PackageTestCheck.TEST_ENTRY_SEGMENTS), ...tests], this.root, environment) === 0;
-      const projects = packages.flatMap(t => [t.name, layout.locateInstalled(t), layout.locateSource(t, PackageTestCheck.SOURCE_FOLDER)]);
+      const projects = packages.flatMap(t => [t.name, layout.locateInstalled(t), layout.locateSource(t, PackageTestCheck.SOURCE_FOLDER), t.coverageExclusions]);
       const coverageComplete = await this.runner.runAsync(process.execPath, [this.locateEntry(PackageTestCheck.COVERAGE_ENTRY_SEGMENTS), coverage, ...projects], this.root, this.environment) === 0;
       return testsPassed && coverageComplete;
     }
