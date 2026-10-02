@@ -98,14 +98,21 @@ describe("IconButtonComponent", () => {
       });
 
   for (const panelSize of AppearanceFixture.panelSizes)
-    it(`keeps a pointer target of at least 24 pixels at panel size ${panelSize}`, () => {
-      AppearanceFixture.apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
+    for (const isFontLoaded of [true, false])
+      it(`keeps a pointer target of at least 24 pixels at panel size ${panelSize} ${isFontLoaded ? "with" : "before"} the symbols font`, () => {
+        AppearanceFixture.apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
+        const glyph = button().querySelector<HTMLElement>(".tr-icon-button-glyph") ?? button();
+        if (!isFontLoaded)
+          glyph.style.fontFamily = "not-a-loaded-font";
 
-      const bounds = button().getBoundingClientRect();
+        const bounds = button().getBoundingClientRect();
+        const glyphBounds = glyph.getBoundingClientRect();
 
-      AppearanceFixture.expectRem(pad().width, 1.375, panelSize);
-      expect(bounds.width).toBeGreaterThanOrEqual(24);
-      expect(bounds.height).toBeGreaterThanOrEqual(24);
-      AppearanceFixture.expectPixels(bounds.width, Math.max(24, AppearanceFixture.toPixels(1.375, panelSize)));
-    });
+        AppearanceFixture.expectRem(pad().width, 1.375, panelSize);
+        expect(bounds.width).toBeGreaterThanOrEqual(24);
+        expect(bounds.height).toBeGreaterThanOrEqual(24);
+        AppearanceFixture.expectPixels(bounds.width, Math.max(24, AppearanceFixture.toPixels(1.375, panelSize)));
+        AppearanceFixture.expectPixels(glyphBounds.width, AppearanceFixture.toPixels(1, panelSize));
+        AppearanceFixture.expectPixels(glyphBounds.height, AppearanceFixture.toPixels(1, panelSize));
+      });
 });
