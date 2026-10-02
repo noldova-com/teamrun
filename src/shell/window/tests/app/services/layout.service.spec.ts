@@ -86,6 +86,8 @@ describe("LayoutService", () => {
     expect(service.layout().documents.active).toEqual(LayoutFixture.plan);
     service.close(LayoutFixture.todo);
     expect(service.layout().isOpen(LayoutFixture.todo)).toBe(false);
+    service.openDocument(LayoutFixture.settings);
+    expect(service.layout().documents.active).toEqual(LayoutFixture.settings);
     service.toggleDock(DockSide.Left);
     expect(service.layout().dock(DockSide.Left).isCollapsed).toBe(true);
     service.resizeDock(DockSide.Left, 30);

@@ -14,6 +14,7 @@ import { JsonException } from "@noldova/teamrun-foundation-json";
 import { Resources } from "../../resources";
 import type { DockSide } from "../enums/dock-side";
 import type { ILayoutStore } from "../interfaces/i-layout-store";
+import type { DocumentTab } from "../models/layout/document-tab";
 import type { DropTarget } from "../models/layout/drop-target";
 import { Layout } from "../models/layout/layout";
 import { LayoutGeometry } from "../models/layout/layout-geometry";
@@ -58,6 +59,10 @@ export class LayoutService {
   public async saveAsync(): Promise<void> {
     this.clearSaveTimer();
     await this.store.writeAsync(this.layoutState().toJson());
+  }
+
+  public openDocument(tab: DocumentTab): void {
+    this.update(this.layoutState().openDocument(tab));
   }
 
   public place(tab: Tab, target: DropTarget): void {
