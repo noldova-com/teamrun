@@ -15,13 +15,13 @@ import { type ElectronApplication, type Page, type TestInfo, _electron, expect }
 
 import { DataDirectory, DiscoveryReader, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
+import ErrorOutputClassifier from "./error-output.classifier.ts";
+
 export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
   private static readonly VIEWPORT_WIDTH: number = 1920;
   private static readonly VIEWPORT_HEIGHT: number = 1080;
   private static readonly LAUNCH_ARGUMENTS: readonly string[] = ["--disable-gpu", "--disable-software-rasterizer"];
-  private static readonly EXPECTED_OUTPUT: readonly RegExp[] = [/^\[\d+:\d+(?:\/\d+)?\.\d+:\w+:/, /^Debugger (?:listening|attached|ending)/, /^For help, see/];
-  private static readonly PLATFORM_LOG: RegExp = /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ Electron(?: Helper(?: \([A-Za-z]+\))?)?\[\d+:\d+\] /;
   private static readonly PLATFORM_LOG_ANNOTATION: string = "platform-log";
   private static readonly ROOT_PREFIX: string = "teamrun-ui-";
   private static readonly DATA_FOLDER: string = "data";
@@ -32,6 +32,7 @@ export default class DesktopApplicationFixture {
 
   private readonly testInfo: TestInfo;
   private readonly environment: Readonly<Record<string, string>>;
+  private readonly output: ErrorOutputClassifier = new ErrorOutputClassifier();
   private electronApplication: ElectronApplication | null = null;
   private page: Page | null = null;
   private childProcess: ChildProcess | null = null;
@@ -209,11 +210,11 @@ export default class DesktopApplicationFixture {
   }
 
   private readOutput(text: string): void {
-    for (const line of text.split(/\r?\n/).map(t => t.trim()).filter(t => t.length > 0 && !DesktopApplicationFixture.EXPECTED_OUTPUT.some(pattern => pattern.test(t))))
-      if (DesktopApplicationFixture.PLATFORM_LOG.test(line))
-        this.testInfo.annotations.push({ type: DesktopApplicationFixture.PLATFORM_LOG_ANNOTATION, description: line });
+    for (const line of this.output.classify(text))
+      if (line.kind === "platform-log")
+        this.testInfo.annotations.push({ type: DesktopApplicationFixture.PLATFORM_LOG_ANNOTATION, description: line.text });
       else
-        this.failures.push(`main: ${line}`);
+        this.failures.push(`main: ${line.text}`);
   }
 
   private async recordEnvironmentAsync(): Promise<void> {
