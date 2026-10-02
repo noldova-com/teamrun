@@ -30,17 +30,20 @@ defaults:
 
 jobs:
   tested:
-    name: Find the merge group run of this commit
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Find the run that tested this tree
+    if: github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       actions: read
+      contents: read
+      pull-requests: read
     outputs:
-      verified: ${{ steps.proof.outputs.verified }}
-      run: ${{ steps.proof.outputs.run }}
+      verified: ${{ steps.proof.outputs.verified || steps.reuse.outputs.verified }}
+      run: ${{ steps.proof.outputs.run || steps.reuse.outputs.run }}
     steps:
       - name: Look up the merge group run
+        if: github.event_name == 'push'
         id: proof
         env:
           GH_TOKEN: ${{ github.token }}
@@ -58,6 +61,49 @@ jobs:
             echo "::notice::No successful merge group run of this workflow tested $GITHUB_SHA, so this run builds and tests it."
           fi
 
+      - name: Check out the merge group
+        if: github.event_name == 'merge_group'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Look up the pull request run
+        if: github.event_name == 'merge_group'
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+        run: |
+          set -uo pipefail
+          refuse() {
+            echo 'verified=false' >> "$GITHUB_OUTPUT"
+            echo "::notice::$1, so this run builds and tests the merge group."
+            exit 0
+          }
+          [[ "$HEAD_REF" =~ ^refs/heads/gh-readonly-queue/main/pr-([0-9]+)-[0-9a-f]{40}$ ]] || refuse "The merge group's branch names no single pull request"
+          pull_request=${BASH_REMATCH[1]}
+          parents=$(git rev-list --parents -n 1 HEAD) || refuse "The merge group's commit could not be read"
+          read -r -a commits <<< "$parents"
+          [ "${#commits[@]}" -eq 2 ] && [ "${commits[1]}" = "$BASE_SHA" ] || refuse "The merge group holds more than one commit on its base"
+          git merge-base --is-ancestor "$BASE_SHA" origin/main || refuse "The merge group is built on another merge group, not on main"
+          tree=$(git rev-parse 'HEAD^{tree}') || refuse "The merge group's commit could not be read"
+          head=$(timeout 30s gh api "repos/$GITHUB_REPOSITORY/pulls/$pull_request" --jq .head.sha) || refuse "The pull request could not be read"
+          latest=$(timeout 30s gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build-and-test.yml/runs?event=pull_request&head_sha=$head&per_page=100" \
+            --jq '[.workflow_runs[] | select(.event == "pull_request" and .path == ".github/workflows/build-and-test.yml")] | max_by(.run_number) // empty | "\(.id) \(.run_attempt) \(.status) \(.conclusion) \(.html_url)"') || refuse "The pull request's runs could not be listed"
+          read -r run attempt status conclusion url <<< "$latest"
+          [ -n "${run:-}" ] || refuse "The pull request has no run of this workflow for its head"
+          [ "$status" = completed ] || refuse "The pull request's last run has not finished"
+          [ "$conclusion" = success ] || refuse "The pull request's last run did not succeed"
+          timeout 60s gh run download "$run" --repo "$GITHUB_REPOSITORY" --name "tested-tree-$attempt" --dir tested-tree || refuse "The pull request's last run left no record of the tree it tested"
+          read -r recorded run_code < tested-tree/tested-tree.txt || refuse "The record of the pull request's last run could not be read"
+          [[ "$recorded" =~ ^[0-9a-f]{40}$ ]] || refuse "The record of the pull request's last run is malformed"
+          [ "$run_code" = true ] || refuse "The pull request's last run checked only the documents"
+          [ "$recorded" = "$tree" ] || refuse "The pull request's last run tested a different tree (main moved or the pull request changed)"
+          echo 'verified=true' >> "$GITHUB_OUTPUT"
+          echo "run=$url/attempts/$attempt" >> "$GITHUB_OUTPUT"
+          echo "The pull request run $url/attempts/$attempt built and tested the tree $tree."
   changes:
     name: Classify changes
     needs: tested
@@ -66,6 +112,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       run-code: ${{ steps.scope.outputs.run-code }}
+      tree: ${{ steps.tree.outputs.tree }}
     steps:
       - name: Check out the change history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -78,6 +125,13 @@ jobs:
         with:
           node-version: '26.7.0'
           package-manager-cache: false
+
+      - name: Record the tested tree
+        id: tree
+        run: |
+          set -euo pipefail
+          tree=$(git rev-parse 'HEAD^{tree}')
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
 
       - name: Check the documents
         run: npm test -- documents
@@ -387,15 +441,20 @@ jobs:
         env:
           TESTED_RESULT: ${{ needs.tested.result }}
           VERIFIED: ${{ needs.tested.outputs.verified }}
-          MERGE_GROUP_RUN: ${{ needs.tested.outputs.run }}
+          TESTED_RUN: ${{ needs.tested.outputs.run }}
+          EVENT_NAME: ${{ github.event_name }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           RUN_CODE: ${{ needs.changes.outputs.run-code }}
           VALIDATION_RESULT: ${{ needs.validate.result }}
         run: |
           set -euo pipefail
-          case "$TESTED_RESULT:$VERIFIED:${MERGE_GROUP_RUN:+cited}:$CHANGES_RESULT:$RUN_CODE:$VALIDATION_RESULT" in
+          case "$TESTED_RESULT:$VERIFIED:${TESTED_RUN:+cited}:$CHANGES_RESULT:$RUN_CODE:$VALIDATION_RESULT" in
             success:true:cited:skipped::skipped)
-              echo "This commit was built and tested by the merge group run $MERGE_GROUP_RUN; this run only maintains the dependency caches." >> "$GITHUB_STEP_SUMMARY"
+              if [ "$EVENT_NAME" = merge_group ]; then
+                echo "This merge group's tree was built and tested by the pull request run $TESTED_RUN, so this run reused that result." >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "This commit was built and tested by the merge group run $TESTED_RUN; this run only maintains the dependency caches." >> "$GITHUB_STEP_SUMMARY"
+              fi
               ;;
             skipped:::success:false:skipped | success:false::success:false:skipped)
               echo 'Only Markdown documentation changed: the document checks passed, and the build and test targets were skipped.' >> "$GITHUB_STEP_SUMMARY"
@@ -408,3 +467,26 @@ jobs:
               exit 1
               ;;
           esac
+
+      - name: Write the record of the tested tree
+        if: github.event_name == 'pull_request'
+        env:
+          TREE: ${{ needs.changes.outputs.tree }}
+          RUN_CODE: ${{ needs.changes.outputs.run-code }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TREE" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error::The classification did not record the tested tree.'
+            exit 1
+          fi
+          mkdir -p tested-tree
+          echo "$TREE $RUN_CODE" > tested-tree/tested-tree.txt
+
+      - name: Keep the record of the tested tree
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tested-tree-${{ github.run_attempt }}
+          path: tested-tree/tested-tree.txt
+          retention-days: 7
+          if-no-files-found: error
