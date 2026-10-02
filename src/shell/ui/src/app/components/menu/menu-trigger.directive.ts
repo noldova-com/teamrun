@@ -37,6 +37,13 @@ export class MenuTriggerDirective extends CdkMenuTrigger {
     this.anchored.originScrolls.pipe(takeUntil(this.destroyed)).subscribe(() => this.menuStack.closeAll());
   }
 
+  public override toggle(): void {
+    if (Object.isNull(this.parent))
+      super.toggle();
+    else
+      this.open();
+  }
+
   public override open(): void {
     const wasOpen = this.isOpen();
     super.open();

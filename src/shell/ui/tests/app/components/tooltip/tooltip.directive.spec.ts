@@ -17,9 +17,9 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 @Component({
   imports: [TooltipDirective],
   template: `
-    <div [attr.data-tr-chrome]="chrome()" style="position: fixed; top: 300px; left: 400px;">
+    <div class="frame" [attr.data-tr-chrome]="chrome()" style="position: fixed; top: 300px; left: 400px; padding: 20px;">
       <button type="button" class="anchor" [style.width]="width()" [trTooltip]="text()" [trTooltipSide]="side()"
-        [trTooltipDisabled]="isDisabled()" [trTooltipTruncated]="isTruncatedOnly()">
+        [trTooltipDisabled]="isDisabled()" [trTooltipTruncated]="isTruncatedOnly()" [trTooltipBeside]="beside()">
         <span data-truncates style="display: block; overflow: hidden; white-space: nowrap;">{{ text() }}</span>
       </button>
     </div>
@@ -33,6 +33,7 @@ class TooltipHostComponent {
   public readonly isTruncatedOnly = signal(false);
   public readonly width = signal("auto");
   public readonly chrome = signal<string | null>(null);
+  public readonly beside = signal<string | null>(null);
   public readonly tooltip = viewChild.required(TooltipDirective);
 }
 
@@ -136,13 +137,38 @@ describe("TooltipDirective", () => {
     expect(shown).toBeNull();
   });
 
-  it("hides when something around its anchor scrolls", async () => {
+  it("hides when something around its anchor scrolls it away, but not for a scroll that leaves it in place", async () => {
     host.tooltip().show();
     await shownAsync();
+    fixture.nativeElement.dispatchEvent(new Event("scroll"));
+    const isShownAfterStill = !Object.isNull(tooltip());
 
+    fixture.nativeElement.querySelector(".frame").style.top = "320px";
     fixture.nativeElement.dispatchEvent(new Event("scroll"));
 
+    expect(isShownAfterStill).toBe(true);
     expect(tooltip()).toBeNull();
+  });
+
+  for (const [name, side] of [["beside", OverlaySide.end], ["above", OverlaySide.above]] as const)
+    it(`keeps ${name} the enclosing element it is told to keep clear of, a gap away`, async () => {
+      update(() => {
+        host.beside.set(".frame");
+        host.side.set(side);
+      });
+      host.tooltip().show();
+      const shown = (await shownAsync()).getBoundingClientRect();
+      const frame = fixture.nativeElement.querySelector(".frame").getBoundingClientRect();
+
+      expect(side.isVertical ? frame.top - shown.bottom : shown.left - frame.right).toBeCloseTo(gap(), 0);
+    });
+
+  it("keeps clear of its anchor alone when nothing around it matches", async () => {
+    update(() => host.beside.set(".missing"));
+    host.tooltip().show();
+    const shown = (await shownAsync()).getBoundingClientRect();
+
+    expect(anchor().getBoundingClientRect().top - shown.bottom).toBeCloseTo(gap(), 0);
   });
 
   it("hides when the pointer leaves the anchor for elsewhere and when the anchor is pressed", async () => {

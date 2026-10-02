@@ -25,6 +25,7 @@ export class AnchoredOverlay {
   private readonly cleanups: (() => void)[] = [];
   private readonly originScrollsValue: Subject<void> = new Subject<void>();
   private origin: Element | null = null;
+  private originAt: DOMRect | null = null;
   private area: (() => DOMRect) | null = null;
   private anchoring: OverlayAnchoring | null = null;
   private placementValue: OverlayPlacement | null = null;
@@ -68,9 +69,9 @@ export class AnchoredOverlay {
     return this.originScrollsValue;
   }
 
-  public openComponent<T>(portal: ComponentPortal<T>, origin: Element, anchoring: OverlayAnchoring): ComponentRef<T> {
+  public openComponent<T>(portal: ComponentPortal<T>, origin: Element, anchoring: OverlayAnchoring, area: (() => DOMRect) | null = null): ComponentRef<T> {
     const attached = this.overlay.attach(portal);
-    this.follow(origin, anchoring);
+    this.follow(origin, anchoring, area);
     return attached;
   }
 
@@ -87,7 +88,7 @@ export class AnchoredOverlay {
     this.area = area;
     const reposition = (): void => this.reposition();
     const scrolled = (event: Event): void => {
-      if (event.target instanceof Node && !this.element.contains(event.target) && event.target.contains(origin))
+      if (event.target instanceof Node && !this.element.contains(event.target) && event.target.contains(origin) && this.hasOriginMoved(origin))
         this.originScrollsValue.next();
     };
     let frame: number | null = null;
@@ -115,7 +116,8 @@ export class AnchoredOverlay {
     const element = this.element;
     element.style.maxHeight = String.empty;
     const size = element.getBoundingClientRect();
-    const anchor = Object.isNull(this.area) ? this.origin.getBoundingClientRect() : this.area();
+    this.originAt = this.origin.getBoundingClientRect();
+    const anchor = Object.isNull(this.area) ? this.originAt : this.area();
     const placement = this.bounds.boundsFor(this.origin).place(anchor, size.width, size.height, this.anchoring);
     element.style.maxHeight = Object.isNull(placement.maxHeight) ? String.empty : `${placement.maxHeight}px`;
     this.strategy.left(`${placement.left}px`).top(`${placement.top}px`);
@@ -134,8 +136,14 @@ export class AnchoredOverlay {
   private release(): void {
     this.cleanups.splice(0).forEach(t => t());
     this.origin = null;
+    this.originAt = null;
     this.area = null;
     this.anchoring = null;
     this.placementValue = null;
+  }
+
+  private hasOriginMoved(origin: Element): boolean {
+    const now = origin.getBoundingClientRect();
+    return now.left !== this.originAt?.left || now.top !== this.originAt.top;
   }
 }

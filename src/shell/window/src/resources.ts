@@ -152,6 +152,7 @@ export class Resources {
     [DockSide.Right]: "Hide the right dock",
     [DockSide.Bottom]: "Hide the bottom dock"
   };
+  public static readonly dockStripSelector: string = ".tr-dock-strip";
   public static readonly dockStripTooltipSides: Readonly<Record<DockSide, OverlaySide>> = {
     [DockSide.Left]: OverlaySide.end,
     [DockSide.Right]: OverlaySide.start,

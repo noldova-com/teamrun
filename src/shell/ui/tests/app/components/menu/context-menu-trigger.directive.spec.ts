@@ -173,6 +173,7 @@ describe("ContextMenuTriggerDirective", () => {
     key({ key: "ContextMenu" });
     await settledAsync();
 
+    area().style.top = "140px";
     fixture.nativeElement.dispatchEvent(new Event("scroll"));
     await settledAsync();
 

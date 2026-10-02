@@ -42,6 +42,7 @@ export class TooltipDirective {
   public readonly side = input<OverlaySide>(OverlaySide.above, { alias: "trTooltipSide" });
   public readonly isDisabled = input<boolean>(false, { alias: "trTooltipDisabled" });
   public readonly isTruncatedOnly = input<boolean>(false, { alias: "trTooltipTruncated" });
+  public readonly besideSelector = input<string | null>(null, { alias: "trTooltipBeside" });
 
   public constructor() {
     const describer = inject(AriaDescriber);
@@ -81,8 +82,9 @@ export class TooltipDirective {
     if (this.isShown || this.isDisabled() || (this.isTruncatedOnly() && !this.isTruncated()))
       return;
     const overlay = this.overlay ?? this.createOverlay();
-    const anchoring = new OverlayAnchoring(this.side(), OverlayAlignment.Center, this.bounds.gap);
-    this.tooltip = overlay.openComponent(new ComponentPortal(TooltipComponent), this.host, anchoring);
+    const side = this.side();
+    const anchoring = new OverlayAnchoring(side, OverlayAlignment.Center, this.bounds.gap);
+    this.tooltip = overlay.openComponent(new ComponentPortal(TooltipComponent), this.host, anchoring, this.areaBeside(side));
     this.tooltip.setInput(Resources.tooltipTextInput, this.text());
     this.tooltip.changeDetectorRef.detectChanges();
     overlay.reposition();
@@ -126,6 +128,18 @@ export class TooltipDirective {
     overlay.originScrolls.subscribe(() => this.hide());
     this.overlay = overlay;
     return overlay;
+  }
+
+  private areaBeside(side: OverlaySide): (() => DOMRect) | null {
+    const selector = this.besideSelector();
+    if (Object.isNull(selector))
+      return null;
+    const around = this.host.closest(selector) ?? this.host;
+    return () => {
+      const anchor = this.host.getBoundingClientRect();
+      const edges = around.getBoundingClientRect();
+      return side.isVertical ? new DOMRect(anchor.left, edges.top, anchor.width, edges.height) : new DOMRect(edges.left, anchor.top, edges.width, anchor.height);
+    };
   }
 
   private isTruncated(): boolean {

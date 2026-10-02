@@ -183,7 +183,7 @@ describe("MenuTriggerDirective", () => {
     expect(focused()).toBe("beta");
   });
 
-  it("opens a submenu on hover flush against its menu, its first row level with the trigger row, and runs a row in it", async () => {
+  it("opens a submenu on hover flush against its menu, its first row level with the trigger row, keeps it open when its row is clicked or chosen again, and runs a row in it", async () => {
     trigger().click();
     await settledAsync();
     await userEvent.hover(row("beta"));
@@ -195,6 +195,13 @@ describe("MenuTriggerDirective", () => {
     expect(child?.left).toBeCloseTo(parent?.right ?? 0, 0);
     expect(row("one").getBoundingClientRect().top).toBeCloseTo(row("beta").getBoundingClientRect().top, 0);
     expect(row("beta").getAttribute("aria-expanded")).toBe("true");
+    await userEvent.click(row("beta"));
+    await settledAsync();
+    expect(menu("submenu")).not.toBeNull();
+    row("beta").focus();
+    await userEvent.keyboard("{Enter}");
+    await settledAsync();
+    expect(menu("submenu")).not.toBeNull();
     await userEvent.click(row("one"));
     await settledAsync();
     expect(fixture.componentInstance.chosen).toEqual(["one"]);
@@ -219,6 +226,8 @@ describe("MenuTriggerDirective", () => {
     row("beta").click();
     await settledAsync();
 
+    fixture.componentInstance.top.set(140);
+    fixture.detectChanges();
     fixture.nativeElement.querySelector(".scroller").dispatchEvent(new Event("scroll"));
     await settledAsync();
 

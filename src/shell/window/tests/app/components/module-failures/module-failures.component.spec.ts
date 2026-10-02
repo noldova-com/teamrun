@@ -111,6 +111,7 @@ describe("ModuleFailuresComponent", () => {
     const fixture = await renderAsync();
     await openAsync(fixture);
 
+    (fixture.nativeElement as HTMLElement).style.marginTop = "40px";
     (fixture.nativeElement as HTMLElement).dispatchEvent(new Event("scroll"));
     await fixture.whenStable();
 
