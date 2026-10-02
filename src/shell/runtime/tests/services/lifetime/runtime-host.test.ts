@@ -12,14 +12,31 @@ import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, QualifiedName, Request, ShellMethods, StopPolicy, StopRequest } from "@noldova/teamrun-shell-protocol";
-import { DataDirectoryOwnedException, OwnershipLock, RuntimeBuild, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
+import { BuildIdentity, ModuleStatusList, QualifiedName, Request, ShellMethods, StopPolicy, StopRequest } from "@noldova/teamrun-shell-protocol";
+import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
 
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 
 @TestClass
 export class RuntimeHostTests {
   private static readonly OTHER: BuildIdentity = new BuildIdentity(RuntimeBuild.identity.productVersion, BuildIdentity.supportedProtocolVersion, "other-build");
+  private static readonly PART: string = [
+    "import { mkdir, writeFile } from \"node:fs/promises\";",
+    "import path from \"node:path\";",
+    "",
+    "export class RuntimePart {",
+    "  async activateAsync(context) {",
+    "    this.folder = context.moduleFolder;",
+    "    context.registerMethod(`${context.moduleId}.echo`, { handleAsync: async request => request.payload });",
+    "  }",
+    "",
+    "  async deactivateAsync() {",
+    "    await mkdir(this.folder, { recursive: true });",
+    "    await writeFile(path.join(this.folder, \"deactivated\"), \"yes\");",
+    "  }",
+    "}",
+    ""
+  ].join("\n");
 
   @TestMethod
   public publishesItselfAndStopsOnRequest(): Promise<void> {
@@ -167,6 +184,79 @@ export class RuntimeHostTests {
 
       await Assert.throwsAsync(() => host.waitForStopAsync(), Error);
       Assert.isFalse(OwnershipLock.isOwned(fixture.dataDirectory));
+    });
+  }
+
+  @TestMethod
+  public activatesItsModulesAndReportsThemToAClientThatAsks(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const declarations = await fixture.writeModulesAsync([["notes", RuntimeHostTests.PART], ["broken", null]]);
+      const host = await fixture.startAsync(30_000, declarations);
+
+      const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      connection.sendMessages(new Request("desktop:1", new QualifiedName("notes", "echo"), { text: "hi" }), new Request("desktop:2", ShellMethods.modules, null));
+      const responses = [await connection.readResponseAsync(), await connection.readResponseAsync()].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+      connection.sendMessages(new Request("desktop:3", ShellMethods.stop, new StopRequest(StopPolicy.IfIdle).toJson()));
+      await host.waitForStopAsync();
+
+      Assert.areEqual("{\"text\":\"hi\"}", JSON.stringify(responses[0]?.payload));
+      Assert.areEqual(
+        "{\"modules\":[{\"id\":\"notes\",\"state\":\"Active\"},{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its runtime part could not be loaded.\"}]}",
+        JSON.stringify(ModuleStatusList.fromJson(responses[1]?.payload).toJson()));
+      Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "deactivated")));
+    });
+  }
+
+  @TestMethod
+  public servesAClientThatNeverAsksForModules(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["notes", RuntimeHostTests.PART]]));
+
+      const [connection, answer] = await fixture.handshakeAsync("older", RuntimeBuild.identity);
+      connection.send(
+        "{\"kind\":\"Request\",\"id\":\"older:1\",\"method\":\"notes.echo\",\"payload\":1}\n"
+        + "{\"kind\":\"Request\",\"id\":\"older:2\",\"method\":\"shell.stop\",\"payload\":{\"policy\":\"IfIdle\"}}\n");
+      const echoed = await connection.readTextAsync();
+      const stopped = await connection.readTextAsync();
+
+      Assert.isFalse(answer.hasFailed);
+      Assert.areEqual("{\"kind\":\"Response\",\"id\":\"older:1\",\"payload\":1}", echoed);
+      Assert.areEqual("{\"kind\":\"Response\",\"id\":\"older:2\",\"payload\":null}", stopped);
+      Assert.areEqual("request", await host.waitForStopAsync());
+    });
+  }
+
+  @TestMethod
+  public activatesItsModulesOnceDataFromBeforeTheShellIsMovedAside(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const declarations = await fixture.writeModulesAsync([["notes", RuntimeHostTests.PART]]);
+      await mkdir(fixture.dataDirectory.root, { recursive: true });
+      await writeFile(path.join(fixture.dataDirectory.root, "teamrun.db"), "old data");
+      const host = await fixture.startAsync(30_000, declarations);
+      const before = host.modules.report.modules.length;
+
+      const [refused] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      refused.sendMessages(new Request("desktop:1", ShellMethods.moveAside, null));
+      await refused.readResponseAsync();
+      await refused.waitForCloseAsync();
+      const [admitted] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      admitted.sendMessages(new Request("desktop:2", new QualifiedName("notes", "echo"), "after"));
+      const echoed = await admitted.readResponseAsync();
+
+      Assert.areEqual(0, before);
+      Assert.areEqual("\"after\"", JSON.stringify(echoed.payload));
+    });
+  }
+
+  @TestMethod
+  public refusesToStartWithUnreadableDeclarations(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const declarations = path.join(fixture.root, "declarations.json");
+      await writeFile(declarations, "{");
+
+      await Assert.throwsAsync(() => fixture.startAsync(30_000, declarations), DeclarationsFormatException);
+
+      Assert.isFalse(existsSync(fixture.dataDirectory.root));
     });
   }
 

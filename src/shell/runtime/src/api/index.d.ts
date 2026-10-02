@@ -12,7 +12,7 @@ import type { Writable } from "node:stream";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import type { BuildIdentity, Event, Failure, PreShellData, QualifiedName, Response, RunningWork, RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
+import type { BuildIdentity, Event, Failure, ModuleStatusList, PreShellData, QualifiedName, Response, RunningWork, RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
 
 /**
  * What a data directory holds, judged from its top-level entries other than the
@@ -1138,7 +1138,72 @@ export declare class PreShellDataFoundException extends Exception {
 }
 
 /**
- * The exception thrown when a method or event name is registered twice, or an event is published after it was withdrawn.
+ * The exception thrown when the build's module declarations cannot be read: the
+ * file is missing or not JSON, its format version is unsupported, or a
+ * declaration lacks a valid field. Its message names the file and the problem.
+ */
+export declare class DeclarationsFormatException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What is wrong.
+   * @param options The cause, when another error led to this one.
+   * @example
+   * ```ts
+   * import { DeclarationsFormatException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new DeclarationsFormatException("A module declaration's id is missing or invalid.");
+   * }
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
+ * The exception thrown when a module's runtime package does not export a
+ * `RuntimePart` class whose instances can activate and deactivate.
+ */
+export declare class ModuleLoadException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What is wrong.
+   * @example
+   * ```ts
+   * import { ModuleLoadException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new ModuleLoadException("The package does not export a RuntimePart class.");
+   * }
+   * ```
+   */
+  public constructor(message: string);
+}
+
+/**
+ * The exception thrown when a module asks for a service it may not use, one
+ * that is not published, or one that is not of the requested type.
+ */
+export declare class ServiceAccessException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @example
+   * ```ts
+   * import { ServiceAccessException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new ServiceAccessException("No service tasks.store is published.");
+   * }
+   * ```
+   */
+  public constructor(message: string);
+}
+
+/**
+ * The exception thrown when a method, event or service name is registered twice, an event is published after it was withdrawn, or a module registers a name its declaration does not contribute or publishes a service under another owner's id.
  */
 export declare class RegistrationException extends Exception {
   /**
@@ -1259,6 +1324,177 @@ export interface IMethodHandler {
    * ```
    */
   handleAsync(context: RequestContext): Promise<JsonValue>;
+}
+
+/**
+ * A module's runtime part. A module's runtime package exports it as the class
+ * `RuntimePart`, which the runtime constructs without arguments.
+ */
+export interface IRuntimePart {
+  /**
+   * Activates the part once, after the modules it depends on: it registers its
+   * methods and events, publishes its services and keeps heavy work for later.
+   *
+   * @param context What the part may register and use.
+   * @returns A promise that resolves once the part is active; a rejection
+   * marks the module failed and withdraws what it registered.
+   * @example
+   * ```ts
+   * import type { IRuntimePart, IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export class RuntimePart implements IRuntimePart {
+   *   public async activateAsync(context: IRuntimePartContext): Promise<void> {
+   *     context.registerMethod("notes.list", { handleAsync: async () => [] });
+   *   }
+   *
+   *   public async deactivateAsync(): Promise<void> {
+   *   }
+   * }
+   * ```
+   */
+  activateAsync(context: IRuntimePartContext): Promise<void>;
+
+  /**
+   * Deactivates the part when the runtime stops, before the runtime withdraws
+   * what the part registered: it releases its timers, files and processes.
+   *
+   * @returns A promise that resolves once the part has released everything.
+   * @example
+   * ```ts
+   * import type { IRuntimePart } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function stopAsync(part: IRuntimePart): Promise<void> {
+   *   return part.deactivateAsync();
+   * }
+   * ```
+   */
+  deactivateAsync(): Promise<void>;
+}
+
+/**
+ * What a module's runtime part may register and use. The runtime withdraws
+ * everything registered through it when the part deactivates or fails to
+ * activate.
+ */
+export interface IRuntimePartContext {
+  /**
+   * The module's id.
+   */
+  readonly moduleId: string;
+
+  /**
+   * The module's folder in the data directory, `modules/<id>`, for its
+   * database and files; the module creates it when it needs it.
+   */
+  readonly moduleFolder: string;
+
+  /**
+   * Registers a handler for one of the methods the module's declaration
+   * contributes.
+   *
+   * @param name The method's name, `<id>.<name>`.
+   * @param handler Its handler.
+   * @throws {RegistrationException} When the declaration does not contribute
+   * the method or it is already registered.
+   * @example
+   * ```ts
+   * import type { IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function serve(context: IRuntimePartContext): void {
+   *   context.registerMethod("notes.list", { handleAsync: async () => [] });
+   * }
+   * ```
+   */
+  registerMethod(name: string, handler: IMethodHandler): void;
+
+  /**
+   * Declares one of the events the module's declaration contributes.
+   *
+   * @param name The event's name, `<id>.<name>`.
+   * @returns The channel the module publishes the event through.
+   * @throws {RegistrationException} When the declaration does not contribute
+   * the event or it is already declared.
+   * @example
+   * ```ts
+   * import type { EventChannel, IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function announce(context: IRuntimePartContext): EventChannel {
+   *   return context.declareEvent("notes.changed");
+   * }
+   * ```
+   */
+  declareEvent(name: string): EventChannel;
+
+  /**
+   * Publishes a service for the modules that depend on this one.
+   *
+   * @param name The service's name, `<id>.<name>` with the module's own id.
+   * @param service The service, an instance of a class the module's API
+   * exports.
+   * @throws {RegistrationException} When the name has another owner or is
+   * already published.
+   * @example
+   * ```ts
+   * import type { IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export class NoteStore {
+   *   public readonly titles: string[] = [];
+   * }
+   *
+   * export function publish(context: IRuntimePartContext): void {
+   *   context.publishService("notes.store", new NoteStore());
+   * }
+   * ```
+   */
+  publishService(name: string, service: object): void;
+
+  /**
+   * Finds a service of the shell or of a module this one depends on.
+   *
+   * @param name The service's name, `<owner>.<name>`; the owner is `shell`
+   * or a dependency's id.
+   * @param type The class the service is an instance of.
+   * @returns The service.
+   * @throws {ServiceAccessException} When the owner is neither the shell nor a
+   * dependency, nothing is published under the name, or the service is not an
+   * instance of the type.
+   * @example
+   * ```ts
+   * import type { IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export class TaskStore {
+   *   public readonly titles: string[] = [];
+   * }
+   *
+   * export function countTasks(context: IRuntimePartContext): number {
+   *   return context.getService("tasks.store", TaskStore).titles.length;
+   * }
+   * ```
+   */
+  getService<T extends object>(name: string, type: abstract new (...args: never[]) => T): T;
+}
+
+/**
+ * Loads a module's runtime part from its package.
+ */
+export interface IRuntimePartLoader {
+  /**
+   * Loads and constructs the part.
+   *
+   * @param packageName The module's runtime package.
+   * @returns A promise of the part.
+   * @throws {ModuleLoadException} Rejected when the package exports no usable
+   * `RuntimePart` class; an import failure rejects as it is.
+   * @example
+   * ```ts
+   * import type { IRuntimePart, IRuntimePartLoader } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function loadNotesAsync(loader: IRuntimePartLoader): Promise<IRuntimePart> {
+   *   return loader.loadAsync("@noldova/teamrun-modules-notes-runtime");
+   * }
+   * ```
+   */
+  loadAsync(packageName: string): Promise<IRuntimePart>;
 }
 
 /**
@@ -1755,6 +1991,87 @@ export declare class RequestContext {
 }
 
 /**
+ * A module as the build declares it to the runtime, read from the build's
+ * `declarations.json`.
+ */
+export declare class ModuleDeclaration {
+  /**
+   * The module's id.
+   */
+  public readonly id: string;
+
+  /**
+   * The name people see.
+   */
+  public readonly displayName: string;
+
+  /**
+   * The ids of the modules it depends on.
+   */
+  public readonly dependencies: readonly string[];
+
+  /**
+   * Its runtime package, or `null` when it has no runtime part.
+   */
+  public readonly runtimePackage: string | null;
+
+  /**
+   * The names it contributes, by kind, such as `methods` and `events`.
+   */
+  public readonly contributions: ReadonlyMap<string, readonly string[]>;
+
+  /**
+   * Creates the declaration.
+   *
+   * @param id The module's id: lowercase kebab-case and not `shell`.
+   * @param displayName The name people see; not whitespace only.
+   * @param dependencies The ids of the modules it depends on.
+   * @param runtimePackage Its runtime package, or `null`.
+   * @param contributions The names it contributes, by kind.
+   * @throws {ArgumentException} When the id or the display name is not valid.
+   * @example
+   * ```ts
+   * import { ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const notes: ModuleDeclaration = new ModuleDeclaration("notes", "Notes", [], "@noldova/teamrun-modules-notes-runtime", new Map([["methods", ["notes.list"]]]));
+   * ```
+   */
+  public constructor(id: string, displayName: string, dependencies: readonly string[], runtimePackage: string | null, contributions: ReadonlyMap<string, readonly string[]>);
+
+  /**
+   * Reads a declaration from its form in `declarations.json`.
+   *
+   * @param value The value read from the file.
+   * @returns The declaration.
+   * @throws {DeclarationsFormatException} When the value is no object or a
+   * field is missing or invalid.
+   * @example
+   * ```ts
+   * import { ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const notes: ModuleDeclaration = ModuleDeclaration.fromJson({ id: "notes", displayName: "Notes", dependencies: [], runtimePackage: null, contributes: {} });
+   * ```
+   */
+  public static fromJson(value: unknown): ModuleDeclaration;
+
+  /**
+   * Lists the names the module contributes of one kind.
+   *
+   * @param kind The kind, such as `methods`.
+   * @returns The names; empty when it contributes none of the kind.
+   * @example
+   * ```ts
+   * import type { ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function listMethods(declaration: ModuleDeclaration): readonly string[] {
+   *   return declaration.listContributions("methods");
+   * }
+   * ```
+   */
+  public listContributions(kind: string): readonly string[];
+}
+
+/**
  * How a runtime process runs, read from its entry arguments.
  */
 export declare class RuntimeOptions {
@@ -1774,11 +2091,18 @@ export declare class RuntimeOptions {
   public readonly serverSettings: ServerSettings;
 
   /**
+   * The build's module declarations, `_build/modules/declarations.json` in the
+   * repository the runtime package is installed in, unless given.
+   */
+  public readonly declarationsFile: string;
+
+  /**
    * Creates the options.
    *
    * @param dataDirectory The data directory.
    * @param idleGraceMilliseconds The idle grace in milliseconds. Defaults to 30 seconds.
    * @param serverSettings The server's limits. Defaults to {@link ServerSettings}' defaults.
+   * @param declarationsFile The build's module declarations. Defaults to the build's file beside the installed runtime.
    * @example
    * ```ts
    * import { DataDirectory, RuntimeOptions, ServerSettings } from "@noldova/teamrun-shell-runtime";
@@ -1786,7 +2110,7 @@ export declare class RuntimeOptions {
    * export const options = new RuntimeOptions(new DataDirectory("/home/person/.noldova/teamrun"), 60_000, new ServerSettings());
    * ```
    */
-  public constructor(dataDirectory: DataDirectory, idleGraceMilliseconds?: number, serverSettings?: ServerSettings);
+  public constructor(dataDirectory: DataDirectory, idleGraceMilliseconds?: number, serverSettings?: ServerSettings, declarationsFile?: string);
 
   /**
    * Reads the options from entry arguments.
@@ -2350,6 +2674,13 @@ export declare class RuntimeHost implements IIdleParticipant {
    */
   public readonly events: EventRegistry;
 
+  /**
+   * The build's modules: activated before discovery is published, or after
+   * data from before the shell is moved aside; `shell.modules` reports where
+   * they stand, and they are deactivated when the runtime stops.
+   */
+  public readonly modules: ModuleHost;
+
   private constructor();
 
   /**
@@ -2420,6 +2751,294 @@ export declare class RuntimeHost implements IIdleParticipant {
    * ```
    */
   public waitForStopAsync(): Promise<string>;
+}
+
+/**
+ * What one module's runtime part may register and use; disposing it withdraws
+ * everything registered through it, newest first.
+ */
+export declare class ModuleContext implements IRuntimePartContext, Disposable {
+  /**
+   * The module's folder in the data directory.
+   */
+  public readonly moduleFolder: string;
+
+  /**
+   * Creates the context.
+   *
+   * @param declaration The module's declaration.
+   * @param dataDirectory The data directory.
+   * @param methods The registry its methods join.
+   * @param events The registry its events join.
+   * @param services The registry its services join.
+   * @example
+   * ```ts
+   * import { DataDirectory, EventRegistry, MethodRegistry, ModuleContext, ModuleDeclaration, ServiceRegistry } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createContext(events: EventRegistry): ModuleContext {
+   *   const notes = new ModuleDeclaration("notes", "Notes", [], null, new Map());
+   *   return new ModuleContext(notes, new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new ServiceRegistry());
+   * }
+   * ```
+   */
+  public constructor(declaration: ModuleDeclaration, dataDirectory: DataDirectory, methods: MethodRegistry, events: EventRegistry, services: ServiceRegistry);
+
+  /**
+   * The module's id.
+   */
+  public get moduleId(): string;
+
+  /**
+   * See {@link IRuntimePartContext.registerMethod}.
+   *
+   * @param name The method's name.
+   * @param handler Its handler.
+   * @throws {RegistrationException} When the declaration does not contribute
+   * the method or it is already registered.
+   * @example
+   * ```ts
+   * import type { ModuleContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function serve(context: ModuleContext): void {
+   *   context.registerMethod("notes.list", { handleAsync: async () => [] });
+   * }
+   * ```
+   */
+  public registerMethod(name: string, handler: IMethodHandler): void;
+
+  /**
+   * See {@link IRuntimePartContext.declareEvent}.
+   *
+   * @param name The event's name.
+   * @returns The event's channel.
+   * @throws {RegistrationException} When the declaration does not contribute
+   * the event or it is already declared.
+   * @example
+   * ```ts
+   * import type { EventChannel, ModuleContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function announce(context: ModuleContext): EventChannel {
+   *   return context.declareEvent("notes.changed");
+   * }
+   * ```
+   */
+  public declareEvent(name: string): EventChannel;
+
+  /**
+   * See {@link IRuntimePartContext.publishService}.
+   *
+   * @param name The service's name under the module's own id.
+   * @param service The service.
+   * @throws {RegistrationException} When the name has another owner or is
+   * already published.
+   * @example
+   * ```ts
+   * import type { ModuleContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function publish(context: ModuleContext): void {
+   *   context.publishService("notes.store", new Map<string, string>());
+   * }
+   * ```
+   */
+  public publishService(name: string, service: object): void;
+
+  /**
+   * See {@link IRuntimePartContext.getService}.
+   *
+   * @param name The service's name.
+   * @param type The class the service is an instance of.
+   * @returns The service.
+   * @throws {ServiceAccessException} When the module may not use the service,
+   * it is not published, or it is not an instance of the type.
+   * @example
+   * ```ts
+   * import type { ModuleContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function countTasks(context: ModuleContext): number {
+   *   return context.getService("tasks.store", Map).size;
+   * }
+   * ```
+   */
+  public getService<T extends object>(name: string, type: abstract new (...args: never[]) => T): T;
+
+  /**
+   * Withdraws everything registered through the context, newest first.
+   *
+   * @example
+   * ```ts
+   * import type { ModuleContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function withdraw(context: ModuleContext): void {
+   *   context[Symbol.dispose]();
+   * }
+   * ```
+   */
+  public [Symbol.dispose](): void;
+}
+
+/**
+ * Reads the build's module declarations.
+ */
+export declare class ModuleDeclarationReader {
+  /**
+   * Reads the declarations file.
+   *
+   * @param file The file, as the build writes it.
+   * @returns A promise of the declarations, in the build's order.
+   * @throws {DeclarationsFormatException} Rejected when the file cannot be read,
+   * is not JSON, has another format version or holds an invalid declaration;
+   * the message names the file.
+   * @example
+   * ```ts
+   * import { ModuleDeclarationReader, type ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readAsync(file: string): Promise<readonly ModuleDeclaration[]> {
+   *   return ModuleDeclarationReader.readAsync(file);
+   * }
+   * ```
+   */
+  public static readAsync(file: string): Promise<readonly ModuleDeclaration[]>;
+}
+
+/**
+ * Runs the build's modules in the runtime: it activates them after their
+ * dependencies, records where each stands and deactivates them in reverse.
+ */
+export declare class ModuleHost {
+  /**
+   * The services the modules publish.
+   */
+  public readonly services: ServiceRegistry;
+
+  /**
+   * Creates the host.
+   *
+   * @param declarations The build's module declarations.
+   * @param dataDirectory The data directory.
+   * @param methods The registry the modules' methods join.
+   * @param events The registry the modules' events join.
+   * @param loader Loads runtime parts.
+   * @example
+   * ```ts
+   * import { DataDirectory, type EventRegistry, MethodRegistry, ModuleHost, PackageRuntimePartLoader } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createHost(events: EventRegistry): ModuleHost {
+   *   return new ModuleHost([], new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new PackageRuntimePartLoader());
+   * }
+   * ```
+   */
+  public constructor(declarations: readonly ModuleDeclaration[], dataDirectory: DataDirectory, methods: MethodRegistry, events: EventRegistry, loader: IRuntimePartLoader);
+
+  /**
+   * Where every module stands, in activation order, as `shell.modules`
+   * answers. A module is active when its runtime part, if any, and all its
+   * dependencies activated; failed when its part could not be loaded or
+   * failed to activate; blocked when a dependency is not active, which its
+   * cause names. Causes are safe to show and hold no error text.
+   */
+  public get report(): ModuleStatusList;
+
+  /**
+   * Activates the modules once, each after the modules it depends on; a
+   * dependency the build does not include or a cycle blocks the modules that
+   * need it.
+   *
+   * @returns A promise that resolves once every module is active, failed or
+   * blocked.
+   * @example
+   * ```ts
+   * import type { ModuleHost } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function startAsync(host: ModuleHost): Promise<number> {
+   *   await host.activateAsync();
+   *   return host.report.modules.length;
+   * }
+   * ```
+   */
+  public activateAsync(): Promise<void>;
+
+  /**
+   * Deactivates the active runtime parts in reverse order, withdrawing what
+   * each registered even when its deactivation fails.
+   *
+   * @returns A promise that resolves once every part is deactivated.
+   * @throws {AggregateError} Rejected after all parts are deactivated when one
+   * or more failed; it holds their errors.
+   * @example
+   * ```ts
+   * import type { ModuleHost } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function stopAsync(host: ModuleHost): Promise<void> {
+   *   return host.deactivateAsync();
+   * }
+   * ```
+   */
+  public deactivateAsync(): Promise<void>;
+}
+
+/**
+ * Loads a module's runtime part by importing its installed package.
+ */
+export declare class PackageRuntimePartLoader implements IRuntimePartLoader {
+  /**
+   * Imports the package and constructs its `RuntimePart` without arguments.
+   *
+   * @param packageName The module's runtime package.
+   * @returns A promise of the part.
+   * @throws {ModuleLoadException} Rejected when the package exports no
+   * `RuntimePart` class whose instances have `activateAsync` and
+   * `deactivateAsync`; an import failure rejects as it is.
+   * @example
+   * ```ts
+   * import { PackageRuntimePartLoader, type IRuntimePart } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function loadNotesAsync(): Promise<IRuntimePart> {
+   *   return new PackageRuntimePartLoader().loadAsync("@noldova/teamrun-modules-notes-runtime");
+   * }
+   * ```
+   */
+  public loadAsync(packageName: string): Promise<IRuntimePart>;
+}
+
+/**
+ * The services modules publish, by name.
+ */
+export declare class ServiceRegistry {
+  /**
+   * Publishes a service.
+   *
+   * @param name The service's qualified name.
+   * @param service The service.
+   * @returns The registration; disposing it withdraws the service.
+   * @throws {RegistrationException} When the name is published.
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   * import type { Registration, ServiceRegistry } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function publish(services: ServiceRegistry): Registration {
+   *   return services.publish(new QualifiedName("notes", "store"), new Map<string, string>());
+   * }
+   * ```
+   */
+  public publish(name: QualifiedName, service: object): Registration;
+
+  /**
+   * Finds a service.
+   *
+   * @param name The service's qualified name.
+   * @returns The service, or `undefined` when none is published.
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   * import type { ServiceRegistry } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isPublished(services: ServiceRegistry): boolean {
+   *   return services.find(new QualifiedName("notes", "store")) !== undefined;
+   * }
+   * ```
+   */
+  public find(name: QualifiedName): object | undefined;
 }
 
 /**

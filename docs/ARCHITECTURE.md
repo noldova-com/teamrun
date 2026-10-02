@@ -98,7 +98,7 @@ Each module declares itself in `module.json` at its folder's root, with exactly 
 | `dependencies` | The ids of the modules it depends on |
 | `contributes` | The names it registers, listed by kind: `methods`, `events`, `views`, `documents` and `themes`, each of the form `<id>.<name>` with a camelCase name |
 
-A module without parts may leave the file out until it gains one. Dependencies form no cycle, and a build includes every module a listed module depends on. The build validates the declarations, orders them after their dependencies and writes them for the runtime. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
+A module without parts may leave the file out until it gains one. Dependencies form no cycle, and a build includes every module a listed module depends on. The build validates the declarations, orders them after their dependencies and writes them for the runtime, which reads them from `_build/modules/declarations.json` in the repository it is installed in, as the desktop finds the window's build there; the packaged layout is decided with packaging. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
 
 ### Lifecycle
 
