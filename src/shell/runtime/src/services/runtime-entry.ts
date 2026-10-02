@@ -60,4 +60,6 @@ export class RuntimeEntry {
 }
 
 if (import.meta.main)
-  process.exitCode = await RuntimeEntry.runAsync(process.argv.slice(2), process.platform, process.env, process, process.stderr);
+  void RuntimeEntry.runAsync(process.argv.slice(2), process.platform, process.env, process, process.stderr).then(t => {
+    process.exitCode = t;
+  });
