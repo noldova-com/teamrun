@@ -15,6 +15,7 @@ import { test, type TestContext } from "node:test";
 
 import Test from "../test.ts";
 import ProcessRunnerFixture from "./fixtures/process-runner.fixture.ts";
+import ProductIdentityFixture from "./fixtures/product-identity.fixture.ts";
 import RepositoryFixture from "./fixtures/repository.fixture.ts";
 import SourceTreeFixture from "./fixtures/source-tree.fixture.ts";
 import TextOutputFixture from "./fixtures/text-output.fixture.ts";
@@ -31,12 +32,12 @@ class TestTests {
 
       assert.equal(exitCode, 0, output.text);
       const titles = [
-        "Documents", "Module folders", "Shell names no module", "Module imports", "Unique names", "Declared dependencies", "Packages", "Package tests and coverage",
+        "Documents", "Module folders", "Shell names no module", "Product identity", "Module imports", "Unique names", "Declared dependencies", "Packages", "Package tests and coverage",
         "Script types", "API declarations", "API examples",
         "Script tests and coverage", "Angular tests and coverage"
       ];
       assert.deepEqual([...output.text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`), titles.map(t => `${t}: passed`));
-      assert.ok(output.text.endsWith("\n13 of 13 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n14 of 14 checks passed.\n"));
       assert.equal(runner.runs.length, 3);
       assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
     });
@@ -51,7 +52,7 @@ class TestTests {
       assert.equal(exitCode, 1);
       assert.ok(output.text.includes("\nScript types: failed\n"));
       assert.ok(output.text.includes("\nScript tests and coverage: passed\n"));
-      assert.ok(output.text.endsWith("\n12 of 13 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n13 of 14 checks passed.\n"));
       assert.equal(runner.runs.length, 3);
     });
 
@@ -129,7 +130,11 @@ class TestTests {
   private static async createRepositoryAsync(t: TestContext): Promise<RepositoryFixture> {
     const repository = await RepositoryFixture.createAsync();
     t.after(() => repository.disposeAsync());
-    await repository.writeAsync({ "README.md": "# TeamRun\n", "src/modules/checkpoints/README.md": "# Checkpoints\n" });
+    await repository.writeAsync({
+      "README.md": "# TeamRun\n",
+      "package.json": `${JSON.stringify(ProductIdentityFixture.manifest(), null, 2)}\n`,
+      "src/modules/checkpoints/README.md": "# Checkpoints\n"
+    });
     return repository;
   }
 }

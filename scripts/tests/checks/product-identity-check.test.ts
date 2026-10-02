@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import ProductIdentityCheck from "../../checks/product-identity-check.ts";
+import ProductIdentity from "../../packages/product-identity.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
 import Git from "../../repository/git.ts";
 import RepositoryFiles from "../../repository/repository-files.ts";
@@ -63,6 +64,7 @@ class ProductIdentityCheckTests {
           "export const message = `${count} windows of Fixture Studio are open.`;",
           "export const folder = \"Fixture Works/Studio\";",
           "export const variable = \"FIXTURE_STUDIO_DATA_DIR\";",
+          "export const hint = \"Set FIXTURE_STUDIO_DATA_DIR to move Fixture Studio's data.\";",
           ""
         ].join("\n"),
         "src/shell/runtime/src/resources.ts": "export const data = [\".fixtureworks/studio\", \"fixtureworks/studio\"].join(\",\");\n",
@@ -82,6 +84,8 @@ class ProductIdentityCheckTests {
         `src/shell/desktop/src/resources.ts:4: spells "Fixture Studio"${rule}`,
         `src/shell/desktop/src/resources.ts:5: spells "Fixture Works/Studio"${rule}`,
         `src/shell/desktop/src/resources.ts:6: spells "FIXTURE_STUDIO_DATA_DIR"${rule}`,
+        `src/shell/desktop/src/resources.ts:7: spells "FIXTURE_STUDIO_DATA_DIR"${rule}`,
+        `src/shell/desktop/src/resources.ts:7: spells "Fixture Studio"${rule}`,
         `src/shell/runtime/src/resources.ts:1: spells ".fixtureworks/studio"${rule}`,
         `src/shell/runtime/src/resources.ts:1: spells "fixtureworks/studio"${rule}`,
         `src/shell/ui/src/styles/brand.scss:1: spells "Fixture Works/Studio Mac"${rule}`,
@@ -103,11 +107,11 @@ class ProductIdentityCheckTests {
       assert.equal(output.text, "The root package.json's teamrun.product.slug must be lowercase kebab-case.\n");
     });
 
-    test("an unexpected error while reading the manifest is not hidden", async t => {
+    test("an unexpected error while reading the identity is not hidden", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
-      await repository.writeAsync({ "package.json": JSON.stringify(ProductIdentityFixture.manifest()) });
-      const check = new ProductIdentityCheck(repository.directory, { readAsync: () => Promise.reject(new TypeError("A defect.")) } as unknown as SourceTree);
+      const directory = repository.directory;
+      const check = new ProductIdentityCheck(new SourceTree(directory, new RepositoryFiles(directory, new Git(directory, new ProcessRunner()))), () => Promise.reject(new TypeError("A defect.")));
 
       await assert.rejects(check.runAsync(new TextOutputFixture()), TypeError);
     });
@@ -115,7 +119,7 @@ class ProductIdentityCheckTests {
 
   private static createCheck(repository: RepositoryFixture): ProductIdentityCheck {
     const directory = repository.directory;
-    return new ProductIdentityCheck(directory, new SourceTree(directory, new RepositoryFiles(directory, new Git(directory, new ProcessRunner()))));
+    return new ProductIdentityCheck(new SourceTree(directory, new RepositoryFiles(directory, new Git(directory, new ProcessRunner()))), () => ProductIdentity.readAsync(directory));
   }
 }
 

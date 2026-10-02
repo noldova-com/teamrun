@@ -9,7 +9,7 @@
 import type { Writable } from "node:stream";
 
 import PackageException from "../packages/package.exception.ts";
-import ProductIdentity from "../packages/product-identity.ts";
+import type ProductIdentity from "../packages/product-identity.ts";
 import type SourceFile from "../structure/source-file.ts";
 import SourceScanner from "../structure/source-scanner.ts";
 import type SourceTree from "../structure/source-tree.ts";
@@ -20,20 +20,20 @@ export default class ProductIdentityCheck implements ICheck {
   private static readonly LINE_SEPARATOR: string = "\n";
   private static readonly SPECIAL_CHARACTERS: RegExp = /[.*+?^${}()|[\]\\]/g;
 
-  private readonly root: string;
   private readonly tree: SourceTree;
+  private readonly readProductAsync: () => Promise<ProductIdentity>;
 
   public readonly title: string = "Product identity";
 
-  public constructor(root: string, tree: SourceTree) {
-    this.root = root;
+  public constructor(tree: SourceTree, readProductAsync: () => Promise<ProductIdentity>) {
     this.tree = tree;
+    this.readProductAsync = readProductAsync;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
     let product: ProductIdentity;
     try {
-      product = await ProductIdentity.readAsync(this.root);
+      product = await this.readProductAsync();
     }
     catch (error) {
       if (!(error instanceof PackageException))

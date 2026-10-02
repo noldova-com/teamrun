@@ -27,6 +27,7 @@ import BuildLayout from "./packages/build-layout.ts";
 import PackageBuild from "./packages/package-build.ts";
 import ModuleCatalog from "./modules/module-catalog.ts";
 import PackageCatalog from "./packages/package-catalog.ts";
+import ProductIdentity from "./packages/product-identity.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import Git from "./repository/git.ts";
 import RepositoryFiles from "./repository/repository-files.ts";
@@ -99,7 +100,7 @@ export default class Test {
       documents,
       new ModuleFolderCheck(this.root, modules),
       new ShellIndependenceCheck(tree),
-      new ProductIdentityCheck(this.root, tree),
+      new ProductIdentityCheck(tree, () => ProductIdentity.readAsync(this.root)),
       new ModuleImportCheck(tree, modules),
       new NameUniquenessCheck(tree, modules),
       new DeclaredDependencyCheck(tree),
