@@ -6,12 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { spawn } from "node:child_process";
-import { once } from "node:events";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rm } from "node:fs/promises";
+import { homedir } from "node:os";
+import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
-import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import { type BuildIdentity, FailureCode, type RuntimeHandover, RunningWork, StopPolicy } from "@noldova/teamrun-shell-protocol";
 
 import { BuildRelation } from "../../enums/build-relation.js";
@@ -20,24 +21,30 @@ import { LaunchException } from "../../exceptions/launch.exception.js";
 import { PreShellDataFoundException } from "../../exceptions/pre-shell-data-found.exception.js";
 import { RuntimeHandoverException } from "../../exceptions/runtime-handover.exception.js";
 import { WorkInProgressException } from "../../exceptions/work-in-progress.exception.js";
+import type { IProcessStarter } from "../../interfaces/process-starter.js";
 import type { IRuntimeClientListener } from "../../interfaces/runtime-client-listener.js";
 import { Endpoint } from "../../models/endpoint.js";
 import type { LaunchSettings } from "../../models/launch-settings.js";
 import { ProcessLaunchCommand } from "../../models/process-launch-command.js";
 import type { RuntimeDiscovery } from "../../models/runtime-discovery.js";
+import { StartedRuntime } from "../../models/started-runtime.js";
 import { Resources } from "../../resources.js";
+import { DiagnosticRedactor } from "../diagnostics/diagnostic-redactor.js";
 import { DiscoveryReader } from "../discovery/discovery-reader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
+import { ChildProcessStarter } from "../process/child-process-starter.js";
 import { BuildComparer } from "./build-comparer.js";
 import { RuntimeClient } from "./runtime-client.js";
 
 export class RuntimeLauncher {
   private readonly settings: LaunchSettings;
   private readonly identity: BuildIdentity;
+  private readonly starter: IProcessStarter;
 
-  public constructor(settings: LaunchSettings, identity: BuildIdentity) {
+  public constructor(settings: LaunchSettings, identity: BuildIdentity, starter: IProcessStarter = new ChildProcessStarter()) {
     this.settings = settings;
     this.identity = identity;
+    this.starter = starter;
   }
 
   public async attachAsync(clientName: string, listener: IRuntimeClientListener, policy: StopPolicy = StopPolicy.IfIdle): Promise<RuntimeClient> {
@@ -66,27 +73,41 @@ export class RuntimeLauncher {
 
   private async connectAsync(clientName: string, listener: IRuntimeClientListener, policy: StopPolicy): Promise<RuntimeClient> {
     const deadline = Date.now() + this.settings.launchTimeout;
-    let hasStarted = false;
+    let started: StartedRuntime | null = null;
     while (Date.now() < deadline) {
       const discovery = await DiscoveryReader.readAsync(this.settings.dataDirectory);
       if (!Object.isNull(discovery) && OwnershipLock.isOwned(this.settings.dataDirectory)) {
         const client = await this.tryConnectAsync(discovery, clientName, listener);
         if (!Object.isNull(client)) {
+          await RuntimeLauncher.forgetAsync(started);
+          started = null;
           const handover = client.handover;
           if (Object.isNull(handover))
             return client;
           await this.resolveOtherBuildAsync(client, handover, policy, deadline);
-          hasStarted = false;
           continue;
         }
       }
-      else if (!hasStarted) {
-        await this.startAsync();
-        hasStarted = true;
-      }
+      else if (Object.isNull(started))
+        started = await this.startAsync();
+      else if (!started.isRunning && !OwnershipLock.isOwned(this.settings.dataDirectory))
+        throw await RuntimeLauncher.describeExitAsync(started);
       await delay(this.settings.pollInterval);
     }
+    await RuntimeLauncher.forgetAsync(started);
     throw new LaunchException(Resources.launchTimedOut);
+  }
+
+  private static async forgetAsync(started: StartedRuntime | null): Promise<void> {
+    if (!Object.isNull(started))
+      await rm(started.startLog, { force: true });
+  }
+
+  private static async describeExitAsync(started: StartedRuntime): Promise<LaunchException> {
+    const text = await readFile(started.startLog, Resources.utf8Encoding);
+    await rm(started.startLog, { force: true });
+    const reason = new DiagnosticRedactor(homedir()).redact(text.slice(-Resources.startLogTailLength).trim());
+    return new LaunchException(String.isNullOrWhitespace(reason) ? Resources.runtimeExitedWithoutReason : Resources.formatRuntimeExited(reason));
   }
 
   private async tryConnectAsync(discovery: RuntimeDiscovery, clientName: string, listener: IRuntimeClientListener): Promise<RuntimeClient | null> {
@@ -120,21 +141,21 @@ export class RuntimeLauncher {
     }
   }
 
-  private async startAsync(): Promise<void> {
+  private async startAsync(): Promise<StartedRuntime> {
+    const directory = this.settings.dataDirectory;
+    const startLogName = Resources.formatStartLogName(randomUUID());
     const command = new ProcessLaunchCommand(this.settings.platform, this.settings.executablePath, [
       this.settings.entryPath,
       Resources.dataDirectoryArgument,
-      this.settings.dataDirectory.root,
+      directory.root,
       Resources.idleGraceArgument,
-      String(this.settings.idleGraceMilliseconds)
+      String(this.settings.idleGraceMilliseconds),
+      Resources.startLogArgument,
+      startLogName
     ]);
-    const child = spawn(command.executable, command.arguments, { detached: true, stdio: Resources.ignoredOutput, windowsHide: true, env: this.settings.environment });
-    try {
-      await once(child, Resources.spawnEvent);
-    }
-    catch (error) {
-      throw new LaunchException(Resources.formatStartFailed(this.settings.executablePath), new ExceptionOptions(error));
-    }
-    child.unref();
+    await mkdir(directory.logsFolder, { recursive: true });
+    const startLog = path.join(directory.logsFolder, startLogName);
+    const processId = await this.starter.startAsync(command.executable, command.arguments, this.settings.environment, startLog);
+    return new StartedRuntime(processId, startLog);
   }
 }

@@ -35,6 +35,7 @@ export class DataDirectoryInspectorTests {
     await mkdir(directory.discoveryFolder);
     for (const folder of [directory.backupsFolder, directory.profileFolder, directory.modulesFolder, directory.workFolder, directory.logsFolder])
       await mkdir(folder);
+    await writeFile(path.join(directory.logsFolder, "start-0f8b2c1e-6a4d-4e2b-9c3f-1a2b3c4d5e6f.log"), "");
     await writeFile(`${directory.ownershipDatabase}-journal`, "");
 
     const runtimeOnly = await DataDirectoryInspector.inspectAsync(directory);

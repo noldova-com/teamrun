@@ -41,6 +41,7 @@ export class DataDirectory {
 
   public get profileFolder(): string {
     return path.join(this.root, Resources.profileFolderName);
+
   }
 
   public get backupsFolder(): string {
@@ -57,6 +58,14 @@ export class DataDirectory {
 
   public get logsFolder(): string {
     return path.join(this.root, Resources.logsFolderName);
+  }
+
+  public get runtimeLog(): string {
+    return path.join(this.logsFolder, Resources.runtimeLogFileName);
+  }
+
+  public get previousRuntimeLog(): string {
+    return path.join(this.logsFolder, Resources.previousRuntimeLogFileName);
   }
 
   public locateModuleFolder(id: string): string {
