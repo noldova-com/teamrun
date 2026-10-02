@@ -142,9 +142,12 @@ test.describe("menus", () => {
     await longRow.scrollIntoViewIfNeeded();
     await longRow.hover();
     await expect(tooltip).toHaveText(keyboardTitle);
-    const tip = await boxOf(tooltip);
-    const row = await boxOf(longRow);
-    expect(tip.left >= row.right - 0.5 || tip.right <= row.left + 0.5 || tip.top >= row.bottom - 0.5 || tip.bottom <= row.top + 0.5).toBe(true);
+    await expect.poll(async () => {
+      const tip = await boxOf(tooltip);
+      const row = await boxOf(longRow);
+      const isApart = tip.left >= row.right - 0.5 || tip.right <= row.left + 0.5 || tip.top >= row.bottom - 0.5 || tip.bottom <= row.top + 0.5;
+      return isApart ? "apart" : JSON.stringify({ tip, row, width: await window.evaluate(() => innerWidth) });
+    }).toBe("apart");
     const shortRow = rows.filter({ has: window.locator(".tr-menu-item-label", { hasText: /^Fonts$/ }) });
     await shortRow.scrollIntoViewIfNeeded();
     await shortRow.hover();
