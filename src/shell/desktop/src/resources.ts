@@ -64,6 +64,13 @@ export class Resources {
   public static readonly windowAllClosedEvent: "window-all-closed" = "window-all-closed";
   public static readonly activateEvent: "activate" = "activate";
   public static readonly willQuitEvent: "will-quit" = "will-quit";
+  public static readonly resizeEvent: "resize" = "resize";
+  public static readonly moveEvent: "move" = "move";
+  public static readonly maximizeEvent: "maximize" = "maximize";
+  public static readonly unmaximizeEvent: "unmaximize" = "unmaximize";
+  public static readonly boundsSaveDelay: number = 500;
+  public static readonly mainWindow: string = "main";
+  public static readonly runtimeNotConnected: string = "TeamRun is not connected to its runtime.";
   public static readonly windowMinimumWidth: number = 640;
   public static readonly windowMinimumHeight: number = 400;
   public static readonly windowWidth: number = 1280;
@@ -88,6 +95,22 @@ export class Resources {
 
   public static formatInvalidDevice(file: string): string {
     return `The device identity in ${file} is not valid; remove the file to give this device a new identity.`;
+  }
+
+  public static formatWindowStateFailed(method: string, message: string): string {
+    return `The runtime refused ${method}: ${message}`;
+  }
+
+  public static formatBoundsUnsaved(reason: string): string {
+    return `The window's bounds could not be saved: ${reason}`;
+  }
+
+  public static formatBoundsNotRestored(reason: string): string {
+    return `The window's saved bounds could not be restored, so it opens with its default bounds: ${reason}`;
+  }
+
+  public static formatDeviceUnavailable(reason: string): string {
+    return `This device's identity could not be read, so window bounds are not kept: ${reason}`;
   }
 
   public static formatAppearanceRejected(reason: string): string {

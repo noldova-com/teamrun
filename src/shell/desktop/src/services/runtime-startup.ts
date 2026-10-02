@@ -32,7 +32,7 @@ export class RuntimeStartup {
   private readonly waitInterval: number;
   private readonly listener: IRuntimeClientListener;
   private state: StartupState = StartupState.connecting();
-  private connection: IRuntimeConnection | null = null;
+  private connectionValue: IRuntimeConnection | null = null;
   private isClosed: boolean = false;
 
   public constructor(launcher: IRuntimeLauncher, publish: (state: StartupState) => void, handOver: (handover: RuntimeHandover) => boolean, waitInterval: number) {
@@ -48,6 +48,10 @@ export class RuntimeStartup {
 
   public get current(): StartupState {
     return this.state;
+  }
+
+  public get connection(): IRuntimeConnection | null {
+    return this.connectionValue;
   }
 
   public startAsync(): Promise<void> {
@@ -71,8 +75,8 @@ export class RuntimeStartup {
 
   public close(): void {
     this.isClosed = true;
-    this.connection?.close();
-    this.connection = null;
+    this.connectionValue?.close();
+    this.connectionValue = null;
   }
 
   private attachAsync(policy: StopPolicy): Promise<void> {
@@ -109,7 +113,7 @@ export class RuntimeStartup {
       connection.close();
       return;
     }
-    this.connection = connection;
+    this.connectionValue = connection;
     this.update(StartupState.ready());
   }
 
@@ -129,9 +133,9 @@ export class RuntimeStartup {
   }
 
   private reconnect(): void {
-    if (Object.isNull(this.connection) || this.isClosed)
+    if (Object.isNull(this.connectionValue) || this.isClosed)
       return;
-    this.connection = null;
+    this.connectionValue = null;
     void this.startAsync();
   }
 

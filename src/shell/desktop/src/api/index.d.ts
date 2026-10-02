@@ -6,11 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { BrowserWindowConstructorOptions, MenuItemConstructorOptions, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
+import type { BrowserWindowConstructorOptions, MenuItemConstructorOptions, Rectangle, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
-import type { JsonObject } from "@noldova/teamrun-foundation-json";
-import type { RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
+import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
+import type { QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey } from "@noldova/teamrun-shell-protocol";
 import type { IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
 
 /**
@@ -103,6 +103,24 @@ export interface IDesktopProcess {
  */
 export interface IRuntimeConnection {
   /**
+   * Sends a request and waits for its response.
+   *
+   * @param method The method's qualified name.
+   * @param payload The request's payload.
+   * @returns A promise of the response, successful or failed.
+   * @example
+   * ```ts
+   * import { ShellMethods, WindowStateKey, type Response } from "@noldova/teamrun-shell-protocol";
+   * import type { IRuntimeConnection } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function readBoundsAsync(connection: IRuntimeConnection): Promise<Response> {
+   *   return connection.callAsync(ShellMethods.readWindowBounds, new WindowStateKey("1b4e28ba-2fa1-41d2-883f-0016d3cca427", "main").toJson());
+   * }
+   * ```
+   */
+  callAsync(method: QualifiedName, payload: JsonValue): Promise<Response>;
+
+  /**
    * Closes the connection.
    *
    * @example
@@ -115,6 +133,63 @@ export interface IRuntimeConnection {
    * ```
    */
   close(): void;
+}
+
+/**
+ * The displays' work areas, as Electron's `screen` provides them.
+ */
+export interface IDisplayHost {
+  /**
+   * Lists the displays.
+   *
+   * @returns Each display, with its work area in screen pixels.
+   * @example
+   * ```ts
+   * import type { IDisplayHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function countDisplays(displays: IDisplayHost): number {
+   *   return displays.getAllDisplays().length;
+   * }
+   * ```
+   */
+  getAllDisplays(): readonly { readonly workArea: Rectangle }[];
+}
+
+/**
+ * Keeps one window's state in a place that outlives the window.
+ */
+export interface IWindowStateStore {
+  /**
+   * Reads the kept state.
+   *
+   * @returns A promise of the state, or `null` when none is kept.
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import type { IWindowStateStore } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function readAsync(store: IWindowStateStore): Promise<JsonObject | null> {
+   *   return store.readAsync();
+   * }
+   * ```
+   */
+  readAsync(): Promise<JsonObject | null>;
+
+  /**
+   * Keeps a new state.
+   *
+   * @param value The state.
+   * @returns A promise that settles once the state is kept.
+   * @example
+   * ```ts
+   * import type { IWindowStateStore } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function keepAsync(store: IWindowStateStore): Promise<void> {
+   *   return store.writeAsync({ width: 1280, height: 800 });
+   * }
+   * ```
+   */
+  writeAsync(value: JsonObject): Promise<void>;
 }
 
 /**
@@ -583,6 +658,79 @@ export interface IDesktopWindow {
   setTitleBarOverlay(options: TitleBarOverlayOptions): void;
 
   /**
+   * The window's bounds when it is neither maximized nor minimized.
+   *
+   * @returns The bounds in screen pixels.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function widthOf(window: IDesktopWindow): number {
+   *   return window.getNormalBounds().width;
+   * }
+   * ```
+   */
+  getNormalBounds(): Rectangle;
+
+  /**
+   * Moves or resizes the window.
+   *
+   * @param bounds The new position, size or both, in screen pixels.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function resize(window: IDesktopWindow): void {
+   *   window.setBounds({ width: 1280, height: 800 });
+   * }
+   * ```
+   */
+  setBounds(bounds: Partial<Rectangle>): void;
+
+  /**
+   * Centers the window on its display.
+   *
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function centerOnDisplay(window: IDesktopWindow): void {
+   *   window.center();
+   * }
+   * ```
+   */
+  center(): void;
+
+  /**
+   * Whether the window is maximized.
+   *
+   * @returns `true` when the window is maximized.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function isLarge(window: IDesktopWindow): boolean {
+   *   return window.isMaximized();
+   * }
+   * ```
+   */
+  isMaximized(): boolean;
+
+  /**
+   * Maximizes the window.
+   *
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function enlarge(window: IDesktopWindow): void {
+   *   window.maximize();
+   * }
+   * ```
+   */
+  maximize(): void;
+
+  /**
    * Whether the window is shown.
    *
    * @returns `true` when the window is visible.
@@ -687,10 +835,11 @@ export interface IDesktopWindow {
   close(): void;
 
   /**
-   * Listens for the window being asked to close; the listener may cancel it.
+   * Listens for the window being asked to close, which the listener may cancel, or for the window being resized,
+   * moved, maximized or restored from maximized.
    *
    * @param event The event's name.
-   * @param listener Receives the cancellable event.
+   * @param listener Receives the cancellable event when the window is asked to close; called with nothing otherwise.
    * @returns Electron's own return value, which the desktop does not use.
    * @example
    * ```ts
@@ -702,6 +851,10 @@ export interface IDesktopWindow {
    * ```
    */
   on(event: "close", listener: (event: IPreventableEvent) => void): unknown;
+  on(event: "resize", listener: () => void): unknown;
+  on(event: "move", listener: () => void): unknown;
+  on(event: "maximize", listener: () => void): unknown;
+  on(event: "unmaximize", listener: () => void): unknown;
 
   /**
    * Listens once for the window having closed.
@@ -745,6 +898,11 @@ export interface IElectron {
    * The application menu.
    */
   readonly menu: IMenuHost;
+
+  /**
+   * The displays, for placing a window on one that shows it.
+   */
+  readonly screen: IDisplayHost;
 
   /**
    * Creates a native window.
@@ -1361,17 +1519,29 @@ export declare class DesktopApplication {
    * @param moduleUrl The URL of the desktop's compiled entry point, which locates the window, the preload and, in a
    * development run, the checkout.
    * @param createLauncher Creates the runtime launcher for the chosen settings.
+   * @param readDeviceAsync Reads this device's identity from a folder: the one `--device-dir=` in the process's
+   * arguments gives, otherwise the operating system's local application data. A failure leaves window bounds unkept.
    * @example
    * ```ts
    * import { RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
-   * import { DesktopApplication, type IDesktopProcess, type IElectron } from "@noldova/teamrun-shell-desktop";
+   * import { DesktopApplication, DeviceIdentity, type IDesktopProcess, type IElectron } from "@noldova/teamrun-shell-desktop";
    *
    * export function launch(electron: IElectron, process: IDesktopProcess): void {
-   *   DesktopApplication.start(electron, process, "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js", t => new RuntimeLauncher(t, RuntimeBuild.identity));
+   *   DesktopApplication.start(
+   *     electron,
+   *     process,
+   *     "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js",
+   *     t => new RuntimeLauncher(t, RuntimeBuild.identity),
+   *     t => DeviceIdentity.readOrCreateAsync(t));
    * }
    * ```
    */
-  public static start(electron: IElectron, process: IDesktopProcess, moduleUrl: string, createLauncher: (settings: LaunchSettings) => IRuntimeLauncher): void;
+  public static start(
+    electron: IElectron,
+    process: IDesktopProcess,
+    moduleUrl: string,
+    createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
+    readDeviceAsync: (folder: string) => Promise<string>): void;
 }
 
 /**
@@ -1402,6 +1572,11 @@ export declare class RuntimeStartup {
    * The latest state.
    */
   public get current(): StartupState;
+
+  /**
+   * The connection to the runtime while the state is {@link StartupStateKind.Ready}; otherwise `null`.
+   */
+  public get connection(): IRuntimeConnection | null;
 
   /**
    * Starts or attaches to the runtime, stopping an older build's runtime only when it is idle. Reconnects when the
@@ -1499,4 +1674,154 @@ export declare class SenderPolicy {
    * ```
    */
   public isWindowUrl(url: string): boolean;
+}
+
+/**
+ * The exception thrown when a window's state cannot be read or kept through the runtime.
+ */
+export declare class WindowStateException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { WindowStateException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: WindowStateException = new WindowStateException("TeamRun is not connected to its runtime.");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
+ * Keeps one window's state, its bounds or its layout, in the shell's database through the runtime.
+ */
+export declare class RuntimeWindowStateStore implements IWindowStateStore {
+  /**
+   * Creates the store.
+   *
+   * @param connection Returns the current connection to the runtime, or `null` while there is none.
+   * @param key The device and window the state belongs to.
+   * @param readMethod The method that reads the state, such as `ShellMethods.readWindowBounds`.
+   * @param writeMethod The method that keeps the state, such as `ShellMethods.writeWindowBounds`.
+   * @example
+   * ```ts
+   * import { ShellMethods, WindowStateKey } from "@noldova/teamrun-shell-protocol";
+   * import { type RuntimeStartup, RuntimeWindowStateStore } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function boundsOf(startup: RuntimeStartup, device: string): RuntimeWindowStateStore {
+   *   return new RuntimeWindowStateStore(() => startup.connection, new WindowStateKey(device, "main"), ShellMethods.readWindowBounds, ShellMethods.writeWindowBounds);
+   * }
+   * ```
+   */
+  public constructor(connection: () => IRuntimeConnection | null, key: WindowStateKey, readMethod: QualifiedName, writeMethod: QualifiedName);
+
+  /**
+   * Reads the kept state.
+   *
+   * @returns A promise of the state, or `null` when none is kept.
+   * @throws WindowStateException as a rejection when there is no connection or the runtime refuses.
+   * @throws JsonException as a rejection when the runtime's answer is not a window state.
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import type { RuntimeWindowStateStore } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function readAsync(store: RuntimeWindowStateStore): Promise<JsonObject | null> {
+   *   return store.readAsync();
+   * }
+   * ```
+   */
+  public readAsync(): Promise<JsonObject | null>;
+
+  /**
+   * Keeps a new state.
+   *
+   * @param value The state.
+   * @returns A promise that settles once the runtime kept it.
+   * @throws WindowStateException as a rejection when there is no connection or the runtime refuses.
+   * @example
+   * ```ts
+   * import type { RuntimeWindowStateStore } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function keepAsync(store: RuntimeWindowStateStore): Promise<void> {
+   *   return store.writeAsync({ x: 100, y: 80, width: 1280, height: 800, maximized: false });
+   * }
+   * ```
+   */
+  public writeAsync(value: JsonObject): Promise<void>;
+}
+
+/**
+ * Restores a window's saved bounds onto the displays that show it, then keeps them after each pause in moving,
+ * resizing and maximizing, and on request before the window closes.
+ */
+export declare class WindowBoundsKeeper {
+  /**
+   * Creates the keeper and listens for the window's changes, which it saves only once it has a store.
+   *
+   * @param window The window.
+   * @param displays The displays, for placing restored bounds.
+   * @param saveDelay How long a pause in changes lasts before the bounds are saved, in milliseconds.
+   * @example
+   * ```ts
+   * import { type IDesktopWindow, type IDisplayHost, WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function keep(window: IDesktopWindow, displays: IDisplayHost): WindowBoundsKeeper {
+   *   return new WindowBoundsKeeper(window, displays, 500);
+   * }
+   * ```
+   */
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number);
+
+  /**
+   * Keeps the bounds in the store from now on, and applies the bounds it holds: the saved position when a display
+   * shows it, otherwise the saved size centered, then maximized when it was.
+   *
+   * @param store Where the bounds are kept.
+   * @returns A promise that settles once the saved bounds are applied, or at once when none are saved.
+   * @throws JsonException as a rejection when the saved bounds are not a window state; the window keeps its bounds.
+   * @example
+   * ```ts
+   * import type { IWindowStateStore, WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function restoreAsync(keeper: WindowBoundsKeeper, store: IWindowStateStore): Promise<void> {
+   *   return keeper.restoreAsync(store);
+   * }
+   * ```
+   */
+  public restoreAsync(store: IWindowStateStore): Promise<void>;
+
+  /**
+   * Saves the window's current bounds at once, cancelling a pending save; does nothing before a store is set or
+   * after the window is gone.
+   *
+   * @returns A promise that settles once the bounds are kept.
+   * @throws The store's failure as a rejection.
+   * @example
+   * ```ts
+   * import type { WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function saveAsync(keeper: WindowBoundsKeeper): Promise<void> {
+   *   return keeper.saveAsync();
+   * }
+   * ```
+   */
+  public saveAsync(): Promise<void>;
+
+  /**
+   * Cancels a pending save.
+   *
+   * @example
+   * ```ts
+   * import type { WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function forget(keeper: WindowBoundsKeeper): void {
+   *   keeper.cancelSave();
+   * }
+   * ```
+   */
+  public cancelSave(): void;
 }

@@ -12,6 +12,7 @@ import type { IElectron, ISessionHost } from "@noldova/teamrun-shell-desktop";
 
 import { FakeApplicationHost } from "./fake-application-host.fixture.js";
 import { FakeDesktopWindow } from "./fake-desktop-window.fixture.js";
+import { FakeDisplayHost } from "./fake-display-host.fixture.js";
 import { FakeIpcHost } from "./fake-ipc-host.fixture.js";
 import { FakeMenuHost } from "./fake-menu-host.fixture.js";
 import { FakePermissionHost } from "./fake-permission-host.fixture.js";
@@ -22,6 +23,7 @@ export class FakeElectron implements IElectron {
   public readonly permissions: FakePermissionHost = new FakePermissionHost();
   public readonly session: ISessionHost = { defaultSession: this.permissions };
   public readonly menu: FakeMenuHost = new FakeMenuHost();
+  public readonly screen: FakeDisplayHost = new FakeDisplayHost();
   public readonly windows: FakeDesktopWindow[] = [];
 
   public constructor(hasLock: boolean = true, isPackaged: boolean = false) {

@@ -7,17 +7,19 @@
  */
 
 import { dirname, join } from "node:path";
-import { setImmediate } from "node:timers/promises";
+import { setTimeout as delay, setImmediate } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, PreShellData, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
 import { DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
-import { DesktopApplication, DesktopSettings, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
+import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
 
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import type { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
+import { FakeDeviceIdentity } from "../fixtures/fake-device-identity.fixture.js";
 import { FakeElectron } from "../fixtures/fake-electron.fixture.js";
+import { FakeRuntimeConnection } from "../fixtures/fake-runtime-connection.fixture.js";
 import { FakeRuntimeLauncher } from "../fixtures/fake-runtime-launcher.fixture.js";
 
 @TestClass
@@ -105,6 +107,7 @@ export class DesktopApplicationTests {
 
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent(platform), DesktopApplicationTests.APPEARANCE);
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent(platform), DesktopApplicationTests.APPEARANCE);
+    await DesktopApplicationTests.waitAsync(() => window.isShown);
 
     Assert.areEqual("#181818", window.backgroundColor);
     Assert.areEqual(overlay, JSON.stringify(window.overlay));
@@ -120,6 +123,7 @@ export class DesktopApplicationTests {
     process.stderr.write = ((text: string): boolean => written.push(text) > 0) as typeof process.stderr.write;
     try {
       electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), { background: "red" });
+      await DesktopApplicationTests.waitAsync(() => window.isShown);
     }
     finally {
       process.stderr.write = write;
@@ -164,8 +168,7 @@ export class DesktopApplicationTests {
     Assert.areEqual("teamrun:closeRequest", request?.[0]);
     Assert.isFalse(window.isGone);
     Assert.isTrue(electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), request?.[1], true) === true);
-    await setImmediate();
-    Assert.isTrue(window.isGone);
+    await DesktopApplicationTests.waitAsync(() => window.isGone);
   }
 
   @TestMethod
@@ -368,17 +371,171 @@ export class DesktopApplicationTests {
     });
   }
 
-  private static start(electron: FakeElectron, process: FakeDesktopProcess, launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher()): LaunchSettings[] {
+  @TestMethod
+  public async restoresTheSavedBoundsBeforeShowingTheWindow(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: false });
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const window = DesktopApplicationTests.firstWindow(electron);
+
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    await DesktopApplicationTests.waitAsync(() => window.isShown);
+
+    Assert.areEqual(JSON.stringify(["setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}", "show"]), JSON.stringify(window.calls));
+  }
+
+  @TestMethod
+  public async readsTheDeviceIdentityFromTheFolderItIsGivenOrTheOperatingSystemsOne(): Promise<void> {
+    const given = new FakeDeviceIdentity();
+    const located = new FakeDeviceIdentity();
+    const environment = { LOCALAPPDATA: "C:\\Users\\person\\AppData\\Local" };
+
+    const first = new FakeElectron();
+    const second = new FakeElectron();
+
+    DesktopApplicationTests.start(first, new FakeDesktopProcess("win32", ["--device-dir=/devices/this"]), new FakeRuntimeLauncher(), given);
+    DesktopApplicationTests.start(second, new FakeDesktopProcess("win32", [], environment, "C:\\Users\\person"), new FakeRuntimeLauncher(), located);
+    await first.app.becomeReadyAsync();
+    await second.app.becomeReadyAsync();
+
+    Assert.areEqual(JSON.stringify(["/devices/this"]), JSON.stringify(given.folders));
+    Assert.areEqual(JSON.stringify([DeviceIdentity.locateFolder("win32", environment, "C:\\Users\\person")]), JSON.stringify(located.folders));
+  }
+
+  @TestMethod
+  public async savesTheBoundsBeforeTheWindowCloses(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const window = DesktopApplicationTests.firstWindow(electron);
+    await DesktopApplicationTests.waitAsync(() => connection.calls.length > 0);
+    window.bounds = { x: 300, y: 150, width: 1100, height: 750 };
+
+    window.close();
+    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    await DesktopApplicationTests.waitAsync(() => window.isGone);
+
+    Assert.areEqual(
+      JSON.stringify({ x: 300, y: 150, width: 1100, height: 750, maximized: false }),
+      JSON.stringify(connection.states.get(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`)));
+  }
+
+  @TestMethod
+  public async stopsClosingAWindowThatIsGoneWhileItsBoundsAreSaved(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const window = DesktopApplicationTests.firstWindow(electron);
+    await DesktopApplicationTests.waitAsync(() => connection.calls.length > 0);
+    connection.onCall = () => window.destroy();
+
+    window.close();
+    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    await DesktopApplicationTests.waitAsync(() => window.isGone);
+    await setImmediate();
+
+    Assert.areEqual(JSON.stringify(["close"]), JSON.stringify(window.calls));
+  }
+
+  @TestMethod
+  public async closesEvenWhenTheBoundsCannotBeSaved(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const window = DesktopApplicationTests.firstWindow(electron);
+    await DesktopApplicationTests.waitAsync(() => connection.calls.length > 0);
+    connection.isFailing = true;
+    const written = await DesktopApplicationTests.captureErrorsAsync(async () => {
+      window.close();
+      electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+      await DesktopApplicationTests.waitAsync(() => window.isGone);
+    });
+
+    Assert.isTrue(written[0]?.startsWith("The window's bounds could not be saved: WindowStateException: The runtime refused shell.writeWindowBounds") === true);
+  }
+
+  @TestMethod
+  public async showsTheWindowWithItsDefaultBoundsWhenTheSavedOnesCannotBeUsed(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { width: 10 });
+    const written = await DesktopApplicationTests.captureErrorsAsync(async () => {
+      const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+      const window = DesktopApplicationTests.firstWindow(electron);
+      electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+      await DesktopApplicationTests.waitAsync(() => window.isShown);
+      Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
+    });
+
+    Assert.isTrue(written[0]?.startsWith("The window's saved bounds could not be restored, so it opens with its default bounds:") === true);
+  }
+
+  @TestMethod
+  public async showsTheWindowWithoutKeepingBoundsWhenTheDeviceHasNoIdentity(): Promise<void> {
+    const device = new FakeDeviceIdentity();
+    device.failure = new Error("The identity file is not JSON.");
+    const connection = new FakeRuntimeConnection();
+    const written = await DesktopApplicationTests.captureErrorsAsync(async () => {
+      const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection), new FakeElectron(), device);
+      const window = DesktopApplicationTests.firstWindow(electron);
+      electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+      await DesktopApplicationTests.waitAsync(() => window.isShown);
+    });
+
+    Assert.areEqual(0, connection.calls.length);
+    Assert.isTrue(written[0]?.startsWith("This device's identity could not be read, so window bounds are not kept:") === true);
+  }
+
+  @TestMethod
+  public async showsARefusalAtOnceAndRestoresTheBoundsOnceTheRuntimeIsReady(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: true });
+    const launcher = new FakeRuntimeLauncher(new PreShellDataFoundException(new PreShellData("/data/old")), connection);
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher);
+    const window = DesktopApplicationTests.firstWindow(electron);
+
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    await DesktopApplicationTests.waitAsync(() => window.isShown);
+    await (electron.ipcMain.invoke("teamrun:startupAction", DesktopApplicationTests.trustedEvent("linux"), "moveAside") as Promise<boolean>);
+    await DesktopApplicationTests.waitAsync(() => window.calls.includes("maximize"));
+
+    Assert.areEqual(JSON.stringify(["show", "setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}", "maximize"]), JSON.stringify(window.calls));
+  }
+
+  private static async waitAsync(condition: () => boolean): Promise<void> {
+    for (let attempt = 0; attempt < 400 && !condition(); attempt++)
+      await delay(5);
+    Assert.isTrue(condition());
+  }
+
+  private static async captureErrorsAsync(action: () => Promise<void>): Promise<string[]> {
+    const written: string[] = [];
+    const write = process.stderr.write;
+    process.stderr.write = ((text: string): boolean => written.push(text) > 0) as typeof process.stderr.write;
+    try {
+      await action();
+    }
+    finally {
+      process.stderr.write = write;
+    }
+    return written;
+  }
+
+  private static start(
+    electron: FakeElectron,
+    process: FakeDesktopProcess,
+    launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher(),
+    device: FakeDeviceIdentity = new FakeDeviceIdentity()): LaunchSettings[] {
     const settings: LaunchSettings[] = [];
     DesktopApplication.start(electron, process, DesktopApplicationTests.MODULE_URL, t => {
       settings.push(t);
       return launcher;
-    });
+    }, t => device.readAsync(t));
     return settings;
   }
 
-  private static async startReadyAsync(platform: string, launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher(), electron: FakeElectron = new FakeElectron()): Promise<FakeElectron> {
-    DesktopApplicationTests.start(electron, new FakeDesktopProcess(platform), launcher);
+  private static async startReadyAsync(
+    platform: string,
+    launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher(),
+    electron: FakeElectron = new FakeElectron(),
+    device: FakeDeviceIdentity = new FakeDeviceIdentity()): Promise<FakeElectron> {
+    DesktopApplicationTests.start(electron, new FakeDesktopProcess(platform), launcher, device);
     await electron.app.becomeReadyAsync();
     await setImmediate();
     return electron;

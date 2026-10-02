@@ -9,14 +9,15 @@
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 
-import { BrowserWindow, Menu, app, ipcMain, session } from "electron";
+import { BrowserWindow, Menu, app, ipcMain, screen, session } from "electron";
 
 import { RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
 
 import { DesktopApplication } from "./services/desktop-application.js";
+import { DeviceIdentity } from "./services/device-identity.js";
 
 DesktopApplication.start(
-  { app, ipcMain, session, menu: Menu, createWindow: t => new BrowserWindow(t) },
+  { app, ipcMain, session, screen, menu: Menu, createWindow: t => new BrowserWindow(t) },
   {
     argv: process.argv,
     env: process.env,
@@ -26,4 +27,5 @@ DesktopApplication.start(
     startDetached: t => spawn(t, [], { detached: true, stdio: "ignore" }).unref()
   },
   import.meta.url,
-  t => new RuntimeLauncher(t, RuntimeBuild.identity));
+  t => new RuntimeLauncher(t, RuntimeBuild.identity),
+  t => DeviceIdentity.readOrCreateAsync(t));

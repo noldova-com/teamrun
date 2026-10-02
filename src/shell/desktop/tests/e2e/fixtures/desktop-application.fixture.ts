@@ -26,6 +26,7 @@ export default class DesktopApplicationFixture {
   private static readonly ROOT_PREFIX: string = "teamrun-ui-";
   private static readonly PROFILE_FOLDER: string = "profile";
   private static readonly DATA_FOLDER: string = "data";
+  private static readonly DEVICE_FOLDER: string = "device";
   private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
   private static readonly TRACE_FILE: string = "trace.zip";
   private static readonly MAIN_WINDOW: string = "main-window";
@@ -173,6 +174,7 @@ export default class DesktopApplicationFixture {
         DesktopApplicationFixture.MAIN,
         `--user-data-dir=${path.join(this.root, DesktopApplicationFixture.PROFILE_FOLDER)}`,
         `--data-dir=${this.dataDirectory}`,
+        `--device-dir=${path.join(this.root, DesktopApplicationFixture.DEVICE_FOLDER)}`,
         ...DesktopApplicationFixture.LAUNCH_ARGUMENTS
       ],
       env: Object.fromEntries(Object.entries({ ...process.env, ...this.environment }).filter((t): t is [string, string] => t[1] !== undefined))

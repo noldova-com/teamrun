@@ -66,11 +66,9 @@ export class WindowFactory {
     return window;
   }
 
-  public show(window: IDesktopWindow, appearance: WindowAppearance): void {
+  public paint(window: IDesktopWindow, appearance: WindowAppearance): void {
     window.setBackgroundColor(appearance.background);
     if (!this.settings.isMac)
       window.setTitleBarOverlay({ color: appearance.titleBar, symbolColor: appearance.titleBarText, height: appearance.titleBarHeight });
-    if (!window.isVisible())
-      window.show();
   }
 }
