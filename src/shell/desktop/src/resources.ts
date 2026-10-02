@@ -36,6 +36,7 @@ export class Resources {
   public static readonly untrustedRequest: string = "Only TeamRun's own window may call the runtime.";
   public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
   public static readonly payloadNotJson: string = "The payload must be a JSON value.";
+  public static readonly layoutNotObject: string = "The layout must be a JSON object.";
   public static readonly clientName: string = "desktop";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly stopWorkAction: string = "stopWork";
@@ -105,6 +106,7 @@ export class Resources {
   public static readonly environmentNotText: string = "An environment variable's value must be text.";
   public static readonly processIdField: string = "processId";
   public static readonly failureField: string = "failure";
+  public static readonly payloadField: string = "payload";
   public static readonly replyNeedsOneOutcome: string = "A start reply carries either a process id or a failure.";
   public static readonly starterEnded: string = "The runtime starter ended before it started the runtime.";
   public static readonly starterServiceName: string = "TeamRun runtime starter";

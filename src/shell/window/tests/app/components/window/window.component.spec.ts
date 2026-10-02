@@ -6,10 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
+import { DockSide } from "../../../../src/app/enums/dock-side";
 import { LayoutStoreService } from "../../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../../src/app/services/layout.service";
 import { WindowComponent } from "../../../../src/app/components/window/window.component";
@@ -71,9 +73,43 @@ describe("WindowComponent", () => {
 
     bridge.requestClose("request");
     await vi.waitFor(() => expect(bridge.answers).toEqual(["request:true"]));
-    expect(await TestBed.inject(LayoutStoreService).readAsync()).toEqual(TestBed.inject(LayoutService).layout().toJson());
     fixture.destroy();
 
+    expect(bridge.layout).toBeNull();
     expect(bridge.closeListenerCount).toBe(0);
+  });
+
+  it("saves a changed layout before it answers a close request", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const fixture = TestBed.createComponent(WindowComponent);
+    await fixture.whenStable();
+    const layout = TestBed.inject(LayoutService);
+    await vi.waitFor(() => expect(bridge.layout).toBeNull());
+    await layout.loadAsync();
+    layout.toggleDock(DockSide.Left);
+
+    bridge.requestClose("request");
+
+    await vi.waitFor(() => expect(bridge.answers).toEqual(["request:true"]));
+    expect(bridge.layout).toEqual(layout.layout().toJson());
+    fixture.destroy();
+  });
+
+  it("reports a failed layout save and still lets TeamRun close", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const fixture = TestBed.createComponent(WindowComponent);
+    await fixture.whenStable();
+    const layout = TestBed.inject(LayoutService);
+    await layout.loadAsync();
+    layout.toggleDock(DockSide.Left);
+    const failure = new Error("This device has no identity, so the window's layout is not kept.");
+    vi.spyOn(TestBed.inject(LayoutStoreService), "writeAsync").mockRejectedValue(failure);
+    const handled = vi.spyOn(TestBed.inject(ErrorHandler), "handleError").mockImplementation(() => undefined);
+
+    bridge.requestClose("request");
+
+    await vi.waitFor(() => expect(bridge.answers).toEqual(["request:true"]));
+    expect(handled).toHaveBeenCalledWith(failure);
+    fixture.destroy();
   });
 });

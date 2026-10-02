@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, DestroyRef, inject } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ErrorHandler, inject } from "@angular/core";
 
 import { AppearanceService } from "@noldova/teamrun-shell-ui";
 
@@ -29,6 +29,7 @@ import { WorkspaceComponent } from "../workspace/workspace.component";
 export class WindowComponent {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly layout: LayoutService = inject(LayoutService);
+  private readonly errors: ErrorHandler = inject(ErrorHandler);
 
   protected readonly startup: StartupService = inject(StartupService);
 
@@ -39,7 +40,12 @@ export class WindowComponent {
   }
 
   private async closeAsync(requestId: string): Promise<void> {
-    await this.layout.saveAsync();
+    try {
+      await this.layout.saveAsync();
+    }
+    catch (error) {
+      this.errors.handleError(error);
+    }
     await this.bridge.answerCloseAsync(requestId, true);
   }
 }

@@ -17,6 +17,7 @@ import type { Tab } from "../../../../src/app/models/layout/tab";
 import type { LayoutService } from "../../../../src/app/services/layout.service";
 import { TabDragService } from "../../../../src/app/services/tab-drag.service";
 import { Resources } from "../../../../src/resources";
+import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 
@@ -36,6 +37,14 @@ class DockingGuidesHostComponent {
 }
 
 describe("DockingGuidesComponent", () => {
+  beforeEach(() => {
+    DesktopBridgeFixture.install();
+  });
+
+  afterEach(() => {
+    DesktopBridgeFixture.remove();
+  });
+
   const registry = LayoutFixture.createRegistry();
   const prepared = Layout.createDefault(registry).openView(LayoutFixture.search, registry).openDocument(LayoutFixture.plan);
   let fixture: ComponentFixture<DockingGuidesHostComponent>;

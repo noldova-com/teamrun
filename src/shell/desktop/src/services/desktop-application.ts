@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
-import { type Event, Failure, FailureCode, QualifiedName, Response, type RuntimeHandover, ShellMethods, WindowStateKey } from "@noldova/teamrun-shell-protocol";
+import { type Event, Failure, FailureCode, QualifiedName, Response, type RuntimeHandover, ShellMethods, WindowStateKey, WindowStateValue, WindowStateWrite } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, type DataDirectory, DataDirectoryLocator, LaunchSettings, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
@@ -20,7 +20,6 @@ import type { IElectron } from "../interfaces/i-electron.js";
 import type { IIpcEvent } from "../interfaces/i-ipc-event.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import { StartupStateKind } from "../enums/startup-state-kind.js";
-import { WindowStateException } from "../exceptions/window-state.exception.js";
 import { DesktopSettings } from "../models/desktop-settings.js";
 import { TaskbarIdentity } from "../models/taskbar-identity.js";
 import { SenderInfo } from "../models/sender-info.js";
@@ -124,9 +123,9 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
     this.electron.ipcMain.handle(Resources.readStartupChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.startup.current.toJson());
     this.electron.ipcMain.handle(Resources.startupActionChannel, (event, action) => Object.isNull(this.findTrusted(event)) ? false : this.startup.actAsync(action));
-    this.electron.ipcMain.handle(Resources.readLayoutChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.readLayoutAsync());
+    this.electron.ipcMain.handle(Resources.readLayoutChannel, event => this.readLayoutAsync(event));
     this.electron.ipcMain.handle(Resources.requestChannel, (event, method, payload) => this.requestAsync(event, method, payload));
-    this.electron.ipcMain.handle(Resources.writeLayoutChannel, (event, layout) => Object.isNull(this.findTrusted(event)) ? false : this.writeLayoutAsync(layout));
+    this.electron.ipcMain.handle(Resources.writeLayoutChannel, (event, layout) => this.writeLayoutAsync(event, layout));
     this.electron.ipcMain.handle(Resources.readBuildChannel, event => Object.isNull(this.findTrusted(event)) ? null : RuntimeBuild.identity.toJson());
     this.electron.ipcMain.handle(Resources.copyTextChannel, (event, text) => Object.isNull(this.findTrusted(event)) ? false : this.copyText(text));
     this.electron.ipcMain.handle(Resources.openLogFolderChannel, event => Object.isNull(this.findTrusted(event)) ? false : this.openLogFolderAsync());
@@ -173,16 +172,20 @@ export class DesktopApplication {
       return DesktopApplication.fail(FailureCode.InvalidMessage, Resources.payloadNotJson);
     if (name.owner === Resources.shellOwner && !Resources.windowShellMethods.includes(name.text))
       return DesktopApplication.fail(FailureCode.Unauthorized, Resources.formatMethodRefused(name.text));
+    return (await this.callAsync(name, value)).toJson();
+  }
+
+  private async callAsync(method: QualifiedName, payload: JsonValue): Promise<Response> {
     const connection = this.startup.connection;
     if (Object.isNull(connection))
-      return DesktopApplication.fail(FailureCode.Unavailable, Resources.runtimeNotConnected);
+      return Response.failure(null, new Failure(FailureCode.Unavailable, Resources.runtimeNotConnected));
     try {
-      return (await connection.callAsync(name, value)).toJson();
+      return await connection.callAsync(method, payload);
     }
     catch (error) {
       if (!(error instanceof ConnectionException))
         throw error;
-      return DesktopApplication.fail(FailureCode.Unavailable, error.message);
+      return Response.failure(null, new Failure(FailureCode.Unavailable, error.message));
     }
   }
 
@@ -194,19 +197,32 @@ export class DesktopApplication {
       this.restored.add(open);
       const device = await this.device;
       if (!Object.isNull(device))
-        await open.bounds.restoreAsync(this.createStore(device, ShellMethods.readWindowBounds, ShellMethods.writeWindowBounds)).catch((error: unknown) => process.stderr.write(`${Resources.formatBoundsNotRestored(String(error))}\n`));
+        await open.bounds.restoreAsync(this.createBoundsStore(device)).catch((error: unknown) => process.stderr.write(`${Resources.formatBoundsNotRestored(String(error))}\n`));
     }
     open.settle();
   }
 
-  private async readLayoutAsync(): Promise<JsonObject | null> {
-    return await (await this.createLayoutStoreAsync()).readAsync();
+  private async readLayoutAsync(event: IIpcEvent): Promise<JsonObject> {
+    if (Object.isNull(this.findTrusted(event)))
+      return DesktopApplication.fail(FailureCode.Unauthorized, Resources.untrustedRequest);
+    const device = await this.device;
+    if (Object.isNull(device))
+      return DesktopApplication.fail(FailureCode.Unavailable, Resources.deviceNotIdentified);
+    const response = await this.callAsync(ShellMethods.readWindowLayout, new WindowStateKey(device, Resources.mainWindow).toJson());
+    return response.hasFailed ? response.toJson() : { [Resources.payloadField]: WindowStateValue.fromJson(response.payload).value };
   }
 
-  private async writeLayoutAsync(layout: unknown): Promise<boolean> {
-    const value = JsonReader.fromValue(layout).toJson();
-    await (await this.createLayoutStoreAsync()).writeAsync(value);
-    return true;
+  private async writeLayoutAsync(event: IIpcEvent, layout: unknown): Promise<JsonObject> {
+    if (Object.isNull(this.findTrusted(event)))
+      return DesktopApplication.fail(FailureCode.Unauthorized, Resources.untrustedRequest);
+    const value = DesktopApplication.readLayout(layout);
+    if (Object.isUndefined(value))
+      return DesktopApplication.fail(FailureCode.InvalidMessage, Resources.layoutNotObject);
+    const device = await this.device;
+    if (Object.isNull(device))
+      return DesktopApplication.fail(FailureCode.Unavailable, Resources.deviceNotIdentified);
+    const response = await this.callAsync(ShellMethods.writeWindowLayout, new WindowStateWrite(new WindowStateKey(device, Resources.mainWindow), value).toJson());
+    return response.hasFailed ? response.toJson() : { [Resources.payloadField]: null };
   }
 
   private copyText(text: unknown): boolean {
@@ -231,15 +247,8 @@ export class DesktopApplication {
     return failure.length === 0;
   }
 
-  private async createLayoutStoreAsync(): Promise<RuntimeWindowStateStore> {
-    const device = await this.device;
-    if (Object.isNull(device))
-      throw new WindowStateException(Resources.deviceNotIdentified);
-    return this.createStore(device, ShellMethods.readWindowLayout, ShellMethods.writeWindowLayout);
-  }
-
-  private createStore(device: string, readMethod: QualifiedName, writeMethod: QualifiedName): RuntimeWindowStateStore {
-    return new RuntimeWindowStateStore(() => this.startup.connection, new WindowStateKey(device, Resources.mainWindow), readMethod, writeMethod);
+  private createBoundsStore(device: string): RuntimeWindowStateStore {
+    return new RuntimeWindowStateStore(() => this.startup.connection, new WindowStateKey(device, Resources.mainWindow), ShellMethods.readWindowBounds, ShellMethods.writeWindowBounds);
   }
 
   private handOver(handover: RuntimeHandover): boolean {
@@ -301,6 +310,15 @@ export class DesktopApplication {
   private static readPayload(payload: unknown): JsonValue | undefined {
     try {
       return JsonReader.toJsonValue(payload);
+    }
+    catch {
+      return undefined;
+    }
+  }
+
+  private static readLayout(layout: unknown): JsonObject | undefined {
+    try {
+      return JsonReader.fromValue(layout).toJson();
     }
     catch {
       return undefined;

@@ -241,7 +241,7 @@ TeamRun does not open data written by a release that predates the shell. The run
 
 ## 8. Window
 
-The window presents confirmed state and keeps only transient state locally. Durable state goes to its section 7 owner after a pause in changes and at close. The window shows once its appearance is painted and, when the runtime is ready, its saved bounds are applied. A window whose runtime refuses, or is still connecting after two seconds, shows at once with its startup state and applies its bounds once the runtime is ready. Bounds that no display shows reopen at their saved size, centered. All privileged requests cross the shell's preload bridge and desktop's authenticated connection; window parts receive no token, socket, process or file handle.
+The window presents confirmed state and keeps only transient state locally. Durable state goes to its section 7 owner after a pause in changes and at close. While the runtime is not ready, the window holds its layout changes and writes the newest layout once the runtime is ready again. The window shows once its appearance is painted and, when the runtime is ready, its saved bounds are applied. A window whose runtime refuses, or is still connecting after two seconds, shows at once with its startup state and applies its bounds once the runtime is ready. Bounds that no display shows reopen at their saved size, centered. All privileged requests cross the shell's preload bridge and desktop's authenticated connection; window parts receive no token, socket, process or file handle.
 
 Snapshot loading and event delivery can overlap: a window part replays or reconciles relevant events against a loaded snapshot and uses selection generations so an old response cannot replace a newer selection. Reconnect reloads potentially missed state.
 
@@ -253,7 +253,7 @@ Persisted tabs and layout restore the person's saved workspace without opening u
 
 A part reports the work it has in progress, such as a running reply or command, to its host. Before TeamRun quits, restarts for an update or stops for a newer build (section 6) while work is in progress, it asks the person whether to wait for the work or to stop it, and never interrupts it without that choice.
 
-Closing TeamRun waits for each window to save its unsaved state. A window part that reports a failed save keeps TeamRun open with the error, while a window that is gone or does not answer before the timeout does not block closing.
+Closing TeamRun waits for each window to save its unsaved state. A window part that reports a failed save keeps TeamRun open with the error, while a window that is gone or does not answer before the timeout does not block closing. The window's own layout is the exception: a failed save of the layout is logged and closing proceeds, because losing the last layout change is minor.
 
 ## 10. Build, installation and updates
 

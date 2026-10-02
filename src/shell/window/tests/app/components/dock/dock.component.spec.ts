@@ -15,6 +15,7 @@ import { Layout } from "../../../../src/app/models/layout/layout";
 import { ViewTab } from "../../../../src/app/models/layout/view-tab";
 import type { LayoutService } from "../../../../src/app/services/layout.service";
 import { Resources } from "../../../../src/resources";
+import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 
@@ -27,6 +28,14 @@ class DockHostComponent {
 }
 
 describe("DockComponent", () => {
+  beforeEach(() => {
+    DesktopBridgeFixture.install();
+  });
+
+  afterEach(() => {
+    DesktopBridgeFixture.remove();
+  });
+
   const registry = LayoutFixture.createRegistry();
   const absent = new ViewTab("absent.view");
   let fixture: ComponentFixture<DockHostComponent>;

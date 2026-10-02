@@ -6,22 +6,32 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Injectable } from "@angular/core";
+import { Injectable, inject } from "@angular/core";
 
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 
+import { Resources } from "../../resources";
+import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
 import type { ILayoutStore } from "../interfaces/i-layout-store";
+import { DesktopBridgeService } from "./desktop-bridge.service";
 
 @Injectable({ providedIn: "root" })
 export class LayoutStoreService implements ILayoutStore {
-  private saved: JsonObject | null = null;
+  private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
 
   public readAsync(): Promise<JsonValue | null> {
-    return Promise.resolve(this.saved);
+    return this.bridge.readLayoutAsync();
   }
 
-  public writeAsync(layout: JsonObject): Promise<void> {
-    this.saved = layout;
-    return Promise.resolve();
+  public async writeAsync(layout: JsonObject): Promise<boolean> {
+    try {
+      await this.bridge.writeLayoutAsync(layout);
+      return true;
+    }
+    catch (error) {
+      if (error instanceof RuntimeRequestException && error.code === Resources.unavailableCode)
+        return false;
+      throw error;
+    }
   }
 }

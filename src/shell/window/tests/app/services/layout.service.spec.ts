@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { DockSide } from "../../../src/app/enums/dock-side";
@@ -17,9 +18,20 @@ import { SplitDropTarget } from "../../../src/app/models/layout/split-drop-targe
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../src/app/services/layout.service";
 import { Resources } from "../../../src/resources";
+import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../fixtures/layout.fixture";
 
 describe("LayoutService", () => {
+  let bridge: DesktopBridgeFixture;
+
+  beforeEach(() => {
+    bridge = DesktopBridgeFixture.install();
+  });
+
+  afterEach(() => {
+    DesktopBridgeFixture.remove();
+  });
+
   const registry = LayoutFixture.createRegistry();
   let service: LayoutService;
   let store: LayoutStoreService;
@@ -137,5 +149,133 @@ describe("LayoutService", () => {
     TestBed.resetTestingModule();
     vi.advanceTimersByTime(Resources.layoutSaveDelay);
     expect(await store.readAsync()).toEqual(saved);
+  });
+
+  it("saves nothing before a layout was loaded, so a window that never loaded cannot replace the kept layout", async () => {
+    const write = vi.spyOn(store, "writeAsync");
+
+    service.toggleDock(DockSide.Left);
+    vi.advanceTimersByTime(Resources.layoutSaveDelay);
+    await service.saveAsync();
+
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("stays unloaded when the kept layout cannot be read, and passes the failure on", async () => {
+    const failure = new Error("The runtime is not connected.");
+    vi.spyOn(store, "readAsync").mockRejectedValue(failure);
+    const write = vi.spyOn(store, "writeAsync");
+
+    await expect(service.loadAsync()).rejects.toBe(failure);
+    service.toggleDock(DockSide.Left);
+    vi.advanceTimersByTime(Resources.layoutSaveDelay);
+    await service.saveAsync();
+
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("writes only a layout that changed since it was loaded or last saved", async () => {
+    await loadAsync(prepared());
+    const write = vi.spyOn(store, "writeAsync");
+
+    await service.saveAsync();
+    service.activate(LayoutFixture.plan);
+    await service.saveAsync();
+    await service.saveAsync();
+
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a save after a pause that fails, and the next change saves again", async () => {
+    await loadAsync(prepared());
+    const failure = new Error("The runtime refused the layout.");
+    const handled = vi.spyOn(TestBed.inject(ErrorHandler), "handleError").mockImplementation(() => undefined);
+    const write = vi.spyOn(store, "writeAsync").mockRejectedValueOnce(failure);
+
+    service.activate(LayoutFixture.plan);
+    vi.advanceTimersByTime(Resources.layoutSaveDelay);
+    await vi.waitFor(() => expect(handled).toHaveBeenCalledWith(failure));
+    service.close(LayoutFixture.todo);
+    vi.advanceTimersByTime(Resources.layoutSaveDelay);
+
+    await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(2));
+    expect(write.mock.calls[1]?.[0]).toEqual(service.layout().toJson());
+  });
+
+  it("writes one layout at a time, so the newest layout is always the last one written", async () => {
+    await loadAsync(prepared());
+    let finishFirst: () => void = () => undefined;
+    const written: unknown[] = [];
+    vi.spyOn(store, "writeAsync").mockImplementation(layout => {
+      written.push(layout);
+      return written.length === 1 ? new Promise<boolean>(resolve => {
+        finishFirst = (): void => resolve(true);
+      }) : Promise.resolve(true);
+    });
+
+    service.activate(LayoutFixture.plan);
+    const first = service.saveAsync();
+    await vi.waitFor(() => expect(written.length).toBe(1));
+    service.toggleDock(DockSide.Left);
+    const second = service.saveAsync();
+    await Promise.resolve();
+    expect(written.length).toBe(1);
+    finishFirst();
+    await Promise.all([first, second]);
+
+    expect(written.length).toBe(2);
+    expect(written[1]).toEqual(service.layout().toJson());
+  });
+
+  it("keeps saving after a failed write", async () => {
+    await loadAsync(prepared());
+    const failure = new Error("The runtime refused the layout.");
+    const write = vi.spyOn(store, "writeAsync").mockRejectedValueOnce(failure);
+
+    service.activate(LayoutFixture.plan);
+    await expect(service.saveAsync()).rejects.toBe(failure);
+    await service.saveAsync();
+
+    expect(write).toHaveBeenCalledTimes(2);
+  });
+
+  it("waits while the runtime is not ready and writes the newest layout once when it is ready again", async () => {
+    await loadAsync(prepared());
+    const write = vi.spyOn(store, "writeAsync");
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    TestBed.tick();
+
+    service.activate(LayoutFixture.plan);
+    await vi.advanceTimersByTimeAsync(Resources.layoutSaveDelay);
+    service.toggleDock(DockSide.Left);
+    await service.saveAsync();
+    expect(write).not.toHaveBeenCalled();
+
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    TestBed.tick();
+    await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(1));
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    TestBed.tick();
+    await service.saveAsync();
+
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write.mock.calls[0]?.[0]).toEqual(service.layout().toJson());
+  });
+
+  it("keeps a layout the runtime was not there to take and writes it when the runtime is ready again", async () => {
+    await loadAsync(prepared());
+    const write = vi.spyOn(store, "writeAsync").mockResolvedValueOnce(false);
+
+    service.activate(LayoutFixture.plan);
+    await service.saveAsync();
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    TestBed.tick();
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    TestBed.tick();
+    await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(2));
+    await service.saveAsync();
+
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(await store.readAsync()).toEqual(service.layout().toJson());
   });
 });
