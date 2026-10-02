@@ -112,6 +112,15 @@ describe("LayoutService", () => {
     await vi.waitFor(async () => expect(await store.readAsync()).toEqual(service.layout().toJson()));
   });
 
+  it("closes several tabs at once, passing over a tab that is not open", async () => {
+    await loadAsync(prepared());
+
+    service.closeTabs([LayoutFixture.plan, LayoutFixture.settings, LayoutFixture.todo]);
+
+    expect(service.layout().documents.tabs).toEqual([]);
+    expect(service.layout().isOpen(LayoutFixture.files)).toBe(true);
+  });
+
   it("resizes a split through its handle", async () => {
     await loadAsync(prepared());
     service.setViewport(160, 80);

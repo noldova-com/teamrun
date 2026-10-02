@@ -67,7 +67,7 @@ test.describe("the empty window", () => {
 
     expect(measured.body).toBe(expected.window);
     expect(measured.row).toEqual({ height: "35px", background: expected.titleBar, color: expected.titleBarText, borderBottom: "0px" });
-    expect(measured.bar).toEqual({ height: "20px", paddingLeft: "8px", paddingRight: "8px", gap: "4px", background: expected.window, borderTop: "0px" });
+    expect(measured.bar).toEqual({ height: "28px", paddingLeft: "8px", paddingRight: "8px", gap: "4px", background: expected.window, borderTop: "0px" });
     expect(measured.card).toEqual({ border: "1px", borderColor: expected.cardBorder, radius: "8px", background: expected.panel, color: expected.text });
     expect(measured.cardBounds["x"]).toBe(4);
     expect(measured.cardBounds["y"]).toBe(measured.rowBottom);
