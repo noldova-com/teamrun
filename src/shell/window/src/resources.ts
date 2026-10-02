@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { DockingDirection } from "@noldova/teamrun-shell-ui";
+
 import { DockSide } from "./app/enums/dock-side";
 import { PanelEdge } from "./app/enums/panel-edge";
 import { SplitAxis } from "./app/enums/split-axis";
@@ -40,6 +42,113 @@ export class Resources {
     [PanelEdge.Bottom]: SplitAxis.Vertical
   };
   public static readonly leadingEdges: readonly PanelEdge[] = [PanelEdge.Left, PanelEdge.Top];
+  public static readonly layoutSaveDelay: number = 500;
+  public static readonly primaryButton: number = 0;
+  public static readonly dragThreshold: number = 4;
+  public static readonly escapeKey: string = "Escape";
+  public static readonly menuKey: string = "F10";
+  public static readonly contextMenuKey: string = "ContextMenu";
+  public static readonly pointerMoveEvent: "pointermove" = "pointermove";
+  public static readonly pointerUpEvent: "pointerup" = "pointerup";
+  public static readonly pointerCancelEvent: "pointercancel" = "pointercancel";
+  public static readonly keyDownEvent: "keydown" = "keydown";
+  public static readonly blurEvent: "blur" = "blur";
+  public static readonly contextMenuEvent: "contextmenu" = "contextmenu";
+  public static readonly draggingClass: string = "tr-tab-dragging";
+  public static readonly dropGroupSelector: string = "[data-drop-group]";
+  public static readonly dropGroupData: string = "dropGroup";
+  public static readonly dropSideSelector: string = "[data-drop-side]";
+  public static readonly dropSideData: string = "dropSide";
+  public static readonly dropTabsSelector: string = "[data-drop-tabs]";
+  public static readonly dropPlateSelector: string = "[data-drop-plate]";
+  public static readonly directionSelector: string = "[data-direction]";
+  public static readonly directionData: string = "direction";
+  public static readonly tabIndexSelector: string = "[data-tab-index]";
+  public static readonly tabIndexData: string = "tabIndex";
+  public static readonly tabKeySelector: string = "[data-tab-key]";
+  public static readonly tabKeyData: string = "tabKey";
+  public static readonly tabCloseSelector: string = ".tr-tab-close";
+  public static readonly selectedTabSelector: string = ".tr-tab-selected";
+  public static readonly tabStripSelector: string = ".tr-tab-group-strip";
+  public static readonly revealOptions: ScrollIntoViewOptions = { block: "nearest", inline: "nearest" };
+  public static readonly arrowLeftKey: string = "ArrowLeft";
+  public static readonly arrowRightKey: string = "ArrowRight";
+  public static readonly homeKey: string = "Home";
+  public static readonly endKey: string = "End";
+  public static readonly dockingGuideSize: number = 2.5;
+  public static readonly sideDirections: Readonly<Record<DockSide, DockingDirection>> = {
+    [DockSide.Left]: DockingDirection.Left,
+    [DockSide.Right]: DockingDirection.Right,
+    [DockSide.Bottom]: DockingDirection.Bottom
+  };
+  public static readonly edgeDirections: Readonly<Record<PanelEdge, DockingDirection>> = {
+    [PanelEdge.Left]: DockingDirection.Left,
+    [PanelEdge.Right]: DockingDirection.Right,
+    [PanelEdge.Top]: DockingDirection.Top,
+    [PanelEdge.Bottom]: DockingDirection.Bottom
+  };
+  public static readonly dockingPlateGap: number = 0.125;
+  public static readonly dockingPlateClearance: number = 0.25;
+  public static readonly viewGlyph: string = "web_asset";
+  public static readonly documentGlyph: string = "description";
+  public static readonly panelActionsGlyph: string = "more_horiz";
+  public static readonly moveToGlyph: string = "drive_file_move";
+  public static readonly splitGlyph: string = "splitscreen";
+  public static readonly dockGlyph: string = "dock_to_right";
+  public static readonly closeGlyph: string = "close";
+  public static readonly moveEarlierGlyph: string = "chevron_left";
+  public static readonly moveLaterGlyph: string = "chevron_right";
+  public static readonly resetLayoutGlyph: string = "restart_alt";
+  public static readonly panelActionsLabel: string = "Panel actions";
+  public static readonly overflowGlyph: string = "expand_more";
+  public static readonly overflowLabel: string = "Show all tabs";
+  public static readonly moveToLabel: string = "Move to";
+  public static readonly splitLabel: string = "Split";
+  public static readonly dockLabel: string = "Dock";
+  public static readonly closeTabLabel: string = "Close";
+  public static readonly moveEarlierLabel: string = "Move left";
+  public static readonly moveLaterLabel: string = "Move right";
+  public static readonly resetLayoutLabel: string = "Reset the layout";
+  public static readonly documentsGroupLabel: string = "Documents";
+  public static readonly groupLabelJoiner: string = ", ";
+  public static readonly splitLabels: Readonly<Record<PanelEdge, string>> = {
+    [PanelEdge.Left]: "Split left",
+    [PanelEdge.Right]: "Split right",
+    [PanelEdge.Top]: "Split up",
+    [PanelEdge.Bottom]: "Split down"
+  };
+  public static readonly splitGlyphs: Readonly<Record<PanelEdge, string>> = {
+    [PanelEdge.Left]: "arrow_back",
+    [PanelEdge.Right]: "arrow_forward",
+    [PanelEdge.Top]: "arrow_upward",
+    [PanelEdge.Bottom]: "arrow_downward"
+  };
+  public static readonly dockLabels: Readonly<Record<DockSide, string>> = {
+    [DockSide.Left]: "Dock left",
+    [DockSide.Right]: "Dock right",
+    [DockSide.Bottom]: "Dock at the bottom"
+  };
+  public static readonly dockGlyphs: Readonly<Record<DockSide, string>> = {
+    [DockSide.Left]: "dock_to_left",
+    [DockSide.Right]: "dock_to_right",
+    [DockSide.Bottom]: "dock_to_bottom"
+  };
+  public static readonly hideDockLabels: Readonly<Record<DockSide, string>> = {
+    [DockSide.Left]: "Hide the left dock",
+    [DockSide.Right]: "Hide the right dock",
+    [DockSide.Bottom]: "Hide the bottom dock"
+  };
+  public static readonly hideDockGlyphs: Readonly<Record<DockSide, string>> = {
+    [DockSide.Left]: "left_panel_close",
+    [DockSide.Right]: "right_panel_close",
+    [DockSide.Bottom]: "bottom_panel_close"
+  };
+  public static readonly resizeDockLabels: Readonly<Record<DockSide, string>> = {
+    [DockSide.Left]: "Resize the left dock",
+    [DockSide.Right]: "Resize the right dock",
+    [DockSide.Bottom]: "Resize the bottom dock"
+  };
+  public static readonly resizeSplitLabel: string = "Resize the split";
   public static readonly versionField: string = "version";
   public static readonly docksField: string = "docks";
   public static readonly middleField: string = "middle";
@@ -56,6 +165,7 @@ export class Resources {
   public static readonly documentField: string = "document";
   public static readonly instanceField: string = "instance";
   public static readonly keySeparator: string = "/";
+  public static readonly contributionSeparator: string = ".";
   public static readonly invalidContributionName: string = "A contribution name has the form <module id>.<name>.";
   public static readonly invalidInstance: string = "An instance is a string that is not blank.";
   public static readonly invalidBounds: string = "Bounds need finite coordinates and a width and height that are not negative.";
@@ -89,5 +199,17 @@ export class Resources {
 
   public static formatUnsupportedVersion(version: number): string {
     return `Layout format version ${version} is not supported; this build reads version ${Resources.layoutFormatVersion}.`;
+  }
+
+  public static formatForeignDocument(moduleId: string, name: string): string {
+    return `The module "${moduleId}" can open only its own documents, not "${name}".`;
+  }
+
+  public static formatUnregisteredDocument(name: string): string {
+    return `No document named "${name}" is registered.`;
+  }
+
+  public static formatDraggedTab(label: string): string {
+    return `Moving ${label}`;
   }
 }

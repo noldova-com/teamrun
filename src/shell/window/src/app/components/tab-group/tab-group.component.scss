@@ -1,0 +1,67 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: absolute;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tr-tab-group-card {
+  flex: 1;
+}
+
+.tr-tab-group-bar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: var(--tr-tab-height);
+  padding-inline-start: var(--tr-space-1);
+}
+
+.tr-tab-group-strip {
+  display: flex;
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tr-tab-group-strip > tr-tab {
+  flex-shrink: 0;
+}
+
+.tr-tab-group-end {
+  flex: 1;
+}
+
+.tr-tab-drop-before {
+  box-shadow: inset calc(2 * var(--tr-border-width)) 0 0 var(--tr-accent);
+}
+
+.tr-tab-dragged {
+  opacity: 0.5;
+}
+
+.tr-tab-group-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tr-space-1);
+  padding-inline: var(--tr-space-1);
+}
+
+.tr-tab-group-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}

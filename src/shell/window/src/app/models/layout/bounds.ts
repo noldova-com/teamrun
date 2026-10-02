@@ -40,6 +40,10 @@ export class Bounds {
     return other?.x === this.x && other.y === this.y && other.width === this.width && other.height === this.height;
   }
 
+  public overlaps(other: Bounds): boolean {
+    return this.x < other.right && other.x < this.right && this.y < other.bottom && other.y < this.bottom;
+  }
+
   public length(axis: SplitAxis): number {
     return axis === SplitAxis.Horizontal ? this.width : this.height;
   }

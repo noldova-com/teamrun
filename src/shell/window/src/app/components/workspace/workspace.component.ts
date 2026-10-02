@@ -6,39 +6,36 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, type Signal, type WritableSignal, computed, inject, input, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, type WritableSignal, effect, inject, signal } from "@angular/core";
 
-import "@noldova/teamrun-foundation-core";
-import { AppearanceService, PanelCardComponent, PanelSurface } from "@noldova/teamrun-shell-ui";
+import { AppearanceService } from "@noldova/teamrun-shell-ui";
 
-import { EmptyWindowComponent } from "../empty-window/empty-window.component";
-import type { GroupFrame } from "../../models/layout/group-frame";
-import type { Layout } from "../../models/layout/layout";
-import { LayoutGeometry } from "../../models/layout/layout-geometry";
-import type { ViewRegistry } from "../../models/layout/view-registry";
 import { Resources } from "../../../resources";
+import { DockSide } from "../../enums/dock-side";
+import type { GroupFrame } from "../../models/layout/group-frame";
+import { LayoutService } from "../../services/layout.service";
+import { DockComponent } from "../dock/dock.component";
+import { DockingGuidesComponent } from "../docking-guides/docking-guides.component";
+import { EmptyWindowComponent } from "../empty-window/empty-window.component";
+import { SplitSashComponent } from "../split-sash/split-sash.component";
+import { TabGroupComponent } from "../tab-group/tab-group.component";
 
 @Component({
   selector: "tr-workspace",
-  imports: [EmptyWindowComponent, PanelCardComponent],
+  imports: [DockComponent, DockingGuidesComponent, EmptyWindowComponent, SplitSashComponent, TabGroupComponent],
   templateUrl: "./workspace.component.html",
   styleUrl: "./workspace.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class WorkspaceComponent {
-  private readonly appearance: AppearanceService = inject(AppearanceService);
   private readonly width: WritableSignal<number> = signal(0);
   private readonly height: WritableSignal<number> = signal(0);
 
-  public readonly layout = input.required<Layout>();
-  public readonly registry = input.required<ViewRegistry>();
-
-  protected readonly geometry: Signal<LayoutGeometry> = computed(() => {
-    const rem = this.appearance.typography().rootSize;
-    return new LayoutGeometry(this.width() / rem, this.height() / rem, this.layout(), this.registry());
-  });
+  protected readonly layout: LayoutService = inject(LayoutService);
+  protected readonly sides: readonly DockSide[] = Object.values(DockSide);
 
   public constructor() {
+    const appearance = inject(AppearanceService);
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
         this.width.set(entry.contentRect.width);
@@ -47,13 +44,13 @@ export class WorkspaceComponent {
     });
     observer.observe(inject<ElementRef<HTMLElement>>(ElementRef).nativeElement);
     inject(DestroyRef).onDestroy(() => observer.disconnect());
-  }
-
-  protected surfaceOf(frame: GroupFrame): PanelSurface {
-    return Object.isNull(frame.side) ? PanelSurface.Panel : PanelSurface.Shell;
+    effect(() => {
+      const rem = appearance.typography().rootSize;
+      this.layout.setViewport(this.width() / rem, this.height() / rem);
+    });
   }
 
   protected isEmptyDocuments(frame: GroupFrame): boolean {
-    return frame.group.id === Resources.documentsGroupId && this.registry().views.length === 0;
+    return frame.group.id === Resources.documentsGroupId && this.layout.registry().views.length === 0;
   }
 }

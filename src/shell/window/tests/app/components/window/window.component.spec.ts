@@ -10,6 +10,8 @@ import { TestBed } from "@angular/core/testing";
 
 import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
+import { LayoutStoreService } from "../../../../src/app/services/layout-store.service";
+import { LayoutService } from "../../../../src/app/services/layout.service";
 import { WindowComponent } from "../../../../src/app/components/window/window.component";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
@@ -53,9 +55,10 @@ describe("WindowComponent", () => {
     await fixture.whenStable();
 
     bridge.requestClose("request");
+    await vi.waitFor(() => expect(bridge.answers).toEqual(["request:true"]));
+    expect(await TestBed.inject(LayoutStoreService).readAsync()).toEqual(TestBed.inject(LayoutService).layout().toJson());
     fixture.destroy();
 
-    expect(bridge.answers).toEqual(["request:true"]);
     expect(bridge.listenerCount).toBe(0);
   });
 });

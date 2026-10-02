@@ -10,9 +10,8 @@ import { ChangeDetectionStrategy, Component, DestroyRef, inject } from "@angular
 
 import { AppearanceService } from "@noldova/teamrun-shell-ui";
 
-import { Layout } from "../../models/layout/layout";
-import { ViewRegistry } from "../../models/layout/view-registry";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
+import { LayoutService } from "../../services/layout.service";
 import { StatusBarComponent } from "../status-bar/status-bar.component";
 import { WindowRowComponent } from "../window-row/window-row.component";
 import { WorkspaceComponent } from "../workspace/workspace.component";
@@ -26,12 +25,16 @@ import { WorkspaceComponent } from "../workspace/workspace.component";
 })
 export class WindowComponent {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
-
-  protected readonly registry: ViewRegistry = ViewRegistry.createEmpty();
-  protected readonly layout: Layout = Layout.createDefault(this.registry);
+  private readonly layout: LayoutService = inject(LayoutService);
 
   public constructor() {
     inject(AppearanceService);
-    inject(DestroyRef).onDestroy(this.bridge.onCloseRequest(t => void this.bridge.answerCloseAsync(t, true)));
+    void this.layout.loadAsync();
+    inject(DestroyRef).onDestroy(this.bridge.onCloseRequest(t => void this.closeAsync(t)));
+  }
+
+  private async closeAsync(requestId: string): Promise<void> {
+    await this.layout.saveAsync();
+    await this.bridge.answerCloseAsync(requestId, true);
   }
 }

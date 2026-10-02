@@ -7,9 +7,10 @@
  */
 
 :host {
-  position: relative;
-  display: block;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
+  position: absolute;
+  display: flex;
+}
+
+.tr-split-sash {
+  flex: 1;
 }

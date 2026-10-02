@@ -90,6 +90,7 @@ The table specifies normal-state colors. Check actual composited foreground/back
 | `--tr-checkbox`, `--tr-checkbox-border` | `checkbox.*`, with contrast-checked border fallback | #F8F8F8, #858585 | #313131, #858585 | Checkbox surface and identifiable boundary |
 | `--tr-badge`, `--tr-badge-text` | `badge.*` | #CCCCCC, #3B3B3B | #616161, #F8F8F8 | Available filled-badge pair; count chips use the component table |
 | `--tr-progress` | `progressBar.background`, fallback accent | #005FB8 | #4DAAFC | Progress indicators |
+| `--tr-docking-preview`, `--tr-docking-preview-border` | `teamrun.dockingPreviewBackground`, fallback `list.inactiveSelectionBackground`; `teamrun.dockingPreviewBorder`, fallback `focusBorder` | #E4E6F1, #005FB8 | #37373D, #4DAAFC | The area a dragged tab will occupy |
 | `--tr-notification`, `--tr-notification-border` | `notifications.*` | #FFFFFF, #E5E5E5 | #1F1F1F, #454545 | Notification surface |
 | `--tr-error`, `--tr-removed` | Semantic error/removal foregrounds | #A1260D | #F48771 | Errors and removed lines/counts, with text or symbols identifying their meaning |
 | `--tr-added` | Semantic addition foreground | #3F6212 | #B5CEA8 | Added lines/counts and copy-success icon |
@@ -189,7 +190,7 @@ This table assigns geometry and radius tokens under sections 1, 3 and 7, with th
 | Settings item | Padding 0.75rem 0.875rem 1.125rem; description gap 0.1875rem; control gap 0.5625rem; medium radius | Panel; title 600 | Subtle hover surface; text and controls wrap |
 | Settings heading | Automatic height; 0.625rem surrounding space, 0.9375rem start inset | Settings group heading, 600 | Heading foreground; grows with its proportional line height |
 | Icon button | 1.375rem visual pad around a 1rem glyph; small radius | Accessible name | Toolbar hover; pointer hit region at least 24px unless a documented exception applies |
-| Docking guide | 2.5rem square around a 1.5rem glyph; small radius; a group's center target and split arrows share a medium-radius plate with 0.125rem gaps, moved clear of the side guides | Accessible action name | Raised surface; shown while a view's tab is dragged; accent for the chosen target, whose landing area is previewed |
+| Docking guide | 2.5rem square around a 1.5rem glyph; small radius; a group's center target and split arrows share a medium-radius plate with 0.125rem gaps, moved clear of the side guides | Accessible action name | Raised surface; shown while a view's tab is dragged; accent for the chosen target, whose landing area is previewed with the docking-preview fill, a 1px docking-preview border and the large radius |
 | Progress | 2px bar; 1rem spinner; reveal after 300ms where delay avoids flicker | Accessible status | Progress token; empty track; completion/error remain understandable without animation |
 | Word wrap | Icon-button geometry; 1rem wrap glyph | Accessible name | Initially off; precedes Copy or diff collapse; pressed state exposed; Enter/Space activate |
 | Inline code | Text metrics; small radius | Code | Inline-code token |

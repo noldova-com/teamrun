@@ -12,30 +12,29 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
 import { WorkspaceComponent } from "../../../../src/app/components/workspace/workspace.component";
+import { PanelEdge } from "../../../../src/app/enums/panel-edge";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
+import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 
 @Component({
   imports: [WorkspaceComponent],
-  template: `<tr-workspace [style.width.px]="width()" [style.height.px]="height()" [layout]="layout" [registry]="registry" />`
+  template: `<tr-workspace [style.width.px]="width()" [style.height.px]="height()" />`
 })
 class WorkspaceHostComponent {
   public readonly width = signal(1000);
   public readonly height = signal(600);
-  public registry: ViewRegistry = ViewRegistry.createEmpty();
-  public layout: Layout = Layout.createDefault(this.registry);
 }
 
 describe("WorkspaceComponent", () => {
   afterEach(() => AppearanceFixture.reset());
 
-  async function renderAsync(registry: ViewRegistry): Promise<ComponentFixture<WorkspaceHostComponent>> {
+  async function renderAsync(registry: ViewRegistry, layout: Layout = Layout.createDefault(registry)): Promise<ComponentFixture<WorkspaceHostComponent>> {
     AppearanceFixture.apply();
+    await LayoutServiceFixture.prepareAsync(registry, layout, 0, 0);
     const fixture = TestBed.createComponent(WorkspaceHostComponent);
-    fixture.componentInstance.registry = registry;
-    fixture.componentInstance.layout = Layout.createDefault(registry);
     await settleAsync(fixture);
     return fixture;
   }
@@ -93,5 +92,17 @@ describe("WorkspaceComponent", () => {
     expect(docked.length).toBeGreaterThan(0);
     expect(fixture.nativeElement.querySelector("tr-empty-window")).toBeNull();
     expect(getComputedStyle(docked[0] ?? fixture.nativeElement).backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "sideBar.background"));
+  });
+
+  it("renders the docks with their sashes, the groups, the split sashes and the docking guides", async () => {
+    const registry = LayoutFixture.createRegistry();
+    const layout = Layout.createDefault(registry).openView(LayoutFixture.search, registry).splitGroup(LayoutFixture.search, 1, PanelEdge.Bottom);
+    const fixture = await renderAsync(registry, layout);
+    const host: HTMLElement = fixture.nativeElement;
+
+    expect([...host.querySelectorAll("tr-tab-group")].map(t => t.getAttribute("data-group"))).toEqual(["2", "3", "4", "0"]);
+    expect([...host.querySelectorAll("tr-dock tr-sash")].map(t => t.getAttribute("aria-label"))).toEqual(["Resize the left dock", "Resize the right dock"]);
+    expect(host.querySelectorAll("tr-split-sash").length).toBe(1);
+    expect(host.querySelector("tr-docking-guides")).not.toBeNull();
   });
 });

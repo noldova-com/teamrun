@@ -68,7 +68,9 @@ export class Resources {
     new ColorToken("--tr-notification-border", "notifications.border"),
     new ColorToken("--tr-error", "errorForeground"),
     new ColorToken("--tr-removed", "teamrun.removedForeground", "errorForeground"),
-    new ColorToken("--tr-added", "teamrun.addedForeground")
+    new ColorToken("--tr-added", "teamrun.addedForeground"),
+    new ColorToken("--tr-docking-preview", "teamrun.dockingPreviewBackground", "list.inactiveSelectionBackground"),
+    new ColorToken("--tr-docking-preview-border", "teamrun.dockingPreviewBorder", "focusBorder")
   ];
   public static readonly lookTokens: readonly string[] = [
     "radius-hover",

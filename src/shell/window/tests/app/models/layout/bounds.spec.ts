@@ -48,4 +48,15 @@ describe("Bounds", () => {
     expect(bounds.edgeHalf(PanelEdge.Bottom)).toEqual(new Bounds(2, 13.125, 40, 9.875));
     expect(new Bounds(0, 0, 0.1, 5).edgeHalf(PanelEdge.Right)).toEqual(new Bounds(0.1, 0, 0, 5));
   });
+
+  it("overlaps another bounds only where they share area", () => {
+    const bounds = new Bounds(2, 3, 4, 5);
+
+    expect(bounds.overlaps(new Bounds(5, 7, 4, 4))).toBe(true);
+    expect(bounds.overlaps(new Bounds(0, 0, 3, 4))).toBe(true);
+    expect(bounds.overlaps(new Bounds(6, 3, 1, 1))).toBe(false);
+    expect(bounds.overlaps(new Bounds(2, 8, 1, 1))).toBe(false);
+    expect(bounds.overlaps(new Bounds(0, 3, 2, 1))).toBe(false);
+    expect(bounds.overlaps(new Bounds(2, 0, 1, 3))).toBe(false);
+  });
 });
