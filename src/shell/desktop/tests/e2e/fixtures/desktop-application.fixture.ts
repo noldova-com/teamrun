@@ -129,11 +129,14 @@ export default class DesktopApplicationFixture {
 
   public async closeAsync(): Promise<number | null> {
     const child = this.requireProcess();
-    const exited = new Promise<number | null>(resolve => child.once("exit", resolve));
-    await this.application.close();
+    const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
+    const closing = this.application.close();
+    const exitCode = await exited;
+    await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
+    await closing;
     this.electronApplication = null;
     this.page = null;
-    return child.exitCode ?? await exited;
+    return exitCode;
   }
 
   public async disposeAsync(): Promise<void> {
@@ -144,7 +147,7 @@ export default class DesktopApplicationFixture {
       await this.testInfo.attach(DesktopApplicationFixture.TRACE_FILE, { path: trace, contentType: "application/zip" });
     }
     if (isRunning)
-      await this.application.close();
+      await this.closeAsync();
     await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
     await rm(this.root, { recursive: true, force: true, maxRetries: 10 });
   }
