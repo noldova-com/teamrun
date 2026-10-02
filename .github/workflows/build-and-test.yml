@@ -115,14 +115,81 @@ jobs:
           test "$(npm --version)" = 11.19.0
           test "$(node --print process.arch)" = "$EXPECTED_ARCHITECTURE"
 
+      - name: Restore the installed dependencies
+        id: root-dependencies
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: dependencies-root-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Restore the Angular project's installed dependencies
+        id: angular-dependencies
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: src/node_modules
+          key: dependencies-src-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('src/package-lock.json') }}
+
+      - name: Discard an inexact Angular install
+        if: steps.angular-dependencies.outputs.cache-hit != 'true'
+        run: rm -rf src/node_modules
+
       - name: Install dependencies
+        if: steps.root-dependencies.outputs.cache-hit != 'true'
         run: npm ci --no-audit --no-fund
+
+      - name: Save the installed dependencies
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.root-dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: ${{ steps.root-dependencies.outputs.cache-primary-key }}
 
       - name: Build
         run: npm run build
 
+      - name: Save the Angular project's installed dependencies
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.angular-dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: src/node_modules
+          key: ${{ steps.angular-dependencies.outputs.cache-primary-key }}
+
       - name: Test
         run: npm test
+
+  caches:
+    name: Remove outdated dependency caches
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.validate.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Check out the revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Delete caches of other lockfiles
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROOT_HASH: ${{ hashFiles('package-lock.json') }}
+          SOURCE_HASH: ${{ hashFiles('src/package-lock.json') }}
+        run: |
+          set -euo pipefail
+          keys=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100" --jq '.actions_caches[].key')
+          while IFS= read -r key; do
+            case "$key" in
+              '' | dependencies-root-*-"$ROOT_HASH" | dependencies-src-*-"$SOURCE_HASH")
+                ;;
+              *)
+                gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/caches?key=$key&ref=refs/heads/main" > /dev/null
+                echo "Deleted the outdated cache $key."
+                ;;
+            esac
+          done <<< "$keys"
 
   result:
     name: Build and test (all targets)

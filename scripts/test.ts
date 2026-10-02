@@ -22,7 +22,9 @@ import PackageTestCheck from "./checks/package-test-check.ts";
 import ScriptTestCheck from "./checks/script-test-check.ts";
 import ShellIndependenceCheck from "./checks/shell-independence-check.ts";
 import TypeCheck from "./checks/type-check.ts";
+import BuildLayout from "./packages/build-layout.ts";
 import PackageBuild from "./packages/package-build.ts";
+import PackageCatalog from "./packages/package-catalog.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import Git from "./repository/git.ts";
 import RepositoryFiles from "./repository/repository-files.ts";
@@ -35,6 +37,7 @@ export default class Test {
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly SUMMARY_HEADER: string = "| Check | Result |\n|---|---|\n";
   private static readonly SUMMARY_VARIABLE: string = "GITHUB_STEP_SUMMARY";
+  private static readonly API_TIMEOUT: number = 300_000;
 
   private readonly root: string;
   private readonly runner: ProcessRunner;
@@ -49,7 +52,7 @@ export default class Test {
   }
 
   public async runAsync(selection: readonly string[]): Promise<number> {
-    const checks = this.selectChecks(selection);
+    const checks = await this.selectChecksAsync(selection);
     if (checks === null) {
       this.output.write(Test.USAGE);
       return Test.USAGE_EXIT_CODE;
@@ -75,26 +78,35 @@ export default class Test {
     return failures === 0 ? 0 : 1;
   }
 
-  private selectChecks(selection: readonly string[]): readonly ICheck[] | null {
+  private async selectChecksAsync(selection: readonly string[]): Promise<readonly ICheck[] | null> {
     const files = new RepositoryFiles(this.root, new Git(this.root, this.runner));
     const documents = new DocumentCheck(this.root, files);
+    if (selection.length > 0)
+      return selection.length === 1 && selection[0] === Test.DOCUMENTS_SELECTION ? [documents] : null;
+
+    const { default: ApiServer } = await import("./api/api-server.ts");
+    const { default: ApiDeclarationCheck } = await import("./checks/api-declaration-check.ts");
+    const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
     const tree = new SourceTree(this.root, files);
     const build = new PackageBuild(this.root, this.runner, this.environment);
-    if (selection.length === 0)
-      return [
-        documents,
-        new ModuleFolderCheck(this.root),
-        new ShellIndependenceCheck(tree),
-        new ModuleImportCheck(tree),
-        new NameUniquenessCheck(tree),
-        new DeclaredDependencyCheck(tree),
-        new PackageCheck(build),
-        new PackageTestCheck(this.root, build, this.runner, this.environment),
-        new TypeCheck(this.root, this.runner),
-        new ScriptTestCheck(this.root, this.runner),
-        new AngularTestCheck(new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment)))
-      ];
-    return selection.length === 1 && selection[0] === Test.DOCUMENTS_SELECTION ? [documents] : null;
+    const catalog = new PackageCatalog(this.root);
+    const layout = new BuildLayout(this.root);
+    const server = [ApiServer.locateCompiler()];
+    return [
+      documents,
+      new ModuleFolderCheck(this.root),
+      new ShellIndependenceCheck(tree),
+      new ModuleImportCheck(tree),
+      new NameUniquenessCheck(tree),
+      new DeclaredDependencyCheck(tree),
+      new PackageCheck(build),
+      new PackageTestCheck(this.root, build, this.runner, this.environment),
+      new TypeCheck(this.root, this.runner),
+      new ApiDeclarationCheck(this.root, catalog, layout, server, Test.API_TIMEOUT),
+      new ApiExampleCheck(this.root, catalog, layout, this.runner, server, Test.API_TIMEOUT),
+      new ScriptTestCheck(this.root, this.runner),
+      new AngularTestCheck(new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment)))
+    ];
   }
 }
 

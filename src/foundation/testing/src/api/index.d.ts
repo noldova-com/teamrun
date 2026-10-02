@@ -20,6 +20,20 @@ import type { Exception, ExceptionOptions } from "@noldova/teamrun-foundation-ex
  * @returns The decorator to apply to the test class or method.
  * @throws ArgumentException synchronously when the name is empty or whitespace
  * only.
+ * @example
+ * ```ts
+ * import { Assert, Category, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+ *
+ * @TestClass
+ * @Category("parsing")
+ * export class NumberParsingTests {
+ *   @TestMethod
+ *   @Category("fast")
+ *   public parsesDecimals(): void {
+ *     Assert.areEqual(1.5, Number.parseFloat("1.5"));
+ *   }
+ * }
+ * ```
  */
 export declare function Category(name: string): (value: Function) => void;
 
@@ -28,6 +42,18 @@ export declare function Category(name: string): (value: Function) => void;
  * carry this mark and whose name ends in `Tests`.
  *
  * @param value The decorated class.
+ * @example
+ * ```ts
+ * import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+ *
+ * @TestClass
+ * export class GreetingTests {
+ *   @TestMethod
+ *   public greetsByName(): void {
+ *     Assert.areEqual("Hello, Ada.", `Hello, ${"Ada"}.`);
+ *   }
+ * }
+ * ```
  */
 export declare function TestClass(value: Function): void;
 
@@ -38,6 +64,34 @@ export declare function TestClass(value: Function): void;
  * @param values The arguments passed to the test method for this row; at
  * least one, matching the method's parameters.
  * @returns The decorator to apply to the test method.
+ * @example
+ * ```ts
+ * import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
+ *
+ * @TestClass
+ * export class AdditionTests {
+ *   @TestMethod
+ *   @TestData(1, 2, 3)
+ *   @TestData(-1, 1, 0)
+ *   public addsTwoNumbers(left: number, right: number, sum: number): void {
+ *     Assert.areEqual(sum, left + right);
+ *   }
+ * }
+ * ```
+ * @example
+ * ```ts
+ * import { TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
+ *
+ * @TestClass
+ * export class LengthTests {
+ *   @TestMethod
+ *   // @ts-expect-error
+ *   @TestData(3)
+ *   public measures(text: string): void {
+ *     text.trim();
+ *   }
+ * }
+ * ```
  */
 export declare function TestData<TArguments extends unknown[]>(...values: TArguments): (value: (...testArguments: TArguments) => unknown) => void;
 
@@ -45,6 +99,18 @@ export declare function TestData<TArguments extends unknown[]>(...values: TArgum
  * Marks a public instance method of a test class as a test.
  *
  * @param value The decorated method.
+ * @example
+ * ```ts
+ * import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+ *
+ * @TestClass
+ * export class TrimTests {
+ *   @TestMethod
+ *   public removesOuterSpaces(): void {
+ *     Assert.areEqual("a b", " a b ".trim());
+ *   }
+ * }
+ * ```
  */
 export declare function TestMethod(value: Function): void;
 
@@ -57,6 +123,19 @@ export declare function TestMethod(value: Function): void;
  * @returns The decorator to apply to the test class or method.
  * @throws ArgumentException synchronously when the reason is empty or
  * whitespace only.
+ * @example
+ * ```ts
+ * import { Assert, Skip, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+ *
+ * @TestClass
+ * export class ClipboardTests {
+ *   @TestMethod
+ *   @Skip("Waits for the clipboard module.")
+ *   public copiesText(): void {
+ *     Assert.fail("Not written yet.");
+ *   }
+ * }
+ * ```
  */
 export declare function Skip(reason: string): (value: Function) => void;
 
@@ -83,6 +162,15 @@ export declare class AssertFailedException extends TestingException {
    * @param expected The value the assertion expected.
    * @param actual The value the assertion observed.
    * @param options The preceding failure, if any.
+   * @example
+   * ```ts
+   * import { AssertFailedException } from "@noldova/teamrun-foundation-testing";
+   *
+   * export function requireTotal(expected: number, actual: number): void {
+   *   if (expected !== actual)
+   *     throw new AssertFailedException("The totals differ.", expected, actual);
+   * }
+   * ```
    */
   public constructor(message?: string, expected?: unknown, actual?: unknown, options?: ExceptionOptions);
 }
@@ -97,6 +185,16 @@ export declare class TestingException extends Exception {
    *
    * @param message The violation.
    * @param options The preceding failure, if any.
+   * @example
+   * ```ts
+   * import { TestingException } from "@noldova/teamrun-foundation-testing";
+   *
+   * export function requireTestName(name: string): string {
+   *   if (!name.endsWith("Tests"))
+   *     throw new TestingException(`${name} does not end in Tests.`);
+   *   return name;
+   * }
+   * ```
    */
   public constructor(message: string, options?: ExceptionOptions);
 }
@@ -119,6 +217,12 @@ export declare class TestTimeoutException extends TestingException {
    * @param options The preceding failure, if any.
    * @throws ArgumentOutOfRangeException synchronously when the time limit is
    * not a positive integer.
+   * @example
+   * ```ts
+   * import { TestTimeoutException } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const timeout: TestTimeoutException = new TestTimeoutException(30_000);
+   * ```
    */
   public constructor(timeoutMilliseconds: number, options?: ExceptionOptions);
 }
@@ -135,6 +239,12 @@ export declare class Assert {
    * @param message The failure message; the assertion's canonical text
    * when omitted.
    * @throws AssertFailedException synchronously when the condition is false.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * Assert.isTrue([1, 2].includes(2), "The list holds 2.");
+   * ```
    */
   public static isTrue(condition: boolean, message?: string): asserts condition;
 
@@ -146,6 +256,12 @@ export declare class Assert {
    * @param message The failure message; the assertion's canonical text
    * when omitted.
    * @throws AssertFailedException synchronously when the condition is true.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * Assert.isFalse(Number.isNaN(1));
+   * ```
    */
   public static isFalse(condition: boolean, message?: string): asserts condition is false;
 
@@ -159,6 +275,20 @@ export declare class Assert {
    * when omitted.
    * @throws AssertFailedException synchronously when the values differ,
    * carrying both.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * Assert.areEqual(4, 2 + 2);
+   * Assert.areEqual(Number.NaN, 0 / 0);
+   * ```
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * // @ts-expect-error
+   * Assert.areEqual(4, "4");
+   * ```
    */
   public static areEqual<T>(expected: T, actual: T, message?: string): void;
 
@@ -170,6 +300,12 @@ export declare class Assert {
    * @param message The failure message; the assertion's canonical text
    * when omitted.
    * @throws AssertFailedException synchronously when the values are the same.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * Assert.areNotEqual(0, -0, "Zero and negative zero differ.");
+   * ```
    */
   public static areNotEqual<T>(notExpected: T, actual: T, message?: string): void;
 
@@ -180,6 +316,12 @@ export declare class Assert {
    * @param message The failure message; the assertion's canonical text
    * when omitted.
    * @throws AssertFailedException synchronously for any other value.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * Assert.isNull(new Map<string, string>().get("missing") ?? null);
+   * ```
    */
   public static isNull(value: unknown, message?: string): asserts value is null;
 
@@ -191,6 +333,15 @@ export declare class Assert {
    * @param message The failure message; the assertion's canonical text
    * when omitted.
    * @throws AssertFailedException synchronously when the value is `null`.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * export function lengthOf(text: string | null): number {
+   *   Assert.isNotNull(text);
+   *   return text.length;
+   * }
+   * ```
    */
   public static isNotNull<T>(value: T, message?: string): asserts value is Exclude<T, null>;
 
@@ -202,6 +353,12 @@ export declare class Assert {
    * @param message The failure message; the assertion's canonical text
    * when omitted.
    * @throws AssertFailedException synchronously for any other value.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * Assert.isUndefined([1, 2].find(t => t > 2));
+   * ```
    */
   public static isUndefined(value: unknown, message?: string): asserts value is undefined;
 
@@ -214,6 +371,16 @@ export declare class Assert {
    * when omitted.
    * @throws AssertFailedException synchronously when the value is
    * `undefined`.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * export function firstEven(values: readonly number[]): number {
+   *   const found = values.find(t => t % 2 === 0);
+   *   Assert.isDefined(found);
+   *   return found;
+   * }
+   * ```
    */
   public static isDefined<T>(value: T, message?: string): asserts value is Exclude<T, undefined>;
 
@@ -226,6 +393,15 @@ export declare class Assert {
    * when omitted.
    * @throws AssertFailedException synchronously when the value is not an
    * instance of the type.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * export function messageOf(failure: unknown): string {
+   *   Assert.isInstanceOf(failure, RangeError);
+   *   return failure.message;
+   * }
+   * ```
    */
   public static isInstanceOf<T>(value: unknown, type: Function & { readonly prototype: T }, message?: string): asserts value is T;
 
@@ -239,6 +415,13 @@ export declare class Assert {
    * @returns The thrown exception, for further assertions.
    * @throws AssertFailedException synchronously when the action throws
    * nothing or throws something else.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * const exception: SyntaxError = Assert.throws(() => JSON.parse("{"), SyntaxError);
+   * Assert.isTrue(exception.message.length > 0);
+   * ```
    */
   public static throws<TException extends Error>(
     action: () => void,
@@ -256,6 +439,13 @@ export declare class Assert {
    * @returns A promise of the rejection, for further assertions.
    * @throws AssertFailedException as a rejection when the action resolves or
    * rejects with something else.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * const exception: RangeError = await Assert.throwsAsync(() => Promise.reject(new RangeError("late")), RangeError);
+   * Assert.areEqual("late", exception.message);
+   * ```
    */
   public static throwsAsync<TException extends Error>(
     action: () => Promise<unknown>,
@@ -270,6 +460,12 @@ export declare class Assert {
    * when omitted.
    * @throws AssertFailedException synchronously when the action throws,
    * carrying the thrown value as `actual`.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * Assert.doesNotThrow(() => JSON.parse("{}"));
+   * ```
    */
   public static doesNotThrow(action: () => void, message?: string): void;
 
@@ -280,6 +476,16 @@ export declare class Assert {
    * text when omitted.
    * @returns Never; it always throws.
    * @throws AssertFailedException synchronously, always.
+   * @example
+   * ```ts
+   * import { Assert } from "@noldova/teamrun-foundation-testing";
+   *
+   * export function requireMode(mode: "light" | "dark"): string {
+   *   if (mode === "light" || mode === "dark")
+   *     return mode;
+   *   return Assert.fail("Every mode is handled.");
+   * }
+   * ```
    */
   public static fail(message?: string): never;
 }
@@ -387,6 +593,21 @@ export declare class TestMethodResult {
    * skipped outcome without a reason.
    * @throws ArgumentOutOfRangeException synchronously for a negative or
    * fractional index or an invalid duration.
+   * @example
+   * ```ts
+   * import { TestMethodResult, TestOutcome } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const passed: TestMethodResult = new TestMethodResult(
+   *   "@noldova/teamrun-foundation-json",
+   *   "JsonReaderTests",
+   *   "readsStrings",
+   *   undefined,
+   *   [],
+   *   TestOutcome.Passed,
+   *   4,
+   *   undefined,
+   *   undefined);
+   * ```
    */
   public constructor(
     packageName: string,
@@ -436,6 +657,22 @@ export declare class TestClassResult {
    * with this package and class. The result keeps its own copy.
    * @throws ArgumentException synchronously for an empty name or path, no
    * results, or a result of another package or class.
+   * @example
+   * ```ts
+   * import { TestClassResult, TestMethodResult, TestOutcome } from "@noldova/teamrun-foundation-testing";
+   *
+   * const passed: TestMethodResult = new TestMethodResult(
+   *   "@noldova/teamrun-foundation-json",
+   *   "JsonReaderTests",
+   *   "readsStrings",
+   *   undefined,
+   *   [],
+   *   TestOutcome.Passed,
+   *   4,
+   *   undefined,
+   *   undefined);
+   * export const classResult: TestClassResult = new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]);
+   * ```
    */
   public constructor(packageName: string, className: string, filePath: string, methodResults: readonly TestMethodResult[]);
 }
@@ -495,6 +732,24 @@ export declare class TestRunResult {
    *
    * @param classResults The class results, in execution order. The result
    * keeps its own copy.
+   * @example
+   * ```ts
+   * import { TestClassResult, TestMethodResult, TestOutcome, TestRunResult } from "@noldova/teamrun-foundation-testing";
+   *
+   * const passed: TestMethodResult = new TestMethodResult(
+   *   "@noldova/teamrun-foundation-json",
+   *   "JsonReaderTests",
+   *   "readsStrings",
+   *   undefined,
+   *   [],
+   *   TestOutcome.Passed,
+   *   4,
+   *   undefined,
+   *   undefined);
+   * const classResult: TestClassResult = new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]);
+   * const result: TestRunResult = new TestRunResult([classResult]);
+   * export const total: number = result.total;
+   * ```
    */
   public constructor(classResults: readonly TestClassResult[]);
 }
@@ -550,6 +805,12 @@ export declare class DiscoveredTestMethod {
    * category, or a mismatched index and data.
    * @throws ArgumentOutOfRangeException synchronously for a negative or
    * fractional index.
+   * @example
+   * ```ts
+   * import { DiscoveredTestMethod } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const row: DiscoveredTestMethod = new DiscoveredTestMethod("addsTwoNumbers", 0, [1, 2, 3], undefined, ["math"]);
+   * ```
    */
   public constructor(
     methodName: string,
@@ -616,6 +877,21 @@ export declare class DiscoveredTestClass {
    * default.
    * @throws ArgumentException synchronously for an empty name, path, reason
    * or category, or no tests.
+   * @example
+   * ```ts
+   * import { DiscoveredTestClass, DiscoveredTestMethod } from "@noldova/teamrun-foundation-testing";
+   *
+   * class AdditionTests {
+   * }
+   *
+   * export const discovered: DiscoveredTestClass = new DiscoveredTestClass(
+   *   "@noldova/teamrun-foundation-math",
+   *   "AdditionTests",
+   *   "addition.test.js",
+   *   AdditionTests,
+   *   undefined,
+   *   [new DiscoveredTestMethod("addsTwoNumbers", undefined, [], undefined)]);
+   * ```
    */
   public constructor(
     packageName: string,
@@ -648,6 +924,12 @@ export declare class TestProject {
    * @param rootDirectory The compiled tests' folder; not whitespace only.
    * @throws ArgumentException synchronously when either is empty or
    * whitespace only.
+   * @example
+   * ```ts
+   * import { TestProject } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const project: TestProject = new TestProject("@noldova/teamrun-foundation-json", "_build/tests/foundation-json");
+   * ```
    */
   public constructor(packageName: string, rootDirectory: string);
 }
@@ -666,6 +948,12 @@ export declare class TestDiscovery {
    * @throws TestingException as a rejection when a test file breaks the
    * testing contract, such as a file without a test class or a marked class
    * whose name does not end in `Tests`.
+   * @example
+   * ```ts
+   * import { type DiscoveredTestClass, TestDiscovery, TestProject } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const classes: DiscoveredTestClass[] = await new TestDiscovery().discoverAsync([new TestProject("@noldova/teamrun-foundation-json", "_build/tests/foundation-json")]);
+   * ```
    */
   public discoverAsync(testProjects: readonly TestProject[]): Promise<DiscoveredTestClass[]>;
 
@@ -680,6 +968,20 @@ export declare class TestDiscovery {
    * @throws ArgumentException synchronously for an empty path or name.
    * @throws TestingException synchronously when the file breaks the testing
    * contract.
+   * @example
+   * ```ts
+   * import { Assert, type DiscoveredTestClass, TestClass, TestDiscovery, TestMethod } from "@noldova/teamrun-foundation-testing";
+   *
+   * @TestClass
+   * class GreetingTests {
+   *   @TestMethod
+   *   public greets(): void {
+   *     Assert.areEqual("hi", "hi");
+   *   }
+   * }
+   *
+   * export const discovered: DiscoveredTestClass[] = new TestDiscovery().discoverModuleExports({ GreetingTests }, "greeting.test.js", "@noldova/teamrun-foundation-greeting");
+   * ```
    */
   public discoverModuleExports(moduleExports: object, filePath: string, packageName: string): DiscoveredTestClass[];
 }
@@ -693,6 +995,18 @@ export interface ITestProgressListener {
    * failure it throws stops the run and reaches the run's caller.
    *
    * @param result The completed class's results.
+   * @example
+   * ```ts
+   * import type { ITestProgressListener, TestClassResult } from "@noldova/teamrun-foundation-testing";
+   *
+   * export class CountingListener implements ITestProgressListener {
+   *   public completed: number = 0;
+   *
+   *   public onClassCompleted(result: TestClassResult): void {
+   *     this.completed += result.methodResults.length;
+   *   }
+   * }
+   * ```
    */
   onClassCompleted(result: TestClassResult): void;
 }
@@ -711,6 +1025,12 @@ export declare class TestExecutor {
    * positive integer.
    * @throws ArgumentOutOfRangeException synchronously when the time limit is
    * not a positive integer.
+   * @example
+   * ```ts
+   * import { TestExecutor } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const executor: TestExecutor = new TestExecutor(30_000);
+   * ```
    */
   public constructor(timeoutMilliseconds: number);
 
@@ -721,6 +1041,13 @@ export declare class TestExecutor {
    * @param progress Notified after each class, before the next one starts.
    * @returns A promise of one result per class, in execution order. A test
    * whose method cannot be called fails with `TestingException`.
+   * @example
+   * ```ts
+   * import { type TestClassResult, TestDiscovery, TestExecutor, TestProject, TestReportWriter } from "@noldova/teamrun-foundation-testing";
+   *
+   * const classes = await new TestDiscovery().discoverAsync([new TestProject("@noldova/teamrun-foundation-json", "_build/tests/foundation-json")]);
+   * export const results: TestClassResult[] = await new TestExecutor(30_000).executeAsync(classes, new TestReportWriter());
+   * ```
    */
   public executeAsync(testClasses: readonly DiscoveredTestClass[], progress?: ITestProgressListener): Promise<TestClassResult[]>;
 }
@@ -735,6 +1062,12 @@ export declare class TestRunner {
    *
    * @param discovery Finds the tests.
    * @param executor Runs them.
+   * @example
+   * ```ts
+   * import { TestDiscovery, TestExecutor, TestRunner } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const runner: TestRunner = new TestRunner(new TestDiscovery(), new TestExecutor(30_000));
+   * ```
    */
   public constructor(discovery: TestDiscovery, executor: TestExecutor);
 
@@ -749,6 +1082,13 @@ export declare class TestRunner {
    * @returns A promise of the run's result.
    * @throws TestingException as a rejection when discovery fails or the
    * results do not account for every selected test.
+   * @example
+   * ```ts
+   * import { TestDiscovery, TestExecutor, TestProject, TestReportWriter, TestRunner, type TestRunResult } from "@noldova/teamrun-foundation-testing";
+   *
+   * const runner = new TestRunner(new TestDiscovery(), new TestExecutor(30_000));
+   * export const result: TestRunResult = await runner.runAsync([new TestProject("@noldova/teamrun-foundation-json", "_build/tests/foundation-json")], ["category:fast"], new TestReportWriter(true));
+   * ```
    */
   public runAsync(testProjects: readonly TestProject[], filters?: readonly string[], progress?: ITestProgressListener): Promise<TestRunResult>;
 }
@@ -764,6 +1104,12 @@ export declare class TestReportWriter implements ITestProgressListener {
    * @param skipPassingDetails Whether progress output hides passed tests and
    * entirely passing classes; false by default. Failures, skips and
    * unreached tests stay visible.
+   * @example
+   * ```ts
+   * import { TestReportWriter } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const quiet: TestReportWriter = new TestReportWriter(true);
+   * ```
    */
   public constructor(skipPassingDetails?: boolean);
 
@@ -771,6 +1117,22 @@ export declare class TestReportWriter implements ITestProgressListener {
    * Writes a completed class's heading and tests.
    *
    * @param result The completed class's results.
+   * @example
+   * ```ts
+   * import { TestClassResult, TestMethodResult, TestOutcome, TestReportWriter } from "@noldova/teamrun-foundation-testing";
+   *
+   * const passed: TestMethodResult = new TestMethodResult(
+   *   "@noldova/teamrun-foundation-json",
+   *   "JsonReaderTests",
+   *   "readsStrings",
+   *   undefined,
+   *   [],
+   *   TestOutcome.Passed,
+   *   4,
+   *   undefined,
+   *   undefined);
+   * new TestReportWriter().onClassCompleted(new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]));
+   * ```
    */
   public onClassCompleted(result: TestClassResult): void;
 
@@ -778,6 +1140,24 @@ export declare class TestReportWriter implements ITestProgressListener {
    * Writes the run's totals without repeating the classes.
    *
    * @param result The run's result.
+   * @example
+   * ```ts
+   * import { TestClassResult, TestMethodResult, TestOutcome, TestReportWriter, TestRunResult } from "@noldova/teamrun-foundation-testing";
+   *
+   * const passed: TestMethodResult = new TestMethodResult(
+   *   "@noldova/teamrun-foundation-json",
+   *   "JsonReaderTests",
+   *   "readsStrings",
+   *   undefined,
+   *   [],
+   *   TestOutcome.Passed,
+   *   4,
+   *   undefined,
+   *   undefined);
+   * const classResult: TestClassResult = new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]);
+   * const result: TestRunResult = new TestRunResult([classResult]);
+   * new TestReportWriter().writeSummary(result);
+   * ```
    */
   public writeSummary(result: TestRunResult): void;
 
@@ -787,6 +1167,24 @@ export declare class TestReportWriter implements ITestProgressListener {
    * @param result The run's result.
    * @param skipPassingDetails Whether to hide passed tests and entirely
    * passing classes.
+   * @example
+   * ```ts
+   * import { TestClassResult, TestMethodResult, TestOutcome, TestReportWriter, TestRunResult } from "@noldova/teamrun-foundation-testing";
+   *
+   * const passed: TestMethodResult = new TestMethodResult(
+   *   "@noldova/teamrun-foundation-json",
+   *   "JsonReaderTests",
+   *   "readsStrings",
+   *   undefined,
+   *   [],
+   *   TestOutcome.Passed,
+   *   4,
+   *   undefined,
+   *   undefined);
+   * const classResult: TestClassResult = new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]);
+   * const result: TestRunResult = new TestRunResult([classResult]);
+   * new TestReportWriter().write(result, false);
+   * ```
    */
   public write(result: TestRunResult, skipPassingDetails: boolean): void;
 
@@ -798,6 +1196,24 @@ export declare class TestReportWriter implements ITestProgressListener {
    * passing classes.
    * @returns The class reports followed by the totals, with terminal color
    * sequences.
+   * @example
+   * ```ts
+   * import { TestClassResult, TestMethodResult, TestOutcome, TestReportWriter, TestRunResult } from "@noldova/teamrun-foundation-testing";
+   *
+   * const passed: TestMethodResult = new TestMethodResult(
+   *   "@noldova/teamrun-foundation-json",
+   *   "JsonReaderTests",
+   *   "readsStrings",
+   *   undefined,
+   *   [],
+   *   TestOutcome.Passed,
+   *   4,
+   *   undefined,
+   *   undefined);
+   * const classResult: TestClassResult = new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]);
+   * const result: TestRunResult = new TestRunResult([classResult]);
+   * export const lines: string[] = new TestReportWriter().formatLines(result, true);
+   * ```
    */
   public formatLines(result: TestRunResult, skipPassingDetails: boolean): string[];
 }
@@ -812,6 +1228,12 @@ export declare class GitHubSummaryWriter {
    *
    * @param path The step summary file; `undefined` or whitespace only turns
    * output off.
+   * @example
+   * ```ts
+   * import { GitHubSummaryWriter } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const summary: GitHubSummaryWriter = new GitHubSummaryWriter(process.env["GITHUB_STEP_SUMMARY"]);
+   * ```
    */
   public constructor(path: string | undefined);
 
@@ -820,6 +1242,24 @@ export declare class GitHubSummaryWriter {
    * details of failed, skipped and unreached tests.
    *
    * @param result The run's result.
+   * @example
+   * ```ts
+   * import { TestClassResult, TestMethodResult, TestOutcome, GitHubSummaryWriter, TestRunResult } from "@noldova/teamrun-foundation-testing";
+   *
+   * const passed: TestMethodResult = new TestMethodResult(
+   *   "@noldova/teamrun-foundation-json",
+   *   "JsonReaderTests",
+   *   "readsStrings",
+   *   undefined,
+   *   [],
+   *   TestOutcome.Passed,
+   *   4,
+   *   undefined,
+   *   undefined);
+   * const classResult: TestClassResult = new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]);
+   * const result: TestRunResult = new TestRunResult([classResult]);
+   * new GitHubSummaryWriter(process.env["GITHUB_STEP_SUMMARY"]).writeTests(result);
+   * ```
    */
   public writeTests(result: TestRunResult): void;
 
@@ -828,6 +1268,12 @@ export declare class GitHubSummaryWriter {
    * the console and does not change the run's verdict.
    *
    * @param message What failed.
+   * @example
+   * ```ts
+   * import { GitHubSummaryWriter } from "@noldova/teamrun-foundation-testing";
+   *
+   * new GitHubSummaryWriter(process.env["GITHUB_STEP_SUMMARY"]).writeFailure("Discovery found no tests.");
+   * ```
    */
   public writeFailure(message: string): void;
 }

@@ -113,16 +113,104 @@ class BuildAndTestTests {
       assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [changes, validate]\n    if: always()\n"));
     });
 
-    test("runs read the repository only, and only pull request runs are cancelled by a newer push", async () => {
+    test("runs read the repository only, except the cache cleanup on main, and only pull request runs are cancelled by a newer push", async () => {
       const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
       assert.ok(text.includes("permissions:\n  contents: read\n"));
-      assert.doesNotMatch(text, /: write/);
-      assert.equal(text.match(/persist-credentials: false/g)?.length, 2);
+      assert.deepEqual(text.match(/^ *\S+: write$/gm), ["      actions: write"]);
+      assert.ok(text.includes("    name: Remove outdated dependency caches\n    needs: validate\n" +
+        "    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.validate.result == 'success'\n"));
+      assert.equal(text.match(/persist-credentials: false/g)?.length, 3);
       assert.ok(text.includes("cancel-in-progress: ${{ github.event_name == 'pull_request' }}"));
       for (const trigger of ["  pull_request:\n    branches: [main]", "  merge_group:\n    types: [checks_requested]", "  push:\n    branches: [main]", "  workflow_dispatch:"])
         assert.ok(text.includes(trigger), trigger);
       for (const action of text.matchAll(/uses: (\S+)/g))
-        assert.match(action[1] ?? "", /^actions\/[a-z-]+@[0-9a-f]{40}$/);
+        assert.match(action[1] ?? "", /^actions\/[a-z-]+(\/[a-z-]+)?@[0-9a-f]{40}$/);
+    });
+
+    test("each target restores both dependency caches by OS, CPU and lockfile, and only main pushes save them right after installing", async () => {
+      const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
+      const order = [
+        "Restore the installed dependencies", "Restore the Angular project's installed dependencies", "Discard an inexact Angular install", "Install dependencies",
+        "Save the installed dependencies", "Build", "Save the Angular project's installed dependencies", "Test"
+      ].map(t => text.indexOf(`      - name: ${t}\n`));
+      assert.ok(order.every((position, index) => position > 0 && (index === 0 || position > (order[index - 1] ?? 0))), order.join(","));
+      assert.ok(text.includes("key: dependencies-root-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('package-lock.json') }}\n"));
+      assert.ok(text.includes("key: dependencies-src-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('src/package-lock.json') }}\n"));
+      assert.doesNotMatch(text, /restore-keys/);
+      assert.ok(text.includes("      - name: Install dependencies\n        if: steps.root-dependencies.outputs.cache-hit != 'true'\n"));
+      assert.ok(text.includes("      - name: Discard an inexact Angular install\n        if: steps.angular-dependencies.outputs.cache-hit != 'true'\n"));
+      const saves: readonly (readonly [string, string])[] = [
+        ["Save the installed dependencies", "root-dependencies"],
+        ["Save the Angular project's installed dependencies", "angular-dependencies"]
+      ];
+      for (const [step, cache] of saves)
+        assert.ok(text.includes(`      - name: ${step}\n        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.${cache}.outputs.cache-hit != 'true'\n`), step);
+      assert.equal(text.match(/key: \$\{\{ steps\.(root|angular)-dependencies\.outputs\.cache-primary-key \}\}/g)?.length, 2);
+    });
+
+    test("an inexact Angular restore is discarded, so a partial restore never passes as installed", async t => {
+      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript("Discard an inexact Angular install");
+      const doubles = await CommandDoublesFixture.createAsync();
+      t.after(() => doubles.disposeAsync());
+      await doubles.runAsync("mkdir -p src/node_modules/partial && touch src/node_modules/.teamrun-install src/package-lock.json\n");
+
+      const result = await doubles.runAsync(script);
+
+      assert.equal(script, "rm -rf src/node_modules\n");
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal((await doubles.runAsync("test -e src/node_modules\n")).status, 1);
+      assert.equal((await doubles.runAsync("test -e src/package-lock.json\n")).status, 0);
+    });
+
+    test("the cleanup deletes only the caches whose key belongs to another lockfile", async t => {
+      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript("Delete caches of other lockfiles");
+      const list = "api --paginate repos/noldova-com/teamrun/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100 --jq .actions_caches[].key";
+      const keys = [
+        "dependencies-root-Linux-x64-rootnew",
+        "dependencies-root-Windows-arm64-rootold",
+        "dependencies-src-macOS-arm64-srcnew",
+        "dependencies-src-Linux-x64-srcold",
+        "dependencies-src-Linux-x64-rootnew"
+      ];
+      const environment = { GITHUB_REPOSITORY: "noldova-com/teamrun", ROOT_HASH: "rootnew", SOURCE_HASH: "srcnew" };
+      const doubles = await CommandDoublesFixture.createAsync();
+      t.after(() => doubles.disposeAsync());
+      doubles.respond("gh", list, `${keys.join("\n")}\n`);
+      for (const key of [keys[1], keys[3], keys[4]])
+        doubles.respond("gh", `api --method DELETE repos/noldova-com/teamrun/actions/caches?key=${key}&ref=refs/heads/main`, "{}");
+
+      const result = await doubles.runAsync(script, environment);
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(await doubles.readCallsAsync(), [
+        `gh ${list}`,
+        "gh api --method DELETE repos/noldova-com/teamrun/actions/caches?key=dependencies-root-Windows-arm64-rootold&ref=refs/heads/main",
+        "gh api --method DELETE repos/noldova-com/teamrun/actions/caches?key=dependencies-src-Linux-x64-srcold&ref=refs/heads/main",
+        "gh api --method DELETE repos/noldova-com/teamrun/actions/caches?key=dependencies-src-Linux-x64-rootnew&ref=refs/heads/main"
+      ]);
+      assert.equal(result.stdout, [keys[1], keys[3], keys[4]].map(t => `Deleted the outdated cache ${t}.\n`).join(""));
+
+      const empty = await CommandDoublesFixture.createAsync();
+      t.after(() => empty.disposeAsync());
+      empty.respond("gh", list, "");
+      assert.equal((await empty.runAsync(script, environment)).status, 0);
+      assert.deepEqual(await empty.readCallsAsync(), [`gh ${list}`]);
+    });
+
+    test("a failed listing or deletion fails the cleanup", async t => {
+      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript("Delete caches of other lockfiles");
+      const list = "api --paginate repos/noldova-com/teamrun/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100 --jq .actions_caches[].key";
+      const environment = { GITHUB_REPOSITORY: "noldova-com/teamrun", ROOT_HASH: "rootnew", SOURCE_HASH: "srcnew" };
+      const listing = await CommandDoublesFixture.createAsync();
+      t.after(() => listing.disposeAsync());
+      listing.respond("gh", list, "", 1);
+      const deletion = await CommandDoublesFixture.createAsync();
+      t.after(() => deletion.disposeAsync());
+      deletion.respond("gh", list, "dependencies-root-Linux-x64-rootold\n");
+      deletion.respond("gh", "api --method DELETE repos/noldova-com/teamrun/actions/caches?key=dependencies-root-Linux-x64-rootold&ref=refs/heads/main", "", 1);
+
+      assert.notEqual((await listing.runAsync(script, environment)).status, 0);
+      assert.notEqual((await deletion.runAsync(script, environment)).status, 0);
     });
   }
 }
