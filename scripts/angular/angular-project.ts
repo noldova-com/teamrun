@@ -28,9 +28,11 @@ export default class AngularProject {
   private static readonly INSTALL_ARGUMENTS: readonly string[] = ["ci", "--no-audit", "--no-fund"];
   private static readonly BROWSER_ARGUMENTS: readonly string[] = ["install", "--only-shell", "chromium"];
   private static readonly TEST_ARGUMENTS: readonly string[] = ["test"];
+  private static readonly BUILD_ARGUMENTS: readonly string[] = ["build"];
   private static readonly NO_PROJECT: string = "No Angular project under src/; there is nothing to prepare.\n";
   private static readonly INSTALLING: string = "Installing the Angular project in src/...\n";
   private static readonly INSTALLING_BROWSER: string = "Installing the browser for the Angular tests...\n";
+  private static readonly BUILDING: string = "Building the window...\n";
 
   private readonly directory: string;
   private readonly runner: ProcessRunner;
@@ -43,7 +45,7 @@ export default class AngularProject {
   }
 
   public async prepareAsync(output: Writable): Promise<void> {
-    if (!existsSync(path.join(this.directory, AngularProject.WORKSPACE_FILE))) {
+    if (!this.hasProject()) {
       output.write(AngularProject.NO_PROJECT);
       return;
     }
@@ -63,8 +65,22 @@ export default class AngularProject {
       throw new ProcessException(`Installing the browser for the Angular tests failed with exit code ${exitCode}.`);
   }
 
+  public async buildAsync(output: Writable): Promise<void> {
+    if (!this.hasProject())
+      return;
+
+    output.write(AngularProject.BUILDING);
+    const exitCode = await this.runner.runAsync(process.execPath, [path.join(this.directory, AngularProject.CLI), ...AngularProject.BUILD_ARGUMENTS], this.directory);
+    if (exitCode !== 0)
+      throw new ProcessException(`Building the window failed with exit code ${exitCode}.`);
+  }
+
   public async testAsync(): Promise<boolean> {
     return await this.runner.runAsync(process.execPath, [path.join(this.directory, AngularProject.CLI), ...AngularProject.TEST_ARGUMENTS], this.directory) === 0;
+  }
+
+  private hasProject(): boolean {
+    return existsSync(path.join(this.directory, AngularProject.WORKSPACE_FILE));
   }
 
   private async needsInstallAsync(): Promise<boolean> {

@@ -1,0 +1,25 @@
+{
+  "name": "@noldova/teamrun-shell-desktop",
+  "version": "__VERSION__",
+  "private": true,
+  "type": "module",
+  "main": "api/index.js",
+  "types": "api/index.d.ts",
+  "license": "MIT",
+  "dependencies": {
+    "@noldova/teamrun-foundation-core": "__VERSION__",
+    "@noldova/teamrun-foundation-exceptions": "__VERSION__",
+    "@noldova/teamrun-foundation-json": "__VERSION__"
+  },
+  "peerDependencies": {
+    "electron": "44.5.1"
+  },
+  "teamrun": {
+    "coverageExclusions": [
+      {
+        "file": "main.ts",
+        "reason": "Composes the desktop from Electron's own modules, which load only inside Electron; the desktop UI workflows run it."
+      }
+    ]
+  }
+}

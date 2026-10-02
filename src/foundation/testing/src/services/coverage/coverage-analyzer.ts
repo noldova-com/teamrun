@@ -29,7 +29,8 @@ export class CoverageAnalyzer {
     const normalizedProjects = projects.map(t => new CoverageProject(
       t.name,
       this.normalizeDirectory(t.productionDirectory),
-      this.normalizeDirectory(t.sourceDirectory)));
+      this.normalizeDirectory(t.sourceDirectory),
+      t.exclusions));
     const expectedFilePathsByProject = new Map<CoverageProject, string[]>();
     for (const project of normalizedProjects)
       expectedFilePathsByProject.set(project, await this.collectExpectedFilePathsAsync(project.productionDirectory));
@@ -43,8 +44,13 @@ export class CoverageAnalyzer {
       const reportedFilePaths = [...scriptEntriesByFile.keys()].filter(t => t.startsWith(project.productionDirectory));
       const filePaths = [...new Set([...expectedFilePaths, ...reportedFilePaths])].sort();
       const fileAnalyzer = new FileCoverageAnalyzer(project);
+      const projectCoverages: FileCoverage[] = [];
       for (const filePath of filePaths)
-        fileCoverages.push(await fileAnalyzer.analyzeAsync(filePath, scriptEntriesByFile.get(filePath) ?? []));
+        projectCoverages.push(await fileAnalyzer.analyzeAsync(filePath, scriptEntriesByFile.get(filePath) ?? []));
+      const unknown = project.exclusions.filter(t => !projectCoverages.some(file => file.relativePath === t.relativePath));
+      if (unknown.length > 0)
+        throw new TestingException(Resources.formatUnknownCoverageExclusions(project.name, unknown.map(t => t.relativePath)));
+      fileCoverages.push(...projectCoverages);
     }
 
     return new CoverageResult(fileCoverages);

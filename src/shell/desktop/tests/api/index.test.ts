@@ -1,0 +1,20 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import * as api from "@noldova/teamrun-shell-desktop";
+
+@TestClass
+export class DesktopApiTests {
+  @TestMethod
+  public exportsTheCompleteRuntimeSurface(): void {
+    Assert.areEqual(
+      JSON.stringify(["CloseCoordinator", "DesktopApplication", "DesktopSettings", "ScreenArea", "SenderInfo", "SenderPolicy", "WindowAppearance", "WindowState"]),
+      JSON.stringify(Object.keys(api).sort()));
+  }
+}

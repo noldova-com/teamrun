@@ -107,7 +107,12 @@ export class Resources {
     "menu-item-padding",
     "menu-separator-spacing",
     "tooltip-width",
-    "tooltip-padding"
+    "tooltip-padding",
+    "window-row-height",
+    "status-bar-height",
+    "status-bar-inset",
+    "status-bar-item-padding",
+    "status-bar-item-gap"
   ];
   public static readonly shapes: ReadonlyMap<string, readonly string[]> = new Map([["tab", ["pill"]]]);
   public static readonly defaultThemeId: string = "shell.default";

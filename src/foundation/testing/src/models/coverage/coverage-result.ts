@@ -13,6 +13,7 @@ export class CoverageResult {
   public readonly isComplete: boolean;
   public readonly executableFileCoverages: readonly FileCoverage[];
   public readonly incompleteFileCoverages: readonly FileCoverage[];
+  public readonly excludedFileCoverages: readonly FileCoverage[];
   public readonly totalLength: number;
   public readonly uncoveredLength: number;
   public readonly blockCount: number;
@@ -21,7 +22,8 @@ export class CoverageResult {
   public constructor(fileCoverages: readonly FileCoverage[]) {
     this.fileCoverages = [...fileCoverages];
     this.executableFileCoverages = this.fileCoverages.filter(t => t.isExecutable);
-    this.incompleteFileCoverages = this.executableFileCoverages.filter(t => !t.isFullyCovered);
+    this.incompleteFileCoverages = this.executableFileCoverages.filter(t => !t.isFullyCovered && !t.isExcluded);
+    this.excludedFileCoverages = this.fileCoverages.filter(t => t.isExcluded);
     this.isComplete = this.incompleteFileCoverages.length === 0;
     this.totalLength = this.fileCoverages.reduce((sum, fileCoverage) => sum + fileCoverage.totalLength, 0);
     this.uncoveredLength = this.fileCoverages.reduce((sum, fileCoverage) => sum + fileCoverage.uncoveredLength, 0);

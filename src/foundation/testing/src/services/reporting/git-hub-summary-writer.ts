@@ -57,10 +57,11 @@ export class GitHubSummaryWriter {
       Resources.summaryTableSeparator,
       Resources.formatSummaryRow(Resources.summaryGateLabel, result.isComplete ? Resources.summaryPassed : Resources.summaryFailed),
       Resources.formatSummaryRow(Resources.summaryCoveredFilesLabel, `${fullyCovered}/${result.executableFileCoverages.length}`),
+      Resources.formatSummaryRow(Resources.summaryExcludedFilesLabel, String(result.excludedFileCoverages.length)),
       Resources.formatSummaryRow(Resources.coverageHeading, percentage),
       Resources.formatSummaryRow(Resources.blocksHeading, `${result.takenBlockCount}/${result.blockCount}`)
     ];
-    if (!result.isComplete)
+    if (!result.isComplete || result.excludedFileCoverages.length > 0)
       lines.push(this.details(new CoverageReportWriter().formatLines(result, true).join(Resources.summaryNewline)));
     this.append(lines);
   }

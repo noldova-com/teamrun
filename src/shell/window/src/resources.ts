@@ -73,6 +73,15 @@ export class Resources {
   public static readonly unknownTab: string = "A tab names a view or a document.";
   public static readonly invalidLayoutPart: string = "The value does not describe a valid part of a layout.";
   public static readonly unknownNode: string = "A node is a split, with children, or a group, with tabs.";
+  public static readonly productName: string = "TeamRun";
+  public static readonly noModules: string = "No modules";
+  public static readonly bridgeName: string = "teamrun";
+  public static readonly macPlatform: string = "darwin";
+  public static readonly backgroundField: string = "background";
+  public static readonly titleBarField: string = "titleBar";
+  public static readonly titleBarTextField: string = "titleBarText";
+  public static readonly titleBarHeightField: string = "titleBarHeight";
+  public static readonly missingBridge: string = "The window needs the desktop's bridge, which the preload provides.";
 
   public static formatUnregisteredView(name: string): string {
     return `No view named "${name}" is registered.`;

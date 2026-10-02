@@ -28,6 +28,19 @@ export class CoverageResultTests {
   }
 
   @TestMethod
+  public leavesExcludedFilesOutOfCompletionButKeepsThemMeasured(): void {
+    const result = new CoverageResult([
+      new FileCoverage("Sample", "covered.js", [], 100, 0, []),
+      new FileCoverage("Sample", "main.js", [new LineRange(1, 3)], 50, 50, [], "Runs only inside Electron.")
+    ]);
+
+    Assert.isTrue(result.isComplete);
+    Assert.areEqual(0, result.incompleteFileCoverages.length);
+    Assert.areEqual(JSON.stringify(["main.js"]), JSON.stringify(result.excludedFileCoverages.map(t => t.relativePath)));
+    Assert.areEqual(50, result.uncoveredLength);
+  }
+
+  @TestMethod
   public treatsAnEmptyResultAsComplete(): void {
     Assert.isTrue(new CoverageResult([]).isComplete);
   }

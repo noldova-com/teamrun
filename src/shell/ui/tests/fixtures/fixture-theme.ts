@@ -160,7 +160,12 @@ export class FixtureTheme {
     ["menu-item-padding", "0.625rem"],
     ["menu-separator-spacing", "0.375rem"],
     ["tooltip-width", "30rem"],
-    ["tooltip-padding", "0.25rem 0.625rem"]
+    ["tooltip-padding", "0.25rem 0.625rem"],
+    ["window-row-height", "2.5rem"],
+    ["status-bar-height", "1.5rem"],
+    ["status-bar-inset", "0.75rem"],
+    ["status-bar-item-padding", "0.5rem"],
+    ["status-bar-item-gap", "0.375rem"]
   ]);
   private static readonly SHAPES: ReadonlyMap<string, string> = new Map([["tab", "pill"]]);
 

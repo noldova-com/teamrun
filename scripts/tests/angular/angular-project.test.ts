@@ -107,6 +107,32 @@ class AngularProjectTests {
       const directory = path.join(repository.directory, "src");
       assert.deepEqual(passing.runs, [[process.execPath, directory, path.join(directory, "node_modules", "@angular", "cli", "bin", "ng.js"), "test"]]);
     });
+
+    test("the window is built with the Angular CLI in src/, and a failed build stops with its exit code", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      const passing = new ProcessRunnerFixture([0]);
+      const output = new TextOutputFixture();
+
+      await AngularProjectTests.create(repository, passing).buildAsync(output);
+
+      const directory = path.join(repository.directory, "src");
+      assert.deepEqual(passing.runs, [[process.execPath, directory, path.join(directory, "node_modules", "@angular", "cli", "bin", "ng.js"), "build"]]);
+      assert.equal(output.text, "Building the window...\n");
+      await assert.rejects(
+        AngularProjectTests.create(repository, new ProcessRunnerFixture([3])).buildAsync(new TextOutputFixture()),
+        new ProcessException("Building the window failed with exit code 3."));
+    });
+
+    test("a tree without the Angular project has no window to build", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const runner = new ProcessRunnerFixture();
+      const output = new TextOutputFixture();
+
+      await AngularProjectTests.create(repository, runner).buildAsync(output);
+
+      assert.deepEqual([output.text, runner.runs], ["", []]);
+    });
   }
 
   private static async createProjectAsync(t: { after: (callback: () => Promise<void>) => void }): Promise<RepositoryFixture> {

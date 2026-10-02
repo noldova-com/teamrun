@@ -40,6 +40,7 @@ export default class Build {
       const packages = await this.build.buildAsync(this.output);
       this.output.write(packages.length === 0 ? Build.NO_PACKAGES : `Packages built and installed: ${packages.length}.\n`);
       await this.angular.prepareAsync(this.output);
+      await this.angular.buildAsync(this.output);
       return 0;
     }
     catch (error) {

@@ -94,6 +94,19 @@ export class CoverageReportWriterTests {
     Assert.isTrue(lines.some(t => t.includes("Overall — 1 of 1 executable files fully covered")));
   }
 
+  @TestMethod
+  public showsAnExcludedFileWithItsReasonEvenWhenDetailsAreSkipped(): void {
+    const lines = new CoverageReportWriter().formatLines(new CoverageResult([
+      new FileCoverage("Sample.Core", "covered.ts", [], 100, 0, []),
+      new FileCoverage("Sample.Core", "main.ts", [new LineRange(1, 5)], 50, 50, [], "Runs only inside Electron.")
+    ]), true);
+
+    Assert.isTrue(lines.some(t => t.includes("main.ts") && t.includes("0.0%")));
+    Assert.isTrue(lines.some(t => t.includes("excluded: Runs only inside Electron.")));
+    Assert.isTrue(lines.every(t => !t.includes("uncovered lines")));
+    Assert.isTrue(lines.some(t => t.includes("Overall — 1 of 2 executable files fully covered, 1 excluded")));
+  }
+
   private format(fileCoverages: readonly FileCoverage[]): string[] {
     return new CoverageReportWriter().formatLines(new CoverageResult(fileCoverages), false);
   }

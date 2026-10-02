@@ -16,12 +16,14 @@ export default class PackageManifest {
   private static readonly SOURCE_PREFIX: string = "src/";
   private static readonly NAME_PREFIX: string = "@noldova/teamrun-";
   private static readonly VERSION_PLACEHOLDER: string = "__VERSION__";
+  private static readonly NO_EXCLUSIONS: string = "[]";
 
   public readonly directory: string;
   public readonly name: string;
   public readonly dependencies: readonly string[];
+  public readonly coverageExclusions: string;
 
-  public constructor(directory: string, name: string, dependencies: readonly string[]) {
+  public constructor(directory: string, name: string, dependencies: readonly string[], coverageExclusions: string = PackageManifest.NO_EXCLUSIONS) {
     const expected = PackageManifest.formatName(directory);
     if (name !== expected)
       throw new PackageException(`${directory}/${PackageManifest.FILE_NAME} must be named "${expected}", the package's path below src/ joined with hyphens.`);
@@ -29,6 +31,7 @@ export default class PackageManifest {
     this.directory = directory;
     this.name = name;
     this.dependencies = [...dependencies].sort();
+    this.coverageExclusions = coverageExclusions;
   }
 
   public static async readAsync(root: string, directory: string): Promise<PackageManifest> {
@@ -52,7 +55,14 @@ export default class PackageManifest {
     const unstamped = own.filter(([, version]) => version !== PackageManifest.VERSION_PLACEHOLDER).map(([name]) => name);
     if (unstamped.length > 0)
       throw new PackageException(`${file} must depend on ${unstamped.join(", ")} at version "${PackageManifest.VERSION_PLACEHOLDER}".`);
-    return new PackageManifest(directory, manifest.name, own.map(([name]) => name));
+
+    const settings = "teamrun" in manifest ? manifest.teamrun : {};
+    if (typeof settings !== "object" || settings === null)
+      throw new PackageException(`${file} must keep its TeamRun settings in an object.`);
+    const exclusions = "coverageExclusions" in settings ? settings.coverageExclusions : [];
+    if (!Array.isArray(exclusions))
+      throw new PackageException(`${file} must list its coverage exclusions in an array.`);
+    return new PackageManifest(directory, manifest.name, own.map(([name]) => name), JSON.stringify(exclusions));
   }
 
   public get id(): string {

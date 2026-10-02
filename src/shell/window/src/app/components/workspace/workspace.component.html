@@ -1,0 +1,13 @@
+@for (frame of geometry().frames; track frame.group.id) {
+  <tr-panel-card
+    class="tr-workspace-group"
+    [surface]="surfaceOf(frame)"
+    [style.left.rem]="frame.bounds.x"
+    [style.top.rem]="frame.bounds.y"
+    [style.width.rem]="frame.bounds.width"
+    [style.height.rem]="frame.bounds.height">
+    @if (isEmptyDocuments(frame)) {
+      <tr-empty-window />
+    }
+  </tr-panel-card>
+}

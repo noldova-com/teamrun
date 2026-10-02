@@ -55,17 +55,34 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
+            "outputPath": "../_build/window",
+            "index": "shell/window/src/index.html",
+            "browser": "shell/window/src/main.ts",
             "tsConfig": "tsconfig.spec.json",
+            "baseHref": "./",
             "styles": [
               "shell/ui/src/styles/kit.scss"
             ]
           },
           "configurations": {
+            "production": {
+              "tsConfig": "tsconfig.app.json",
+              "outputHashing": "none",
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": false
+              }
+            },
             "development": {
               "optimization": false,
               "sourceMap": true
             }
-          }
+          },
+          "defaultConfiguration": "production"
         }
       }
     }
