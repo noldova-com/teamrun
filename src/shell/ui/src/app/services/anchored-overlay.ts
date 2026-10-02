@@ -90,12 +90,20 @@ export class AnchoredOverlay {
       if (event.target instanceof Node && !this.element.contains(event.target) && event.target.contains(origin))
         this.originScrollsValue.next();
     };
-    const resize = new ResizeObserver(reposition);
+    let frame: number | null = null;
+    const resize = new ResizeObserver(() => frame ??= requestAnimationFrame(() => {
+      frame = null;
+      this.reposition();
+    }));
     resize.observe(this.element);
     window.addEventListener(Resources.resizeEvent, reposition);
     document.addEventListener(Resources.scrollEvent, scrolled, { capture: true, passive: true });
     this.cleanups.push(
       () => resize.disconnect(),
+      () => {
+        if (!Object.isNull(frame))
+          cancelAnimationFrame(frame);
+      },
       () => window.removeEventListener(Resources.resizeEvent, reposition),
       () => document.removeEventListener(Resources.scrollEvent, scrolled, { capture: true }));
     this.reposition();

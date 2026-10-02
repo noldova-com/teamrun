@@ -115,7 +115,7 @@ describe("MenuTriggerDirective", () => {
     trigger().click();
     await settledAsync();
 
-    expect(menu("root")?.getBoundingClientRect().right).toBeCloseTo(trigger().getBoundingClientRect().right, 0);
+    await vi.waitFor(() => expect(menu("root")?.getBoundingClientRect().right).toBeCloseTo(trigger().getBoundingClientRect().right, 0));
   });
 
   it("moves through its rows with the arrow keys, Home, End and type-ahead, skipping nothing", async () => {

@@ -107,11 +107,24 @@ describe("AnchoredOverlay", () => {
 
     content.instance.height.set(5000);
     content.changeDetectorRef.detectChanges();
-    await settledAsync();
+    await vi.waitFor(() => expect(overlay.placement?.maxHeight ?? 0).toBeGreaterThan(0));
     const limit = overlay.placement?.maxHeight ?? 0;
 
-    expect(limit).toBeGreaterThan(0);
     expect(overlay.element.style.maxHeight).toBe(`${limit}px`);
+  });
+
+  it("drops a reposition its content asked for when it closes first", async () => {
+    const content = overlay.openComponent(new ComponentPortal(ContentComponent), anchor(), below());
+    content.instance.height.set(200);
+    content.changeDetectorRef.detectChanges();
+    const reposition = vi.spyOn(overlay, "reposition");
+    await new Promise(resolve => setTimeout(resolve));
+    overlay.close();
+
+    await settledAsync();
+
+    expect(reposition).not.toHaveBeenCalled();
+    expect(overlay.placement).toBeNull();
   });
 
   it("reports an ancestor scroll that moves its anchor, but not a scroll inside itself or elsewhere", async () => {
