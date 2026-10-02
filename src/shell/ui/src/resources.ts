@@ -116,6 +116,7 @@ export class Resources {
     "status-bar-height",
     "status-bar-inset",
     "status-bar-item-padding",
+    "status-bar-item-height",
     "status-bar-item-gap",
     "button-height",
     "button-padding"
