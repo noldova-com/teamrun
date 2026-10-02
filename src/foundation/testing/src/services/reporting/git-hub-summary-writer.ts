@@ -11,8 +11,10 @@ import "@noldova/teamrun-foundation-core";
 import { appendFileSync } from "node:fs";
 import { stripVTControlCharacters } from "node:util";
 
+import type { CoverageResult } from "../../models/coverage/coverage-result.js";
 import type { TestRunResult } from "../../models/results/test-run-result.js";
 import { Resources } from "../../resources.js";
+import { CoverageReportWriter } from "./coverage-report-writer.js";
 import { TestReportWriter } from "./test-report-writer.js";
 
 export class GitHubSummaryWriter {
@@ -39,6 +41,26 @@ export class GitHubSummaryWriter {
     ];
     if (result.failed > 0 || result.skipped > 0 || result.unreached > 0)
       lines.push(this.details(new TestReportWriter().formatLines(result, true).join(Resources.summaryNewline)));
+    this.append(lines);
+  }
+
+  public writeCoverage(result: CoverageResult): void {
+    const fullyCovered = result.executableFileCoverages.filter(t => t.isFullyCovered).length;
+    const percentage = result.totalLength === 0
+      ? Resources.coverageNotApplicable
+      : `${((1 - result.uncoveredLength / result.totalLength) * 100).toFixed(1)}${Resources.coveragePercentSuffix}`;
+    const lines = [
+      Resources.summaryCoverageHeading,
+      String.empty,
+      Resources.summaryTableHeading,
+      Resources.summaryTableSeparator,
+      Resources.formatSummaryRow(Resources.summaryGateLabel, result.isComplete ? Resources.summaryPassed : Resources.summaryFailed),
+      Resources.formatSummaryRow(Resources.summaryCoveredFilesLabel, `${fullyCovered}/${result.executableFileCoverages.length}`),
+      Resources.formatSummaryRow(Resources.coverageHeading, percentage),
+      Resources.formatSummaryRow(Resources.blocksHeading, `${result.takenBlockCount}/${result.blockCount}`)
+    ];
+    if (!result.isComplete)
+      lines.push(this.details(new CoverageReportWriter().formatLines(result, true).join(Resources.summaryNewline)));
     this.append(lines);
   }
 
