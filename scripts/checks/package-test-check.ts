@@ -11,6 +11,8 @@ import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import BuildVariant from "../modules/build-variant.ts";
+import ModuleException from "../modules/module.exception.ts";
 import BuildLayout from "../packages/build-layout.ts";
 import type PackageBuild from "../packages/package-build.ts";
 import PackageCatalog from "../packages/package-catalog.ts";
@@ -49,7 +51,7 @@ export default class PackageTestCheck implements ICheck {
 
   public async runAsync(output: Writable): Promise<boolean> {
     try {
-      await this.build.requireCurrentAsync(false);
+      await this.build.requireCurrentAsync(BuildVariant.REGULAR);
       const layout = new BuildLayout(this.root);
       const packages = await new PackageCatalog(this.root).listPackagesAsync(false);
       const tested = packages.filter(t => existsSync(layout.locateTestOutput(t)));
@@ -73,7 +75,7 @@ export default class PackageTestCheck implements ICheck {
       return testsPassed && coverageComplete;
     }
     catch (error) {
-      if (!(error instanceof PackageException || error instanceof ProcessException))
+      if (!(error instanceof PackageException || error instanceof ProcessException || error instanceof ModuleException))
         throw error;
       output.write(`${error.message}\n`);
       return false;

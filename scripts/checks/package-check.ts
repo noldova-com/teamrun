@@ -8,6 +8,8 @@
 
 import type { Writable } from "node:stream";
 
+import BuildVariant from "../modules/build-variant.ts";
+import ModuleException from "../modules/module.exception.ts";
 import type PackageBuild from "../packages/package-build.ts";
 import PackageException from "../packages/package.exception.ts";
 import ProcessException from "../processes/process.exception.ts";
@@ -26,12 +28,12 @@ export default class PackageCheck implements ICheck {
 
   public async runAsync(output: Writable): Promise<boolean> {
     try {
-      const packages = await this.build.buildAsync(output, true);
+      const packages = await this.build.buildAsync(output, BuildVariant.REGULAR);
       output.write(packages.length === 0 ? PackageCheck.NO_PACKAGES : `Packages built and installed: ${packages.length}.\n`);
       return true;
     }
     catch (error) {
-      if (!(error instanceof PackageException || error instanceof ProcessException))
+      if (!(error instanceof PackageException || error instanceof ProcessException || error instanceof ModuleException))
         throw error;
       output.write(`${error.message}\n`);
       return false;

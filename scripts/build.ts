@@ -9,6 +9,7 @@
 import type { Writable } from "node:stream";
 
 import AngularProject from "./angular/angular-project.ts";
+import BuildVariant from "./modules/build-variant.ts";
 import ModuleArtifacts from "./modules/module-artifacts.ts";
 import ModuleCatalog from "./modules/module-catalog.ts";
 import ModuleException from "./modules/module.exception.ts";
@@ -49,8 +50,9 @@ export default class Build {
     }
 
     try {
-      const declarations = await this.modules.listBuildAsync(isTest, exclusions.filter((_, i) => i % 2 === 1));
-      const packages = await this.build.buildAsync(this.output, isTest);
+      const variant = new BuildVariant(isTest, exclusions.filter((_, i) => i % 2 === 1));
+      const declarations = await this.modules.listBuildAsync(variant.isTest, variant.excluded);
+      const packages = await this.build.buildAsync(this.output, variant);
       this.output.write(packages.length === 0 ? Build.NO_PACKAGES : `Packages built and installed: ${packages.length}.\n`);
       await this.artifacts.writeAsync(declarations);
       this.output.write(`Modules in the build: ${declarations.length}.\n`);
