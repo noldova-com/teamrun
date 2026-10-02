@@ -44,8 +44,8 @@ export default class PackageBuild {
     this.environment = environment;
   }
 
-  public async buildAsync(output: Writable): Promise<readonly PackageManifest[]> {
-    const packages = await this.catalog.listPackagesAsync();
+  public async buildAsync(output: Writable, includeFixtures: boolean): Promise<readonly PackageManifest[]> {
+    const packages = await this.catalog.listPackagesAsync(includeFixtures);
     if (packages.length === 0)
       return packages;
 
@@ -66,7 +66,7 @@ export default class PackageBuild {
       output.write(`${manifest.name}: ${isCurrent ? "reused" : "built"}\n`);
     }
 
-    const installed = PackageBuild.hashInstalled(archiveHashes);
+    const installed = PackageBuild.hashInstalled(packages, archiveHashes);
     for (const manifest of this.listTested(packages)) {
       const inputs = await this.hashTestInputsAsync(manifest, common, installed);
       const artifacts = [this.layout.locateTestOutput(manifest)];
@@ -77,12 +77,12 @@ export default class PackageBuild {
       output.write(`${manifest.name} tests: ${isCurrent ? "reused" : "compiled"}\n`);
     }
 
-    await this.requireCurrentAsync();
+    await this.requireCurrentAsync(includeFixtures);
     return packages;
   }
 
-  public async requireCurrentAsync(): Promise<void> {
-    const packages = await this.catalog.listPackagesAsync();
+  public async requireCurrentAsync(includeFixtures: boolean): Promise<void> {
+    const packages = await this.catalog.listPackagesAsync(includeFixtures);
     if (packages.length === 0)
       return;
 
@@ -98,7 +98,7 @@ export default class PackageBuild {
       archiveHashes.set(manifest.name, isCurrent ? await ContentHash.ofFileAsync(this.layout.locateArchive(manifest, version)) : PackageBuild.STALE);
     }
 
-    const installed = PackageBuild.hashInstalled(archiveHashes);
+    const installed = PackageBuild.hashInstalled(packages, archiveHashes);
     for (const manifest of this.listTested(packages)) {
       const inputs = await this.hashTestInputsAsync(manifest, common, installed);
       if (!await PackageBuild.isCurrentAsync(this.layout.locateTestRecord(manifest), inputs, [this.layout.locateTestOutput(manifest)]))
@@ -113,8 +113,8 @@ export default class PackageBuild {
     return [...new Set(direct.flatMap(t => [t.name, ...PackageBuild.collectDependencies(t, packages)]))].sort();
   }
 
-  private static hashInstalled(archiveHashes: ReadonlyMap<string, string>): string {
-    return ContentHash.ofParts([...archiveHashes].map(([name, hash]) => `${name} ${hash}`));
+  private static hashInstalled(packages: readonly PackageManifest[], archiveHashes: ReadonlyMap<string, string>): string {
+    return ContentHash.ofParts(packages.filter(t => !t.isFixture).map(t => `${t.name} ${archiveHashes.get(t.name)}`));
   }
 
   private static async isCurrentAsync(recordFile: string, inputs: string, artifacts: readonly string[]): Promise<boolean> {

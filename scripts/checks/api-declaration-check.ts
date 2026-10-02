@@ -41,7 +41,7 @@ export default class ApiDeclarationCheck implements ICheck {
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
-    const manifests = await this.catalog.listPackagesAsync();
+    const manifests = await this.catalog.listPackagesAsync(false);
     if (manifests.length === 0) {
       output.write(ApiDeclarationCheck.NO_PACKAGES);
       return true;

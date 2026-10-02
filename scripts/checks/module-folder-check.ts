@@ -11,6 +11,8 @@ import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import type ModuleCatalog from "../modules/module-catalog.ts";
+import ModuleDeclaration from "../modules/module-declaration.ts";
 import type ICheck from "./interfaces/check.ts";
 
 export default class ModuleFolderCheck implements ICheck {
@@ -20,11 +22,13 @@ export default class ModuleFolderCheck implements ICheck {
   private static readonly DOCUMENT_NAME: string = "README.md";
 
   private readonly root: string;
+  private readonly modules: ModuleCatalog;
 
   public readonly title: string = "Module folders";
 
-  public constructor(root: string) {
+  public constructor(root: string, modules: ModuleCatalog) {
     this.root = root;
+    this.modules = modules;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
@@ -41,7 +45,11 @@ export default class ModuleFolderCheck implements ICheck {
         findings.push(`${location}: "${name}" is not a module id; an id is lowercase kebab-case and not "${ModuleFolderCheck.RESERVED_ID}".`);
       if (!existsSync(path.join(folder, name, ModuleFolderCheck.DOCUMENT_NAME)))
         findings.push(`${location} has no ${ModuleFolderCheck.DOCUMENT_NAME}.`);
+      const parts = ModuleDeclaration.PARTS.filter(t => existsSync(path.join(folder, name, t)));
+      if (parts.length > 0 && !ModuleDeclaration.hasDeclaration(this.root, location))
+        findings.push(`${location} has the parts ${parts.join(", ")} but no module.json.`);
     }
+    findings.push(...(await this.modules.readAllAsync()).problems);
 
     for (const finding of findings)
       output.write(`${finding}\n`);

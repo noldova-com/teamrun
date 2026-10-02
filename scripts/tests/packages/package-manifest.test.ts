@@ -9,6 +9,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import ModuleCatalog from "../../modules/module-catalog.ts";
 import PackageManifest from "../../packages/package-manifest.ts";
 import PackageException from "../../packages/package.exception.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
@@ -54,6 +55,20 @@ class PackageManifestTests {
       assert.throws(
         () => new PackageManifest("src/shell/ui", "@noldova/teamrun-ui", []),
         new PackageException("src/shell/ui/package.json must be named \"@noldova/teamrun-shell-ui\", the package's path below src/ joined with hyphens."));
+    });
+
+    test("a fixture module's package is named for its path below the fixture folder, and other names are refused", () => {
+      const directory = `${ModuleCatalog.FIXTURE_FOLDER}/notes/runtime`;
+
+      const fixture = new PackageManifest(directory, "@noldova/teamrun-fixture-notes-runtime", []);
+
+      assert.equal(fixture.isFixture, true);
+      assert.equal(fixture.id, "fixture-notes-runtime");
+      assert.equal(new PackageManifest("src/shell/ui", "@noldova/teamrun-shell-ui", []).isFixture, false);
+      assert.throws(
+        () => new PackageManifest(directory, "@noldova/teamrun-shell-desktop-tests-e2e-fixtures-modules-notes-runtime", []),
+        new PackageException(
+          `${directory}/package.json must be named "@noldova/teamrun-fixture-notes-runtime", the fixture package's path below ${ModuleCatalog.FIXTURE_FOLDER}/ joined with hyphens.`));
     });
 
     test("unreadable, nameless, unstamped or malformed manifests are refused with the reason", async t => {

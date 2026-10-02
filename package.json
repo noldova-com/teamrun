@@ -2,7 +2,8 @@
   "name": "teamrun",
   "version": "0.0.1",
   "teamrun": {
-    "protocolVersion": 1
+    "protocolVersion": 1,
+    "modules": []
   },
   "private": true,
   "type": "module",

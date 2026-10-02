@@ -24,6 +24,7 @@ import ShellIndependenceCheck from "./checks/shell-independence-check.ts";
 import TypeCheck from "./checks/type-check.ts";
 import BuildLayout from "./packages/build-layout.ts";
 import PackageBuild from "./packages/package-build.ts";
+import ModuleCatalog from "./modules/module-catalog.ts";
 import PackageCatalog from "./packages/package-catalog.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import Git from "./repository/git.ts";
@@ -90,14 +91,15 @@ export default class Test {
     const tree = new SourceTree(this.root, files);
     const build = new PackageBuild(this.root, this.runner, this.environment);
     const catalog = new PackageCatalog(this.root);
+    const modules = new ModuleCatalog(this.root);
     const layout = new BuildLayout(this.root);
     const server = [ApiServer.locateCompiler()];
     return [
       documents,
-      new ModuleFolderCheck(this.root),
+      new ModuleFolderCheck(this.root, modules),
       new ShellIndependenceCheck(tree),
-      new ModuleImportCheck(tree),
-      new NameUniquenessCheck(tree),
+      new ModuleImportCheck(tree, modules),
+      new NameUniquenessCheck(tree, modules),
       new DeclaredDependencyCheck(tree),
       new PackageCheck(build),
       new PackageTestCheck(this.root, build, this.runner, this.environment),

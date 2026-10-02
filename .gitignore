@@ -4,3 +4,4 @@ node_modules/
 Thumbs.db
 .angular/
 /src/.vitest/
+/src/generated/

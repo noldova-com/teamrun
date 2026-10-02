@@ -45,7 +45,7 @@ Four rules keep the shell empty:
 
 - **The shell names no module.** No production source under `src/shell` or `src/foundation` imports a module or contains an identifier, text or special case that belongs to one. Tests and their fixtures are not production source.
 - **A module uses only published APIs.** It imports its own packages, foundation, the shell's published APIs and the published APIs of the modules it declares as dependencies.
-- **The build's module list names the modules an application build includes.** It lives in the root `package.json`, outside `src/shell`. Adding a module changes that list and no shell source. The build generates the file that brings the listed modules' window parts into the window, and a test build adds the fixture modules.
+- **The build's module list names the modules an application build includes.** It is `teamrun.modules` in the root `package.json`, outside `src/shell`. Adding a module changes that list and no shell source. The build generates the file that brings the listed modules' window parts into the window, and a test build adds the fixture modules.
 - **Automated checks enforce the first two rules and the unique names of section 3 on every change.**
 
 Everything that belongs to a module lives in its folder, `src/modules/<id>`: its parts and their tests, end-to-end tests, styles, assets, migrations and its document. Adding a module adds its folder and a line in the build's module list; removing it removes both. Its data has its own folder in the data directory (section 3).
@@ -88,7 +88,17 @@ A module has only the parts it needs, in any combination: runtime for data, proc
 
 ### Declaration
 
-Each module declares its id, display name, parts, the modules it depends on and the themes it provides. Dependencies form no cycle. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
+Each module declares itself in `module.json` at its folder's root, with exactly these fields:
+
+| Field | Holds |
+|---|---|
+| `id` | The module's id, which is its folder's name |
+| `displayName` | The name people see |
+| `parts` | Its parts, each once: `runtime`, `window` or `cli`, each with a folder of that name |
+| `dependencies` | The ids of the modules it depends on |
+| `contributes` | The names it registers, listed by kind: `methods`, `events`, `views`, `documents` and `themes`, each of the form `<id>.<name>` with a camelCase name |
+
+A module without parts may leave the file out until it gains one. Dependencies form no cycle, and a build includes every module a listed module depends on. The build validates the declarations, orders them after their dependencies and writes them for the runtime. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
 
 ### Lifecycle
 
@@ -134,7 +144,7 @@ The shell owns registration, collisions, user overrides, persistence and removal
 | Context menus | Items for the shell's context and panel menus and for its own | Shows them in declared order |
 | Notifications | Operating-system notifications: a title, text and the command that opening one runs | Shows them through the operating system's notification service when the person's settings allow it |
 | Settings | Settings with defaults and the scopes that may override them, their pages, and setting scopes for the objects it owns | Stores the values per scope, resolves the effective value, shows the pages and reports changes |
-| Themes | Themes in its declaration: for each, colors for the light and dark modes and a look, as data | Offers them in Settings and applies the person's theme and mode before the window paints; uses the default theme when the chosen one is absent |
+| Themes | Themes in its declaration: for each, colors for the light and dark modes and a look, as data. The declaration lists only theme names so far; the format of that data is decided when a second theme is built | Offers them in Settings and applies the person's theme and mode before the window paints; uses the default theme when the chosen one is absent |
 | Protocol | Methods and events | Authenticates, routes and delivers them |
 | Storage | Its database's tables and migrations, and its files | Creates, migrates, backs up and closes its database |
 | CLI | Commands | Reads the command line and runs the command |

@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import ModuleImportCheck from "../../checks/module-import-check.ts";
+import ModuleCatalog from "../../modules/module-catalog.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
 import Git from "../../repository/git.ts";
 import RepositoryFiles from "../../repository/repository-files.ts";
@@ -84,11 +85,39 @@ class ModuleImportCheckTests {
         ""
       ].join("\n"));
     });
+
+    test("a module imports the published packages of the modules its declaration depends on, and nothing inside them", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await repository.writeAsync({
+        "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", parts: ["window"], dependencies: ["tasks"], contributes: {} }),
+        "src/modules/notes/window/package.json": "{}\n",
+        "src/modules/notes/window/src/view.ts": [
+          "import { Task } from \"@noldova/teamrun-modules-tasks-protocol\";",
+          "import { Row } from \"@noldova/teamrun-modules-tasks-window/row\";",
+          "import { Clock } from \"@noldova/teamrun-modules-clock-protocol\";",
+          ""
+        ].join("\n")
+      });
+      const output = new TextOutputFixture();
+
+      const passed = await ModuleImportCheckTests.createCheck(repository).runAsync(output);
+
+      const file = "src/modules/notes/window/src/view.ts";
+      const rule = "; a module uses only its own packages, foundation, the shell's published APIs and the published APIs of the modules it declares.";
+      assert.equal(passed, false);
+      assert.equal(output.text, [
+        `${file}:2: the import "@noldova/teamrun-modules-tasks-window/row" is not the published API of @noldova/teamrun-modules-tasks-window; import the package itself${rule}`,
+        `${file}:3: the import "@noldova/teamrun-modules-clock-protocol" belongs to module "clock", but module "notes" declares no dependency on "clock"${rule}`,
+        "Checked the imports of 1 production script files of modules.",
+        ""
+      ].join("\n"));
+    });
   }
 
   private static createCheck(repository: RepositoryFixture): ModuleImportCheck {
     const directory = repository.directory;
-    return new ModuleImportCheck(new SourceTree(directory, new RepositoryFiles(directory, new Git(directory, new ProcessRunner()))));
+    return new ModuleImportCheck(new SourceTree(directory, new RepositoryFiles(directory, new Git(directory, new ProcessRunner()))), new ModuleCatalog(directory));
   }
 }
 
