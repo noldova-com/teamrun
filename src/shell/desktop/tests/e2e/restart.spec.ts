@@ -27,6 +27,7 @@ test.describe("restarting", () => {
 
     await desktop.reopenAsync();
 
+    expect(desktop.closeMilliseconds, "the close finishes without waiting for the runtime").toBeLessThan(10_000);
     expect(runtime).toBeDefined();
     expect(await desktop.readRuntimeProcessIdAsync()).toBe(runtime);
     await expect(desktop.window.locator("tr-empty-window")).toHaveText(/TeamRun\s*No modules/);

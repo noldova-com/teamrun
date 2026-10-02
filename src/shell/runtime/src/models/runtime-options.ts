@@ -21,21 +21,28 @@ export class RuntimeOptions {
   public readonly idleGraceMilliseconds: number;
   public readonly serverSettings: ServerSettings;
   public readonly declarationsFile: string;
+  public readonly startLogName: string | null;
 
   public constructor(
     dataDirectory: DataDirectory,
     idleGraceMilliseconds: number = Resources.idleGrace,
     serverSettings: ServerSettings = new ServerSettings(),
-    declarationsFile: string = RuntimeOptions.locateDeclarations()) {
+    declarationsFile: string = RuntimeOptions.locateDeclarations(),
+    startLogName: string | null = null) {
+    if (!Object.isNull(startLogName) && !Resources.startLogNamePattern.test(startLogName))
+      throw new ArgumentException(Resources.formatStartLogNameInvalid(startLogName), Resources.startLogNameParameterName);
+
     this.dataDirectory = dataDirectory;
     this.idleGraceMilliseconds = idleGraceMilliseconds;
     this.serverSettings = serverSettings;
     this.declarationsFile = declarationsFile;
+    this.startLogName = startLogName;
   }
 
   public static parse(entryArguments: readonly string[]): RuntimeOptions {
     let dataDirectory: string | undefined;
     let idleGrace = Resources.idleGrace;
+    let startLogName: string | null = null;
     for (let index = 0; index < entryArguments.length; index += 2) {
       const name = entryArguments[index];
       const value = entryArguments[index + 1];
@@ -45,12 +52,14 @@ export class RuntimeOptions {
         dataDirectory = value;
       else if (name === Resources.idleGraceArgument && Resources.positiveIntegerPattern.test(value))
         idleGrace = Number(value);
+      else if (name === Resources.startLogArgument)
+        startLogName = value;
       else
         throw new ArgumentException(Resources.formatArgumentInvalid(String(name), value), Resources.argumentsParameterName);
     }
     if (Object.isUndefined(dataDirectory))
       throw new ArgumentException(Resources.dataDirectoryRequired, Resources.argumentsParameterName);
-    return new RuntimeOptions(new DataDirectory(dataDirectory), idleGrace);
+    return new RuntimeOptions(new DataDirectory(dataDirectory), idleGrace, new ServerSettings(), RuntimeOptions.locateDeclarations(), startLogName);
   }
 
   private static locateDeclarations(): string {

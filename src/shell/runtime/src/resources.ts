@@ -29,6 +29,10 @@ export class Resources {
   public static readonly ownershipDatabaseFileName: string = "ownership.sqlite";
   public static readonly shellDatabaseFileName: string = "shell.sqlite";
   public static readonly discoveryFolderName: string = "discovery";
+  public static readonly runtimeLogFileName: string = "runtime.log";
+  public static readonly previousRuntimeLogFileName: string = "runtime.previous.log";
+  public static readonly startLogPrefix: string = "start-";
+  public static readonly startLogExtension: string = ".log";
   public static readonly discoveryFileName: string = "runtime.json";
   public static readonly backupsFolderName: string = "backups";
   public static readonly profileFolderName: string = "desktop";
@@ -224,11 +228,27 @@ export class Resources {
   public static readonly handshakeRefused: string = "The runtime closed the connection during the handshake.";
   public static readonly handshakeIdentityMismatch: string = "The runtime answered the handshake with another build's identity.";
   public static readonly launchTimedOut: string = "The runtime did not start in time.";
+  public static readonly runtimeExitedWithoutReason: string = "The runtime exited while starting and left no reason.";
+  public static readonly startLogArgument: string = "--start-log";
+  public static readonly startLogNamePattern: RegExp = /^start-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.log$/;
+  public static readonly startLogTailLength: number = 4096;
+  public static readonly homeAbbreviation: string = "~";
+  public static readonly redactedValue: string = "[redacted]";
+  public static readonly opaqueValuePattern: RegExp = /[A-Za-z0-9+_=-]{32,}/g;
+  public static readonly pathSeparatorPattern: RegExp = /[\\/]/;
+  public static readonly pathSeparatorSource: string = "[\\\\/]";
+  public static readonly regularExpressionSyntaxPattern: RegExp = /[.*+?^${}()|[\]\\]/g;
+  public static readonly escapedMatch: string = "\\$&";
+  public static readonly caseInsensitiveGlobalFlags: string = "gi";
+  public static readonly writeFlag: string = "w";
+  public static readonly appendFlag: string = "a";
+  public static readonly uncaughtExceptionEvent: string = "uncaughtExceptionMonitor";
+  public static readonly startLogNameParameterName: string = "startLog";
   public static readonly stopTimedOut: string = "The other build's runtime did not stop in time.";
   public static readonly launchShellUnavailable: string = "Starting a program on Linux requires executable Bash at /bin/bash. Install Bash or restore its execute permissions.";
   public static readonly launchDescriptorsUnavailable: string = "Starting a program on Linux requires access to /proc/self/fd. Ensure procfs is mounted at /proc and this process can read and traverse its descriptor directory.";
   public static readonly dataDirectoryRequired: string = "The --data-dir argument is required.";
-  public static readonly usage: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>]";
+  public static readonly usage: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>] [--start-log <start log name>]";
 
   public static formatDiscoveryVersion(version: unknown): string {
     return `The discovery metadata has the unsupported format version ${String(version)}.`;
@@ -380,6 +400,18 @@ export class Resources {
 
   public static formatStopRefused(message: string): string {
     return `The other build's runtime refused to stop: ${message}`;
+  }
+
+  public static formatRuntimeExited(reason: string): string {
+    return `The runtime exited while starting: ${reason}`;
+  }
+
+  public static formatStartLogNameInvalid(name: string): string {
+    return `"${name}" is not the name of a start log.`;
+  }
+
+  public static formatStartLogName(unique: string): string {
+    return `${Resources.startLogPrefix}${unique}${Resources.startLogExtension}`;
   }
 
   public static formatStartFailed(executablePath: string): string {

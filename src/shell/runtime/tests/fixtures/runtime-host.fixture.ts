@@ -16,7 +16,6 @@ import { DataDirectory, DiscoveryReader, Endpoint, type RuntimeDiscovery, Runtim
 
 import { RawConnectionFixture } from "./raw-connection.fixture.js";
 import { SocketFolderFixture } from "./socket-folder.fixture.js";
-import { TextOutputFixture } from "./text-output.fixture.js";
 
 export class RuntimeHostFixture implements AsyncDisposable {
   private readonly connections: RawConnectionFixture[] = [];
@@ -24,7 +23,6 @@ export class RuntimeHostFixture implements AsyncDisposable {
 
   public readonly root: string;
   public readonly dataDirectory: DataDirectory;
-  public readonly diagnostics: TextOutputFixture = new TextOutputFixture();
 
   private constructor(root: string) {
     this.root = root;
@@ -45,7 +43,7 @@ export class RuntimeHostFixture implements AsyncDisposable {
     const options = Object.isUndefined(declarationsFile)
       ? new RuntimeOptions(this.dataDirectory, idleGraceMilliseconds)
       : new RuntimeOptions(this.dataDirectory, idleGraceMilliseconds, new ServerSettings(), declarationsFile);
-    this.currentHost = await RuntimeHost.startAsync(options, process.platform, process.env, this.diagnostics);
+    this.currentHost = await RuntimeHost.startAsync(options, process.platform, process.env);
     return this.currentHost;
   }
 

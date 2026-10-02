@@ -196,9 +196,15 @@ A module decides when something deserves a notification; muting, for example for
 - Explicit shutdown cancels owned work, resolves waiters, flushes state and closes resources; acknowledgement does not prove process exit.
 - Reconnect from durable records, allowing for missed events.
 
-### Launch on Linux
+### Launching the runtime
 
-Starting a detached runtime on Linux requires executable Bash at `/bin/bash` and a readable, searchable `/proc/self/fd` from a mounted `/proc`. The launcher checks these before spawning and reports a missing requirement immediately. In the child, before executing the runtime, it closes inherited descriptors above standard input, output and error, so the runtime and the processes it starts do not keep the desktop's files or sockets. Standard streams are disconnected, and Bash startup files and inherited shell options are disabled. Windows and macOS use the host's direct process launch.
+The runtime must not keep the files, sockets or pipes of the client that started it.
+
+- **Linux:** starting a detached runtime requires executable Bash at `/bin/bash` and a readable, searchable `/proc/self/fd` from a mounted `/proc`. The launcher checks these before spawning and reports a missing requirement immediately. In the child, before executing the runtime, Bash closes inherited descriptors above standard input, output and error, with its startup files and inherited shell options disabled.
+- **Windows:** Electron's main process keeps its standard handles inheritable, and Node.js starts every child with handle inheritance on. The desktop therefore starts the runtime through a short-lived Electron utility process, which Chromium starts with only the handles it lists; the utility process starts the runtime and ends.
+- **macOS, and the CLI on Windows:** the host's direct process launch.
+
+Each start writes the runtime's standard error to its own `logs/start-<UUID>.log`, and standard input and output are disconnected. Once the runtime owns the data directory, it writes its diagnostics to `logs/runtime.log`, keeps the previous run's log as `logs/runtime.previous.log`, and removes start logs that launchers left behind. When the started process ends before any runtime owns the directory, the launcher stops waiting and reports the end of that start log, with the home folder shown as `~` and opaque values such as tokens removed.
 
 ## 7. State and persistence
 

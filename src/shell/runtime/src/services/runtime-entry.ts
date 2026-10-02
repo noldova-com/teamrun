@@ -9,6 +9,7 @@
 import type { EventEmitter } from "node:events";
 import type { Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import { inspect } from "node:util";
 
 import { DataDirectoryOwnedException } from "../exceptions/data-directory-owned.exception.js";
 import { RuntimeOptions } from "../models/runtime-options.js";
@@ -32,7 +33,7 @@ export class RuntimeEntry {
 
     let host: RuntimeHost;
     try {
-      host = await RuntimeHost.startAsync(options, platform, environment, error);
+      host = await RuntimeHost.startAsync(options, platform, environment);
     }
     catch (failure) {
       if (failure instanceof DataDirectoryOwnedException)
@@ -42,8 +43,10 @@ export class RuntimeEntry {
     }
 
     const stop = (): void => host.requestStop(Resources.stoppedBySignal);
+    const report = (failure: unknown): void => host.log.writeLine(inspect(failure));
     for (const signal of Resources.stopSignals)
       signals.on(signal, stop);
+    signals.on(Resources.uncaughtExceptionEvent, report);
     try {
       await host.waitForStopAsync();
       return 0;
@@ -51,6 +54,7 @@ export class RuntimeEntry {
     finally {
       for (const signal of Resources.stopSignals)
         signals.off(signal, stop);
+      signals.off(Resources.uncaughtExceptionEvent, report);
     }
   }
 }

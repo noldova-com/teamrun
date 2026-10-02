@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
@@ -17,7 +17,6 @@ import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock
 
 import type { RawConnectionFixture } from "../../fixtures/raw-connection.fixture.js";
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
-import { TextOutputFixture } from "../../fixtures/text-output.fixture.js";
 
 @TestClass
 export class RuntimeHostTests {
@@ -216,7 +215,7 @@ export class RuntimeHostTests {
     return RuntimeHostTests.runAsync(async fixture => {
       const otherPlatform = process.platform === "win32" ? "linux" : "win32";
 
-      await Assert.throwsAsync(() => RuntimeHost.startAsync(new RuntimeOptions(fixture.dataDirectory), otherPlatform, {}, new TextOutputFixture()), Error);
+      await Assert.throwsAsync(() => RuntimeHost.startAsync(new RuntimeOptions(fixture.dataDirectory), otherPlatform, {}), Error);
 
       Assert.isFalse(OwnershipLock.isOwned(fixture.dataDirectory));
       Assert.isFalse(existsSync(fixture.dataDirectory.discoveryFile));
@@ -234,6 +233,32 @@ export class RuntimeHostTests {
       host.requestStop("second");
 
       await Assert.throwsAsync(() => host.waitForStopAsync(), Error);
+      Assert.isFalse(OwnershipLock.isOwned(fixture.dataDirectory));
+      Assert.isTrue((await readFile(fixture.dataDirectory.runtimeLog, "utf8")).includes("EISDIR"), "the stop's failure is in the runtime's log");
+    });
+  }
+
+  @TestMethod
+  public writesItsDiagnosticsToItsLog(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const host = await fixture.startAsync();
+
+      await new Promise<void>(resolve => host.log.diagnostics.write("The module notes failed.\n", () => resolve()));
+      host.requestStop("test");
+      await host.waitForStopAsync();
+
+      Assert.areEqual("The module notes failed.\n", await readFile(fixture.dataDirectory.runtimeLog, "utf8"));
+    });
+  }
+
+  @TestMethod
+  public releasesOwnershipWhenItsLogCannotOpen(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      await mkdir(fixture.dataDirectory.root, { recursive: true });
+      await writeFile(fixture.dataDirectory.logsFolder, "not a folder");
+
+      await Assert.throwsAsync(() => fixture.startAsync(), Error);
+
       Assert.isFalse(OwnershipLock.isOwned(fixture.dataDirectory));
     });
   }
@@ -255,7 +280,7 @@ export class RuntimeHostTests {
         "{\"modules\":[{\"id\":\"notes\",\"state\":\"Active\"},{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its runtime part could not be loaded.\"}]}",
         JSON.stringify(ModuleStatusList.fromJson(responses[1]?.payload).toJson()));
       Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "deactivated")));
-      Assert.isTrue(fixture.diagnostics.text.startsWith("The module broken: Its runtime part could not be loaded.\nError [ERR_MODULE_NOT_FOUND]"));
+      Assert.isTrue((await readFile(fixture.dataDirectory.runtimeLog, "utf8")).startsWith("The module broken: Its runtime part could not be loaded.\nError [ERR_MODULE_NOT_FOUND]"));
     });
   }
 

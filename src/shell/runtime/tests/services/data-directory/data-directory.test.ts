@@ -26,6 +26,9 @@ export class DataDirectoryTests {
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "shell.sqlite"), directory.shellDatabase);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "discovery"), directory.discoveryFolder);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "discovery", "runtime.json"), directory.discoveryFile);
+    Assert.areEqual(path.join(DataDirectoryTests.ROOT, "logs"), directory.logsFolder);
+    Assert.areEqual(path.join(DataDirectoryTests.ROOT, "logs", "runtime.log"), directory.runtimeLog);
+    Assert.areEqual(path.join(DataDirectoryTests.ROOT, "logs", "runtime.previous.log"), directory.previousRuntimeLog);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "backups"), directory.backupsFolder);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "desktop"), directory.profileFolder);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "modules"), directory.modulesFolder);
