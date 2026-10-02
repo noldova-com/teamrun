@@ -11,21 +11,23 @@ import { test } from "node:test";
 
 import PackageException from "../../packages/package.exception.ts";
 import RootManifest from "../../packages/root-manifest.ts";
+import ProductIdentityFixture from "../fixtures/product-identity.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 
 class RootManifestTests {
   private static readonly INVALID: string = "The root package.json must declare a numbered version and a positive whole teamrun.protocolVersion.";
 
   public static register(): void {
-    test("the product and protocol versions come from the root manifest", async t => {
+    test("the product's versions and identity come from the root manifest", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
-      await repository.writeAsync({ "package.json": "{ \"version\": \"1.2.3\", \"teamrun\": { \"protocolVersion\": 4 } }\n" });
+      await repository.writeAsync({ "package.json": JSON.stringify({ version: "1.2.3", teamrun: { protocolVersion: 4, product: ProductIdentityFixture.json } }) });
 
       const manifest = await RootManifest.readAsync(repository.directory);
 
       assert.equal(manifest.productVersion, "1.2.3");
       assert.equal(manifest.protocolVersion, 4);
+      assert.equal(manifest.product.name, "Fixture Studio");
     });
 
     test("a missing, malformed or incomplete root manifest is refused", async t => {

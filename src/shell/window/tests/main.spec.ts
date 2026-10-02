@@ -6,12 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { Resources } from "../src/resources";
 import { DesktopBridgeFixture } from "./fixtures/desktop-bridge.fixture";
 
 describe("main", () => {
   afterEach(() => DesktopBridgeFixture.remove());
 
-  it("starts the window in the page's tr-window element", async () => {
+  it("names the page after the product and starts the window in the page's tr-window element", async () => {
     const bridge = DesktopBridgeFixture.install();
     const host = document.createElement("tr-window");
     document.body.append(host);
@@ -21,5 +22,6 @@ describe("main", () => {
 
     expect(host.querySelector("tr-empty-window")?.textContent).toContain("No modules");
     expect(bridge.appearances.length).toBe(1);
+    expect(document.title).toBe(Resources.productName);
   });
 });

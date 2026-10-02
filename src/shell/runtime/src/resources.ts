@@ -9,6 +9,9 @@
 import "@noldova/teamrun-foundation-core";
 
 export class Resources {
+  public static readonly productName: string = "__PRODUCT_NAME__";
+  public static readonly productSlug: string = "__PRODUCT_SLUG__";
+  public static readonly folderSeparator: string = "/";
   public static readonly rootParameterName: string = "root";
   public static readonly idParameterName: string = "id";
   public static readonly statementsParameterName: string = "statements";
@@ -134,10 +137,10 @@ export class Resources {
   public static readonly deactivateMember: "deactivateAsync" = "deactivateAsync";
   public static readonly methodsKind: string = "methods";
   public static readonly eventsKind: string = "events";
-  public static readonly dataDirectoryVariable: string = "TEAMRUN_DATA_DIR";
-  public static readonly defaultDataFolder: readonly string[] = [".noldova", "teamrun"];
+  public static readonly dataDirectoryVariable: string = "__DATA_DIRECTORY_VARIABLE__";
+  public static readonly defaultDataFolder: readonly string[] = "__DATA_FOLDER__".split(Resources.folderSeparator);
   public static readonly developmentDataFolder: readonly string[] = ["_build", "data"];
-  public static readonly preShellData: string = "This data directory holds data from a TeamRun release that predates the shell; move it aside to continue.";
+  public static readonly preShellData: string = `This data directory holds data from a ${Resources.productName} release that predates the shell; move it aside to continue.`;
   public static readonly productVersion: string = "__VERSION__";
   public static readonly build: string = "__BUILD__";
   public static readonly linuxPlatform: string = "linux";
@@ -187,7 +190,7 @@ export class Resources {
     "-p",
     "-c",
     "set -e; shopt -s failglob; for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done; exec -- \"$@\"",
-    "teamrun-launch"
+    `${Resources.productSlug}-launch`
   ];
   public static readonly stoppedByIdle: string = "idle";
   public static readonly stoppedByRequest: string = "request";
@@ -215,7 +218,7 @@ export class Resources {
   public static readonly endpointUnavailable: string = "The runtime's local endpoint has no address.";
   public static readonly handshakeRequired: string = "A connection must begin with a handshake.";
   public static readonly unauthorized: string = "The capability token is not valid for this runtime.";
-  public static readonly buildMismatch: string = "Another build of TeamRun owns this data directory.";
+  public static readonly buildMismatch: string = `Another build of ${Resources.productName} owns this data directory.`;
   public static readonly otherBuildMayOnlyStop: string = "A connection from another build may only ask the runtime to stop.";
   public static readonly unexpectedMessage: string = "Only requests and cancellations may follow the handshake.";
   public static readonly invalidFrame: string = "The frame is not a valid message.";
@@ -275,7 +278,7 @@ export class Resources {
   }
 
   public static formatOwned(root: string): string {
-    return `Another TeamRun runtime owns the data directory ${root}.`;
+    return `Another ${Resources.productName} runtime owns the data directory ${root}.`;
   }
 
   public static formatPreShellData(root: string, entries: readonly string[]): string {
@@ -319,7 +322,7 @@ export class Resources {
   }
 
   public static formatEndpointInvalid(text: string): string {
-    return `"${text}" is not a TeamRun endpoint.`;
+    return `"${text}" is not a ${Resources.productName} endpoint.`;
   }
 
   public static formatSocketPathTooLong(socketPath: string): string {
@@ -387,7 +390,7 @@ export class Resources {
   }
 
   public static formatHandover(productVersion: string, executablePath: string): string {
-    return `TeamRun ${productVersion} at ${executablePath} owns this data directory and is newer; open that TeamRun instead.`;
+    return `${Resources.productName} ${productVersion} at ${executablePath} owns this data directory and is newer; open that ${Resources.productName} instead.`;
   }
 
   public static formatWorkInProgress(descriptions: readonly string[]): string {
@@ -423,7 +426,7 @@ export class Resources {
   }
 
   public static formatPreShellFound(location: string): string {
-    return `The data directory ${location} holds data from a TeamRun release that predates the shell.`;
+    return `The data directory ${location} holds data from a ${Resources.productName} release that predates the shell.`;
   }
 
   public static formatMoveAsideFailed(message: string): string {

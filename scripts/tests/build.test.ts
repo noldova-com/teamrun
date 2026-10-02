@@ -13,6 +13,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import AngularProject from "../angular/angular-project.ts";
+import ProductFile from "../angular/product-file.ts";
 import Build from "../build.ts";
 import ModuleArtifacts from "../modules/module-artifacts.ts";
 import ModuleCatalog from "../modules/module-catalog.ts";
@@ -20,13 +21,14 @@ import PackageBuild from "../packages/package-build.ts";
 import ProcessRunner from "../processes/process-runner.ts";
 import NpmCommand from "../toolchain/npm-command.ts";
 import PackageTreeFixture from "./fixtures/package-tree.fixture.ts";
+import ProductIdentityFixture from "./fixtures/product-identity.fixture.ts";
 import RepositoryFixture from "./fixtures/repository.fixture.ts";
 import SourceTreeFixture from "./fixtures/source-tree.fixture.ts";
 import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 
 class BuildTests {
   private static readonly BUILD_TIMEOUT: number = 60_000;
-  private static readonly ROOT_MANIFEST: string = JSON.stringify({ teamrun: { modules: [] } });
+  private static readonly ROOT_MANIFEST: string = JSON.stringify({ teamrun: { modules: [], product: ProductIdentityFixture.json } });
   private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>]]\n";
 
   public static register(): void {
@@ -57,7 +59,7 @@ class BuildTests {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
-        "package.json": JSON.stringify({ teamrun: { modules: ["notes"] } }),
+        "package.json": JSON.stringify({ teamrun: { modules: ["notes"], product: ProductIdentityFixture.json } }),
         "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", parts: ["window"], dependencies: [], contributes: { views: ["notes.list"] } }),
         "src/modules/notes/window/src/api/index.ts": "export {};\n",
         [`${ModuleCatalog.FIXTURE_FOLDER}/clock/module.json`]: JSON.stringify({ id: "clock", displayName: "Clock", parts: ["window"], dependencies: ["notes"], contributes: {} }),
@@ -156,7 +158,7 @@ class BuildTests {
   private static create(root: string, output: TextOutputFixture, environment: NodeJS.ProcessEnv): Build {
     const runner = new ProcessRunner();
     const angular = new AngularProject(root, runner, new NpmCommand(runner, environment));
-    return new Build(new PackageBuild(root, runner, environment), new ModuleCatalog(root), new ModuleArtifacts(root), angular, output);
+    return new Build(new PackageBuild(root, runner, environment), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), angular, output);
   }
 }
 

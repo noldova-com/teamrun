@@ -3,7 +3,22 @@
   "version": "0.0.1",
   "teamrun": {
     "protocolVersion": 1,
-    "modules": []
+    "modules": [],
+    "product": {
+      "name": "TeamRun",
+      "publisher": "Noldova",
+      "slug": "teamrun",
+      "applicationId": "com.noldova.teamrun",
+      "developmentApplicationId": "com.noldova.teamrun.development",
+      "dataFolder": ".noldova/teamrun",
+      "deviceFolders": {
+        "windows": "Noldova/TeamRun",
+        "macos": "Noldova/TeamRun",
+        "linux": "noldova/teamrun"
+      },
+      "dataDirectoryVariable": "TEAMRUN_DATA_DIR",
+      "icons": "assets/icons"
+    }
   },
   "private": true,
   "type": "module",

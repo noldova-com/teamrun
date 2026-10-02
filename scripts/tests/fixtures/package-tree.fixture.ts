@@ -9,6 +9,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import ProductIdentityFixture from "./product-identity.fixture.ts";
 import type RepositoryFixture from "./repository.fixture.ts";
 import SourceTreeFixture from "./source-tree.fixture.ts";
 
@@ -17,7 +18,7 @@ export default class PackageTreeFixture {
 
   public static async writeRootAsync(repository: RepositoryFixture): Promise<void> {
     await repository.writeAsync({
-      "package.json": `${JSON.stringify({ name: "fixture", version: "0.0.7", teamrun: { protocolVersion: 3, modules: [] }, private: true, type: "module" }, null, 2)}\n`,
+      "package.json": `${JSON.stringify({ name: "fixture", version: "0.0.7", teamrun: { protocolVersion: 3, modules: [], product: ProductIdentityFixture.json }, private: true, type: "module" }, null, 2)}\n`,
       "package-lock.json": `${JSON.stringify({ name: "fixture", version: "0.0.7", lockfileVersion: 3, requires: true, packages: { "": { name: "fixture", version: "0.0.7" } } }, null, 2)}\n`,
       "tsconfig.base.json": await readFile(path.join(SourceTreeFixture.root, "tsconfig.base.json"), "utf8"),
       "LICENSE": "Fixture license\n"
