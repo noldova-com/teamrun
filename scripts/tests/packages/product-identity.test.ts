@@ -7,6 +7,7 @@
  */
 
 import assert from "node:assert/strict";
+import path from "node:path";
 import { test } from "node:test";
 
 import PackageException from "../../packages/package.exception.ts";
@@ -32,12 +33,22 @@ class ProductIdentityTests {
           "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons"]);
       assert.deepEqual([...product.placeholders.keys()], [
         "__PRODUCT_NAME__", "__PRODUCT_SLUG__", "__APPLICATION_ID__", "__DEVELOPMENT_APPLICATION_ID__", "__DATA_FOLDER__",
-        "__WINDOWS_DEVICE_FOLDER__", "__MACOS_DEVICE_FOLDER__", "__LINUX_DEVICE_FOLDER__", "__DATA_DIRECTORY_VARIABLE__"
+        "__WINDOWS_DEVICE_FOLDER__", "__MACOS_DEVICE_FOLDER__", "__LINUX_DEVICE_FOLDER__", "__DATA_DIRECTORY_VARIABLE__", "__ICONS_FOLDER__"
       ]);
       assert.deepEqual(product.literals, [
         "Fixture Studio", "org.fixtureworks.studio", "org.fixtureworks.studio.development", ".fixtureworks/studio",
-        "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR"
+        "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons"
       ]);
+    });
+
+    test("each checkout gets its own stable development application ID", () => {
+      const product = ProductIdentity.fromManifest(ProductIdentityFixture.manifest());
+      const first = product.formatDevelopmentApplicationId(path.resolve("lanes", "first"));
+
+      assert.match(first, /^org\.fixtureworks\.studio\.development\.[0-9a-f]{8}$/);
+      assert.equal(product.formatDevelopmentApplicationId(path.resolve("lanes", "first")), first);
+      assert.equal(product.formatDevelopmentApplicationId(path.join(path.resolve("lanes", "first"), "..", "first")), first);
+      assert.notEqual(product.formatDevelopmentApplicationId(path.resolve("lanes", "second")), first);
     });
 
     test("the same device folder on several systems is one literal", () => {

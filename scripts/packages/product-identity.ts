@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -21,6 +22,8 @@ export default class ProductIdentity {
   private static readonly UNSAFE_NAME: RegExp = /["\\\n\r]/;
   private static readonly UNSAFE_SEGMENT: RegExp = /[\\:*?"<>|]/;
   private static readonly SEPARATOR: string = "/";
+  private static readonly CHECKOUT_HASH_ALGORITHM: string = "sha256";
+  private static readonly CHECKOUT_HASH_LENGTH: number = 8;
 
   public readonly name: string;
   public readonly publisher: string;
@@ -106,7 +109,8 @@ export default class ProductIdentity {
       ["__WINDOWS_DEVICE_FOLDER__", this.windowsDeviceFolder],
       ["__MACOS_DEVICE_FOLDER__", this.macosDeviceFolder],
       ["__LINUX_DEVICE_FOLDER__", this.linuxDeviceFolder],
-      ["__DATA_DIRECTORY_VARIABLE__", this.dataDirectoryVariable]
+      ["__DATA_DIRECTORY_VARIABLE__", this.dataDirectoryVariable],
+      ["__ICONS_FOLDER__", this.icons]
     ]);
   }
 
@@ -119,8 +123,14 @@ export default class ProductIdentity {
       this.windowsDeviceFolder,
       this.macosDeviceFolder,
       this.linuxDeviceFolder,
-      this.dataDirectoryVariable
+      this.dataDirectoryVariable,
+      this.icons
     ])];
+  }
+
+  public formatDevelopmentApplicationId(checkout: string): string {
+    const hash = createHash(ProductIdentity.CHECKOUT_HASH_ALGORITHM).update(path.resolve(checkout)).digest("hex").slice(0, ProductIdentity.CHECKOUT_HASH_LENGTH);
+    return `${this.developmentApplicationId}.${hash}`;
   }
 
   private static isRelativeFolder(folder: string): boolean {

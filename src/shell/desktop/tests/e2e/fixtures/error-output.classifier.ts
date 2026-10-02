@@ -15,8 +15,8 @@ export interface ClassifiedLine {
 
 export default class ErrorOutputClassifier {
   private static readonly EXPECTED: readonly RegExp[] = [/^\[\d+:\d+(?:\/\d+)?\.\d+:\w+:/, /^Debugger (?:listening|attached|ending)/, /^Waiting for the debugger to disconnect/, /^For help, see/];
-  private static readonly MAC_LOG: RegExp = /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ Electron(?: Helper(?: \([A-Za-z]+\))?)?\[\d+:\d+\] /;
-  private static readonly GTK_WARNING: RegExp = /^\(electron:\d+\): Gtk-WARNING \*\*: /;
+  private static readonly MAC_LOG: RegExp = /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ [\w ]+(?: \([A-Za-z]+\))?\[\d+:\d+\] /;
+  private static readonly GTK_WARNING: RegExp = /^\([\w.-]+:\d+\): Gtk-WARNING \*\*: /;
   private static readonly GTK_CONTINUATION: RegExp = /^This may indicate that pixbuf loaders or the mime database could not be found\.$/;
 
   private isAfterGtkWarning: boolean = false;

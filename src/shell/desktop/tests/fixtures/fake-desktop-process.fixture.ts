@@ -17,6 +17,7 @@ export class FakeDesktopProcess implements IDesktopProcess {
   public readonly execPath: string = "/electron/electron";
   public readonly homeFolder: string;
   public readonly workingDirectory: string = path.resolve("work");
+  public isDefaultApp: boolean = false;
   public readonly started: string[] = [];
 
   public constructor(platform: string, argv: readonly string[] = [], env: NodeJS.ProcessEnv = {}, homeFolder: string = "/home/person") {
