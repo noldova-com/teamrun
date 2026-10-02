@@ -16,9 +16,9 @@ export class TestingApiTests {
   public exportsTheCompleteCatalog(): void {
     const exportNames = [
       "Assert", "AssertFailedException", "BlockCoverage", "Category", "CoverageAnalyzer", "CoverageEnvironment", "CoverageProject", "CoverageReportWriter",
-      "CoverageResult", "DiscoveredTestClass", "DiscoveredTestMethod", "FileCoverage", "GitHubSummaryWriter", "LineRange",
-      "Skip", "SourceMap", "SourcePosition", "TestClass", "TestClassResult", "TestData", "TestDiscovery",
-      "TestExecutor", "TestingException", "TestMethod", "TestMethodResult", "TestOutcome",
+      "CoverageResult", "DiscoveredTestClass", "DiscoveredTestClassOptions", "DiscoveredTestMethod", "DiscoveredTestMethodOptions", "FileCoverage",
+      "GitHubSummaryWriter", "LineRange", "Skip", "SourceMap", "SourcePosition", "TestClass", "TestClassResult", "TestData", "TestDataRow", "TestDiscovery",
+      "TestExecutor", "TestingException", "TestMethod", "TestMethodResult", "TestMethodResultOptions", "TestOutcome",
       "TestProject", "TestReportWriter", "TestRunner", "TestRunResult", "TestTimeoutException"
     ];
 

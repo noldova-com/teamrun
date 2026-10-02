@@ -16,10 +16,12 @@ import { TestOutcome } from "../../enums/test-outcome.js";
 import { TestingException } from "../../exceptions/testing.exception.js";
 import { TestTimeoutException } from "../../exceptions/test-timeout.exception.js";
 import type { ITestProgressListener } from "../../interfaces/i-test-progress-listener.js";
+import type { ITestMethodResultOptions } from "../../interfaces/results/i-test-method-result-options.js";
 import type { DiscoveredTestClass } from "../../models/discovery/discovered-test-class.js";
 import type { DiscoveredTestMethod } from "../../models/discovery/discovered-test-method.js";
 import { TestClassResult } from "../../models/results/test-class-result.js";
 import { TestMethodResult } from "../../models/results/test-method-result.js";
+import { TestMethodResultOptions } from "../../models/results/test-method-result-options.js";
 import { Resources } from "../../resources.js";
 
 export class TestExecutor {
@@ -73,31 +75,13 @@ export class TestExecutor {
   }
 
   private createUnreachedResult(testClass: DiscoveredTestClass, method: DiscoveredTestMethod): TestMethodResult {
-    return new TestMethodResult(
-      testClass.packageName,
-      testClass.className,
-      method.methodName,
-      method.testDataIndex,
-      method.testData,
-      TestOutcome.Unreached,
-      0,
-      undefined,
-      undefined);
+    return this.createResult(testClass, method, TestOutcome.Unreached, 0);
   }
 
   private async executeMethodAsync(testClass: DiscoveredTestClass, method: DiscoveredTestMethod): Promise<TestMethodResult> {
     const skipReason = method.skipReason ?? testClass.skipReason;
     if (!Object.isUndefined(skipReason))
-      return new TestMethodResult(
-        testClass.packageName,
-        testClass.className,
-        method.methodName,
-        method.testDataIndex,
-        method.testData,
-        TestOutcome.Skipped,
-        0,
-        undefined,
-        skipReason);
+      return this.createResult(testClass, method, TestOutcome.Skipped, 0, { skipReason });
 
     const start = performance.now();
     const unhandledRejections: unknown[] = [];
@@ -122,27 +106,25 @@ export class TestExecutor {
 
     const durationMilliseconds = performance.now() - start;
     if (didFail)
-      return new TestMethodResult(
-        testClass.packageName,
-        testClass.className,
-        method.methodName,
-        method.testDataIndex,
-        method.testData,
-        TestOutcome.Failed,
-        durationMilliseconds,
-        failure,
-        undefined);
+      return this.createResult(testClass, method, TestOutcome.Failed, durationMilliseconds, { failure });
 
+    return this.createResult(testClass, method, TestOutcome.Passed, durationMilliseconds);
+  }
+
+  private createResult(
+    testClass: DiscoveredTestClass,
+    method: DiscoveredTestMethod,
+    outcome: TestOutcome,
+    durationMilliseconds: number,
+    details: ITestMethodResultOptions = {}): TestMethodResult {
+    const options = Object.isUndefined(method.testDataRow) ? details : { ...details, testDataRow: method.testDataRow };
     return new TestMethodResult(
       testClass.packageName,
       testClass.className,
       method.methodName,
-      method.testDataIndex,
-      method.testData,
-      TestOutcome.Passed,
+      outcome,
       durationMilliseconds,
-      undefined,
-      undefined);
+      new TestMethodResultOptions(options));
   }
 
   private async invokeWithTimeoutAsync(testClass: DiscoveredTestClass, method: DiscoveredTestMethod): Promise<void> {
@@ -157,7 +139,7 @@ export class TestExecutor {
     });
 
     try {
-      await Promise.race([Promise.resolve(testMethod.call(instance, ...method.testData)), timeoutPromise]);
+      await Promise.race([Promise.resolve(testMethod.call(instance, ...method.testDataRow?.values ?? [])), timeoutPromise]);
     }
     finally {
       if (!Object.isUndefined(timeoutHandle))

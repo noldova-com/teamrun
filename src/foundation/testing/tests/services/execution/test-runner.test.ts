@@ -9,8 +9,11 @@
 import {
   Assert,
   DiscoveredTestClass,
+  DiscoveredTestClassOptions,
   DiscoveredTestMethod,
+  DiscoveredTestMethodOptions,
   TestClass,
+  TestDataRow,
   TestExecutor,
   TestingException,
   TestMethod,
@@ -62,15 +65,20 @@ export class TestRunnerTests {
 
   @TestMethod
   public async filtersByTestDataIndex(): Promise<void> {
-    const testClass = new DiscoveredTestClass("TestPackage", "DataFixtureTests", "inline://data", QuietFixture, undefined, [
-      new DiscoveredTestMethod("first", 0, ["first"], undefined),
-      new DiscoveredTestMethod("first", 1, ["second"], undefined)
+    const testClass = new DiscoveredTestClass(
+      "TestPackage",
+      "DataFixtureTests",
+      "inline://data",
+      QuietFixture,
+      [
+      new DiscoveredTestMethod("first", new DiscoveredTestMethodOptions({ testDataRow: new TestDataRow(0, ["first"]) })),
+      new DiscoveredTestMethod("first", new DiscoveredTestMethodOptions({ testDataRow: new TestDataRow(1, ["second"]) }))
     ]);
     const runner = new TestRunner(new StubDiscovery([testClass]), new TestExecutor(5000));
     const result = await runner.runAsync([], ["DataFixtureTests.first[1]"]);
 
     Assert.areEqual(1, result.total);
-    Assert.areEqual<number | undefined>(1, result.classResults[0]?.methodResults[0]?.testDataIndex);
+    Assert.areEqual<number | undefined>(1, result.classResults[0]?.methodResults[0]?.testDataRow?.index);
   }
 
   @TestMethod
@@ -114,9 +122,14 @@ export class TestRunnerTests {
 
   @TestMethod
   public async filtersByExactMethodCategory(): Promise<void> {
-    const testClass = new DiscoveredTestClass("TestPackage", "CategorizedFixtureTests", "inline://fixture", QuietFixture, undefined, [
-      new DiscoveredTestMethod("first", undefined, [], undefined, ["first-category"]),
-      new DiscoveredTestMethod("second", undefined, [], undefined, ["second-category"])
+    const testClass = new DiscoveredTestClass(
+      "TestPackage",
+      "CategorizedFixtureTests",
+      "inline://fixture",
+      QuietFixture,
+      [
+      new DiscoveredTestMethod("first", new DiscoveredTestMethodOptions({ categories: ["first-category"] })),
+      new DiscoveredTestMethod("second", new DiscoveredTestMethodOptions({ categories: ["second-category"] }))
     ]);
     const runner = new TestRunner(new StubDiscovery([testClass]), new TestExecutor(5000));
     const result = await runner.runAsync([], ["category:second-category"]);
@@ -145,13 +158,18 @@ export class TestRunnerTests {
 
   @TestMethod
   public async classifiesAndReportsEveryRequiredNegativeFixture(): Promise<void> {
-    const testClass = new DiscoveredTestClass("TestPackage", "ExecutionFixtureTests", "inline://negative-fixture", ExecutionFixture, undefined, [
-      new DiscoveredTestMethod("failsOnAssertion", undefined, [], undefined),
-      new DiscoveredTestMethod("throwsAnError", undefined, [], undefined),
-      new DiscoveredTestMethod("rejects", undefined, [], undefined),
-      new DiscoveredTestMethod("hangs", undefined, [], undefined),
-      new DiscoveredTestMethod("increments", undefined, [], "deliberately skipped"),
-      new DiscoveredTestMethod("incrementsAgain", undefined, [], undefined)
+    const testClass = new DiscoveredTestClass(
+      "TestPackage",
+      "ExecutionFixtureTests",
+      "inline://negative-fixture",
+      ExecutionFixture,
+      [
+      new DiscoveredTestMethod("failsOnAssertion"),
+      new DiscoveredTestMethod("throwsAnError"),
+      new DiscoveredTestMethod("rejects"),
+      new DiscoveredTestMethod("hangs"),
+      new DiscoveredTestMethod("increments", new DiscoveredTestMethodOptions({ skipReason: "deliberately skipped" })),
+      new DiscoveredTestMethod("incrementsAgain")
     ]);
     const result = await new TestRunner(new StubDiscovery([testClass]), new TestExecutor(100)).runAsync([]);
     const methods = result.classResults[0]?.methodResults ?? [];
@@ -180,9 +198,15 @@ export class TestRunnerTests {
   }
 
   private discoveredClass(className: string, categories: readonly string[] = []): DiscoveredTestClass {
-    return new DiscoveredTestClass("TestPackage", className, "inline://fixture", QuietFixture, undefined, [
-      new DiscoveredTestMethod("first", undefined, [], undefined),
-      new DiscoveredTestMethod("second", undefined, [], undefined)
-    ], categories);
+    return new DiscoveredTestClass(
+      "TestPackage",
+      className,
+      "inline://fixture",
+      QuietFixture,
+      [
+      new DiscoveredTestMethod("first"),
+      new DiscoveredTestMethod("second")
+    ],
+      new DiscoveredTestClassOptions({ categories }));
   }
 }
