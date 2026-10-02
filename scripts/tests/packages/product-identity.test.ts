@@ -1,0 +1,89 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import PackageException from "../../packages/package.exception.ts";
+import ProductIdentity from "../../packages/product-identity.ts";
+import ProductIdentityFixture from "../fixtures/product-identity.fixture.ts";
+import RepositoryFixture from "../fixtures/repository.fixture.ts";
+
+class ProductIdentityTests {
+  private static readonly MISSING: string = "The root package.json must declare teamrun.product.";
+
+  public static register(): void {
+    test("the product's identity is read from the root manifest's teamrun.product", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await repository.writeAsync({ "package.json": JSON.stringify(ProductIdentityFixture.manifest()) });
+
+      const product = await ProductIdentity.readAsync(repository.directory);
+
+      assert.deepEqual(
+        [product.name, product.publisher, product.slug, product.applicationId, product.developmentApplicationId, product.dataFolder,
+          product.windowsDeviceFolder, product.macosDeviceFolder, product.linuxDeviceFolder, product.dataDirectoryVariable, product.icons],
+        ["Fixture Studio", "Fixture Works", "fixture-studio", "org.fixtureworks.studio", "org.fixtureworks.studio.development", ".fixtureworks/studio",
+          "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons"]);
+      assert.deepEqual([...product.placeholders.keys()], [
+        "__PRODUCT_NAME__", "__PRODUCT_SLUG__", "__APPLICATION_ID__", "__DEVELOPMENT_APPLICATION_ID__", "__DATA_FOLDER__",
+        "__WINDOWS_DEVICE_FOLDER__", "__MACOS_DEVICE_FOLDER__", "__LINUX_DEVICE_FOLDER__", "__DATA_DIRECTORY_VARIABLE__"
+      ]);
+      assert.deepEqual(product.literals, [
+        "Fixture Studio", "org.fixtureworks.studio", "org.fixtureworks.studio.development", ".fixtureworks/studio",
+        "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR"
+      ]);
+    });
+
+    test("the same device folder on several systems is one literal", () => {
+      const product = ProductIdentity.fromManifest(ProductIdentityFixture.manifest({ deviceFolders: { windows: "Works/Studio", macos: "Works/Studio", linux: "works/studio" } }));
+
+      assert.deepEqual(product.literals.filter(t => t.includes("Studio") && t.includes("/")), ["Works/Studio"]);
+    });
+
+    test("a missing or unreadable section is refused", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const isMissing = (error: unknown): boolean => error instanceof PackageException && error.message === ProductIdentityTests.MISSING;
+
+      await assert.rejects(ProductIdentity.readAsync(repository.directory), isMissing);
+      for (const manifest of [null, [], {}, { teamrun: null }, { teamrun: {} }, { teamrun: { product: "TeamRun" } }, { teamrun: { product: [] } }])
+        assert.throws(() => ProductIdentity.fromManifest(manifest), isMissing, JSON.stringify(manifest));
+    });
+
+    test("each invalid field is refused by name", () => {
+      const cases: readonly [Readonly<Record<string, unknown>>, string][] = [
+        [{ name: " " }, "name must be a name without quotes, backslashes or line breaks"],
+        [{ name: "Quote\"d" }, "name must be a name without quotes, backslashes or line breaks"],
+        [{ publisher: "" }, "publisher must be a name without quotes, backslashes or line breaks"],
+        [{ publisher: "Back\\slash" }, "publisher must be a name without quotes, backslashes or line breaks"],
+        [{ slug: "Fixture" }, "slug must be lowercase kebab-case"],
+        [{ applicationId: "fixture" }, "applicationId must be a lowercase reverse-DNS ID"],
+        [{ applicationId: 7 }, "applicationId must be a lowercase reverse-DNS ID"],
+        [{ developmentApplicationId: "org.fixtureworks.studio" }, "developmentApplicationId must be a lowercase reverse-DNS ID other than applicationId"],
+        [{ developmentApplicationId: "Org.Fixture" }, "developmentApplicationId must be a lowercase reverse-DNS ID other than applicationId"],
+        [{ dataFolder: "/absolute" }, "dataFolder must be a relative folder whose segments are separated by /"],
+        [{ dataFolder: "up/../out" }, "dataFolder must be a relative folder whose segments are separated by /"],
+        [{ deviceFolders: { windows: "C:\\Works", macos: "Works", linux: "works" } }, "deviceFolders.windows must be a relative folder whose segments are separated by /"],
+        [{ deviceFolders: { windows: "Works", macos: "./Works", linux: "works" } }, "deviceFolders.macos must be a relative folder whose segments are separated by /"],
+        [{ deviceFolders: { windows: "Works", macos: "Works" } }, "deviceFolders.linux must be a relative folder whose segments are separated by /"],
+        [{ deviceFolders: null }, "deviceFolders.windows must be a relative folder whose segments are separated by /"],
+        [{ dataDirectoryVariable: "fixture_dir" }, "dataDirectoryVariable must be an uppercase environment variable name"],
+        [{ icons: "assets/*" }, "icons must be a relative folder whose segments are separated by /"]
+      ];
+
+      for (const [overrides, problem] of cases)
+        assert.throws(
+          () => ProductIdentity.fromManifest(ProductIdentityFixture.manifest(overrides)),
+          (error: unknown) => error instanceof PackageException && error.message === `The root package.json's teamrun.product.${problem}.`,
+          JSON.stringify(overrides));
+    });
+  }
+}
+
+ProductIdentityTests.register();

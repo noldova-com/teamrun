@@ -24,6 +24,18 @@ export class RuntimeBuildFixture implements AsyncDisposable {
     this.entryPath = entryPath;
   }
 
+  public static async createWithModuleAsync(productVersion: string, moduleId: string, method: string, runtimePart: string): Promise<RuntimeBuildFixture> {
+    const build = await RuntimeBuildFixture.createAsync(productVersion);
+    const runtimePackage = `@noldova/teamrun-fixture-${moduleId}-runtime`;
+    const packageFolder = path.join(build.folder, "node_modules", runtimePackage);
+    await mkdir(packageFolder, { recursive: true });
+    await writeFile(path.join(packageFolder, "package.json"), JSON.stringify({ name: runtimePackage, version: productVersion, type: "module", main: "index.js" }));
+    await writeFile(path.join(packageFolder, "index.js"), runtimePart);
+    const declaration = { id: moduleId, displayName: moduleId, dependencies: [], runtimePackage, contributes: { methods: [method] } };
+    await writeFile(path.join(build.folder, "_build", "modules", "declarations.json"), JSON.stringify({ formatVersion: 1, modules: [declaration] }));
+    return build;
+  }
+
   public static async createAsync(productVersion: string): Promise<RuntimeBuildFixture> {
     const installed = path.resolve(path.dirname(RuntimeEntry.entryPath), "..");
     const folder = path.resolve(installed, "..", "..", "..", "_build", "runtime-builds", `${productVersion}-${process.pid}-${Date.now()}`);

@@ -13,7 +13,7 @@ import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, Failure, FailureCode, PreShellData, ShellMethods, StopPolicy } from "@noldova/teamrun-shell-protocol";
+import { BuildIdentity, Failure, FailureCode, PreShellData, QualifiedName, ShellMethods, StopPolicy } from "@noldova/teamrun-shell-protocol";
 import {
   ConnectionException,
   LaunchException,
@@ -39,6 +39,21 @@ import { ScriptedStarterFixture } from "../../fixtures/scripted-starter.fixture.
 
 @TestClass
 export class RuntimeLauncherTests {
+  private static readonly PROBE_COUNT: QualifiedName = new QualifiedName("probe", "count");
+  private static readonly PROBE_PART: string = [
+    "import { Migration } from \"@noldova/teamrun-shell-runtime\";",
+    "export class RuntimePart {",
+    "  migrations = [new Migration(\"create-entries\", [\"CREATE TABLE entries (value TEXT NOT NULL) STRICT\"])];",
+    "  async activateAsync(context) {",
+    "    const database = context.database;",
+    "    context.registerMethod(\"probe.count\", { handleAsync: async () => {",
+    "      database.run(\"INSERT INTO entries (value) VALUES ('entry')\");",
+    "      return { entries: database.readAll(\"SELECT value FROM entries\").length };",
+    "    } });",
+    "  }",
+    "  async deactivateAsync() {}",
+    "}"
+  ].join("\n");
   @TestMethod
   public async startsARuntimeAndStopsItOnRequest(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
@@ -121,6 +136,21 @@ export class RuntimeLauncherTests {
     Assert.areEqual(process.execPath, handover.handover.executablePath);
     Assert.isTrue(RuntimeLaunchFixture.isRunning(processId), "the newer runtime keeps running");
     Assert.isFalse((await newerClient.stopAsync(StopPolicy.IfIdle)).hasFailed);
+    Assert.isTrue(await RuntimeLaunchFixture.waitForExitAsync(processId));
+  }
+
+  @TestMethod
+  public async aModuleWhoseRuntimePartImportsTheRuntimesApiActivatesInTheRuntimesProcess(): Promise<void> {
+    await using launch = await RuntimeLaunchFixture.createAsync();
+    await using build = await RuntimeBuildFixture.createWithModuleAsync("0.0.0", "probe", "probe.count", RuntimeLauncherTests.PROBE_PART);
+    const client = await new RuntimeLauncher(launch.createSettings(30_000, build.entryPath), build.identity).attachAsync("desktop", new ClientListenerFixture());
+    const processId = await launch.readProcessIdAsync();
+
+    const response = await client.callAsync(RuntimeLauncherTests.PROBE_COUNT, null);
+
+    Assert.areEqual("{\"entries\":1}", JSON.stringify(response.payload));
+    Assert.isTrue(existsSync(launch.dataDirectory.locateModuleDatabase("probe")));
+    Assert.isFalse((await client.stopAsync(StopPolicy.IfIdle)).hasFailed);
     Assert.isTrue(await RuntimeLaunchFixture.waitForExitAsync(processId));
   }
 

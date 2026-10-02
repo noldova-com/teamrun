@@ -105,7 +105,7 @@ A module without parts may leave the file out until it gains one. Dependencies f
 The runtime decides which modules are active, and the window and the CLI follow it.
 
 1. The runtime reads the build's declarations and orders modules after their dependencies.
-2. Each runtime part activates once, registering contributions and published services. It receives only shell services and its declared dependencies' published services.
+2. Each runtime part activates once, registering contributions and published services. It receives only shell services and its declared dependencies' published services. Before a part with migrations activates, the runtime opens its module's database and applies the pending migrations; a migration that fails, or a schema the migrations don't recognize, leaves the module failed without activating the part.
 3. A module is active when its runtime part, if any, and all dependencies have activated. Otherwise the runtime records its failure; the shell and unaffected modules continue.
 4. After handshake and reconnection, window/CLI hosts receive active modules and failures before sending module requests. They activate only active modules' parts, in dependency order. The window restores its saved layout once, after its parts first activate, so documents a part opens while activating appear in it.
 5. Window/CLI activation failure affects that host alone: withdraw the failed part's contributions and do not activate dependent parts there. Runtime parts continue serving other clients.
@@ -113,6 +113,8 @@ The runtime decides which modules are active, and the window and the CLI follow 
 7. Hosts deactivate parts in reverse order, releasing contributions, subscriptions, timers, files and child processes.
 
 Activation stays light. A part loads heavy code when its first view opens or its first request arrives.
+
+A runtime part's constructor only sets fields, because the runtime constructs the part before migrating its database. Its migrations are a fixed list it declares, never computed from data. The part reaches its database only through its context. Database calls are synchronous and every client shares one runtime, so queries stay short; long work happens outside a database call, and a transaction's work finishes before the transaction returns.
 
 ### Cooperation
 
@@ -217,6 +219,7 @@ SQLite is the authority for durable records. The shell and each module that keep
 - A working folder, where the person's and the agents' files live, is not module data. A project's folder is wherever the person keeps it. A folder TeamRun creates for work outside any project, such as a conversation without one, lives in the data directory's `work` folder beside the `modules` folder, under a name that carries its owner's id (section 3). The owner creates and removes it, and any module may work in it as in a project folder.
 - Records reference filesystem locations by stable, owner-defined identities mapped to paths per device. Moving the data directory preserves records; owners report missing paths for reconnection, never treating them as empty.
 - Removing a module from a build preserves its database and files; deleting them requires a separate user request.
+- A module's database is `modules/<id>/<id>.sqlite`, so a module never names another file that way. Its migration history lives in it, as the shell's lives in the shell's database. The runtime opens it before the module's runtime part activates and closes it when the part deactivates, at shutdown and before an update. A module that fails, whether its migration failed or its schema is newer, keeps its database as it was: nothing is reset or deleted.
 
 | State | Owner and lifetime |
 |---|---|
@@ -233,7 +236,7 @@ Related writes and their durable change records commit atomically within one dat
 Migrations are ordered, explicit and transactional:
 
 - Validate that a database's existing migration history is a recognized prefix before modifying it.
-- Back up a database before upgrading its schema, using a SQLite-aware operation that includes committed WAL data, and verify the completed backup before publishing it as a recovery point.
+- Back up a database before upgrading its schema, using a SQLite-aware operation that includes committed WAL data, and verify the completed backup before publishing it as a recovery point. Backups go to the data directory's `backups` folder as `<owner>-before-migration-<position>-<time>.sqlite`, where the owner is `shell` or the module's id.
 - Refuse unknown or newer schemas rather than resetting them.
 - Destructive rollback, backup retention and cleanup of owned files require explicit policies; no automatic deletion is assumed.
 
@@ -262,6 +265,7 @@ Closing TeamRun waits for each window to save its unsaved state. A window part t
 - The repository is self-contained. Reviewed foundation source is built here; no sibling checkout, copied installation directory or private reference repository is a build dependency.
 - Exact external dependency versions and lockfiles describe the install inputs.
 - The root manifest declares the product version and, separately, the protocol version. The build stamps the product version into sibling packages consistently.
+- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable and icons folder. Windows' app user model ID, the macOS bundle ID and the Linux desktop name (`<id>.desktop`) derive from the application IDs. The build stamps the identity into the shell's packages and generates the window's product file, so the shell reads no manifest at run time and spells none of it; the section's key, `teamrun`, keeps the build settings' existing name.
 - The build also stamps the runtime with the fingerprint of the inputs it was compiled from: the build's tools and root files, its ordered module declarations and the sources of the packages it builds, including fixture packages in a test build. The fingerprint identifies the runtime's build: the same inputs give the same build, and any change gives another.
 - Compile, package and install through one reproducible path. Tests and the window consume fresh installed artifacts, detecting stale inputs. The coding standards own public declarations and documentation.
 - The Angular project in `src/` pins its own toolchain, including the TypeScript version Angular requires. The build installs it from its lockfile, separately from the packages, and the Angular CLI builds and tests the Angular parts. A package never imports from the Angular project's dependencies; it imports only what its own manifest declares.

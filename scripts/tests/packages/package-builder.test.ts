@@ -16,18 +16,20 @@ import BuildLayout from "../../packages/build-layout.ts";
 import PackageBuilder from "../../packages/package-builder.ts";
 import PackageManifest from "../../packages/package-manifest.ts";
 import PackageException from "../../packages/package.exception.ts";
+import ProductIdentity from "../../packages/product-identity.ts";
 import RootManifest from "../../packages/root-manifest.ts";
 import ProcessResult from "../../processes/process-result.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
 import NpmCommand from "../../toolchain/npm-command.ts";
 import PackageTreeFixture from "../fixtures/package-tree.fixture.ts";
+import ProductIdentityFixture from "../fixtures/product-identity.fixture.ts";
 import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 
 class PackageBuilderTests {
   private static readonly BUILD_TIMEOUT: number = 60_000;
   private static readonly ALPHA: PackageManifest = new PackageManifest("src/foundation/alpha", "@noldova/teamrun-foundation-alpha", []);
-  private static readonly ROOT: RootManifest = new RootManifest("0.0.7", 3);
+  private static readonly ROOT: RootManifest = new RootManifest("0.0.7", 3, ProductIdentity.fromManifest(ProductIdentityFixture.manifest()));
 
   public static register(): void {
     test("a package is compiled, stamped, packed and installed, and its tests compile against the installed package", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {
@@ -88,6 +90,24 @@ class PackageBuilderTests {
         .buildSourceAsync(PackageBuilderTests.ALPHA, [layout.locateArchive(PackageBuilderTests.ALPHA, "0.0.7")]);
 
       assert.ok(existsSync(path.join(layout.locateInstalled(PackageBuilderTests.ALPHA), "api", "index.js")));
+    });
+
+    test("the product's identity is stamped into the package's resources, leaving no placeholder", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {
+      const repository = await PackageBuilderTests.createAsync(t, false);
+      const placeholders = [...PackageBuilderTests.ROOT.product.placeholders.keys()];
+      await repository.writeAsync({
+        "src/foundation/alpha/src/resources.ts": `export default class Resources {\n${placeholders.map((t, index) => `  public static readonly value${index}: string = "${t}";\n`).join("")}}\n`
+      });
+      const layout = new BuildLayout(repository.directory);
+
+      await PackageBuilderTests.createBuilder(layout, new NpmCommand(new ProcessRunner(), process.env)).buildSourceAsync(PackageBuilderTests.ALPHA, [layout.locateArchive(PackageBuilderTests.ALPHA, "0.0.7")]);
+      const stamped = await readFile(path.join(layout.locateInstalled(PackageBuilderTests.ALPHA), "resources.js"), "utf8");
+
+      assert.deepEqual(
+        [...stamped.matchAll(/value\d+ = "([^"]*)";/g)].map(t => t[1]),
+        ["Fixture Studio", "fixture-studio", "org.fixtureworks.studio", "org.fixtureworks.studio.development", ".fixtureworks/studio",
+          "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR"]);
+      assert.doesNotMatch(stamped, /__[A-Z_]+__/);
     });
 
     test("a package without resources is installed without stamping them", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {

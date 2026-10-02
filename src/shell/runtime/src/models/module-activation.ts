@@ -7,14 +7,18 @@
  */
 
 import type { IRuntimePart } from "../interfaces/runtime-part.js";
+import type { ModuleDatabase } from "../services/database/module-database.js";
 import type { ModuleContext } from "../services/modules/module-context.js";
 
 export class ModuleActivation {
   public readonly context: ModuleContext;
   public readonly part: IRuntimePart;
+  public readonly database?: ModuleDatabase;
 
-  public constructor(context: ModuleContext, part: IRuntimePart) {
+  public constructor(context: ModuleContext, part: IRuntimePart, database?: ModuleDatabase) {
     this.context = context;
     this.part = part;
+    if (!Object.isUndefined(database))
+      this.database = database;
   }
 }

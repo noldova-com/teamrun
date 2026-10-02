@@ -113,6 +113,28 @@ export class RuntimeEntryTests {
     });
   }
 
+  @TestMethod
+  public async settlesTheExitCodeARunEndsWith(): Promise<void> {
+    const error = new PassThrough({ encoding: "utf8" });
+    const exit: Pick<NodeJS.Process, "exitCode"> = { exitCode: undefined };
+
+    await RuntimeEntry.settleAsync(Promise.resolve(3), error, exit);
+
+    Assert.areEqual(3, exit.exitCode);
+    Assert.areEqual("", RuntimeEntryTests.read(error));
+  }
+
+  @TestMethod
+  public async writesARejectedRunAndExitsWithAFailure(): Promise<void> {
+    const error = new PassThrough({ encoding: "utf8" });
+    const exit: Pick<NodeJS.Process, "exitCode"> = { exitCode: undefined };
+
+    await RuntimeEntry.settleAsync(Promise.reject(new RangeError("The run broke.")), error, exit);
+
+    Assert.areEqual(1, exit.exitCode);
+    Assert.isTrue(RuntimeEntryTests.read(error).startsWith("RangeError: The run broke.\n    at "));
+  }
+
   private static read(stream: PassThrough): string {
     return String(stream.read() ?? "");
   }

@@ -10,6 +10,7 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 
 import AngularProject from "./angular/angular-project.ts";
+import ProductFile from "./angular/product-file.ts";
 import BuildVariant from "./modules/build-variant.ts";
 import ModuleArtifacts from "./modules/module-artifacts.ts";
 import ModuleCatalog from "./modules/module-catalog.ts";
@@ -32,13 +33,15 @@ export default class Build {
   private readonly build: PackageBuild;
   private readonly modules: ModuleCatalog;
   private readonly artifacts: ModuleArtifacts;
+  private readonly product: ProductFile;
   private readonly angular: AngularProject;
   private readonly output: Writable;
 
-  public constructor(build: PackageBuild, modules: ModuleCatalog, artifacts: ModuleArtifacts, angular: AngularProject, output: Writable) {
+  public constructor(build: PackageBuild, modules: ModuleCatalog, artifacts: ModuleArtifacts, product: ProductFile, angular: AngularProject, output: Writable) {
     this.build = build;
     this.modules = modules;
     this.artifacts = artifacts;
+    this.product = product;
     this.angular = angular;
     this.output = output;
   }
@@ -65,6 +68,7 @@ export default class Build {
       this.output.write(packages.length === 0 ? Build.NO_PACKAGES : `Packages built and installed: ${packages.length}.\n`);
       await this.artifacts.writeAsync(declarations, outputFolder);
       this.output.write(`Modules in the build: ${declarations.length}.\n`);
+      await this.product.writeAsync();
       await this.angular.prepareAsync(this.output);
       await this.angular.buildAsync(this.output, outputFolder === null ? null : path.join(outputFolder, Build.WINDOW_FOLDER));
       return 0;
@@ -82,6 +86,6 @@ if (import.meta.main) {
   const runner = new ProcessRunner();
   const root = process.cwd();
   const angular = new AngularProject(root, runner, new NpmCommand(runner, process.env));
-  const build = new Build(new PackageBuild(root, runner, process.env), new ModuleCatalog(root), new ModuleArtifacts(root), angular, process.stdout);
+  const build = new Build(new PackageBuild(root, runner, process.env), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), angular, process.stdout);
   process.exitCode = await build.runAsync(process.argv.slice(2));
 }

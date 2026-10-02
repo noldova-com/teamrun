@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { IRuntimePart, IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+import type { IRuntimePart, IRuntimePartContext, Migration } from "@noldova/teamrun-shell-runtime";
 
 export class RuntimePartFixture implements IRuntimePart {
   private readonly name: string;
@@ -15,9 +15,17 @@ export class RuntimePartFixture implements IRuntimePart {
   private readonly deactivationFailure: Error | null;
 
   public context: IRuntimePartContext | null = null;
+  public readonly migrations?: readonly Migration[];
 
-  public constructor(name: string, log: string[], activate: (context: IRuntimePartContext) => void = () => undefined, deactivationFailure: Error | null = null) {
+  public constructor(
+    name: string,
+    log: string[],
+    activate: (context: IRuntimePartContext) => void = () => undefined,
+    deactivationFailure: Error | null = null,
+    migrations?: readonly Migration[]) {
     this.name = name;
+    if (migrations !== undefined)
+      this.migrations = migrations;
     this.log = log;
     this.activate = activate;
     this.deactivationFailure = deactivationFailure;

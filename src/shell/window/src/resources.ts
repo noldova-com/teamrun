@@ -13,6 +13,7 @@ import { DockingDirection, OverlaySide } from "@noldova/teamrun-shell-ui";
 import { DockSide } from "./app/enums/dock-side";
 import { PanelEdge } from "./app/enums/panel-edge";
 import { SplitAxis } from "./app/enums/split-axis";
+import { productName } from "../../../generated/product";
 
 export class Resources {
   public static readonly contributionNamePattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -204,7 +205,7 @@ export class Resources {
   public static readonly unknownTab: string = "A tab names a view or a document.";
   public static readonly invalidLayoutPart: string = "The value does not describe a valid part of a layout.";
   public static readonly unknownNode: string = "A node is a split, with children, or a group, with tabs.";
-  public static readonly productName: string = "TeamRun";
+  public static readonly productName: string = productName;
   public static readonly noModules: string = "No modules";
   public static readonly moduleFailuresTitle: string = "Modules that didn't start";
   public static readonly copyDetailsLabel: string = "Copy details";
@@ -237,20 +238,20 @@ export class Resources {
   public static readonly waitAction: string = "wait";
   public static readonly stopWorkAction: string = "stopWork";
   public static readonly retryAction: string = "retry";
-  public static readonly startingTitle: string = "Starting TeamRun…";
-  public static readonly preShellDataTitle: string = "Data from an earlier TeamRun";
+  public static readonly startingTitle: string = `Starting ${Resources.productName}…`;
+  public static readonly preShellDataTitle: string = `Data from an earlier ${Resources.productName}`;
   public static readonly preShellDataText: string =
-    "This release does not open data that an earlier TeamRun wrote. Moving it aside keeps all of it in a new folder beside it, " +
-    "changes and deletes nothing, and starts TeamRun with an empty data folder.";
+    `This release does not open data that an earlier ${Resources.productName} wrote. Moving it aside keeps all of it in a new folder beside it, ` +
+    `changes and deletes nothing, and starts ${Resources.productName} with an empty data folder.`;
   public static readonly moveAside: string = "Move aside";
-  public static readonly workInProgressTitle: string = "An older TeamRun is still working";
-  public static readonly workInProgressText: string = "This TeamRun replaces it. Wait for this work to finish, or stop it now.";
+  public static readonly workInProgressTitle: string = `An older ${Resources.productName} is still working`;
+  public static readonly workInProgressText: string = `This ${Resources.productName} replaces it. Wait for this work to finish, or stop it now.`;
   public static readonly waitForWork: string = "Wait for it";
   public static readonly stopWork: string = "Stop the work";
-  public static readonly waitingTitle: string = "Waiting for the older TeamRun";
-  public static readonly waitingText: string = "TeamRun starts when this work finishes.";
-  public static readonly newerBuildTitle: string = "A newer TeamRun is running";
-  public static readonly failedTitle: string = "TeamRun could not start";
+  public static readonly waitingTitle: string = `Waiting for the older ${Resources.productName}`;
+  public static readonly waitingText: string = `${Resources.productName} starts when this work finishes.`;
+  public static readonly newerBuildTitle: string = `A newer ${Resources.productName} is running`;
+  public static readonly failedTitle: string = `${Resources.productName} could not start`;
   public static readonly tryAgain: string = "Try again";
   public static readonly missingBridge: string = "The window needs the desktop's bridge, which the preload provides.";
 
@@ -263,7 +264,7 @@ export class Resources {
   }
 
   public static formatBuildDetails(productVersion: string, fingerprint: string): string {
-    return `TeamRun ${productVersion}, build ${fingerprint}`;
+    return `${Resources.productName} ${productVersion}, build ${fingerprint}`;
   }
 
   public static formatModuleDetails(moduleId: string, state: string, cause: string | null): string {
@@ -283,7 +284,7 @@ export class Resources {
   }
 
   public static formatNewerBuild(version: string): string {
-    return `TeamRun ${version} is using this data folder. Use that TeamRun instead.`;
+    return `${Resources.productName} ${version} is using this data folder. Use that ${Resources.productName} instead.`;
   }
 
   public static formatUnregisteredView(name: string): string {

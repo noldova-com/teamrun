@@ -14,10 +14,12 @@ import { ModuleState, ModuleStatus, ModuleStatusList } from "@noldova/teamrun-sh
 
 import type { IRuntimePart } from "../../interfaces/runtime-part.js";
 import type { IRuntimePartLoader } from "../../interfaces/runtime-part-loader.js";
+import { UnknownSchemaException } from "../../exceptions/unknown-schema.exception.js";
 import { ModuleActivation } from "../../models/module-activation.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
 import { Resources } from "../../resources.js";
 import type { DataDirectory } from "../data-directory/data-directory.js";
+import { ModuleDatabase } from "../database/module-database.js";
 import type { EventRegistry } from "../registry/event-registry.js";
 import type { MethodRegistry } from "../registry/method-registry.js";
 import { ServiceRegistry } from "../registry/service-registry.js";
@@ -71,6 +73,7 @@ export class ModuleHost {
       }
       finally {
         activation.context[Symbol.dispose]();
+        activation.database?.close();
       }
     }
     if (failures.length > 0)
@@ -106,16 +109,28 @@ export class ModuleHost {
       return new ModuleStatus(declaration.id, ModuleState.Failed, Resources.moduleLoadFailed);
     }
 
-    const context = new ModuleContext(declaration, this.dataDirectory, this.methods, this.events, this.services);
+    let database: ModuleDatabase | undefined;
+    if (!Object.isUndefined(part.migrations))
+      try {
+        database = await ModuleDatabase.openAsync(this.dataDirectory, declaration.id, part.migrations);
+      }
+      catch (error) {
+        const cause = error instanceof UnknownSchemaException ? Resources.moduleDatabaseUnknown : Resources.moduleDatabaseFailed;
+        this.writeDiagnostic(declaration.id, cause, error);
+        return new ModuleStatus(declaration.id, ModuleState.Failed, cause);
+      }
+
+    const context = new ModuleContext(declaration, this.dataDirectory, this.methods, this.events, this.services, database);
     try {
       await part.activateAsync(context);
     }
     catch (error) {
       context[Symbol.dispose]();
+      database?.close();
       this.writeDiagnostic(declaration.id, Resources.moduleActivationFailed, error);
       return new ModuleStatus(declaration.id, ModuleState.Failed, Resources.moduleActivationFailed);
     }
-    this.activations.push(new ModuleActivation(context, part));
+    this.activations.push(new ModuleActivation(context, part, database));
     return new ModuleStatus(declaration.id, ModuleState.Active, null);
   }
 

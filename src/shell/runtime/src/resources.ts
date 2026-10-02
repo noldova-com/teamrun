@@ -9,6 +9,9 @@
 import "@noldova/teamrun-foundation-core";
 
 export class Resources {
+  public static readonly productName: string = "__PRODUCT_NAME__";
+  public static readonly productSlug: string = "__PRODUCT_SLUG__";
+  public static readonly folderSeparator: string = "/";
   public static readonly rootParameterName: string = "root";
   public static readonly idParameterName: string = "id";
   public static readonly statementsParameterName: string = "statements";
@@ -88,7 +91,7 @@ export class Resources {
   public static readonly privateFolderMode: number = 0o700;
   public static readonly exclusiveWriteFlag: string = "wx";
   public static readonly temporarySuffix: string = ".tmp";
-  public static readonly backupPrefix: string = "shell-before-migration-";
+  public static readonly backupInfix: string = "-before-migration-";
   public static readonly backupExtension: string = ".sqlite";
   public static readonly discoveryFormatVersion: number = 1;
   public static readonly declarationsFormatVersion: number = 1;
@@ -118,9 +121,14 @@ export class Resources {
   public static readonly ownershipReleased: string = "The data directory's ownership has been released.";
   public static readonly systemRootMissing: string = "SystemRoot is not set, so the Windows system tools cannot be found.";
   public static readonly backupUnverified: string = "The database backup did not pass its integrity check.";
-  public static readonly historyNotRecognized: string = "The shell database's migration history is not one this build recognizes.";
-  public static readonly historyNewer: string = "The shell database was written by a newer build.";
-  public static readonly tablesWithoutHistory: string = "The shell database has tables but no migration history.";
+  public static readonly shellDatabaseName: string = "shell database";
+  public static readonly moduleDatabaseExtension: string = ".sqlite";
+  public static readonly thenProperty: string = "then";
+  public static readonly actionParameterName: string = "action";
+  public static readonly transactionNotSynchronous: string =
+    "A transaction's action must finish before it returns; it committed nothing, because an awaited step would run after the commit.";
+  public static readonly moduleDatabaseUnknown: string = "Its database was written by a newer build or is not one this build recognizes.";
+  public static readonly moduleDatabaseFailed: string = "Its database could not be opened or migrated.";
   public static readonly discoveryNotObject: string = "The discovery metadata is not a JSON object.";
   public static readonly declarationsNotObject: string = "The module declarations are not a JSON object with a list of modules.";
   public static readonly declarationNotObject: string = "A module declaration is not a JSON object.";
@@ -134,10 +142,10 @@ export class Resources {
   public static readonly deactivateMember: "deactivateAsync" = "deactivateAsync";
   public static readonly methodsKind: string = "methods";
   public static readonly eventsKind: string = "events";
-  public static readonly dataDirectoryVariable: string = "TEAMRUN_DATA_DIR";
-  public static readonly defaultDataFolder: readonly string[] = [".noldova", "teamrun"];
+  public static readonly dataDirectoryVariable: string = "__DATA_DIRECTORY_VARIABLE__";
+  public static readonly defaultDataFolder: readonly string[] = "__DATA_FOLDER__".split(Resources.folderSeparator);
   public static readonly developmentDataFolder: readonly string[] = ["_build", "data"];
-  public static readonly preShellData: string = "This data directory holds data from a TeamRun release that predates the shell; move it aside to continue.";
+  public static readonly preShellData: string = `This data directory holds data from a ${Resources.productName} release that predates the shell; move it aside to continue.`;
   public static readonly productVersion: string = "__VERSION__";
   public static readonly build: string = "__BUILD__";
   public static readonly linuxPlatform: string = "linux";
@@ -187,7 +195,7 @@ export class Resources {
     "-p",
     "-c",
     "set -e; shopt -s failglob; for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done; exec -- \"$@\"",
-    "teamrun-launch"
+    `${Resources.productSlug}-launch`
   ];
   public static readonly stoppedByIdle: string = "idle";
   public static readonly stoppedByRequest: string = "request";
@@ -215,7 +223,7 @@ export class Resources {
   public static readonly endpointUnavailable: string = "The runtime's local endpoint has no address.";
   public static readonly handshakeRequired: string = "A connection must begin with a handshake.";
   public static readonly unauthorized: string = "The capability token is not valid for this runtime.";
-  public static readonly buildMismatch: string = "Another build of TeamRun owns this data directory.";
+  public static readonly buildMismatch: string = `Another build of ${Resources.productName} owns this data directory.`;
   public static readonly otherBuildMayOnlyStop: string = "A connection from another build may only ask the runtime to stop.";
   public static readonly unexpectedMessage: string = "Only requests and cancellations may follow the handshake.";
   public static readonly invalidFrame: string = "The frame is not a valid message.";
@@ -275,15 +283,35 @@ export class Resources {
   }
 
   public static formatOwned(root: string): string {
-    return `Another TeamRun runtime owns the data directory ${root}.`;
+    return `Another ${Resources.productName} runtime owns the data directory ${root}.`;
   }
 
   public static formatPreShellData(root: string, entries: readonly string[]): string {
     return `The data directory ${root} holds data from a release before the shell: ${entries.join(", ")}.`;
   }
 
-  public static formatMigrationFailed(id: string): string {
-    return `The migration ${id} of the shell database failed and was rolled back.`;
+  public static formatMigrationFailed(database: string, id: string): string {
+    return `The migration ${id} of the ${database} failed and was rolled back.`;
+  }
+
+  public static formatHistoryNotRecognized(database: string): string {
+    return `The ${database}'s migration history is not one this build recognizes.`;
+  }
+
+  public static formatHistoryNewer(database: string): string {
+    return `The ${database} was written by a newer build.`;
+  }
+
+  public static formatTablesWithoutHistory(database: string): string {
+    return `The ${database} has tables but no migration history.`;
+  }
+
+  public static formatModuleDatabaseName(moduleId: string): string {
+    return `database of the module ${moduleId}`;
+  }
+
+  public static formatNoModuleDatabase(moduleId: string): string {
+    return `The module ${moduleId} has no database, because its runtime part declares no migrations.`;
   }
 
   public static formatAccessGrant(securityIdentifier: string): string {
@@ -302,8 +330,8 @@ export class Resources {
     return `The current user's security identifier could not be read from: ${output}`;
   }
 
-  public static formatBackupName(position: number, timestamp: string): string {
-    return `${Resources.backupPrefix}${position}-${timestamp}${Resources.backupExtension}`;
+  public static formatBackupName(owner: string, position: number, timestamp: string): string {
+    return `${owner}${Resources.backupInfix}${position}-${timestamp}${Resources.backupExtension}`;
   }
 
   public static formatMovedFolderName(root: string, timestamp: string): string {
@@ -319,7 +347,7 @@ export class Resources {
   }
 
   public static formatEndpointInvalid(text: string): string {
-    return `"${text}" is not a TeamRun endpoint.`;
+    return `"${text}" is not a ${Resources.productName} endpoint.`;
   }
 
   public static formatSocketPathTooLong(socketPath: string): string {
@@ -387,7 +415,7 @@ export class Resources {
   }
 
   public static formatHandover(productVersion: string, executablePath: string): string {
-    return `TeamRun ${productVersion} at ${executablePath} owns this data directory and is newer; open that TeamRun instead.`;
+    return `${Resources.productName} ${productVersion} at ${executablePath} owns this data directory and is newer; open that ${Resources.productName} instead.`;
   }
 
   public static formatWorkInProgress(descriptions: readonly string[]): string {
@@ -423,7 +451,7 @@ export class Resources {
   }
 
   public static formatPreShellFound(location: string): string {
-    return `The data directory ${location} holds data from a TeamRun release that predates the shell.`;
+    return `The data directory ${location} holds data from a ${Resources.productName} release that predates the shell.`;
   }
 
   public static formatMoveAsideFailed(message: string): string {

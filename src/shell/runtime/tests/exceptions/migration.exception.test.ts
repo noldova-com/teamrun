@@ -16,7 +16,7 @@ export class MigrationExceptionTests {
   @TestMethod
   public namesTheFailedMigrationAndKeepsTheCause(): void {
     const cause = new Error("no such table");
-    const exception = new MigrationException("create-layout", new ExceptionOptions(cause));
+    const exception = new MigrationException("shell database", "create-layout", new ExceptionOptions(cause));
 
     Assert.areEqual("The migration create-layout of the shell database failed and was rolled back.", exception.message);
     Assert.areEqual("create-layout", exception.migrationId);

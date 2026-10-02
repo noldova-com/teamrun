@@ -13,8 +13,8 @@ import { Resources } from "../resources.js";
 export class MigrationException extends Exception {
   public readonly migrationId: string;
 
-  public constructor(migrationId: string, options?: ExceptionOptions) {
-    super(Resources.formatMigrationFailed(migrationId), options);
+  public constructor(database: string, migrationId: string, options?: ExceptionOptions) {
+    super(Resources.formatMigrationFailed(database, migrationId), options);
 
     this.migrationId = migrationId;
   }

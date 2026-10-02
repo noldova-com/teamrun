@@ -48,6 +48,7 @@ export class DataDirectoryTests {
   @TestData("git-hub2")
   public locatesAModuleFolderUnderModules(id: string): void {
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "modules", id), new DataDirectory(DataDirectoryTests.ROOT).locateModuleFolder(id));
+    Assert.areEqual(path.join(DataDirectoryTests.ROOT, "modules", id, `${id}.sqlite`), new DataDirectory(DataDirectoryTests.ROOT).locateModuleDatabase(id));
   }
 
   @TestMethod
