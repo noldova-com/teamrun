@@ -37,7 +37,6 @@ export class Resources {
   public static readonly dataDirectoryArgument: string = "--data-dir=";
   public static readonly userDataArgument: string = "--user-data-dir=";
   public static readonly userDataPath: "userData" = "userData";
-  public static readonly profileFolder: string = "desktop";
   public static readonly runAsNodeVariable: string = "ELECTRON_RUN_AS_NODE";
   public static readonly runAsNodeValue: string = "1";
   public static readonly workWaitInterval: number = 2000;

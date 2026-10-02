@@ -70,7 +70,7 @@ export class DesktopApplication {
       join(moduleDirectory, ...Resources.repositoryRootSegments),
       DesktopApplication.readArgument(process.argv, Resources.dataDirectoryArgument));
     if (Object.isUndefined(DesktopApplication.readArgument(process.argv, Resources.userDataArgument)))
-      electron.app.setPath(Resources.userDataPath, join(dataDirectory.root, Resources.profileFolder));
+      electron.app.setPath(Resources.userDataPath, dataDirectory.profileFolder);
     const launchSettings = new LaunchSettings(
       dataDirectory,
       process.execPath,

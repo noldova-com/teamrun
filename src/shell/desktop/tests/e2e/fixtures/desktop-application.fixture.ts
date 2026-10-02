@@ -24,7 +24,6 @@ export default class DesktopApplicationFixture {
   private static readonly PLATFORM_LOG: RegExp = /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ Electron(?: Helper(?: \([A-Za-z]+\))?)?\[\d+:\d+\] /;
   private static readonly PLATFORM_LOG_ANNOTATION: string = "platform-log";
   private static readonly ROOT_PREFIX: string = "teamrun-ui-";
-  private static readonly PROFILE_FOLDER: string = "profile";
   private static readonly DATA_FOLDER: string = "data";
   private static readonly DEVICE_FOLDER: string = "device";
   private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
@@ -172,7 +171,6 @@ export default class DesktopApplicationFixture {
     const application = await _electron.launch({
       args: [
         DesktopApplicationFixture.MAIN,
-        `--user-data-dir=${path.join(this.root, DesktopApplicationFixture.PROFILE_FOLDER)}`,
         `--data-dir=${this.dataDirectory}`,
         `--device-dir=${path.join(this.root, DesktopApplicationFixture.DEVICE_FOLDER)}`,
         ...DesktopApplicationFixture.LAUNCH_ARGUMENTS

@@ -26,10 +26,11 @@ test.describe("data from before the shell", () => {
     await window.getByRole("button", { name: "Move aside" }).click();
 
     await expect(window.locator("tr-empty-window")).toHaveText(/TeamRun\s*No modules/);
-    const siblings = (await readdir(desktop.root)).filter(t => t !== "data" && t !== "profile" && t !== "device");
+    const siblings = (await readdir(desktop.root)).filter(t => t !== "data" && t !== "device");
     expect(siblings.length).toBe(1);
     expect(existsSync(path.join(desktop.root, siblings[0] ?? "", "conversations.json"))).toBe(true);
     expect(existsSync(path.join(desktop.dataDirectory, "conversations.json"))).toBe(false);
+    expect(existsSync(path.join(desktop.dataDirectory, "desktop"))).toBe(true);
   });
 });
 

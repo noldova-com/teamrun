@@ -39,6 +39,10 @@ export class DataDirectory {
     return path.join(this.discoveryFolder, Resources.discoveryFileName);
   }
 
+  public get profileFolder(): string {
+    return path.join(this.root, Resources.profileFolderName);
+  }
+
   public get backupsFolder(): string {
     return path.join(this.root, Resources.backupsFolderName);
   }

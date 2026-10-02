@@ -544,6 +544,12 @@ export declare class DataDirectory {
   public get discoveryFile(): string;
 
   /**
+   * The path of the desktop's Electron profile folder, `desktop`. Like the ownership database and the discovery
+   * folder, it is the shell's own and never counts as data from before the shell.
+   */
+  public get profileFolder(): string;
+
+  /**
    * The path of the database backups folder, `backups`.
    */
   public get backupsFolder(): string;

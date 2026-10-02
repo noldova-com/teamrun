@@ -31,10 +31,12 @@ export class Resources {
   public static readonly discoveryFolderName: string = "discovery";
   public static readonly discoveryFileName: string = "runtime.json";
   public static readonly backupsFolderName: string = "backups";
+  public static readonly profileFolderName: string = "desktop";
   public static readonly runtimeEntries: readonly string[] = [
     Resources.ownershipDatabaseFileName,
     `${Resources.ownershipDatabaseFileName}-journal`,
-    Resources.discoveryFolderName
+    Resources.discoveryFolderName,
+    Resources.profileFolderName
   ];
   public static readonly modulesFolderName: string = "modules";
   public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;

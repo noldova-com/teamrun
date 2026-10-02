@@ -33,6 +33,7 @@ export class DataDirectoryInspectorTests {
     const missing = await DataDirectoryInspector.inspectAsync(directory);
     using lock = OwnershipLock.acquire(directory);
     await mkdir(directory.discoveryFolder);
+    await mkdir(directory.profileFolder);
     await writeFile(`${directory.ownershipDatabase}-journal`, "");
 
     const runtimeOnly = await DataDirectoryInspector.inspectAsync(directory);
