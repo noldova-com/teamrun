@@ -10,7 +10,6 @@ import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
-import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import OlderRuntimeFixture from "./fixtures/older-runtime.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
@@ -37,17 +36,18 @@ test.describe("data from before the shell", () => {
 test.describe("builds", () => {
   test("a newer build takes over the data directory from an older build's runtime", async ({ desktop }) => {
     await expect(desktop.window.locator("tr-empty-window")).toHaveText(/TeamRun\s*No modules/);
-    expect(await desktop.closeAsync()).toBe(0);
-    await DesktopApplicationFixture.stopRuntimeAsync(desktop.dataDirectory);
-    const older = await OlderRuntimeFixture.startAsync(desktop.dataDirectory);
+    const older: OlderRuntimeFixture[] = [];
     try {
-      await desktop.launchAgainAsync();
+      await desktop.restartAsync(async () => {
+        older.push(await OlderRuntimeFixture.startAsync(desktop.dataDirectory));
+      });
 
       await expect(desktop.window.locator("tr-empty-window")).toHaveText(/TeamRun\s*No modules/);
-      await expect.poll(() => older.hasExited).toBe(true);
+      await expect.poll(() => older.every(t => t.hasExited) && older.length === 1).toBe(true);
     }
     finally {
-      await older.disposeAsync();
+      for (const runtime of older)
+        await runtime.disposeAsync();
     }
   });
 });

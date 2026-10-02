@@ -91,12 +91,10 @@ export default class DesktopApplicationFixture {
     return this.page;
   }
 
-  public async restartAsync(): Promise<void> {
+  public async restartAsync(beforeStart?: () => Promise<void>): Promise<void> {
     expect(await this.closeAsync()).toBe(0);
-    await this.startAsync();
-  }
-
-  public async launchAgainAsync(): Promise<void> {
+    await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
+    await beforeStart?.();
     await this.startAsync();
   }
 
