@@ -14,7 +14,8 @@
   },
   "scripts": {
     "build": "node scripts/build.ts",
-    "test": "node scripts/test.ts"
+    "test": "node scripts/test.ts",
+    "test:ui": "tsc --project src/shell/desktop/tests/e2e && playwright test --config src/shell/desktop/tests/e2e/playwright.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
