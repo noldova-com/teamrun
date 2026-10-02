@@ -17,7 +17,7 @@ export default class PackageTreeFixture {
 
   public static async writeRootAsync(repository: RepositoryFixture): Promise<void> {
     await repository.writeAsync({
-      "package.json": `${JSON.stringify({ name: "fixture", version: "0.0.7", teamrun: { protocolVersion: 3 }, private: true, type: "module" }, null, 2)}\n`,
+      "package.json": `${JSON.stringify({ name: "fixture", version: "0.0.7", teamrun: { protocolVersion: 3, modules: [] }, private: true, type: "module" }, null, 2)}\n`,
       "package-lock.json": `${JSON.stringify({ name: "fixture", version: "0.0.7", lockfileVersion: 3, requires: true, packages: { "": { name: "fixture", version: "0.0.7" } } }, null, 2)}\n`,
       "tsconfig.base.json": await readFile(path.join(SourceTreeFixture.root, "tsconfig.base.json"), "utf8"),
       "LICENSE": "Fixture license\n"
@@ -29,8 +29,8 @@ export default class PackageTreeFixture {
     id: string,
     dependencies: readonly string[],
     withTests: boolean = true,
-    withResources: boolean = true): Promise<void> {
-    const directory = `src/${id.replace("-", "/")}`;
+    withResources: boolean = true,
+    directory: string = `src/${id.replace("-", "/")}`): Promise<void> {
     const base = `${"../".repeat(directory.split("/").length + 1)}tsconfig.base.json`;
     const project = `${JSON.stringify({ extends: base }, null, 2)}\n`;
     const imports = dependencies.map(t => `import { Resources as ${PackageTreeFixture.formatSymbol(t)} } from "${PackageTreeFixture.NAME_PREFIX}${t}";\n`).join("");

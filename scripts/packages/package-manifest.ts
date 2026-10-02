@@ -9,12 +9,15 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import ModuleCatalog from "../modules/module-catalog.ts";
 import PackageException from "./package.exception.ts";
 
 export default class PackageManifest {
   private static readonly FILE_NAME: string = "package.json";
   private static readonly SOURCE_PREFIX: string = "src/";
   private static readonly NAME_PREFIX: string = "@noldova/teamrun-";
+  private static readonly FIXTURE_NAME_PREFIX: string = "@noldova/teamrun-fixture-";
+  private static readonly FIXTURE_PREFIX: string = `${ModuleCatalog.FIXTURE_FOLDER}/`;
   private static readonly VERSION_PLACEHOLDER: string = "__VERSION__";
 
   public readonly directory: string;
@@ -24,7 +27,9 @@ export default class PackageManifest {
   public constructor(directory: string, name: string, dependencies: readonly string[]) {
     const expected = PackageManifest.formatName(directory);
     if (name !== expected)
-      throw new PackageException(`${directory}/${PackageManifest.FILE_NAME} must be named "${expected}", the package's path below src/ joined with hyphens.`);
+      throw new PackageException(PackageManifest.isFixtureDirectory(directory)
+        ? `${directory}/${PackageManifest.FILE_NAME} must be named "${expected}", the fixture package's path below ${ModuleCatalog.FIXTURE_FOLDER}/ joined with hyphens.`
+        : `${directory}/${PackageManifest.FILE_NAME} must be named "${expected}", the package's path below src/ joined with hyphens.`);
 
     this.directory = directory;
     this.name = name;
@@ -59,7 +64,17 @@ export default class PackageManifest {
     return this.name.slice(PackageManifest.NAME_PREFIX.length);
   }
 
+  public get isFixture(): boolean {
+    return PackageManifest.isFixtureDirectory(this.directory);
+  }
+
+  private static isFixtureDirectory(directory: string): boolean {
+    return directory.startsWith(PackageManifest.FIXTURE_PREFIX);
+  }
+
   private static formatName(directory: string): string {
-    return `${PackageManifest.NAME_PREFIX}${directory.slice(PackageManifest.SOURCE_PREFIX.length).split("/").join("-")}`;
+    return PackageManifest.isFixtureDirectory(directory)
+      ? `${PackageManifest.FIXTURE_NAME_PREFIX}${directory.slice(PackageManifest.FIXTURE_PREFIX.length).split("/").join("-")}`
+      : `${PackageManifest.NAME_PREFIX}${directory.slice(PackageManifest.SOURCE_PREFIX.length).split("/").join("-")}`;
   }
 }

@@ -26,7 +26,7 @@ export default class PackageCheck implements ICheck {
 
   public async runAsync(output: Writable): Promise<boolean> {
     try {
-      const packages = await this.build.buildAsync(output);
+      const packages = await this.build.buildAsync(output, true);
       output.write(packages.length === 0 ? PackageCheck.NO_PACKAGES : `Packages built and installed: ${packages.length}.\n`);
       return true;
     }

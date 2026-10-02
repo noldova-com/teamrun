@@ -11,6 +11,7 @@ import { appendFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
+import ModuleCatalog from "../../modules/module-catalog.ts";
 import PackageBuild from "../../packages/package-build.ts";
 import PackageException from "../../packages/package.exception.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
@@ -45,8 +46,8 @@ class PackageBuildTests {
       const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
       const output = new TextOutputFixture();
 
-      assert.deepEqual(await build.buildAsync(output), []);
-      await build.requireCurrentAsync();
+      assert.deepEqual(await build.buildAsync(output, false), []);
+      await build.requireCurrentAsync(false);
       assert.equal(output.text, "");
     });
 
@@ -55,7 +56,7 @@ class PackageBuildTests {
       await PackageTreeFixture.writePackageAsync(repository, "shell-gamma", [], false, false);
       const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
 
-      const packages = await build.buildAsync(new TextOutputFixture());
+      const packages = await build.buildAsync(new TextOutputFixture(), false);
       const output = await PackageBuildTests.buildAsync(build);
 
       assert.deepEqual(packages.map(t => t.name), [PackageBuildTests.ALPHA, PackageBuildTests.GAMMA, PackageBuildTests.BETA]);
@@ -102,9 +103,9 @@ class PackageBuildTests {
       await PackageBuildTests.buildAsync(build);
 
       await appendFile(path.join(repository.directory, "node_modules", "@noldova", "teamrun-foundation-alpha", "api", "index.js"), "\n");
-      await assert.rejects(build.requireCurrentAsync(), PackageBuildTests.ALL_STALE);
+      await assert.rejects(build.requireCurrentAsync(false), PackageBuildTests.ALL_STALE);
       const repaired = await PackageBuildTests.buildAsync(build);
-      await build.requireCurrentAsync();
+      await build.requireCurrentAsync(false);
 
       assert.deepEqual(repaired, PackageBuildTests.REINSTALLED);
     });
@@ -115,11 +116,40 @@ class PackageBuildTests {
       await PackageBuildTests.buildAsync(build);
 
       await rm(path.join(repository.directory, "node_modules"), { recursive: true, force: true });
-      await assert.rejects(build.requireCurrentAsync(), PackageBuildTests.ALL_STALE);
+      await assert.rejects(build.requireCurrentAsync(false), PackageBuildTests.ALL_STALE);
       const reinstalled = await PackageBuildTests.buildAsync(build);
-      await build.requireCurrentAsync();
+      await build.requireCurrentAsync(false);
 
       assert.deepEqual(reinstalled, PackageBuildTests.REINSTALLED);
+    });
+
+    test("a test build adds fixture modules' packages without making the other packages' tests stale", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
+      const repository = await PackageBuildTests.createAsync(t);
+      await PackageTreeFixture.writePackageAsync(repository, "fixture-notes-runtime", ["shell-beta"], false, true, `${ModuleCatalog.FIXTURE_FOLDER}/notes/runtime`);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const fixture = "@noldova/teamrun-fixture-notes-runtime";
+
+      const regular = await PackageBuildTests.buildAsync(build);
+      const tested = new TextOutputFixture();
+      const packages = await build.buildAsync(tested, true);
+      await build.requireCurrentAsync(false);
+      const again = await PackageBuildTests.buildAsync(build);
+
+      assert.deepEqual(regular, PackageBuildTests.ALL_BUILT);
+      assert.deepEqual(packages.map(t => t.name), [PackageBuildTests.ALPHA, PackageBuildTests.BETA, fixture]);
+      assert.deepEqual(tested.text.split("\n").filter(t => t.length > 0), [
+        `${PackageBuildTests.ALPHA}: reused`,
+        `${PackageBuildTests.BETA}: reused`,
+        `${fixture}: built`,
+        `${PackageBuildTests.ALPHA} tests: reused`,
+        `${PackageBuildTests.BETA} tests: reused`
+      ]);
+      assert.deepEqual(again, [
+        `${PackageBuildTests.ALPHA}: reused`,
+        `${PackageBuildTests.BETA}: reused`,
+        `${PackageBuildTests.ALPHA} tests: reused`,
+        `${PackageBuildTests.BETA} tests: reused`
+      ]);
     });
   }
 
@@ -134,7 +164,7 @@ class PackageBuildTests {
 
   private static async buildAsync(build: PackageBuild): Promise<readonly string[]> {
     const output = new TextOutputFixture();
-    await build.buildAsync(output);
+    await build.buildAsync(output, false);
     return output.text.split("\n").filter(t => t.length > 0);
   }
 }

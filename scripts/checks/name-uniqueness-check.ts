@@ -8,6 +8,8 @@
 
 import type { Writable } from "node:stream";
 
+import type ModuleCatalog from "../modules/module-catalog.ts";
+import type ModuleDeclaration from "../modules/module-declaration.ts";
 import type SourceFile from "../structure/source-file.ts";
 import SourceScanner from "../structure/source-scanner.ts";
 import SourceTree from "../structure/source-tree.ts";
@@ -23,24 +25,29 @@ export default class NameUniquenessCheck implements ICheck {
   private static readonly LIST_SEPARATOR: string = ", ";
 
   private readonly tree: SourceTree;
+  private readonly modules: ModuleCatalog;
 
   public readonly title: string = "Unique names";
 
-  public constructor(tree: SourceTree) {
+  public constructor(tree: SourceTree, modules: ModuleCatalog) {
     this.tree = tree;
+    this.modules = modules;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
     const inventory = await this.tree.readAsync();
     const files = inventory.files.filter(t => t.isProduction);
+    const declarations = (await this.modules.readAllAsync()).declarations;
     const findings = [
       ...NameUniquenessCheck.checkSelectors(files.filter(t => t.isScript)),
       ...NameUniquenessCheck.checkTokens(files.filter(t => t.isStyle)),
-      ...NameUniquenessCheck.checkPackageNames(files.filter(t => t.isManifest))
+      ...NameUniquenessCheck.checkPackageNames(files.filter(t => t.isManifest)),
+      ...NameUniquenessCheck.checkModuleNames(declarations)
     ];
     for (const finding of findings)
       output.write(`${finding}\n`);
-    output.write(`Checked the selectors, style tokens and package names of ${files.length} production files.\n`);
+    output.write(
+      `Checked the selectors, style tokens and package names of ${files.length} production files and the names in ${declarations.length} module declarations.\n`);
     return findings.length === 0;
   }
 
@@ -107,6 +114,26 @@ export default class NameUniquenessCheck implements ICheck {
     for (const [name, places] of manifests)
       if (places.length > 1)
         findings.push(`The package name "${name}" is used by more than one manifest: ${places.join(NameUniquenessCheck.LIST_SEPARATOR)}.`);
+    return findings;
+  }
+
+  private static checkModuleNames(declarations: readonly ModuleDeclaration[]): readonly string[] {
+    const findings: string[] = [];
+    const ids = new Map<string, string[]>();
+    const names = new Map<string, string[]>();
+    for (const declaration of declarations) {
+      ids.set(declaration.id, [...ids.get(declaration.id) ?? [], declaration.file]);
+      for (const [kind, contributed] of declaration.contributions)
+        for (const name of contributed)
+          names.set(name, [...names.get(name) ?? [], `${declaration.file} (${kind})`]);
+    }
+
+    for (const [id, places] of ids)
+      if (places.length > 1)
+        findings.push(`The module id "${id}" is declared more than once: ${places.join(NameUniquenessCheck.LIST_SEPARATOR)}.`);
+    for (const [name, places] of names)
+      if (places.length > 1)
+        findings.push(`The contributed name "${name}" is declared more than once: ${places.join(NameUniquenessCheck.LIST_SEPARATOR)}.`);
     return findings;
   }
 

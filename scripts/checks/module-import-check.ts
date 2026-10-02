@@ -9,6 +9,7 @@
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import type ModuleCatalog from "../modules/module-catalog.ts";
 import type SourceFile from "../structure/source-file.ts";
 import type SourceLiteral from "../structure/source-literal.ts";
 import SourceScanner from "../structure/source-scanner.ts";
@@ -26,20 +27,24 @@ export default class ModuleImportCheck implements ICheck {
   private static readonly SEPARATOR: string = "/";
 
   private readonly tree: SourceTree;
+  private readonly modules: ModuleCatalog;
 
   public readonly title: string = "Module imports";
 
-  public constructor(tree: SourceTree) {
+  public constructor(tree: SourceTree, modules: ModuleCatalog) {
     this.tree = tree;
+    this.modules = modules;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
     const inventory = await this.tree.readAsync();
     const files = inventory.files.filter(t => t.owner !== SourceTree.SHELL_OWNER && t.isProduction && t.isScript);
+    const declarations = (await this.modules.readAllAsync()).declarations;
+    const dependencies = new Map<string, readonly string[]>(declarations.filter(t => !t.isFixture).map(t => [t.id, t.dependencies]));
     const findings: string[] = [];
     for (const file of files)
       for (const literal of new SourceScanner(file.text).scan().imports) {
-        const problem = ModuleImportCheck.findProblem(file, literal.value);
+        const problem = ModuleImportCheck.findProblem(file, literal.value, dependencies.get(file.owner) ?? []);
         if (problem !== null)
           findings.push(ModuleImportCheck.formatFinding(file, literal, problem));
       }
@@ -50,7 +55,7 @@ export default class ModuleImportCheck implements ICheck {
     return findings.length === 0;
   }
 
-  private static findProblem(file: SourceFile, specifier: string): string | null {
+  private static findProblem(file: SourceFile, specifier: string, dependencies: readonly string[]): string | null {
     if (specifier.startsWith(ModuleImportCheck.ABSOLUTE_PREFIX))
       return "is an absolute path";
     if (specifier.startsWith(ModuleImportCheck.RELATIVE_PREFIX))
@@ -67,7 +72,11 @@ export default class ModuleImportCheck implements ICheck {
     const moduleId = ModuleImportCheck.readModuleId(packageName);
     if (moduleId === null)
       return "is not a TeamRun package a module may use";
-    return moduleId === file.owner ? null : `belongs to module "${moduleId}", but module "${file.owner}" declares no dependency on "${moduleId}"`;
+    if (moduleId === file.owner)
+      return null;
+    if (!dependencies.includes(moduleId))
+      return `belongs to module "${moduleId}", but module "${file.owner}" declares no dependency on "${moduleId}"`;
+    return packageName === specifier ? null : `is not the published API of ${packageName}; import the package itself`;
   }
 
   private static isInside(target: string, folder: string): boolean {

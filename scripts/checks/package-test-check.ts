@@ -49,9 +49,9 @@ export default class PackageTestCheck implements ICheck {
 
   public async runAsync(output: Writable): Promise<boolean> {
     try {
-      await this.build.requireCurrentAsync();
+      await this.build.requireCurrentAsync(false);
       const layout = new BuildLayout(this.root);
-      const packages = await new PackageCatalog(this.root).listPackagesAsync();
+      const packages = await new PackageCatalog(this.root).listPackagesAsync(false);
       const tested = packages.filter(t => existsSync(layout.locateTestOutput(t)));
       if (tested.length === 0) {
         output.write(PackageTestCheck.NO_TESTS);

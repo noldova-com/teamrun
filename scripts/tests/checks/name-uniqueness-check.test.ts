@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import NameUniquenessCheck from "../../checks/name-uniqueness-check.ts";
+import ModuleCatalog from "../../modules/module-catalog.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
 import Git from "../../repository/git.ts";
 import RepositoryFiles from "../../repository/repository-files.ts";
@@ -38,7 +39,7 @@ class NameUniquenessCheckTests {
       const check = NameUniquenessCheckTests.createCheck(repository);
 
       assert.equal(await check.runAsync(output), true);
-      assert.equal(output.text, "Checked the selectors, style tokens and package names of 7 production files.\n");
+      assert.equal(output.text, "Checked the selectors, style tokens and package names of 7 production files and the names in 0 module declarations.\n");
       assert.equal(check.title, "Unique names");
     });
 
@@ -73,7 +74,32 @@ class NameUniquenessCheckTests {
         "The style token \"--tr-text\" is defined by more than one owner: module \"notes\" (src/modules/notes/window/src/styles.scss:2), the shell (src/shell/ui/src/styles/theme.scss:2).",
         "src/modules/notes/runtime/package.json: the manifest is not valid JSON.",
         "The package name \"@noldova/teamrun-shell-ui\" is used by more than one manifest: src/modules/notes/window/package.json, src/shell/ui/package.json.",
-        "Checked the selectors, style tokens and package names of 13 production files.",
+        "Checked the selectors, style tokens and package names of 13 production files and the names in 0 module declarations.",
+        ""
+      ].join("\n"));
+    });
+
+    test("a module id or contributed name declared twice fails, across modules and fixture modules", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const declare = (id: string, contributes: Readonly<Record<string, readonly string[]>>): string =>
+        JSON.stringify({ id, displayName: id, parts: [], dependencies: [], contributes });
+      await repository.writeAsync({
+        "src/modules/notes/module.json": declare("notes", { views: ["notes.list", "notes.list"], documents: ["notes.note"] }),
+        "src/modules/clock/module.json": declare("clock", { views: ["clock.face"] }),
+        [`${ModuleCatalog.FIXTURE_FOLDER}/notes/module.json`]: declare("notes", { documents: ["notes.note"] })
+      });
+      const output = new TextOutputFixture();
+
+      const passed = await NameUniquenessCheckTests.createCheck(repository).runAsync(output);
+
+      const fixture = `${ModuleCatalog.FIXTURE_FOLDER}/notes/module.json`;
+      assert.equal(passed, false);
+      assert.equal(output.text, [
+        `The module id "notes" is declared more than once: src/modules/notes/module.json, ${fixture}.`,
+        "The contributed name \"notes.list\" is declared more than once: src/modules/notes/module.json (views), src/modules/notes/module.json (views).",
+        `The contributed name "notes.note" is declared more than once: src/modules/notes/module.json (documents), ${fixture} (documents).`,
+        "Checked the selectors, style tokens and package names of 2 production files and the names in 3 module declarations.",
         ""
       ].join("\n"));
     });
@@ -81,7 +107,7 @@ class NameUniquenessCheckTests {
 
   private static createCheck(repository: RepositoryFixture): NameUniquenessCheck {
     const directory = repository.directory;
-    return new NameUniquenessCheck(new SourceTree(directory, new RepositoryFiles(directory, new Git(directory, new ProcessRunner()))));
+    return new NameUniquenessCheck(new SourceTree(directory, new RepositoryFiles(directory, new Git(directory, new ProcessRunner()))), new ModuleCatalog(directory));
   }
 }
 

@@ -10,6 +10,7 @@ import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
+import DependencyOrder from "../ordering/dependency-order.ts";
 import PackageManifest from "./package-manifest.ts";
 import PackageException from "./package.exception.ts";
 
@@ -25,11 +26,11 @@ export default class PackageCatalog {
     this.root = root;
   }
 
-  public async listPackagesAsync(): Promise<readonly PackageManifest[]> {
+  public async listPackagesAsync(includeFixtures: boolean): Promise<readonly PackageManifest[]> {
     const packages: PackageManifest[] = [];
     for (const directory of await this.listDirectoriesAsync())
       packages.push(await PackageManifest.readAsync(this.root, directory));
-    return PackageCatalog.order(packages);
+    return PackageCatalog.order(packages.filter(t => includeFixtures || !t.isFixture));
   }
 
   private static order(packages: readonly PackageManifest[]): readonly PackageManifest[] {
@@ -42,20 +43,8 @@ export default class PackageCatalog {
         throw new PackageException(`${manifest.directory} depends on ${unknown.join(", ")}, which is not a package under src/.`);
     }
 
-    const ordered: PackageManifest[] = [];
-    const placed = new Set<string>();
-    let remaining = packages;
-    while (remaining.length > 0) {
-      const ready = remaining.filter(t => t.dependencies.every(t => placed.has(t)));
-      if (ready.length === 0)
-        throw new PackageException(`The dependencies of ${remaining.map(t => t.name).join(", ")} form a cycle.`);
-      for (const manifest of ready) {
-        ordered.push(manifest);
-        placed.add(manifest.name);
-      }
-      remaining = remaining.filter(t => !placed.has(t.name));
-    }
-    return ordered;
+    return new DependencyOrder(packages, t => t.name, t => t.dependencies)
+      .sort(t => new PackageException(`The dependencies of ${t.join(", ")} form a cycle.`));
   }
 
   private async listDirectoriesAsync(): Promise<readonly string[]> {
