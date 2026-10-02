@@ -11,11 +11,12 @@ import path from "node:path";
 
 import { TaskbarIdentity } from "@noldova/teamrun-shell-desktop";
 
+import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 test.describe("the Windows taskbar", () => {
   test.skip(process.platform !== "win32", "The taskbar's relaunch command is Windows only.");
-  test.use({ desktopArguments: ["--user-data-dir=profile"] });
+  test.use({ desktopArguments: ["--user-data-dir=profile"], desktopVariant: BuildVariantFixture.noModules });
 
   test("the taskbar's relaunch command, started elsewhere, reaches the running TeamRun with a relative profile and opens no second window", async ({ desktop }) => {
     await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
