@@ -6,9 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { TooltipPosition } from "@angular/material/tooltip";
 
 import { DockingDirection } from "./app/enums/docking-direction";
+import { OverlayAlignment } from "./app/enums/overlay-alignment";
 import { SashOrientation } from "./app/enums/sash-orientation";
 import { ColorToken } from "./app/models/color-token";
 
@@ -176,10 +176,27 @@ export class Resources {
   };
   public static readonly verticalOrientation: string = "vertical";
   public static readonly horizontalOrientation: string = "horizontal";
-  public static readonly tooltipPosition: TooltipPosition = "above";
   public static readonly tooltipShowDelay: number = 0;
   public static readonly tooltipHideDelay: number = 0;
-  public static readonly tooltipTouchendHideDelay: number = 1500;
+  public static readonly tooltipPaneClass: string = "tr-tooltip-pane";
+  public static readonly tooltipTextInput: string = "text";
+  public static readonly overlayAlignmentFactors: Readonly<Record<OverlayAlignment, number>> = {
+    [OverlayAlignment.Center]: 0.5,
+    [OverlayAlignment.Start]: 0,
+    [OverlayAlignment.End]: 1
+  };
+  public static readonly resizeEvent: string = "resize";
+  public static readonly pointerLeaveEvent: "pointerleave" = "pointerleave";
+  public static readonly scrollEvent: string = "scroll";
+  public static readonly keyboardFocusOrigin: string = "keyboard";
+  public static readonly truncationSelector: string = "[data-truncates]";
+  public static readonly chromeAttribute: string = "data-tr-chrome";
+  public static readonly chromeSelector: string = "[data-tr-chrome]";
+  public static readonly topChrome: string = "top";
+  public static readonly bottomChrome: string = "bottom";
+  public static readonly overlayGapLook: string = "space-2";
+  public static readonly windowRowLook: string = "window-row-height";
+  public static readonly statusBarLook: string = "status-bar-height";
   public static readonly middleButton: number = 1;
   public static readonly primaryButton: number = 0;
 

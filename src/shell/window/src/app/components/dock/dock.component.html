@@ -14,7 +14,8 @@ LICENSE file in the root directory of this source tree.
         [style.left.rem]="box.x" [style.top.rem]="box.y" [style.width.rem]="box.width" [style.height.rem]="box.height">
         @for (tab of tabsOf(root); track tab.key) {
           @let label = labels.of(tab);
-          <button type="button" tr-icon-button class="tr-dock-strip-view" [icon]="label.icon" [label]="label.title" (click)="layout.activate(tab)"></button>
+          <button type="button" tr-icon-button class="tr-dock-strip-view" [icon]="label.icon" [label]="label.title"
+            [trTooltip]="label.title" [trTooltipSide]="tooltipSide()" (click)="layout.activate(tab)"></button>
         }
       </tr-panel-card>
     }

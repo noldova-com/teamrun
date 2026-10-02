@@ -17,6 +17,7 @@ import { DesktopBridgeService } from "../../services/desktop-bridge.service";
   styleUrl: "./window-row.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
+    "data-tr-chrome": "top",
     "[class.tr-window-row-mac]": "isMac"
   }
 })

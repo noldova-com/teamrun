@@ -8,7 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 import { ModuleState } from "@noldova/teamrun-shell-protocol";
-import { DockingDirection } from "@noldova/teamrun-shell-ui";
+import { DockingDirection, OverlaySide } from "@noldova/teamrun-shell-ui";
 
 import { DockSide } from "./app/enums/dock-side";
 import { PanelEdge } from "./app/enums/panel-edge";
@@ -52,6 +52,7 @@ export class Resources {
   public static readonly primaryButton: number = 0;
   public static readonly dragThreshold: number = 4;
   public static readonly escapeKey: string = "Escape";
+  public static readonly popoverPaneClass: string = "tr-popover-pane";
   public static readonly menuKey: string = "F10";
   public static readonly contextMenuKey: string = "ContextMenu";
   public static readonly pointerMoveEvent: "pointermove" = "pointermove";
@@ -146,6 +147,11 @@ export class Resources {
     [DockSide.Left]: "Hide the left dock",
     [DockSide.Right]: "Hide the right dock",
     [DockSide.Bottom]: "Hide the bottom dock"
+  };
+  public static readonly dockStripTooltipSides: Readonly<Record<DockSide, OverlaySide>> = {
+    [DockSide.Left]: OverlaySide.end,
+    [DockSide.Right]: OverlaySide.start,
+    [DockSide.Bottom]: OverlaySide.above
   };
   public static readonly hideDockGlyphs: Readonly<Record<DockSide, string>> = {
     [DockSide.Left]: "left_panel_close",

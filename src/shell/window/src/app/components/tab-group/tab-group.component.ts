@@ -10,7 +10,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, type Signal, computed, 
 import { MatMenuModule } from "@angular/material/menu";
 
 import "@noldova/teamrun-foundation-core";
-import { IconButtonComponent, PanelCardComponent, PanelSurface, TabComponent } from "@noldova/teamrun-shell-ui";
+import { IconButtonComponent, OverlaySide, PanelCardComponent, PanelSurface, TabComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
 import type { DockSide } from "../../enums/dock-side";
@@ -25,7 +25,7 @@ import { TabScrollerDirective } from "./tab-scroller.directive";
 
 @Component({
   selector: "tr-tab-group",
-  imports: [IconButtonComponent, MatMenuModule, PanelCardComponent, TabComponent, TabMenuComponent, TabScrollerDirective],
+  imports: [IconButtonComponent, MatMenuModule, PanelCardComponent, TabComponent, TabMenuComponent, TabScrollerDirective, TooltipDirective],
   templateUrl: "./tab-group.component.html",
   styleUrl: "./tab-group.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -42,6 +42,7 @@ export class TabGroupComponent {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
   protected readonly resources: typeof Resources = Resources;
+  protected readonly below: OverlaySide = OverlaySide.below;
   protected readonly layout: LayoutService = inject(LayoutService);
   protected readonly drag: TabDragService = inject(TabDragService);
   protected readonly labels: TabLabelService = inject(TabLabelService);

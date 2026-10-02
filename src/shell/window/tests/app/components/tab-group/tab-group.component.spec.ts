@@ -108,6 +108,23 @@ describe("TabGroupComponent", () => {
     expect(group(0).querySelector("[role=tabpanel]")).not.toBeNull();
   });
 
+  it("shows a tab's title below it only while its label is cut short", async () => {
+    await renderAsync();
+    const target = tab(1, 1);
+    const tooltip = (): HTMLElement | null => document.querySelector<HTMLElement>(".cdk-overlay-container tr-tooltip");
+
+    target.dispatchEvent(new PointerEvent("pointerenter"));
+    await new Promise(resolve => setTimeout(resolve));
+    const isShownWhenFitting = !Object.isNull(tooltip());
+    target.dispatchEvent(new PointerEvent("pointerleave"));
+    target.style.maxWidth = "3rem";
+    target.dispatchEvent(new PointerEvent("pointerenter"));
+    await vi.waitFor(() => expect(tooltip()?.textContent?.trim()).toBe("files.search"));
+
+    expect(isShownWhenFitting).toBe(false);
+    expect(tooltip()?.getBoundingClientRect().top).toBeGreaterThan(target.getBoundingClientRect().bottom);
+  });
+
   it("activates a clicked tab, closes a tab with its close button and starts a drag from a tab", async () => {
     await renderAsync();
     const begin = vi.spyOn(TestBed.inject(TabDragService), "begin");

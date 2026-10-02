@@ -32,16 +32,6 @@
     item-with-icon-leading-spacing: var(--tr-menu-item-padding),
     item-with-icon-trailing-spacing: var(--tr-menu-item-padding)
   ));
-  @include mat.tooltip-overrides((
-    container-shape: var(--tr-radius-hover),
-    container-color: var(--tr-hover-widget),
-    supporting-text-color: var(--tr-text),
-    supporting-text-font: var(--tr-font-sans),
-    supporting-text-size: var(--tr-text-label),
-    supporting-text-line-height: var(--tr-line-tooltip),
-    supporting-text-weight: 400,
-    supporting-text-tracking: normal
-  ));
 }
 
 .mat-mdc-menu-panel.mat-mdc-menu-panel {
@@ -67,11 +57,4 @@
   color: var(--tr-text-muted);
   font-size: var(--tr-text-panel);
   line-height: var(--tr-line-panel);
-}
-
-.mat-mdc-tooltip .mat-mdc-tooltip-surface {
-  max-width: min(var(--tr-tooltip-width), calc(100vw - var(--tr-space-4)));
-  padding: var(--tr-tooltip-padding);
-  border: var(--tr-border-width) solid var(--tr-hover-widget-border);
-  box-shadow: var(--tr-shadow-large);
 }

@@ -15,7 +15,10 @@ import { ModuleFailuresComponent } from "../module-failures/module-failures.comp
   imports: [ModuleFailuresComponent],
   templateUrl: "./status-bar.component.html",
   styleUrl: "./status-bar.component.scss",
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    "data-tr-chrome": "bottom"
+  }
 })
 export class StatusBarComponent {
 }

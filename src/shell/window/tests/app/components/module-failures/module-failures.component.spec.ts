@@ -107,6 +107,24 @@ describe("ModuleFailuresComponent", () => {
     expect(item(fixture).getAttribute("aria-expanded")).toBe("true");
   });
 
+  it("places its popover above the item, a gap away and end-aligned with it", async () => {
+    AppearanceFixture.apply();
+    failures.set([clock, notes]);
+    const fixture = await renderAsync();
+    const host: HTMLElement = fixture.nativeElement;
+    Object.assign(host.style, { position: "fixed", right: "4rem", bottom: "0.25rem" });
+    host.setAttribute("data-tr-chrome", "bottom");
+
+    const surface = await openAsync(fixture);
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const box = surface.getBoundingClientRect();
+    const anchor = item(fixture).getBoundingClientRect();
+    const gap = parseFloat(getComputedStyle(document.documentElement).fontSize) * 0.5;
+
+    expect(anchor.top - box.bottom).toBeCloseTo(gap, 1);
+    expect(box.right).toBeCloseTo(anchor.right, 1);
+  });
+
   it("closes on Escape and returns focus to the item, but not on other keys", async () => {
     const fixture = await renderAsync();
     const surface = await openAsync(fixture);

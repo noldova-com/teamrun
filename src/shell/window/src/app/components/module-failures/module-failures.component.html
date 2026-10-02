@@ -7,17 +7,11 @@ LICENSE file in the root directory of this source tree.
 -->
 
 @if (failures().length > 0) {
-  <button #item type="button" class="tr-module-failures-item" cdkOverlayOrigin #origin="cdkOverlayOrigin" aria-haspopup="dialog" [attr.aria-expanded]="isShown()" (click)="toggle()">
+  <button #item type="button" class="tr-module-failures-item" aria-haspopup="dialog" [attr.aria-expanded]="isShown()" (click)="toggle(item, popover)">
     <span class="material-symbols-rounded tr-module-failures-icon" aria-hidden="true">{{ resources.moduleFailureGlyph }}</span>
     <span>{{ resources.formatModulesDidNotStart(failures().length) }}</span>
   </button>
-  <ng-template
-    cdkConnectedOverlay
-    [cdkConnectedOverlayOrigin]="origin"
-    [cdkConnectedOverlayOpen]="isShown()"
-    [cdkConnectedOverlayPositions]="positions"
-    (overlayOutsideClick)="close()"
-    (overlayKeydown)="closeFromKeyboard($event, item)">
+  <ng-template #popover>
     <tr-module-failures-popover [failures]="failures()" />
   </ng-template>
 }

@@ -13,7 +13,6 @@
   box-sizing: border-box;
   width: min(var(--tr-popover-width), calc(100vw - var(--tr-space-4)));
   max-height: calc(100vh - var(--tr-space-6) * 2);
-  margin-bottom: var(--tr-space-1);
   padding: var(--tr-space-3);
   overflow: auto;
   border: var(--tr-border-width) solid var(--tr-menu-border);

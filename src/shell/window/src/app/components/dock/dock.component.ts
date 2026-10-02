@@ -9,7 +9,7 @@
 import { ChangeDetectionStrategy, Component, type Signal, computed, inject, input } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import { AppearanceService, IconButtonComponent, PanelCardComponent, PanelSurface, SashComponent, SashOrientation } from "@noldova/teamrun-shell-ui";
+import { AppearanceService, IconButtonComponent, OverlaySide, PanelCardComponent, PanelSurface, SashComponent, SashOrientation, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
 import { DockSide } from "../../enums/dock-side";
@@ -22,7 +22,7 @@ import { TabLabelService } from "../../services/tab-label.service";
 
 @Component({
   selector: "tr-dock",
-  imports: [IconButtonComponent, PanelCardComponent, SashComponent],
+  imports: [IconButtonComponent, PanelCardComponent, SashComponent, TooltipDirective],
   templateUrl: "./dock.component.html",
   styleUrl: "./dock.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -45,6 +45,7 @@ export class DockComponent {
   protected readonly orientation: Signal<SashOrientation> = computed(() => this.side() === DockSide.Bottom ? SashOrientation.Horizontal : SashOrientation.Vertical);
   protected readonly size: Signal<number> = computed(() => this.dock().size ?? this.bounds().length(this.dock().axis));
   protected readonly isVertical: Signal<boolean> = computed(() => this.side() !== DockSide.Bottom);
+  protected readonly tooltipSide: Signal<OverlaySide> = computed(() => Resources.dockStripTooltipSides[this.side()]);
   protected readonly sash: Signal<Bounds> = computed(() => {
     const bounds = this.bounds();
     const gap = Resources.panelGap;
