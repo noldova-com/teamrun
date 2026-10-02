@@ -7,7 +7,7 @@
  */
 
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -17,6 +17,7 @@ import WorkflowFileFixture from "../../fixtures/workflow-file.fixture.ts";
 
 class BuildAndTestTests {
   private static readonly SCRIPT_TIMEOUT: number = 30_000;
+  private static readonly REPOSITORY_TIMEOUT: number = 60_000;
   private static readonly WORKFLOW: string = "build-and-test.yml";
   private static readonly TOOLCHAIN_STEP: string = "Verify the toolchain";
   private static readonly RESULT_STEP: string = "Require the selected verification to pass";
@@ -232,7 +233,7 @@ class BuildAndTestTests {
       }
     });
 
-    test("a merge group reuses the pull request's result only when its one squash on main has the tree the pull request's last attempt recorded", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+    test("a merge group reuses the pull request's result only when its one squash on main has the tree the pull request's last attempt recorded", { timeout: BuildAndTestTests.REPOSITORY_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript("Look up the pull request run");
       const pullRequestHead = "d".repeat(40);
       const runs = "api repos/noldova-com/teamrun/actions/workflows/build-and-test.yml/runs?event=pull_request&head_sha=" + pullRequestHead + "&per_page=100 --jq " +
@@ -250,6 +251,15 @@ class BuildAndTestTests {
           `echo change > change.txt\ngit add change.txt\n${commit} -m squash\n`,
         none: ""
       };
+      const repositories = new Map<string, { readonly directory: string; readonly base: string; readonly tree: string }>();
+      for (const [name, history] of Object.entries(histories)) {
+        const repository = await CommandDoublesFixture.createAsync();
+        t.after(() => repository.disposeAsync());
+        const prepared = await repository.runAsync(history.length === 0 ? "true\n" : `${history}git rev-parse base 'HEAD^{tree}'\n`);
+        assert.equal(prepared.status, 0, `${name}: ${prepared.stderr}`);
+        const [base = "b".repeat(40), tree = "a".repeat(40)] = prepared.stdout.trim().split("\n").filter(line => line.length > 0);
+        repositories.set(name, { directory: repository.directory, base, tree });
+      }
       interface ICase {
         readonly name: string;
         readonly history?: string;
@@ -285,14 +295,16 @@ class BuildAndTestTests {
       for (const item of cases) {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
-        const prepared = await doubles.runAsync(`${histories[item.history ?? "squash"] ?? ""}touch outputs.txt\n`);
-        assert.equal(prepared.status, 0, `${item.name}: ${prepared.stderr}`);
-        const known = item.history === "none" ? null : (await doubles.runAsync("git rev-parse base 'HEAD^{tree}'\n")).stdout.trim().split("\n");
-        const base = known?.[0] ?? "b".repeat(40);
-        const tree = known?.[1] ?? "a".repeat(40);
+        const repository = repositories.get(item.history ?? "squash");
+        assert.ok(repository !== undefined, item.name);
+        await cp(repository.directory, doubles.directory, { recursive: true });
+        const { base, tree } = repository;
         const record = item.record === undefined ? `${tree} true` : item.record?.replace("TREE", tree) ?? null;
-        if (record !== null)
-          await doubles.runAsync(`mkdir tested-tree\necho '${record}' > tested-tree/tested-tree.txt\n`);
+        await writeFile(path.join(doubles.directory, "outputs.txt"), "");
+        if (record !== null) {
+          await mkdir(path.join(doubles.directory, "tested-tree"));
+          await writeFile(path.join(doubles.directory, "tested-tree", "tested-tree.txt"), `${record}\n`);
+        }
         doubles.forward("timeout");
         doubles.respond("gh", "api repos/noldova-com/teamrun/pulls/58 --jq .head.sha", `${pullRequestHead}\n`, item.pullStatus ?? 0);
         doubles.respond("gh", runs, `${item.latest ?? `123 2 completed success ${runUrl}`}\n`, item.runsStatus ?? 0);
