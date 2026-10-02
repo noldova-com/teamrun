@@ -3642,6 +3642,26 @@ export declare class RuntimeEntry {
    * ```
    */
   public static runAsync(entryArguments: readonly string[], platform: string, environment: NodeJS.ProcessEnv, signals: EventEmitter, error: Writable): Promise<number>;
+
+  /**
+   * Sets the exit code a run ends with; a run that rejects is written to `error` and exits with 1. The entry
+   * script settles its run this way instead of awaiting it at the top level, because a module's runtime part that
+   * imports this package's values is loaded while the run is still going.
+   *
+   * @param run The run, as {@link RuntimeEntry.runAsync} returns it.
+   * @param error Receives the rejection.
+   * @param exit Receives the exit code, as `process` does.
+   * @returns A promise that resolves once the exit code is set; it never rejects.
+   * @example
+   * ```ts
+   * import { RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function main(): void {
+   *   void RuntimeEntry.settleAsync(RuntimeEntry.runAsync(process.argv.slice(2), process.platform, process.env, process, process.stderr), process.stderr, process);
+   * }
+   * ```
+   */
+  public static settleAsync(run: Promise<number>, error: Writable, exit: Pick<NodeJS.Process, "exitCode">): Promise<void>;
 }
 
 /**

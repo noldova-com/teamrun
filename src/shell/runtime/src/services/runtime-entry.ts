@@ -57,9 +57,17 @@ export class RuntimeEntry {
       signals.off(Resources.uncaughtExceptionEvent, report);
     }
   }
+
+  public static async settleAsync(run: Promise<number>, error: Writable, exit: Pick<NodeJS.Process, "exitCode">): Promise<void> {
+    try {
+      exit.exitCode = await run;
+    }
+    catch (failure) {
+      error.write(`${inspect(failure)}\n`);
+      exit.exitCode = Resources.failureExitCode;
+    }
+  }
 }
 
 if (import.meta.main)
-  void RuntimeEntry.runAsync(process.argv.slice(2), process.platform, process.env, process, process.stderr).then(t => {
-    process.exitCode = t;
-  });
+  void RuntimeEntry.settleAsync(RuntimeEntry.runAsync(process.argv.slice(2), process.platform, process.env, process, process.stderr), process.stderr, process);
