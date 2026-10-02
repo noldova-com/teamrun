@@ -6,7 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+
+test.use({ desktopVariant: BuildVariantFixture.noModules });
 
 test.describe("restarting", () => {
   test.use({ desktopEnvironment: { TEAMRUN_UI_PROBE: "restart" } });

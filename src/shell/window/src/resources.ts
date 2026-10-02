@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
+import { ModuleState } from "@noldova/teamrun-shell-protocol";
 import { DockingDirection } from "@noldova/teamrun-shell-ui";
 
 import { DockSide } from "./app/enums/dock-side";
@@ -14,6 +16,9 @@ import { SplitAxis } from "./app/enums/split-axis";
 
 export class Resources {
   public static readonly contributionNamePattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.[A-Za-z0-9][A-Za-z0-9._-]*$/;
+  public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+  public static readonly windowPartContextToken: string = "The window part's context";
+  public static readonly windowPartSourcesToken: string = "The build's window parts";
   public static readonly documentsGroupId: number = 0;
   public static readonly layoutFormatVersion: number = 1;
   public static readonly panelGap: number = 0.25;
@@ -91,6 +96,10 @@ export class Resources {
   public static readonly dockingPlateClearance: number = 0.25;
   public static readonly viewGlyph: string = "web_asset";
   public static readonly documentGlyph: string = "description";
+  public static readonly moduleFailureGlyph: string = "error";
+  public static readonly copyGlyph: string = "content_copy";
+  public static readonly copiedGlyph: string = "check";
+  public static readonly logFolderGlyph: string = "folder_open";
   public static readonly panelActionsGlyph: string = "more_horiz";
   public static readonly moveToGlyph: string = "drive_file_move";
   public static readonly splitGlyph: string = "splitscreen";
@@ -167,6 +176,9 @@ export class Resources {
   public static readonly keySeparator: string = "/";
   public static readonly contributionSeparator: string = ".";
   public static readonly invalidContributionName: string = "A contribution name has the form <module id>.<name>.";
+  public static readonly invalidModuleId: string = "A module id is lowercase kebab-case.";
+  public static readonly windowPartLoadFailed: string = "Its window part could not be loaded.";
+  public static readonly windowPartActivationFailed: string = "Its window part failed to activate.";
   public static readonly invalidInstance: string = "An instance is a string that is not blank.";
   public static readonly invalidBounds: string = "Bounds need finite coordinates and a width and height that are not negative.";
   public static readonly invalidSize: string = "A size is a finite number of rem.";
@@ -185,6 +197,18 @@ export class Resources {
   public static readonly unknownNode: string = "A node is a split, with children, or a group, with tabs.";
   public static readonly productName: string = "TeamRun";
   public static readonly noModules: string = "No modules";
+  public static readonly moduleFailuresTitle: string = "Modules that didn't start";
+  public static readonly copyDetailsLabel: string = "Copy details";
+  public static readonly copiedLabel: string = "Copied";
+  public static readonly openLogFolderLabel: string = "Open log folder";
+  public static readonly logFolderNotOpened: string = "The log folder could not be opened.";
+  public static readonly copiedDuration: number = 2000;
+  public static readonly detailsSeparator: string = "\n";
+  public static readonly moduleStateLabels: Readonly<Record<ModuleState, string>> = {
+    [ModuleState.Active]: "Active",
+    [ModuleState.Failed]: "Failed",
+    [ModuleState.Blocked]: "Blocked"
+  };
   public static readonly bridgeName: string = "teamrun";
   public static readonly macPlatform: string = "darwin";
   public static readonly backgroundField: string = "background";
@@ -192,6 +216,8 @@ export class Resources {
   public static readonly titleBarTextField: string = "titleBarText";
   public static readonly titleBarHeightField: string = "titleBarHeight";
   public static readonly kindField: string = "kind";
+  public static readonly productVersionField: string = "productVersion";
+  public static readonly fingerprintField: string = "fingerprint";
   public static readonly detailsField: string = "details";
   public static readonly payloadField: string = "payload";
   public static readonly failureField: string = "failure";
@@ -218,6 +244,34 @@ export class Resources {
   public static readonly failedTitle: string = "TeamRun could not start";
   public static readonly tryAgain: string = "Try again";
   public static readonly missingBridge: string = "The window needs the desktop's bridge, which the preload provides.";
+
+  public static formatModulesDidNotStart(count: number): string {
+    return count === 1 ? "1 module didn't start" : `${count} modules didn't start`;
+  }
+
+  public static formatModuleDidNotStart(displayName: string): string {
+    return `${displayName} didn't start`;
+  }
+
+  public static formatBuildDetails(productVersion: string, fingerprint: string): string {
+    return `TeamRun ${productVersion}, build ${fingerprint}`;
+  }
+
+  public static formatModuleDetails(moduleId: string, state: string, cause: string | null): string {
+    return Object.isNull(cause) ? `${moduleId}: ${state}` : `${moduleId}: ${state}: ${cause}`;
+  }
+
+  public static formatModuleBlocked(dependency: string): string {
+    return `It depends on ${dependency}, which is not active.`;
+  }
+
+  public static formatForeignContribution(moduleId: string, name: string): string {
+    return `The module ${moduleId} may contribute only names of its own, not ${name}.`;
+  }
+
+  public static formatForeignName(moduleId: string, name: string): string {
+    return `The module ${moduleId} may use only its own methods and events and those of the modules it depends on, not ${name}.`;
+  }
 
   public static formatNewerBuild(version: string): string {
     return `TeamRun ${version} is using this data folder. Use that TeamRun instead.`;

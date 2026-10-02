@@ -59,8 +59,11 @@ export default class DesktopApplicationFixture {
     const root = await mkdtemp(path.join(os.tmpdir(), DesktopApplicationFixture.ROOT_PREFIX));
     const fixture = new DesktopApplicationFixture(testInfo, root, environment, extraArguments);
     await mkdir(fixture.dataDirectory);
-    for (const [name, text] of Object.entries(dataFiles))
-      await writeFile(path.join(fixture.dataDirectory, name), text);
+    for (const [name, text] of Object.entries(dataFiles)) {
+      const file = path.join(fixture.dataDirectory, name);
+      await mkdir(path.dirname(file), { recursive: true });
+      await writeFile(file, text);
+    }
     await fixture.startAsync();
     await fixture.recordEnvironmentAsync();
     return fixture;

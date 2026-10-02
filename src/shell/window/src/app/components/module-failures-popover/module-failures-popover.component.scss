@@ -1,0 +1,82 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-2);
+  box-sizing: border-box;
+  width: min(var(--tr-popover-width), calc(100vw - var(--tr-space-4)));
+  max-height: calc(100vh - var(--tr-space-6) * 2);
+  margin-bottom: var(--tr-space-1);
+  padding: var(--tr-space-3);
+  overflow: auto;
+  border: var(--tr-border-width) solid var(--tr-menu-border);
+  border-radius: var(--tr-radius-large);
+  background-color: var(--tr-menu);
+  box-shadow: var(--tr-shadow-large);
+  color: var(--tr-menu-text);
+  font-size: var(--tr-text-panel);
+  line-height: var(--tr-line-panel);
+}
+
+:host(:focus) {
+  outline: none;
+}
+
+.tr-module-failures-title {
+  margin: 0;
+  font-size: inherit;
+  font-weight: var(--tr-weight-emphasis);
+  line-height: inherit;
+}
+
+.tr-module-failures-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tr-module-failures-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--tr-space-2);
+}
+
+.tr-module-failures-name {
+  overflow-wrap: anywhere;
+}
+
+.tr-module-failures-state,
+.tr-module-failures-cause {
+  color: var(--tr-text-muted);
+}
+
+.tr-module-failures-cause {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
+
+.tr-module-failures-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tr-space-2);
+}
+
+.tr-module-failures-glyph {
+  margin-inline-end: var(--tr-space-1);
+  font-size: var(--tr-icon);
+}
+
+.tr-module-failures-notice {
+  margin: 0;
+}

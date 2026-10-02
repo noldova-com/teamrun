@@ -48,5 +48,14 @@ contextBridge.exposeInMainWorld("teamrun", {
     const handler = (_event: IpcRendererEvent, name: string, payload: unknown): void => listener(name, payload);
     ipcRenderer.on("teamrun:runtimeEvent", handler);
     return () => ipcRenderer.removeListener("teamrun:runtimeEvent", handler);
+  },
+  readBuild(): Promise<unknown> {
+    return ipcRenderer.invoke("teamrun:readBuild");
+  },
+  copyText(text: string): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:copyText", text) as Promise<boolean>;
+  },
+  openLogFolder(): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:openLogFolder") as Promise<boolean>;
   }
 });

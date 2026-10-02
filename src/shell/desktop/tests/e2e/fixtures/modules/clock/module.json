@@ -1,0 +1,10 @@
+{
+  "id": "clock",
+  "displayName": "Clock",
+  "parts": ["runtime", "window"],
+  "dependencies": [],
+  "contributes": {
+    "methods": ["clock.time"],
+    "views": ["clock.face"]
+  }
+}

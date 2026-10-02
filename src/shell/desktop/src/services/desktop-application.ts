@@ -6,13 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import { type Event, Failure, FailureCode, QualifiedName, Response, type RuntimeHandover, ShellMethods, WindowStateKey } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, DataDirectoryLocator, LaunchSettings, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+import { ConnectionException, type DataDirectory, DataDirectoryLocator, LaunchSettings, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import type { IElectron } from "../interfaces/i-electron.js";
@@ -40,6 +41,7 @@ export class DesktopApplication {
   private readonly process: IDesktopProcess;
   private readonly settings: DesktopSettings;
   private readonly taskbar: TaskbarIdentity;
+  private readonly dataDirectory: DataDirectory;
   private readonly policy: SenderPolicy;
   private readonly factory: WindowFactory;
   private readonly startup: RuntimeStartup;
@@ -53,6 +55,7 @@ export class DesktopApplication {
     process: IDesktopProcess,
     settings: DesktopSettings,
     taskbar: TaskbarIdentity,
+    dataDirectory: DataDirectory,
     launcher: IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>) {
     this.electron = electron;
@@ -60,6 +63,7 @@ export class DesktopApplication {
     this.process = process;
     this.settings = settings;
     this.taskbar = taskbar;
+    this.dataDirectory = dataDirectory;
     this.policy = new SenderPolicy(settings.windowUrl);
     this.factory = new WindowFactory(settings, this.policy, electron, taskbar);
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t));
@@ -87,7 +91,7 @@ export class DesktopApplication {
       { ...process.env, [Resources.runAsNodeVariable]: Resources.runAsNodeValue },
       process.platform);
     const taskbar = TaskbarIdentity.create(electron.app.isPackaged, process.execPath, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
-    new DesktopApplication(electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, createLauncher(launchSettings), readDeviceAsync).run();
+    new DesktopApplication(electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, createLauncher(launchSettings), readDeviceAsync).run();
   }
 
   private run(): void {
@@ -123,6 +127,9 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.readLayoutChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.readLayoutAsync());
     this.electron.ipcMain.handle(Resources.requestChannel, (event, method, payload) => this.requestAsync(event, method, payload));
     this.electron.ipcMain.handle(Resources.writeLayoutChannel, (event, layout) => Object.isNull(this.findTrusted(event)) ? false : this.writeLayoutAsync(layout));
+    this.electron.ipcMain.handle(Resources.readBuildChannel, event => Object.isNull(this.findTrusted(event)) ? null : RuntimeBuild.identity.toJson());
+    this.electron.ipcMain.handle(Resources.copyTextChannel, (event, text) => Object.isNull(this.findTrusted(event)) ? false : this.copyText(text));
+    this.electron.ipcMain.handle(Resources.openLogFolderChannel, event => Object.isNull(this.findTrusted(event)) ? false : this.openLogFolderAsync());
     this.electron.app.on(Resources.activateEvent, () => {
       if (this.windows.size === 0)
         this.open();
@@ -200,6 +207,28 @@ export class DesktopApplication {
     const value = JsonReader.fromValue(layout).toJson();
     await (await this.createLayoutStoreAsync()).writeAsync(value);
     return true;
+  }
+
+  private copyText(text: unknown): boolean {
+    if (!Object.isString(text) || text.length > Resources.copyTextLimit)
+      return false;
+    this.electron.clipboard.writeText(text);
+    return true;
+  }
+
+  private async openLogFolderAsync(): Promise<boolean> {
+    const folder = this.dataDirectory.logsFolder;
+    try {
+      await mkdir(folder, { recursive: true });
+    }
+    catch (error) {
+      process.stderr.write(`${Resources.formatLogFolderNotOpened(String(error))}\n`);
+      return false;
+    }
+    const failure = await this.electron.shell.openPath(folder);
+    if (failure.length > 0)
+      process.stderr.write(`${Resources.formatLogFolderNotOpened(failure)}\n`);
+    return failure.length === 0;
   }
 
   private async createLayoutStoreAsync(): Promise<RuntimeWindowStateStore> {

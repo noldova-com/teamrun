@@ -165,6 +165,7 @@ export class FixtureTheme {
     ["menu-separator-spacing", "0.375rem"],
     ["tooltip-width", "30rem"],
     ["tooltip-padding", "0.25rem 0.625rem"],
+    ["popover-width", "31rem"],
     ["window-row-height", "2.5rem"],
     ["status-bar-height", "1.5rem"],
     ["status-bar-inset", "0.75rem"],

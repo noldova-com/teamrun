@@ -18,6 +18,7 @@ import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
+import { WindowPartHostFixture } from "../../../fixtures/window-part-host.fixture";
 
 @Component({
   imports: [WorkspaceComponent],
@@ -29,6 +30,8 @@ class WorkspaceHostComponent {
 }
 
 describe("WorkspaceComponent", () => {
+  beforeEach(() => TestBed.configureTestingModule({ providers: [WindowPartHostFixture.provide()] }));
+
   afterEach(() => AppearanceFixture.reset());
 
   async function renderAsync(registry: ViewRegistry, layout: Layout = Layout.createDefault(registry)): Promise<ComponentFixture<WorkspaceHostComponent>> {

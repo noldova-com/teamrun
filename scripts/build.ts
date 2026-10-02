@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import path from "node:path";
 import type { Writable } from "node:stream";
 
 import AngularProject from "./angular/angular-project.ts";
@@ -20,10 +21,12 @@ import ProcessException from "./processes/process.exception.ts";
 import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Build {
-  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]...]\n";
+  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>]]\n";
   private static readonly NO_PACKAGES: string = "No packages under src/; there is nothing to build.\n";
   private static readonly TEST_OPTION: string = "--test";
   private static readonly WITHOUT_OPTION: string = "--without";
+  private static readonly OUTPUT_OPTION: string = "--output";
+  private static readonly WINDOW_FOLDER: string = "window";
   private static readonly USAGE_EXIT_CODE: number = 2;
 
   private readonly build: PackageBuild;
@@ -42,22 +45,28 @@ export default class Build {
 
   public async runAsync(buildArguments: readonly string[]): Promise<number> {
     const isTest = buildArguments[0] === Build.TEST_OPTION;
-    const exclusions = buildArguments.slice(isTest ? 1 : 0);
-    const isWellFormed = exclusions.length % 2 === 0 && exclusions.every((t, i) => i % 2 === 1 || t === Build.WITHOUT_OPTION);
-    if (!isWellFormed || (!isTest && exclusions.length > 0)) {
+    const options = buildArguments.slice(isTest ? 1 : 0);
+    const names = options.filter((_, i) => i % 2 === 0);
+    const values = options.filter((_, i) => i % 2 === 1);
+    const isWellFormed = options.length % 2 === 0
+      && names.every(t => t === Build.WITHOUT_OPTION || t === Build.OUTPUT_OPTION)
+      && names.filter(t => t === Build.OUTPUT_OPTION).length < 2;
+    if (!isWellFormed || (!isTest && options.length > 0)) {
       this.output.write(Build.USAGE);
       return Build.USAGE_EXIT_CODE;
     }
 
     try {
-      const variant = new BuildVariant(isTest, exclusions.filter((_, i) => i % 2 === 1));
+      const variant = new BuildVariant(isTest, values.filter((_, i) => names[i] === Build.WITHOUT_OPTION));
+      const outputIndex = names.indexOf(Build.OUTPUT_OPTION);
+      const outputFolder = outputIndex < 0 ? null : path.resolve(String(values[outputIndex]));
       const declarations = await this.modules.listBuildAsync(variant.isTest, variant.excluded);
       const packages = await this.build.buildAsync(this.output, variant);
       this.output.write(packages.length === 0 ? Build.NO_PACKAGES : `Packages built and installed: ${packages.length}.\n`);
-      await this.artifacts.writeAsync(declarations);
+      await this.artifacts.writeAsync(declarations, outputFolder);
       this.output.write(`Modules in the build: ${declarations.length}.\n`);
       await this.angular.prepareAsync(this.output);
-      await this.angular.buildAsync(this.output);
+      await this.angular.buildAsync(this.output, outputFolder === null ? null : path.join(outputFolder, Build.WINDOW_FOLDER));
       return 0;
     }
     catch (error) {

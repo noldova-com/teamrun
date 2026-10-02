@@ -110,16 +110,19 @@ class AngularProjectTests {
 
     test("the window is built with the Angular CLI in src/, and a failed build stops with its exit code", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
-      const passing = new ProcessRunnerFixture([0]);
+      const passing = new ProcessRunnerFixture([0, 0]);
       const output = new TextOutputFixture();
+      const variant = path.join(repository.directory, "_build", "variants", "without-clock", "window");
 
-      await AngularProjectTests.create(repository, passing).buildAsync(output);
+      await AngularProjectTests.create(repository, passing).buildAsync(output, null);
+      await AngularProjectTests.create(repository, passing).buildAsync(new TextOutputFixture(), variant);
 
       const directory = path.join(repository.directory, "src");
-      assert.deepEqual(passing.runs, [[process.execPath, directory, path.join(directory, "node_modules", "@angular", "cli", "bin", "ng.js"), "build"]]);
+      const cli = path.join(directory, "node_modules", "@angular", "cli", "bin", "ng.js");
+      assert.deepEqual(passing.runs, [[process.execPath, directory, cli, "build"], [process.execPath, directory, cli, "build", "--output-path", variant]]);
       assert.equal(output.text, "Building the window...\n");
       await assert.rejects(
-        AngularProjectTests.create(repository, new ProcessRunnerFixture([3])).buildAsync(new TextOutputFixture()),
+        AngularProjectTests.create(repository, new ProcessRunnerFixture([3])).buildAsync(new TextOutputFixture(), null),
         new ProcessException("Building the window failed with exit code 3."));
     });
 
@@ -129,7 +132,7 @@ class AngularProjectTests {
       const runner = new ProcessRunnerFixture();
       const output = new TextOutputFixture();
 
-      await AngularProjectTests.create(repository, runner).buildAsync(output);
+      await AngularProjectTests.create(repository, runner).buildAsync(output, null);
 
       assert.deepEqual([output.text, runner.runs], ["", []]);
     });

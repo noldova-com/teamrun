@@ -30,6 +30,10 @@ test.describe("the harness's reading of the main process's error output", () => 
       .toEqual([{ kind: "platform-log", text: service }]);
   });
 
+  test("Node's debugger lines are expected, including the wait for the debugger to disconnect as the process exits", () => {
+    expect(new ErrorOutputClassifier().classify("Debugger attached.\nWaiting for the debugger to disconnect...\nDebugger ending on ws://127.0.0.1:1/x\n")).toEqual([]);
+  });
+
   test("any other output still fails, including GTK's continuation text without a GTK warning before it", () => {
     const classifier = new ErrorOutputClassifier();
 

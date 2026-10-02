@@ -163,6 +163,7 @@ export class DefaultTheme {
       ["menu-separator-spacing", "0.3125rem"],
       ["tooltip-width", "43.75rem"],
       ["tooltip-padding", "0.125rem 0.5rem"],
+      ["popover-width", "27.5rem"],
       ["window-row-height", "2.1875rem"],
       ["status-bar-height", "1.25rem"],
       ["status-bar-inset", "0.5rem"],

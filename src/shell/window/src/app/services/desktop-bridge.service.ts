@@ -14,6 +14,7 @@ import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-fo
 import { DesktopBridgeException } from "../exceptions/desktop-bridge.exception";
 import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
 import type { IDesktopBridge } from "../interfaces/i-desktop-bridge";
+import { BuildInfo } from "../models/build-info";
 import { StartupState } from "../models/startup-state";
 import type { WindowAppearance } from "../models/window-appearance";
 import { Resources } from "../../resources";
@@ -74,6 +75,18 @@ export class DesktopBridgeService {
     return this.bridge.onEvent((name, payload) => listener(name, JsonReader.toJsonValue(payload)));
   }
 
+  public async readBuildAsync(): Promise<BuildInfo> {
+    return BuildInfo.fromJson(await this.bridge.readBuild());
+  }
+
+  public copyTextAsync(text: string): Promise<boolean> {
+    return this.bridge.copyText(text);
+  }
+
+  public openLogFolderAsync(): Promise<boolean> {
+    return this.bridge.openLogFolder();
+  }
+
   private static find(): IDesktopBridge {
     const bridge: unknown = Reflect.get(globalThis, Resources.bridgeName);
     if (!DesktopBridgeService.isBridge(bridge))
@@ -93,6 +106,9 @@ export class DesktopBridgeService {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readLayout))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.writeLayout))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.request))) &&
-      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onEvent)));
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onEvent))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readBuild))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.copyText))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.openLogFolder)));
   }
 }

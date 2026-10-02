@@ -29,6 +29,7 @@ export default class AngularProject {
   private static readonly BROWSER_ARGUMENTS: readonly string[] = ["install", "--only-shell", "chromium"];
   private static readonly TEST_ARGUMENTS: readonly string[] = ["test"];
   private static readonly BUILD_ARGUMENTS: readonly string[] = ["build"];
+  private static readonly OUTPUT_PATH_OPTION: string = "--output-path";
   private static readonly NO_PROJECT: string = "No Angular project under src/; there is nothing to prepare.\n";
   private static readonly INSTALLING: string = "Installing the Angular project in src/...\n";
   private static readonly INSTALLING_BROWSER: string = "Installing the browser for the Angular tests...\n";
@@ -65,12 +66,16 @@ export default class AngularProject {
       throw new ProcessException(`Installing the browser for the Angular tests failed with exit code ${exitCode}.`);
   }
 
-  public async buildAsync(output: Writable): Promise<void> {
+  public async buildAsync(output: Writable, outputPath: string | null): Promise<void> {
     if (!this.hasProject())
       return;
 
     output.write(AngularProject.BUILDING);
-    const exitCode = await this.runner.runAsync(process.execPath, [path.join(this.directory, AngularProject.CLI), ...AngularProject.BUILD_ARGUMENTS], this.directory);
+    const outputArguments = outputPath === null ? [] : [AngularProject.OUTPUT_PATH_OPTION, outputPath];
+    const exitCode = await this.runner.runAsync(
+      process.execPath,
+      [path.join(this.directory, AngularProject.CLI), ...AngularProject.BUILD_ARGUMENTS, ...outputArguments],
+      this.directory);
     if (exitCode !== 0)
       throw new ProcessException(`Building the window failed with exit code ${exitCode}.`);
   }

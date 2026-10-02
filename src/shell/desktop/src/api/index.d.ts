@@ -545,6 +545,47 @@ export interface IMenuHost {
 }
 
 /**
+ * Writes to the system clipboard, as Electron's `clipboard` provides it.
+ */
+export interface IClipboardHost {
+  /**
+   * Replaces the clipboard's contents with plain text.
+   *
+   * @param text The text to copy.
+   * @example
+   * ```ts
+   * import type { IClipboardHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function copyVersion(host: IClipboardHost, version: string): void {
+   *   host.writeText(`TeamRun ${version}`);
+   * }
+   * ```
+   */
+  writeText(text: string): void;
+}
+
+/**
+ * Opens files and folders in the system's own application, as Electron's `shell` provides it.
+ */
+export interface IShellHost {
+  /**
+   * Opens a file or folder, such as a folder in the system's file manager.
+   *
+   * @param path The absolute path to open.
+   * @returns An empty string once it opens, or the system's reason it could not.
+   * @example
+   * ```ts
+   * import type { IShellHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function openFolderAsync(host: IShellHost, folder: string): Promise<boolean> {
+   *   return (await host.openPath(folder)).length === 0;
+   * }
+   * ```
+   */
+  openPath(path: string): Promise<string>;
+}
+
+/**
  * A window's web contents, as Electron's `WebContents` provides them.
  */
 export interface IWindowContents {
@@ -998,6 +1039,16 @@ export interface IElectron {
    * The application menu.
    */
   readonly menu: IMenuHost;
+
+  /**
+   * The system clipboard, for copying text the window asks to copy.
+   */
+  readonly clipboard: IClipboardHost;
+
+  /**
+   * The system's file manager, for opening the log folder.
+   */
+  readonly shell: IShellHost;
 
   /**
    * The displays, for placing a window on one that shows it.
