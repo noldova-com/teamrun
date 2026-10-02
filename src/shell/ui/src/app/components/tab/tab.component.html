@@ -1,0 +1,18 @@
+<span class="tr-tab-pill">
+  @if (icon(); as glyph) {
+    <span class="tr-tab-icon material-symbols-rounded" aria-hidden="true">{{ glyph }}</span>
+  }
+  <span class="tr-tab-label">{{ label() }}</span>
+  @if (closable() || working()) {
+    <span class="tr-tab-action">
+      @if (working()) {
+        <span class="tr-tab-spinner" aria-hidden="true"></span>
+      }
+      @if (closable()) {
+        <button type="button" class="tr-tab-close" tabindex="-1" [attr.aria-label]="closeLabel()" (click)="onCloseClick($event)">
+          <span class="material-symbols-rounded" aria-hidden="true">{{ resources.closeGlyph }}</span>
+        </button>
+      }
+    </span>
+  }
+</span>

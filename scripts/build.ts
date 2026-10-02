@@ -8,19 +8,25 @@
 
 import type { Writable } from "node:stream";
 
-import PackageCatalog from "./packages/package-catalog.ts";
+import AngularProject from "./angular/angular-project.ts";
+import PackageBuild from "./packages/package-build.ts";
+import PackageException from "./packages/package.exception.ts";
+import ProcessRunner from "./processes/process-runner.ts";
+import ProcessException from "./processes/process.exception.ts";
+import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Build {
   private static readonly USAGE: string = "Usage: npm run build\n";
   private static readonly NO_PACKAGES: string = "No packages under src/; there is nothing to build.\n";
-  private static readonly UNSUPPORTED: string = "The build cannot build packages yet. Found:\n";
   private static readonly USAGE_EXIT_CODE: number = 2;
 
-  private readonly catalog: PackageCatalog;
+  private readonly build: PackageBuild;
+  private readonly angular: AngularProject;
   private readonly output: Writable;
 
-  public constructor(catalog: PackageCatalog, output: Writable) {
-    this.catalog = catalog;
+  public constructor(build: PackageBuild, angular: AngularProject, output: Writable) {
+    this.build = build;
+    this.angular = angular;
     this.output = output;
   }
 
@@ -30,16 +36,23 @@ export default class Build {
       return Build.USAGE_EXIT_CODE;
     }
 
-    const manifests = await this.catalog.listManifestsAsync();
-    if (manifests.length === 0) {
-      this.output.write(Build.NO_PACKAGES);
+    try {
+      const packages = await this.build.buildAsync(this.output);
+      this.output.write(packages.length === 0 ? Build.NO_PACKAGES : `Packages built and installed: ${packages.length}.\n`);
+      await this.angular.prepareAsync(this.output);
       return 0;
     }
-
-    this.output.write(`${Build.UNSUPPORTED}${manifests.map(t => `  ${t}\n`).join("")}`);
-    return 1;
+    catch (error) {
+      if (!(error instanceof PackageException || error instanceof ProcessException))
+        throw error;
+      this.output.write(`${error.message}\n`);
+      return 1;
+    }
   }
 }
 
-if (import.meta.main)
-  process.exitCode = await new Build(new PackageCatalog(process.cwd()), process.stdout).runAsync(process.argv.slice(2));
+if (import.meta.main) {
+  const runner = new ProcessRunner();
+  const angular = new AngularProject(process.cwd(), runner, new NpmCommand(runner, process.env));
+  process.exitCode = await new Build(new PackageBuild(process.cwd(), runner, process.env), angular, process.stdout).runAsync(process.argv.slice(2));
+}

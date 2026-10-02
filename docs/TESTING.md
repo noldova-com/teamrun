@@ -10,10 +10,10 @@ The [coding standards](CODING-STANDARDS.md) own test authoring, placement, API c
 |---|---|
 | Foundation Testing (`src/foundation/testing`) | Package-test discovery, execution, assertions, structured results, reporting and coverage measurement/enforcement |
 | Node.js's built-in test runner | The tests of the repository's scripts under `scripts/tests` and their coverage, because scripts run before foundation is built |
-| Angular test configuration | Component and service execution through Angular's supported testing surface, including framework error propagation and DOM-state isolation |
+| Angular test configuration | Component and service execution through Angular's supported testing surface, including framework error propagation and DOM-state isolation. Vitest runs the specs in headless Chromium through Playwright, so styles, layout and computed values are real |
 | Playwright desktop UI suite | User workflows through the running Electron application, named screenshot checkpoints, traces and cross-platform results |
 | Tests of the owning package | Its domain, protocol, persistence and process behavior through the boundary being verified |
-| Structural checks | The architecture's [dependency rules](ARCHITECTURE.md#2-components-and-dependency-direction): what a module may import, and that the shell's production source names no module; and its [identity rules](ARCHITECTURE.md#3-vocabulary-and-identity): that no two complete names are equal |
+| Structural checks | The architecture's [dependency rules](ARCHITECTURE.md#2-components-and-dependency-direction): what a module may import, that each package imports only what its own manifest declares, and that the shell's production source names no module; and its [identity rules](ARCHITECTURE.md#3-vocabulary-and-identity): that no two complete names are equal |
 | Build and verification entry points | Select the source state and scope, prepare the required installed artifacts, invoke the relevant checks and aggregate their outcomes |
 | Native installer and update checks | Exercise the packaged application and installation lifecycle on the stated OS and CPU |
 
@@ -67,7 +67,7 @@ The coverage and configuration requirements are:
 | Repository-owned executable automation, including build, test, packaging and release logic | 100% executable-code coverage, with behavior and process-boundary checks appropriate to the operation |
 | YAML and other non-executable configuration | Applicable schema/configuration validation and workflow checks; no executable-code coverage percentage |
 | A module's `protocol`, `runtime` and `cli` | 100% of executable production code. Where a part drives an external tool, doubles cover parsing, routing and lifecycle; behavior only the real tool can exercise needs separately authorized live verification and explicit accounting of uncovered lines |
-| Angular packages: the shell's `window` and `ui`, and a module's `window` | 100% of executable production code through component and service tests on the framework's testing surface, measured with Vitest's V8 coverage through the Angular unit-test builder and fed into the same report and gate as the other packages, plus the desktop UI workflow gate in section 6 |
+| Angular parts: the shell's `window` and `ui`, and a module's `window` | 100% of executable production code through component and service tests on the framework's testing surface, measured with Vitest's V8 coverage through the Angular unit-test builder, whose threshold fails `npm test` like the other coverage gates, plus the desktop UI workflow gate in section 6. Enum files hold no executable code after the build, which inlines their members, and are left out of the measurement |
 | `src/shell/desktop` | Application-launch verification, process-boundary tests through appropriate doubles and real-process checks, and the desktop UI workflow gate in section 6 |
 
 Define additional packages' coverage and scope before claiming a complete gate. Non-executable definitions need no artificial tests; other exclusions are explicit, justified and reported, including behavior requiring live services. Executable scripts retain their coverage obligations. Inline workflow scripts stay small and carry no coverage percentage; their tests run the exact text from the workflow against doubles of the tools it calls.

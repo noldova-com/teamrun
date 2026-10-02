@@ -9,16 +9,25 @@
 import { appendFile } from "node:fs/promises";
 import type { Writable } from "node:stream";
 
+import AngularProject from "./angular/angular-project.ts";
+import AngularTestCheck from "./checks/angular-test-check.ts";
+import DeclaredDependencyCheck from "./checks/declared-dependency-check.ts";
 import DocumentCheck from "./checks/document-check.ts";
 import type ICheck from "./checks/interfaces/check.ts";
 import ModuleFolderCheck from "./checks/module-folder-check.ts";
+import ModuleImportCheck from "./checks/module-import-check.ts";
+import NameUniquenessCheck from "./checks/name-uniqueness-check.ts";
 import PackageCheck from "./checks/package-check.ts";
+import PackageTestCheck from "./checks/package-test-check.ts";
 import ScriptTestCheck from "./checks/script-test-check.ts";
+import ShellIndependenceCheck from "./checks/shell-independence-check.ts";
 import TypeCheck from "./checks/type-check.ts";
-import PackageCatalog from "./packages/package-catalog.ts";
+import PackageBuild from "./packages/package-build.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import Git from "./repository/git.ts";
 import RepositoryFiles from "./repository/repository-files.ts";
+import SourceTree from "./structure/source-tree.ts";
+import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Test {
   private static readonly DOCUMENTS_SELECTION: string = "documents";
@@ -67,14 +76,23 @@ export default class Test {
   }
 
   private selectChecks(selection: readonly string[]): readonly ICheck[] | null {
-    const documents = new DocumentCheck(this.root, new RepositoryFiles(this.root, new Git(this.root, this.runner)));
+    const files = new RepositoryFiles(this.root, new Git(this.root, this.runner));
+    const documents = new DocumentCheck(this.root, files);
+    const tree = new SourceTree(this.root, files);
+    const build = new PackageBuild(this.root, this.runner, this.environment);
     if (selection.length === 0)
       return [
         documents,
         new ModuleFolderCheck(this.root),
-        new PackageCheck(new PackageCatalog(this.root)),
+        new ShellIndependenceCheck(tree),
+        new ModuleImportCheck(tree),
+        new NameUniquenessCheck(tree),
+        new DeclaredDependencyCheck(tree),
+        new PackageCheck(build),
+        new PackageTestCheck(this.root, build, this.runner, this.environment),
         new TypeCheck(this.root, this.runner),
-        new ScriptTestCheck(this.root, this.runner)
+        new ScriptTestCheck(this.root, this.runner),
+        new AngularTestCheck(new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment)))
       ];
     return selection.length === 1 && selection[0] === Test.DOCUMENTS_SELECTION ? [documents] : null;
   }

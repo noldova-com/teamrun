@@ -1,0 +1,60 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: var(--tr-sash);
+  cursor: row-resize;
+  outline: none;
+  touch-action: none;
+}
+
+:host(.tr-sash-vertical) {
+  width: var(--tr-sash);
+  height: auto;
+  cursor: col-resize;
+}
+
+:host::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--tr-sash) * -1) 0;
+}
+
+:host(.tr-sash-vertical)::before {
+  inset: 0 calc(var(--tr-sash) * -1);
+}
+
+:host(:focus-visible) {
+  outline: var(--tr-border-width) solid var(--tr-accent);
+}
+
+.tr-sash-grip {
+  display: flex;
+  gap: var(--tr-sash-grip-spacing);
+}
+
+:host(.tr-sash-vertical) .tr-sash-grip {
+  flex-direction: column;
+}
+
+.tr-sash-dot {
+  width: var(--tr-sash-grip);
+  height: var(--tr-sash-grip);
+  border-radius: 50%;
+  background-color: color-mix(in srgb, var(--tr-text) 30%, transparent);
+}
+
+:host(.tr-sash-active) .tr-sash-dot {
+  background-color: var(--tr-accent);
+}

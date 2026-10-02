@@ -29,7 +29,7 @@ npm run build
 npm test
 ```
 
-`npm ci` installs the exact tool versions the repository pins and warns when your Node.js or npm version differs from the required one. `npm run build` builds the packages under `src/`. `npm test` runs the complete set of checks: the documents' format and links, the folder structure, and the type check and tests of the repository's scripts with full coverage. `npm test -- documents` runs only the document checks.
+`npm ci` installs the exact tool versions the repository pins and warns when your Node.js or npm version differs from the required one. `npm run build` builds the packages under `src/`, installs the Angular project in `src/` from its own lockfile and downloads the headless Chromium its tests run in. `npm test` runs the complete set of checks: the documents' format and links, the folder structure, the architecture's dependency and naming rules, the type check and tests of the repository's scripts, and the Angular tests, each with full coverage. `npm test -- documents` runs only the document checks.
 
 ## Questions, ideas and contributions
 
