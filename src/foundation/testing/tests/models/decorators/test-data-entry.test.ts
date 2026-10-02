@@ -27,6 +27,6 @@ export class TestDataEntryTests {
     const testClass = new TestDiscovery().discoverModuleExports({ SampleTests }, "sample.test.js", "Sample")[0];
     const method = testClass?.methods[0];
     Assert.isDefined(method);
-    Assert.areEqual<unknown>("original", method.testData[0]);
+    Assert.areEqual<unknown>("original", method.testDataRow?.values[0]);
   }
 }
