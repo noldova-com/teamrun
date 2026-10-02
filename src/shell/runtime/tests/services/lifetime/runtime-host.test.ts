@@ -12,9 +12,10 @@ import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, ModuleStatusList, QualifiedName, Request, ShellMethods, StopPolicy, StopRequest } from "@noldova/teamrun-shell-protocol";
+import { BuildIdentity, ModuleStatusList, QualifiedName, Request, type Response, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateWrite } from "@noldova/teamrun-shell-protocol";
 import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
 
+import type { RawConnectionFixture } from "../../fixtures/raw-connection.fixture.js";
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 import { TextOutputFixture } from "../../fixtures/text-output.fixture.js";
 
@@ -131,11 +132,60 @@ export class RuntimeHostTests {
       Assert.isFalse(responses.slice(1).some(t => t.hasFailed));
       Assert.isFalse(admission.hasFailed);
       Assert.isFalse(again.hasFailed);
+      admitted.sendMessages(new Request("desktop:5", ShellMethods.readWindowBounds, new WindowStateKey("device-1", "main").toJson()));
+      Assert.areEqual("{\"value\":null}", JSON.stringify((await admitted.readResponseAsync()).payload));
       Assert.isTrue(existsSync(path.join(root, "shell.sqlite")));
       Assert.isFalse(existsSync(path.join(root, "teamrun.db")));
       const moved = (await readdir(fixture.root)).filter(t => t.startsWith("data-before-shell-"));
       Assert.areEqual(1, moved.length);
       Assert.areEqual("teamrun.db", (await readdir(path.join(fixture.root, String(moved[0])))).join(","));
+    });
+  }
+
+  @TestMethod
+  public keepsEachWindowsBoundsAndLayoutForItsDevice(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      await fixture.startAsync();
+      const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      const main = new WindowStateKey("device-1", "main");
+      const other = new WindowStateKey("device-2", "main");
+
+      connection.sendMessages(
+        new Request("desktop:1", ShellMethods.readWindowBounds, main.toJson()),
+        new Request("desktop:2", ShellMethods.writeWindowBounds, new WindowStateWrite(main, { width: 1000, height: 700 }).toJson()),
+        new Request("desktop:3", ShellMethods.writeWindowLayout, new WindowStateWrite(main, { version: 1 }).toJson()),
+        new Request("desktop:4", ShellMethods.writeWindowBounds, new WindowStateWrite(main, { width: 1100, height: 700 }).toJson()),
+        new Request("desktop:5", ShellMethods.readWindowBounds, main.toJson()),
+        new Request("desktop:6", ShellMethods.readWindowLayout, main.toJson()),
+        new Request("desktop:7", ShellMethods.readWindowBounds, other.toJson()),
+        new Request("desktop:8", ShellMethods.writeWindowLayout, { device: "device-1", window: "main" }));
+      const responses = await RuntimeHostTests.readResponsesAsync(connection, 8);
+
+      Assert.areEqual("{\"value\":null}", JSON.stringify(responses.get("desktop:1")?.payload));
+      Assert.areEqual("{\"value\":{\"width\":1100,\"height\":700}}", JSON.stringify(responses.get("desktop:5")?.payload));
+      Assert.areEqual("{\"value\":{\"version\":1}}", JSON.stringify(responses.get("desktop:6")?.payload));
+      Assert.areEqual("{\"value\":null}", JSON.stringify(responses.get("desktop:7")?.payload));
+      Assert.areEqual("InvalidParams", responses.get("desktop:8")?.failure?.code);
+      Assert.isFalse(["desktop:2", "desktop:3", "desktop:4"].some(t => responses.get(t)?.hasFailed === true));
+    });
+  }
+
+  @TestMethod
+  public keepsWindowStateAcrossRuntimes(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const first = await fixture.startAsync();
+      const [writer] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      const key = new WindowStateKey("device-1", "main");
+      writer.sendMessages(new Request("desktop:1", ShellMethods.writeWindowBounds, new WindowStateWrite(key, { width: 900, height: 600 }).toJson()));
+      await writer.readResponseAsync();
+      first.requestStop("test");
+      await first.waitForStopAsync();
+
+      await fixture.startAsync();
+      const [reader] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      reader.sendMessages(new Request("desktop:2", ShellMethods.readWindowBounds, key.toJson()));
+
+      Assert.areEqual("{\"value\":{\"width\":900,\"height\":600}}", JSON.stringify((await reader.readResponseAsync()).payload));
     });
   }
 
@@ -260,6 +310,15 @@ export class RuntimeHostTests {
 
       Assert.isFalse(existsSync(fixture.dataDirectory.root));
     });
+  }
+
+  private static async readResponsesAsync(connection: RawConnectionFixture, count: number): Promise<Map<string, Response>> {
+    const responses = new Map<string, Response>();
+    for (let index = 0; index < count; index++) {
+      const response = await connection.readResponseAsync();
+      responses.set(String(response.id), response);
+    }
+    return responses;
   }
 
   private static async runAsync(test: (fixture: RuntimeHostFixture) => Promise<void>): Promise<void> {

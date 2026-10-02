@@ -53,6 +53,20 @@ export class ShellDatabaseTests {
   }
 
   @TestMethod
+  public async runsAndReadsStatementsWhileOpen(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    using lock = OwnershipLock.acquire(new DataDirectory(folder.path));
+    const database = await ShellDatabase.openAsync(lock, [ShellDatabaseTests.SETTINGS]);
+
+    database.run("INSERT INTO settings (name, value) VALUES (?, ?)", "theme", "dark");
+
+    Assert.areEqual("dark", database.read("SELECT value FROM settings WHERE name = ?", "theme")?.["value"]);
+    Assert.isUndefined(database.read("SELECT value FROM settings WHERE name = ?", "mode"));
+    database.close();
+    Assert.throws(() => database.read("SELECT value FROM settings"), Error);
+  }
+
+  @TestMethod
   public async backsUpAnExistingDatabaseBeforeApplyingNewMigrations(): Promise<void> {
     await using folder = await TemporaryFolderFixture.createAsync();
     using lock = OwnershipLock.acquire(new DataDirectory(folder.path));

@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from "node:sqlite";
 
 import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
@@ -22,7 +22,7 @@ import type { OwnershipLock } from "../ownership/ownership-lock.js";
 import { DatabaseBackup } from "./database-backup.js";
 
 export class ShellDatabase implements Disposable {
-  private connection: DatabaseSync | null;
+  private readonly connection: DatabaseSync;
 
   public readonly appliedMigrations: readonly string[];
 
@@ -58,9 +58,17 @@ export class ShellDatabase implements Disposable {
     }
   }
 
+  public read(statement: string, ...values: SQLInputValue[]): Record<string, SQLOutputValue> | undefined {
+    return this.connection.prepare(statement).get(...values);
+  }
+
+  public run(statement: string, ...values: SQLInputValue[]): void {
+    this.connection.prepare(statement).run(...values);
+  }
+
   public close(): void {
-    this.connection?.close();
-    this.connection = null;
+    if (this.connection.isOpen)
+      this.connection.close();
   }
 
   public [Symbol.dispose](): void {

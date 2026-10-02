@@ -7,7 +7,7 @@
  */
 
 import type { EventEmitter } from "node:events";
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync, SQLInputValue, SQLOutputValue } from "node:sqlite";
 import type { Writable } from "node:stream";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
@@ -713,6 +713,41 @@ export declare class ShellDatabase implements Disposable {
    * ```
    */
   public static openAsync(lock: OwnershipLock, migrations: readonly Migration[], moment?: Date): Promise<ShellDatabase>;
+
+  /**
+   * Runs a query of the shell's own facilities and returns its first row.
+   *
+   * @param statement The SQL statement, with `?` placeholders.
+   * @param values The placeholders' values, in order.
+   * @returns The first row, or `undefined` when there is none.
+   * @throws Error synchronously when the statement fails or the database is closed.
+   * @example
+   * ```ts
+   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readBounds(database: ShellDatabase): unknown {
+   *   return database.read("SELECT bounds AS value FROM window_states WHERE device = ? AND window = ?", "device-1", "main")?.["value"];
+   * }
+   * ```
+   */
+  public read(statement: string, ...values: SQLInputValue[]): Record<string, SQLOutputValue> | undefined;
+
+  /**
+   * Runs a statement that changes the shell's own facilities.
+   *
+   * @param statement The SQL statement, with `?` placeholders.
+   * @param values The placeholders' values, in order.
+   * @throws Error synchronously when the statement fails or the database is closed.
+   * @example
+   * ```ts
+   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function forget(database: ShellDatabase): void {
+   *   database.run("DELETE FROM window_states WHERE device = ?", "device-1");
+   * }
+   * ```
+   */
+  public run(statement: string, ...values: SQLInputValue[]): void;
 
   /**
    * Closes the database; closing again does nothing.

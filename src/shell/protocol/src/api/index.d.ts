@@ -607,6 +607,199 @@ export declare class StopRequest {
 }
 
 /**
+ * Which window's state a request reads or writes: the device that recorded
+ * it and the window on that device. State tied to a display or a window is
+ * kept for the device and window that recorded it.
+ */
+export declare class WindowStateKey {
+  /**
+   * The device's identity.
+   */
+  public readonly device: string;
+
+  /**
+   * The window's identity on the device.
+   */
+  public readonly window: string;
+
+  /**
+   * Creates the key.
+   *
+   * @param device The device's identity; not whitespace only.
+   * @param window The window's identity; not whitespace only.
+   * @throws ArgumentException synchronously when either is empty or
+   * whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { WindowStateKey } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const key: WindowStateKey = new WindowStateKey("1b4e28ba-2fa1-41d2-883f-0016d3cca427", "main");
+   * ```
+   */
+  public constructor(device: string, window: string);
+
+  /**
+   * Reads a key from its wire form, the payload of `shell.readWindowBounds`
+   * and `shell.readWindowLayout`.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The key.
+   * @throws JsonException synchronously when a field is missing, blank or
+   * not a string, or another field is present; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { WindowStateKey } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const key: WindowStateKey = WindowStateKey.fromJson({ device: "1b4e28ba-2fa1-41d2-883f-0016d3cca427", window: "main" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): WindowStateKey;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `device` and `window` fields.
+   *
+   * @example
+   * ```ts
+   * import { Request, ShellMethods, WindowStateKey } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const read: Request = new Request("r1", ShellMethods.readWindowBounds, new WindowStateKey("1b4e28ba-2fa1-41d2-883f-0016d3cca427", "main").toJson());
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The payload of `shell.writeWindowBounds` and `shell.writeWindowLayout`:
+ * the window's key and the state to keep for it. The shell stores the state
+ * as given; its owner, the desktop for bounds and the window for layout,
+ * defines its form.
+ */
+export declare class WindowStateWrite {
+  /**
+   * The window whose state is written.
+   */
+  public readonly key: WindowStateKey;
+
+  /**
+   * The state to keep.
+   */
+  public readonly value: JsonObject;
+
+  /**
+   * Creates the write.
+   *
+   * @param key The window.
+   * @param value The state to keep.
+   *
+   * @example
+   * ```ts
+   * import { WindowStateKey, WindowStateWrite } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const write: WindowStateWrite = new WindowStateWrite(new WindowStateKey("1b4e28ba-2fa1-41d2-883f-0016d3cca427", "main"), { width: 1280, height: 800 });
+   * ```
+   */
+  public constructor(key: WindowStateKey, value: JsonObject);
+
+  /**
+   * Reads a write from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The write.
+   * @throws JsonException synchronously when the key's fields are invalid,
+   * the value is missing or not an object, or another field is present;
+   * its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { WindowStateWrite } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const write: WindowStateWrite = WindowStateWrite.fromJson({ device: "1b4e28ba-2fa1-41d2-883f-0016d3cca427", window: "main", value: { width: 1280 } });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): WindowStateWrite;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The key's `device` and `window` fields and the `value` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { WindowStateKey, WindowStateWrite } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new WindowStateWrite(new WindowStateKey("1b4e28ba-2fa1-41d2-883f-0016d3cca427", "main"), { width: 1280 }).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The answer to `shell.readWindowBounds` and `shell.readWindowLayout`: the
+ * state kept for the window, or `null` when none is kept.
+ */
+export declare class WindowStateValue {
+  /**
+   * The kept state, or `null`.
+   */
+  public readonly value: JsonObject | null;
+
+  /**
+   * Creates the answer.
+   *
+   * @param value The kept state, or `null` when none is kept.
+   *
+   * @example
+   * ```ts
+   * import { WindowStateValue } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const answer: WindowStateValue = new WindowStateValue(null);
+   * ```
+   */
+  public constructor(value: JsonObject | null);
+
+  /**
+   * Reads an answer from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The answer.
+   * @throws JsonException synchronously when the value is missing or neither
+   * an object nor `null`, or another field is present; its path names the
+   * field.
+   *
+   * @example
+   * ```ts
+   * import { WindowStateValue } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const answer: WindowStateValue = WindowStateValue.fromJson({ value: { width: 1280 } });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): WindowStateValue;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `value` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { WindowStateValue } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new WindowStateValue({ width: 1280 }).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
  * The work in progress that keeps a runtime from stopping, as a `Conflict`
  * answer to `shell.stop` carries it in its details. Its wire form never
  * changes after protocol version 1.
@@ -884,6 +1077,31 @@ export declare class ShellMethods {
    * is unaffected.
    */
   public static readonly modules: QualifiedName;
+
+  /**
+   * `shell.readWindowBounds`: reads the bounds the desktop kept for a
+   * window; its payload is a `WindowStateKey` and its answer a
+   * `WindowStateValue`.
+   */
+  public static readonly readWindowBounds: QualifiedName;
+
+  /**
+   * `shell.writeWindowBounds`: keeps a window's bounds; its payload is a
+   * `WindowStateWrite`.
+   */
+  public static readonly writeWindowBounds: QualifiedName;
+
+  /**
+   * `shell.readWindowLayout`: reads the layout a window kept; its payload is
+   * a `WindowStateKey` and its answer a `WindowStateValue`.
+   */
+  public static readonly readWindowLayout: QualifiedName;
+
+  /**
+   * `shell.writeWindowLayout`: keeps a window's layout; its payload is a
+   * `WindowStateWrite`.
+   */
+  public static readonly writeWindowLayout: QualifiedName;
 }
 
 /**

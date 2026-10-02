@@ -60,6 +60,10 @@ export class Resources {
   public static readonly nameColumn: string = "name";
   public static readonly positionColumn: string = "position";
   public static readonly idColumn: string = "id";
+  public static readonly valueColumn: string = "value";
+  public static readonly windowStatesMigration: string = "window-states";
+  public static readonly createWindowStatesStatement: string =
+    "CREATE TABLE window_states (device TEXT NOT NULL, window TEXT NOT NULL, bounds TEXT, layout TEXT, PRIMARY KEY (device, window)) STRICT";
   public static readonly errorCodeField: "errcode" = "errcode";
   public static readonly busyErrorCode: number = 5;
   public static readonly ownershipWaitMilliseconds: number = 250;
@@ -384,5 +388,13 @@ export class Resources {
 
   public static formatArgumentInvalid(name: string, value: string): string {
     return `The argument ${name} ${value} is not valid.`;
+  }
+
+  public static formatReadWindowState(column: string): string {
+    return `SELECT ${column} AS value FROM window_states WHERE device = ? AND window = ?`;
+  }
+
+  public static formatWriteWindowState(column: string): string {
+    return `INSERT INTO window_states (device, window, ${column}) VALUES (?, ?, ?) ON CONFLICT (device, window) DO UPDATE SET ${column} = excluded.${column}`;
   }
 }
