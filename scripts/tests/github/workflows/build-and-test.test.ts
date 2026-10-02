@@ -149,6 +149,66 @@ class BuildAndTestTests {
       assert.equal(text.match(/key: \$\{\{ steps\.(root|angular)-dependencies\.outputs\.cache-primary-key \}\}/g)?.length, 2);
     });
 
+    test("Electron's binary is installed before the dependencies are saved, so a saved install includes it", async () => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const text = workflow.text;
+
+      assert.equal(workflow.readStepScript("Install Electron"), "node node_modules/electron/install.js\n");
+      assert.ok(text.includes("      - name: Install Electron\n        run: "));
+      assert.ok(text.indexOf("      - name: Install dependencies\n") < text.indexOf("      - name: Install Electron\n"));
+      assert.ok(text.indexOf("      - name: Install Electron\n") < text.indexOf("      - name: Save the installed dependencies\n"));
+    });
+
+    test("the UI workflows run after the tests, under Xvfb on Linux, and their results are kept from every run", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const text = workflow.text;
+      const script = workflow.readStepScript("Test the UI workflows");
+      const doubles = await CommandDoublesFixture.createAsync();
+      t.after(() => doubles.disposeAsync());
+      doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui", "");
+      doubles.respond("npm", "run test:ui", "");
+
+      const linux = await doubles.runAsync(script, { RUNNER_OS: "Linux" });
+      const windows = await doubles.runAsync(script, { RUNNER_OS: "Windows" });
+      const macos = await doubles.runAsync(script, { RUNNER_OS: "macOS" });
+
+      assert.deepEqual([linux.status, windows.status, macos.status], [0, 0, 0], linux.stderr + windows.stderr + macos.stderr);
+      assert.deepEqual(await doubles.readCallsAsync(), ["xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui", "npm run test:ui", "npm run test:ui"]);
+      assert.ok(text.indexOf("      - name: Test\n") < text.indexOf("      - name: Test the UI workflows\n"));
+      for (const [step, id] of [["Keep the UI workflow results", ""], ["Keep the main window screenshot", "        id: screenshot\n"], ["Summarize the UI workflows", ""]] as const)
+        assert.ok(text.includes(`      - name: ${step}\n${id}        if: always() && steps.ui.outcome != 'skipped'\n`), step);
+      assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n"));
+      assert.ok(text.includes("          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}\n          path: _build/ui\n          retention-days: 14\n"));
+      assert.ok(text.includes("          path: _build/ui/main-window-*.png\n          archive: false\n          retention-days: 14\n"));
+      assert.equal(workflow.readStepScript("Summarize the UI workflows"), "node scripts/ui-summary.ts\n");
+      assert.ok(text.includes("          UI_TARGET: ${{ matrix.target }}\n          SCREENSHOT_URL: ${{ steps.screenshot.outputs.artifact-url }}\n"));
+    });
+
+    test("a failed UI workflow run fails its step", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript("Test the UI workflows");
+      const doubles = await CommandDoublesFixture.createAsync();
+      t.after(() => doubles.disposeAsync());
+      doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui", "", 1);
+      doubles.respond("npm", "run test:ui", "", 1);
+
+      assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Linux" })).status, 1);
+      assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Windows" })).status, 1);
+    });
+
+    test("Linux targets let Electron's sandbox create its namespaces before the UI workflows", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const doubles = await CommandDoublesFixture.createAsync();
+      t.after(() => doubles.disposeAsync());
+      doubles.respond("sudo", "sysctl -w kernel.apparmor_restrict_unprivileged_userns=0", "");
+
+      const result = await doubles.runAsync(workflow.readStepScript("Let Electron's sandbox start on Linux"));
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(await doubles.readCallsAsync(), ["sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0"]);
+      assert.ok(workflow.text.includes("      - name: Let Electron's sandbox start on Linux\n        if: runner.os == 'Linux'\n"));
+      assert.ok(workflow.text.indexOf("Let Electron's sandbox start on Linux") < workflow.text.indexOf("Test the UI workflows"));
+    });
+
     test("an inexact Angular restore is discarded, so a partial restore never passes as installed", async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript("Discard an inexact Angular install");
       const doubles = await CommandDoublesFixture.createAsync();

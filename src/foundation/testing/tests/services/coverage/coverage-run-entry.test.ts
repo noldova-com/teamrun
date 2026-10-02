@@ -40,13 +40,37 @@ export class CoverageRunEntryTests {
   }
 
   @TestMethod
+  public passesAPackageWhoseOnlyUncoveredFileItExcludes(): Promise<void> {
+    return this.runPackageAsync(false, async (run, summary) => {
+      Assert.areEqual(0, run.exitCode, run.errorOutput);
+      Assert.isTrue(summary.includes("| Coverage gate | Passed |"), summary);
+      Assert.isTrue(summary.includes("| Excluded files | 1 |"), summary);
+      Assert.isTrue(summary.includes("excluded: Runs only inside Electron."), summary);
+    }, JSON.stringify([{ file: "orphan.js", reason: "Runs only inside Electron." }]));
+  }
+
+  @TestMethod
+  public failsForAnExclusionOfAFileThePackageDoesNotHave(): Promise<void> {
+    return this.runPackageAsync(true, async run => {
+      Assert.areEqual(1, run.exitCode, run.errorOutput);
+      Assert.isTrue(run.errorOutput.includes("Sample excludes files it does not have: main.js."), run.errorOutput);
+    }, JSON.stringify([{ file: "main.js", reason: "Runs only inside Electron." }]));
+  }
+
+  @TestMethod
+  public async failsForExclusionsThatAreNotAListOfFilesAndReasons(): Promise<void> {
+    for (const exclusions of ["{", "{}", "[1]", "[{\"file\":\"a.js\"}]", "[{\"reason\":\"Why.\"}]"])
+      await this.expectFailureAsync(["coverage", "Sample", "production", "production", exclusions], "exclusions must be a JSON array");
+  }
+
+  @TestMethod
   public failsWithoutTheCoverageFolder(): Promise<void> {
     return this.expectFailureAsync([], "requires the folder of the V8 coverage reports");
   }
 
   @TestMethod
   public failsForAnIncompleteProject(): Promise<void> {
-    return this.expectFailureAsync(["coverage", "Sample", "production"], "requires a package name, a production folder and a source folder");
+    return this.expectFailureAsync(["coverage", "Sample", "production", "production"], "requires a package name, a production folder, a source folder and its exclusions");
   }
 
   @TestMethod
@@ -59,7 +83,7 @@ export class CoverageRunEntryTests {
     await CompiledScriptFixture.writeAsync(join(production, "sample.js"), "sample;\n");
     await writeFile(join(coverage, "coverage-1.json"), "not json");
 
-    const run = await this.runEntryAsync([coverage, "Sample", production, production]);
+    const run = await this.runEntryAsync([coverage, "Sample", production, production, "[]"]);
 
     Assert.areEqual(1, run.exitCode);
     Assert.isTrue(run.errorOutput.includes("malformed"), run.errorOutput);
@@ -76,7 +100,7 @@ export class CoverageRunEntryTests {
     Assert.isTrue((await readFile(summaryPath, "utf8")).includes(message));
   }
 
-  private async runPackageAsync(isComplete: boolean, verify: (run: EntryRun, summary: string) => Promise<void>): Promise<void> {
+  private async runPackageAsync(isComplete: boolean, verify: (run: EntryRun, summary: string) => Promise<void>, exclusions: string = "[]"): Promise<void> {
     using directory = new TemporaryDirectory();
     const production = join(directory.path, "production");
     const coverage = join(directory.path, "coverage");
@@ -91,7 +115,7 @@ export class CoverageRunEntryTests {
     await writeFile(join(coverage, "coverage-1.json"), JSON.stringify(report));
     const summaryPath = join(directory.path, "summary.md");
 
-    const run = await this.runEntryAsync([coverage, "Sample", production, production], summaryPath);
+    const run = await this.runEntryAsync([coverage, "Sample", production, production, exclusions], summaryPath);
 
     await verify(run, await readFile(summaryPath, "utf8"));
   }

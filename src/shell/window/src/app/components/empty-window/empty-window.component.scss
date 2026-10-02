@@ -1,0 +1,28 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  color: var(--tr-text-muted);
+  text-align: center;
+}
+
+p {
+  margin: 0;
+}
+
+.tr-empty-window-name {
+  font-size: var(--tr-text-heading);
+  font-weight: var(--tr-weight-emphasis);
+  line-height: var(--tr-line-heading);
+}

@@ -137,6 +137,9 @@ jobs:
         if: steps.root-dependencies.outputs.cache-hit != 'true'
         run: npm ci --no-audit --no-fund
 
+      - name: Install Electron
+        run: node node_modules/electron/install.js
+
       - name: Save the installed dependencies
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.root-dependencies.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -156,6 +159,45 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Let Electron's sandbox start on Linux
+        if: runner.os == 'Linux'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Test the UI workflows
+        id: ui
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui
+          else
+            npm run test:ui
+          fi
+
+      - name: Keep the UI workflow results
+        if: always() && steps.ui.outcome != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: _build/ui
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Keep the main window screenshot
+        id: screenshot
+        if: always() && steps.ui.outcome != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: _build/ui/main-window-*.png
+          archive: false
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Summarize the UI workflows
+        if: always() && steps.ui.outcome != 'skipped'
+        env:
+          UI_TARGET: ${{ matrix.target }}
+          SCREENSHOT_URL: ${{ steps.screenshot.outputs.artifact-url }}
+        run: node scripts/ui-summary.ts
 
   caches:
     name: Remove outdated dependency caches

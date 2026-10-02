@@ -28,6 +28,9 @@
     "paths": {
       "@noldova/teamrun-shell-ui": [
         "./shell/ui/src/api/index.ts"
+      ],
+      "@noldova/teamrun-shell-window": [
+        "./shell/window/src/api/index.ts"
       ]
     }
   },

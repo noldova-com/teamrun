@@ -8,7 +8,10 @@
 
 import "@noldova/teamrun-foundation-core";
 
+import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
+
 import { TestingException } from "../../exceptions/testing.exception.js";
+import { CoverageExclusion } from "../../models/coverage/coverage-exclusion.js";
 import { CoverageProject } from "../../models/coverage/coverage-project.js";
 import { Resources } from "../../resources.js";
 import { CoverageReportWriter } from "../reporting/coverage-report-writer.js";
@@ -25,14 +28,15 @@ export class CoverageRunEntry {
         throw new TestingException(Resources.coverageDirectoryRequired);
 
       const projects: CoverageProject[] = [];
-      for (let index = 0; index < projectArguments.length; index += 3) {
+      for (let index = 0; index < projectArguments.length; index += 4) {
         const name = projectArguments[index];
         const productionDirectory = projectArguments[index + 1];
         const sourceDirectory = projectArguments[index + 2];
-        if (Object.isUndefined(name) || Object.isUndefined(productionDirectory) || Object.isUndefined(sourceDirectory))
+        const exclusions = projectArguments[index + 3];
+        if (Object.isUndefined(name) || Object.isUndefined(productionDirectory) || Object.isUndefined(sourceDirectory) || Object.isUndefined(exclusions))
           throw new TestingException(Resources.coverageProjectTripleRequired);
 
-        projects.push(new CoverageProject(name, productionDirectory, sourceDirectory));
+        projects.push(new CoverageProject(name, productionDirectory, sourceDirectory, this.parseExclusions(exclusions)));
       }
 
       const result = await new CoverageAnalyzer().analyzeAsync(coverageDirectory, projects);
@@ -46,6 +50,28 @@ export class CoverageRunEntry {
       summary.writeFailure(String(error));
       process.exitCode = Resources.failedExitCode;
     }
+  }
+
+  private parseExclusions(text: string): CoverageExclusion[] {
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    }
+    catch (error) {
+      throw new TestingException(Resources.coverageExclusionsInvalid, new ExceptionOptions(error));
+    }
+
+    if (!Array.isArray(value))
+      throw new TestingException(Resources.coverageExclusionsInvalid);
+
+    return value.map((t: unknown) => {
+      const file: unknown = Object.isObject(t) ? Reflect.get(t, Resources.exclusionFileField) : undefined;
+      const reason: unknown = Object.isObject(t) ? Reflect.get(t, Resources.exclusionReasonField) : undefined;
+      if (!Object.isString(file) || !Object.isString(reason))
+        throw new TestingException(Resources.coverageExclusionsInvalid);
+
+      return new CoverageExclusion(file, reason);
+    });
   }
 }
 

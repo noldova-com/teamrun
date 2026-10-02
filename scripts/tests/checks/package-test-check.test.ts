@@ -7,7 +7,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
@@ -36,6 +36,9 @@ class PackageTestCheckTests {
 
     test("the test framework runs every tested package's tests with coverage, then measures every package's coverage", async t => {
       const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
+      const manifest = path.join(repository.directory, "src", "foundation", "alpha", "package.json");
+      const exclusions = [{ file: "main.ts", reason: "Runs only inside Electron." }];
+      await writeFile(manifest, JSON.stringify({ ...JSON.parse(await readFile(manifest, "utf8")) as object, teamrun: { coverageExclusions: exclusions } }));
       const runner = new ProcessRunnerFixture([0, 0]);
       const check = new PackageTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, { KEPT: "yes" });
 
@@ -61,9 +64,11 @@ class PackageTestCheckTests {
         "@noldova/teamrun-foundation-testing",
         path.join(repository.directory, "node_modules", "@noldova", "teamrun-foundation-testing"),
         path.join(repository.directory, "src", "foundation", "testing", "src"),
+        "[]",
         "@noldova/teamrun-foundation-alpha",
         path.join(repository.directory, "node_modules", "@noldova", "teamrun-foundation-alpha"),
-        path.join(repository.directory, "src", "foundation", "alpha", "src")
+        path.join(repository.directory, "src", "foundation", "alpha", "src"),
+        "[{\"file\":\"main.ts\",\"reason\":\"Runs only inside Electron.\"}]"
       ]);
       assert.deepEqual(runner.environments[1], { KEPT: "yes" });
     });

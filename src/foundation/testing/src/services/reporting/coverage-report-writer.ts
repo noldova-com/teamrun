@@ -43,7 +43,7 @@ export class CoverageReportWriter {
 
   private buildFileRows(result: CoverageResult, skipCoveredDetails: boolean): CoverageReportRow[] {
     const rows: CoverageReportRow[] = [];
-    const shownFileCoverages = skipCoveredDetails ? result.incompleteFileCoverages : result.fileCoverages;
+    const shownFileCoverages = result.fileCoverages.filter(t => !skipCoveredDetails || t.isExcluded || result.incompleteFileCoverages.includes(t));
 
     let currentProject = String.empty;
     for (const fileCoverage of shownFileCoverages) {
@@ -60,8 +60,11 @@ export class CoverageReportWriter {
         color,
         false));
 
-      for (const lineRange of fileCoverage.uncoveredLineRanges)
-        rows.push(new CoverageReportRow(Resources.formatUncoveredLines(lineRange.displayText), String.empty, String.empty, TerminalColor.RED, true));
+      if (!Object.isUndefined(fileCoverage.exclusionReason))
+        rows.push(new CoverageReportRow(Resources.formatExclusion(fileCoverage.exclusionReason), String.empty, String.empty, TerminalColor.YELLOW, true));
+      else
+        for (const lineRange of fileCoverage.uncoveredLineRanges)
+          rows.push(new CoverageReportRow(Resources.formatUncoveredLines(lineRange.displayText), String.empty, String.empty, TerminalColor.RED, true));
     }
 
     return rows;
@@ -73,7 +76,7 @@ export class CoverageReportWriter {
     const hasExecutableFiles = executableFileCoverages.length > 0;
 
     return new CoverageReportRow(
-      Resources.formatOverallCoverage(fullyCovered, executableFileCoverages.length),
+      Resources.formatOverallCoverage(fullyCovered, executableFileCoverages.length, result.excludedFileCoverages.length),
       hasExecutableFiles ? this.formatPercentage(result.totalLength, result.uncoveredLength) : Resources.coverageNotApplicable,
       this.formatBlocks(result.takenBlockCount, result.blockCount),
       hasExecutableFiles ? this.colorOf(result.totalLength, result.uncoveredLength) : String.empty,

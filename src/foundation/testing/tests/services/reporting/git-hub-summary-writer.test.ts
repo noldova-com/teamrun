@@ -89,6 +89,7 @@ export class GitHubSummaryWriterTests {
       let report = readFileSync(path, "utf8");
       Assert.isTrue(report.includes("| Coverage gate | Passed |"));
       Assert.isTrue(report.includes("| Fully covered executable files | 1/1 |"));
+      Assert.isTrue(report.includes("| Excluded files | 0 |"));
       Assert.isTrue(report.includes("| Coverage | 100.0% |"));
       Assert.isTrue(report.includes("| Blocks | 1/1 |"));
       Assert.isFalse(report.includes("<details>"));
@@ -101,6 +102,11 @@ export class GitHubSummaryWriterTests {
       Assert.isTrue(report.includes("| Coverage | - |"));
       Assert.isTrue(report.includes("&lt;partial&gt;.ts"));
       Assert.isTrue(report.includes("uncovered lines 1-2"));
+
+      writer.writeCoverage(new CoverageResult([new FileCoverage("Package", "main.ts", [new LineRange(1, 2)], 100, 100, [], "Runs only inside Electron.")]));
+      report = readFileSync(path, "utf8");
+      Assert.isTrue(report.includes("| Excluded files | 1 |"));
+      Assert.isTrue(report.includes("excluded: Runs only inside Electron."));
     }
     finally {
       rmSync(directory, { recursive: true, force: true });

@@ -23,6 +23,7 @@ export type { IDiscoveredTestMethodOptions } from "../interfaces/discovery/i-dis
 export type { ITestProgressListener } from "../interfaces/i-test-progress-listener.js";
 export type { ITestMethodResultOptions } from "../interfaces/results/i-test-method-result-options.js";
 export { BlockCoverage } from "../models/coverage/block-coverage.js";
+export { CoverageExclusion } from "../models/coverage/coverage-exclusion.js";
 export { CoverageProject } from "../models/coverage/coverage-project.js";
 export { CoverageResult } from "../models/coverage/coverage-result.js";
 export { FileCoverage } from "../models/coverage/file-coverage.js";

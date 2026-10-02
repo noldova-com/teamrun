@@ -162,7 +162,12 @@ export class DefaultTheme {
       ["menu-item-padding", "0.5rem"],
       ["menu-separator-spacing", "0.3125rem"],
       ["tooltip-width", "43.75rem"],
-      ["tooltip-padding", "0.125rem 0.5rem"]
+      ["tooltip-padding", "0.125rem 0.5rem"],
+      ["window-row-height", "2.1875rem"],
+      ["status-bar-height", "1.25rem"],
+      ["status-bar-inset", "0.5rem"],
+      ["status-bar-item-padding", "0.375rem"],
+      ["status-bar-item-gap", "0.25rem"]
     ]),
     new Map([["tab", "pill"]]));
 }

@@ -1,0 +1,36 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--tr-window-row-height);
+  padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+  background-color: var(--tr-title-bar);
+  color: var(--tr-title-bar-text);
+  font-size: var(--tr-text-panel);
+  font-weight: var(--tr-weight-emphasis);
+  app-region: drag;
+  user-select: none;
+}
+
+:host(.tr-window-row-mac) {
+  padding-right: 0;
+  padding-left: 78px;
+}
+
+.tr-window-row-breadcrumb {
+  flex: 1;
+  min-width: 0;
+}
+
+.tr-window-row-actions {
+  display: flex;
+  align-items: center;
+}

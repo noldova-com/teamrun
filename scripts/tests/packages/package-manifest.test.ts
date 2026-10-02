@@ -38,6 +38,19 @@ class PackageManifestTests {
       assert.deepEqual(core.dependencies, []);
     });
 
+    test("a manifest passes its declared coverage exclusions on as JSON, and none when it declares none", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const exclusions = [{ file: "main.ts", reason: "Runs only inside Electron." }];
+      await repository.writeAsync({
+        "src/shell/desktop/package.json": JSON.stringify({ name: "@noldova/teamrun-shell-desktop", version: "__VERSION__", teamrun: { coverageExclusions: exclusions } }),
+        "src/shell/ui/package.json": JSON.stringify({ name: "@noldova/teamrun-shell-ui", version: "__VERSION__", teamrun: {} })
+      });
+
+      assert.equal((await PackageManifest.readAsync(repository.directory, "src/shell/desktop")).coverageExclusions, JSON.stringify(exclusions));
+      assert.equal((await PackageManifest.readAsync(repository.directory, "src/shell/ui")).coverageExclusions, "[]");
+    });
+
     test("a name that does not follow the package's path is refused", () => {
       assert.throws(
         () => new PackageManifest("src/shell/ui", "@noldova/teamrun-ui", []),
@@ -75,7 +88,9 @@ class PackageManifestTests {
         [
           `{ ${name}, "version": "__VERSION__", "dependencies": { "@noldova/teamrun-foundation-core": "0.0.1", "@noldova/teamrun-foundation-json": "__VERSION__" } }`,
           "src/shell/ui/package.json must depend on @noldova/teamrun-foundation-core at version \"__VERSION__\"."
-        ]
+        ],
+        [`{ ${name}, "version": "__VERSION__", "teamrun": null }`, "src/shell/ui/package.json must keep its TeamRun settings in an object."],
+        [`{ ${name}, "version": "__VERSION__", "teamrun": { "coverageExclusions": "main.ts" } }`, "src/shell/ui/package.json must list its coverage exclusions in an array."]
       ];
       for (const [text, message] of cases) {
         if (text !== null)

@@ -55,6 +55,7 @@ export default class Build {
       await this.artifacts.writeAsync(declarations);
       this.output.write(`Modules in the build: ${declarations.length}.\n`);
       await this.angular.prepareAsync(this.output);
+      await this.angular.buildAsync(this.output);
       return 0;
     }
     catch (error) {
