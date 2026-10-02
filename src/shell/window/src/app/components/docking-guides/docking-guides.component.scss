@@ -15,9 +15,9 @@
 .tr-docking-preview {
   position: absolute;
   box-sizing: border-box;
-  border: var(--tr-border-width) solid var(--tr-accent);
+  border: var(--tr-border-width) solid var(--tr-docking-preview-border);
   border-radius: var(--tr-radius-large);
-  background-color: var(--tr-selected);
+  background-color: var(--tr-docking-preview);
 }
 
 .tr-docking-side,

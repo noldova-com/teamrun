@@ -32,6 +32,8 @@ describe("ThemePainter", () => {
     expect(element.style.getPropertyValue("color-scheme")).toBe("dark");
     expect(variable("--tr-window")).toBe("#2001A0");
     expect(variable("--tr-removed")).toBe("#2037A0");
+    expect(variable("--tr-docking-preview")).toBe("#2038A0");
+    expect(variable("--tr-docking-preview-border")).toBe("#2039A0");
     expect(variable("--tr-radius-large")).toBe("0.6rem");
     expect(variable("--tr-tooltip-padding")).toBe("0.25rem 0.625rem");
     expect(element.getAttribute("data-tr-tab-shape")).toBe("pill");

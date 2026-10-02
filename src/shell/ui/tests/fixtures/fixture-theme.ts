@@ -64,7 +64,9 @@ export class FixtureTheme {
     ["notifications.border", "#A03410"],
     ["errorForeground", "#A03510"],
     ["teamrun.addedForeground", "#A03610"],
-    ["teamrun.removedForeground", "#A03710"]
+    ["teamrun.removedForeground", "#A03710"],
+    ["teamrun.dockingPreviewBackground", "#A03810"],
+    ["teamrun.dockingPreviewBorder", "#A03910"]
   ]);
   private static readonly DARK: ReadonlyMap<string, string> = new Map([
     ["sideBar.background", "#2001A0"],
@@ -121,7 +123,9 @@ export class FixtureTheme {
     ["notifications.border", "#2034A0"],
     ["errorForeground", "#2035A0"],
     ["teamrun.addedForeground", "#2036A0"],
-    ["teamrun.removedForeground", "#2037A0"]
+    ["teamrun.removedForeground", "#2037A0"],
+    ["teamrun.dockingPreviewBackground", "#2038A0"],
+    ["teamrun.dockingPreviewBorder", "#2039A0"]
   ]);
   private static readonly LOOK: ReadonlyMap<string, string> = new Map([
     ["radius-hover", "0.25rem"],
