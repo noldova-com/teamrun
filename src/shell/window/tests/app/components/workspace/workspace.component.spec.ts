@@ -15,6 +15,7 @@ import { WorkspaceComponent } from "../../../../src/app/components/workspace/wor
 import { PanelEdge } from "../../../../src/app/enums/panel-edge";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
+import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
@@ -30,6 +31,14 @@ class WorkspaceHostComponent {
 }
 
 describe("WorkspaceComponent", () => {
+  beforeEach(() => {
+    DesktopBridgeFixture.install();
+  });
+
+  afterEach(() => {
+    DesktopBridgeFixture.remove();
+  });
+
   beforeEach(() => TestBed.configureTestingModule({ providers: [WindowPartHostFixture.provide()] }));
 
   afterEach(() => AppearanceFixture.reset());

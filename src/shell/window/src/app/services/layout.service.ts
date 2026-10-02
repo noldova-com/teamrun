@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { DestroyRef, Injectable, type Signal, type WritableSignal, computed, inject, signal } from "@angular/core";
+import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal, computed, inject, signal } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import { JsonException } from "@noldova/teamrun-foundation-json";
@@ -27,11 +27,14 @@ import { LayoutStoreService } from "./layout-store.service";
 @Injectable({ providedIn: "root" })
 export class LayoutService {
   private readonly store: ILayoutStore = inject(LayoutStoreService);
+  private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly registryState: WritableSignal<ViewRegistry> = signal(ViewRegistry.createEmpty());
   private readonly layoutState: WritableSignal<Layout> = signal(Layout.createDefault(this.registryState()));
   private readonly width: WritableSignal<number> = signal(0);
   private readonly height: WritableSignal<number> = signal(0);
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private saved: Layout | null = null;
+  private writing: Promise<void> = Promise.resolve();
 
   public readonly layout: Signal<Layout> = this.layoutState.asReadonly();
   public readonly registry: Signal<ViewRegistry> = this.registryState.asReadonly();
@@ -52,13 +55,17 @@ export class LayoutService {
 
   public async loadAsync(): Promise<void> {
     const saved = await this.store.readAsync();
+    const layout = Object.isNull(saved) ? Layout.createDefault(this.registryState()) : this.read(saved);
     this.clearSaveTimer();
-    this.layoutState.set(Object.isNull(saved) ? Layout.createDefault(this.registryState()) : this.read(saved));
+    this.layoutState.set(layout);
+    this.saved = layout;
   }
 
-  public async saveAsync(): Promise<void> {
+  public saveAsync(): Promise<void> {
     this.clearSaveTimer();
-    await this.store.writeAsync(this.layoutState().toJson());
+    const saving = this.writing.then(() => this.writeLatestAsync());
+    this.writing = saving.catch(() => undefined);
+    return saving;
   }
 
   public openDocument(tab: DocumentTab): void {
@@ -93,6 +100,14 @@ export class LayoutService {
     this.update(this.layoutState().reset(this.registryState()));
   }
 
+  private async writeLatestAsync(): Promise<void> {
+    const layout = this.layoutState();
+    if (Object.isNull(this.saved) || layout === this.saved)
+      return;
+    await this.store.writeAsync(layout.toJson());
+    this.saved = layout;
+  }
+
   private read(saved: unknown): Layout {
     try {
       return LayoutReader.read(saved);
@@ -109,7 +124,8 @@ export class LayoutService {
       return;
     this.layoutState.set(layout);
     this.clearSaveTimer();
-    this.saveTimer = setTimeout(() => void this.saveAsync(), Resources.layoutSaveDelay);
+    if (!Object.isNull(this.saved))
+      this.saveTimer = setTimeout(() => void this.saveAsync().catch((error: unknown) => this.errors.handleError(error)), Resources.layoutSaveDelay);
   }
 
   private clearSaveTimer(): void {

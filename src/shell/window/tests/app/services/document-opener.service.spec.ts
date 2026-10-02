@@ -14,9 +14,18 @@ import { DocumentTab } from "../../../src/app/models/layout/document-tab";
 import { DocumentOpenerService } from "../../../src/app/services/document-opener.service";
 import { LayoutService } from "../../../src/app/services/layout.service";
 import { TabLabelService } from "../../../src/app/services/tab-label.service";
+import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../fixtures/layout.fixture";
 
 describe("DocumentOpenerService", () => {
+  beforeEach(() => {
+    DesktopBridgeFixture.install();
+  });
+
+  afterEach(() => {
+    DesktopBridgeFixture.remove();
+  });
+
   let opener: DocumentOpenerService;
   let layout: LayoutService;
   let labels: TabLabelService;

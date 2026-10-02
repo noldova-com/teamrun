@@ -19,9 +19,18 @@ import { LayoutStoreService } from "../../../src/app/services/layout-store.servi
 import { LayoutService } from "../../../src/app/services/layout.service";
 import { TabDragService } from "../../../src/app/services/tab-drag.service";
 import { Resources } from "../../../src/resources";
+import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../fixtures/layout.fixture";
 
 describe("TabDragService", () => {
+  beforeEach(() => {
+    DesktopBridgeFixture.install();
+  });
+
+  afterEach(() => {
+    DesktopBridgeFixture.remove();
+  });
+
   const registry = LayoutFixture.createRegistry();
   let layout: LayoutService;
   let drag: TabDragService;

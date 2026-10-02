@@ -15,6 +15,7 @@ import { Layout } from "../../../../src/app/models/layout/layout";
 import type { SplitHandle } from "../../../../src/app/models/layout/split-handle";
 import { LayoutService } from "../../../../src/app/services/layout.service";
 import { Resources } from "../../../../src/resources";
+import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 
@@ -33,6 +34,14 @@ class SplitSashHostComponent {
 }
 
 describe("SplitSashComponent", () => {
+  beforeEach(() => {
+    DesktopBridgeFixture.install();
+  });
+
+  afterEach(() => {
+    DesktopBridgeFixture.remove();
+  });
+
   const registry = LayoutFixture.createRegistry();
   let fixture: ComponentFixture<SplitSashHostComponent>;
   let layout: LayoutService;

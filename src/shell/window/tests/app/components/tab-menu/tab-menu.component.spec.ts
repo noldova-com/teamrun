@@ -17,6 +17,7 @@ import type { Tab } from "../../../../src/app/models/layout/tab";
 import { ViewTab } from "../../../../src/app/models/layout/view-tab";
 import { LayoutService } from "../../../../src/app/services/layout.service";
 import { Resources } from "../../../../src/resources";
+import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 
@@ -40,6 +41,14 @@ class TabMenuHostComponent {
 }
 
 describe("TabMenuComponent", () => {
+  beforeEach(() => {
+    DesktopBridgeFixture.install();
+  });
+
+  afterEach(() => {
+    DesktopBridgeFixture.remove();
+  });
+
   const registry = LayoutFixture.createRegistry();
   const prepared = Layout.createDefault(registry).openView(LayoutFixture.search, registry).openDocument(LayoutFixture.plan).openDocument(LayoutFixture.todo);
   let fixture: ComponentFixture<TabMenuHostComponent>;

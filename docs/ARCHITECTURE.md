@@ -253,7 +253,7 @@ Persisted tabs and layout restore the person's saved workspace without opening u
 
 A part reports the work it has in progress, such as a running reply or command, to its host. Before TeamRun quits, restarts for an update or stops for a newer build (section 6) while work is in progress, it asks the person whether to wait for the work or to stop it, and never interrupts it without that choice.
 
-Closing TeamRun waits for each window to save its unsaved state. A window part that reports a failed save keeps TeamRun open with the error, while a window that is gone or does not answer before the timeout does not block closing.
+Closing TeamRun waits for each window to save its unsaved state. A window part that reports a failed save keeps TeamRun open with the error, while a window that is gone or does not answer before the timeout does not block closing. The window's own layout is the exception: a failed save of the layout is logged and closing proceeds, because losing the last layout change is minor.
 
 ## 10. Build, installation and updates
 
