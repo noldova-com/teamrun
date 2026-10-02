@@ -70,7 +70,7 @@ export class DesktopApplicationTests {
     const linux = new FakeElectron();
     DesktopApplicationTests.start(linux, new FakeDesktopProcess("linux"));
     return Promise.all([packaged.app.becomeReadyAsync(), development.app.becomeReadyAsync(), linux.app.becomeReadyAsync()]).then(() => {
-      const mainScript = fileURLToPath(DesktopApplicationTests.MODULE_URL);
+      const mainScript = resolve(fileURLToPath(DesktopApplicationTests.MODULE_URL));
 
       Assert.areEqual(`"/electron/electron" "--data-dir=${data}"`, DesktopApplicationTests.firstWindow(packaged).appDetails?.relaunchCommand);
       Assert.areEqual("com.noldova.teamrun", DesktopApplicationTests.firstWindow(packaged).appDetails?.appId);

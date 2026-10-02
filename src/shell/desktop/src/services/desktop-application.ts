@@ -86,7 +86,7 @@ export class DesktopApplication {
       RuntimeEntry.entryPath,
       { ...process.env, [Resources.runAsNodeVariable]: Resources.runAsNodeValue },
       process.platform);
-    const taskbar = TaskbarIdentity.create(electron.app.isPackaged, process.execPath, fileURLToPath(moduleUrl), process.argv);
+    const taskbar = TaskbarIdentity.create(electron.app.isPackaged, process.execPath, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
     new DesktopApplication(electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, createLauncher(launchSettings), readDeviceAsync).run();
   }
 

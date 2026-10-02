@@ -32,6 +32,7 @@ export default class DesktopApplicationFixture {
 
   private readonly testInfo: TestInfo;
   private readonly environment: Readonly<Record<string, string>>;
+  private readonly extraArguments: readonly string[];
   private readonly output: ErrorOutputClassifier = new ErrorOutputClassifier();
   private electronApplication: ElectronApplication | null = null;
   private page: Page | null = null;
@@ -42,8 +43,9 @@ export default class DesktopApplicationFixture {
   public readonly root: string;
   public readonly dataDirectory: string;
 
-  private constructor(testInfo: TestInfo, root: string, environment: Readonly<Record<string, string>>) {
+  private constructor(testInfo: TestInfo, root: string, environment: Readonly<Record<string, string>>, extraArguments: readonly string[]) {
     this.testInfo = testInfo;
+    this.extraArguments = extraArguments;
     this.root = root;
     this.dataDirectory = path.join(root, DesktopApplicationFixture.DATA_FOLDER);
     this.environment = environment;
@@ -52,9 +54,10 @@ export default class DesktopApplicationFixture {
   public static async launchAsync(
     testInfo: TestInfo,
     environment: Readonly<Record<string, string>> = {},
-    dataFiles: Readonly<Record<string, string>> = {}): Promise<DesktopApplicationFixture> {
+    dataFiles: Readonly<Record<string, string>> = {},
+    extraArguments: readonly string[] = []): Promise<DesktopApplicationFixture> {
     const root = await mkdtemp(path.join(os.tmpdir(), DesktopApplicationFixture.ROOT_PREFIX));
-    const fixture = new DesktopApplicationFixture(testInfo, root, environment);
+    const fixture = new DesktopApplicationFixture(testInfo, root, environment, extraArguments);
     await mkdir(fixture.dataDirectory);
     for (const [name, text] of Object.entries(dataFiles))
       await writeFile(path.join(fixture.dataDirectory, name), text);
@@ -174,8 +177,10 @@ export default class DesktopApplicationFixture {
         DesktopApplicationFixture.MAIN,
         `--data-dir=${this.dataDirectory}`,
         `--device-dir=${path.join(this.root, DesktopApplicationFixture.DEVICE_FOLDER)}`,
-        ...DesktopApplicationFixture.LAUNCH_ARGUMENTS
+        ...DesktopApplicationFixture.LAUNCH_ARGUMENTS,
+        ...this.extraArguments
       ],
+      cwd: this.root,
       env: Object.fromEntries(Object.entries({ ...process.env, ...this.environment }).filter((t): t is [string, string] => t[1] !== undefined))
     });
     application.process().stderr?.on("data", (data: Buffer) => this.readOutput(data.toString()));

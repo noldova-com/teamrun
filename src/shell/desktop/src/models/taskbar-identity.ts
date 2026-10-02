@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import path from "node:path";
+
 import type { AppDetailsOptions } from "electron";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
@@ -27,9 +29,11 @@ export class TaskbarIdentity {
     this.relaunchCommand = relaunchCommand;
   }
 
-  public static create(isPackaged: boolean, executablePath: string, mainScript: string, argv: readonly string[]): TaskbarIdentity {
-    const kept = argv.filter(t => Resources.relaunchArgumentPrefixes.some(prefix => t.startsWith(prefix)));
-    const parts = isPackaged ? [executablePath, ...kept] : [executablePath, mainScript, ...kept];
+  public static create(isPackaged: boolean, executablePath: string, mainScript: string, argv: readonly string[], workingDirectory: string): TaskbarIdentity {
+    const kept = argv.flatMap(t => Resources.relaunchArgumentPrefixes
+      .filter(prefix => t.startsWith(prefix))
+      .map(prefix => `${prefix}${path.resolve(workingDirectory, t.slice(prefix.length))}`));
+    const parts = isPackaged ? [executablePath, ...kept] : [executablePath, path.resolve(workingDirectory, mainScript), ...kept];
     return new TaskbarIdentity(
       isPackaged ? Resources.appUserModelId : Resources.developmentAppUserModelId,
       executablePath,

@@ -83,6 +83,11 @@ export interface IDesktopProcess {
   readonly homeFolder: string;
 
   /**
+   * The working directory the desktop started in, against which relative path arguments resolve.
+   */
+  readonly workingDirectory: string;
+
+  /**
    * Starts another program, detached, for the hand-over to a newer build.
    *
    * @param executablePath The program.
@@ -666,7 +671,7 @@ export interface IDesktopWindow {
    * import { type IDesktopWindow, TaskbarIdentity } from "@noldova/teamrun-shell-desktop";
    *
    * export function describe(window: IDesktopWindow): void {
-   *   window.setAppDetails(TaskbarIdentity.create(true, "C:\TeamRun\TeamRun.exe", "", []).toAppDetails());
+   *   window.setAppDetails(TaskbarIdentity.create(true, "/opt/teamrun/teamrun", "", [], "/opt/teamrun").toAppDetails());
    * }
    * ```
    */
@@ -1879,29 +1884,30 @@ export declare class TaskbarIdentity {
    * ```ts
    * import { TaskbarIdentity } from "@noldova/teamrun-shell-desktop";
    *
-   * export const identity: TaskbarIdentity = new TaskbarIdentity("com.noldova.teamrun", "C:\TeamRun\TeamRun.exe", "\"C:\TeamRun\TeamRun.exe\"");
+   * export const identity: TaskbarIdentity = new TaskbarIdentity("com.noldova.teamrun", "/opt/teamrun/teamrun", "\"/opt/teamrun/teamrun\"");
    * ```
    */
   public constructor(appId: string, iconPath: string, relaunchCommand: string);
 
   /**
    * Describes the running build. A packaged build starts again by its program; a development build by Electron with
-   * its main script. Both keep the given `--data-dir=`, `--user-data-dir=` and `--device-dir=` arguments, so the
-   * relaunch reaches the running instance's single-instance lock.
+   * its main script. Both keep the given `--data-dir=`, `--user-data-dir=` and `--device-dir=` arguments, resolved to
+   * absolute paths, so the relaunch reaches the running instance's single-instance lock from any working directory.
    *
    * @param isPackaged Whether the build is packaged.
    * @param executablePath The running program.
    * @param mainScript The desktop's main script, which a development build passes to Electron.
    * @param argv The process's command-line arguments.
+   * @param workingDirectory The directory relative paths in the arguments resolve against.
    * @returns The identity.
    * @example
    * ```ts
    * import { TaskbarIdentity } from "@noldova/teamrun-shell-desktop";
    *
-   * export const identity: TaskbarIdentity = TaskbarIdentity.create(false, "D:\checkout\electron.exe", "D:\checkout\main.js", []);
+   * export const identity: TaskbarIdentity = TaskbarIdentity.create(false, "/checkout/electron", "/checkout/main.js", ["--data-dir=data"], "/checkout");
    * ```
    */
-  public static create(isPackaged: boolean, executablePath: string, mainScript: string, argv: readonly string[]): TaskbarIdentity;
+  public static create(isPackaged: boolean, executablePath: string, mainScript: string, argv: readonly string[], workingDirectory: string): TaskbarIdentity;
 
   /**
    * The details for `BrowserWindow.setAppDetails`.
