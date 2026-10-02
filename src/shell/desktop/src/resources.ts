@@ -9,9 +9,10 @@
 import { ShellMethods } from "@noldova/teamrun-shell-protocol";
 
 export class Resources {
-  public static readonly applicationName: string = "TeamRun";
-  public static readonly appUserModelId: string = "com.noldova.teamrun";
-  public static readonly developmentAppUserModelId: string = "com.noldova.teamrun.development";
+  public static readonly folderSeparator: string = "/";
+  public static readonly applicationName: string = "__PRODUCT_NAME__";
+  public static readonly appUserModelId: string = "__APPLICATION_ID__";
+  public static readonly developmentAppUserModelId: string = "__DEVELOPMENT_APPLICATION_ID__";
   public static readonly relaunchArgumentPrefixes: readonly string[] = ["--data-dir=", "--user-data-dir=", "--device-dir="];
   public static readonly appIdParameter: string = "appId";
   public static readonly iconPathParameter: string = "iconPath";
@@ -33,7 +34,7 @@ export class Resources {
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
   public static readonly windowShellMethods: readonly string[] = [ShellMethods.modules.text];
-  public static readonly untrustedRequest: string = "Only TeamRun's own window may call the runtime.";
+  public static readonly untrustedRequest: string = `Only ${Resources.applicationName}'s own window may call the runtime.`;
   public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
   public static readonly payloadNotJson: string = "The payload must be a JSON value.";
   public static readonly layoutNotObject: string = "The layout must be a JSON object.";
@@ -54,11 +55,11 @@ export class Resources {
   public static readonly windowsPlatform: string = "win32";
   public static readonly localAppDataVariable: string = "LOCALAPPDATA";
   public static readonly windowsLocalAppData: readonly string[] = ["AppData", "Local"];
-  public static readonly windowsDeviceFolder: readonly string[] = ["Noldova", "TeamRun"];
-  public static readonly macDeviceFolder: readonly string[] = ["Library", "Application Support", "Noldova", "TeamRun"];
+  public static readonly windowsDeviceFolder: readonly string[] = "__WINDOWS_DEVICE_FOLDER__".split(Resources.folderSeparator);
+  public static readonly macDeviceFolder: readonly string[] = ["Library", "Application Support", ..."__MACOS_DEVICE_FOLDER__".split(Resources.folderSeparator)];
   public static readonly xdgStateVariable: string = "XDG_STATE_HOME";
   public static readonly xdgStateDefault: readonly string[] = [".local", "state"];
-  public static readonly linuxDeviceFolder: readonly string[] = ["noldova", "teamrun"];
+  public static readonly linuxDeviceFolder: readonly string[] = "__LINUX_DEVICE_FOLDER__".split(Resources.folderSeparator);
   public static readonly deviceFileName: string = "device.json";
   public static readonly deviceIdField: string = "id";
   public static readonly createOnlyFlag: string = "wx";
@@ -92,7 +93,7 @@ export class Resources {
   public static readonly boundsSaveDelay: number = 500;
   public static readonly connectingShowLimit: number = 2_000;
   public static readonly mainWindow: string = "main";
-  public static readonly runtimeNotConnected: string = "TeamRun is not connected to its runtime.";
+  public static readonly runtimeNotConnected: string = `${Resources.applicationName} is not connected to its runtime.`;
   public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout is not kept.";
   public static readonly windowMinimumWidth: number = 640;
   public static readonly windowMinimumHeight: number = 400;
@@ -109,7 +110,7 @@ export class Resources {
   public static readonly payloadField: string = "payload";
   public static readonly replyNeedsOneOutcome: string = "A start reply carries either a process id or a failure.";
   public static readonly starterEnded: string = "The runtime starter ended before it started the runtime.";
-  public static readonly starterServiceName: string = "TeamRun runtime starter";
+  public static readonly starterServiceName: string = `${Resources.applicationName} runtime starter`;
   public static readonly utilityEntryRelativePath: string = "../utility-entry.js";
   public static readonly ignoredStdio: "ignore" = "ignore";
   public static readonly messageEvent: "message" = "message";

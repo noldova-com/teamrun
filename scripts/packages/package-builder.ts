@@ -115,7 +115,7 @@ export default class PackageBuilder {
   }
 
   private stamp(text: string): string {
-    return text
+    return [...this.rootManifest.product.placeholders].reduce((stamped, [placeholder, value]) => stamped.replaceAll(placeholder, value), text)
       .replaceAll(PackageBuilder.VERSION_PLACEHOLDER, this.rootManifest.productVersion)
       .replaceAll(PackageBuilder.PROTOCOL_VERSION_PLACEHOLDER, String(this.rootManifest.protocolVersion))
       .replaceAll(PackageBuilder.BUILD_PLACEHOLDER, this.fingerprint);

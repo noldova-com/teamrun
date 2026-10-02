@@ -19,6 +19,7 @@ import ModuleImportCheck from "./checks/module-import-check.ts";
 import NameUniquenessCheck from "./checks/name-uniqueness-check.ts";
 import PackageCheck from "./checks/package-check.ts";
 import PackageTestCheck from "./checks/package-test-check.ts";
+import ProductIdentityCheck from "./checks/product-identity-check.ts";
 import ScriptTestCheck from "./checks/script-test-check.ts";
 import ShellIndependenceCheck from "./checks/shell-independence-check.ts";
 import TypeCheck from "./checks/type-check.ts";
@@ -98,6 +99,7 @@ export default class Test {
       documents,
       new ModuleFolderCheck(this.root, modules),
       new ShellIndependenceCheck(tree),
+      new ProductIdentityCheck(this.root, tree),
       new ModuleImportCheck(tree, modules),
       new NameUniquenessCheck(tree, modules),
       new DeclaredDependencyCheck(tree),

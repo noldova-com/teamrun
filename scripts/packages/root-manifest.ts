@@ -10,6 +10,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import PackageException from "./package.exception.ts";
+import ProductIdentity from "./product-identity.ts";
 
 export default class RootManifest {
   private static readonly FILE_NAME: string = "package.json";
@@ -18,13 +19,14 @@ export default class RootManifest {
 
   public readonly productVersion: string;
   public readonly protocolVersion: number;
+  public readonly product: ProductIdentity;
 
-  public constructor(productVersion: string, protocolVersion: number) {
-    if (!RootManifest.VERSION_PATTERN.test(productVersion) || !Number.isSafeInteger(protocolVersion) || protocolVersion < 1)
-      throw new PackageException(RootManifest.INVALID);
+  public constructor(productVersion: string, protocolVersion: number, product: ProductIdentity) {
+    RootManifest.requireVersions(productVersion, protocolVersion);
 
     this.productVersion = productVersion;
     this.protocolVersion = protocolVersion;
+    this.product = product;
   }
 
   public static async readAsync(root: string): Promise<RootManifest> {
@@ -42,6 +44,12 @@ export default class RootManifest {
       throw new PackageException(RootManifest.INVALID);
     if (typeof settings.protocolVersion !== "number")
       throw new PackageException(RootManifest.INVALID);
-    return new RootManifest(manifest.version, settings.protocolVersion);
+    RootManifest.requireVersions(manifest.version, settings.protocolVersion);
+    return new RootManifest(manifest.version, settings.protocolVersion, ProductIdentity.fromManifest(manifest));
+  }
+
+  private static requireVersions(productVersion: string, protocolVersion: number): void {
+    if (!RootManifest.VERSION_PATTERN.test(productVersion) || !Number.isSafeInteger(protocolVersion) || protocolVersion < 1)
+      throw new PackageException(RootManifest.INVALID);
   }
 }
