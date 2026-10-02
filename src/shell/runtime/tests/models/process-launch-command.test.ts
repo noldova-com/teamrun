@@ -19,6 +19,7 @@ import { PlatformFixture } from "../fixtures/platform.fixture.js";
 
 @TestClass
 export class ProcessLaunchCommandTests {
+  private static readonly INHERITED_DESCRIPTOR: number = 9;
   private static readonly SHELL_ARGUMENTS: string = [
     "--noprofile",
     "--norc",
@@ -85,15 +86,16 @@ export class ProcessLaunchCommandTests {
     const direct = await ProcessLaunchCommandTests.listDescriptorsAsync("/bin/ls", ["/proc/self/fd"]);
     const launched = await ProcessLaunchCommandTests.listDescriptorsAsync(command.executable, command.arguments);
 
-    Assert.areEqual("0,1,2,3,4", direct);
-    Assert.areEqual("0,1,2,3", launched);
+    Assert.isTrue(direct.includes(ProcessLaunchCommandTests.INHERITED_DESCRIPTOR), `the program started directly inherits descriptor ${ProcessLaunchCommandTests.INHERITED_DESCRIPTOR}: ${direct.join(",")}`);
+    Assert.areEqual("0,1,2,3", launched.join(","), "only the standard descriptors and the one ls opens itself remain");
   }
 
-  private static async listDescriptorsAsync(executable: string, launchArguments: readonly string[]): Promise<string> {
-    const child = spawn(executable, launchArguments, { stdio: ["ignore", "pipe", "ignore", "pipe"] });
+  private static async listDescriptorsAsync(executable: string, launchArguments: readonly string[]): Promise<number[]> {
+    const stdio = Array.from({ length: ProcessLaunchCommandTests.INHERITED_DESCRIPTOR + 1 }, (_, index) => index === 1 || index === ProcessLaunchCommandTests.INHERITED_DESCRIPTOR ? "pipe" : "ignore");
+    const child = spawn(executable, launchArguments, { stdio });
     let output = "";
     child.stdout?.setEncoding("utf8").on("data", (chunk: string) => output += chunk);
     await once(child, "close");
-    return output.trim().split(/\s+/).join(",");
+    return output.trim().split(/\s+/).map(Number).sort((left, right) => left - right);
   }
 }
