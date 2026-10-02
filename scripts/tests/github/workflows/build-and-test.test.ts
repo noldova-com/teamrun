@@ -20,6 +20,21 @@ class BuildAndTestTests {
   private static readonly WORKFLOW: string = "build-and-test.yml";
   private static readonly TOOLCHAIN_STEP: string = "Verify the toolchain";
   private static readonly RESULT_STEP: string = "Require the selected verification to pass";
+  private static readonly LOOKUP_STEP: string = "Look up the merge group run";
+  private static readonly PLAN_STEP: string = "List the targets without a current cache";
+  private static readonly SHA: string = "0123456789abcdef0123456789abcdef01234567";
+  private static readonly RUNS_QUERY: string = "api repos/noldova-com/teamrun/actions/workflows/build-and-test.yml/runs?event=merge_group" +
+    "&head_sha=0123456789abcdef0123456789abcdef01234567&status=success&per_page=100 --jq .workflow_runs[] | select(.event == \"merge_group\" and " +
+    ".head_sha == env.GITHUB_SHA and .conclusion == \"success\" and .path == \".github/workflows/build-and-test.yml\") | \"\\(.html_url)/attempts/\\(.run_attempt)\"";
+  private static readonly CACHE_LIST: string = "api --paginate repos/noldova-com/teamrun/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100 --jq .actions_caches[].key";
+  private static readonly TARGETS: readonly (readonly [string, string, string, string])[] = [
+    ["Linux x64", "ubuntu-24.04", "Linux", "x64"],
+    ["Linux ARM64", "ubuntu-24.04-arm", "Linux", "arm64"],
+    ["Windows x64", "windows-2025", "Windows", "x64"],
+    ["Windows ARM64", "windows-11-arm", "Windows", "arm64"],
+    ["macOS x64", "macos-15-intel", "macOS", "x64"],
+    ["macOS ARM64", "macos-15", "macOS", "arm64"]
+  ];
 
   public static register(): void {
     test("the toolchain check passes only for the pinned Node.js and npm versions on the expected architecture", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
@@ -51,35 +66,46 @@ class BuildAndTestTests {
       assert.ok(typeof manifest === "object" && manifest !== null && "engines" in manifest && "packageManager" in manifest);
       assert.deepEqual(manifest.engines, { node: ">=26.7.0 <27", npm: "11.19.0" });
       assert.equal(manifest.packageManager, "npm@11.19.0");
-      assert.equal(workflow.text.match(/node-version: '26\.7\.0'/g)?.length, 2);
+      assert.equal(workflow.text.match(/node-version: '26\.7\.0'/g)?.length, 3);
       assert.doesNotMatch(workflow.text, /node-version: '(?!26\.7\.0')/);
       const script = workflow.readStepScript(BuildAndTestTests.TOOLCHAIN_STEP);
       assert.ok(script.includes("test \"$(node --version)\" = v26.7.0\n"));
       assert.ok(script.includes("test \"$(npm --version)\" = 11.19.0\n"));
     });
 
-    test("the aggregate check passes a documentation-only skip or a complete pass, and fails otherwise", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+    test("the aggregate check passes a documentation-only skip, a complete pass or a push the merge queue tested, and fails otherwise", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
-      const cases: readonly (readonly [string, string, string, number, RegExp])[] = [
-        ["success", "false", "skipped", 0, /^Only Markdown documentation changed/],
-        ["success", "true", "success", 0, /^The document checks passed, and the build and tests passed on every target/],
-        ["success", "true", "failure", 1, /^$/],
-        ["success", "true", "cancelled", 1, /^$/],
-        ["success", "true", "skipped", 1, /^$/],
-        ["success", "false", "success", 1, /^$/],
-        ["failure", "", "skipped", 1, /^$/],
-        ["cancelled", "", "skipped", 1, /^$/]
+      const run = "https://github.com/noldova-com/teamrun/actions/runs/7/attempts/2";
+      const cases: readonly (readonly [string, string, string, string, string, string, number, RegExp])[] = [
+        ["skipped", "", "", "success", "false", "skipped", 0, /^Only Markdown documentation changed/],
+        ["skipped", "", "", "success", "true", "success", 0, /^The document checks passed, and the build and tests passed on every target/],
+        ["success", "false", "", "success", "false", "skipped", 0, /^Only Markdown documentation changed/],
+        ["success", "false", "", "success", "true", "success", 0, /^The document checks passed, and the build and tests passed on every target/],
+        ["success", "true", run, "skipped", "", "skipped", 0,
+          /^This commit was built and tested by the merge group run https:\/\/github\.com\/noldova-com\/teamrun\/actions\/runs\/7\/attempts\/2; this run only maintains the dependency caches\.\n$/],
+        ["success", "true", "", "skipped", "", "skipped", 1, /^$/],
+        ["success", "true", run, "success", "true", "success", 1, /^$/],
+        ["success", "false", run, "success", "true", "success", 1, /^$/],
+        ["failure", "", "", "skipped", "", "skipped", 1, /^$/],
+        ["success", "false", "", "skipped", "", "skipped", 1, /^$/],
+        ["skipped", "", "", "success", "true", "failure", 1, /^$/],
+        ["skipped", "", "", "success", "true", "cancelled", 1, /^$/],
+        ["skipped", "", "", "success", "true", "skipped", 1, /^$/],
+        ["skipped", "", "", "success", "false", "success", 1, /^$/],
+        ["skipped", "", "", "failure", "", "skipped", 1, /^$/],
+        ["skipped", "", "", "cancelled", "", "skipped", 1, /^$/]
       ];
-      for (const [changes, runCode, validation, status, summary] of cases) {
+      for (const [tested, verified, mergeGroupRun, changes, runCode, validation, status, summary] of cases) {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
         await doubles.runAsync("touch summary.md\n");
 
         const result = await doubles.runAsync(script, {
-          CHANGES_RESULT: changes, RUN_CODE: runCode, VALIDATION_RESULT: validation, GITHUB_STEP_SUMMARY: "summary.md"
+          TESTED_RESULT: tested, VERIFIED: verified, MERGE_GROUP_RUN: mergeGroupRun, CHANGES_RESULT: changes, RUN_CODE: runCode, VALIDATION_RESULT: validation,
+          GITHUB_STEP_SUMMARY: "summary.md"
         });
 
-        assert.equal(result.status, status, `${changes}:${runCode}:${validation}: ${result.stderr}`);
+        assert.equal(result.status, status, `${tested}:${verified}:${changes}:${runCode}:${validation}: ${result.stderr}`);
         assert.match(await doubles.readFileAsync("summary.md"), summary);
         if (status !== 0)
           assert.match(result.stdout, /^::error::/);
@@ -105,22 +131,24 @@ class BuildAndTestTests {
       assert.equal(workflow.readStepScript("Check the documents"), "npm test -- documents\n");
       assert.equal(workflow.readStepScript("Select the verification scope"), "node scripts/classify-changes.ts\n");
       assert.ok(text.indexOf("Check the documents") < text.indexOf("Select the verification scope"));
-      assert.ok(text.includes("    if: needs.changes.outputs.run-code == 'true'\n"));
+      assert.ok(text.includes("    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}\n"));
       for (const target of ["Linux x64", "Linux ARM64", "Windows x64", "Windows ARM64", "macOS x64", "macOS ARM64"])
         assert.ok(text.includes(`          - target: ${target}\n`), target);
       assert.equal(workflow.readStepScript("Install dependencies"), "npm ci --no-audit --no-fund\n");
       assert.equal(workflow.readStepScript("Build"), "npm run build\n");
       assert.equal(workflow.readStepScript("Test"), "npm test\n");
-      assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [changes, validate]\n    if: always()\n"));
+      assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [tested, changes, validate]\n    if: always()\n"));
     });
 
     test("runs read the repository only, except the cache cleanup on main, and only pull request runs are cancelled by a newer push", async () => {
       const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
       assert.ok(text.includes("permissions:\n  contents: read\n"));
       assert.deepEqual(text.match(/^ *\S+: write$/gm), ["      actions: write"]);
-      assert.ok(text.includes("    name: Remove outdated dependency caches\n    needs: validate\n" +
-        "    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.validate.result == 'success'\n"));
-      assert.equal(text.match(/persist-credentials: false/g)?.length, 3);
+      assert.deepEqual(text.match(/^ *\S+: read$/gm), ["  contents: read", "      actions: read", "      actions: read", "      contents: read", "      contents: read"]);
+      assert.ok(text.includes("    name: Remove outdated dependency caches\n    needs: [cache-plan, cache]\n" +
+        "    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.cache-plan.result == 'success' && " +
+        "(needs.cache.result == 'success' || needs.cache.result == 'skipped') }}\n"));
+      assert.equal(text.match(/persist-credentials: false/g)?.length, 5);
       assert.ok(text.includes("cancel-in-progress: ${{ github.event_name == 'pull_request' }}"));
       for (const trigger of ["  pull_request:\n    branches: [main]", "  merge_group:\n    types: [checks_requested]", "  push:\n    branches: [main]", "  workflow_dispatch:"])
         assert.ok(text.includes(trigger), trigger);
@@ -128,25 +156,144 @@ class BuildAndTestTests {
         assert.match(action[1] ?? "", /^actions\/[a-z-]+(\/[a-z-]+)?@[0-9a-f]{40}$/);
     });
 
-    test("each target restores both dependency caches by OS, CPU and lockfile, and only main pushes save them right after installing", async () => {
+    test("each target restores both dependency caches by OS, CPU and lockfile and never saves them", async () => {
       const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
+      const validate = text.slice(text.indexOf("  validate:\n"), text.indexOf("  cache-plan:\n"));
       const order = [
-        "Restore the installed dependencies", "Restore the Angular project's installed dependencies", "Discard an inexact Angular install", "Install dependencies",
-        "Save the installed dependencies", "Build", "Save the Angular project's installed dependencies", "Test"
-      ].map(t => text.indexOf(`      - name: ${t}\n`));
+        "Restore the installed dependencies", "Restore the Angular project's installed dependencies", "Discard an inexact Angular install", "Install dependencies", "Build", "Test"
+      ].map(t => validate.indexOf(`      - name: ${t}\n`));
       assert.ok(order.every((position, index) => position > 0 && (index === 0 || position > (order[index - 1] ?? 0))), order.join(","));
-      assert.ok(text.includes("key: dependencies-root-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('package-lock.json') }}\n"));
-      assert.ok(text.includes("key: dependencies-src-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('src/package-lock.json') }}\n"));
+      assert.equal(text.match(/key: dependencies-root-\$\{\{ runner\.os \}\}-\$\{\{ matrix\.architecture \}\}-\$\{\{ hashFiles\('package-lock\.json'\) \}\}\n/g)?.length, 2);
+      assert.equal(text.match(/key: dependencies-src-\$\{\{ runner\.os \}\}-\$\{\{ matrix\.architecture \}\}-\$\{\{ hashFiles\('src\/package-lock\.json'\) \}\}\n/g)?.length, 2);
       assert.doesNotMatch(text, /restore-keys/);
-      assert.ok(text.includes("      - name: Install dependencies\n        if: steps.root-dependencies.outputs.cache-hit != 'true'\n"));
-      assert.ok(text.includes("      - name: Discard an inexact Angular install\n        if: steps.angular-dependencies.outputs.cache-hit != 'true'\n"));
-      const saves: readonly (readonly [string, string])[] = [
-        ["Save the installed dependencies", "root-dependencies"],
-        ["Save the Angular project's installed dependencies", "angular-dependencies"]
+      assert.ok(validate.includes("      - name: Install dependencies\n        if: steps.root-dependencies.outputs.cache-hit != 'true'\n"));
+      assert.ok(validate.includes("      - name: Discard an inexact Angular install\n        if: steps.angular-dependencies.outputs.cache-hit != 'true'\n"));
+      assert.doesNotMatch(validate, /actions\/cache\/save/);
+    });
+
+    test("a push builds and tests only when no successful merge group run of this workflow is found for its exact commit", async () => {
+      const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
+      assert.ok(text.includes("  tested:\n    name: Find the merge group run of this commit\n    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n"));
+      assert.ok(text.includes("    name: Classify changes\n    needs: tested\n" +
+        "    if: ${{ !cancelled() && (needs.tested.result == 'skipped' || (needs.tested.result == 'success' && needs.tested.outputs.verified != 'true')) }}\n"));
+      assert.ok(text.includes("      verified: ${{ steps.proof.outputs.verified }}\n      run: ${{ steps.proof.outputs.run }}\n"));
+    });
+
+    test("every job that depends on the merge group lookup, directly or through another job, states its own status condition", async () => {
+      const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
+      const jobs = new Map<string, { readonly needs: readonly string[]; readonly condition: string }>();
+      for (const block of text.slice(text.indexOf("\njobs:\n")).split(/\n(?= {2}[a-z-]+:\n)/).slice(1)) {
+        const name = /^ {2}([a-z-]+):\n/.exec(block)?.[1] ?? "";
+        const needs = /^ {4}needs: (?:\[(.+)\]|(.+))$/m.exec(block);
+        jobs.set(name, { needs: (needs?.[1] ?? needs?.[2] ?? "").split(",").map(t => t.trim()).filter(t => t.length > 0), condition: /^ {4}if: (.+)$/m.exec(block)?.[1] ?? "" });
+      }
+      const dependsOnLookup = (name: string): boolean => (jobs.get(name)?.needs ?? []).some(t => t === "tested" || dependsOnLookup(t));
+      const dependents = [...jobs.keys()].filter(dependsOnLookup);
+
+      assert.deepEqual([...jobs.keys()], ["tested", "changes", "validate", "cache-plan", "cache", "caches", "result"]);
+      assert.deepEqual(dependents, ["changes", "validate", "result"]);
+      for (const name of dependents)
+        assert.match(jobs.get(name)?.condition ?? "", /!cancelled\(\)|always\(\)/, name);
+    });
+
+    test("the lookup cites the first successful merge group run that tested the commit, and finds none on an empty or failed answer", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.LOOKUP_STEP);
+      assert.ok(script.includes("runs=$(timeout 30s gh api "));
+      const first = "https://github.com/noldova-com/teamrun/actions/runs/11/attempts/2";
+      const cases: readonly (readonly [string, number, string, string])[] = [
+        [`${first}\n`, 0, `verified=true\nrun=${first}\n`, `The merge group run ${first} built and tested ${BuildAndTestTests.SHA}.\n`],
+        [`${first}\nhttps://github.com/noldova-com/teamrun/actions/runs/12/attempts/1\n`, 0, `verified=true\nrun=${first}\n`, `The merge group run ${first} built and tested ${BuildAndTestTests.SHA}.\n`],
+        ["", 0, "verified=false\n", `::notice::No successful merge group run of this workflow tested ${BuildAndTestTests.SHA}, so this run builds and tests it.\n`],
+        [`${first}\n`, 1, "verified=false\n", `::notice::No successful merge group run of this workflow tested ${BuildAndTestTests.SHA}, so this run builds and tests it.\n`]
       ];
-      for (const [step, cache] of saves)
-        assert.ok(text.includes(`      - name: ${step}\n        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.${cache}.outputs.cache-hit != 'true'\n`), step);
-      assert.equal(text.match(/key: \$\{\{ steps\.(root|angular)-dependencies\.outputs\.cache-primary-key \}\}/g)?.length, 2);
+      for (const [answer, exitCode, outputs, message] of cases) {
+        const doubles = await CommandDoublesFixture.createAsync();
+        t.after(() => doubles.disposeAsync());
+        doubles.forward("timeout");
+        doubles.respond("gh", BuildAndTestTests.RUNS_QUERY, answer, exitCode);
+        await doubles.runAsync("touch outputs.txt\n");
+
+        const result = await doubles.runAsync(script, { GITHUB_REPOSITORY: "noldova-com/teamrun", GITHUB_SHA: BuildAndTestTests.SHA, GITHUB_OUTPUT: "outputs.txt" });
+
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(await doubles.readFileAsync("outputs.txt"), outputs);
+        assert.equal(result.stdout, message);
+        assert.deepEqual((await doubles.readCallsAsync()).filter(call => call.startsWith("gh ")), [`gh ${BuildAndTestTests.RUNS_QUERY}`]);
+      }
+    });
+
+    test("the plan lists only the targets that miss a current root or Angular cache", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.PLAN_STEP);
+      const complete = BuildAndTestTests.TARGETS.flatMap(([, , os, architecture]) => [`dependencies-root-${os}-${architecture}-rootnew`, `dependencies-src-${os}-${architecture}-srcnew`]);
+      const entry = ([target, runner, , architecture]: readonly [string, string, string, string]): string =>
+        `{"target":"${target}","runner":"${runner}","architecture":"${architecture}"}`;
+      const cases: readonly (readonly [readonly string[], string])[] = [
+        [complete, "targets=[]\n"],
+        [[...complete, "dependencies-root-Linux-x64-rootold"], "targets=[]\n"],
+        [complete.filter(t => t !== "dependencies-src-macOS-arm64-srcnew"), `targets=[${entry(BuildAndTestTests.TARGETS[5] ?? ["", "", "", ""])}]\n`],
+        [complete.filter(t => t !== "dependencies-root-Windows-x64-rootnew" && t !== "dependencies-src-Linux-arm64-srcnew"),
+          `targets=[${entry(BuildAndTestTests.TARGETS[1] ?? ["", "", "", ""])},${entry(BuildAndTestTests.TARGETS[2] ?? ["", "", "", ""])}]\n`],
+        [complete.map(t => `${t}x`), `targets=[${BuildAndTestTests.TARGETS.map(entry).join(",")}]\n`],
+        [[], `targets=[${BuildAndTestTests.TARGETS.map(entry).join(",")}]\n`]
+      ];
+      for (const [keys, outputs] of cases) {
+        const doubles = await CommandDoublesFixture.createAsync();
+        t.after(() => doubles.disposeAsync());
+        doubles.respond("gh", BuildAndTestTests.CACHE_LIST, keys.length === 0 ? "" : `${keys.join("\n")}\n`);
+        await doubles.runAsync("touch outputs.txt\n");
+
+        const result = await doubles.runAsync(script, { GITHUB_REPOSITORY: "noldova-com/teamrun", ROOT_HASH: "rootnew", SOURCE_HASH: "srcnew", GITHUB_OUTPUT: "outputs.txt" });
+
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(await doubles.readFileAsync("outputs.txt"), outputs);
+        const parsed: unknown = JSON.parse(outputs.slice("targets=".length));
+        assert.ok(Array.isArray(parsed));
+        assert.equal(result.stdout, parsed.map(t => `${String((t as { target: unknown }).target)} has no current dependency cache.\n`).join(""));
+      }
+
+      const failing = await CommandDoublesFixture.createAsync();
+      t.after(() => failing.disposeAsync());
+      failing.respond("gh", BuildAndTestTests.CACHE_LIST, "", 1);
+      assert.notEqual((await failing.runAsync(script, { GITHUB_REPOSITORY: "noldova-com/teamrun", ROOT_HASH: "rootnew", SOURCE_HASH: "srcnew", GITHUB_OUTPUT: "outputs.txt" })).status, 0);
+    });
+
+    test("the plan's targets are the validated targets", async () => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const matrix = [...workflow.text.matchAll(/ {10}- target: (.+)\n {12}runner: (.+)\n {12}architecture: (.+)\n/g)].map(t => [t[1], t[2], t[3]]);
+      const operatingSystems: Readonly<Record<string, string>> = { ubuntu: "Linux", windows: "Windows", macos: "macOS" };
+      const planned = workflow.readStepScript(BuildAndTestTests.PLAN_STEP).split("<<'TARGETS'\n")[1]?.split("TARGETS\n")[0]?.trimEnd().split("\n").map(t => t.split("|")) ?? [];
+
+      assert.deepEqual(matrix, BuildAndTestTests.TARGETS.map(([target, runner, , architecture]) => [target, runner, architecture]));
+      assert.deepEqual(planned, BuildAndTestTests.TARGETS.map(t => [...t]));
+      for (const [, runner, os] of BuildAndTestTests.TARGETS)
+        assert.equal(operatingSystems[runner.split("-")[0] ?? ""], os, runner);
+    });
+
+    test("a target without a current cache installs exactly as validation does and saves only what is missing", async () => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const text = workflow.text;
+      const cache = text.slice(text.indexOf("  cache:\n"), text.indexOf("  caches:\n"));
+      assert.ok(cache.startsWith("  cache:\n    name: Save the dependency caches (${{ matrix.target }})\n    needs: cache-plan\n" +
+        "    if: needs.cache-plan.outputs.targets != '[]'\n"));
+      assert.ok(cache.includes("        include: ${{ fromJSON(needs.cache-plan.outputs.targets) }}\n"));
+      assert.equal(workflow.readStepScript("Verify the toolchain to install"), workflow.readStepScript(BuildAndTestTests.TOOLCHAIN_STEP));
+      assert.equal(workflow.readStepScript("Stop Spotlight indexing while saving"), workflow.readStepScript("Stop Spotlight indexing"));
+      assert.equal(workflow.readStepScript("Install the dependencies to save"), workflow.readStepScript("Install dependencies"));
+      assert.equal(workflow.readStepScript("Install Electron to save"), workflow.readStepScript("Install Electron"));
+      assert.equal(workflow.readStepScript("Install the Angular project to save"), workflow.readStepScript("Build"));
+      const order = [
+        "Stop Spotlight indexing while saving", "Check out the revision to install", "Set up Node.js to install", "Verify the toolchain to install",
+        "Restore the saved installed dependencies", "Look up the Angular project's saved dependencies", "Install the dependencies to save", "Install Electron to save",
+        "Save the installed dependencies", "Install the Angular project to save", "Save the Angular project's installed dependencies"
+      ].map(t => cache.indexOf(`      - name: ${t}\n`));
+      assert.ok(order.every((position, index) => position > 0 && (index === 0 || position > (order[index - 1] ?? 0))), order.join(","));
+      for (const step of ["Install the dependencies to save", "Install Electron to save", "Save the installed dependencies"])
+        assert.ok(cache.includes(`      - name: ${step}\n        if: steps.root-dependencies.outputs.cache-hit != 'true'\n`), step);
+      for (const step of ["Install the Angular project to save", "Save the Angular project's installed dependencies"])
+        assert.ok(cache.includes(`      - name: ${step}\n        if: steps.angular-dependencies.outputs.cache-hit != 'true'\n`), step);
+      assert.ok(cache.includes("          path: src/node_modules\n          key: dependencies-src-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('src/package-lock.json') }}\n" +
+        "          lookup-only: true\n"));
+      assert.equal(cache.match(/key: \$\{\{ steps\.(root|angular)-dependencies\.outputs\.cache-primary-key \}\}/g)?.length, 2);
     });
 
     test("Electron's binary is installed before the dependencies are saved, so a saved install includes it", async () => {
@@ -156,7 +303,7 @@ class BuildAndTestTests {
       assert.equal(workflow.readStepScript("Install Electron"), "node node_modules/electron/install.js\n");
       assert.ok(text.includes("      - name: Install Electron\n        run: "));
       assert.ok(text.indexOf("      - name: Install dependencies\n") < text.indexOf("      - name: Install Electron\n"));
-      assert.ok(text.indexOf("      - name: Install Electron\n") < text.indexOf("      - name: Save the installed dependencies\n"));
+      assert.ok(text.indexOf("      - name: Install Electron to save\n") < text.indexOf("      - name: Save the installed dependencies\n"));
     });
 
     test("the UI workflows run after the tests, under Xvfb on Linux, and their results are kept from every run", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {

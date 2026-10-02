@@ -29,8 +29,39 @@ defaults:
     shell: bash
 
 jobs:
+  tested:
+    name: Find the merge group run of this commit
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      verified: ${{ steps.proof.outputs.verified }}
+      run: ${{ steps.proof.outputs.run }}
+    steps:
+      - name: Look up the merge group run
+        id: proof
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          runs=$(timeout 30s gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build-and-test.yml/runs?event=merge_group&head_sha=$GITHUB_SHA&status=success&per_page=100" \
+            --jq '.workflow_runs[] | select(.event == "merge_group" and .head_sha == env.GITHUB_SHA and .conclusion == "success" and .path == ".github/workflows/build-and-test.yml") | "\(.html_url)/attempts/\(.run_attempt)"') || runs=''
+          run=${runs%%$'\n'*}
+          if [ -n "$run" ]; then
+            echo 'verified=true' >> "$GITHUB_OUTPUT"
+            echo "run=$run" >> "$GITHUB_OUTPUT"
+            echo "The merge group run $run built and tested $GITHUB_SHA."
+          else
+            echo 'verified=false' >> "$GITHUB_OUTPUT"
+            echo "::notice::No successful merge group run of this workflow tested $GITHUB_SHA, so this run builds and tests it."
+          fi
+
   changes:
     name: Classify changes
+    needs: tested
+    if: ${{ !cancelled() && (needs.tested.result == 'skipped' || (needs.tested.result == 'success' && needs.tested.outputs.verified != 'true')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
@@ -62,7 +93,7 @@ jobs:
   validate:
     name: Build and test (${{ matrix.target }})
     needs: changes
-    if: needs.changes.outputs.run-code == 'true'
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -140,22 +171,8 @@ jobs:
       - name: Install Electron
         run: node node_modules/electron/install.js
 
-      - name: Save the installed dependencies
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.root-dependencies.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.root-dependencies.outputs.cache-primary-key }}
-
       - name: Build
         run: npm run build
-
-      - name: Save the Angular project's installed dependencies
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.angular-dependencies.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: src/node_modules
-          key: ${{ steps.angular-dependencies.outputs.cache-primary-key }}
 
       - name: Test
         run: npm test
@@ -199,10 +216,136 @@ jobs:
           SCREENSHOT_URL: ${{ steps.screenshot.outputs.artifact-url }}
         run: node scripts/ui-summary.ts
 
+  cache-plan:
+    name: Find the missing dependency caches
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      targets: ${{ steps.plan.outputs.targets }}
+    steps:
+      - name: Check out the lockfiles
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: List the targets without a current cache
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROOT_HASH: ${{ hashFiles('package-lock.json') }}
+          SOURCE_HASH: ${{ hashFiles('src/package-lock.json') }}
+        run: |
+          set -euo pipefail
+          keys=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100" --jq '.actions_caches[].key')
+          saved() {
+            case $'\n'"$keys"$'\n' in
+              *$'\n'"$1"$'\n'*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+          targets=''
+          while IFS='|' read -r target runner os architecture; do
+            if ! saved "dependencies-root-$os-$architecture-$ROOT_HASH" || ! saved "dependencies-src-$os-$architecture-$SOURCE_HASH"; then
+              targets="$targets${targets:+,}{\"target\":\"$target\",\"runner\":\"$runner\",\"architecture\":\"$architecture\"}"
+              echo "$target has no current dependency cache."
+            fi
+          done <<'TARGETS'
+          Linux x64|ubuntu-24.04|Linux|x64
+          Linux ARM64|ubuntu-24.04-arm|Linux|arm64
+          Windows x64|windows-2025|Windows|x64
+          Windows ARM64|windows-11-arm|Windows|arm64
+          macOS x64|macos-15-intel|macOS|x64
+          macOS ARM64|macos-15|macOS|arm64
+          TARGETS
+          echo "targets=[$targets]" >> "$GITHUB_OUTPUT"
+
+  cache:
+    name: Save the dependency caches (${{ matrix.target }})
+    needs: cache-plan
+    if: needs.cache-plan.outputs.targets != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.cache-plan.outputs.targets) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - name: Stop Spotlight indexing while saving
+        if: runner.os == 'macOS'
+        run: sudo mdutil -a -i off
+
+      - name: Check out the revision to install
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js to install
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          architecture: ${{ matrix.architecture }}
+          package-manager-cache: false
+
+      - name: Verify the toolchain to install
+        env:
+          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          node --version
+          npm --version
+          node --print "process.platform + '/' + process.arch"
+          test "$(node --version)" = v26.7.0
+          test "$(npm --version)" = 11.19.0
+          test "$(node --print process.arch)" = "$EXPECTED_ARCHITECTURE"
+
+      - name: Restore the saved installed dependencies
+        id: root-dependencies
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: dependencies-root-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Look up the Angular project's saved dependencies
+        id: angular-dependencies
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: src/node_modules
+          key: dependencies-src-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('src/package-lock.json') }}
+          lookup-only: true
+
+      - name: Install the dependencies to save
+        if: steps.root-dependencies.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Electron to save
+        if: steps.root-dependencies.outputs.cache-hit != 'true'
+        run: node node_modules/electron/install.js
+
+      - name: Save the installed dependencies
+        if: steps.root-dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: ${{ steps.root-dependencies.outputs.cache-primary-key }}
+
+      - name: Install the Angular project to save
+        if: steps.angular-dependencies.outputs.cache-hit != 'true'
+        run: npm run build
+
+      - name: Save the Angular project's installed dependencies
+        if: steps.angular-dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: src/node_modules
+          key: ${{ steps.angular-dependencies.outputs.cache-primary-key }}
+
   caches:
     name: Remove outdated dependency caches
-    needs: validate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.validate.result == 'success'
+    needs: [cache-plan, cache]
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.cache-plan.result == 'success' && (needs.cache.result == 'success' || needs.cache.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -235,23 +378,29 @@ jobs:
 
   result:
     name: Build and test (all targets)
-    needs: [changes, validate]
+    needs: [tested, changes, validate]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require the selected verification to pass
         env:
+          TESTED_RESULT: ${{ needs.tested.result }}
+          VERIFIED: ${{ needs.tested.outputs.verified }}
+          MERGE_GROUP_RUN: ${{ needs.tested.outputs.run }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           RUN_CODE: ${{ needs.changes.outputs.run-code }}
           VALIDATION_RESULT: ${{ needs.validate.result }}
         run: |
           set -euo pipefail
-          case "$CHANGES_RESULT:$RUN_CODE:$VALIDATION_RESULT" in
-            success:false:skipped)
+          case "$TESTED_RESULT:$VERIFIED:${MERGE_GROUP_RUN:+cited}:$CHANGES_RESULT:$RUN_CODE:$VALIDATION_RESULT" in
+            success:true:cited:skipped::skipped)
+              echo "This commit was built and tested by the merge group run $MERGE_GROUP_RUN; this run only maintains the dependency caches." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            skipped:::success:false:skipped | success:false::success:false:skipped)
               echo 'Only Markdown documentation changed: the document checks passed, and the build and test targets were skipped.' >> "$GITHUB_STEP_SUMMARY"
               ;;
-            success:true:success)
+            skipped:::success:true:success | success:false::success:true:success)
               echo 'The document checks passed, and the build and tests passed on every target.' >> "$GITHUB_STEP_SUMMARY"
               ;;
             *)
