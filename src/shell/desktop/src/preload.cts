@@ -34,5 +34,11 @@ contextBridge.exposeInMainWorld("teamrun", {
   },
   actOnStartup(action: string): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:startupAction", action) as Promise<boolean>;
+  },
+  readLayout(): Promise<unknown> {
+    return ipcRenderer.invoke("teamrun:readLayout");
+  },
+  writeLayout(layout: unknown): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:writeLayout", layout) as Promise<boolean>;
   }
 });

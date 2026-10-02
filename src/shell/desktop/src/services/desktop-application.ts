@@ -10,7 +10,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import "@noldova/teamrun-foundation-core";
-import { type RuntimeHandover, ShellMethods, WindowStateKey } from "@noldova/teamrun-shell-protocol";
+import { type JsonObject, JsonReader } from "@noldova/teamrun-foundation-json";
+import { type QualifiedName, type RuntimeHandover, ShellMethods, WindowStateKey } from "@noldova/teamrun-shell-protocol";
 import { DataDirectoryLocator, LaunchSettings, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
@@ -18,6 +19,7 @@ import type { IElectron } from "../interfaces/i-electron.js";
 import type { IIpcEvent } from "../interfaces/i-ipc-event.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import { StartupStateKind } from "../enums/startup-state-kind.js";
+import { WindowStateException } from "../exceptions/window-state.exception.js";
 import { DesktopSettings } from "../models/desktop-settings.js";
 import { SenderInfo } from "../models/sender-info.js";
 import type { StartupState } from "../models/startup-state.js";
@@ -108,6 +110,8 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
     this.electron.ipcMain.handle(Resources.readStartupChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.startup.current.toJson());
     this.electron.ipcMain.handle(Resources.startupActionChannel, (event, action) => Object.isNull(this.findTrusted(event)) ? false : this.startup.actAsync(action));
+    this.electron.ipcMain.handle(Resources.readLayoutChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.readLayoutAsync());
+    this.electron.ipcMain.handle(Resources.writeLayoutChannel, (event, layout) => Object.isNull(this.findTrusted(event)) ? false : this.writeLayoutAsync(layout));
     this.electron.app.on(Resources.activateEvent, () => {
       if (this.windows.size === 0)
         this.open();
@@ -141,13 +145,30 @@ export class DesktopApplication {
       this.restored.add(open);
       const device = await this.device;
       if (!Object.isNull(device))
-        await open.bounds.restoreAsync(new RuntimeWindowStateStore(
-          () => this.startup.connection,
-          new WindowStateKey(device, Resources.mainWindow),
-          ShellMethods.readWindowBounds,
-          ShellMethods.writeWindowBounds)).catch((error: unknown) => process.stderr.write(`${Resources.formatBoundsNotRestored(String(error))}\n`));
+        await open.bounds.restoreAsync(this.createStore(device, ShellMethods.readWindowBounds, ShellMethods.writeWindowBounds)).catch((error: unknown) => process.stderr.write(`${Resources.formatBoundsNotRestored(String(error))}\n`));
     }
     open.settle();
+  }
+
+  private async readLayoutAsync(): Promise<JsonObject | null> {
+    return await (await this.createLayoutStoreAsync()).readAsync();
+  }
+
+  private async writeLayoutAsync(layout: unknown): Promise<boolean> {
+    const value = JsonReader.fromValue(layout).toJson();
+    await (await this.createLayoutStoreAsync()).writeAsync(value);
+    return true;
+  }
+
+  private async createLayoutStoreAsync(): Promise<RuntimeWindowStateStore> {
+    const device = await this.device;
+    if (Object.isNull(device))
+      throw new WindowStateException(Resources.deviceNotIdentified);
+    return this.createStore(device, ShellMethods.readWindowLayout, ShellMethods.writeWindowLayout);
+  }
+
+  private createStore(device: string, readMethod: QualifiedName, writeMethod: QualifiedName): RuntimeWindowStateStore {
+    return new RuntimeWindowStateStore(() => this.startup.connection, new WindowStateKey(device, Resources.mainWindow), readMethod, writeMethod);
   }
 
   private handOver(handover: RuntimeHandover): boolean {

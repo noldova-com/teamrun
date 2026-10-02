@@ -21,6 +21,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public readonly answers: string[] = [];
   public readonly actions: string[] = [];
   public startup: unknown = { kind: "Ready", details: [] };
+  public layout: unknown = null;
 
   public constructor(platform: string) {
     this.platform = platform;
@@ -73,6 +74,15 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public actOnStartup(action: string): Promise<boolean> {
     this.actions.push(action);
+    return Promise.resolve(true);
+  }
+
+  public readLayout(): Promise<unknown> {
+    return Promise.resolve(this.layout);
+  }
+
+  public writeLayout(layout: JsonObject): Promise<boolean> {
+    this.layout = layout;
     return Promise.resolve(true);
   }
 

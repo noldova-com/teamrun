@@ -15,6 +15,8 @@ export class Resources {
   public static readonly startupStateChannel: string = "teamrun:startupState";
   public static readonly readStartupChannel: string = "teamrun:readStartup";
   public static readonly startupActionChannel: string = "teamrun:startupAction";
+  public static readonly readLayoutChannel: string = "teamrun:readLayout";
+  public static readonly writeLayoutChannel: string = "teamrun:writeLayout";
   public static readonly clientName: string = "desktop";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly stopWorkAction: string = "stopWork";
@@ -71,6 +73,7 @@ export class Resources {
   public static readonly boundsSaveDelay: number = 500;
   public static readonly mainWindow: string = "main";
   public static readonly runtimeNotConnected: string = "TeamRun is not connected to its runtime.";
+  public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout is not kept.";
   public static readonly windowMinimumWidth: number = 640;
   public static readonly windowMinimumHeight: number = 400;
   public static readonly windowWidth: number = 1280;

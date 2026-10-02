@@ -9,6 +9,7 @@
 import { Injectable } from "@angular/core";
 
 import { nameof } from "@noldova/teamrun-foundation-core";
+import { type JsonObject, JsonReader } from "@noldova/teamrun-foundation-json";
 
 import { DesktopBridgeException } from "../exceptions/desktop-bridge.exception";
 import type { IDesktopBridge } from "../interfaces/i-desktop-bridge";
@@ -48,6 +49,15 @@ export class DesktopBridgeService {
     return this.bridge.actOnStartup(action);
   }
 
+  public async readLayoutAsync(): Promise<JsonObject | null> {
+    const layout = await this.bridge.readLayout();
+    return Object.isNull(layout) ? null : JsonReader.fromValue(layout).toJson();
+  }
+
+  public writeLayoutAsync(layout: JsonObject): Promise<boolean> {
+    return this.bridge.writeLayout(layout);
+  }
+
   private static find(): IDesktopBridge {
     const bridge: unknown = Reflect.get(globalThis, Resources.bridgeName);
     if (!DesktopBridgeService.isBridge(bridge))
@@ -63,6 +73,8 @@ export class DesktopBridgeService {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerClose))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readStartup))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onStartup))) &&
-      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.actOnStartup)));
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.actOnStartup))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readLayout))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.writeLayout)));
   }
 }

@@ -8,6 +8,8 @@
 
 import { TestBed } from "@angular/core/testing";
 
+import { JsonException } from "@noldova/teamrun-foundation-json";
+
 import { DesktopBridgeException } from "../../../src/app/exceptions/desktop-bridge.exception";
 import { WindowAppearance } from "../../../src/app/models/window-appearance";
 import { DesktopBridgeService } from "../../../src/app/services/desktop-bridge.service";
@@ -23,7 +25,9 @@ describe("DesktopBridgeService", () => {
     answerClose: (): Promise<boolean> => Promise.resolve(true),
     readStartup: (): Promise<unknown> => Promise.resolve(null),
     onStartup: (): (() => void) => () => undefined,
-    actOnStartup: (): Promise<boolean> => Promise.resolve(true)
+    actOnStartup: (): Promise<boolean> => Promise.resolve(true),
+    readLayout: (): Promise<unknown> => Promise.resolve(null),
+    writeLayout: (): Promise<boolean> => Promise.resolve(true)
   };
   const incomplete: readonly [string, unknown][] = [
     ["nothing", undefined],
@@ -34,7 +38,9 @@ describe("DesktopBridgeService", () => {
     ["no answerClose", { ...complete, answerClose: null }],
     ["no readStartup", { ...complete, readStartup: null }],
     ["no onStartup", { ...complete, onStartup: null }],
-    ["no actOnStartup", { ...complete, actOnStartup: null }]
+    ["no actOnStartup", { ...complete, actOnStartup: null }],
+    ["no readLayout", { ...complete, readLayout: null }],
+    ["no writeLayout", { ...complete, writeLayout: null }]
   ];
 
   for (const [name, value] of incomplete)
@@ -95,5 +101,24 @@ describe("DesktopBridgeService", () => {
     expect(states).toEqual(["Connecting"]);
     expect(await service.actOnStartupAsync("moveAside")).toBe(true);
     expect(bridge.actions).toEqual(["moveAside"]);
+  });
+
+  it("keeps the window's layout through the desktop and reads none before it is kept", async () => {
+    DesktopBridgeFixture.install();
+    const service = TestBed.inject(DesktopBridgeService);
+
+    const before = await service.readLayoutAsync();
+    const isKept = await service.writeLayoutAsync({ version: 1 });
+
+    expect(before).toBeNull();
+    expect(isKept).toBe(true);
+    expect(await service.readLayoutAsync()).toEqual({ version: 1 });
+  });
+
+  it("refuses a kept layout that is not a JSON object", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    bridge.layout = [1, 2];
+
+    await expect(TestBed.inject(DesktopBridgeService).readLayoutAsync()).rejects.toThrow(JsonException);
   });
 });

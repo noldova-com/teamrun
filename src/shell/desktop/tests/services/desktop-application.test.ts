@@ -10,10 +10,11 @@ import { dirname, join } from "node:path";
 import { setTimeout as delay, setImmediate } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { JsonException } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, PreShellData, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
 import { DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
-import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
+import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent, WindowStateException } from "@noldova/teamrun-shell-desktop";
 
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import type { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
@@ -400,6 +401,49 @@ export class DesktopApplicationTests {
 
     Assert.areEqual(JSON.stringify(["/devices/this"]), JSON.stringify(given.folders));
     Assert.areEqual(JSON.stringify([DeviceIdentity.locateFolder("win32", environment, "C:\\Users\\person")]), JSON.stringify(located.folders));
+  }
+
+  @TestMethod
+  public async keepsItsWindowsLayoutForThisDeviceThroughTheRuntime(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    const before = await (electron.ipcMain.invoke("teamrun:readLayout", event) as Promise<unknown>);
+    const isKept = await (electron.ipcMain.invoke("teamrun:writeLayout", event, { version: 1 }) as Promise<boolean>);
+    const after = await (electron.ipcMain.invoke("teamrun:readLayout", event) as Promise<unknown>);
+
+    Assert.isNull(before);
+    Assert.isTrue(isKept);
+    Assert.areEqual(JSON.stringify({ version: 1 }), JSON.stringify(after));
+    Assert.areEqual(JSON.stringify({ version: 1 }), JSON.stringify(connection.states.get(`writeWindowLayout:${FakeDeviceIdentity.ID}:main`)));
+  }
+
+  @TestMethod
+  public async keepsNoLayoutForAnUntrustedSenderOrOneThatIsNotAnObject(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const untrusted = { sender: { id: 1 }, senderFrame: null };
+
+    Assert.isNull(electron.ipcMain.invoke("teamrun:readLayout", untrusted));
+    Assert.isFalse(electron.ipcMain.invoke("teamrun:writeLayout", untrusted, { version: 1 }) as boolean);
+    await Assert.throwsAsync(() => electron.ipcMain.invoke("teamrun:writeLayout", DesktopApplicationTests.trustedEvent("linux"), [1]) as Promise<boolean>, JsonException);
+    Assert.isFalse(connection.calls.some(t => t.endsWith("Layout")));
+  }
+
+  @TestMethod
+  public async refusesToKeepALayoutWhenTheDeviceHasNoIdentity(): Promise<void> {
+    const device = new FakeDeviceIdentity();
+    device.failure = new Error("The identity file is not JSON.");
+    const written = await DesktopApplicationTests.captureErrorsAsync(async () => {
+      const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), device);
+
+      const failure = await Assert.throwsAsync(() => electron.ipcMain.invoke("teamrun:readLayout", DesktopApplicationTests.trustedEvent("linux")) as Promise<unknown>, WindowStateException);
+
+      Assert.areEqual("This device has no identity, so the window's layout is not kept.", failure.message);
+    });
+
+    Assert.areEqual(1, written.length);
   }
 
   @TestMethod
