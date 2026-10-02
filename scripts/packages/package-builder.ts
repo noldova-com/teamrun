@@ -28,6 +28,7 @@ export default class PackageBuilder {
   private static readonly ROOT_OPTION: string = "--rootDir";
   private static readonly OUTPUT_OPTION: string = "--outDir";
   private static readonly SOURCE_MAP_OPTION: string = "--sourceMap";
+  private static readonly NO_EMIT_OPTION: string = "--noEmit";
   private static readonly MANIFEST_FILE: string = "package.json";
   private static readonly RESOURCES_FILE: string = "resources.js";
   private static readonly LICENSE_FILE: string = "LICENSE";
@@ -78,6 +79,15 @@ export default class PackageBuilder {
     const output = this.layout.locateTestOutput(manifest);
     await rm(output, { recursive: true, force: true });
     await this.compileAsync(manifest, PackageBuilder.TESTS_FOLDER, output);
+  }
+
+  public async typeCheckAsync(manifest: PackageManifest): Promise<void> {
+    const result = await this.runner.captureAsync(
+      process.execPath,
+      [TypeScriptCompiler.locate(), PackageBuilder.PROJECT_OPTION, this.layout.locateSource(manifest, PackageBuilder.SOURCE_FOLDER, PackageBuilder.PROJECT_FILE), PackageBuilder.NO_EMIT_OPTION],
+      this.layout.root,
+      PackageBuilder.COMPILE_TIMEOUT);
+    PackageBuilder.require(result, `Type-checking ${manifest.directory}/${PackageBuilder.SOURCE_FOLDER}`);
   }
 
   private static require(result: ProcessResult, operation: string): void {

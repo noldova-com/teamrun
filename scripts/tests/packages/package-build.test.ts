@@ -11,6 +11,7 @@ import { appendFile, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
+import BuildVariant from "../../modules/build-variant.ts";
 import ModuleCatalog from "../../modules/module-catalog.ts";
 import PackageBuild from "../../packages/package-build.ts";
 import PackageException from "../../packages/package.exception.ts";
@@ -46,8 +47,8 @@ class PackageBuildTests {
       const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
       const output = new TextOutputFixture();
 
-      assert.deepEqual(await build.buildAsync(output, false), []);
-      await build.requireCurrentAsync(false);
+      assert.deepEqual(await build.buildAsync(output, BuildVariant.REGULAR), []);
+      await build.requireCurrentAsync(BuildVariant.REGULAR);
       assert.equal(output.text, "");
     });
 
@@ -56,7 +57,7 @@ class PackageBuildTests {
       await PackageTreeFixture.writePackageAsync(repository, "shell-gamma", [], false, false);
       const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
 
-      const packages = await build.buildAsync(new TextOutputFixture(), false);
+      const packages = await build.buildAsync(new TextOutputFixture(), BuildVariant.REGULAR);
       const output = await PackageBuildTests.buildAsync(build);
 
       assert.deepEqual(packages.map(t => t.name), [PackageBuildTests.ALPHA, PackageBuildTests.GAMMA, PackageBuildTests.BETA]);
@@ -92,7 +93,7 @@ class PackageBuildTests {
 
       await repository.writeAsync({ "src/shell/beta/src/resources.ts": "export default class Resources {\n  public static readonly version: string = \"changed\";\n  public static readonly protocol: string = \"\";\n}\n" });
       const changed = await PackageBuildTests.buildAsync(build);
-      await build.requireCurrentAsync(false);
+      await build.requireCurrentAsync(BuildVariant.REGULAR);
 
       assert.match(first, /^[0-9a-f]{64}$/);
       assert.notEqual(await stamped(), first);
@@ -127,9 +128,9 @@ class PackageBuildTests {
       await PackageBuildTests.buildAsync(build);
 
       await appendFile(path.join(repository.directory, "node_modules", "@noldova", "teamrun-foundation-alpha", "api", "index.js"), "\n");
-      await assert.rejects(build.requireCurrentAsync(false), PackageBuildTests.ALL_STALE);
+      await assert.rejects(build.requireCurrentAsync(BuildVariant.REGULAR), PackageBuildTests.ALL_STALE);
       const repaired = await PackageBuildTests.buildAsync(build);
-      await build.requireCurrentAsync(false);
+      await build.requireCurrentAsync(BuildVariant.REGULAR);
 
       assert.deepEqual(repaired, PackageBuildTests.REINSTALLED);
     });
@@ -140,9 +141,9 @@ class PackageBuildTests {
       await PackageBuildTests.buildAsync(build);
 
       await rm(path.join(repository.directory, "node_modules"), { recursive: true, force: true });
-      await assert.rejects(build.requireCurrentAsync(false), PackageBuildTests.ALL_STALE);
+      await assert.rejects(build.requireCurrentAsync(BuildVariant.REGULAR), PackageBuildTests.ALL_STALE);
       const reinstalled = await PackageBuildTests.buildAsync(build);
-      await build.requireCurrentAsync(false);
+      await build.requireCurrentAsync(BuildVariant.REGULAR);
 
       assert.deepEqual(reinstalled, PackageBuildTests.REINSTALLED);
     });
@@ -155,11 +156,11 @@ class PackageBuildTests {
 
       const regular = await PackageBuildTests.buildAsync(build);
       const tested = new TextOutputFixture();
-      const packages = await build.buildAsync(tested, true);
-      await build.requireCurrentAsync(false);
+      const packages = await build.buildAsync(tested, new BuildVariant(true, []));
+      await build.requireCurrentAsync(BuildVariant.REGULAR);
       const again = await PackageBuildTests.buildAsync(build);
 
-      assert.deepEqual(regular, PackageBuildTests.ALL_BUILT);
+      assert.deepEqual(regular, [...PackageBuildTests.ALL_BUILT, `${fixture}: type-checked`]);
       assert.deepEqual(packages.map(t => t.name), [PackageBuildTests.ALPHA, PackageBuildTests.BETA, fixture]);
       assert.deepEqual(tested.text.split("\n").filter(t => t.length > 0), [
         `${PackageBuildTests.ALPHA}: reused`,
@@ -172,8 +173,48 @@ class PackageBuildTests {
         `${PackageBuildTests.ALPHA}: reused`,
         `${PackageBuildTests.BETA}: reused`,
         `${PackageBuildTests.ALPHA} tests: reused`,
-        `${PackageBuildTests.BETA} tests: reused`
+        `${PackageBuildTests.BETA} tests: reused`,
+        `${fixture}: type-checked`
       ]);
+    });
+
+    test("the build's module declarations and the packages it hosts decide the fingerprint", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await PackageTreeFixture.writeRootAsync(repository);
+      await PackageTreeFixture.writePackageAsync(repository, "shell-gamma", [], false, false);
+      await PackageTreeFixture.writePackageAsync(repository, "fixture-notes-runtime", [], false, true, `${ModuleCatalog.FIXTURE_FOLDER}/notes/runtime`);
+      const root = JSON.parse(await readFile(path.join(repository.directory, "package.json"), "utf8"));
+      const declare = (id: string, displayName: string): string => JSON.stringify({ id, displayName, parts: [], dependencies: [], contributes: {} });
+      await repository.writeAsync({
+        "package.json": `${JSON.stringify({ ...root, teamrun: { ...root.teamrun, modules: ["tasks"] } }, null, 2)}\n`,
+        "src/modules/tasks/module.json": declare("tasks", "Tasks"),
+        [`${ModuleCatalog.FIXTURE_FOLDER}/notes/module.json`]: declare("notes", "Notes"),
+        "src/shell/gamma/src/resources.ts": "export default class Resources {\n  public static readonly build: string = \"__BUILD__\";\n}\n"
+      });
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const stamped = async (variant: BuildVariant): Promise<string> => {
+        await build.buildAsync(new TextOutputFixture(), variant);
+        await build.requireCurrentAsync(variant);
+        return await readFile(path.join(repository.directory, "node_modules", "@noldova", "teamrun-shell-gamma", "resources.js"), "utf8");
+      };
+
+      const regular = await stamped(BuildVariant.REGULAR);
+      const tested = await stamped(new BuildVariant(true, ["notes"]));
+      await repository.writeAsync({ "src/modules/tasks/module.json": declare("tasks", "Task list") });
+      const renamed = await stamped(BuildVariant.REGULAR);
+
+      assert.equal(new Set([regular, tested, renamed]).size, 3);
+    });
+
+    test("a regular build type-checks the fixture packages it does not build, and refuses one with a type error", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
+      const repository = await PackageBuildTests.createAsync(t);
+      const directory = `${ModuleCatalog.FIXTURE_FOLDER}/notes/runtime`;
+      await PackageTreeFixture.writePackageAsync(repository, "fixture-notes-runtime", [], false, true, directory);
+      await repository.writeAsync({ [`${directory}/src/api/index.ts`]: "export const count: number = \"many\";\n" });
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+
+      await assert.rejects(build.buildAsync(new TextOutputFixture(), BuildVariant.REGULAR), new RegExp(`^PackageException: Type-checking ${directory}/src failed with exit code \\d+:`));
     });
   }
 
@@ -188,7 +229,7 @@ class PackageBuildTests {
 
   private static async buildAsync(build: PackageBuild): Promise<readonly string[]> {
     const output = new TextOutputFixture();
-    await build.buildAsync(output, false);
+    await build.buildAsync(output, BuildVariant.REGULAR);
     return output.text.split("\n").filter(t => t.length > 0);
   }
 }

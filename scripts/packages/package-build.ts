@@ -12,6 +12,9 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
+import type BuildVariant from "../modules/build-variant.ts";
+import ModuleCatalog from "../modules/module-catalog.ts";
+import type ModuleDeclaration from "../modules/module-declaration.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import NpmCommand from "../toolchain/npm-command.ts";
 import BuildLayout from "./build-layout.ts";
@@ -36,18 +39,20 @@ export default class PackageBuild {
 
   private readonly layout: BuildLayout;
   private readonly catalog: PackageCatalog;
+  private readonly modules: ModuleCatalog;
   private readonly runner: ProcessRunner;
   private readonly environment: NodeJS.ProcessEnv;
 
   public constructor(root: string, runner: ProcessRunner, environment: NodeJS.ProcessEnv) {
     this.layout = new BuildLayout(root);
     this.catalog = new PackageCatalog(root);
+    this.modules = new ModuleCatalog(root);
     this.runner = runner;
     this.environment = environment;
   }
 
-  public async buildAsync(output: Writable, includeFixtures: boolean): Promise<readonly PackageManifest[]> {
-    const packages = await this.catalog.listPackagesAsync(includeFixtures);
+  public async buildAsync(output: Writable, variant: BuildVariant): Promise<readonly PackageManifest[]> {
+    const packages = await this.catalog.listPackagesAsync(variant.isTest);
     if (packages.length === 0)
       return packages;
 
@@ -55,7 +60,7 @@ export default class PackageBuild {
     const version = rootManifest.productVersion;
     const archives = packages.map(t => this.layout.locateArchive(t, version));
     const common = await this.hashCommonInputsAsync();
-    const fingerprint = await this.hashFingerprintAsync(packages, common);
+    const fingerprint = await this.hashFingerprintAsync(packages, common, await this.modules.listBuildAsync(variant.isTest, variant.excluded));
     const builder = new PackageBuilder(this.layout, rootManifest, this.runner, new NpmCommand(this.runner, this.environment), fingerprint);
     const archiveHashes = new Map<string, string>();
     for (const manifest of packages) {
@@ -80,18 +85,24 @@ export default class PackageBuild {
       output.write(`${manifest.name} tests: ${isCurrent ? "reused" : "compiled"}\n`);
     }
 
-    await this.requireCurrentAsync(includeFixtures);
+    if (!variant.isTest)
+      for (const fixture of (await this.catalog.listPackagesAsync(true)).filter(t => t.isFixture)) {
+        await builder.typeCheckAsync(fixture);
+        output.write(`${fixture.name}: type-checked\n`);
+      }
+
+    await this.requireCurrentAsync(variant);
     return packages;
   }
 
-  public async requireCurrentAsync(includeFixtures: boolean): Promise<void> {
-    const packages = await this.catalog.listPackagesAsync(includeFixtures);
+  public async requireCurrentAsync(variant: BuildVariant): Promise<void> {
+    const packages = await this.catalog.listPackagesAsync(variant.isTest);
     if (packages.length === 0)
       return;
 
     const version = (await RootManifest.readAsync(this.layout.root)).productVersion;
     const common = await this.hashCommonInputsAsync();
-    const fingerprint = await this.hashFingerprintAsync(packages, common);
+    const fingerprint = await this.hashFingerprintAsync(packages, common, await this.modules.listBuildAsync(variant.isTest, variant.excluded));
     const archiveHashes = new Map<string, string>();
     const stale: string[] = [];
     for (const manifest of packages) {
@@ -149,8 +160,8 @@ export default class PackageBuild {
     return ContentHash.ofParts(parts);
   }
 
-  private async hashFingerprintAsync(packages: readonly PackageManifest[], common: string): Promise<string> {
-    const parts = [common];
+  private async hashFingerprintAsync(packages: readonly PackageManifest[], common: string, declarations: readonly ModuleDeclaration[]): Promise<string> {
+    const parts = [common, JSON.stringify(declarations.map(t => t.toJson()))];
     for (const manifest of packages)
       parts.push(`${manifest.name} ${await this.hashPackageSourceAsync(manifest)}`);
     return ContentHash.ofParts(parts);

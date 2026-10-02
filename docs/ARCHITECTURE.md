@@ -256,7 +256,7 @@ Closing TeamRun waits for each window to save its unsaved state. A window part t
 - The repository is self-contained. Reviewed foundation source is built here; no sibling checkout, copied installation directory or private reference repository is a build dependency.
 - Exact external dependency versions and lockfiles describe the install inputs.
 - The root manifest declares the product version and, separately, the protocol version. The build stamps the product version into sibling packages consistently.
-- The build also stamps the runtime with the fingerprint of the inputs it was compiled from. The fingerprint identifies the runtime's build: the same inputs give the same build, and any change gives another.
+- The build also stamps the runtime with the fingerprint of the inputs it was compiled from: the build's tools and root files, its ordered module declarations and the sources of the packages it builds, including fixture packages in a test build. The fingerprint identifies the runtime's build: the same inputs give the same build, and any change gives another.
 - Compile, package and install through one reproducible path. Tests and the window consume fresh installed artifacts, detecting stale inputs. The coding standards own public declarations and documentation.
 - The Angular project in `src/` pins its own toolchain, including the TypeScript version Angular requires. The build installs it from its lockfile, separately from the packages, and the Angular CLI builds and tests the Angular parts. A package never imports from the Angular project's dependencies; it imports only what its own manifest declares.
 
