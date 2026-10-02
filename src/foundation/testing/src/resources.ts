@@ -59,7 +59,6 @@ export class Resources {
   public static readonly categoryMarkInvalid: string = "A category mark must carry a non-empty collection of non-whitespace string names.";
   public static readonly skipReasonInvalid: string = "A skip mark must carry a non-whitespace string reason.";
   public static readonly testDataMarkInvalid: string = "A test-data mark must carry a non-empty collection of test-data entries.";
-  public static readonly testDataIdentityInvalid: string = "Test data and its index must either both be present or both be absent.";
   public static readonly testDataIndexInvalid: string = "The test-data index must be a non-negative integer.";
   public static readonly directorySeparator: string = "/";
   public static readonly windowsDirectorySeparator: string = "\\";
@@ -190,7 +189,7 @@ export class Resources {
     return `Test data for "${memberName}" of "${className}" in "${filePath}" supplies ${actualCount} values for ${expectedCount} parameters.`;
   }
 
-  public static formatSkippedTest(methodName: string, reason: string | undefined): string {
+  public static formatSkippedTest(methodName: string, reason?: string): string {
     return `${methodName} — skipped: ${reason}`;
   }
 

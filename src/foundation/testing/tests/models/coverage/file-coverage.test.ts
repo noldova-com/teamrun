@@ -21,7 +21,7 @@ export class FileCoverageTests {
     Assert.isTrue(fileCoverage.isExecutable);
     Assert.areEqual(2, fileCoverage.blockCount);
     Assert.areEqual(1, fileCoverage.takenBlockCount);
-    Assert.isNull(fileCoverage.exclusionReason);
+    Assert.isUndefined(fileCoverage.exclusionReason);
     Assert.isFalse(fileCoverage.isExcluded);
   }
 

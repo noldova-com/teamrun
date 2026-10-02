@@ -60,7 +60,7 @@ export class CoverageReportWriter {
         color,
         false));
 
-      if (!Object.isNull(fileCoverage.exclusionReason))
+      if (!Object.isUndefined(fileCoverage.exclusionReason))
         rows.push(new CoverageReportRow(Resources.formatExclusion(fileCoverage.exclusionReason), String.empty, String.empty, TerminalColor.YELLOW, true));
       else
         for (const lineRange of fileCoverage.uncoveredLineRanges)

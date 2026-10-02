@@ -7,21 +7,24 @@
  */
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
-import { Assert, TestClass, TestMethod, TestMethodResult, TestOutcome } from "@noldova/teamrun-foundation-testing";
+import { Assert, TestClass, TestDataRow, TestMethod, TestMethodResult, TestMethodResultOptions, TestOutcome } from "@noldova/teamrun-foundation-testing";
 
 @TestClass
 export class TestMethodResultTests {
   @TestMethod
   public composesTheDisplayName(): void {
-    const result = new TestMethodResult("TestPackage", "SampleTests", "behaves", undefined, [], TestOutcome.Passed, 1, undefined, undefined);
+    const result = new TestMethodResult("TestPackage", "SampleTests", "behaves", TestOutcome.Passed, 1);
 
     Assert.areEqual("SampleTests.behaves", result.displayName);
+    Assert.isUndefined(result.testDataRow);
+    Assert.isUndefined(result.failure);
+    Assert.isUndefined(result.skipReason);
   }
 
   @TestMethod
   public carriesTheCompleteResult(): void {
     const failure = new Error("boom");
-    const result = new TestMethodResult("TestPackage", "SampleTests", "behaves", undefined, [], TestOutcome.Failed, 12, failure, undefined);
+    const result = new TestMethodResult("TestPackage", "SampleTests", "behaves", TestOutcome.Failed, 12, new TestMethodResultOptions({ failure }));
 
     Assert.areEqual("TestPackage", result.packageName);
     Assert.areEqual(TestOutcome.Failed, result.outcome);
@@ -32,81 +35,69 @@ export class TestMethodResultTests {
 
   @TestMethod
   public carriesTheSkipReason(): void {
-    const result = new TestMethodResult("TestPackage", "SampleTests", "waits", undefined, [], TestOutcome.Skipped, 0, undefined, "pending");
+    const result = new TestMethodResult("TestPackage", "SampleTests", "waits", TestOutcome.Skipped, 0, new TestMethodResultOptions({ skipReason: "pending" }));
 
     Assert.areEqual<string | undefined>("pending", result.skipReason);
   }
 
   @TestMethod
-  public carriesTestDataAndItsDisplayName(): void {
-    const testData = ["value"];
-    const result = new TestMethodResult("TestPackage", "SampleTests", "behaves", 3, testData, TestOutcome.Passed, 1, undefined, undefined);
-    testData[0] = "changed";
+  public carriesTheTestDataRowAndItsDisplayName(): void {
+    const testDataRow = new TestDataRow(3, ["value"]);
+    const result = new TestMethodResult("TestPackage", "SampleTests", "behaves", TestOutcome.Passed, 1, new TestMethodResultOptions({ testDataRow }));
 
-    Assert.areEqual<number | undefined>(3, result.testDataIndex);
-    Assert.areEqual<unknown>("value", result.testData[0]);
+    Assert.areEqual<TestDataRow | undefined>(testDataRow, result.testDataRow);
     Assert.areEqual("SampleTests.behaves[3]", result.displayName);
   }
 
   @TestMethod
-  public rejectsTestDataWithoutAnIndex(): void {
-    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", undefined, ["value"], TestOutcome.Passed, 1, undefined, undefined), ArgumentException);
-  }
-
-  @TestMethod
-  public rejectsAnIndexWithoutTestData(): void {
-    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", 0, [], TestOutcome.Passed, 1, undefined, undefined), ArgumentException);
-  }
-
-  @TestMethod
-  public rejectsAnInvalidTestDataIndex(): void {
-    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", -1, ["value"], TestOutcome.Passed, 1, undefined, undefined), ArgumentException);
-    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", 1.5, ["value"], TestOutcome.Passed, 1, undefined, undefined), ArgumentException);
-  }
-
-  @TestMethod
   public rejectsAWhitespacePackageName(): void {
-    Assert.throws(() => new TestMethodResult(" ", "SampleTests", "behaves", undefined, [], TestOutcome.Passed, 1, undefined, undefined), ArgumentException);
+    Assert.throws(() => new TestMethodResult(" ", "SampleTests", "behaves", TestOutcome.Passed, 1), ArgumentException);
   }
 
   @TestMethod
   public rejectsAWhitespaceClassName(): void {
-    Assert.throws(() => new TestMethodResult("TestPackage", " ", "behaves", undefined, [], TestOutcome.Passed, 1, undefined, undefined), ArgumentException);
+    Assert.throws(() => new TestMethodResult("TestPackage", " ", "behaves", TestOutcome.Passed, 1), ArgumentException);
   }
 
   @TestMethod
   public rejectsAWhitespaceMethodName(): void {
-    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", " ", undefined, [], TestOutcome.Passed, 1, undefined, undefined), ArgumentException);
+    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", " ", TestOutcome.Passed, 1), ArgumentException);
   }
 
   @TestMethod
   public rejectsANegativeDuration(): void {
-    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", undefined, [], TestOutcome.Passed, -1, undefined, undefined), ArgumentException);
+    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", TestOutcome.Passed, -1), ArgumentException);
   }
 
   @TestMethod
   public rejectsANonFiniteDuration(): void {
-    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", undefined, [], TestOutcome.Passed, Number.NaN, undefined, undefined), ArgumentException);
-    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", undefined, [], TestOutcome.Passed, Number.POSITIVE_INFINITY, undefined, undefined), ArgumentException);
+    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", TestOutcome.Passed, Number.NaN), ArgumentException);
+    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", TestOutcome.Passed, Number.POSITIVE_INFINITY), ArgumentException);
   }
 
   @TestMethod
   public rejectsAPassedResultCarryingAFailure(): void {
-    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", undefined, [], TestOutcome.Passed, 1, new Error("boom"), undefined), ArgumentException);
+    const options = new TestMethodResultOptions({ failure: new Error("boom") });
+
+    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", TestOutcome.Passed, 1, options), ArgumentException);
   }
 
   @TestMethod
   public rejectsASkippedResultWithoutAReason(): void {
-    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "waits", undefined, [], TestOutcome.Skipped, 0, undefined, undefined), ArgumentException);
+    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "waits", TestOutcome.Skipped, 0), ArgumentException);
   }
 
   @TestMethod
   public rejectsAPassedResultCarryingASkipReason(): void {
-    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", undefined, [], TestOutcome.Passed, 1, undefined, "pending"), ArgumentException);
+    const options = new TestMethodResultOptions({ skipReason: "pending" });
+
+    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", TestOutcome.Passed, 1, options), ArgumentException);
   }
 
   @TestMethod
   public rejectsAFailedResultCarryingASkipReason(): void {
-    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", undefined, [], TestOutcome.Failed, 1, new Error("boom"), "pending"), ArgumentException);
+    const options = new TestMethodResultOptions({ failure: new Error("boom"), skipReason: "pending" });
+
+    Assert.throws(() => new TestMethodResult("TestPackage", "SampleTests", "behaves", TestOutcome.Failed, 1, options), ArgumentException);
   }
 }

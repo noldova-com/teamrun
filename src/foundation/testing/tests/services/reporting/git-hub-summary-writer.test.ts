@@ -11,8 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  Assert, AssertFailedException, BlockCoverage, CoverageResult, FileCoverage, GitHubSummaryWriter, LineRange, TestClass, TestClassResult, TestMethod, TestMethodResult,
-  TestOutcome, TestRunResult
+  Assert, AssertFailedException, BlockCoverage, CoverageResult, FileCoverage, GitHubSummaryWriter, LineRange, TestClass, TestClassResult, TestDataRow, TestMethod,
+  TestMethodResult, TestMethodResultOptions, TestOutcome, TestRunResult
 } from "@noldova/teamrun-foundation-testing";
 
 @TestClass
@@ -25,14 +25,14 @@ export class GitHubSummaryWriterTests {
       writeFileSync(path, "Existing step content\n");
       const result = new TestRunResult([
         new TestClassResult("Package", "SampleTests", "sample.test.js", [
-          new TestMethodResult("Package", "SampleTests", "passes", undefined, [], TestOutcome.Passed, 1000, undefined, undefined),
-          new TestMethodResult("Package", "SampleTests", "fails", 0, ["row"], TestOutcome.Failed, 200, new AssertFailedException("</pre><script>&", 1, 2), undefined)
+          new TestMethodResult("Package", "SampleTests", "passes", TestOutcome.Passed, 1000),
+          new TestMethodResult("Package", "SampleTests", "fails", TestOutcome.Failed, 200, new TestMethodResultOptions({ testDataRow: new TestDataRow(0, ["row"]), failure: new AssertFailedException("</pre><script>&", 1, 2) }))
         ]),
         new TestClassResult("Package", "OtherTests", "sample.test.js", [
-          new TestMethodResult("Package", "OtherTests", "skips", undefined, [], TestOutcome.Skipped, 0, undefined, "not available")
+          new TestMethodResult("Package", "OtherTests", "skips", TestOutcome.Skipped, 0, new TestMethodResultOptions({ skipReason: "not available" }))
         ]),
         new TestClassResult("OtherPackage", "SampleTests", "sample.test.js", [
-          new TestMethodResult("OtherPackage", "SampleTests", "passes", undefined, [], TestOutcome.Passed, 50, undefined, undefined)
+          new TestMethodResult("OtherPackage", "SampleTests", "passes", TestOutcome.Passed, 50)
         ])
       ]);
       new GitHubSummaryWriter(path).writeTests(result);
@@ -67,7 +67,7 @@ export class GitHubSummaryWriterTests {
 
       writer.writeTests(new TestRunResult([
         new TestClassResult("Package", "SampleTests", "sample.test.js", [
-          new TestMethodResult("Package", "SampleTests", "waits", undefined, [], TestOutcome.Unreached, 0, undefined, undefined)
+          new TestMethodResult("Package", "SampleTests", "waits", TestOutcome.Unreached, 0)
         ])
       ]));
       report = readFileSync(path, "utf8");
@@ -137,7 +137,7 @@ export class GitHubSummaryWriterTests {
     const previous = console.error;
     console.error = (value: unknown): void => { messages.push(value); };
     try {
-      new GitHubSummaryWriter(undefined).writeFailure("ignored");
+      new GitHubSummaryWriter().writeFailure("ignored");
       new GitHubSummaryWriter(" ").writeFailure("ignored");
       Assert.areEqual(0, messages.length);
       new GitHubSummaryWriter(directory).writeFailure("cannot append to a directory");

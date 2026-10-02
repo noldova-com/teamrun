@@ -90,12 +90,12 @@ export class TestDiscoveryTests {
 
     Assert.areEqual(3, methods.length);
     Assert.areEqual<string | undefined>("acceptsData", methods[0]?.methodName);
-    Assert.areEqual<number | undefined>(0, methods[0]?.testDataIndex);
-    Assert.areEqual<unknown>("first", methods[0]?.testData[0]);
-    Assert.areEqual<number | undefined>(1, methods[1]?.testDataIndex);
-    Assert.areEqual<unknown>("second", methods[1]?.testData[0]);
+    Assert.areEqual<number | undefined>(0, methods[0]?.testDataRow?.index);
+    Assert.areEqual<unknown>("first", methods[0]?.testDataRow?.values[0]);
+    Assert.areEqual<number | undefined>(1, methods[1]?.testDataRow?.index);
+    Assert.areEqual<unknown>("second", methods[1]?.testDataRow?.values[0]);
     Assert.areEqual<string | undefined>("ordinary", methods[2]?.methodName);
-    Assert.isUndefined(methods[2]?.testDataIndex);
+    Assert.isUndefined(methods[2]?.testDataRow);
   }
 
   @TestMethod

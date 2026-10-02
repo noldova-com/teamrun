@@ -9,6 +9,7 @@
 import { TestingException } from "../../exceptions/testing.exception.js";
 import type { ITestProgressListener } from "../../interfaces/i-test-progress-listener.js";
 import { DiscoveredTestClass } from "../../models/discovery/discovered-test-class.js";
+import { DiscoveredTestClassOptions } from "../../models/discovery/discovered-test-class-options.js";
 import type { TestProject } from "../../models/discovery/test-project.js";
 import { TestRunResult } from "../../models/results/test-run-result.js";
 import { Resources } from "../../resources.js";
@@ -63,9 +64,8 @@ export class TestRunner {
           testClass.className,
           testClass.filePath,
           testClass.testClassConstructor,
-          testClass.skipReason,
           matchingMethods,
-          testClass.categories));
+          new DiscoveredTestClassOptions(testClass)));
     }
 
     return selected;

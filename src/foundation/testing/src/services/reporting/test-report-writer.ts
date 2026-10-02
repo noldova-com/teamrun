@@ -123,10 +123,10 @@ export class TestReportWriter implements ITestProgressListener {
   }
 
   private formatMethodName(methodResult: TestMethodResult): string {
-    if (Object.isUndefined(methodResult.testDataIndex))
+    if (Object.isUndefined(methodResult.testDataRow))
       return methodResult.methodName;
 
-    return `${methodResult.methodName}[${methodResult.testDataIndex}](${methodResult.testData.map(t => this.formatValue(t)).join(", ")})`;
+    return `${methodResult.methodName}[${methodResult.testDataRow.index}](${methodResult.testDataRow.values.map(t => this.formatValue(t)).join(", ")})`;
   }
 
   private formatFailureLines(failure: unknown): string[] {

@@ -13,7 +13,7 @@ import { Assert, TestClass, TestClassResult, TestMethod, TestMethodResult, TestO
 export class TestClassResultTests {
   @TestMethod
   public carriesTheCompleteResult(): void {
-    const methodResult = new TestMethodResult("TestPackage", "SampleTests", "behaves", undefined, [], TestOutcome.Passed, 1, undefined, undefined);
+    const methodResult = new TestMethodResult("TestPackage", "SampleTests", "behaves", TestOutcome.Passed, 1);
     const result = new TestClassResult("TestPackage", "SampleTests", "sample.test.js", [methodResult]);
 
     Assert.areEqual("TestPackage", result.packageName);
@@ -44,23 +44,23 @@ export class TestClassResultTests {
 
   @TestMethod
   public rejectsAMethodResultFromAnotherClass(): void {
-    const methodResult = new TestMethodResult("TestPackage", "OtherTests", "behaves", undefined, [], TestOutcome.Passed, 1, undefined, undefined);
+    const methodResult = new TestMethodResult("TestPackage", "OtherTests", "behaves", TestOutcome.Passed, 1);
 
     Assert.throws(() => new TestClassResult("TestPackage", "SampleTests", "sample.test.js", [methodResult]), ArgumentException);
   }
 
   @TestMethod
   public rejectsAMethodResultFromAnotherPackage(): void {
-    const methodResult = new TestMethodResult("OtherPackage", "SampleTests", "behaves", undefined, [], TestOutcome.Passed, 1, undefined, undefined);
+    const methodResult = new TestMethodResult("OtherPackage", "SampleTests", "behaves", TestOutcome.Passed, 1);
 
     Assert.throws(() => new TestClassResult("TestPackage", "SampleTests", "sample.test.js", [methodResult]), ArgumentException);
   }
 
   @TestMethod
   public copiesTheMethodResults(): void {
-    const methodResults = [new TestMethodResult("TestPackage", "SampleTests", "behaves", undefined, [], TestOutcome.Passed, 1, undefined, undefined)];
+    const methodResults = [new TestMethodResult("TestPackage", "SampleTests", "behaves", TestOutcome.Passed, 1)];
     const result = new TestClassResult("TestPackage", "SampleTests", "sample.test.js", methodResults);
-    methodResults.push(new TestMethodResult("TestPackage", "SampleTests", "alsoBehaves", undefined, [], TestOutcome.Passed, 1, undefined, undefined));
+    methodResults.push(new TestMethodResult("TestPackage", "SampleTests", "alsoBehaves", TestOutcome.Passed, 1));
 
     Assert.areEqual(1, result.methodResults.length);
   }

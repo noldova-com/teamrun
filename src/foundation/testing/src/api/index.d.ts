@@ -517,8 +517,98 @@ export declare enum TestOutcome {
 }
 
 /**
+ * One test-data row of a test method: its position among the method's
+ * `@TestData` marks and the arguments the test receives.
+ */
+export declare class TestDataRow {
+  /**
+   * The zero-based position of the row among the method's marks.
+   */
+  public readonly index: number;
+
+  /**
+   * The arguments the test receives; at least one.
+   */
+  public readonly values: readonly unknown[];
+
+  /**
+   * Creates the row.
+   *
+   * @param index The row's position; a non-negative integer.
+   * @param values The arguments; at least one. The row keeps its own copy.
+   * @throws ArgumentOutOfRangeException synchronously for a negative or
+   * fractional index.
+   * @throws ArgumentException synchronously when there are no values.
+   * @example
+   * ```ts
+   * import { TestDataRow } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const row: TestDataRow = new TestDataRow(0, [1, 2, 3]);
+   * ```
+   */
+  public constructor(index: number, values: readonly unknown[]);
+}
+
+/**
+ * The optional parts of a test result, as a caller writes them.
+ */
+export interface ITestMethodResultOptions {
+  /**
+   * The test-data row the test ran with; absent for a method without test
+   * data.
+   */
+  readonly testDataRow?: TestDataRow;
+
+  /**
+   * What the test threw; only for a failed outcome.
+   */
+  readonly failure?: unknown;
+
+  /**
+   * The skip reason; required for a skipped outcome and absent otherwise.
+   */
+  readonly skipReason?: string;
+}
+
+/**
+ * The validated optional parts of a test result. An option that is not
+ * given stays absent.
+ */
+export declare class TestMethodResultOptions implements ITestMethodResultOptions {
+  /**
+   * The test-data row the test ran with, when it has one.
+   */
+  public readonly testDataRow?: TestDataRow;
+
+  /**
+   * What the test threw, when it failed.
+   */
+  public readonly failure?: unknown;
+
+  /**
+   * The skip reason, when the test was skipped.
+   */
+  public readonly skipReason?: string;
+
+  /**
+   * Creates the options.
+   *
+   * @param options The options to carry; none by default.
+   * @throws ArgumentException synchronously for an empty or whitespace-only
+   * skip reason.
+   * @example
+   * ```ts
+   * import { TestMethodResultOptions } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const skipped: TestMethodResultOptions = new TestMethodResultOptions({ skipReason: "Needs a network." });
+   * ```
+   */
+  public constructor(options?: ITestMethodResultOptions);
+}
+
+/**
  * The immutable result of one test. The constructor rejects contradictory
- * outcome, failure, skip and test-data states.
+ * outcome, failure and skip states.
  */
 export declare class TestMethodResult {
   /**
@@ -537,17 +627,6 @@ export declare class TestMethodResult {
   public readonly methodName: string;
 
   /**
-   * The zero-based index of the test-data row, or `undefined` for a method
-   * without test data.
-   */
-  public readonly testDataIndex: number | undefined;
-
-  /**
-   * The arguments of this row; empty for a method without test data.
-   */
-  public readonly testData: readonly unknown[];
-
-  /**
    * The outcome.
    */
   public readonly outcome: TestOutcome;
@@ -558,14 +637,20 @@ export declare class TestMethodResult {
   public readonly durationMilliseconds: number;
 
   /**
-   * What the test threw when it failed; `undefined` for every other outcome.
+   * The test-data row the test ran with; absent for a method without test
+   * data.
    */
-  public readonly failure: unknown;
+  public readonly testDataRow?: TestDataRow;
 
   /**
-   * The skip reason of a skipped test; `undefined` for every other outcome.
+   * What the test threw when it failed; absent for every other outcome.
    */
-  public readonly skipReason: string | undefined;
+  public readonly failure?: unknown;
+
+  /**
+   * The skip reason of a skipped test; absent for every other outcome.
+   */
+  public readonly skipReason?: string;
 
   /**
    * `ClassName.methodName`, followed by `[index]` for a test-data row.
@@ -578,47 +663,42 @@ export declare class TestMethodResult {
    * @param packageName The package the test belongs to; not whitespace only.
    * @param className The test class name; not whitespace only.
    * @param methodName The test method name; not whitespace only.
-   * @param testDataIndex The test-data row index, a non-negative integer, or
-   * `undefined` when the method has no test data.
-   * @param testData The row's arguments: non-empty with an index, empty
-   * without one. The result keeps its own copy.
    * @param outcome The outcome.
    * @param durationMilliseconds How long the test ran; a finite, non-negative
    * number of milliseconds.
-   * @param failure What the test threw; only for a failed outcome.
-   * @param skipReason The skip reason; required for a skipped outcome and
-   * absent otherwise.
-   * @throws ArgumentException synchronously for an empty name, a mismatched
-   * index and data, a failure or skip reason the outcome cannot carry, or a
-   * skipped outcome without a reason.
-   * @throws ArgumentOutOfRangeException synchronously for a negative or
-   * fractional index or an invalid duration.
+   * @param options The test-data row, the failure of a failed outcome and the
+   * skip reason a skipped outcome requires; none by default.
+   * @throws ArgumentException synchronously for an empty name, a failure or
+   * skip reason the outcome cannot carry, or a skipped outcome without a
+   * reason.
+   * @throws ArgumentOutOfRangeException synchronously for an invalid
+   * duration.
    * @example
    * ```ts
    * import { TestMethodResult, TestOutcome } from "@noldova/teamrun-foundation-testing";
    *
-   * export const passed: TestMethodResult = new TestMethodResult(
-   *   "@noldova/teamrun-foundation-json",
-   *   "JsonReaderTests",
-   *   "readsStrings",
-   *   undefined,
-   *   [],
-   *   TestOutcome.Passed,
-   *   4,
-   *   undefined,
-   *   undefined);
+   * export const passed: TestMethodResult = new TestMethodResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "readsStrings", TestOutcome.Passed, 4);
+   * ```
+   * @example
+   * ```ts
+   * import { TestDataRow, TestMethodResult, TestMethodResultOptions, TestOutcome } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const failed: TestMethodResult = new TestMethodResult(
+   *   "@noldova/teamrun-foundation-math",
+   *   "AdditionTests",
+   *   "addsTwoNumbers",
+   *   TestOutcome.Failed,
+   *   2,
+   *   new TestMethodResultOptions({ testDataRow: new TestDataRow(1, [2, 2, 5]), failure: new Error("Expected 5, got 4.") }));
    * ```
    */
   public constructor(
     packageName: string,
     className: string,
     methodName: string,
-    testDataIndex: number | undefined,
-    testData: readonly unknown[],
     outcome: TestOutcome,
     durationMilliseconds: number,
-    failure: unknown,
-    skipReason: string | undefined);
+    options?: TestMethodResultOptions);
 }
 
 /**
@@ -661,16 +741,7 @@ export declare class TestClassResult {
    * ```ts
    * import { TestClassResult, TestMethodResult, TestOutcome } from "@noldova/teamrun-foundation-testing";
    *
-   * const passed: TestMethodResult = new TestMethodResult(
-   *   "@noldova/teamrun-foundation-json",
-   *   "JsonReaderTests",
-   *   "readsStrings",
-   *   undefined,
-   *   [],
-   *   TestOutcome.Passed,
-   *   4,
-   *   undefined,
-   *   undefined);
+   * const passed: TestMethodResult = new TestMethodResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "readsStrings", TestOutcome.Passed, 4);
    * export const classResult: TestClassResult = new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]);
    * ```
    */
@@ -736,22 +807,71 @@ export declare class TestRunResult {
    * ```ts
    * import { TestClassResult, TestMethodResult, TestOutcome, TestRunResult } from "@noldova/teamrun-foundation-testing";
    *
-   * const passed: TestMethodResult = new TestMethodResult(
-   *   "@noldova/teamrun-foundation-json",
-   *   "JsonReaderTests",
-   *   "readsStrings",
-   *   undefined,
-   *   [],
-   *   TestOutcome.Passed,
-   *   4,
-   *   undefined,
-   *   undefined);
+   * const passed: TestMethodResult = new TestMethodResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "readsStrings", TestOutcome.Passed, 4);
    * const classResult: TestClassResult = new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]);
    * const result: TestRunResult = new TestRunResult([classResult]);
    * export const total: number = result.total;
    * ```
    */
   public constructor(classResults: readonly TestClassResult[]);
+}
+
+/**
+ * The optional parts of a discovered test, as a caller writes them.
+ */
+export interface IDiscoveredTestMethodOptions {
+  /**
+   * The test-data row; absent for a method without test data.
+   */
+  readonly testDataRow?: TestDataRow;
+
+  /**
+   * The method's skip reason; absent when the method is not skipped.
+   */
+  readonly skipReason?: string;
+
+  /**
+   * The category names of the method and its test class, in written order;
+   * none when absent.
+   */
+  readonly categories?: readonly string[];
+}
+
+/**
+ * The validated optional parts of a discovered test. An option that is not
+ * given stays absent, and categories default to none.
+ */
+export declare class DiscoveredTestMethodOptions implements IDiscoveredTestMethodOptions {
+  /**
+   * The test-data row, when the method has test data.
+   */
+  public readonly testDataRow?: TestDataRow;
+
+  /**
+   * The skip reason, when the method is skipped.
+   */
+  public readonly skipReason?: string;
+
+  /**
+   * The distinct category names, in written order.
+   */
+  public readonly categories: readonly string[];
+
+  /**
+   * Creates the options.
+   *
+   * @param options The options to carry; none by default. The options keep
+   * their own copy of the categories.
+   * @throws ArgumentException synchronously for an empty or whitespace-only
+   * skip reason or category.
+   * @example
+   * ```ts
+   * import { DiscoveredTestMethodOptions, TestDataRow } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const options: DiscoveredTestMethodOptions = new DiscoveredTestMethodOptions({ testDataRow: new TestDataRow(0, [1, 2, 3]), categories: ["math"] });
+   * ```
+   */
+  public constructor(options?: IDiscoveredTestMethodOptions);
 }
 
 /**
@@ -764,20 +884,14 @@ export declare class DiscoveredTestMethod {
   public readonly methodName: string;
 
   /**
-   * The zero-based index of the test-data row, or `undefined` for a method
-   * without test data.
+   * The test-data row; absent for a method without test data.
    */
-  public readonly testDataIndex: number | undefined;
+  public readonly testDataRow?: TestDataRow;
 
   /**
-   * The arguments of this row; empty for a method without test data.
+   * The method's skip reason; absent when the method is not skipped.
    */
-  public readonly testData: readonly unknown[];
-
-  /**
-   * The method's skip reason, or `undefined` when the method is not skipped.
-   */
-  public readonly skipReason: string | undefined;
+  public readonly skipReason?: string;
 
   /**
    * The distinct category names of the method and its test class, in written
@@ -794,30 +908,72 @@ export declare class DiscoveredTestMethod {
    * Creates the discovered test.
    *
    * @param methodName The method name; not whitespace only.
-   * @param testDataIndex The test-data row index, a non-negative integer, or
-   * `undefined` when the method has no test data.
-   * @param testData The row's arguments: non-empty with an index, empty
-   * without one.
-   * @param skipReason The skip reason, not whitespace only, or `undefined`.
-   * @param categories The category names, each not whitespace only; none by
+   * @param options The test-data row, skip reason and categories; none by
    * default.
-   * @throws ArgumentException synchronously for an empty name, reason or
-   * category, or a mismatched index and data.
-   * @throws ArgumentOutOfRangeException synchronously for a negative or
-   * fractional index.
+   * @throws ArgumentException synchronously for an empty name.
    * @example
    * ```ts
    * import { DiscoveredTestMethod } from "@noldova/teamrun-foundation-testing";
    *
-   * export const row: DiscoveredTestMethod = new DiscoveredTestMethod("addsTwoNumbers", 0, [1, 2, 3], undefined, ["math"]);
+   * export const method: DiscoveredTestMethod = new DiscoveredTestMethod("addsTwoNumbers");
+   * ```
+   * @example
+   * ```ts
+   * import { DiscoveredTestMethod, DiscoveredTestMethodOptions, TestDataRow } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const row: DiscoveredTestMethod = new DiscoveredTestMethod(
+   *   "addsTwoNumbers",
+   *   new DiscoveredTestMethodOptions({ testDataRow: new TestDataRow(0, [1, 2, 3]), categories: ["math"] }));
    * ```
    */
-  public constructor(
-    methodName: string,
-    testDataIndex: number | undefined,
-    testData: readonly unknown[],
-    skipReason: string | undefined,
-    categories?: readonly string[]);
+  public constructor(methodName: string, options?: DiscoveredTestMethodOptions);
+}
+
+/**
+ * The optional parts of a discovered test class, as a caller writes them.
+ */
+export interface IDiscoveredTestClassOptions {
+  /**
+   * The class's skip reason; absent when the class is not skipped.
+   */
+  readonly skipReason?: string;
+
+  /**
+   * The category names of the class, in written order; none when absent.
+   */
+  readonly categories?: readonly string[];
+}
+
+/**
+ * The validated optional parts of a discovered test class. An option that is
+ * not given stays absent, and categories default to none.
+ */
+export declare class DiscoveredTestClassOptions implements IDiscoveredTestClassOptions {
+  /**
+   * The skip reason, when the class is skipped.
+   */
+  public readonly skipReason?: string;
+
+  /**
+   * The distinct category names, in written order.
+   */
+  public readonly categories: readonly string[];
+
+  /**
+   * Creates the options.
+   *
+   * @param options The options to carry; none by default. The options keep
+   * their own copy of the categories.
+   * @throws ArgumentException synchronously for an empty or whitespace-only
+   * skip reason or category.
+   * @example
+   * ```ts
+   * import { DiscoveredTestClassOptions } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const options: DiscoveredTestClassOptions = new DiscoveredTestClassOptions({ skipReason: "Needs a network.", categories: ["integration"] });
+   * ```
+   */
+  public constructor(options?: IDiscoveredTestClassOptions);
 }
 
 /**
@@ -847,14 +1003,14 @@ export declare class DiscoveredTestClass {
   public readonly testClassConstructor: new () => object;
 
   /**
-   * The class's skip reason, or `undefined` when the class is not skipped.
-   */
-  public readonly skipReason: string | undefined;
-
-  /**
    * The class's tests, in method and test-data order.
    */
   public readonly methods: readonly DiscoveredTestMethod[];
+
+  /**
+   * The class's skip reason; absent when the class is not skipped.
+   */
+  public readonly skipReason?: string;
 
   /**
    * The distinct category names of the class, in written order.
@@ -870,16 +1026,14 @@ export declare class DiscoveredTestClass {
    * only.
    * @param testClassConstructor The constructor that creates the class's
    * instances.
-   * @param skipReason The skip reason, not whitespace only, or `undefined`.
    * @param methods The class's tests; at least one. The class keeps its own
    * copy.
-   * @param categories The category names, each not whitespace only; none by
-   * default.
-   * @throws ArgumentException synchronously for an empty name, path, reason
-   * or category, or no tests.
+   * @param options The skip reason and categories; none by default.
+   * @throws ArgumentException synchronously for an empty name or path, or no
+   * tests.
    * @example
    * ```ts
-   * import { DiscoveredTestClass, DiscoveredTestMethod } from "@noldova/teamrun-foundation-testing";
+   * import { DiscoveredTestClass, DiscoveredTestClassOptions, DiscoveredTestMethod } from "@noldova/teamrun-foundation-testing";
    *
    * class AdditionTests {
    * }
@@ -889,8 +1043,8 @@ export declare class DiscoveredTestClass {
    *   "AdditionTests",
    *   "addition.test.js",
    *   AdditionTests,
-   *   undefined,
-   *   [new DiscoveredTestMethod("addsTwoNumbers", undefined, [], undefined)]);
+   *   [new DiscoveredTestMethod("addsTwoNumbers")],
+   *   new DiscoveredTestClassOptions({ categories: ["math"] }));
    * ```
    */
   public constructor(
@@ -898,9 +1052,8 @@ export declare class DiscoveredTestClass {
     className: string,
     filePath: string,
     testClassConstructor: new () => object,
-    skipReason: string | undefined,
     methods: readonly DiscoveredTestMethod[],
-    categories?: readonly string[]);
+    options?: DiscoveredTestClassOptions);
 }
 
 /**
@@ -1121,16 +1274,7 @@ export declare class TestReportWriter implements ITestProgressListener {
    * ```ts
    * import { TestClassResult, TestMethodResult, TestOutcome, TestReportWriter } from "@noldova/teamrun-foundation-testing";
    *
-   * const passed: TestMethodResult = new TestMethodResult(
-   *   "@noldova/teamrun-foundation-json",
-   *   "JsonReaderTests",
-   *   "readsStrings",
-   *   undefined,
-   *   [],
-   *   TestOutcome.Passed,
-   *   4,
-   *   undefined,
-   *   undefined);
+   * const passed: TestMethodResult = new TestMethodResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "readsStrings", TestOutcome.Passed, 4);
    * new TestReportWriter().onClassCompleted(new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]));
    * ```
    */
@@ -1144,16 +1288,7 @@ export declare class TestReportWriter implements ITestProgressListener {
    * ```ts
    * import { TestClassResult, TestMethodResult, TestOutcome, TestReportWriter, TestRunResult } from "@noldova/teamrun-foundation-testing";
    *
-   * const passed: TestMethodResult = new TestMethodResult(
-   *   "@noldova/teamrun-foundation-json",
-   *   "JsonReaderTests",
-   *   "readsStrings",
-   *   undefined,
-   *   [],
-   *   TestOutcome.Passed,
-   *   4,
-   *   undefined,
-   *   undefined);
+   * const passed: TestMethodResult = new TestMethodResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "readsStrings", TestOutcome.Passed, 4);
    * const classResult: TestClassResult = new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]);
    * const result: TestRunResult = new TestRunResult([classResult]);
    * new TestReportWriter().writeSummary(result);
@@ -1171,16 +1306,7 @@ export declare class TestReportWriter implements ITestProgressListener {
    * ```ts
    * import { TestClassResult, TestMethodResult, TestOutcome, TestReportWriter, TestRunResult } from "@noldova/teamrun-foundation-testing";
    *
-   * const passed: TestMethodResult = new TestMethodResult(
-   *   "@noldova/teamrun-foundation-json",
-   *   "JsonReaderTests",
-   *   "readsStrings",
-   *   undefined,
-   *   [],
-   *   TestOutcome.Passed,
-   *   4,
-   *   undefined,
-   *   undefined);
+   * const passed: TestMethodResult = new TestMethodResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "readsStrings", TestOutcome.Passed, 4);
    * const classResult: TestClassResult = new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]);
    * const result: TestRunResult = new TestRunResult([classResult]);
    * new TestReportWriter().write(result, false);
@@ -1200,16 +1326,7 @@ export declare class TestReportWriter implements ITestProgressListener {
    * ```ts
    * import { TestClassResult, TestMethodResult, TestOutcome, TestReportWriter, TestRunResult } from "@noldova/teamrun-foundation-testing";
    *
-   * const passed: TestMethodResult = new TestMethodResult(
-   *   "@noldova/teamrun-foundation-json",
-   *   "JsonReaderTests",
-   *   "readsStrings",
-   *   undefined,
-   *   [],
-   *   TestOutcome.Passed,
-   *   4,
-   *   undefined,
-   *   undefined);
+   * const passed: TestMethodResult = new TestMethodResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "readsStrings", TestOutcome.Passed, 4);
    * const classResult: TestClassResult = new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]);
    * const result: TestRunResult = new TestRunResult([classResult]);
    * export const lines: string[] = new TestReportWriter().formatLines(result, true);
@@ -1226,7 +1343,7 @@ export declare class GitHubSummaryWriter {
   /**
    * Creates the writer.
    *
-   * @param path The step summary file; `undefined` or whitespace only turns
+   * @param path The step summary file; absent or whitespace only turns
    * output off.
    * @example
    * ```ts
@@ -1235,7 +1352,7 @@ export declare class GitHubSummaryWriter {
    * export const summary: GitHubSummaryWriter = new GitHubSummaryWriter(process.env["GITHUB_STEP_SUMMARY"]);
    * ```
    */
-  public constructor(path: string | undefined);
+  public constructor(path?: string);
 
   /**
    * Appends the run's counts, its summed duration and bounded, escaped
@@ -1246,16 +1363,7 @@ export declare class GitHubSummaryWriter {
    * ```ts
    * import { TestClassResult, TestMethodResult, TestOutcome, GitHubSummaryWriter, TestRunResult } from "@noldova/teamrun-foundation-testing";
    *
-   * const passed: TestMethodResult = new TestMethodResult(
-   *   "@noldova/teamrun-foundation-json",
-   *   "JsonReaderTests",
-   *   "readsStrings",
-   *   undefined,
-   *   [],
-   *   TestOutcome.Passed,
-   *   4,
-   *   undefined,
-   *   undefined);
+   * const passed: TestMethodResult = new TestMethodResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "readsStrings", TestOutcome.Passed, 4);
    * const classResult: TestClassResult = new TestClassResult("@noldova/teamrun-foundation-json", "JsonReaderTests", "json-reader.test.js", [passed]);
    * const result: TestRunResult = new TestRunResult([classResult]);
    * new GitHubSummaryWriter(process.env["GITHUB_STEP_SUMMARY"]).writeTests(result);
@@ -1620,10 +1728,10 @@ export declare class FileCoverage {
   public readonly takenBlockCount: number;
 
   /**
-   * Why the package leaves the file out of its coverage gate; `null` when it
+   * Why the package leaves the file out of its coverage gate; absent when it
    * does not.
    */
-  public readonly exclusionReason: string | null;
+  public readonly exclusionReason?: string;
 
   /**
    * True when the package leaves the file out of its coverage gate.
@@ -1643,7 +1751,7 @@ export declare class FileCoverage {
    * @param blockCoverages The instrumented blocks; none when the total length
    * is zero. The coverage keeps its own copy.
    * @param exclusionReason Why the file is left out of the coverage gate;
-   * `null`, the default, when it is not.
+   * omitted when it is not.
    * @throws ArgumentException synchronously for an empty name or path,
    * uncovered lines and length that disagree, or blocks in a file without
    * executable text.
@@ -1668,7 +1776,7 @@ export declare class FileCoverage {
     totalLength: number,
     uncoveredLength: number,
     blockCoverages: readonly BlockCoverage[],
-    exclusionReason?: string | null);
+    exclusionReason?: string);
 }
 
 /**

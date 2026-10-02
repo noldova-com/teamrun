@@ -46,7 +46,7 @@ export class FileCoverageAnalyzer {
       ? this.toRelativePath(filePath, this.project.productionDirectory)
       : this.toRelativePath(sourcePath, this.project.sourceDirectory);
     const toLine = (t: number): number => this.toSourceLine(t, lineStartOffsets, sourceMap);
-    const exclusionReason = this.project.exclusions.find(t => t.relativePath === relativePath)?.reason ?? null;
+    const exclusionReason = this.project.exclusions.find(t => t.relativePath === relativePath)?.reason;
 
     if (this.isInertModule(fileText))
       return new FileCoverage(this.project.name, relativePath, [], 0, 0, [], exclusionReason);
@@ -73,7 +73,7 @@ export class FileCoverageAnalyzer {
     return new FileCoverage(this.project.name, relativePath, this.mergeLineRanges(uncoveredLineRanges), fileText.length, uncoveredLength, blockCoverages, exclusionReason);
   }
 
-  private toNeverLoadedFileCoverage(relativePath: string, fileText: string, toLine: (offset: number) => number, exclusionReason: string | null): FileCoverage {
+  private toNeverLoadedFileCoverage(relativePath: string, fileText: string, toLine: (offset: number) => number, exclusionReason?: string): FileCoverage {
     const firstLine = toLine(0);
     const lastLine = toLine(fileText.length - 1);
 
