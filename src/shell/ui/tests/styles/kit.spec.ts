@@ -55,6 +55,29 @@ describe("kit styles", () => {
     expect([sans.length, sansItalic.length, mono.length, symbols.length].every(t => t > 0)).toBe(true);
   });
 
+  it("give headings a line height that cannot overlap when they wrap", () => {
+    AppearanceFixture.apply();
+    const area = document.createElement("div");
+    area.style.cssText = "width: 160px;";
+    area.innerHTML = "<h1>A very long heading that keeps going past one line</h1><h2>A second-level heading that also wraps</h2>";
+    document.body.append(area);
+
+    try {
+      for (const heading of area.querySelectorAll<HTMLElement>("h1, h2")) {
+        const style = getComputedStyle(heading);
+        const lineHeight = parseFloat(style.lineHeight);
+        expect(lineHeight).toBeGreaterThanOrEqual(parseFloat(style.fontSize) * 1.25);
+        expect(heading.getBoundingClientRect().height).toBeGreaterThanOrEqual(lineHeight * 2);
+      }
+      const h1 = getComputedStyle(area.querySelector("h1") ?? area);
+      const root = getComputedStyle(document.documentElement);
+      expect(h1.fontSize).toBe(`${parseFloat(root.getPropertyValue("--tr-text-panel")) * parseFloat(root.fontSize) * 2}px`);
+    }
+    finally {
+      area.remove();
+    }
+  });
+
   for (const theme of AppearanceFixture.themes)
     it(`give scroll areas thin scrollbars without arrows whose thumb shows on hover, with the ${theme.id} theme`, async () => {
       AppearanceFixture.apply(theme, ThemeMode.Light);
