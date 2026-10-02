@@ -1268,6 +1268,15 @@ export declare class GitHubSummaryWriter {
    * escaped details of files that are not fully covered.
    *
    * @param result The run's coverage.
+   * @example
+   * ```ts
+   * import { BlockCoverage, CoverageResult, FileCoverage, GitHubSummaryWriter, LineRange } from "@noldova/teamrun-foundation-testing";
+   *
+   * const result: CoverageResult = new CoverageResult([
+   *   new FileCoverage("@noldova/teamrun-foundation-json", "services/json-reader.ts", [new LineRange(12, 14)], 900, 60, [new BlockCoverage(12, false)])
+   * ]);
+   * new GitHubSummaryWriter(process.env["GITHUB_STEP_SUMMARY"]).writeCoverage(result);
+   * ```
    */
   public writeCoverage(result: CoverageResult): void;
 
@@ -1311,6 +1320,12 @@ export declare class LineRange {
    * @param startLine The first line; a positive integer.
    * @param endLine The last line; an integer no smaller than the first.
    * @throws ArgumentOutOfRangeException synchronously when a line is invalid.
+   * @example
+   * ```ts
+   * import { LineRange } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const range: LineRange = new LineRange(12, 14);
+   * ```
    */
   public constructor(startLine: number, endLine: number);
 }
@@ -1337,6 +1352,12 @@ export declare class BlockCoverage {
    * @param isTaken Whether a test entered the block.
    * @throws ArgumentOutOfRangeException synchronously when the line is not a
    * positive integer.
+   * @example
+   * ```ts
+   * import { BlockCoverage } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const block: BlockCoverage = new BlockCoverage(12, true);
+   * ```
    */
   public constructor(line: number, isTaken: boolean);
 }
@@ -1396,6 +1417,12 @@ export declare class SourcePosition {
    * whitespace only.
    * @throws ArgumentOutOfRangeException synchronously when the line is not a
    * positive integer.
+   * @example
+   * ```ts
+   * import { SourcePosition } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const position: SourcePosition = new SourcePosition("/repository/src/foundation/json/src/services/json-reader.ts", 12);
+   * ```
    */
   public constructor(sourcePath: string, line: number);
 }
@@ -1416,6 +1443,12 @@ export declare class SourceMap {
    * @throws TestingException synchronously when the map is not a valid
    * version 3 map without sections, such as an unknown version, a malformed
    * mapping or a reference to a missing source or name.
+   * @example
+   * ```ts
+   * import { SourceMap } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const map: SourceMap = new SourceMap({ version: 3, sources: ["../src/index.ts"], mappings: "AAAA" }, "/repository/_build/packages/foundation-json");
+   * ```
    */
   public constructor(data: ISourceMapData, mapDirectory: string);
 
@@ -1429,6 +1462,13 @@ export declare class SourceMap {
    * position.
    * @throws ArgumentOutOfRangeException synchronously for a line that is not
    * a positive integer or a column that is not a non-negative integer.
+   * @example
+   * ```ts
+   * import { SourceMap, type SourcePosition } from "@noldova/teamrun-foundation-testing";
+   *
+   * const map: SourceMap = new SourceMap({ version: 3, sources: ["../src/index.ts"], mappings: "AAAA;AACA" }, "/repository/_build/packages/foundation-json");
+   * export const position: SourcePosition | undefined = map.mapToSource(2, 0);
+   * ```
    */
   public mapToSource(generatedLine: number, generatedColumn: number): SourcePosition | undefined;
 }
@@ -1461,6 +1501,15 @@ export declare class CoverageProject {
    * @param sourceDirectory The source folder; not whitespace only.
    * @throws ArgumentException synchronously when any is empty or whitespace
    * only.
+   * @example
+   * ```ts
+   * import { CoverageProject } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const project: CoverageProject = new CoverageProject(
+   *   "@noldova/teamrun-foundation-json",
+   *   "/repository/node_modules/@noldova/teamrun-foundation-json",
+   *   "/repository/src/foundation/json/src");
+   * ```
    */
   public constructor(name: string, productionDirectory: string, sourceDirectory: string);
 }
@@ -1537,6 +1586,12 @@ export declare class FileCoverage {
    * uncovered lines and length that disagree, or blocks in a file without
    * executable text.
    * @throws ArgumentOutOfRangeException synchronously for an invalid length.
+   * @example
+   * ```ts
+   * import { BlockCoverage, FileCoverage, LineRange } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const file: FileCoverage = new FileCoverage("@noldova/teamrun-foundation-json", "services/json-reader.ts", [new LineRange(12, 14)], 900, 60, [new BlockCoverage(12, false)]);
+   * ```
    */
   public constructor(
     projectName: string,
@@ -1596,6 +1651,14 @@ export declare class CoverageResult {
    *
    * @param fileCoverages The coverage of every file. The result keeps its own
    * copy.
+   * @example
+   * ```ts
+   * import { BlockCoverage, CoverageResult, FileCoverage, LineRange } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const result: CoverageResult = new CoverageResult([
+   *   new FileCoverage("@noldova/teamrun-foundation-json", "services/json-reader.ts", [new LineRange(12, 14)], 900, 60, [new BlockCoverage(12, false)])
+   * ]);
+   * ```
    */
   public constructor(fileCoverages: readonly FileCoverage[]);
 }
@@ -1613,6 +1676,15 @@ export declare class CoverageReportWriter {
    * @param result The coverage to report.
    * @param skipCoveredDetails Whether to leave out fully covered files.
    * @returns The report lines, with terminal color sequences.
+   * @example
+   * ```ts
+   * import { BlockCoverage, CoverageReportWriter, CoverageResult, FileCoverage, LineRange } from "@noldova/teamrun-foundation-testing";
+   *
+   * const result: CoverageResult = new CoverageResult([
+   *   new FileCoverage("@noldova/teamrun-foundation-json", "services/json-reader.ts", [new LineRange(12, 14)], 900, 60, [new BlockCoverage(12, false)])
+   * ]);
+   * export const lines: string[] = new CoverageReportWriter().formatLines(result, true);
+   * ```
    */
   public formatLines(result: CoverageResult, skipCoveredDetails: boolean): string[];
 }
@@ -1632,6 +1704,13 @@ export declare class CoverageEnvironment {
    * modified.
    * @returns A copy of the environment with `NODE_V8_COVERAGE` set to the
    * run's coverage folder, or without it when the run measures no coverage.
+   * @example
+   * ```ts
+   * import { spawn } from "node:child_process";
+   * import { CoverageEnvironment } from "@noldova/teamrun-foundation-testing";
+   *
+   * spawn(process.execPath, ["--version"], { env: CoverageEnvironment.forChild(process.env), stdio: "inherit" });
+   * ```
    */
   public static forChild(base: Readonly<Record<string, string | undefined>>): Record<string, string | undefined>;
 }
@@ -1656,6 +1735,18 @@ export declare class CoverageAnalyzer {
    * @throws TestingException as a rejection when the packages have no
    * JavaScript files, or when a report or source map is missing, malformed
    * or refers to a file outside its package.
+   * @example
+   * ```ts
+   * import { CoverageAnalyzer, CoverageProject, type CoverageResult } from "@noldova/teamrun-foundation-testing";
+   *
+   * export async function measureAsync(coverageDirectory: string): Promise<CoverageResult> {
+   *   const project = new CoverageProject(
+   *     "@noldova/teamrun-foundation-json",
+   *     "/repository/node_modules/@noldova/teamrun-foundation-json",
+   *     "/repository/src/foundation/json/src");
+   *   return new CoverageAnalyzer().analyzeAsync(coverageDirectory, [project]);
+   * }
+   * ```
    */
   public analyzeAsync(coverageDirectory: string, projects: readonly CoverageProject[]): Promise<CoverageResult>;
 }

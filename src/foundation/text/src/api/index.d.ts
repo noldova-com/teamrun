@@ -21,6 +21,24 @@ export declare abstract class LineTerminator {
    * line break starts there, including at the end of the text.
    * @throws ArgumentOutOfRangeException synchronously when the index is not an
    * integer within the text.
+   * @example
+   * ```ts
+   * import { EcmaScriptLineTerminator, type LineTerminator } from "@noldova/teamrun-foundation-text";
+   *
+   * export function countLines(text: string, terminator: LineTerminator): number {
+   *   let count = 1;
+   *   for (let index = 0; index < text.length; index++) {
+   *     const length = terminator.getLength(text, index);
+   *     if (length > 0) {
+   *       count++;
+   *       index += length - 1;
+   *     }
+   *   }
+   *   return count;
+   * }
+   *
+   * export const lineCount: number = countLines("one\r\ntwo\nthree", new EcmaScriptLineTerminator());
+   * ```
    */
   public abstract getLength(value: string, index: number): 0 | 1 | 2;
 
@@ -30,6 +48,16 @@ export declare abstract class LineTerminator {
    * @param character One character.
    * @returns True when the character ends a line on its own or starts a
    * two-character line break.
+   * @example
+   * ```ts
+   * import { EcmaScriptLineTerminator, type LineTerminator } from "@noldova/teamrun-foundation-text";
+   *
+   * export function endsWithLineBreak(text: string, terminator: LineTerminator): boolean {
+   *   return text.length > 0 && terminator.isLineTerminator(text.charAt(text.length - 1));
+   * }
+   *
+   * export const ends: boolean = endsWithLineBreak("done\n", new EcmaScriptLineTerminator());
+   * ```
    */
   public abstract isLineTerminator(character: string): boolean;
 }
@@ -50,6 +78,12 @@ export declare class EcmaScriptLineTerminator extends LineTerminator {
    * line terminator, and 0 when none starts at the index.
    * @throws ArgumentOutOfRangeException synchronously when the index is not an
    * integer within the text.
+   * @example
+   * ```ts
+   * import { EcmaScriptLineTerminator } from "@noldova/teamrun-foundation-text";
+   *
+   * export const length: 0 | 1 | 2 = new EcmaScriptLineTerminator().getLength("one\r\ntwo", 3);
+   * ```
    */
   public override getLength(value: string, index: number): 0 | 1 | 2;
 
@@ -59,6 +93,12 @@ export declare class EcmaScriptLineTerminator extends LineTerminator {
    * @param character One character.
    * @returns True for a line feed, carriage return, line separator or
    * paragraph separator.
+   * @example
+   * ```ts
+   * import { EcmaScriptLineTerminator } from "@noldova/teamrun-foundation-text";
+   *
+   * export const isTerminator: boolean = new EcmaScriptLineTerminator().isLineTerminator("\u2028");
+   * ```
    */
   public override isLineTerminator(character: string): boolean;
 }
