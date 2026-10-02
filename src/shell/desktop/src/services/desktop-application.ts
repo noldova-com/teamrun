@@ -127,6 +127,7 @@ export class DesktopApplication {
     const open = new OpenWindow(window, this.electron.screen);
     this.windows.set(contentsId, open);
     window.once(Resources.closedEvent, () => this.windows.delete(contentsId));
+    open.settleWithin(Resources.connectingShowLimit);
     void this.prepareAsync(open);
   }
 

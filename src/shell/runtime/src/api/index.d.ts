@@ -794,6 +794,7 @@ export declare class DiscoveryPublisher {
    *
    * @param lock The held ownership of the data directory.
    * @param protector Restricts the discovery folder when it is created.
+   * @param replaceFileAsync Renames a file over another; `fs.promises.rename` by default.
    * @example
    * ```ts
    * import { DiscoveryPublisher, PosixFolderProtector, type OwnershipLock } from "@noldova/teamrun-shell-runtime";
@@ -803,17 +804,22 @@ export declare class DiscoveryPublisher {
    * }
    * ```
    */
-  public constructor(lock: OwnershipLock, protector: IFolderProtector);
+  public constructor(lock: OwnershipLock, protector: IFolderProtector, replaceFileAsync?: (from: string, to: string) => Promise<void>);
 
   /**
    * Writes the metadata to a new owner-only file in the discovery folder and
    * renames it over the discovery file, so readers see the old or the new
    * metadata, never a partial file. The folder is created and protected when
-   * missing.
+   * missing. While another process holds the old file open, which on Windows
+   * makes the rename fail with `EPERM`, `EACCES` or `EBUSY`, the rename is
+   * retried for about two seconds; a rename that still fails removes the new
+   * file.
    *
    * @param discovery The metadata to publish.
    * @returns A promise of the discovery file's path.
    * @throws {OwnershipReleasedException} When the ownership was released.
+   * @throws {Error} The promise rejects with the rename's error when it fails
+   * for another reason or the old file stays held.
    * @throws {SystemCommandException} The promise rejects when the folder
    * cannot be protected.
    * @example

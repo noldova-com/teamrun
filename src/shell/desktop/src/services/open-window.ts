@@ -19,6 +19,7 @@ export class OpenWindow {
   private canClose: boolean = false;
   private isPainted: boolean = false;
   private isSettled: boolean = false;
+  private settleTimer: NodeJS.Timeout | null = null;
 
   public readonly window: IDesktopWindow;
   public readonly coordinator: CloseCoordinator;
@@ -35,6 +36,7 @@ export class OpenWindow {
       this.closing ??= this.closeWhenSavedAsync();
     });
     window.once(Resources.closedEvent, () => {
+      this.stopSettleTimer();
       this.bounds.cancelSave();
       this.coordinator.release();
     });
@@ -45,9 +47,20 @@ export class OpenWindow {
     this.showWhenReady();
   }
 
+  public settleWithin(milliseconds: number): void {
+    this.settleTimer = setTimeout(() => this.settle(), milliseconds);
+  }
+
   public settle(): void {
+    this.stopSettleTimer();
     this.isSettled = true;
     this.showWhenReady();
+  }
+
+  private stopSettleTimer(): void {
+    if (!Object.isNull(this.settleTimer))
+      clearTimeout(this.settleTimer);
+    this.settleTimer = null;
   }
 
   private showWhenReady(): void {

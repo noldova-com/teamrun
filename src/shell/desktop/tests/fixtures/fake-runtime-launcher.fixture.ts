@@ -13,13 +13,13 @@ import type { IRuntimeConnection, IRuntimeLauncher } from "@noldova/teamrun-shel
 import { FakeRuntimeConnection } from "./fake-runtime-connection.fixture.js";
 
 export class FakeRuntimeLauncher implements IRuntimeLauncher {
-  private readonly outcomes: (Error | FakeRuntimeConnection)[];
+  private readonly outcomes: (Error | FakeRuntimeConnection | Promise<FakeRuntimeConnection>)[];
 
   public readonly calls: string[] = [];
   public readonly connections: FakeRuntimeConnection[] = [];
   public listener: IRuntimeClientListener | null = null;
 
-  public constructor(...outcomes: (Error | FakeRuntimeConnection)[]) {
+  public constructor(...outcomes: (Error | FakeRuntimeConnection | Promise<FakeRuntimeConnection>)[]) {
     this.outcomes = outcomes;
   }
 
@@ -37,6 +37,11 @@ export class FakeRuntimeLauncher implements IRuntimeLauncher {
     const outcome = this.outcomes.shift() ?? new FakeRuntimeConnection();
     if (outcome instanceof Error)
       return Promise.reject(outcome);
+    if (outcome instanceof Promise)
+      return outcome.then(t => {
+        this.connections.push(t);
+        return t;
+      });
     this.connections.push(outcome);
     return Promise.resolve(outcome);
   }

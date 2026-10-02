@@ -520,6 +520,30 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async showsAWindowWhoseRuntimeIsSlowToStartAndRestoresItsBoundsOnceReady(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: false });
+    let arrive: (connection: FakeRuntimeConnection) => void = () => undefined;
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new Promise(resolve => {
+      arrive = resolve;
+    })));
+    const window = DesktopApplicationTests.firstWindow(electron);
+    const started = Date.now();
+
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    await delay(500);
+    const isShownEarly = window.isShown;
+    await DesktopApplicationTests.waitAsync(() => window.isShown, 2_000);
+    const waited = Date.now() - started;
+    arrive(connection);
+    await DesktopApplicationTests.waitAsync(() => window.calls.length > 1);
+
+    Assert.isFalse(isShownEarly);
+    Assert.isTrue(waited >= 1_900, `shown after ${waited} ms`);
+    Assert.areEqual(JSON.stringify(["show", "setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}"]), JSON.stringify(window.calls));
+  }
+
+  @TestMethod
   public async savesTheBoundsBeforeTheWindowCloses(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
@@ -615,8 +639,8 @@ export class DesktopApplicationTests {
     Assert.areEqual(JSON.stringify(["show", "setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}", "maximize"]), JSON.stringify(window.calls));
   }
 
-  private static async waitAsync(condition: () => boolean): Promise<void> {
-    for (let attempt = 0; attempt < 400 && !condition(); attempt++)
+  private static async waitAsync(condition: () => boolean, attempts: number = 400): Promise<void> {
+    for (let attempt = 0; attempt < attempts && !condition(); attempt++)
       await delay(5);
     Assert.isTrue(condition());
   }

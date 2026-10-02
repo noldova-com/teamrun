@@ -74,6 +74,10 @@ export class Resources {
     "CREATE TABLE window_states (device TEXT NOT NULL, window TEXT NOT NULL, bounds TEXT, layout TEXT, PRIMARY KEY (device, window)) STRICT";
   public static readonly errorCodeField: "errcode" = "errcode";
   public static readonly busyErrorCode: number = 5;
+  public static readonly fileErrorCodeField: "code" = "code";
+  public static readonly busyFileErrorCodes: readonly string[] = ["EPERM", "EACCES", "EBUSY"];
+  public static readonly replaceAttempts: number = 40;
+  public static readonly replaceRetryDelay: number = 50;
   public static readonly ownershipWaitMilliseconds: number = 250;
   public static readonly backupWakeMilliseconds: number = 25;
   public static readonly privateFileMode: number = 0o600;

@@ -235,7 +235,7 @@ TeamRun does not open data written by a release that predates the shell. The run
 
 ## 8. Window
 
-The window presents confirmed state and keeps only transient state locally. Durable state goes to its section 7 owner after a pause in changes and at close. The window shows once its appearance is painted and, when the runtime is ready, its saved bounds are applied; a window that shows a startup refusal applies them once the runtime is ready. Bounds that no display shows reopen at their saved size, centered. All privileged requests cross the shell's preload bridge and desktop's authenticated connection; window parts receive no token, socket, process or file handle.
+The window presents confirmed state and keeps only transient state locally. Durable state goes to its section 7 owner after a pause in changes and at close. The window shows once its appearance is painted and, when the runtime is ready, its saved bounds are applied. A window whose runtime refuses, or is still connecting after two seconds, shows at once with its startup state and applies its bounds once the runtime is ready. Bounds that no display shows reopen at their saved size, centered. All privileged requests cross the shell's preload bridge and desktop's authenticated connection; window parts receive no token, socket, process or file handle.
 
 Snapshot loading and event delivery can overlap: a window part replays or reconciles relevant events against a loaded snapshot and uses selection generations so an old response cannot replace a newer selection. Reconnect reloads potentially missed state.
 

@@ -80,6 +80,7 @@ export class Resources {
   public static readonly maximizeEvent: "maximize" = "maximize";
   public static readonly unmaximizeEvent: "unmaximize" = "unmaximize";
   public static readonly boundsSaveDelay: number = 500;
+  public static readonly connectingShowLimit: number = 2_000;
   public static readonly mainWindow: string = "main";
   public static readonly runtimeNotConnected: string = "TeamRun is not connected to its runtime.";
   public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout is not kept.";
