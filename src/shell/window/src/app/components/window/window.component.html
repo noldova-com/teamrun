@@ -1,3 +1,7 @@
 <tr-window-row />
-<tr-workspace />
+@if (startup.state().isReady) {
+  <tr-workspace />
+} @else {
+  <tr-startup />
+}
 <tr-status-bar />

@@ -191,7 +191,33 @@ export class Resources {
   public static readonly titleBarField: string = "titleBar";
   public static readonly titleBarTextField: string = "titleBarText";
   public static readonly titleBarHeightField: string = "titleBarHeight";
+  public static readonly kindField: string = "kind";
+  public static readonly detailsField: string = "details";
+  public static readonly unknownStartupState: string = "The startup state is not one the window knows.";
+  public static readonly moveAsideAction: string = "moveAside";
+  public static readonly waitAction: string = "wait";
+  public static readonly stopWorkAction: string = "stopWork";
+  public static readonly retryAction: string = "retry";
+  public static readonly startingTitle: string = "Starting TeamRun…";
+  public static readonly preShellDataTitle: string = "Data from an earlier TeamRun";
+  public static readonly preShellDataText: string =
+    "This release does not open data that an earlier TeamRun wrote. Moving it aside keeps all of it in a new folder beside it, " +
+    "changes and deletes nothing, and starts TeamRun with an empty data folder.";
+  public static readonly moveAside: string = "Move aside";
+  public static readonly workInProgressTitle: string = "An older TeamRun is still working";
+  public static readonly workInProgressText: string = "This TeamRun replaces it. Wait for this work to finish, or stop it now.";
+  public static readonly waitForWork: string = "Wait for it";
+  public static readonly stopWork: string = "Stop the work";
+  public static readonly waitingTitle: string = "Waiting for the older TeamRun";
+  public static readonly waitingText: string = "TeamRun starts when this work finishes.";
+  public static readonly newerBuildTitle: string = "A newer TeamRun is running";
+  public static readonly failedTitle: string = "TeamRun could not start";
+  public static readonly tryAgain: string = "Try again";
   public static readonly missingBridge: string = "The window needs the desktop's bridge, which the preload provides.";
+
+  public static formatNewerBuild(version: string): string {
+    return `TeamRun ${version} is using this data folder. Use that TeamRun instead.`;
+  }
 
   public static formatUnregisteredView(name: string): string {
     return `No view named "${name}" is registered.`;

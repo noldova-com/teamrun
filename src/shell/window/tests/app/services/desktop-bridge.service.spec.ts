@@ -20,7 +20,10 @@ describe("DesktopBridgeService", () => {
     platform: "linux",
     notifyReady: (): void => undefined,
     onCloseRequest: (): (() => void) => () => undefined,
-    answerClose: (): Promise<boolean> => Promise.resolve(true)
+    answerClose: (): Promise<boolean> => Promise.resolve(true),
+    readStartup: (): Promise<unknown> => Promise.resolve(null),
+    onStartup: (): (() => void) => () => undefined,
+    actOnStartup: (): Promise<boolean> => Promise.resolve(true)
   };
   const incomplete: readonly [string, unknown][] = [
     ["nothing", undefined],
@@ -28,7 +31,10 @@ describe("DesktopBridgeService", () => {
     ["no platform", { ...complete, platform: 1 }],
     ["no notifyReady", { ...complete, notifyReady: null }],
     ["no onCloseRequest", { ...complete, onCloseRequest: null }],
-    ["no answerClose", { ...complete, answerClose: null }]
+    ["no answerClose", { ...complete, answerClose: null }],
+    ["no readStartup", { ...complete, readStartup: null }],
+    ["no onStartup", { ...complete, onStartup: null }],
+    ["no actOnStartup", { ...complete, actOnStartup: null }]
   ];
 
   for (const [name, value] of incomplete)
@@ -71,5 +77,23 @@ describe("DesktopBridgeService", () => {
     expect(requests).toEqual(["first"]);
     expect(await service.answerCloseAsync("first", false)).toBe(true);
     expect(bridge.answers).toEqual(["first:false"]);
+  });
+
+  it("reads and follows the startup state until unsubscribed, and passes the person's choice on", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    bridge.startup = { kind: "PreShellData", details: ["/data/old"] };
+    const service = TestBed.inject(DesktopBridgeService);
+    const states: string[] = [];
+
+    const initial = await service.readStartupAsync();
+    const unsubscribe = service.onStartup(t => states.push(t.kind));
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    unsubscribe();
+    bridge.publishStartup({ kind: "Ready", details: [] });
+
+    expect([initial.kind, initial.details]).toEqual(["PreShellData", ["/data/old"]]);
+    expect(states).toEqual(["Connecting"]);
+    expect(await service.actOnStartupAsync("moveAside")).toBe(true);
+    expect(bridge.actions).toEqual(["moveAside"]);
   });
 });

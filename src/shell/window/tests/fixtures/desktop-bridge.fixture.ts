@@ -14,10 +14,13 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private static readonly NAME: string = "teamrun";
 
   private readonly listeners: Set<(requestId: string) => void> = new Set();
+  private readonly startupListeners: Set<(state: unknown) => void> = new Set();
 
   public readonly platform: string;
   public readonly appearances: JsonObject[] = [];
   public readonly answers: string[] = [];
+  public readonly actions: string[] = [];
+  public startup: unknown = { kind: "Ready", details: [] };
 
   public constructor(platform: string) {
     this.platform = platform;
@@ -38,6 +41,10 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   }
 
   public get listenerCount(): number {
+    return this.listeners.size + this.startupListeners.size;
+  }
+
+  public get closeListenerCount(): number {
     return this.listeners.size;
   }
 
@@ -53,6 +60,25 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public answerClose(requestId: string, isSaved: boolean): Promise<boolean> {
     this.answers.push(`${requestId}:${isSaved}`);
     return Promise.resolve(true);
+  }
+
+  public readStartup(): Promise<unknown> {
+    return Promise.resolve(this.startup);
+  }
+
+  public onStartup(listener: (state: unknown) => void): () => void {
+    this.startupListeners.add(listener);
+    return () => this.startupListeners.delete(listener);
+  }
+
+  public actOnStartup(action: string): Promise<boolean> {
+    this.actions.push(action);
+    return Promise.resolve(true);
+  }
+
+  public publishStartup(state: unknown): void {
+    for (const listener of this.startupListeners)
+      listener(state);
   }
 
   public requestClose(requestId: string): void {

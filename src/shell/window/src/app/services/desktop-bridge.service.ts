@@ -12,6 +12,7 @@ import { nameof } from "@noldova/teamrun-foundation-core";
 
 import { DesktopBridgeException } from "../exceptions/desktop-bridge.exception";
 import type { IDesktopBridge } from "../interfaces/i-desktop-bridge";
+import { StartupState } from "../models/startup-state";
 import type { WindowAppearance } from "../models/window-appearance";
 import { Resources } from "../../resources";
 
@@ -35,6 +36,18 @@ export class DesktopBridgeService {
     return this.bridge.answerClose(requestId, isSaved);
   }
 
+  public async readStartupAsync(): Promise<StartupState> {
+    return StartupState.fromJson(await this.bridge.readStartup());
+  }
+
+  public onStartup(listener: (state: StartupState) => void): () => void {
+    return this.bridge.onStartup(t => listener(StartupState.fromJson(t)));
+  }
+
+  public actOnStartupAsync(action: string): Promise<boolean> {
+    return this.bridge.actOnStartup(action);
+  }
+
   private static find(): IDesktopBridge {
     const bridge: unknown = Reflect.get(globalThis, Resources.bridgeName);
     if (!DesktopBridgeService.isBridge(bridge))
@@ -47,6 +60,9 @@ export class DesktopBridgeService {
       Object.isString(Reflect.get(value, nameof<IDesktopBridge>(t => t.platform))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.notifyReady))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onCloseRequest))) &&
-      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerClose)));
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerClose))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readStartup))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onStartup))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.actOnStartup)));
   }
 }
