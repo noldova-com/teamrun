@@ -41,6 +41,14 @@ export declare class BackupVerificationException extends Exception {
    * Creates the exception.
    *
    * @param options The failure that prevented the check, if any.
+   * @example
+   * ```ts
+   * import { BackupVerificationException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new BackupVerificationException();
+   * }
+   * ```
    */
   public constructor(options?: ExceptionOptions);
 }
@@ -59,6 +67,14 @@ export declare class DataDirectoryOwnedException extends Exception {
    *
    * @param root The absolute path of the owned data directory.
    * @param options The SQLite failure that reported the ownership, if any.
+   * @example
+   * ```ts
+   * import { DataDirectoryOwnedException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new DataDirectoryOwnedException("/home/person/.noldova/teamrun");
+   * }
+   * ```
    */
   public constructor(root: string, options?: ExceptionOptions);
 }
@@ -74,6 +90,14 @@ export declare class DiscoveryFormatException extends Exception {
    *
    * @param message What is wrong with the metadata.
    * @param options The parse failure, if any.
+   * @example
+   * ```ts
+   * import { DiscoveryFormatException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new DiscoveryFormatException("The discovery metadata is not a JSON object.");
+   * }
+   * ```
    */
   public constructor(message: string, options?: ExceptionOptions);
 }
@@ -93,6 +117,14 @@ export declare class MigrationException extends Exception {
    *
    * @param migrationId The id of the failed migration.
    * @param options The SQLite failure, if any.
+   * @example
+   * ```ts
+   * import { MigrationException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new MigrationException("create-settings");
+   * }
+   * ```
    */
   public constructor(migrationId: string, options?: ExceptionOptions);
 }
@@ -104,6 +136,14 @@ export declare class MigrationException extends Exception {
 export declare class OwnershipReleasedException extends Exception {
   /**
    * Creates the exception.
+   * @example
+   * ```ts
+   * import { OwnershipReleasedException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new OwnershipReleasedException();
+   * }
+   * ```
    */
   public constructor();
 }
@@ -130,6 +170,14 @@ export declare class PreShellDataException extends Exception {
    * @param root The absolute path of the data directory.
    * @param entries The entries that belong to the earlier release; the array
    * is copied.
+   * @example
+   * ```ts
+   * import { PreShellDataException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new PreShellDataException("/home/person/.noldova/teamrun", ["teamrun.db"]);
+   * }
+   * ```
    */
   public constructor(root: string, entries: readonly string[]);
 }
@@ -144,6 +192,14 @@ export declare class SystemCommandException extends Exception {
    *
    * @param message What failed.
    * @param options The process failure, if any.
+   * @example
+   * ```ts
+   * import { SystemCommandException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new SystemCommandException("icacls.exe failed");
+   * }
+   * ```
    */
   public constructor(message: string, options?: ExceptionOptions);
 }
@@ -159,6 +215,14 @@ export declare class UnknownSchemaException extends Exception {
    * Creates the exception.
    *
    * @param message Why the schema is not recognized.
+   * @example
+   * ```ts
+   * import { UnknownSchemaException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new UnknownSchemaException("The shell database was written by a newer build.");
+   * }
+   * ```
    */
   public constructor(message: string);
 }
@@ -174,6 +238,18 @@ export interface IFolderProtector {
    * @returns A promise that resolves once the folder is restricted.
    * @throws {SystemCommandException} The promise rejects when an
    * operating-system command fails.
+   * @example
+   * ```ts
+   * import type { IFolderProtector } from "@noldova/teamrun-shell-runtime";
+   *
+   * export class RecordingProtector implements IFolderProtector {
+   *   public readonly folders: string[] = [];
+   *
+   *   public async protectAsync(folder: string): Promise<void> {
+   *     this.folders.push(folder);
+   *   }
+   * }
+   * ```
    */
   protectAsync(folder: string): Promise<void>;
 }
@@ -244,6 +320,12 @@ export declare class DataDirectoryInspection {
    * @param state What the directory holds.
    * @param entries The top-level entries other than the runtime's own; the
    * array is copied.
+   * @example
+   * ```ts
+   * import { DataDirectoryInspection, DataDirectoryState } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const inspection: DataDirectoryInspection = new DataDirectoryInspection(DataDirectoryState.Empty, []);
+   * ```
    */
   public constructor(state: DataDirectoryState, entries: readonly string[]);
 }
@@ -272,7 +354,11 @@ export declare class Migration {
    * @throws {ArgumentException} When the id is malformed or there are no
    * statements.
    * @example
-   * const migration = new Migration("create-settings", ["CREATE TABLE settings (name TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT"]);
+   * ```ts
+   * import { Migration } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const createSettings: Migration = new Migration("create-settings", ["CREATE TABLE settings (name TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT"]);
+   * ```
    */
   public constructor(id: string, statements: readonly string[]);
 }
@@ -331,7 +417,11 @@ export declare class RuntimeDiscovery {
    * @throws {ArgumentOutOfRangeException} When the process id or the protocol
    * version is not a positive integer.
    * @example
-   * const discovery = new RuntimeDiscovery("127.0.0.1:52000", token, process.pid, process.execPath, "0.0.1", 1, build);
+   * ```ts
+   * import { RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const discovery: RuntimeDiscovery = new RuntimeDiscovery("127.0.0.1:52000", "capability-token", 4242, "/opt/teamrun/node", "0.0.1", 1, "build-fingerprint");
+   * ```
    */
   public constructor(
     endpoint: string,
@@ -352,7 +442,13 @@ export declare class RuntimeDiscovery {
    * unsupported format version, or a field is missing or invalid; the message
    * names the field.
    * @example
-   * const discovery = RuntimeDiscovery.fromJson(JSON.parse(text));
+   * ```ts
+   * import { RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function parseDiscovery(text: string): RuntimeDiscovery {
+   *   return RuntimeDiscovery.fromJson(JSON.parse(text));
+   * }
+   * ```
    */
   public static fromJson(value: unknown): RuntimeDiscovery;
 
@@ -361,7 +457,13 @@ export declare class RuntimeDiscovery {
    *
    * @returns A new object holding every field.
    * @example
-   * const text = JSON.stringify(discovery.toJson());
+   * ```ts
+   * import type { RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function serializeDiscovery(discovery: RuntimeDiscovery): string {
+   *   return JSON.stringify(discovery.toJson());
+   * }
+   * ```
    */
   public toJson(): IRuntimeDiscoveryJson;
 }
@@ -381,7 +483,13 @@ export declare class SystemCommand {
    * @throws {SystemCommandException} The promise rejects when the program
    * cannot start, exits with a nonzero code, times out or writes too much.
    * @example
-   * const output = await new SystemCommand().runAsync("C:\\Windows\\System32\\whoami.exe", ["/user"]);
+   * ```ts
+   * import { SystemCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readUserAsync(): Promise<string> {
+   *   return new SystemCommand().runAsync("C:\\Windows\\System32\\whoami.exe", ["/user", "/fo", "csv", "/nh"]);
+   * }
+   * ```
    */
   public runAsync(file: string, commandArguments: readonly string[]): Promise<string>;
 }
@@ -402,7 +510,11 @@ export declare class DataDirectory {
    * @param root The directory's absolute path; it need not exist yet.
    * @throws {ArgumentException} When the path is not absolute.
    * @example
-   * const directory = new DataDirectory(path.join(os.homedir(), ".noldova", "teamrun"));
+   * ```ts
+   * import { DataDirectory } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const directory: DataDirectory = new DataDirectory("/home/person/.noldova/teamrun");
+   * ```
    */
   public constructor(root: string);
 
@@ -444,7 +556,13 @@ export declare class DataDirectory {
    * @returns The folder's path; the folder is not created.
    * @throws {ArgumentException} When the id is not a module id.
    * @example
-   * const folder = directory.locateModuleFolder("checkpoints");
+   * ```ts
+   * import type { DataDirectory } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function locateCheckpoints(directory: DataDirectory): string {
+   *   return directory.locateModuleFolder("checkpoints");
+   * }
+   * ```
    */
   public locateModuleFolder(id: string): string;
 }
@@ -460,7 +578,13 @@ export declare class DataDirectoryInspector {
    * @param dataDirectory The directory to inspect; it need not exist.
    * @returns A promise of the directory's state and entries.
    * @example
-   * const inspection = await DataDirectoryInspector.inspectAsync(directory);
+   * ```ts
+   * import { DataDirectoryInspector, DataDirectoryState, type DataDirectory } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function holdsPreShellDataAsync(directory: DataDirectory): Promise<boolean> {
+   *   return (await DataDirectoryInspector.inspectAsync(directory)).state === DataDirectoryState.PreShell;
+   * }
+   * ```
    */
   public static inspectAsync(dataDirectory: DataDirectory): Promise<DataDirectoryInspection>;
 
@@ -477,7 +601,13 @@ export declare class DataDirectoryInspector {
    * @throws {Error} The promise rejects when the folder already exists or an
    * entry cannot be moved; entries moved before the failure stay moved.
    * @example
-   * const destination = await DataDirectoryInspector.moveAsideAsync(lock);
+   * ```ts
+   * import { DataDirectoryInspector, type OwnershipLock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function moveAsideAsync(lock: OwnershipLock): Promise<string | null> {
+   *   return DataDirectoryInspector.moveAsideAsync(lock, new Date("2026-10-01T12:00:00Z"));
+   * }
+   * ```
    */
   public static moveAsideAsync(lock: OwnershipLock, moment?: Date): Promise<string | null>;
 }
@@ -501,7 +631,13 @@ export declare class DatabaseBackup {
    * @throws {Error} The promise rejects when a backup with that name already
    * exists or the copy fails.
    * @example
-   * const file = await DatabaseBackup.createAsync(connection, directory.backupsFolder, "shell-before-migration-2-20261001T120000Z.sqlite");
+   * ```ts
+   * import { DatabaseBackup } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function backUpAsync(connection: Parameters<typeof DatabaseBackup.createAsync>[0], folder: string): Promise<string> {
+   *   return DatabaseBackup.createAsync(connection, folder, "shell-before-migration-2-20261001T120000Z.sqlite");
+   * }
+   * ```
    */
   public static createAsync(source: DatabaseSync, folder: string, name: string): Promise<string>;
 
@@ -512,7 +648,21 @@ export declare class DatabaseBackup {
    * @throws {BackupVerificationException} When the file cannot be opened as a
    * database or its integrity check reports a problem.
    * @example
-   * DatabaseBackup.verify(file);
+   * ```ts
+   * import { BackupVerificationException, DatabaseBackup } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isSound(file: string): boolean {
+   *   try {
+   *     DatabaseBackup.verify(file);
+   *     return true;
+   *   }
+   *   catch (error) {
+   *     if (error instanceof BackupVerificationException)
+   *       return false;
+   *     throw error;
+   *   }
+   * }
+   * ```
    */
   public static verify(file: string): void;
 }
@@ -526,6 +676,8 @@ export declare class ShellDatabase implements Disposable {
    * The ids of the migrations the database holds after opening, in order.
    */
   public readonly appliedMigrations: readonly string[];
+
+  private constructor();
 
   /**
    * Opens the shell database of an owned data directory and applies the
@@ -547,7 +699,14 @@ export declare class ShellDatabase implements Disposable {
    * @throws {MigrationException} The promise rejects when a migration fails;
    * earlier migrations stay applied.
    * @example
-   * using database = await ShellDatabase.openAsync(lock, migrations);
+   * ```ts
+   * import { Migration, ShellDatabase, type OwnershipLock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function listMigrationsAsync(lock: OwnershipLock): Promise<readonly string[]> {
+   *   using database = await ShellDatabase.openAsync(lock, [new Migration("create-settings", ["CREATE TABLE settings (name TEXT PRIMARY KEY) STRICT"])]);
+   *   return database.appliedMigrations;
+   * }
+   * ```
    */
   public static openAsync(lock: OwnershipLock, migrations: readonly Migration[], moment?: Date): Promise<ShellDatabase>;
 
@@ -555,7 +714,13 @@ export declare class ShellDatabase implements Disposable {
    * Closes the database; closing again does nothing.
    *
    * @example
-   * database.close();
+   * ```ts
+   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function closeDatabase(database: ShellDatabase): void {
+   *   database.close();
+   * }
+   * ```
    */
   public close(): void;
 
@@ -575,7 +740,13 @@ export declare class DiscoveryPublisher {
    * @param lock The held ownership of the data directory.
    * @param protector Restricts the discovery folder when it is created.
    * @example
-   * const publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(process.platform, new SystemCommand(), process.env));
+   * ```ts
+   * import { DiscoveryPublisher, PosixFolderProtector, type OwnershipLock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createPublisher(lock: OwnershipLock): DiscoveryPublisher {
+   *   return new DiscoveryPublisher(lock, new PosixFolderProtector());
+   * }
+   * ```
    */
   public constructor(lock: OwnershipLock, protector: IFolderProtector);
 
@@ -591,7 +762,13 @@ export declare class DiscoveryPublisher {
    * @throws {SystemCommandException} The promise rejects when the folder
    * cannot be protected.
    * @example
-   * await publisher.publishAsync(discovery);
+   * ```ts
+   * import type { DiscoveryPublisher, RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function publishAsync(publisher: DiscoveryPublisher, discovery: RuntimeDiscovery): Promise<string> {
+   *   return publisher.publishAsync(discovery);
+   * }
+   * ```
    */
   public publishAsync(discovery: RuntimeDiscovery): Promise<string>;
 
@@ -602,7 +779,13 @@ export declare class DiscoveryPublisher {
    * @returns A promise of whether the file was removed.
    * @throws {OwnershipReleasedException} When the ownership was released.
    * @example
-   * await publisher.withdrawAsync(discovery);
+   * ```ts
+   * import type { DiscoveryPublisher, RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function withdrawAsync(publisher: DiscoveryPublisher, discovery: RuntimeDiscovery): Promise<boolean> {
+   *   return publisher.withdrawAsync(discovery);
+   * }
+   * ```
    */
   public withdrawAsync(discovery: RuntimeDiscovery): Promise<boolean>;
 }
@@ -622,7 +805,14 @@ export declare class DiscoveryReader {
    * @throws {DiscoveryFormatException} The promise rejects when the file is not
    * valid JSON or not valid metadata; the message names the file.
    * @example
-   * const discovery = await DiscoveryReader.readAsync(directory);
+   * ```ts
+   * import { DiscoveryReader, OwnershipLock, type DataDirectory } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function findLiveEndpointAsync(directory: DataDirectory): Promise<string | null> {
+   *   const discovery = await DiscoveryReader.readAsync(directory);
+   *   return discovery === null || !OwnershipLock.isOwned(directory) ? null : discovery.endpoint;
+   * }
+   * ```
    */
   public static readAsync(dataDirectory: DataDirectory): Promise<RuntimeDiscovery | null>;
 }
@@ -640,7 +830,11 @@ export declare class FolderProtectorFactory {
    * @returns A {@link WindowsFolderProtector} for `win32`, otherwise a
    * {@link PosixFolderProtector}.
    * @example
-   * const protector = FolderProtectorFactory.create(process.platform, new SystemCommand(), process.env);
+   * ```ts
+   * import { FolderProtectorFactory, SystemCommand, type IFolderProtector } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const protector: IFolderProtector = FolderProtectorFactory.create("linux", new SystemCommand(), {});
+   * ```
    */
   public static create(platform: string, command: SystemCommand, environment: NodeJS.ProcessEnv): IFolderProtector;
 }
@@ -655,7 +849,13 @@ export declare class PosixFolderProtector implements IFolderProtector {
    * @param folder The absolute path of an existing folder.
    * @returns A promise that resolves once the mode is set.
    * @example
-   * await new PosixFolderProtector().protectAsync(folder);
+   * ```ts
+   * import { PosixFolderProtector } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function protectAsync(folder: string): Promise<void> {
+   *   return new PosixFolderProtector().protectAsync(folder);
+   * }
+   * ```
    */
   public protectAsync(folder: string): Promise<void>;
 }
@@ -673,7 +873,11 @@ export declare class WindowsFolderProtector implements IFolderProtector {
    * `%SystemRoot%\System32`.
    * @param environment Supplies `SystemRoot`.
    * @example
-   * const protector = new WindowsFolderProtector(new SystemCommand(), process.env);
+   * ```ts
+   * import { SystemCommand, WindowsFolderProtector } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const protector: WindowsFolderProtector = new WindowsFolderProtector(new SystemCommand(), { SystemRoot: "C:\\Windows" });
+   * ```
    */
   public constructor(command: SystemCommand, environment: NodeJS.ProcessEnv);
 
@@ -686,7 +890,13 @@ export declare class WindowsFolderProtector implements IFolderProtector {
    * @throws {SystemCommandException} The promise rejects when `SystemRoot` is
    * not set, a tool fails or the identifier cannot be read.
    * @example
-   * await protector.protectAsync(folder);
+   * ```ts
+   * import type { WindowsFolderProtector } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function protectAsync(protector: WindowsFolderProtector, folder: string): Promise<void> {
+   *   return protector.protectAsync(folder);
+   * }
+   * ```
    */
   public protectAsync(folder: string): Promise<void>;
 }
@@ -702,6 +912,8 @@ export declare class OwnershipLock implements Disposable {
    */
   public readonly dataDirectory: DataDirectory;
 
+  private constructor();
+
   /**
    * Takes the directory's ownership, creating the directory when missing. It
    * waits up to 250 milliseconds for a brief {@link OwnershipLock.isOwned}
@@ -713,7 +925,14 @@ export declare class OwnershipLock implements Disposable {
    * another process, holds the ownership.
    * @throws {Error} When the ownership database cannot be used.
    * @example
-   * using lock = OwnershipLock.acquire(directory);
+   * ```ts
+   * import { DataDirectory, OwnershipLock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function canOwn(root: string): boolean {
+   *   using lock = OwnershipLock.acquire(new DataDirectory(root));
+   *   return lock.isHeld;
+   * }
+   * ```
    */
   public static acquire(dataDirectory: DataDirectory): OwnershipLock;
 
@@ -726,7 +945,11 @@ export declare class OwnershipLock implements Disposable {
    * @returns `true` when another connection holds the ownership.
    * @throws {Error} When the ownership database cannot be used.
    * @example
-   * const isLive = OwnershipLock.isOwned(directory);
+   * ```ts
+   * import { DataDirectory, OwnershipLock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const isLive: boolean = OwnershipLock.isOwned(new DataDirectory("/home/person/.noldova/teamrun"));
+   * ```
    */
   public static isOwned(dataDirectory: DataDirectory): boolean;
 
@@ -740,7 +963,13 @@ export declare class OwnershipLock implements Disposable {
    *
    * @throws {OwnershipReleasedException} When it was released.
    * @example
-   * lock.requireHeld();
+   * ```ts
+   * import type { OwnershipLock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function ensureOwned(lock: OwnershipLock): void {
+   *   lock.requireHeld();
+   * }
+   * ```
    */
   public requireHeld(): void;
 
@@ -748,7 +977,13 @@ export declare class OwnershipLock implements Disposable {
    * Releases the ownership; releasing again does nothing.
    *
    * @example
-   * lock.release();
+   * ```ts
+   * import type { OwnershipLock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function releaseOwnership(lock: OwnershipLock): void {
+   *   lock.release();
+   * }
+   * ```
    */
   public release(): void;
 
