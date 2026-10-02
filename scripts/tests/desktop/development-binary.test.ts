@@ -9,8 +9,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync, realpathSync } from "node:fs";
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -141,7 +141,7 @@ class DevelopmentBinaryTests {
       const binary = await new DevelopmentBinary(repository.directory, runner, "darwin", "arm64").prepareAsync(new TextOutputFixture());
 
       const bundle = path.join(repository.directory, DevelopmentBinaryTests.OUTPUT, "Fixture Studio.app");
-      const identifier = `org.fixtureworks.studio.development.${createHash("sha256").update(path.resolve(repository.directory)).digest("hex").slice(0, 8)}`;
+      const identifier = `org.fixtureworks.studio.development.${createHash("sha256").update(realpathSync(repository.directory)).digest("hex").slice(0, 8)}`;
       const helpers = path.join(bundle, "Contents", "Frameworks");
       assert.equal(binary, path.join(bundle, "Contents", "MacOS", "Fixture Studio"));
       assert.equal(await readFile(binary, "utf8"), "Electron");
@@ -214,19 +214,28 @@ class DevelopmentBinaryTests {
       assert.ok(!existsSync(path.join(repository.directory, DevelopmentBinaryTests.OUTPUT)));
     });
 
-    test("the command prepares the working directory's binary and records its path", async t => {
+    test("the command prepares the checkout's binary and records its canonical path, also from a link to the checkout", async t => {
       const repository = await DevelopmentBinaryTests.createAsync(t);
       await repository.writeAsync({ [`${DevelopmentBinaryTests.DISTRIBUTION}/electron`]: "fixture executable" });
-
-      const result = spawnSync(process.execPath, [
+      const link = path.join(path.dirname(repository.directory), "link");
+      await symlink(repository.directory, link, "junction");
+      const record = path.join(repository.directory, DevelopmentBinaryTests.OUTPUT, "path.txt");
+      const expected = path.join(realpathSync(repository.directory), DevelopmentBinaryTests.OUTPUT, "fixture-studio");
+      const run = (directory: string): ReturnType<typeof spawnSync> => spawnSync(process.execPath, [
         "--import", "data:text/javascript,Object.defineProperty(process, \"platform\", { value: \"linux\" });",
         SourceTreeFixture.locateScript(path.join("desktop", "development-binary.ts"))
-      ], { cwd: repository.directory, encoding: "utf8", timeout: 30_000 });
+      ], { cwd: directory, encoding: "utf8", timeout: 30_000 });
 
-      assert.equal(result.status, 0, result.stderr);
-      assert.equal(result.stdout, "Preparing the Fixture Studio development binary...\n");
-      assert.equal(await readFile(path.join(repository.directory, DevelopmentBinaryTests.OUTPUT, "path.txt"), "utf8"),
-        path.join(repository.directory, DevelopmentBinaryTests.OUTPUT, "fixture-studio"));
+      const direct = run(repository.directory);
+      const recordedDirectly = await readFile(record, "utf8");
+      const linked = run(link);
+
+      assert.equal(direct.status, 0, String(direct.stderr));
+      assert.equal(direct.stdout, "Preparing the Fixture Studio development binary...\n");
+      assert.equal(recordedDirectly, expected);
+      assert.equal(linked.status, 0, String(linked.stderr));
+      assert.equal(linked.stdout, "");
+      assert.equal(await readFile(record, "utf8"), expected);
     });
   }
 

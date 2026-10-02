@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { realpathSync } from "node:fs";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
@@ -44,7 +45,8 @@ export default class Start {
 }
 
 if (import.meta.main) {
+  const root = realpathSync(process.cwd());
   const runner = new ProcessRunner();
   const sandbox = new SandboxHelper(process.platform, SandboxHelper.readOptionalTextAsync, SandboxHelper.statOptionalAsync);
-  process.exitCode = await new Start(process.cwd(), runner, new DevelopmentBinary(process.cwd(), runner), sandbox).runAsync(process.argv.slice(2), process.env, process.stdout);
+  process.exitCode = await new Start(root, runner, new DevelopmentBinary(root, runner), sandbox).runAsync(process.argv.slice(2), process.env, process.stdout);
 }

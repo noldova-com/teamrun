@@ -7,7 +7,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
@@ -201,4 +201,4 @@ export default class DevelopmentBinary {
 }
 
 if (import.meta.main)
-  await new DevelopmentBinary(process.cwd(), new ProcessRunner()).prepareAsync(process.stdout);
+  await new DevelopmentBinary(realpathSync(process.cwd()), new ProcessRunner()).prepareAsync(process.stdout);

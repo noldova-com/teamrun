@@ -8,7 +8,8 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFile, mkdir, readFile } from "node:fs/promises";
+import { realpathSync } from "node:fs";
+import { copyFile, mkdir, readFile, symlink } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 import { test } from "node:test";
@@ -69,14 +70,18 @@ class StartTests {
       assert.equal(runner.runs.length, 0);
     });
 
-    test("the command starts the prepared binary with the desktop's main script and exits with its exit code", { timeout: 60_000 }, async t => {
+    test("the command starts the prepared binary with the desktop's canonical main script, also from a link, and exits with its exit code", { timeout: 60_000 }, async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       const platform = process.platform === "win32" ? "win32" : "linux";
+      const link = path.join(path.dirname(repository.directory), "link");
+      await symlink(repository.directory, link, "junction");
+      const main = JSON.stringify(path.join(realpathSync(repository.directory), "node_modules", "@noldova", "teamrun-shell-desktop", "main.js"));
       await repository.writeAsync({
         "package.json": `${JSON.stringify({ ...ProductIdentityFixture.manifest(), version: "1.2.3" })}\n`,
         "node_modules/electron/package.json": "{ \"version\": \"44.5.1\" }\n",
-        "node_modules/@noldova/teamrun-shell-desktop/main.js": "process.exit(process.argv.at(-1) === \"--data-dir=data\" && process.env.ELECTRON_RUN_AS_NODE === undefined ? 5 : 6);\n",
+        "node_modules/@noldova/teamrun-shell-desktop/main.js":
+          `process.exit(process.argv[1] === ${main} && process.argv.at(-1) === "--data-dir=data" && process.env.ELECTRON_RUN_AS_NODE === undefined ? 5 : 6);\n`,
         "assets/fixture-icons/icon-dark.ico": await readFile(path.join(SourceTreeFixture.root, "assets", "icons", "icon-dark.ico")),
         "assets/fixture-icons/icon-dock-512.png": await readFile(path.join(SourceTreeFixture.root, "assets", "icons", "icon-dock-512.png"))
       });
@@ -84,13 +89,17 @@ class StartTests {
       await mkdir(path.dirname(program), { recursive: true });
       await copyFile(process.execPath, program);
 
-      const result = spawnSync(process.execPath, [
+      const run = (directory: string): ReturnType<typeof spawnSync> => spawnSync(process.execPath, [
         "--import", `data:text/javascript,Object.defineProperty(process, "platform", { value: "${platform}" });`,
         SourceTreeFixture.locateScript(path.join("desktop", "start.ts")),
         "--data-dir=data"
-      ], { cwd: repository.directory, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" }, encoding: "utf8", timeout: 60_000 });
+      ], { cwd: directory, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" }, encoding: "utf8", timeout: 60_000 });
 
-      assert.equal(result.status, 5, result.stderr);
+      const direct = run(repository.directory);
+      const linked = run(link);
+
+      assert.equal(direct.status, 5, String(direct.stderr));
+      assert.equal(linked.status, 5, String(linked.stderr));
     });
 
     test("the command fails without starting anything outside a checkout with a product", async t => {

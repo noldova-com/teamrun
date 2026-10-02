@@ -7,6 +7,7 @@
  */
 
 import assert from "node:assert/strict";
+import { symlink } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -41,14 +42,20 @@ class ProductIdentityTests {
       ]);
     });
 
-    test("each checkout gets its own stable development application ID", () => {
+    test("each checkout gets its own stable development application ID, the same when reached through a link", async t => {
+      const first = await RepositoryFixture.createAsync();
+      const second = await RepositoryFixture.createAsync();
+      t.after(() => Promise.all([first.disposeAsync(), second.disposeAsync()]));
+      const link = path.join(path.dirname(first.directory), "link");
+      await symlink(first.directory, link, "junction");
       const product = ProductIdentity.fromManifest(ProductIdentityFixture.manifest());
-      const first = product.formatDevelopmentApplicationId(path.resolve("lanes", "first"));
 
-      assert.match(first, /^org\.fixtureworks\.studio\.development\.[0-9a-f]{8}$/);
-      assert.equal(product.formatDevelopmentApplicationId(path.resolve("lanes", "first")), first);
-      assert.equal(product.formatDevelopmentApplicationId(path.join(path.resolve("lanes", "first"), "..", "first")), first);
-      assert.notEqual(product.formatDevelopmentApplicationId(path.resolve("lanes", "second")), first);
+      const id = product.formatDevelopmentApplicationId(first.directory);
+
+      assert.match(id, /^org\.fixtureworks\.studio\.development\.[0-9a-f]{8}$/);
+      assert.equal(product.formatDevelopmentApplicationId(path.join(first.directory, "..", "repository")), id);
+      assert.equal(product.formatDevelopmentApplicationId(link), id);
+      assert.notEqual(product.formatDevelopmentApplicationId(second.directory), id);
     });
 
     test("the same device folder on several systems is one literal", () => {

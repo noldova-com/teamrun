@@ -7,6 +7,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -129,7 +130,7 @@ export default class ProductIdentity {
   }
 
   public formatDevelopmentApplicationId(checkout: string): string {
-    const hash = createHash(ProductIdentity.CHECKOUT_HASH_ALGORITHM).update(path.resolve(checkout)).digest("hex").slice(0, ProductIdentity.CHECKOUT_HASH_LENGTH);
+    const hash = createHash(ProductIdentity.CHECKOUT_HASH_ALGORITHM).update(realpathSync(checkout)).digest("hex").slice(0, ProductIdentity.CHECKOUT_HASH_LENGTH);
     return `${this.developmentApplicationId}.${hash}`;
   }
 
