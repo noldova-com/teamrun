@@ -18,9 +18,9 @@ export class WindowAppearance {
   public readonly titleBarHeight: number;
 
   public constructor(background: string, titleBar: string, titleBarText: string, titleBarHeight: number) {
-    for (const [name, value] of [[Resources.backgroundField, background], [Resources.titleBarField, titleBar], [Resources.titleBarTextField, titleBarText]])
-      if (!Resources.colorPattern.test(value))
-        throw new ArgumentException(Resources.invalidColor, name);
+    WindowAppearance.requireColor(background, Resources.backgroundField);
+    WindowAppearance.requireColor(titleBar, Resources.titleBarField);
+    WindowAppearance.requireColor(titleBarText, Resources.titleBarTextField);
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(titleBarHeight, Resources.titleBarHeightField);
 
     this.background = background;
@@ -50,5 +50,10 @@ export class WindowAppearance {
       [Resources.titleBarTextField]: this.titleBarText,
       [Resources.titleBarHeightField]: this.titleBarHeight
     };
+  }
+
+  private static requireColor(value: string, name: string): void {
+    if (!Resources.colorPattern.test(value))
+      throw new ArgumentException(Resources.invalidColor, name);
   }
 }

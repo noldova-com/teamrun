@@ -2,6 +2,11 @@
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
     "sourceMap": true,
+    "lib": [
+      "ES2025",
+      "ESNext.Disposable",
+      "DOM"
+    ],
     "types": [
       "node"
     ]

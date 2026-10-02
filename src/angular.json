@@ -24,13 +24,15 @@
             ],
             "browserViewport": "1280x800",
             "include": [
-              "shell/*/tests/**/*.spec.ts"
+              "shell/ui/tests/**/*.spec.ts",
+              "shell/window/tests/**/*.spec.ts"
             ],
             "providersFile": "shell/ui/tests/test-providers.ts",
             "watch": false,
             "coverage": true,
             "coverageInclude": [
-              "shell/*/src/**/*.ts"
+              "shell/ui/src/**/*.ts",
+              "shell/window/src/**/*.ts"
             ],
             "coverageReporters": [
               "text"
@@ -42,7 +44,8 @@
               "lines": 100
             },
             "coverageExclude": [
-              "shell/*/src/app/enums/**"
+              "shell/ui/src/app/enums/**",
+              "shell/window/src/app/enums/**"
             ]
           }
         },
