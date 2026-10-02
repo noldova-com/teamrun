@@ -36,6 +36,9 @@ body {
 }
 
 .material-symbols-rounded {
+  width: 1em;
+  height: 1em;
+  overflow: hidden;
   font-size: var(--tr-icon);
   line-height: 1;
 }
