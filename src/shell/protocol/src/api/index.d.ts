@@ -61,9 +61,18 @@ export declare enum FailureCode {
   UnsupportedVersion = "UnsupportedVersion",
 
   /**
-   * The client comes from another build than the runtime.
+   * The client comes from another build than the runtime. The failure's
+   * details are a `RuntimeHandover`.
    */
   BuildMismatch = "BuildMismatch",
+
+  /**
+   * The data directory holds data written by a release that predates the
+   * shell, which the runtime refuses to open. The failure's details are a
+   * `PreShellData`; `shell.moveAside` moves that data aside at the person's
+   * request.
+   */
+  PreShellData = "PreShellData",
 
   /**
    * The handshake's capability token is wrong, or the connection has not
@@ -384,9 +393,9 @@ export declare class RuntimeHandover {
    * @param value The untrusted value.
    * @param path The path a failure reports; `$` by default.
    * @returns The handover.
-   * @throws JsonException synchronously when a field is missing, has the
-   * wrong type or breaks the rules, or the identity has an unknown field;
-   * its path names the field.
+   * @throws JsonException synchronously when a field is unknown, missing, has
+   * the wrong type or breaks the rules, in the handover or its identity; its
+   * path names the field.
    */
   public static fromJson(value: unknown, path?: string): RuntimeHandover;
 
@@ -422,7 +431,7 @@ export declare class StopRequest {
    * @param path The path a failure reports; `$` by default.
    * @returns The request.
    * @throws JsonException synchronously when the policy is missing or
-   * unknown; its path names the field.
+   * unknown, or another field is present; its path names the field.
    */
   public static fromJson(value: unknown, path?: string): StopRequest;
 
@@ -463,8 +472,8 @@ export declare class RunningWork {
    * @param path The path a failure reports; `$` by default.
    * @returns The list.
    * @throws JsonException synchronously when `descriptions` is missing, not
-   * an array of strings, empty or holds a blank description; its path names
-   * the field or item.
+   * an array of strings, empty or holds a blank description, or another
+   * field is present; its path names the field or item.
    */
   public static fromJson(value: unknown, path?: string): RunningWork;
 
@@ -474,6 +483,62 @@ export declare class RunningWork {
    * @returns The `descriptions` field.
    */
   public toJson(): JsonObject;
+}
+
+/**
+ * Where data written by a release that predates the shell was found, as a
+ * `PreShellData` failure carries it in its details. Its wire form never
+ * changes after protocol version 1.
+ */
+export declare class PreShellData {
+  /**
+   * The full path of the data directory that holds the data.
+   */
+  public readonly location: string;
+
+  /**
+   * Creates the details.
+   *
+   * @param location The data directory's full path; not whitespace only.
+   * @throws ArgumentException synchronously when the location is empty or
+   * whitespace only.
+   */
+  public constructor(location: string);
+
+  /**
+   * Reads the details from their wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The details.
+   * @throws JsonException synchronously when `location` is missing, not a
+   * string or blank, or another field is present; its path names the field.
+   */
+  public static fromJson(value: unknown, path?: string): PreShellData;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `location` field.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The names of the shell's methods that every build understands. They never
+ * change after protocol version 1.
+ */
+export declare class ShellMethods {
+  /**
+   * `shell.stop`: asks the runtime to stop; its payload is a `StopRequest`.
+   */
+  public static readonly stop: QualifiedName;
+
+  /**
+   * `shell.moveAside`: asks the runtime to move data that predates the
+   * shell aside, after a `PreShellData` failure.
+   */
+  public static readonly moveAside: QualifiedName;
 }
 
 /**

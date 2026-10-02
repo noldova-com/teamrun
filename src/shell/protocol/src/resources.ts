@@ -36,6 +36,9 @@ export class Resources {
   public static readonly executablePathField: string = "executablePath";
   public static readonly policyField: string = "policy";
   public static readonly descriptionsField: string = "descriptions";
+  public static readonly locationField: string = "location";
+  public static readonly stopMember: string = "stop";
+  public static readonly moveAsideMember: string = "moveAside";
   public static readonly textParameterName: string = "text";
   public static readonly maximumFrameLengthParameterName: string = "maximumFrameLength";
 

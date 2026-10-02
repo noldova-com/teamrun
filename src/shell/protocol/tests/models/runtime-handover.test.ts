@@ -30,5 +30,6 @@ export class RuntimeHandoverTests {
     const identity = { productVersion: "0.0.2", protocolVersion: 1, fingerprint: "def" };
     Assert.areEqual("$.executablePath", Assert.throws(() => RuntimeHandover.fromJson({ identity, executablePath: "" }), JsonException).path);
     Assert.areEqual("$.identity.extra", Assert.throws(() => RuntimeHandover.fromJson({ identity: { ...identity, extra: 1 }, executablePath: "x" }), JsonException).path);
+    Assert.areEqual("$.arguments", Assert.throws(() => RuntimeHandover.fromJson({ identity, executablePath: "x", arguments: [] }), JsonException).path);
   }
 }

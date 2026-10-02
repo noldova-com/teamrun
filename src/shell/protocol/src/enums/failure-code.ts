@@ -11,6 +11,7 @@ export enum FailureCode {
   FrameTooLarge = "FrameTooLarge",
   UnsupportedVersion = "UnsupportedVersion",
   BuildMismatch = "BuildMismatch",
+  PreShellData = "PreShellData",
   Unauthorized = "Unauthorized",
   UnknownMethod = "UnknownMethod",
   InvalidParams = "InvalidParams",

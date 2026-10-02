@@ -30,5 +30,6 @@ export class RunningWorkTests {
     Assert.throws(() => new RunningWork(["work", " "]), ArgumentException);
     Assert.areEqual("$.descriptions", Assert.throws(() => RunningWork.fromJson({ descriptions: [] }), JsonException).path);
     Assert.areEqual("$.descriptions.1", Assert.throws(() => RunningWork.fromJson({ descriptions: ["work", 2] }), JsonException).path);
+    Assert.areEqual("$.count", Assert.throws(() => RunningWork.fromJson({ descriptions: ["work"], count: 1 }), JsonException).path);
   }
 }

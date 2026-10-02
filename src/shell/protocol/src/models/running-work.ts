@@ -13,6 +13,8 @@ import { Resources } from "../resources.js";
 import { WireContract } from "../services/wire-contract.js";
 
 export class RunningWork {
+  private static readonly FIELDS: readonly string[] = [Resources.descriptionsField];
+
   public readonly descriptions: readonly string[];
 
   public constructor(descriptions: readonly string[]) {
@@ -25,6 +27,7 @@ export class RunningWork {
 
   public static fromJson(value: unknown, path?: string): RunningWork {
     const reader = JsonReader.fromValue(value, path);
+    WireContract.requireKnownFields(reader, RunningWork.FIELDS);
     return WireContract.create(reader, () => new RunningWork(reader.readStringArray(Resources.descriptionsField)));
   }
 

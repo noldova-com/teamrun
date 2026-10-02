@@ -14,6 +14,8 @@ import { WireContract } from "../services/wire-contract.js";
 import { BuildIdentity } from "./build-identity.js";
 
 export class RuntimeHandover {
+  private static readonly FIELDS: readonly string[] = [Resources.identityField, Resources.executablePathField];
+
   public readonly identity: BuildIdentity;
   public readonly executablePath: string;
 
@@ -26,6 +28,7 @@ export class RuntimeHandover {
 
   public static fromJson(value: unknown, path?: string): RuntimeHandover {
     const reader = JsonReader.fromValue(value, path);
+    WireContract.requireKnownFields(reader, RuntimeHandover.FIELDS);
     const identity = reader.readObject(Resources.identityField);
     return WireContract.create(reader, () => new RuntimeHandover(
       BuildIdentity.fromJson(identity.toJson(), identity.path),

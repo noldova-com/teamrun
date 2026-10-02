@@ -24,4 +24,9 @@ export class StopRequestTests {
   public rejectsAnUnknownPolicy(): void {
     Assert.areEqual("$.policy", Assert.throws(() => StopRequest.fromJson({ policy: "Never" }), JsonException).path);
   }
+
+  @TestMethod
+  public rejectsUnknownFields(): void {
+    Assert.areEqual("$.force", Assert.throws(() => StopRequest.fromJson({ policy: "IfIdle", force: true }), JsonException).path);
+  }
 }
