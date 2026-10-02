@@ -91,7 +91,7 @@ export class Resources {
   public static readonly privateFolderMode: number = 0o700;
   public static readonly exclusiveWriteFlag: string = "wx";
   public static readonly temporarySuffix: string = ".tmp";
-  public static readonly backupPrefix: string = "shell-before-migration-";
+  public static readonly backupInfix: string = "-before-migration-";
   public static readonly backupExtension: string = ".sqlite";
   public static readonly discoveryFormatVersion: number = 1;
   public static readonly declarationsFormatVersion: number = 1;
@@ -121,9 +121,14 @@ export class Resources {
   public static readonly ownershipReleased: string = "The data directory's ownership has been released.";
   public static readonly systemRootMissing: string = "SystemRoot is not set, so the Windows system tools cannot be found.";
   public static readonly backupUnverified: string = "The database backup did not pass its integrity check.";
-  public static readonly historyNotRecognized: string = "The shell database's migration history is not one this build recognizes.";
-  public static readonly historyNewer: string = "The shell database was written by a newer build.";
-  public static readonly tablesWithoutHistory: string = "The shell database has tables but no migration history.";
+  public static readonly shellDatabaseName: string = "shell database";
+  public static readonly moduleDatabaseExtension: string = ".sqlite";
+  public static readonly thenProperty: string = "then";
+  public static readonly actionParameterName: string = "action";
+  public static readonly transactionNotSynchronous: string =
+    "A transaction's action must finish before it returns; it committed nothing, because an awaited step would run after the commit.";
+  public static readonly moduleDatabaseUnknown: string = "Its database was written by a newer build or is not one this build recognizes.";
+  public static readonly moduleDatabaseFailed: string = "Its database could not be opened or migrated.";
   public static readonly discoveryNotObject: string = "The discovery metadata is not a JSON object.";
   public static readonly declarationsNotObject: string = "The module declarations are not a JSON object with a list of modules.";
   public static readonly declarationNotObject: string = "A module declaration is not a JSON object.";
@@ -285,8 +290,28 @@ export class Resources {
     return `The data directory ${root} holds data from a release before the shell: ${entries.join(", ")}.`;
   }
 
-  public static formatMigrationFailed(id: string): string {
-    return `The migration ${id} of the shell database failed and was rolled back.`;
+  public static formatMigrationFailed(database: string, id: string): string {
+    return `The migration ${id} of the ${database} failed and was rolled back.`;
+  }
+
+  public static formatHistoryNotRecognized(database: string): string {
+    return `The ${database}'s migration history is not one this build recognizes.`;
+  }
+
+  public static formatHistoryNewer(database: string): string {
+    return `The ${database} was written by a newer build.`;
+  }
+
+  public static formatTablesWithoutHistory(database: string): string {
+    return `The ${database} has tables but no migration history.`;
+  }
+
+  public static formatModuleDatabaseName(moduleId: string): string {
+    return `database of the module ${moduleId}`;
+  }
+
+  public static formatNoModuleDatabase(moduleId: string): string {
+    return `The module ${moduleId} has no database, because its runtime part declares no migrations.`;
   }
 
   public static formatAccessGrant(securityIdentifier: string): string {
@@ -305,8 +330,8 @@ export class Resources {
     return `The current user's security identifier could not be read from: ${output}`;
   }
 
-  public static formatBackupName(position: number, timestamp: string): string {
-    return `${Resources.backupPrefix}${position}-${timestamp}${Resources.backupExtension}`;
+  public static formatBackupName(owner: string, position: number, timestamp: string): string {
+    return `${owner}${Resources.backupInfix}${position}-${timestamp}${Resources.backupExtension}`;
   }
 
   public static formatMovedFolderName(root: string, timestamp: string): string {

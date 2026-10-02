@@ -6,15 +6,17 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { QualifiedName } from "@noldova/teamrun-shell-protocol";
-import { DataDirectory, EventRegistry, type IRuntimePart, MethodRegistry, ModuleDeclaration, ModuleHost } from "@noldova/teamrun-shell-runtime";
+import { DataDirectory, EventRegistry, type IRuntimePart, MethodRegistry, Migration, ModuleDatabase, ModuleDatabaseException, ModuleDeclaration, ModuleHost } from "@noldova/teamrun-shell-runtime";
 
 import { RuntimePartFixture } from "../../fixtures/runtime-part.fixture.js";
 import { RuntimePartLoaderFixture } from "../../fixtures/runtime-part-loader.fixture.js";
+import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
 import { TextOutputFixture } from "../../fixtures/text-output.fixture.js";
 
 @TestClass
@@ -115,6 +117,83 @@ export class ModuleHostTests {
     Assert.isTrue(diagnostics.text.startsWith("The module notes: Its runtime part failed to deactivate.\nError: The notes cannot be saved.\n"));
   }
 
+  @TestMethod
+  public async migratesAModulesDatabaseBeforeActivatingItAndClosesItAtDeactivation(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const log: string[] = [];
+    const migrations = [new Migration("create-notes", ["CREATE TABLE notes (title TEXT NOT NULL) STRICT"])];
+    const notes = new RuntimePartFixture("notes", log, t => t.database.run("INSERT INTO notes (title) VALUES (?)", "Plan"), null, migrations);
+    const tasks = new RuntimePartFixture("tasks", log);
+    const host = ModuleHostTests.create([
+      ModuleHostTests.declare("notes", [], "notes-runtime"),
+      ModuleHostTests.declare("tasks", [], "tasks-runtime")
+    ], new Map<string, IRuntimePart>([["notes-runtime", notes], ["tasks-runtime", tasks]]), new MethodRegistry(), new TextOutputFixture(), folder.path);
+
+    await host.activateAsync();
+    const database = notes.context?.database;
+    const missing = Assert.throws(() => tasks.context?.database, ModuleDatabaseException);
+    await host.deactivateAsync();
+
+    Assert.isTrue(database instanceof ModuleDatabase);
+    Assert.areEqual("The module tasks has no database, because its runtime part declares no migrations.", missing.message);
+    Assert.throws(() => database?.readAll("SELECT title FROM notes"), Error);
+    using reopened = await ModuleDatabase.openAsync(new DataDirectory(folder.path), "notes", migrations);
+    Assert.areEqual("Plan", reopened.read("SELECT title FROM notes")?.["title"]);
+    Assert.isFalse(existsSync(new DataDirectory(folder.path).locateModuleDatabase("tasks")));
+  }
+
+  @TestMethod
+  public async failsAModuleWhoseDatabaseCannotBeMigratedOrIsNewerWithoutActivatingIt(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const directory = new DataDirectory(folder.path);
+    (await ModuleDatabase.openAsync(directory, "newer", [
+      new Migration("create-items", ["CREATE TABLE items (name TEXT) STRICT"]),
+      new Migration("create-tags", ["CREATE TABLE tags (name TEXT) STRICT"])
+    ])).close();
+    const log: string[] = [];
+    const diagnostics = new TextOutputFixture();
+    const parts = new Map<string, IRuntimePart>([
+      ["broken-runtime", new RuntimePartFixture("broken", log, () => undefined, null, [new Migration("create-broken", ["INSERT INTO missing VALUES (1)"])])],
+      ["newer-runtime", new RuntimePartFixture("newer", log, () => undefined, null, [new Migration("create-items", ["CREATE TABLE items (name TEXT) STRICT"])])]
+    ]);
+    const host = ModuleHostTests.create([
+      ModuleHostTests.declare("broken", [], "broken-runtime"),
+      ModuleHostTests.declare("newer", [], "newer-runtime")
+    ], parts, new MethodRegistry(), diagnostics, folder.path);
+
+    await host.activateAsync();
+
+    Assert.areEqual("", log.join(","));
+    Assert.areEqual(
+      "{\"modules\":[{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its database could not be opened or migrated.\"}," +
+      "{\"id\":\"newer\",\"state\":\"Failed\",\"cause\":\"Its database was written by a newer build or is not one this build recognizes.\"}]}",
+      JSON.stringify(host.report.toJson()));
+    Assert.isTrue(diagnostics.text.includes("The migration create-broken of the database of the module broken failed and was rolled back."));
+    using kept = await ModuleDatabase.openAsync(directory, "newer", [
+      new Migration("create-items", ["CREATE TABLE items (name TEXT) STRICT"]),
+      new Migration("create-tags", ["CREATE TABLE tags (name TEXT) STRICT"])
+    ]);
+    Assert.areEqual("create-items,create-tags", kept.appliedMigrations.join(","));
+  }
+
+  @TestMethod
+  public async closesTheDatabaseOfAPartThatFailsToActivate(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const migrations = [new Migration("create-notes", ["CREATE TABLE notes (title TEXT NOT NULL) STRICT"])];
+    const part = new RuntimePartFixture("notes", [], t => {
+      t.database.run("INSERT INTO notes (title) VALUES (?)", "Plan");
+      throw new Error("activation failed");
+    }, null, migrations);
+    const host = ModuleHostTests.create([ModuleHostTests.declare("notes", [], "notes-runtime")], new Map<string, IRuntimePart>([["notes-runtime", part]]),
+      new MethodRegistry(), new TextOutputFixture(), folder.path);
+
+    await host.activateAsync();
+    const database = part.context?.database;
+
+    Assert.areEqual("Failed", host.report.modules[0]?.state);
+    Assert.throws(() => database?.readAll("SELECT title FROM notes"), Error);
+  }
+
   private static declare(id: string, dependencies: readonly string[], runtimePackage: string | null, methods: readonly string[] = []): ModuleDeclaration {
     return new ModuleDeclaration(id, id, dependencies, runtimePackage, new Map([["methods", [...methods, `${id}.run`]]]));
   }
@@ -123,10 +202,11 @@ export class ModuleHostTests {
     declarations: readonly ModuleDeclaration[],
     parts: ReadonlyMap<string, IRuntimePart | Error>,
     methods: MethodRegistry = new MethodRegistry(),
-    diagnostics: TextOutputFixture = new TextOutputFixture()): ModuleHost {
+    diagnostics: TextOutputFixture = new TextOutputFixture(),
+    root: string = path.resolve("teamrun-data")): ModuleHost {
     return new ModuleHost(
       declarations,
-      new DataDirectory(path.resolve("teamrun-data")),
+      new DataDirectory(root),
       methods,
       new EventRegistry({ broadcast: () => undefined }),
       new RuntimePartLoaderFixture(parts),

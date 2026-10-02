@@ -68,6 +68,10 @@ export class DataDirectory {
     return path.join(this.logsFolder, Resources.previousRuntimeLogFileName);
   }
 
+  public locateModuleDatabase(id: string): string {
+    return path.join(this.locateModuleFolder(id), `${id}${Resources.moduleDatabaseExtension}`);
+  }
+
   public locateModuleFolder(id: string): string {
     if (!Resources.moduleIdPattern.test(id) || id === Resources.reservedModuleId)
       throw new ArgumentException(Resources.moduleIdInvalid, Resources.idParameterName);
