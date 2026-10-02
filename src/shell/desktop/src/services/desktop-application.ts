@@ -35,6 +35,7 @@ import { RuntimeStartup } from "./runtime-startup.js";
 import { RuntimeWindowStateStore } from "./runtime-window-state-store.js";
 import { SenderPolicy } from "./sender-policy.js";
 import { WindowFactory } from "./window-factory.js";
+import { WindowRecovery } from "./window-recovery.js";
 
 export class DesktopApplication {
   private static readonly UNOWNED_STATES: readonly StartupStateKind[] = [StartupStateKind.Connecting, StartupStateKind.PreShellData, StartupStateKind.Failed];
@@ -148,6 +149,7 @@ export class DesktopApplication {
     const window = this.factory.create(WindowState.createDefault());
     const contentsId = window.webContents.id;
     const open = new OpenWindow(window, this.electron.screen, this.log);
+    new WindowRecovery(open, this.electron.dialog, this.log, () => this.electron.app.quit(), () => this.openLogFolderAsync(), Resources.reloadCrashLimit);
     this.windows.set(contentsId, open);
     window.once(Resources.closedEvent, () => this.windows.delete(contentsId));
     open.settleWithin(Resources.connectingShowLimit);

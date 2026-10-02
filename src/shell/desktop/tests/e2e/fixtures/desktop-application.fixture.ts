@@ -120,6 +120,12 @@ export default class DesktopApplicationFixture {
     await this.startAsync();
   }
 
+  public acceptFailures(pattern: RegExp): string[] {
+    const accepted = this.failures.filter(t => pattern.test(t));
+    this.failures.splice(0, this.failures.length, ...this.failures.filter(t => !pattern.test(t)));
+    return accepted;
+  }
+
   public async isVisibleAsync(): Promise<boolean> {
     return await this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some(t => t.isVisible()));
   }

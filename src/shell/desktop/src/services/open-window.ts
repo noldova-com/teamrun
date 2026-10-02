@@ -57,12 +57,16 @@ export class OpenWindow {
     this.paintTimer = setTimeout(() => this.showUnpainted(milliseconds), milliseconds).unref();
   }
 
-  private showUnpainted(milliseconds: number): void {
-    this.paintTimer = null;
-    const contents = this.window.webContents;
-    this.log.write(Resources.formatWindowShownUnpainted(milliseconds / 1000, contents.isLoading(), contents.isCrashed()));
+  public showNow(): void {
+    this.stopPaintTimer();
     this.isPainted = true;
     this.settle();
+  }
+
+  private showUnpainted(milliseconds: number): void {
+    const contents = this.window.webContents;
+    this.log.write(Resources.formatWindowShownUnpainted(milliseconds / 1000, contents.isLoading(), contents.isCrashed()));
+    this.showNow();
   }
 
   private stopPaintTimer(): void {

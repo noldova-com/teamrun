@@ -9,8 +9,9 @@
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 
-import { BrowserWindow, Menu, app, clipboard, ipcMain, screen, session, shell, utilityProcess } from "electron";
+import { BrowserWindow, Menu, app, clipboard, dialog, ipcMain, screen, session, shell, utilityProcess } from "electron";
 
+import "@noldova/teamrun-foundation-core";
 import { ChildProcessStarter, RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "./resources.js";
@@ -21,7 +22,22 @@ import { UtilityProcessStarter } from "./services/utility-process-starter.js";
 const starter = process.platform === Resources.windowsPlatform ? new UtilityProcessStarter(utilityProcess) : new ChildProcessStarter();
 
 DesktopApplication.start(
-  { app, ipcMain, session, screen, menu: Menu, clipboard, shell, createWindow: t => new BrowserWindow(t) },
+  {
+    app,
+    ipcMain,
+    session,
+    screen,
+    menu: Menu,
+    clipboard,
+    shell,
+    dialog: {
+      showMessageBox: (windowId, options) => {
+        const window = BrowserWindow.fromId(windowId);
+        return Object.isNull(window) ? dialog.showMessageBox(options) : dialog.showMessageBox(window, options);
+      }
+    },
+    createWindow: t => new BrowserWindow(t)
+  },
   {
     argv: process.argv,
     env: process.env,

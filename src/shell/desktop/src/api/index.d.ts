@@ -8,7 +8,7 @@
 
 import type { Writable } from "node:stream";
 
-import type { AppDetailsOptions, BrowserWindowConstructorOptions, MenuItemConstructorOptions, Rectangle, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
+import type { AppDetailsOptions, BrowserWindowConstructorOptions, MenuItemConstructorOptions, MessageBoxOptions, MessageBoxReturnValue, Rectangle, RenderProcessGoneDetails, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
@@ -624,6 +624,23 @@ export interface IWindowContents {
   on(event: "will-attach-webview", listener: (event: IPreventableEvent) => void): unknown;
 
   /**
+   * Listens for the page's renderer process having gone, for any reason including a clean exit.
+   *
+   * @param event The event's name.
+   * @param listener Receives Electron's event, which the desktop does not use, and why the process went.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function watch(contents: IWindowContents, record: (reason: string) => void): void {
+   *   contents.on("render-process-gone", (_event, details) => record(details.reason));
+   * }
+   * ```
+   */
+  on(event: "render-process-gone", listener: (event: unknown, details: RenderProcessGoneDetails) => void): unknown;
+
+  /**
    * Decides what happens when the page asks to open a window.
    *
    * @param handler Returns the decision.
@@ -683,6 +700,59 @@ export interface IWindowContents {
    * ```
    */
   isCrashed(): boolean;
+
+  /**
+   * Loads the page again, starting a new renderer process when the old one has gone.
+   *
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function reload(contents: IWindowContents): void {
+   *   contents.reload();
+   * }
+   * ```
+   */
+  reload(): void;
+
+  /**
+   * Ends the page's renderer process at once, which recovers a page that no longer responds before a reload.
+   *
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function restart(contents: IWindowContents): void {
+   *   contents.forcefullyCrashRenderer();
+   *   contents.reload();
+   * }
+   * ```
+   */
+  forcefullyCrashRenderer(): void;
+}
+
+/**
+ * Native message boxes, as Electron's `dialog` provides them; the desktop uses them only when its window's page cannot
+ * draw.
+ */
+export interface IDialogHost {
+  /**
+   * Shows a message box on a window, or on its own when the window is gone.
+   *
+   * @param windowId The window's id.
+   * @param options The box's message, buttons and, when it may be dismissed from code, its abort signal.
+   * @returns A promise of the chosen button's index, or the cancel button's when the box was dismissed.
+   * @example
+   * ```ts
+   * import type { IDialogHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function askAsync(dialog: IDialogHost, windowId: number): Promise<boolean> {
+   *   const { response } = await dialog.showMessageBox(windowId, { message: "Reload?", buttons: ["Reload", "Quit"], cancelId: 1 });
+   *   return response === 0;
+   * }
+   * ```
+   */
+  showMessageBox(windowId: number, options: MessageBoxOptions): Promise<MessageBoxReturnValue>;
 }
 
 /**
@@ -709,6 +779,11 @@ export interface IDesktopLog {
  * A native window, as Electron's `BrowserWindow` provides it.
  */
 export interface IDesktopWindow {
+  /**
+   * The window's id, which a message box names as its parent.
+   */
+  readonly id: number;
+
   /**
    * The window's web contents.
    */
@@ -953,8 +1028,8 @@ export interface IDesktopWindow {
   close(): void;
 
   /**
-   * Listens for the window being asked to close, which the listener may cancel, or for the window being resized,
-   * moved, maximized or restored from maximized.
+   * Listens for the window being asked to close, which the listener may cancel; for the window being resized, moved,
+   * maximized or restored from maximized; or for its page no longer responding or responding again.
    *
    * @param event The event's name.
    * @param listener Receives the cancellable event when the window is asked to close; called with nothing otherwise.
@@ -973,6 +1048,8 @@ export interface IDesktopWindow {
   on(event: "move", listener: () => void): unknown;
   on(event: "maximize", listener: () => void): unknown;
   on(event: "unmaximize", listener: () => void): unknown;
+  on(event: "unresponsive", listener: () => void): unknown;
+  on(event: "responsive", listener: () => void): unknown;
 
   /**
    * Listens once for the window having closed.
@@ -1106,6 +1183,11 @@ export interface IElectron {
    * The system's file manager, for opening the log folder.
    */
   readonly shell: IShellHost;
+
+  /**
+   * Native message boxes, for a window whose page cannot draw.
+   */
+  readonly dialog: IDialogHost;
 
   /**
    * The displays, for placing a window on one that shows it.
@@ -1805,6 +1887,56 @@ export declare class OpenWindow {
    * ```
    */
   public showUnpaintedWithin(milliseconds: number): void;
+
+  /**
+   * Shows the window now, painted or not, settling its startup.
+   *
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function showAtOnce(open: OpenWindow): void {
+   *   open.showNow();
+   * }
+   * ```
+   */
+  public showNow(): void;
+}
+
+/**
+ * Keeps a window usable when its page's renderer process is gone or stops responding. It records each episode, its
+ * outcome and the person's choice in the desktop log, and asks with a native message box, because the page cannot draw:
+ * a gone page offers Reload or Quit, or the log folder and Quit when it went again soon after a reload, so a page that
+ * fails while loading never becomes a loop; a page that stops responding offers Wait or Reload once per episode, and the
+ * box closes when the page responds again.
+ */
+export declare class WindowRecovery {
+  /**
+   * Starts watching a window.
+   *
+   * @param open The window.
+   * @param dialog Shows the message boxes.
+   * @param log Records each episode, its outcome and the person's choice.
+   * @param quit Quits the application.
+   * @param openLogFolderAsync Opens the log folder; its promise tells whether it opened.
+   * @param reloadCrashLimit How soon after a reload a page that goes again is offered the log folder instead, in
+   * milliseconds.
+   * @example
+   * ```ts
+   * import { type IDesktopLog, type IDialogHost, type OpenWindow, WindowRecovery } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function recover(open: OpenWindow, dialog: IDialogHost, log: IDesktopLog): WindowRecovery {
+   *   return new WindowRecovery(open, dialog, log, () => process.exit(0), () => Promise.resolve(true), 10_000);
+   * }
+   * ```
+   */
+  public constructor(
+    open: OpenWindow,
+    dialog: IDialogHost,
+    log: IDesktopLog,
+    quit: () => void,
+    openLogFolderAsync: () => Promise<boolean>,
+    reloadCrashLimit: number);
 }
 
 /**
