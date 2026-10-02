@@ -6,9 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-tr-menu .tr-menu-label {
-  padding: var(--tr-menu-label-padding);
-  color: var(--tr-text-muted);
-  font-size: var(--tr-text-panel);
-  line-height: var(--tr-line-panel);
+:host {
+  display: block;
+  flex: none;
+  height: var(--tr-border-width);
+  margin-block: var(--tr-menu-separator-spacing);
+  background-color: var(--tr-menu-separator);
 }

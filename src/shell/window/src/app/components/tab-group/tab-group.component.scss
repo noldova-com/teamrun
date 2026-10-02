@@ -77,3 +77,8 @@
   min-height: 0;
   overflow: hidden;
 }
+
+.tr-tab-group-overflow-menu {
+  max-width: min(var(--tr-popover-width), calc(100vw - var(--tr-space-4)));
+  max-height: min(60vh, calc(20 * var(--tr-menu-item-height) + 2 * (var(--tr-menu-padding) + var(--tr-border-width))));
+}

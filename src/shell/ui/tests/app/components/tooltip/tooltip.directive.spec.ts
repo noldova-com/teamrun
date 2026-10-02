@@ -136,6 +136,15 @@ describe("TooltipDirective", () => {
     expect(shown).toBeNull();
   });
 
+  it("hides when something around its anchor scrolls", async () => {
+    host.tooltip().show();
+    await shownAsync();
+
+    fixture.nativeElement.dispatchEvent(new Event("scroll"));
+
+    expect(tooltip()).toBeNull();
+  });
+
   it("hides when the pointer leaves the anchor for elsewhere and when the anchor is pressed", async () => {
     await userEvent.hover(anchor());
     await shownAsync();

@@ -91,6 +91,10 @@ export class LayoutService {
     this.update(this.layoutState().close(tab));
   }
 
+  public closeTabs(tabs: readonly Tab[]): void {
+    this.update(tabs.reduce((layout, t) => layout.close(t), this.layoutState()));
+  }
+
   public toggleDock(side: DockSide): void {
     this.update(this.layoutState().toggleDock(side));
   }

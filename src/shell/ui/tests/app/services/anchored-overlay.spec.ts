@@ -82,12 +82,17 @@ describe("AnchoredOverlay", () => {
     expect(overlay.placement?.side).toBe(OverlaySide.below);
   });
 
-  it("places an attached template at a point instead of its origin's box", () => {
+  it("places an attached template by an area it is given instead of its origin's box, and follows it again when asked", () => {
     const host = fixture.componentInstance;
-    overlay.openTemplate(new TemplatePortal(host.panel(), host.viewContainer), anchor(), below(0), new DOMRect(300, 150, 0, 0));
-    const box = overlay.element.getBoundingClientRect();
+    overlay.overlayRef.attach(new TemplatePortal(host.panel(), host.viewContainer));
+    overlay.follow(anchor(), below(0), () => new DOMRect(300, 150, 0, 0));
+    const first = overlay.element.getBoundingClientRect();
+    overlay.follow(anchor(), below(0));
+    const second = overlay.element.getBoundingClientRect();
+    const target = anchor().getBoundingClientRect();
 
-    expect([box.left, box.top]).toEqual([300, 150]);
+    expect([first.left, first.top]).toEqual([300, 150]);
+    expect([second.left, second.top]).toEqual([target.left, target.bottom]);
     expect(overlay.element.querySelector(".panel")).not.toBeNull();
   });
 
@@ -109,20 +114,22 @@ describe("AnchoredOverlay", () => {
     expect(overlay.element.style.maxHeight).toBe(`${limit}px`);
   });
 
-  it("closes when an ancestor scroll moves its anchor, but not for a scroll inside itself or elsewhere", async () => {
+  it("reports an ancestor scroll that moves its anchor, but not a scroll inside itself or elsewhere", async () => {
+    let scrolls = 0;
+    overlay.originScrolls.subscribe(() => scrolls++);
     overlay.openComponent(new ComponentPortal(ContentComponent), anchor(), below());
     const elsewhere = document.body.appendChild(document.createElement("div"));
     elsewhere.dispatchEvent(new Event("scroll"));
     overlay.element.dispatchEvent(new Event("scroll"));
     elsewhere.remove();
-    const isOpenAfterOthers = overlay.isOpen;
+    const scrollsAfterOthers = scrolls;
 
     const scroller = fixture.nativeElement.querySelector(".scroller") as HTMLElement;
     scroller.scrollTop = 120;
-    await vi.waitFor(() => expect(overlay.isOpen).toBe(false));
+    await vi.waitFor(() => expect(scrolls).toBe(1));
 
-    expect(isOpenAfterOthers).toBe(true);
-    expect(overlay.placement).toBeNull();
+    expect(scrollsAfterOthers).toBe(0);
+    expect(overlay.isOpen).toBe(true);
   });
 
   it("does nothing when asked to reposition while closed and lets go of its listeners once closed", () => {

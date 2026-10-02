@@ -179,21 +179,35 @@ describe("TabGroupComponent", () => {
 
   it("opens the active tab's menu from the panel actions and a tab's menu from the keyboard", async () => {
     await renderAsync();
-    const actions = group(1).querySelector<HTMLButtonElement>(".tr-tab-group-menu");
+    const actions = group(0).querySelector<HTMLButtonElement>(".tr-tab-group-menu");
     expect(actions?.getAttribute("aria-label")).toBe(Resources.panelActionsLabel);
     actions?.click();
     update();
     await fixture.whenStable();
-    expect(document.querySelector(".cdk-overlay-container .tr-tab-menu")).not.toBeNull();
-    document.querySelector(".cdk-overlay-container")?.replaceChildren();
+    const menu = document.querySelector<HTMLElement>(".cdk-overlay-container .tr-tab-menu");
+    expect(menu).not.toBeNull();
+    expect(menu?.getBoundingClientRect().right).toBeCloseTo(actions?.getBoundingClientRect().right ?? 0, 0);
+    expect(menu?.getBoundingClientRect().top).toBeGreaterThanOrEqual(actions?.getBoundingClientRect().bottom ?? Infinity);
+    actions?.click();
+    update();
+    await fixture.whenStable();
+    expect(document.querySelector(".cdk-overlay-container .tr-tab-menu")).toBeNull();
 
     const key = new KeyboardEvent("keydown", { key: "F10", shiftKey: true, bubbles: true, cancelable: true });
     tab(0, 0).dispatchEvent(key);
     update();
     await fixture.whenStable();
+    const opened = document.querySelector<HTMLElement>(".cdk-overlay-container .tr-tab-menu");
 
     expect(key.defaultPrevented).toBe(true);
-    expect(document.querySelector(".cdk-overlay-container .tr-tab-menu")).not.toBeNull();
+    expect(opened?.getBoundingClientRect().top).toBeGreaterThanOrEqual(tab(0, 0).getBoundingClientRect().bottom);
+    expect(opened?.getBoundingClientRect().left).toBeCloseTo(tab(0, 0).getBoundingClientRect().left, 0);
+    expect(document.activeElement?.classList.contains("tr-tab-menu-earlier")).toBe(true);
+    document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, bubbles: true, cancelable: true }));
+    update();
+    await fixture.whenStable();
+    expect(document.querySelector(".cdk-overlay-container .tr-tab-menu")).toBeNull();
+    expect(document.activeElement).toBe(tab(0, 0));
   });
 
   it("moves between tabs with the arrow keys, Home and End", async () => {
@@ -234,7 +248,11 @@ describe("TabGroupComponent", () => {
     update();
     await fixture.whenStable();
     const choices = [...document.querySelectorAll<HTMLButtonElement>(".cdk-overlay-container .tr-tab-group-overflow-tab")];
-    expect(choices.map(t => t.textContent?.trim())).toEqual(many.map(t => t.instance));
+    const list = document.querySelector<HTMLElement>(".cdk-overlay-container .tr-tab-group-overflow-menu");
+    expect(choices.map(t => t.querySelector(".tr-menu-item-label")?.textContent)).toEqual(many.map(t => t.instance));
+    expect(choices.map(t => t.getAttribute("aria-current"))).toEqual(many.map((_, index) => index === many.length - 1 ? "true" : null));
+    expect(list?.children[0]?.classList.contains("tr-tab-group-overflow-close-all")).toBe(true);
+    expect(list?.children[1]?.tagName).toBe("TR-MENU-SEPARATOR");
 
     choices[0]?.click();
     update();
@@ -255,6 +273,26 @@ describe("TabGroupComponent", () => {
 
     expect(getComputedStyle(actions).position).toBe("sticky");
     expect(scroller.style.scrollPaddingInlineEnd).toBe(`${actions.offsetWidth}px`);
+  });
+
+  it("closes every tab of the group from the overflow list's Close all", async () => {
+    const many = Array.from({ length: 12 }, (_, index) => new DocumentTab("notes.note", `note ${index}`));
+    await renderAsync(many.reduce((current, t) => current.openDocument(t), Layout.createDefault(registry)), 60);
+    update();
+    await fixture.whenStable();
+    update();
+    group(0).querySelector<HTMLButtonElement>(".tr-tab-group-overflow")?.click();
+    update();
+    await fixture.whenStable();
+    const closeAll = document.querySelector<HTMLButtonElement>(".cdk-overlay-container .tr-tab-group-overflow-close-all");
+    expect(closeAll?.querySelector(".tr-menu-item-label")?.textContent).toBe(Resources.closeAllLabel);
+
+    closeAll?.click();
+    update();
+    await fixture.whenStable();
+
+    expect(layout.layout().documents.tabs).toEqual([]);
+    expect(document.querySelector(".cdk-overlay-container tr-menu")).toBeNull();
   });
 
   it("drops the overflow list once the group is wide enough", async () => {

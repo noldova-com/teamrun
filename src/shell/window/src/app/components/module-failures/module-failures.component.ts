@@ -56,6 +56,7 @@ export class ModuleFailuresComponent {
         this.close();
     });
     overlay.keydownEvents.subscribe(event => this.closeFromKeyboard(event, item));
+    overlay.originScrolls.subscribe(() => this.close());
     this.overlay = overlay;
     this.isOpen.set(true);
     overlay.openTemplate(new TemplatePortal(popover, this.viewContainer), item, new OverlayAnchoring(OverlaySide.above, OverlayAlignment.End, this.bounds.gap));

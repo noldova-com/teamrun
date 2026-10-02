@@ -123,6 +123,7 @@ export class TooltipDirective {
         this.scheduleHide();
     });
     overlay.detachments.subscribe(() => this.tooltip = null);
+    overlay.originScrolls.subscribe(() => this.hide());
     this.overlay = overlay;
     return overlay;
   }

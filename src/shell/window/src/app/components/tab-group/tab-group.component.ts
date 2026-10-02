@@ -6,11 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, ElementRef, type Signal, computed, inject, input } from "@angular/core";
-import { MatMenuModule } from "@angular/material/menu";
+import { ChangeDetectionStrategy, Component, ElementRef, EnvironmentInjector, type Signal, afterNextRender, computed, inject, input } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import { IconButtonComponent, OverlaySide, PanelCardComponent, PanelSurface, TabComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
+import {
+  ContextMenuTriggerDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, OverlayAlignment, OverlaySide,
+  PanelCardComponent, PanelSurface, TabComponent, TooltipDirective
+} from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
 import type { DockSide } from "../../enums/dock-side";
@@ -25,7 +27,10 @@ import { TabScrollerDirective } from "./tab-scroller.directive";
 
 @Component({
   selector: "tr-tab-group",
-  imports: [IconButtonComponent, MatMenuModule, PanelCardComponent, TabComponent, TabMenuComponent, TabScrollerDirective, TooltipDirective],
+  imports: [
+    ContextMenuTriggerDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, PanelCardComponent, TabComponent,
+    TabMenuComponent, TabScrollerDirective, TooltipDirective
+  ],
   templateUrl: "./tab-group.component.html",
   styleUrl: "./tab-group.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -40,9 +45,12 @@ import { TabScrollerDirective } from "./tab-scroller.directive";
 })
 export class TabGroupComponent {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly below: OverlaySide = OverlaySide.below;
+  protected readonly besides: OverlaySide = OverlaySide.end;
+  protected readonly end: OverlayAlignment = OverlayAlignment.End;
   protected readonly layout: LayoutService = inject(LayoutService);
   protected readonly drag: TabDragService = inject(TabDragService);
   protected readonly labels: TabLabelService = inject(TabLabelService);
@@ -58,9 +66,15 @@ export class TabGroupComponent {
 
   protected choose(tab: Tab): void {
     this.layout.activate(tab);
-    for (const element of this.host.querySelectorAll<HTMLElement>(Resources.tabKeySelector))
-      if (element.dataset[Resources.tabKeyData] === tab.key)
-        element.focus();
+    afterNextRender(() => {
+      for (const element of this.host.querySelectorAll<HTMLElement>(Resources.tabKeySelector))
+        if (element.dataset[Resources.tabKeyData] === tab.key)
+          element.focus();
+    }, { injector: this.environment });
+  }
+
+  protected closeAll(): void {
+    this.layout.closeTabs(this.group().tabs);
   }
 
   protected onStripKey(event: KeyboardEvent): void {

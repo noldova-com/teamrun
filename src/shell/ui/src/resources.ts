@@ -7,6 +7,8 @@
  */
 
 
+import type { FocusOrigin } from "@angular/cdk/a11y";
+
 import { DockingDirection } from "./app/enums/docking-direction";
 import { OverlayAlignment } from "./app/enums/overlay-alignment";
 import { SashOrientation } from "./app/enums/sash-orientation";
@@ -188,7 +190,15 @@ export class Resources {
   public static readonly resizeEvent: string = "resize";
   public static readonly pointerLeaveEvent: "pointerleave" = "pointerleave";
   public static readonly scrollEvent: string = "scroll";
-  public static readonly keyboardFocusOrigin: string = "keyboard";
+  public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
+  public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
+  public static readonly menuPaneClass: string = "tr-menu-pane";
+  public static readonly submenuGlyph: string = "chevron_right";
+  public static readonly contextMenuKey: string = "ContextMenu";
+  public static readonly menuKey: string = "F10";
+  public static readonly clickEvent: string = "click";
+  public static readonly auxclickEvent: string = "auxclick";
+  public static readonly secondaryButton: number = 2;
   public static readonly truncationSelector: string = "[data-truncates]";
   public static readonly chromeAttribute: string = "data-tr-chrome";
   public static readonly chromeSelector: string = "[data-tr-chrome]";

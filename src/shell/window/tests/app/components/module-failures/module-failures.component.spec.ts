@@ -107,6 +107,17 @@ describe("ModuleFailuresComponent", () => {
     expect(item(fixture).getAttribute("aria-expanded")).toBe("true");
   });
 
+  it("closes its popover when something around the item scrolls", async () => {
+    const fixture = await renderAsync();
+    await openAsync(fixture);
+
+    (fixture.nativeElement as HTMLElement).dispatchEvent(new Event("scroll"));
+    await fixture.whenStable();
+
+    expect(popover()).toBeNull();
+    expect(item(fixture).getAttribute("aria-expanded")).toBe("false");
+  });
+
   it("places its popover above the item, a gap away and end-aligned with it", async () => {
     AppearanceFixture.apply();
     failures.set([clock, notes]);
