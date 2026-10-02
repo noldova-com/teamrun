@@ -32,7 +32,7 @@
     "build": "node scripts/build.ts",
     "start": "electron node_modules/@noldova/teamrun-shell-desktop/main.js",
     "test": "node scripts/test.ts",
-    "test:ui": "tsc --project src/shell/desktop/tests/e2e && playwright test --config src/shell/desktop/tests/e2e/playwright.config.ts"
+    "test:ui": "node scripts/ui-workflows.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

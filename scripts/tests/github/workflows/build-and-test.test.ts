@@ -492,29 +492,12 @@ class BuildAndTestTests {
       assert.ok(text.includes("          UI_TARGET: ${{ matrix.target }}\n          SCREENSHOT_URL: ${{ steps.screenshot.outputs.artifact-url }}\n"));
     });
 
-    test("the UI workflows run on the test build, with variants that leave out every fixture module and the clock module", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+    test("the UI workflows build their own test builds, so the workflow builds none", async () => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
-      const script = workflow.readStepScript("Build the test build for the UI workflows");
-      const variant = "run build -- --test --without notes --without clock --output _build/variants/no-modules";
-      const withoutClock = "run build -- --test --without clock --output _build/variants/without-clock";
-      const built = await CommandDoublesFixture.createAsync();
-      const failed = await CommandDoublesFixture.createAsync();
-      t.after(() => built.disposeAsync());
-      t.after(() => failed.disposeAsync());
-      built.respond("npm", variant, "");
-      built.respond("npm", withoutClock, "");
-      built.respond("npm", "run build -- --test", "");
-      failed.respond("npm", variant, "", 1);
 
-      const result = await built.runAsync(script);
-      const failure = await failed.runAsync(script);
-
-      assert.equal(result.status, 0, result.stderr);
-      assert.deepEqual(await built.readCallsAsync(), [`npm ${variant}`, `npm ${withoutClock}`, "npm run build -- --test"]);
-      assert.equal(failure.status, 1);
-      assert.deepEqual(await failed.readCallsAsync(), [`npm ${variant}`]);
-      assert.ok(workflow.text.indexOf("      - name: Test\n") < workflow.text.indexOf("      - name: Build the test build for the UI workflows\n"));
-      assert.ok(workflow.text.indexOf("      - name: Build the test build for the UI workflows\n") < workflow.text.indexOf("      - name: Test the UI workflows\n"));
+      assert.ok(!workflow.text.includes("--output _build/variants"));
+      assert.ok(!workflow.text.includes("npm run build -- --test"));
+      assert.ok(workflow.text.indexOf("      - name: Test\n") < workflow.text.indexOf("      - name: Test the UI workflows\n"));
     });
 
     test("a failed UI workflow run fails its step",{ timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
