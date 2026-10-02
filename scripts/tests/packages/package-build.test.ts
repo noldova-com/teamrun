@@ -92,7 +92,7 @@ class PackageBuildTests {
 
       await repository.writeAsync({ "src/shell/beta/src/resources.ts": "export default class Resources {\n  public static readonly version: string = \"changed\";\n  public static readonly protocol: string = \"\";\n}\n" });
       const changed = await PackageBuildTests.buildAsync(build);
-      await build.requireCurrentAsync();
+      await build.requireCurrentAsync(false);
 
       assert.match(first, /^[0-9a-f]{64}$/);
       assert.notEqual(await stamped(), first);
