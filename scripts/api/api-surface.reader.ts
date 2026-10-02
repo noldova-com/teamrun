@@ -120,11 +120,15 @@ export default class ApiSurfaceReader {
     const declaration = signature.declaration === undefined ? undefined : ApiValue.require(await signature.declaration.resolve(this.project), "declaration");
     if (declaration === undefined || !isSignatureDeclaration(declaration))
       return `${prefix}${ApiSurfaceReader.IMPLICIT_CONSTRUCTOR}`;
+    const flags = ApiValue.readModifierFlags(declaration);
+    if ((flags & ModifierFlags.Private) !== 0)
+      return `private ${prefix}${ApiSurfaceReader.IMPLICIT_CONSTRUCTOR}`;
+    const visibility = (flags & ModifierFlags.Protected) === 0 ? "" : "protected ";
     const parameters = await Promise.all(declaration.parameters.map(t => this.describeParameterAsync(t)));
     const returned = declaration.type !== undefined && isTypePredicateNode(declaration.type)
       ? await this.project.emitter.printNode(declaration.type)
       : await this.printAsync(ApiValue.require(await this.project.checker.getReturnTypeOfSignature(signature), "return type"));
-    return `${prefix}${await this.describeTypeParametersAsync(declaration.typeParameters ?? [])}(${parameters.join(", ")}): ${returned}`;
+    return `${visibility}${prefix}${await this.describeTypeParametersAsync(declaration.typeParameters ?? [])}(${parameters.join(", ")}): ${returned}`;
   }
 
   private async describeParameterAsync(parameter: ParameterDeclaration): Promise<string> {

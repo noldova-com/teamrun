@@ -40,9 +40,9 @@ export default class ApiExampleReader {
     return new ApiExamples(examples, undocumented);
   }
 
-  private static collect(owner: string, declarations: readonly Node[], examples: ApiExample[], undocumented: string[]): void {
+  private static collect(owner: string, declarations: readonly Node[], isRequired: boolean, examples: ApiExample[], undocumented: string[]): void {
     const found = declarations.flatMap(t => (t.jsDoc ?? []).flatMap(doc => new ApiDocComment(doc.getText()).readExamples(owner)));
-    if (found.length === 0)
+    if (isRequired && found.length === 0)
       undocumented.push(owner);
     found.forEach((t, index) => examples.push(new ApiExample(owner, index + 1, t)));
   }
@@ -53,8 +53,7 @@ export default class ApiExampleReader {
     const owned = declarations.filter(t => t.getSourceFile().fileName === fileName);
     if (owned.length === 0 || owned.some(t => (ApiValue.readModifierFlags(t) & ModifierFlags.Private) !== 0))
       return;
-    if ((symbol.flags & ApiExampleReader.CALLABLE) !== 0)
-      ApiExampleReader.collect(path, owned, examples, undocumented);
+    ApiExampleReader.collect(path, owned, (symbol.flags & ApiExampleReader.CALLABLE) !== 0, examples, undocumented);
     if ((symbol.flags & ApiExampleReader.CONTAINERS) === 0)
       return;
     for (const [name, member] of await symbol.getMembers())

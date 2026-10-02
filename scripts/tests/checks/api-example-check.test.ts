@@ -131,6 +131,25 @@ class ApiExampleCheckTests {
       assert.ok(output.includes("\n    Types of parameters 'value' and 'value' are incompatible.\n"), output);
     });
 
+    test("an example on a declaration that is not callable is compiled too", async t => {
+      const example = [
+        "/**",
+        " * Counts.",
+        " *",
+        " * @example",
+        " * ```ts",
+        " * import { Counter } from \"@noldova/teamrun-foundation-counter\";",
+        " *",
+        " * new Counter(\"one\");",
+        " * ```",
+        " */",
+        ""
+      ].join("\n");
+      const output = await ApiExampleCheckTests.runAsync(t, `${example}${ApiExampleCheckTests.DECLARATIONS}`, false);
+
+      assert.ok(output.includes("  Counter example 1, line 3: error TS2345: "), output);
+    });
+
     test("an expected-error example that compiles fails", async t => {
       const output = await ApiExampleCheckTests.runAsync(t, ApiExampleCheckTests.DECLARATIONS.replace("next(\"twice\");", "next();"), false);
 

@@ -53,6 +53,22 @@ class ApiDeclarationCheckTests {
       "  }",
       "}",
       "",
+      "export class Registry {",
+      "  private readonly names: readonly string[];",
+      "",
+      "  private constructor(names: readonly string[]) {",
+      "    this.names = names;",
+      "  }",
+      "",
+      "  public static create(): Registry {",
+      "    return new Registry([]);",
+      "  }",
+      "",
+      "  public get count(): number {",
+      "    return this.names.length;",
+      "  }",
+      "}",
+      "",
       "export function isShape(value: unknown): value is Shape {",
       "  return value instanceof Shape;",
       "}",
@@ -73,7 +89,7 @@ class ApiDeclarationCheckTests {
       "}",
       ""
     ].join("\n"),
-    "api/index.ts": "export { isShape, Marker, Mode, scale, Shape, unitNames } from \"../models/shapes.js\";\nexport type { IMeasured, Pair } from \"../models/shapes.js\";\n"
+    "api/index.ts": "export { isShape, Marker, Mode, Registry, scale, Shape, unitNames } from \"../models/shapes.js\";\nexport type { IMeasured, Pair } from \"../models/shapes.js\";\n"
   };
   private static readonly DECLARATIONS: string = [
     "export declare abstract class Shape<TUnit extends string = string> {",
@@ -89,6 +105,11 @@ class ApiDeclarationCheckTests {
     "export declare const unitNames: readonly string[];",
     "export declare class Marker {",
     "  public get size(): number;",
+    "}",
+    "export declare class Registry {",
+    "  private constructor();",
+    "  public static create(): Registry;",
+    "  public get count(): number;",
     "}",
     "export declare function isShape(value: unknown): value is Shape;",
     "export interface IMeasured {",
@@ -142,6 +163,9 @@ class ApiDeclarationCheckTests {
       ["a type predicate", "value is Shape;", "value is Marker;", "isShape(0): the implementation has (value: unknown): value is Shape; the declarations have (value: unknown): value is Marker"],
       ["a parameter name", "(value: TValue, factor?: number)", "(amount: TValue, factor?: number)", "scale(0): the implementation has <TValue extends number>(value: TValue"],
       ["an accessor", "public get size(): number;", "public readonly size: number;", "Marker#size: the implementation has get : number; the declarations have property readonly : number"],
+      ["a private constructor", "  private constructor();\n", "", "Registry.constructor(0): the implementation has private new (); the declarations have new ()"],
+      ["a protected constructor", "public constructor(unit: TUnit, id?: number);", "protected constructor(unit: TUnit, id?: number);",
+        "Shape.constructor(0): the implementation has abstract new (unit: TUnit, id?: number): Shape<TUnit>; the declarations have protected abstract new"],
       ["a static method", "public static describe(shape: Shape): string;", "public describe(shape: Shape): string;", "Shape.describe: missing from the declarations"]
     ];
     for (const [kind, from, to, expected] of drifts)

@@ -42,6 +42,16 @@ export declare class JsonException extends Exception {
    * @param path Path of the offending field, or the root path.
    * @param options Optional options carrying the cause, such as the `SyntaxError` of a failed
    * parse.
+   * @example
+   * ```ts
+   * import { JsonException } from "@noldova/teamrun-foundation-json";
+   *
+   * export function requirePort(port: unknown): number {
+   *   if (typeof port !== "number")
+   *     throw new JsonException("Expected a port number.", "$.port");
+   *   return port;
+   * }
+   * ```
    */
   public constructor(text: string, path: string, options?: ExceptionOptions);
 }
@@ -58,9 +68,13 @@ export declare class JsonException extends Exception {
  *
  * @example
  * ```ts
- * const reader = JsonReader.parse(line);
- * const id = reader.readNonBlankString("id");
- * const detail = reader.readOptionalString("detail"); // undefined when absent
+ * import { JsonReader } from "@noldova/teamrun-foundation-json";
+ *
+ * export function readMessage(line: string): string {
+ *   const reader = JsonReader.parse(line);
+ *   const detail = reader.readOptionalString("detail");
+ *   return `${reader.readNonBlankString("id")}: ${detail ?? "no detail"}`;
+ * }
  * ```
  */
 export declare class JsonReader {
@@ -70,6 +84,8 @@ export declare class JsonReader {
    */
   public readonly path: string;
 
+  private constructor();
+
   /**
    * Parses text as JSON and returns a reader over the resulting object.
    * @param text The JSON text, normally one line received from a peer.
@@ -77,6 +93,24 @@ export declare class JsonReader {
    * @returns A reader over the parsed object.
    * @throws JsonException when the text is not valid JSON (the `SyntaxError` is the cause) or
    * the parsed value is not an object.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * export const reader: JsonReader = JsonReader.parse("{\"name\":\"Ada\"}");
+   * ```
+   * @example
+   * ```ts
+   * import { JsonException, JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * try {
+   *   JsonReader.parse("[1, 2]");
+   * }
+   * catch (error) {
+   *   if (!(error instanceof JsonException))
+   *     throw error;
+   * }
+   * ```
    */
   public static parse(text: string, path?: string): JsonReader;
 
@@ -87,6 +121,14 @@ export declare class JsonReader {
    * @returns A reader over the narrowed object.
    * @throws JsonException when the value is not a JSON object or contains anything JSON
    * cannot carry, including circular references.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * export function readName(message: unknown): string {
+   *   return JsonReader.fromValue(message, "$.params").readString("name");
+   * }
+   * ```
    */
   public static fromValue(value: unknown, path?: string): JsonReader;
 
@@ -97,12 +139,25 @@ export declare class JsonReader {
    * @returns The value as JSON; object members whose value is `undefined` are dropped.
    * @throws JsonException for `undefined`, functions, symbols, bigints, and non-finite
    * numbers, or circular references, at the path of the offending member.
+   * @example
+   * ```ts
+   * import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
+   *
+   * export const value: JsonValue = JsonReader.toJsonValue({ name: "Ada", nickname: undefined });
+   * ```
    */
   public static toJsonValue(value: unknown, path?: string): JsonValue;
 
   /**
    * Returns the narrowed object this reader reads from.
    * @returns The object, as JSON.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"name\":\"Ada\"}");
+   * export const copy: string = JSON.stringify(reader.toJson());
+   * ```
    */
   public toJson(): JsonObject;
 
@@ -110,6 +165,13 @@ export declare class JsonReader {
    * Reports whether a field is present, with any value including `null`.
    * @param name The field's name.
    * @returns `true` when the field exists.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"name\":\"Ada\"}");
+   * export const hasEmail: boolean = reader.hasField("email");
+   * ```
    */
   public hasField(name: string): boolean;
 
@@ -118,6 +180,13 @@ export declare class JsonReader {
    * @param name The field's name.
    * @returns The string, possibly empty.
    * @throws JsonException when the field is absent, `null`, or not a string.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"name\":\"Ada\"}");
+   * export const name: string = reader.readString("name");
+   * ```
    */
   public readString(name: string): string;
 
@@ -126,6 +195,13 @@ export declare class JsonReader {
    * @param name The field's name.
    * @returns The string, which is not blank.
    * @throws JsonException when the field is absent, `null`, not a string, or empty or whitespace.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"id\":\"a1\"}");
+   * export const id: string = reader.readNonBlankString("id");
+   * ```
    */
   public readNonBlankString(name: string): string;
 
@@ -134,6 +210,13 @@ export declare class JsonReader {
    * @param name The field's name.
    * @returns The string, or `undefined` when the field is absent.
    * @throws JsonException when the field is present but `null` or not a string.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"name\":\"Ada\"}");
+   * export const nickname: string | undefined = reader.readOptionalString("nickname");
+   * ```
    */
   public readOptionalString(name: string): string | undefined;
 
@@ -142,6 +225,13 @@ export declare class JsonReader {
    * @param name The field's name.
    * @returns The string, or `null` when the field is `null`.
    * @throws JsonException when the field is absent or neither a string nor `null`.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"parentId\":null}");
+   * export const parentId: string | null = reader.readNullableString("parentId");
+   * ```
    */
   public readNullableString(name: string): string | null;
 
@@ -150,6 +240,13 @@ export declare class JsonReader {
    * @param name The field's name.
    * @returns The number, always finite.
    * @throws JsonException when the field is absent, `null`, or not a number.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"ratio\":0.5}");
+   * export const ratio: number = reader.readNumber("ratio");
+   * ```
    */
   public readNumber(name: string): number;
 
@@ -158,6 +255,13 @@ export declare class JsonReader {
    * @param name The field's name.
    * @returns The integer.
    * @throws JsonException when the field is absent, `null`, not a number, or not an integer.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"count\":3}");
+   * export const count: number = reader.readInteger("count");
+   * ```
    */
   public readInteger(name: string): number;
 
@@ -166,6 +270,13 @@ export declare class JsonReader {
    * @param name The field's name.
    * @returns The integer, or `null` when the field is `null`.
    * @throws JsonException when the field is absent or not an integer.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"exitCode\":null}");
+   * export const exitCode: number | null = reader.readNullableInteger("exitCode");
+   * ```
    */
   public readNullableInteger(name: string): number | null;
 
@@ -175,6 +286,13 @@ export declare class JsonReader {
    * @returns The strings, in order; empty for an empty array.
    * @throws JsonException when the field is absent, `null`, or not an array, or when an item is
    * not a string; the path names the item.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"tags\":[\"a\",\"b\"]}");
+   * export const tags: readonly string[] = reader.readStringArray("tags");
+   * ```
    */
   public readStringArray(name: string): readonly string[];
 
@@ -185,6 +303,13 @@ export declare class JsonReader {
    * for an empty array.
    * @throws JsonException when the field is absent, `null`, or not an array, or when an item is
    * not an object; the path names the item.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"items\":[{\"id\":\"a\"},{\"id\":\"b\"}]}");
+   * export const ids: readonly string[] = reader.readObjectArray("items").map(t => t.readString("id"));
+   * ```
    */
   public readObjectArray(name: string): readonly JsonReader[];
 
@@ -193,6 +318,13 @@ export declare class JsonReader {
    * @param name The field's name.
    * @returns A reader over the nested object, or `null` when the field is `null`.
    * @throws JsonException when the field is absent or neither an object nor `null`.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"error\":null}");
+   * export const error: JsonReader | null = reader.readNullableObject("error");
+   * ```
    */
   public readNullableObject(name: string): JsonReader | null;
 
@@ -201,6 +333,13 @@ export declare class JsonReader {
    * @param name The field's name.
    * @returns The boolean.
    * @throws JsonException when the field is absent, `null`, or not a boolean.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"enabled\":true}");
+   * export const enabled: boolean = reader.readBoolean("enabled");
+   * ```
    */
   public readBoolean(name: string): boolean;
 
@@ -209,6 +348,13 @@ export declare class JsonReader {
    * @param name The field's name.
    * @returns A reader over the nested object whose path is this reader's path plus the name.
    * @throws JsonException when the field is absent, `null`, or not an object.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"params\":{\"taskId\":\"t1\"}}");
+   * export const taskId: string = reader.readObject("params").readString("taskId");
+   * ```
    */
   public readObject(name: string): JsonReader;
 
@@ -219,6 +365,21 @@ export declare class JsonReader {
    * @returns The matching value, typed as one of `values`.
    * @throws JsonException when the field is absent, `null`, not a string, or not among the
    * values.
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"mode\":\"dark\"}");
+   * export const mode: "light" | "dark" = reader.readOneOf("mode", ["light", "dark"]);
+   * ```
+   * @example
+   * ```ts
+   * import { JsonReader } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"mode\":\"dark\"}");
+   * // @ts-expect-error
+   * export const mode: "light" = reader.readOneOf("mode", ["light", "dark"]);
+   * ```
    */
   public readOneOf<T extends string>(name: string, values: readonly T[]): T;
 
@@ -227,6 +388,13 @@ export declare class JsonReader {
    * @param name The field's name.
    * @returns The field's value, including `null` when the field is `null`.
    * @throws JsonException when the field is absent.
+   * @example
+   * ```ts
+   * import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
+   *
+   * const reader: JsonReader = JsonReader.parse("{\"data\":[1,null]}");
+   * export const data: JsonValue = reader.readValue("data");
+   * ```
    */
   public readValue(name: string): JsonValue;
 }
