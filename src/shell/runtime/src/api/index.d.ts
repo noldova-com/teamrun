@@ -550,6 +550,16 @@ export declare class DataDirectory {
   public get profileFolder(): string;
 
   /**
+   * The path of the running runtime's log, `logs/runtime.log`.
+   */
+  public get runtimeLog(): string;
+
+  /**
+   * The path of the previous run's log, `logs/runtime.previous.log`.
+   */
+  public get previousRuntimeLog(): string;
+
+  /**
    * The path of the database backups folder, `backups`.
    */
   public get backupsFolder(): string;
@@ -1359,6 +1369,36 @@ export interface IIdleParticipant {
 }
 
 /**
+ * Starts the runtime's process detached, so that it outlives the client that started it.
+ */
+export interface IProcessStarter {
+  /**
+   * Starts a program detached, without standard input or output, writing its standard error to a file.
+   *
+   * @param executable The program to run.
+   * @param launchArguments The program's arguments.
+   * @param environment The program's environment.
+   * @param errorFile The file the program's standard error is appended to.
+   * @returns A promise of the started process's id, once the process exists.
+   * @throws {LaunchException} Rejected when the program cannot be started.
+   * @example
+   * ```ts
+   * import type { IProcessStarter } from "@noldova/teamrun-shell-runtime";
+   *
+   * export class RecordingStarter implements IProcessStarter {
+   *   public readonly started: string[] = [];
+   *
+   *   public async startAsync(executable: string, launchArguments: readonly string[], environment: NodeJS.ProcessEnv, errorFile: string): Promise<number> {
+   *     this.started.push([executable, ...launchArguments, errorFile].join(" "));
+   *     return Object.keys(environment).length;
+   *   }
+   * }
+   * ```
+   */
+  startAsync(executable: string, launchArguments: readonly string[], environment: NodeJS.ProcessEnv, errorFile: string): Promise<number>;
+}
+
+/**
  * Handles requests for one registered method.
  */
 export interface IMethodHandler {
@@ -2154,12 +2194,19 @@ export declare class RuntimeOptions {
   public readonly declarationsFile: string;
 
   /**
+   * The name of the start log in the logs folder that the launcher which started this runtime reads, or `null` when no launcher started it. The runtime keeps that file when it removes start logs left behind.
+   */
+  public readonly startLogName: string | null;
+
+  /**
    * Creates the options.
    *
    * @param dataDirectory The data directory.
    * @param idleGraceMilliseconds The idle grace in milliseconds. Defaults to 30 seconds.
    * @param serverSettings The server's limits. Defaults to {@link ServerSettings}' defaults.
    * @param declarationsFile The build's module declarations. Defaults to the build's file beside the installed runtime.
+   * @param startLogName The start log's file name, `start-<UUID>.log`, or `null`. Defaults to `null`.
+   * @throws {ArgumentException} When the start log's name is not of that form.
    * @example
    * ```ts
    * import { DataDirectory, RuntimeOptions, ServerSettings } from "@noldova/teamrun-shell-runtime";
@@ -2167,12 +2214,12 @@ export declare class RuntimeOptions {
    * export const options = new RuntimeOptions(new DataDirectory("/home/person/.noldova/teamrun"), 60_000, new ServerSettings());
    * ```
    */
-  public constructor(dataDirectory: DataDirectory, idleGraceMilliseconds?: number, serverSettings?: ServerSettings, declarationsFile?: string);
+  public constructor(dataDirectory: DataDirectory, idleGraceMilliseconds?: number, serverSettings?: ServerSettings, declarationsFile?: string, startLogName?: string | null);
 
   /**
    * Reads the options from entry arguments.
    *
-   * @param entryArguments `--data-dir <absolute path>` and optionally `--idle-grace <milliseconds>`.
+   * @param entryArguments `--data-dir <absolute path>`, and optionally `--idle-grace <milliseconds>` and `--start-log <start log name>`.
    * @returns The options.
    * @throws {ArgumentException} When the data directory is missing or not absolute, or an argument is unknown, lacks its value or is not valid.
    * @example
@@ -2429,6 +2476,93 @@ export declare class RuntimeClient {
 }
 
 /**
+ * Starts a detached process with Node.js's child processes. On Windows the process inherits the starting process's inheritable handles; Node.js keeps its own standard handles out of them, but Electron's main process does not.
+ */
+export declare class ChildProcessStarter implements IProcessStarter {
+  /**
+   * Starts a program detached, without standard input or output, appending its standard error to a file.
+   *
+   * @param executable The program to run.
+   * @param launchArguments The program's arguments.
+   * @param environment The program's environment.
+   * @param errorFile The file the program's standard error is appended to; it is created when missing.
+   * @returns A promise of the started process's id.
+   * @throws {LaunchException} Rejected when the program cannot be started.
+   * @example
+   * ```ts
+   * import { ChildProcessStarter } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function startAsync(errorFile: string): Promise<number> {
+   *   return new ChildProcessStarter().startAsync(process.execPath, ["--version"], process.env, errorFile);
+   * }
+   * ```
+   */
+  public startAsync(executable: string, launchArguments: readonly string[], environment: NodeJS.ProcessEnv, errorFile: string): Promise<number>;
+}
+
+/**
+ * The running runtime's log, `logs/runtime.log`. Opening it under ownership keeps the previous run's log as `logs/runtime.previous.log` and removes the start logs that launchers left behind.
+ */
+export declare class RuntimeLog {
+  /**
+   * The stream the runtime writes its diagnostics to; it writes to the log until the log closes.
+   */
+  public readonly diagnostics: Writable;
+
+  private constructor();
+
+  /**
+   * Opens a new log. The current log becomes the previous one, replacing it; when that fails the new log starts anyway. Start logs other than the runtime's own are removed, and those that cannot be removed are left.
+   *
+   * @param lock The held ownership of the data directory.
+   * @param ownStartLogName The start log of the launcher that started this runtime, which is kept, or `null`.
+   * @returns A promise of the open log.
+   * @throws {OwnershipReleasedException} Rejected when the ownership was released.
+   * @example
+   * ```ts
+   * import { type OwnershipLock, RuntimeLog } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function noteAsync(lock: OwnershipLock): Promise<void> {
+   *   const log = await RuntimeLog.openAsync(lock, null);
+   *   log.writeLine("The runtime started.");
+   *   await log.closeAsync();
+   * }
+   * ```
+   */
+  public static openAsync(lock: OwnershipLock, ownStartLogName: string | null): Promise<RuntimeLog>;
+
+  /**
+   * Writes one line at once, as when the process is about to end; nothing is written after the log closes.
+   *
+   * @param text The line, without its line ending.
+   * @example
+   * ```ts
+   * import type { RuntimeLog } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function note(log: RuntimeLog, failure: Error): void {
+   *   log.writeLine(String(failure.stack));
+   * }
+   * ```
+   */
+  public writeLine(text: string): void;
+
+  /**
+   * Finishes the diagnostics stream and closes the log; closing again does nothing.
+   *
+   * @returns A promise that settles once the log is closed.
+   * @example
+   * ```ts
+   * import type { RuntimeLog } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function finishAsync(log: RuntimeLog): Promise<void> {
+   *   await log.closeAsync();
+   * }
+   * ```
+   */
+  public closeAsync(): Promise<void>;
+}
+
+/**
  * Starts or attaches to the runtime of a data directory, taking over from an older build and handing over to a newer one.
  */
 export declare class RuntimeLauncher {
@@ -2437,6 +2571,7 @@ export declare class RuntimeLauncher {
    *
    * @param settings How to start and attach.
    * @param identity The client's build identity.
+   * @param starter Starts the runtime's process. Defaults to {@link ChildProcessStarter}; the desktop passes one that keeps its own handles out of the runtime on Windows.
    * @example
    * ```ts
    * import { type IRuntimeClientListener, type LaunchSettings, RuntimeBuild, type RuntimeClient, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
@@ -2446,7 +2581,7 @@ export declare class RuntimeLauncher {
    * }
    * ```
    */
-  public constructor(settings: LaunchSettings, identity: BuildIdentity);
+  public constructor(settings: LaunchSettings, identity: BuildIdentity, starter?: IProcessStarter);
 
   /**
    * Returns a connection to the data directory's runtime of this build, starting one when none runs. An older build's runtime is asked to stop and replaced.
@@ -2738,6 +2873,11 @@ export declare class RuntimeHost implements IIdleParticipant {
    */
   public readonly modules: ModuleHost;
 
+  /**
+   * The runtime's log, opened under ownership; its {@link RuntimeLog.diagnostics} stream receives the runtime's diagnostics, such as module failures.
+   */
+  public readonly log: RuntimeLog;
+
   private constructor();
 
   /**
@@ -2751,7 +2891,6 @@ export declare class RuntimeHost implements IIdleParticipant {
    * @param options How the runtime runs.
    * @param platform The platform, as in `process.platform`; Windows listens on loopback TCP, others on a socket in the discovery folder.
    * @param environment The environment the discovery folder's protection uses.
-   * @param diagnostics Receives the full error of each module part that cannot be loaded, activated or deactivated.
    * @returns A promise of the running host.
    * @throws {DeclarationsFormatException} Rejected, before taking ownership, when the build's module declarations cannot be read.
    * @throws {DataDirectoryOwnedException} Rejected when another runtime owns the directory.
@@ -2760,12 +2899,12 @@ export declare class RuntimeHost implements IIdleParticipant {
    * import { RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
    *
    * export async function runAsync(entryArguments: readonly string[]): Promise<string> {
-   *   const host = await RuntimeHost.startAsync(RuntimeOptions.parse(entryArguments), process.platform, process.env, process.stderr);
+   *   const host = await RuntimeHost.startAsync(RuntimeOptions.parse(entryArguments), process.platform, process.env);
    *   return host.waitForStopAsync();
    * }
    * ```
    */
-  public static startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv, diagnostics: Writable): Promise<RuntimeHost>;
+  public static startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv): Promise<RuntimeHost>;
 
   /**
    * Stops the runtime because it stayed idle.
@@ -2804,7 +2943,7 @@ export declare class RuntimeHost implements IIdleParticipant {
    * import { RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
    *
    * export async function runAsync(entryArguments: readonly string[]): Promise<string> {
-   *   const host = await RuntimeHost.startAsync(RuntimeOptions.parse(entryArguments), process.platform, process.env, process.stderr);
+   *   const host = await RuntimeHost.startAsync(RuntimeOptions.parse(entryArguments), process.platform, process.env);
    *   return host.waitForStopAsync();
    * }
    * ```

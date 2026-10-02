@@ -8,7 +8,7 @@
 
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import type { Writable } from "node:stream";
+import { inspect } from "node:util";
 
 import "@noldova/teamrun-foundation-core";
 import { type BuildIdentity, Failure, FailureCode, PreShellData, RuntimeHandover, ShellMethods } from "@noldova/teamrun-shell-protocol";
@@ -44,6 +44,7 @@ import { WindowStateWriteMethod } from "../window-state/window-state-write-metho
 import { WorkTracker } from "../work/work-tracker.js";
 import { IdleMonitor } from "./idle-monitor.js";
 import { MoveAsideMethod } from "./move-aside-method.js";
+import { RuntimeLog } from "./runtime-log.js";
 import { StopMethod } from "./stop-method.js";
 
 export class RuntimeHost implements IIdleParticipant {
@@ -63,16 +64,18 @@ export class RuntimeHost implements IIdleParticipant {
   public readonly methods: MethodRegistry = new MethodRegistry();
   public readonly events: EventRegistry;
   public readonly modules: ModuleHost;
+  public readonly log: RuntimeLog;
 
   private constructor(
     options: RuntimeOptions,
     platform: string,
     environment: NodeJS.ProcessEnv,
     lock: OwnershipLock,
+    log: RuntimeLog,
     database: ShellDatabase | null,
-    declarations: readonly ModuleDeclaration[],
-    diagnostics: Writable) {
+    declarations: readonly ModuleDeclaration[]) {
     this.lock = lock;
+    this.log = log;
     this.database = database;
     this.identity = RuntimeBuild.identity;
     this.work = new WorkTracker(() => this.idle.check());
@@ -86,7 +89,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.events = new EventRegistry(this.server);
     this.publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(platform, new SystemCommand(), environment));
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
-    this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, new PackageRuntimePartLoader(), diagnostics);
+    this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, new PackageRuntimePartLoader(), log.diagnostics);
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
     if (!Object.isNull(database))
@@ -103,21 +106,24 @@ export class RuntimeHost implements IIdleParticipant {
     return this.server.sessionCount === 0 && this.work.isEmpty;
   }
 
-  public static async startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv, diagnostics: Writable): Promise<RuntimeHost> {
+  public static async startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv): Promise<RuntimeHost> {
     const declarations = await ModuleDeclarationReader.readAsync(options.declarationsFile);
     const lock = OwnershipLock.acquire(options.dataDirectory);
+    let log: RuntimeLog | null = null;
     let database: ShellDatabase | null = null;
     try {
+      log = await RuntimeLog.openAsync(lock, options.startLogName);
       const inspection = await DataDirectoryInspector.inspectAsync(options.dataDirectory);
       if (inspection.state !== DataDirectoryState.PreShell)
         database = await ShellDatabase.openAsync(lock, ShellMigrations.all);
     }
     catch (error) {
+      await log?.closeAsync();
       lock.release();
       throw error;
     }
 
-    const host = new RuntimeHost(options, platform, environment, lock, database, declarations, diagnostics);
+    const host = new RuntimeHost(options, platform, environment, lock, log, database, declarations);
     try {
       await host.openAsync(platform);
     }
@@ -202,9 +208,14 @@ export class RuntimeHost implements IIdleParticipant {
           await this.publisher.withdrawAsync(this.discovery);
       }
     }
+    catch (error) {
+      this.log.writeLine(inspect(error));
+      throw error;
+    }
     finally {
       this.database?.close();
       this.lock.release();
+      await this.log.closeAsync();
     }
   }
 }

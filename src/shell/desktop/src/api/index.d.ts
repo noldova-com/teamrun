@@ -11,7 +11,7 @@ import type { AppDetailsOptions, BrowserWindowConstructorOptions, MenuItemConstr
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { Event, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey } from "@noldova/teamrun-shell-protocol";
-import type { IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
+import type { IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -892,6 +892,86 @@ export interface IDesktopWindow {
    * ```
    */
   once(event: "closed", listener: () => void): unknown;
+}
+
+/**
+ * The parent port of an Electron utility process, through which it answers the process that started it.
+ */
+export interface IParentPort {
+  /**
+   * Sends a message to the parent process.
+   *
+   * @param message A structured-cloneable value.
+   * @example
+   * ```ts
+   * import type { IParentPort } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function answer(port: IParentPort): void {
+   *   port.postMessage({ processId: 4120, failure: null });
+   * }
+   * ```
+   */
+  postMessage(message: unknown): void;
+}
+
+/**
+ * An Electron utility process, as the desktop uses one.
+ */
+export interface IUtilityProcess {
+  /**
+   * Sends a message to the utility process; messages wait until it is ready.
+   *
+   * @param message A structured-cloneable value.
+   * @example
+   * ```ts
+   * import type { IUtilityProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function ask(child: IUtilityProcess): void {
+   *   child.postMessage({ executable: "node", arguments: [], errorFile: "start.log", environment: {} });
+   * }
+   * ```
+   */
+  postMessage(message: unknown): void;
+
+  /**
+   * Listens once for the utility process's first message or its exit.
+   *
+   * @param event `message` or `exit`.
+   * @param listener Receives the message, or the exit code.
+   * @returns The utility process, for chaining.
+   * @example
+   * ```ts
+   * import type { IUtilityProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function watch(child: IUtilityProcess, exits: unknown[]): void {
+   *   child.once("exit", code => exits.push(code));
+   * }
+   * ```
+   */
+  once(event: "message" | "exit", listener: (value: unknown) => void): this;
+}
+
+/**
+ * Electron's `utilityProcess`, as the desktop uses it.
+ */
+export interface IUtilityProcessHost {
+  /**
+   * Starts a utility process. Chromium's launcher gives it only the handles it lists, none of the desktop's other handles.
+   *
+   * @param modulePath The script the utility process runs.
+   * @param args The script's arguments.
+   * @param options The utility process's standard streams and the name it shows in task managers; it keeps the desktop's environment.
+   * @returns The utility process.
+   * @example
+   * ```ts
+   * import type { IUtilityProcess, IUtilityProcessHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function start(host: IUtilityProcessHost, script: string): IUtilityProcess {
+   *   return host.fork(script, [], { stdio: "ignore", serviceName: "Example" });
+   * }
+   * ```
+   */
+  fork(modulePath: string, args: string[], options: { stdio: "ignore"; serviceName: string }): IUtilityProcess;
 }
 
 /**
@@ -1924,4 +2004,240 @@ export declare class TaskbarIdentity {
    * ```
    */
   public toAppDetails(): AppDetailsOptions;
+}
+
+/**
+ * What a utility process is asked to start: a program, its arguments, the file for its standard error and its environment.
+ */
+export declare class DetachedStartRequest {
+  /**
+   * The program to start.
+   */
+  public readonly executable: string;
+
+  /**
+   * The program's arguments.
+   */
+  public readonly launchArguments: readonly string[];
+
+  /**
+   * The file the program's standard error is appended to.
+   */
+  public readonly errorFile: string;
+
+  /**
+   * The program's environment. The utility process itself runs with the desktop's environment, since a variable such as `ELECTRON_RUN_AS_NODE` must reach the program but not the utility process.
+   */
+  public readonly environment: Readonly<Record<string, string>>;
+
+  /**
+   * Creates the request.
+   *
+   * @param executable The program; not whitespace only.
+   * @param launchArguments The program's arguments, copied.
+   * @param errorFile The file for standard error; not whitespace only.
+   * @param environment The program's environment; variables without a value are left out.
+   * @throws ArgumentException synchronously when the program or the file is empty or whitespace only.
+   * @example
+   * ```ts
+   * import { DetachedStartRequest } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const request: DetachedStartRequest = new DetachedStartRequest(process.execPath, ["--version"], "start.log", process.env);
+   * ```
+   */
+  public constructor(executable: string, launchArguments: readonly string[], errorFile: string, environment: NodeJS.ProcessEnv);
+
+  /**
+   * Reads a request from a message.
+   *
+   * @param value The message: `executable`, `arguments`, `errorFile` and `environment`.
+   * @returns The request.
+   * @throws JsonException synchronously when a field is missing or invalid, or an environment variable's value is not text.
+   * @example
+   * ```ts
+   * import { DetachedStartRequest } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const request: DetachedStartRequest = DetachedStartRequest.fromJson({ executable: "node", arguments: [], errorFile: "start.log", environment: { PATH: "/usr/bin" } });
+   * ```
+   */
+  public static fromJson(value: unknown): DetachedStartRequest;
+
+  /**
+   * Writes the request as a message.
+   *
+   * @returns The message.
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { DetachedStartRequest } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const message: JsonObject = new DetachedStartRequest("node", [], "start.log", {}).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A utility process's answer to a start request: the started process's id, or why it could not start.
+ */
+export declare class DetachedStartReply {
+  /**
+   * The started process's id, or `null` when the start failed.
+   */
+  public readonly processId: number | null;
+
+  /**
+   * Why the start failed, or `null` when it succeeded.
+   */
+  public readonly failure: string | null;
+
+  private constructor();
+
+  /**
+   * Creates the reply of a successful start.
+   *
+   * @param processId The started process's id.
+   * @returns The reply.
+   * @example
+   * ```ts
+   * import { DetachedStartReply } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const reply: DetachedStartReply = DetachedStartReply.started(4120);
+   * ```
+   */
+  public static started(processId: number): DetachedStartReply;
+
+  /**
+   * Creates the reply of a failed start.
+   *
+   * @param failure Why the start failed.
+   * @returns The reply.
+   * @example
+   * ```ts
+   * import { DetachedStartReply } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const reply: DetachedStartReply = DetachedStartReply.failed("The program is missing.");
+   * ```
+   */
+  public static failed(failure: string): DetachedStartReply;
+
+  /**
+   * Reads a reply from a message.
+   *
+   * @param value The message: `processId` and `failure`, exactly one of them not `null`.
+   * @returns The reply.
+   * @throws JsonException synchronously when a field is invalid or the message carries both outcomes or neither.
+   * @example
+   * ```ts
+   * import { DetachedStartReply } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const reply: DetachedStartReply = DetachedStartReply.fromJson({ processId: 4120, failure: null });
+   * ```
+   */
+  public static fromJson(value: unknown): DetachedStartReply;
+
+  /**
+   * Returns the started process's id.
+   *
+   * @returns The process id.
+   * @throws LaunchException synchronously when the start failed; its message carries the failure.
+   * @example
+   * ```ts
+   * import { DetachedStartReply } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const processId: number = DetachedStartReply.started(4120).requireProcessId();
+   * ```
+   */
+  public requireProcessId(): number;
+
+  /**
+   * Writes the reply as a message.
+   *
+   * @returns The message.
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { DetachedStartReply } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const message: JsonObject = DetachedStartReply.started(4120).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * Starts the runtime through a short-lived Electron utility process, so that the runtime inherits none of the desktop's handles. Electron's main process keeps its standard handles inheritable, and Node.js starts every child with handle inheritance on; a utility process, which Chromium starts with only its listed handles, then starts the runtime and ends.
+ */
+export declare class UtilityProcessStarter implements IProcessStarter {
+  /**
+   * Creates the starter.
+   *
+   * @param host Electron's `utilityProcess`.
+   * @param entryPath The script the utility process runs. Defaults to {@link UtilityProcessStarter.entryPath}.
+   * @example
+   * ```ts
+   * import { type IUtilityProcessHost, UtilityProcessStarter } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function createStarter(host: IUtilityProcessHost): UtilityProcessStarter {
+   *   return new UtilityProcessStarter(host);
+   * }
+   * ```
+   */
+  public constructor(host: IUtilityProcessHost, entryPath?: string);
+
+  /**
+   * The path of the package's utility script, which answers one start request and ends.
+   *
+   * @example
+   * ```ts
+   * import { UtilityProcessStarter } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const script: string = UtilityProcessStarter.entryPath;
+   * ```
+   */
+  public static get entryPath(): string;
+
+  /**
+   * Asks a new utility process to start a program detached and returns the program's process id; the utility process ends after it answers.
+   *
+   * @param executable The program to run.
+   * @param launchArguments The program's arguments.
+   * @param environment The program's environment, which the request carries; the utility process keeps the desktop's own.
+   * @param errorFile The file the program's standard error is appended to.
+   * @returns A promise of the started program's process id.
+   * @throws LaunchException as a rejection when the utility process cannot start the program or ends without answering.
+   * @throws JsonException as a rejection when the answer is not a start reply.
+   * @example
+   * ```ts
+   * import { type IUtilityProcessHost, UtilityProcessStarter } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function startAsync(host: IUtilityProcessHost, errorFile: string): Promise<number> {
+   *   return new UtilityProcessStarter(host).startAsync(process.execPath, ["--version"], process.env, errorFile);
+   * }
+   * ```
+   */
+  public startAsync(executable: string, launchArguments: readonly string[], environment: NodeJS.ProcessEnv, errorFile: string): Promise<number>;
+}
+
+/**
+ * The utility process's side of a detached start: it reads the request, starts the program and answers.
+ */
+export declare class DetachedStart {
+  /**
+   * Answers one start request; a failure is answered, never thrown.
+   *
+   * @param message The start request.
+   * @param port The utility process's parent port.
+   * @param starter Starts the program. Defaults to the runtime package's `ChildProcessStarter`.
+   * @returns A promise that settles once the answer is sent.
+   * @example
+   * ```ts
+   * import { DetachedStart, type IParentPort } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function answerAsync(message: unknown, port: IParentPort): Promise<void> {
+   *   return DetachedStart.runAsync(message, port);
+   * }
+   * ```
+   */
+  public static runAsync(message: unknown, port: IParentPort, starter?: IProcessStarter): Promise<void>;
 }

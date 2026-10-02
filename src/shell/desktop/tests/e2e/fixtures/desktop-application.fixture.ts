@@ -37,9 +37,9 @@ export default class DesktopApplicationFixture {
   private electronApplication: ElectronApplication | null = null;
   private page: Page | null = null;
   private childProcess: ChildProcess | null = null;
-  private readonly pendingCloses: Promise<void>[] = [];
 
   public readonly failures: string[] = [];
+  public closeMilliseconds: number | null = null;
   public readonly root: string;
   public readonly dataDirectory: string;
 
@@ -140,16 +140,14 @@ export default class DesktopApplicationFixture {
   public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
     const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
-    const closing = this.application.close();
+    const started = Date.now();
+    await this.application.close();
+    this.closeMilliseconds = Date.now() - started;
     const exitCode = await exited;
     this.electronApplication = null;
     this.page = null;
-    if (keepRuntime)
-      this.pendingCloses.push(closing);
-    else {
+    if (!keepRuntime)
       await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
-      await closing;
-    }
     return exitCode;
   }
 
@@ -167,7 +165,6 @@ export default class DesktopApplicationFixture {
     if (isRunning)
       await this.closeAsync();
     await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
-    await Promise.all(this.pendingCloses);
     await rm(this.root, { recursive: true, force: true, maxRetries: 10 });
   }
 

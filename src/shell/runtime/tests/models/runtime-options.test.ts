@@ -39,6 +39,24 @@ export class RuntimeOptionsTests {
   }
 
   @TestMethod
+  public readsTheStartLogName(): void {
+    const name = "start-0f8b2c1e-6a4d-4e2b-9c3f-1a2b3c4d5e6f.log";
+
+    const options = RuntimeOptions.parse(["--data-dir", RuntimeOptionsTests.ROOT, "--start-log", name]);
+
+    Assert.areEqual(name, options.startLogName);
+    Assert.isNull(RuntimeOptions.parse(["--data-dir", RuntimeOptionsTests.ROOT]).startLogName);
+  }
+
+  @TestMethod
+  public rejectsAStartLogNameThatIsNotOne(): void {
+    for (const name of ["../start-0f8b2c1e-6a4d-4e2b-9c3f-1a2b3c4d5e6f.log", "start-1.log", "runtime.log", "start-0F8B2C1E-6A4D-4E2B-9C3F-1A2B3C4D5E6F.log"]) {
+      const exception = Assert.throws(() => RuntimeOptions.parse(["--data-dir", RuntimeOptionsTests.ROOT, "--start-log", name]), ArgumentException, name);
+      Assert.areEqual(`"${name}" is not the name of a start log. (Parameter 'startLog')`, exception.message);
+    }
+  }
+
+  @TestMethod
   public defaultsTheIdleGrace(): void {
     Assert.areEqual(30_000, RuntimeOptions.parse(["--data-dir", RuntimeOptionsTests.ROOT]).idleGraceMilliseconds);
   }

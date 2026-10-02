@@ -94,6 +94,20 @@ export class Resources {
   public static readonly windowWidth: number = 1280;
   public static readonly windowHeight: number = 800;
   public static readonly closeAnswerTimeout: number = 5000;
+  public static readonly executableField: string = "executable";
+  public static readonly argumentsField: string = "arguments";
+  public static readonly errorFileField: string = "errorFile";
+  public static readonly environmentField: string = "environment";
+  public static readonly environmentNotText: string = "An environment variable's value must be text.";
+  public static readonly processIdField: string = "processId";
+  public static readonly failureField: string = "failure";
+  public static readonly replyNeedsOneOutcome: string = "A start reply carries either a process id or a failure.";
+  public static readonly starterEnded: string = "The runtime starter ended before it started the runtime.";
+  public static readonly starterServiceName: string = "TeamRun runtime starter";
+  public static readonly utilityEntryRelativePath: string = "../utility-entry.js";
+  public static readonly ignoredStdio: "ignore" = "ignore";
+  public static readonly messageEvent: "message" = "message";
+  public static readonly exitEvent: "exit" = "exit";
   public static readonly xField: string = "x";
   public static readonly yField: string = "y";
   public static readonly widthField: string = "width";
@@ -133,6 +147,10 @@ export class Resources {
 
   public static formatDeviceUnavailable(reason: string): string {
     return `This device's identity could not be read, so window bounds are not kept: ${reason}`;
+  }
+
+  public static formatStarterFailed(failure: string): string {
+    return `The runtime starter could not start the runtime: ${failure}`;
   }
 
   public static formatAppearanceRejected(reason: string): string {

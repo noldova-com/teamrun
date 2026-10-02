@@ -8,7 +8,7 @@
 
 import { spawn } from "node:child_process";
 import { EventEmitter, once } from "node:events";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { PassThrough } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -20,7 +20,7 @@ import { RuntimeHostFixture } from "../fixtures/runtime-host.fixture.js";
 
 @TestClass
 export class RuntimeEntryTests {
-  private static readonly USAGE: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>]";
+  private static readonly USAGE: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>] [--start-log <start log name>]";
 
   @TestMethod
   public explainsItsUsage(): Promise<void> {
@@ -76,6 +76,22 @@ export class RuntimeEntryTests {
       Assert.areEqual(0, signals.listenerCount("SIGTERM"));
       Assert.areEqual(0, signals.listenerCount("SIGINT"));
       Assert.isFalse(OwnershipLock.isOwned(fixture.dataDirectory));
+    });
+  }
+
+  @TestMethod
+  public writesAnUncaughtFailureToTheLog(): Promise<void> {
+    return RuntimeEntryTests.runAsync(async (fixture, signals, error) => {
+      const running = RuntimeEntry.runAsync(["--data-dir", fixture.dataDirectory.root, "--idle-grace", "60000"], process.platform, process.env, signals, error);
+      while (await DiscoveryReader.readAsync(fixture.dataDirectory) === null)
+        await delay(10);
+
+      signals.emit("uncaughtExceptionMonitor", new Error("The module notes threw."));
+      signals.emit("SIGTERM");
+
+      Assert.areEqual(0, await running);
+      Assert.areEqual(0, signals.listenerCount("uncaughtExceptionMonitor"));
+      Assert.isTrue((await readFile(fixture.dataDirectory.runtimeLog, "utf8")).startsWith("Error: The module notes threw.\n    at "));
     });
   }
 
