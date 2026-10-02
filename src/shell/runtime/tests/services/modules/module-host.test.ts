@@ -12,7 +12,7 @@ import path from "node:path";
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { QualifiedName } from "@noldova/teamrun-shell-protocol";
-import { DataDirectory, EventRegistry, type IRuntimePart, MethodRegistry, Migration, ModuleDatabase, ModuleDatabaseException, ModuleDeclaration, ModuleHost } from "@noldova/teamrun-shell-runtime";
+import { CommandRegistry, DataDirectory, EventRegistry, type IRuntimePart, MethodRegistry, Migration, ModuleDatabase, ModuleDatabaseException, ModuleDeclaration, ModuleHost } from "@noldova/teamrun-shell-runtime";
 
 import { RuntimePartFixture } from "../../fixtures/runtime-part.fixture.js";
 import { RuntimePartLoaderFixture } from "../../fixtures/runtime-part-loader.fixture.js";
@@ -209,6 +209,7 @@ export class ModuleHostTests {
       new DataDirectory(root),
       methods,
       new EventRegistry({ broadcast: () => undefined }),
+      new CommandRegistry(),
       new RuntimePartLoaderFixture(parts),
       diagnostics);
   }

@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { DockSide, DocumentContribution, type IWindowPart, type IWindowPartContext, ViewContribution } from "@noldova/teamrun-shell-window";
+import { CommandContribution, DockSide, DocumentContribution, type IWindowPart, type IWindowPartContext, ViewContribution } from "@noldova/teamrun-shell-window";
 
 export class NotesWindowPart implements IWindowPart {
   public readonly moduleId: string = "notes";
@@ -20,6 +20,12 @@ export class NotesWindowPart implements IWindowPart {
       () => import("./components/note/note.component").then(t => t.NoteComponent)));
     context.openDocument("notes.note", "1", "Note 1");
     context.openDocument("notes.note", "2", "Note 2");
+    let count = 2;
+    context.registerCommand(new CommandContribution("notes.newNote", "New note", "note_add", "Mod+Alt+N", async () => {
+      count++;
+      context.openDocument("notes.note", String(count), `Note ${count}`);
+      return count;
+    }));
   }
 
   public async deactivateAsync(): Promise<void> {

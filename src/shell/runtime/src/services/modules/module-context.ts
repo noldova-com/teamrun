@@ -17,8 +17,10 @@ import type { IModuleDatabase } from "../../interfaces/module-database.js";
 import type { IRuntimePartContext } from "../../interfaces/runtime-part-context.js";
 import type { EventChannel } from "../../models/event-channel.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
+import type { RuntimeCommand } from "../../models/runtime-command.js";
 import { Resources } from "../../resources.js";
 import type { DataDirectory } from "../data-directory/data-directory.js";
+import type { CommandRegistry } from "../registry/command-registry.js";
 import type { EventRegistry } from "../registry/event-registry.js";
 import type { MethodRegistry } from "../registry/method-registry.js";
 import type { ServiceRegistry } from "../registry/service-registry.js";
@@ -27,6 +29,7 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
   private readonly declaration: ModuleDeclaration;
   private readonly methods: MethodRegistry;
   private readonly events: EventRegistry;
+  private readonly commands: CommandRegistry;
   private readonly services: ServiceRegistry;
   private readonly registrations: Disposable[] = [];
   private readonly moduleDatabase?: IModuleDatabase;
@@ -38,6 +41,7 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     dataDirectory: DataDirectory,
     methods: MethodRegistry,
     events: EventRegistry,
+    commands: CommandRegistry,
     services: ServiceRegistry,
     database?: IModuleDatabase) {
     this.declaration = declaration;
@@ -45,6 +49,7 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
       this.moduleDatabase = database;
     this.methods = methods;
     this.events = events;
+    this.commands = commands;
     this.services = services;
     this.moduleFolder = dataDirectory.locateModuleFolder(declaration.id);
   }
@@ -67,6 +72,11 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     const channel = this.events.declare(this.requireContributed(Resources.eventsKind, name));
     this.registrations.push(channel);
     return channel;
+  }
+
+  public registerCommand(command: RuntimeCommand): void {
+    this.requireContributed(Resources.commandsKind, command.info.name.text);
+    this.registrations.push(this.commands.register(command));
   }
 
   public publishService(name: string, service: object): void {

@@ -4,6 +4,7 @@
   "parts": ["window"],
   "dependencies": [],
   "contributes": {
+    "commands": ["notes.newNote"],
     "views": ["notes.list", "notes.outline"],
     "documents": ["notes.note"]
   }

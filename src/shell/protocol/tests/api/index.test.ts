@@ -14,7 +14,7 @@ export class ProtocolApiTests {
   @TestMethod
   public exportsTheCompleteCatalog(): void {
     const exportNames = [
-      "BuildIdentity", "Cancel", "Event", "Failure", "FailureCode", "FrameReader", "FrameWriter", "Handshake", "ModuleState", "ModuleStatus", "ModuleStatusList", "PreShellData",
+      "BuildIdentity", "Cancel", "CommandInfo", "CommandList", "CommandRun", "Event", "Failure", "FailureCode", "FrameReader", "FrameWriter", "Handshake", "KeyChord", "KeyName", "ModuleState", "ModuleStatus", "ModuleStatusList", "PreShellData",
       "ProtocolException", "QualifiedName", "Request", "Response", "RunningWork", "RuntimeHandover", "ShellMethods", "StopPolicy", "StopRequest", "WindowStateKey", "WindowStateValue", "WindowStateWrite", "WireContract", "WireDecoder", "WireMessage", "WireMessageKind"
     ];
 

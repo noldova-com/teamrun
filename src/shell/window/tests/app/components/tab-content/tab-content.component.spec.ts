@@ -61,7 +61,14 @@ class StubWindowPartHost {
 }
 
 describe("TabContentComponent", () => {
-  const context = new WindowPartContext("notes", [], { requestAsync: () => Promise.resolve(null), onEvent: () => () => undefined, openDocument: () => undefined, refresh: () => undefined });
+  const context = new WindowPartContext("notes", [], [], {
+    requestAsync: () => Promise.resolve(null),
+    onEvent: () => () => undefined,
+    openDocument: () => undefined,
+    isCommandRegistered: () => false,
+    runCommandAsync: () => Promise.resolve(null),
+    refresh: () => undefined
+  });
   let host: StubWindowPartHost;
 
   beforeEach(() => {

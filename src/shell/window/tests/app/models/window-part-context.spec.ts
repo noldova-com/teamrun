@@ -13,6 +13,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { WindowPartAccessException } from "../../../src/app/exceptions/window-part-access.exception";
 import type { IWindowPartHost } from "../../../src/app/interfaces/i-window-part-host";
+import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { DocumentContribution } from "../../../src/app/models/document-contribution";
 import { ViewContribution } from "../../../src/app/models/view-contribution";
 import { WindowPartContext } from "../../../src/app/models/window-part-context";
@@ -24,6 +25,7 @@ class ListComponent {
 class FakeWindowPartHost implements IWindowPartHost {
   public readonly calls: string[] = [];
   public readonly listeners: Set<(name: string, payload: JsonValue) => void> = new Set();
+  public readonly registered: Set<string> = new Set(["notes.taken"]);
 
   public requestAsync(method: string, payload: JsonValue): Promise<JsonValue> {
     this.calls.push(`request ${method}`);
@@ -37,6 +39,15 @@ class FakeWindowPartHost implements IWindowPartHost {
 
   public openDocument(moduleId: string, name: string, instance: string, title: string): void {
     this.calls.push(`open ${moduleId} ${name} ${instance} ${title}`);
+  }
+
+  public isCommandRegistered(name: string): boolean {
+    return this.registered.has(name);
+  }
+
+  public runCommandAsync(name: string, commandArguments: JsonValue): Promise<JsonValue> {
+    this.calls.push(`run ${name}`);
+    return Promise.resolve({ name, commandArguments });
   }
 
   public refresh(): void {
@@ -57,7 +68,7 @@ describe("WindowPartContext", () => {
 
   beforeEach(() => {
     host = new FakeWindowPartHost();
-    context = new WindowPartContext("notes", ["tasks"], host);
+    context = new WindowPartContext("notes", ["tasks"], ["notes.newNote", "notes.taken"], host);
   });
 
   it("registers its module's own views and documents and has the host refresh after each", () => {
@@ -68,6 +79,24 @@ describe("WindowPartContext", () => {
     expect(context.views.map(t => t.name)).toEqual(["notes.list"]);
     expect(context.documents.map(t => t.name)).toEqual(["notes.note"]);
     expect(host.calls).toEqual(["refresh", "refresh"]);
+  });
+
+  it("registers its declared commands, refuses others and runs its own and its dependencies' commands", async () => {
+    const newNote = new CommandContribution("notes.newNote", "New note", null, "Mod+Alt+N", () => Promise.resolve(null));
+
+    context.registerCommand(newNote);
+
+    expect(context.commands).toEqual([newNote]);
+    expect(() => context.registerCommand(new CommandContribution("notes.delete", "Delete", null, null, () => Promise.resolve(null))))
+      .toThrowError("The module notes does not declare the command notes.delete.");
+    expect(() => context.registerCommand(new CommandContribution("notes.taken", "Taken", null, null, () => Promise.resolve(null))))
+      .toThrowError("The command notes.taken is already registered.");
+    expect(() => context.registerCommand(new CommandContribution("clock.tick", "Tick", null, null, () => Promise.resolve(null))))
+      .toThrowError(WindowPartAccessException);
+    expect(await context.runCommandAsync("tasks.add", { title: "Write" })).toEqual({ name: "tasks.add", commandArguments: { title: "Write" } });
+    expect(await context.runCommandAsync("notes.newNote")).toEqual({ name: "notes.newNote", commandArguments: null });
+    expect(() => context.runCommandAsync("clock.tick")).toThrowError(WindowPartAccessException);
+    expect(host.calls).toEqual(["refresh", "run tasks.add", "run notes.newNote"]);
   });
 
   it("refuses another module's views, documents and documents to open", () => {

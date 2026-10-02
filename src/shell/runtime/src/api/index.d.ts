@@ -12,7 +12,7 @@ import type { Writable } from "node:stream";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import type { BuildIdentity, Event, Failure, ModuleStatusList, PreShellData, QualifiedName, Response, RunningWork, RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
+import type { BuildIdentity, CommandInfo, CommandList, Event, Failure, ModuleStatusList, PreShellData, QualifiedName, Response, RunningWork, RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
 
 /**
  * What a data directory holds, judged from its top-level entries other than the
@@ -1801,6 +1801,25 @@ export interface IRuntimePartContext {
   declareEvent(name: string): EventChannel;
 
   /**
+   * Registers one of the commands the module's declaration contributes. A
+   * window runs it through `shell.runCommand`; it is withdrawn when the
+   * module deactivates.
+   *
+   * @param command The command, its title, icon, default key and handler.
+   * @throws {RegistrationException} When the declaration does not contribute
+   * the command or it is already registered.
+   * @example
+   * ```ts
+   * import { type IRuntimePartContext, RuntimeCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function serveTick(context: IRuntimePartContext): void {
+   *   context.registerCommand(new RuntimeCommand("clock.tick", "Tick", "timer", "Mod+Alt+T", { handleAsync: async () => null }));
+   * }
+   * ```
+   */
+  registerCommand(command: RuntimeCommand): void;
+
+  /**
    * Publishes a service for the modules that depend on this one.
    *
    * @param name The service's name, `<id>.<name>` with the module's own id.
@@ -3140,6 +3159,12 @@ export declare class RuntimeHost implements IIdleParticipant {
   public readonly methods: MethodRegistry;
 
   /**
+   * The commands the modules' runtime parts registered, which `shell.commands`
+   * lists and `shell.runCommand` runs.
+   */
+  public readonly commands: CommandRegistry;
+
+  /**
    * The registry of events published to clients.
    */
   public readonly events: EventRegistry;
@@ -3246,15 +3271,16 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * @param dataDirectory The data directory.
    * @param methods The registry its methods join.
    * @param events The registry its events join.
+   * @param commands The registry its commands join.
    * @param services The registry its services join.
    * @param database The module's open database, when its runtime part declares migrations.
    * @example
    * ```ts
-   * import { DataDirectory, EventRegistry, MethodRegistry, ModuleContext, ModuleDeclaration, ServiceRegistry } from "@noldova/teamrun-shell-runtime";
+   * import { CommandRegistry, DataDirectory, EventRegistry, MethodRegistry, ModuleContext, ModuleDeclaration, ServiceRegistry } from "@noldova/teamrun-shell-runtime";
    *
    * export function createContext(events: EventRegistry): ModuleContext {
    *   const notes = new ModuleDeclaration("notes", "Notes", [], null, new Map());
-   *   return new ModuleContext(notes, new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new ServiceRegistry());
+   *   return new ModuleContext(notes, new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(), new ServiceRegistry());
    * }
    * ```
    */
@@ -3263,6 +3289,7 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
     dataDirectory: DataDirectory,
     methods: MethodRegistry,
     events: EventRegistry,
+    commands: CommandRegistry,
     services: ServiceRegistry,
     database?: IModuleDatabase);
 
@@ -3313,6 +3340,23 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * ```
    */
   public declareEvent(name: string): EventChannel;
+
+  /**
+   * See {@link IRuntimePartContext.registerCommand}.
+   *
+   * @param command The command.
+   * @throws {RegistrationException} When the declaration does not contribute
+   * the command or it is already registered.
+   * @example
+   * ```ts
+   * import { type ModuleContext, RuntimeCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function serveTick(context: ModuleContext): void {
+   *   context.registerCommand(new RuntimeCommand("clock.tick", "Tick", null, null, { handleAsync: async () => null }));
+   * }
+   * ```
+   */
+  public registerCommand(command: RuntimeCommand): void;
 
   /**
    * See {@link IRuntimePartContext.publishService}.
@@ -3407,19 +3451,20 @@ export declare class ModuleHost {
    * @param dataDirectory The data directory.
    * @param methods The registry the modules' methods join.
    * @param events The registry the modules' events join.
+   * @param commands The registry the modules' commands join.
    * @param loader Loads runtime parts.
    * @param diagnostics Receives the full error of each part that cannot be
    * loaded, activated or deactivated, which the module statuses leave out.
    * @example
    * ```ts
-   * import { DataDirectory, type EventRegistry, MethodRegistry, ModuleHost, PackageRuntimePartLoader } from "@noldova/teamrun-shell-runtime";
+   * import { CommandRegistry, DataDirectory, type EventRegistry, MethodRegistry, ModuleHost, PackageRuntimePartLoader } from "@noldova/teamrun-shell-runtime";
    *
    * export function createHost(events: EventRegistry): ModuleHost {
-   *   return new ModuleHost([], new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new PackageRuntimePartLoader(), process.stderr);
+   *   return new ModuleHost([], new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(), new PackageRuntimePartLoader(), process.stderr);
    * }
    * ```
    */
-  public constructor(declarations: readonly ModuleDeclaration[], dataDirectory: DataDirectory, methods: MethodRegistry, events: EventRegistry, loader: IRuntimePartLoader, diagnostics: Writable);
+  public constructor(declarations: readonly ModuleDeclaration[], dataDirectory: DataDirectory, methods: MethodRegistry, events: EventRegistry, commands: CommandRegistry, loader: IRuntimePartLoader, diagnostics: Writable);
 
   /**
    * Where every module stands, in activation order, as `shell.modules`
@@ -3572,6 +3617,89 @@ export declare class MethodRegistry {
    * ```
    */
   public find(name: QualifiedName): IMethodHandler | undefined;
+}
+
+/**
+ * A command a runtime part registers: its title, icon and default key, which
+ * windows show and bind, and the handler that runs it. The handler receives
+ * the command's arguments as the request context's payload.
+ */
+export declare class RuntimeCommand {
+  /**
+   * The command's name, title, icon and default key, as `shell.commands`
+   * reports them.
+   */
+  public readonly info: CommandInfo;
+
+  /**
+   * Runs the command.
+   */
+  public readonly handler: IMethodHandler;
+
+  /**
+   * Creates the command.
+   *
+   * @param name The command's name, `<module id>.<name>`.
+   * @param title What menus and search show; not whitespace only.
+   * @param icon A Material Symbols name, not whitespace only, or `null`.
+   * @param defaultKey The key the command asks for, such as `Mod+Alt+T`, or
+   * `null`; see `KeyChord.parseDefault` for the keys a default may use.
+   * @param handler Runs the command.
+   * @throws {ArgumentException} When the name, title, icon or default key is
+   * invalid; the parameter names which.
+   * @example
+   * ```ts
+   * import { RuntimeCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const tick: RuntimeCommand = new RuntimeCommand("clock.tick", "Tick", "timer", "Mod+Alt+T", { handleAsync: async context => context.payload });
+   * ```
+   */
+  public constructor(name: string, title: string, icon: string | null, defaultKey: string | null, handler: IMethodHandler);
+}
+
+/**
+ * The commands the runtime parts registered, in registration order.
+ */
+export declare class CommandRegistry {
+  /**
+   * The registered commands, as `shell.commands` answers.
+   */
+  public get list(): CommandList;
+
+  /**
+   * Registers a command.
+   *
+   * @param command The command.
+   * @returns The registration; disposing it removes the command.
+   * @throws {RegistrationException} When a command with its name is
+   * registered.
+   * @example
+   * ```ts
+   * import { type CommandRegistry, type Registration, RuntimeCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function serveTick(commands: CommandRegistry): Registration {
+   *   return commands.register(new RuntimeCommand("clock.tick", "Tick", null, null, { handleAsync: async () => null }));
+   * }
+   * ```
+   */
+  public register(command: RuntimeCommand): Registration;
+
+  /**
+   * Finds a command.
+   *
+   * @param name The command's name.
+   * @returns The command, or `undefined` when none is registered.
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   * import type { CommandRegistry } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isRegistered(commands: CommandRegistry): boolean {
+   *   return commands.find(QualifiedName.parse("clock.tick")) !== undefined;
+   * }
+   * ```
+   */
+  public find(name: QualifiedName): RuntimeCommand | undefined;
 }
 
 /**

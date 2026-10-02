@@ -10,11 +10,12 @@ import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal,
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { ModuleState, ModuleStatus, ModuleStatusList, ShellMethods } from "@noldova/teamrun-shell-protocol";
+import { type CommandInfo, CommandList, CommandRun, ModuleState, ModuleStatus, ModuleStatusList, ShellMethods } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../enums/dock-side";
 import type { IWindowPart } from "../interfaces/i-window-part";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
+import { CommandContribution } from "../models/command-contribution";
 import { ContributionMatch } from "../models/contribution-match";
 import { DocumentTab } from "../models/layout/document-tab";
 import type { Tab } from "../models/layout/tab";
@@ -30,6 +31,7 @@ import { WindowPartContext } from "../models/window-part-context";
 import type { WindowPartSource } from "../models/window-part-source";
 import { WindowPartTokens } from "../models/window-part-tokens";
 import { Resources } from "../../resources";
+import { CommandService } from "./command.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { DocumentOpenerService } from "./document-opener.service";
 import { LayoutService } from "./layout.service";
@@ -41,10 +43,13 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly layout: LayoutService = inject(LayoutService);
   private readonly opener: DocumentOpenerService = inject(DocumentOpenerService);
   private readonly labels: TabLabelService = inject(TabLabelService);
+  private readonly commands: CommandService = inject(CommandService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
   private readonly activations: WindowPartActivation[] = [];
   private readonly pendingOpens: PendingDocument[] = [];
+  private moduleOrder: readonly string[] = [];
+  private runtimeCommands: readonly CommandContribution[] = [];
   private readonly failuresValue: WritableSignal<readonly ModuleFailure[]> = signal([]);
   private readonly generationValue: WritableSignal<number> = signal(0);
   private isReady: boolean = false;
@@ -88,7 +93,19 @@ export class WindowPartHostService implements IWindowPartHost {
       this.pendingOpens.push(new PendingDocument(moduleId, name, instance, title));
   }
 
+  public isCommandRegistered(name: string): boolean {
+    return this.runtimeCommands.some(t => t.name === name) || this.activations.some(t => t.context.commands.some(u => u.name === name));
+  }
+
+  public runCommandAsync(name: string, commandArguments: JsonValue): Promise<JsonValue> {
+    return this.commands.runAsync(name, commandArguments);
+  }
+
   public refresh(): void {
+    this.commands.setCommands(this.moduleOrder.flatMap(t => [
+      ...this.runtimeCommands.filter(u => u.name.startsWith(`${t}${Resources.contributionSeparator}`)),
+      ...this.activations.find(u => u.context.moduleId === t)?.context.commands ?? []
+    ]));
     const views = this.activations.flatMap(t => t.context.views);
     for (const view of views)
       this.labels.register(view.name, new TabLabel(view.title, view.icon));
@@ -109,6 +126,8 @@ export class WindowPartHostService implements IWindowPartHost {
   private async reloadAsync(): Promise<void> {
     await this.deactivateAsync();
     this.failuresValue.set([]);
+    this.moduleOrder = [];
+    this.runtimeCommands = [];
     try {
       await this.activateReportedAsync();
     }
@@ -123,6 +142,8 @@ export class WindowPartHostService implements IWindowPartHost {
 
   private async activateReportedAsync(): Promise<void> {
     const report = ModuleStatusList.fromJson(await this.bridge.requestAsync(ShellMethods.modules.text, null));
+    this.moduleOrder = report.modules.map(t => t.id);
+    this.runtimeCommands = CommandList.fromJson(await this.bridge.requestAsync(ShellMethods.commands.text, null)).commands.map(t => this.describeRuntimeCommand(t));
     const active = new Set<string>();
     const statuses: ModuleStatus[] = [];
     for (const status of report.modules) {
@@ -154,6 +175,15 @@ export class WindowPartHostService implements IWindowPartHost {
     }
   }
 
+  private describeRuntimeCommand(info: CommandInfo): CommandContribution {
+    return new CommandContribution(
+      info.name.text,
+      info.title,
+      info.icon,
+      info.defaultKey?.text ?? null,
+      t => this.bridge.requestAsync(ShellMethods.runCommand.text, new CommandRun(info.name, t).toJson()));
+  }
+
   private describeFailure(status: ModuleStatus): ModuleFailure {
     const source = this.sources.find(t => t.moduleId === status.id);
     return new ModuleFailure(status.id, source?.displayName ?? status.id, status.state, status.cause, source?.viewNames ?? []);
@@ -176,7 +206,7 @@ export class WindowPartHostService implements IWindowPartHost {
       return new ModuleStatus(moduleId, ModuleState.Failed, Resources.windowPartLoadFailed);
     }
 
-    const activation = new WindowPartActivation(new WindowPartContext(moduleId, source.dependencies, this), part);
+    const activation = new WindowPartActivation(new WindowPartContext(moduleId, source.dependencies, source.commandNames, this), part);
     this.activations.push(activation);
     try {
       await part.activateAsync(activation.context);

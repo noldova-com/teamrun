@@ -14,6 +14,11 @@ export class Resources {
   public static readonly insertReadingStatement: string = "INSERT INTO readings (time) VALUES (?)";
   public static readonly countReadingsStatement: string = "SELECT count(*) AS count FROM readings";
   public static readonly countColumn: string = "count";
+  public static readonly tickedEvent: string = "clock.ticked";
+  public static readonly tickCommand: string = "clock.tick";
+  public static readonly tickTitle: string = "Tick";
+  public static readonly tickIcon: string = "timer";
+  public static readonly tickKey: string = "Mod+Alt+T";
   public static readonly failureMarker: string = "fail-activation";
   public static readonly failureMessage: string = "The clock fixture was asked to fail its activation.";
 }

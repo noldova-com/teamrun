@@ -20,6 +20,12 @@ export class ShellMethodsTests {
   }
 
   @TestMethod
+  public namesTheCommandMethods(): void {
+    Assert.areEqual("shell.commands", ShellMethods.commands.text);
+    Assert.areEqual("shell.runCommand", ShellMethods.runCommand.text);
+  }
+
+  @TestMethod
   public namesTheWindowStateMethods(): void {
     Assert.areEqual(
       JSON.stringify(["shell.readWindowBounds", "shell.writeWindowBounds", "shell.readWindowLayout", "shell.writeWindowLayout"]),

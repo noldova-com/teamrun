@@ -32,10 +32,13 @@ import { DiscoveryPublisher } from "../discovery/discovery-publisher.js";
 import { FolderProtectorFactory } from "../discovery/folder-protector-factory.js";
 import { RuntimeServer } from "../endpoint/runtime-server.js";
 import { ModuleDeclarationReader } from "../modules/module-declaration.reader.js";
+import { CommandsMethod } from "../modules/commands-method.js";
 import { ModuleHost } from "../modules/module-host.js";
 import { ModulesMethod } from "../modules/modules-method.js";
+import { RunCommandMethod } from "../modules/run-command-method.js";
 import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
+import { CommandRegistry } from "../registry/command-registry.js";
 import { EventRegistry } from "../registry/event-registry.js";
 import { MethodRegistry } from "../registry/method-registry.js";
 import { WindowStateReadMethod } from "../window-state/window-state-read-method.js";
@@ -62,6 +65,7 @@ export class RuntimeHost implements IIdleParticipant {
   public readonly identity: BuildIdentity;
   public readonly work: WorkTracker;
   public readonly methods: MethodRegistry = new MethodRegistry();
+  public readonly commands: CommandRegistry = new CommandRegistry();
   public readonly events: EventRegistry;
   public readonly modules: ModuleHost;
   public readonly log: RuntimeLog;
@@ -89,9 +93,11 @@ export class RuntimeHost implements IIdleParticipant {
     this.events = new EventRegistry(this.server);
     this.publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(platform, new SystemCommand(), environment));
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
-    this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, new PackageRuntimePartLoader(), log.diagnostics);
+    this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, this.commands, new PackageRuntimePartLoader(), log.diagnostics);
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
+    this.methods.register(ShellMethods.commands, new CommandsMethod(this.commands));
+    this.methods.register(ShellMethods.runCommand, new RunCommandMethod(this.commands));
     if (!Object.isNull(database))
       this.registerShellFacilities(database);
     else {

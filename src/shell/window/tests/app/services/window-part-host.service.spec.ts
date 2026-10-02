@@ -14,6 +14,7 @@ import { ModuleState } from "@noldova/teamrun-shell-protocol";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
 import type { IWindowPartContext } from "../../../src/app/interfaces/i-window-part-context";
+import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { DocumentContribution } from "../../../src/app/models/document-contribution";
 import { DocumentTab } from "../../../src/app/models/layout/document-tab";
 import { Layout } from "../../../src/app/models/layout/layout";
@@ -23,6 +24,7 @@ import { ViewType } from "../../../src/app/models/layout/view-type";
 import { ViewContribution } from "../../../src/app/models/view-contribution";
 import { WindowPartSource } from "../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
+import { CommandService } from "../../../src/app/services/command.service";
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../src/app/services/layout.service";
 import { TabLabelService } from "../../../src/app/services/tab-label.service";
@@ -61,8 +63,8 @@ class FakeWindowPart implements IWindowPart {
 describe("WindowPartHostService", () => {
   const load = (): Promise<Type<unknown>> => Promise.resolve(ContentComponent);
   const status = (id: string, state: ModuleState = ModuleState.Active, cause: string | null = null): object => ({ id, state, ...(cause === null ? {} : { cause }) });
-  const source = (moduleId: string, part: IWindowPart | Error, dependencies: readonly string[] = [], views: readonly string[] = []): WindowPartSource =>
-    new WindowPartSource(moduleId, `${moduleId[0]?.toUpperCase()}${moduleId.slice(1)}`, dependencies, views, () => part instanceof Error ? Promise.reject(part) : Promise.resolve(part));
+  const source = (moduleId: string, part: IWindowPart | Error, dependencies: readonly string[] = [], views: readonly string[] = [], commands: readonly string[] = []): WindowPartSource =>
+    new WindowPartSource(moduleId, `${moduleId[0]?.toUpperCase()}${moduleId.slice(1)}`, dependencies, views, commands, () => part instanceof Error ? Promise.reject(part) : Promise.resolve(part));
   const notesPart = (log: string[]): FakeWindowPart => new FakeWindowPart("notes", log, t => {
     t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load));
     t.registerDocument(new DocumentContribution("notes.note", load));
@@ -103,7 +105,7 @@ describe("WindowPartHostService", () => {
 
     await vi.waitFor(() => expect(loads).toEqual([""]));
 
-    expect(bridge.requests).toEqual([["shell.modules", null]]);
+    expect(bridge.requests).toEqual([["shell.modules", null], ["shell.commands", null]]);
     expect(host.failures()).toEqual([]);
     expect(host.generation()).toBe(1);
     expect(layout.layout().documents.tabs).toEqual([]);
@@ -176,6 +178,51 @@ describe("WindowPartHostService", () => {
     expect(host.findContribution(new ViewTab("clock.face"))).toBeNull();
     expect(layout.registry().view("clock.face").isShownByDefault).toBe(false);
     expect(errors.map(t => (t as Error).message)).toEqual(["No chunk.", "The clock broke."]);
+  });
+
+  it("lists the runtime's and the window parts' commands in module order and runs both", async () => {
+    const runs: string[] = [];
+    const notes = new FakeWindowPart("notes", log, t => {
+      t.registerCommand(new CommandContribution("notes.newNote", "New note", "note_add", "Mod+Alt+N", async u => {
+        runs.push(`notes.newNote ${JSON.stringify(u)}`);
+        return "opened";
+      }));
+    });
+    bridge.responses.set("shell.commands", { payload: { commands: [{ name: "notes.sync", title: "Sync" }, { name: "clock.tick", title: "Tick", icon: "timer", defaultKey: "Mod+Alt+T" }] } });
+    bridge.responses.set("shell.runCommand", { payload: 3 });
+    const { host } = start([source("notes", notes, [], [], ["notes.newNote"])], [status("clock"), status("notes")]);
+    const commands = TestBed.inject(CommandService);
+
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    expect(commands.commands().map(t => [t.name, t.title, t.icon, t.defaultKey?.text ?? null])).toEqual([
+      ["clock.tick", "Tick", "timer", "Mod+Alt+T"],
+      ["notes.sync", "Sync", null, null],
+      ["notes.newNote", "New note", "note_add", "Mod+Alt+N"]
+    ]);
+    expect(await commands.runAsync("clock.tick", { by: 2 })).toBe(3);
+    expect(await host.runCommandAsync("notes.newNote", { folder: "inbox" })).toBe("opened");
+    expect(bridge.requests.at(-1)).toEqual(["shell.runCommand", { name: "clock.tick", arguments: { by: 2 } }]);
+    expect(runs).toEqual(["notes.newNote {\"folder\":\"inbox\"}"]);
+    expect([host.isCommandRegistered("clock.tick"), host.isCommandRegistered("notes.newNote"), host.isCommandRegistered("notes.open")]).toEqual([true, true, false]);
+  });
+
+  it("fails a window part that registers a command the runtime part registered, and replaces the commands when the runtime returns", async () => {
+    const notes = new FakeWindowPart("notes", log, t => t.registerCommand(new CommandContribution("notes.sync", "Sync", null, null, () => Promise.resolve(null))));
+    bridge.responses.set("shell.commands", { payload: { commands: [{ name: "notes.sync", title: "Sync" }] } });
+    const { host } = start([source("notes", notes, [], [], ["notes.sync"])], [status("notes")]);
+    const commands = TestBed.inject(CommandService);
+    await vi.waitFor(() => expect(host.failures().length).toBe(1));
+
+    bridge.responses.set("shell.commands", { payload: { commands: [] } });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(errors.map(t => (t as Error).message)).toEqual(["The command notes.sync is already registered."]);
+    expect(commands.commands().map(t => t.title)).toEqual(["Sync"]);
+    expect(host.isCommandRegistered("notes.sync")).toBe(true);
+    expect(host.failures().length).toBe(0);
   });
 
   it("still loads the layout when the runtime does not answer with its modules", async () => {

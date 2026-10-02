@@ -33,7 +33,7 @@ export class Resources {
   public static readonly copyTextLimit: number = 65536;
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
-  public static readonly windowShellMethods: readonly string[] = [ShellMethods.modules.text];
+  public static readonly windowShellMethods: readonly string[] = [ShellMethods.modules.text, ShellMethods.commands.text, ShellMethods.runCommand.text];
   public static readonly untrustedRequest: string = `Only ${Resources.applicationName}'s own window may call the runtime.`;
   public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
   public static readonly payloadNotJson: string = "The payload must be a JSON value.";
