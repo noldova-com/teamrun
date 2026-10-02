@@ -9,7 +9,7 @@
 import { Resources } from "../../resources";
 import type { OverlayAnchoring } from "./overlay-anchoring";
 import { OverlayPlacement } from "./overlay-placement";
-import type { OverlaySide } from "./overlay-side";
+import { OverlaySide } from "./overlay-side";
 
 export class OverlayBounds {
   public readonly top: number;
@@ -27,7 +27,8 @@ export class OverlayBounds {
   public place(anchor: DOMRect, width: number, height: number, anchoring: OverlayAnchoring): OverlayPlacement {
     const preferred = anchoring.side;
     const opposite = preferred.opposite;
-    for (const side of [preferred, opposite])
+    const across = preferred.isVertical ? [OverlaySide.end, OverlaySide.start] : [OverlaySide.below, OverlaySide.above];
+    for (const side of [preferred, opposite, ...across])
       if (this.fits(side, anchor, width, height, anchoring.gap))
         return this.placeOn(side, anchor, width, height, anchoring);
     const side = this.roomOn(preferred, anchor, anchoring.gap) >= this.roomOn(opposite, anchor, anchoring.gap) ? preferred : opposite;

@@ -144,7 +144,7 @@ test.describe("menus", () => {
     await expect(tooltip).toHaveText(keyboardTitle);
     const tip = await boxOf(tooltip);
     const row = await boxOf(longRow);
-    expect(tip.left >= row.right - 0.5 || tip.right <= row.left + 0.5).toBe(true);
+    expect(tip.left >= row.right - 0.5 || tip.right <= row.left + 0.5 || tip.top >= row.bottom - 0.5 || tip.bottom <= row.top + 0.5).toBe(true);
     const shortRow = rows.filter({ has: window.locator(".tr-menu-item-label", { hasText: /^Fonts$/ }) });
     await shortRow.scrollIntoViewIfNeeded();
     await shortRow.hover();

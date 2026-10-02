@@ -73,6 +73,19 @@ describe("OverlayBounds", () => {
     expect(inside(low, 200, 300)).toBe(true);
   });
 
+  it("puts a tooltip too wide for either side of its anchor below it, or above it when there is no room below, before overlapping it", () => {
+    const row = anchor(600, 400, 300, 26);
+    const low = anchor(600, 820, 300, 26);
+
+    const below = bounds.place(row, 700, 30, new OverlayAnchoring(OverlaySide.end, OverlayAlignment.Center, 8));
+    const above = bounds.place(low, 700, 30, new OverlayAnchoring(OverlaySide.end, OverlayAlignment.Center, 8));
+    const tall = bounds.place(anchor(700, 400, 30, 26), 30, 600, new OverlayAnchoring(OverlaySide.above, OverlayAlignment.Center, 8));
+
+    expect([below.side, below.left, below.top]).toEqual([OverlaySide.below, 400, 434]);
+    expect([above.side, above.top]).toEqual([OverlaySide.above, 782]);
+    expect([tall.side, tall.left]).toEqual([OverlaySide.end, 738]);
+  });
+
   it("gives a menu taller than the window the side with more room and limits its height to that room", () => {
     const short = new OverlayBounds(43, 1432, 392, 8);
 
@@ -83,7 +96,7 @@ describe("OverlayBounds", () => {
     expect([fromBottom.side, fromBottom.top, fromBottom.maxHeight]).toEqual([OverlaySide.above, 43, 289]);
   });
 
-  it("flips a submenu at the right edge to the menu's other side, aligned with its row, and clamps one wider than both sides", () => {
+  it("flips a submenu at the right edge to the menu's other side, aligned with its row, and drops one wider than both sides below its row", () => {
     const row = anchor(1250, 300, 170, 26);
 
     const flipped = bounds.place(row, 160, 120, new OverlayAnchoring(OverlaySide.end, OverlayAlignment.Start, 0, -5));
@@ -91,7 +104,7 @@ describe("OverlayBounds", () => {
     const tall = bounds.place(row, 160, 1200, new OverlayAnchoring(OverlaySide.end, OverlayAlignment.Start, 0, -5));
 
     expect([flipped.side, flipped.left, flipped.top]).toEqual([OverlaySide.start, 1090, 295]);
-    expect([crowded.side, crowded.left]).toEqual([OverlaySide.start, 8]);
+    expect([crowded.side, crowded.left, crowded.top]).toEqual([OverlaySide.below, 432, 326]);
     expect([tall.top, tall.maxHeight]).toEqual([43, 813]);
   });
 });
