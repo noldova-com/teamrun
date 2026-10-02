@@ -19,6 +19,7 @@ import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
 class PackageBuildTests {
+  private static readonly BUILD_TIMEOUT: number = 60_000;
   private static readonly ALPHA: string = "@noldova/teamrun-foundation-alpha";
   private static readonly BETA: string = "@noldova/teamrun-shell-beta";
   private static readonly GAMMA: string = "@noldova/teamrun-shell-gamma";
@@ -49,7 +50,7 @@ class PackageBuildTests {
       assert.equal(output.text, "");
     });
 
-    test("packages build after their dependencies, otherwise in path order, and then their tests; an unchanged tree reuses everything", async t => {
+    test("packages build after their dependencies, otherwise in path order, and then their tests; an unchanged tree reuses everything", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
       await PackageTreeFixture.writePackageAsync(repository, "shell-gamma", [], false, false);
       const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
@@ -67,7 +68,7 @@ class PackageBuildTests {
       ]);
     });
 
-    test("a changed source rebuilds its package, its dependants and all tests", async t => {
+    test("a changed source rebuilds its package, its dependants and all tests", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
       const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
       const first = await PackageBuildTests.buildAsync(build);
@@ -79,7 +80,7 @@ class PackageBuildTests {
       assert.deepEqual(changed, PackageBuildTests.ALL_BUILT);
     });
 
-    test("a changed test recompiles only that package's tests", async t => {
+    test("a changed test recompiles only that package's tests", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
       const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
       await PackageBuildTests.buildAsync(build);
@@ -95,7 +96,7 @@ class PackageBuildTests {
       ]);
     });
 
-    test("a changed installed package is refused, with everything that depends on it, until the build replaces it", async t => {
+    test("a changed installed package is refused, with everything that depends on it, until the build replaces it", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
       const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
       await PackageBuildTests.buildAsync(build);
@@ -108,7 +109,7 @@ class PackageBuildTests {
       assert.deepEqual(repaired, PackageBuildTests.REINSTALLED);
     });
 
-    test("missing installed packages are refused until the build reinstalls them", async t => {
+    test("missing installed packages are refused until the build reinstalls them", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
       const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
       await PackageBuildTests.buildAsync(build);

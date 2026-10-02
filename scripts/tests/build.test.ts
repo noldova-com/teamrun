@@ -23,6 +23,8 @@ import SourceTreeFixture from "./fixtures/source-tree.fixture.ts";
 import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 
 class BuildTests {
+  private static readonly BUILD_TIMEOUT: number = 60_000;
+
   public static register(): void {
     test("a tree without packages builds nothing and succeeds", async t => {
       const repository = await RepositoryFixture.createAsync();
@@ -34,7 +36,7 @@ class BuildTests {
       assert.equal(output.text, "No packages under src/; there is nothing to build.\nNo Angular project under src/; there is nothing to prepare.\n");
     });
 
-    test("packages are built and installed, and the build says how many", async t => {
+    test("packages are built and installed, and the build says how many", { timeout: BuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await PackageTreeFixture.writeRootAsync(repository);
