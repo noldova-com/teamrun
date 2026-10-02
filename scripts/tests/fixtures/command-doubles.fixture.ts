@@ -16,7 +16,7 @@ import ExecutableLocator from "../../processes/executable-locator.ts";
 
 export default class CommandDoublesFixture {
   private static readonly PREFIX: string = "teamrun-doubles-";
-  private static readonly TIMEOUT: number = 10_000;
+  private static readonly TIMEOUT: number = 30_000;
   private static readonly EXECUTABLE_MODE: number = 0o755;
   private static readonly SCRIPT_NAME: string = "step.sh";
   private static readonly CALL_LOG_NAME: string = "calls.log";

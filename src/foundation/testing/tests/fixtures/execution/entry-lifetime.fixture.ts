@@ -23,6 +23,12 @@ export class EntryLifetimeFixture {
   }
 
   @TestMethod
+  public keepsTheCoverageFolderOutOfItsEnvironment(): void {
+    Assert.isTrue(Object.isUndefined(process.env["NODE_V8_COVERAGE"]));
+    Assert.isFalse(Object.isUndefined(process.env["TEAMRUN_COVERAGE_DIRECTORY"]));
+  }
+
+  @TestMethod
   public usesTheRunsOwnTemporaryFolder(): void {
     Assert.isTrue(basename(tmpdir()).startsWith("teamrun-test-run-"));
     rmSync(mkdtempSync(join(tmpdir(), "entry-removed-")), { recursive: true });

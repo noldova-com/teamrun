@@ -30,29 +30,52 @@ class PackageTestCheckTests {
 
       assert.equal(await check.runAsync(output), true);
       assert.equal(output.text, "No package has tests.\n");
-      assert.equal(check.title, "Package tests");
+      assert.equal(check.title, "Package tests and coverage");
       assert.equal(runner.runs.length, 0);
     });
 
-    test("the test framework runs every tested package's compiled tests with all tests selected", async t => {
+    test("the test framework runs every tested package's tests with coverage, then measures every package's coverage", async t => {
       const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
-      const runner = new ProcessRunnerFixture([0, 1]);
+      const runner = new ProcessRunnerFixture([0, 0]);
       const check = new PackageTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, { KEPT: "yes" });
 
       assert.equal(await check.runAsync(new TextOutputFixture()), true);
-      assert.equal(await check.runAsync(new TextOutputFixture()), false);
-      const entry = path.join(repository.directory, "node_modules", "@noldova", "teamrun-foundation-testing", "services", "execution", "test-run-entry.js");
+      const services = path.join(repository.directory, "node_modules", "@noldova", "teamrun-foundation-testing", "services");
+      const coverage = path.join(repository.directory, "_build", "coverage");
       assert.deepEqual(runner.runs[0], [
         process.execPath,
         repository.directory,
         "--enable-source-maps",
-        entry,
+        path.join(services, "execution", "test-run-entry.js"),
         "@noldova/teamrun-foundation-testing",
         path.join(repository.directory, "_build", "tests", "foundation-testing"),
         "@noldova/teamrun-foundation-alpha",
         path.join(repository.directory, "_build", "tests", "foundation-alpha")
       ]);
-      assert.deepEqual(runner.environments[0], { KEPT: "yes", TEAMRUN_TEST_FILTERS: "[]" });
+      assert.deepEqual(runner.environments[0], { KEPT: "yes", TEAMRUN_TEST_FILTERS: "[]", NODE_V8_COVERAGE: coverage });
+      assert.deepEqual(runner.runs[1], [
+        process.execPath,
+        repository.directory,
+        path.join(services, "coverage", "coverage-run-entry.js"),
+        coverage,
+        "@noldova/teamrun-foundation-testing",
+        path.join(repository.directory, "node_modules", "@noldova", "teamrun-foundation-testing"),
+        path.join(repository.directory, "src", "foundation", "testing", "src"),
+        "@noldova/teamrun-foundation-alpha",
+        path.join(repository.directory, "node_modules", "@noldova", "teamrun-foundation-alpha"),
+        path.join(repository.directory, "src", "foundation", "alpha", "src")
+      ]);
+      assert.deepEqual(runner.environments[1], { KEPT: "yes" });
+    });
+
+    test("failing tests or incomplete coverage fail the check, and both still run", async t => {
+      const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
+      const runner = new ProcessRunnerFixture([1, 0, 0, 1]);
+      const check = new PackageTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, {});
+
+      assert.equal(await check.runAsync(new TextOutputFixture()), false);
+      assert.equal(await check.runAsync(new TextOutputFixture()), false);
+      assert.equal(runner.runs.length, 4);
     });
 
     test("tests without the test framework fail the check", async t => {

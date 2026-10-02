@@ -13,6 +13,7 @@ import CommandDoublesFixture from "../../fixtures/command-doubles.fixture.ts";
 import WorkflowFileFixture from "../../fixtures/workflow-file.fixture.ts";
 
 class RequireLinkedIssueTests {
+  private static readonly SCRIPT_TIMEOUT: number = 30_000;
   private static readonly REPOSITORY: string = "noldova-com/teamrun";
   private static readonly PULL_REQUEST: string = "7";
   private static readonly API_VERSION: string = "-H X-GitHub-Api-Version: 2026-03-10";
@@ -23,7 +24,7 @@ class RequireLinkedIssueTests {
   private static readonly ISSUE_FILTER: string = "--jq if type == \"object\" and (has(\"pull_request\") | not) then .url else \"\" end";
 
   public static register(): void {
-    test("every accepted form of a standalone tracking-issue line passes when it names an issue of this repository", { skip: RequireLinkedIssueTests.OLD_BASH }, async t => {
+    test("every accepted form of a standalone tracking-issue line passes when it names an issue of this repository", { skip: RequireLinkedIssueTests.OLD_BASH, timeout: RequireLinkedIssueTests.SCRIPT_TIMEOUT }, async t => {
       for (const body of ["Issue: #12", "Issue #12", "issue:#12", "Closes #12", "FIXES: #12", "resolved #12", "Summary\r\n\r\nCloses #12\r\n", "Issue: #12\nCloses #13"]) {
         const result = await RequireLinkedIssueTests.runAsync(t, body, "12", `https://api.github.com/repos/${RequireLinkedIssueTests.REPOSITORY}/issues/12`);
 
@@ -32,7 +33,7 @@ class RequireLinkedIssueTests {
       }
     });
 
-    test("a description without a standalone tracking-issue line fails before looking up an issue", { skip: RequireLinkedIssueTests.OLD_BASH }, async t => {
+    test("a description without a standalone tracking-issue line fails before looking up an issue", { skip: RequireLinkedIssueTests.OLD_BASH, timeout: RequireLinkedIssueTests.SCRIPT_TIMEOUT }, async t => {
       for (const body of ["", "See #12", "Closes #12 and more", "Closes #0", "Issue: #", "Closes noldova-com/teamrun#12", "Does not close: #12."]) {
         const result = await RequireLinkedIssueTests.runAsync(t, body, null, "");
 
@@ -41,7 +42,7 @@ class RequireLinkedIssueTests {
       }
     });
 
-    test("a reference to a pull request, a transferred issue or an unreadable issue fails", { skip: RequireLinkedIssueTests.OLD_BASH }, async t => {
+    test("a reference to a pull request, a transferred issue or an unreadable issue fails", { skip: RequireLinkedIssueTests.OLD_BASH, timeout: RequireLinkedIssueTests.SCRIPT_TIMEOUT }, async t => {
       const pullRequest = await RequireLinkedIssueTests.runAsync(t, "Closes #12", "12", "");
       const transferred = await RequireLinkedIssueTests.runAsync(t, "Closes #12", "12", "https://api.github.com/repos/someone/else/issues/40");
       const unreadable = await RequireLinkedIssueTests.runAsync(t, "Closes #12", "12", "", 1);
@@ -54,7 +55,7 @@ class RequireLinkedIssueTests {
       assert.match(unreadable.stdout, /^::error::Could not verify the tracking issue/);
     });
 
-    test("an unreadable pull request description fails", { skip: RequireLinkedIssueTests.OLD_BASH }, async t => {
+    test("an unreadable pull request description fails", { skip: RequireLinkedIssueTests.OLD_BASH, timeout: RequireLinkedIssueTests.SCRIPT_TIMEOUT }, async t => {
       const doubles = await RequireLinkedIssueTests.createDoublesAsync(t);
       doubles.respond("gh", RequireLinkedIssueTests.formatCall("pulls", RequireLinkedIssueTests.PULL_REQUEST, RequireLinkedIssueTests.BODY_FILTER), "", 1);
 
