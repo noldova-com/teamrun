@@ -8,7 +8,6 @@
 
 import { type ChildProcessByStdio, spawn } from "node:child_process";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Readable } from "node:stream";
 
@@ -82,7 +81,7 @@ export default class ApiServer {
     const [executable, ...prefix] = command;
     if (executable === undefined)
       throw new ApiException("The TypeScript API needs a command to start its server.");
-    const pipe = new ApiPipe(process.platform, tmpdir());
+    const pipe = await ApiPipe.createAsync(process.platform);
     const child = spawn(executable, [...prefix, ...ApiServer.SERVER_ARGUMENTS, root, ApiServer.PIPE_OPTION, pipe.name], {
       cwd: root, shell: false, stdio: ["ignore", "ignore", "pipe"], windowsHide: true
     });
