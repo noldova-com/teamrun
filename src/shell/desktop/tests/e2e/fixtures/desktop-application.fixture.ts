@@ -35,6 +35,7 @@ export default class DesktopApplicationFixture {
   private electronApplication: ElectronApplication | null = null;
   private page: Page | null = null;
   private childProcess: ChildProcess | null = null;
+  private readonly pendingCloses: Promise<void>[] = [];
 
   public readonly failures: string[] = [];
   public readonly root: string;
@@ -91,6 +92,11 @@ export default class DesktopApplicationFixture {
     return this.page;
   }
 
+  public async reopenAsync(): Promise<void> {
+    expect(await this.closeAsync(true)).toBe(0);
+    await this.startAsync();
+  }
+
   public async restartAsync(beforeStart?: () => Promise<void>): Promise<void> {
     expect(await this.closeAsync()).toBe(0);
     await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
@@ -127,16 +133,24 @@ export default class DesktopApplicationFixture {
     await writeFile(path.join(this.testInfo.project.outputDir, "..", file), image);
   }
 
-  public async closeAsync(): Promise<number | null> {
+  public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
     const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
     const closing = this.application.close();
     const exitCode = await exited;
-    await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
-    await closing;
     this.electronApplication = null;
     this.page = null;
+    if (keepRuntime)
+      this.pendingCloses.push(closing);
+    else {
+      await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
+      await closing;
+    }
     return exitCode;
+  }
+
+  public async readRuntimeProcessIdAsync(): Promise<number | undefined> {
+    return (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.processId;
   }
 
   public async disposeAsync(): Promise<void> {
@@ -149,6 +163,7 @@ export default class DesktopApplicationFixture {
     if (isRunning)
       await this.closeAsync();
     await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
+    await Promise.all(this.pendingCloses);
     await rm(this.root, { recursive: true, force: true, maxRetries: 10 });
   }
 

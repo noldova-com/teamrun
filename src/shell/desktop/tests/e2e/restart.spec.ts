@@ -21,4 +21,14 @@ test.describe("restarting", () => {
     expect(before[1]).toBe("restart");
     await expect(desktop.window.locator("tr-empty-window")).toHaveText(/TeamRun\s*No modules/);
   });
+
+  test("TeamRun reopened within the runtime's idle grace attaches to the runtime still running", async ({ desktop }) => {
+    const runtime = await desktop.readRuntimeProcessIdAsync();
+
+    await desktop.reopenAsync();
+
+    expect(runtime).toBeDefined();
+    expect(await desktop.readRuntimeProcessIdAsync()).toBe(runtime);
+    await expect(desktop.window.locator("tr-empty-window")).toHaveText(/TeamRun\s*No modules/);
+  });
 });
