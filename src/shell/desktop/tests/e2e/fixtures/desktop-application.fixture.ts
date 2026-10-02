@@ -7,7 +7,8 @@
  */
 
 import { type ChildProcess, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -28,6 +29,8 @@ export default class DesktopApplicationFixture {
   private static readonly DEVICE_FOLDER: string = "device";
   private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
   private static readonly TRACE_FILE: string = "trace.zip";
+  private static readonly WINDOWS_FILE: string = "windows.json";
+  private static readonly DIAGNOSTIC_TIMEOUT: number = 10_000;
   private static readonly MAIN_WINDOW: string = "main-window";
 
   private readonly testInfo: TestInfo;
@@ -64,8 +67,14 @@ export default class DesktopApplicationFixture {
       await mkdir(path.dirname(file), { recursive: true });
       await writeFile(file, text);
     }
-    await fixture.startAsync();
-    await fixture.recordEnvironmentAsync();
+    try {
+      await fixture.startAsync();
+      await fixture.recordEnvironmentAsync();
+    }
+    catch (error) {
+      await fixture.disposeAsync(true);
+      throw error;
+    }
     return fixture;
   }
 
@@ -158,17 +167,59 @@ export default class DesktopApplicationFixture {
     return (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.processId;
   }
 
-  public async disposeAsync(): Promise<void> {
+  public async disposeAsync(hasFailed: boolean = this.testInfo.status !== this.testInfo.expectedStatus): Promise<void> {
     const isRunning = this.electronApplication !== null && Object.is(this.requireProcess().exitCode, null);
-    if (isRunning && this.testInfo.status !== this.testInfo.expectedStatus) {
-      const trace = this.testInfo.outputPath(DesktopApplicationFixture.TRACE_FILE);
-      await this.application.context().tracing.stop({ path: trace });
-      await this.testInfo.attach(DesktopApplicationFixture.TRACE_FILE, { path: trace, contentType: "application/zip" });
-    }
+    if (hasFailed)
+      await this.keepDiagnosticsAsync(isRunning);
     if (isRunning)
       await this.closeAsync();
     await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
     await rm(this.root, { recursive: true, force: true, maxRetries: 10 });
+  }
+
+  private async keepDiagnosticsAsync(isRunning: boolean): Promise<void> {
+    if (isRunning) {
+      await this.keepAsync(DesktopApplicationFixture.TRACE_FILE, "application/zip", async () => {
+        const trace = this.testInfo.outputPath(DesktopApplicationFixture.TRACE_FILE);
+        await this.application.context().tracing.stop({ path: trace });
+        return await readFile(trace);
+      });
+      await this.keepAsync(DesktopApplicationFixture.WINDOWS_FILE, "application/json", async () => JSON.stringify(await this.application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().map(t => ({
+          id: t.id,
+          isVisible: t.isVisible(),
+          isDestroyed: t.isDestroyed(),
+          url: t.webContents.getURL(),
+          isLoading: t.webContents.isLoading(),
+          isCrashed: t.webContents.isCrashed()
+        }))), null, 2));
+      for (const [index, page] of this.application.windows().entries()) {
+        await this.keepAsync(`page-${index}.png`, "image/png", () => page.screenshot());
+        await this.keepAsync(`page-${index}.html`, "text/html", () => page.content());
+      }
+    }
+    const logs = new DataDirectory(this.dataDirectory).logsFolder;
+    const files = existsSync(logs) ? (await readdir(logs)).sort() : [];
+    for (const file of files)
+      await this.keepAsync(file, "text/plain", () => readFile(path.join(logs, file)));
+  }
+
+  private async keepAsync(name: string, contentType: string, capture: () => Promise<Buffer | string>): Promise<void> {
+    let timer: NodeJS.Timeout | undefined;
+    const captured = capture();
+    captured.catch(() => undefined);
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error(`No answer within ${DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT} ms.`)), DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT);
+    });
+    try {
+      await this.testInfo.attach(name, { body: await Promise.race([captured, deadline]), contentType });
+    }
+    catch (error) {
+      await this.testInfo.attach(`${name}.unavailable.txt`, { body: String(error), contentType: "text/plain" });
+    }
+    finally {
+      clearTimeout(timer);
+    }
   }
 
   private async startAsync(): Promise<void> {
@@ -183,6 +234,8 @@ export default class DesktopApplicationFixture {
       cwd: this.root,
       env: Object.fromEntries(Object.entries({ ...process.env, ...this.environment }).filter((t): t is [string, string] => t[1] !== undefined))
     });
+    this.electronApplication = application;
+    this.childProcess = application.process();
     application.process().stderr?.on("data", (data: Buffer) => this.readOutput(data.toString()));
     application.on("console", t => {
       if (t.type() === "error")
@@ -195,9 +248,7 @@ export default class DesktopApplicationFixture {
         this.failures.push(`renderer: ${t.text()}`);
     });
     window.on("pageerror", t => this.failures.push(`renderer: ${t.message}`));
-    this.electronApplication = application;
     this.page = window;
-    this.childProcess = application.process();
     await expect.poll(() => this.isVisibleAsync()).toBe(true);
     await expect.poll(async () => (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.productVersion)
       .toBe(RuntimeBuild.identity.productVersion);
