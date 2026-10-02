@@ -772,6 +772,32 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async quitsOrOpensTheLogFolderAsThePersonChoosesForAWindowWhosePageStops(): Promise<void> {
+    const data = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const quitting = new FakeElectron();
+      quitting.dialog.answers.push(1);
+      const looping = new FakeElectron();
+      looping.dialog.answers.push(0, 0);
+      await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), quitting);
+      await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), looping, new FakeDeviceIdentity(), new FakeDesktopProcess("linux", [`--data-dir=${data}`]));
+
+      DesktopApplicationTests.firstWindow(quitting).webContents.goAway("crashed", 5);
+      DesktopApplicationTests.firstWindow(looping).webContents.goAway("crashed", 5);
+      await DesktopApplicationTests.waitAsync(() => DesktopApplicationTests.firstWindow(looping).webContents.calls.includes("reload"));
+      DesktopApplicationTests.firstWindow(looping).webContents.goAway("crashed", 5);
+      await DesktopApplicationTests.waitAsync(() => looping.shell.opened.length === 1);
+
+      Assert.areEqual(1, quitting.app.calls.filter(t => t === "quit").length);
+      Assert.areEqual(JSON.stringify([join(data, "logs")]), JSON.stringify(looping.shell.opened));
+      Assert.areEqual(0, looping.app.calls.filter(t => t === "quit").length);
+    }
+    finally {
+      await rm(data, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
   public async reportsALogFolderItCannotCreateOrOpen(): Promise<void> {
     const data = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
     try {
