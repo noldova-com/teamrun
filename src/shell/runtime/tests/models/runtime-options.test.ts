@@ -11,7 +11,7 @@ import path from "node:path";
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { DataDirectory, RuntimeOptions, ServerSettings } from "@noldova/teamrun-shell-runtime";
+import { DataDirectory, RuntimeEntry, RuntimeOptions, ServerSettings } from "@noldova/teamrun-shell-runtime";
 
 @TestClass
 export class RuntimeOptionsTests {
@@ -24,6 +24,18 @@ export class RuntimeOptionsTests {
     Assert.areEqual(RuntimeOptionsTests.ROOT, options.dataDirectory.root);
     Assert.areEqual(250, options.idleGraceMilliseconds);
     Assert.areEqual(600_000, options.serverSettings.defaultRequestTimeout);
+  }
+
+  @TestMethod
+  public findsTheBuildsDeclarationsBesideTheInstalledRuntimeUnlessGiven(): void {
+    const installed = path.resolve(path.dirname(RuntimeEntry.entryPath), "..", "..", "..", "..");
+    const given = path.resolve("declarations.json");
+
+    const options = RuntimeOptions.parse(["--data-dir", RuntimeOptionsTests.ROOT]);
+    const explicit = new RuntimeOptions(new DataDirectory(RuntimeOptionsTests.ROOT), 5, new ServerSettings(), given);
+
+    Assert.areEqual(path.join(installed, "_build", "modules", "declarations.json"), options.declarationsFile);
+    Assert.areEqual(given, explicit.declarationsFile);
   }
 
   @TestMethod

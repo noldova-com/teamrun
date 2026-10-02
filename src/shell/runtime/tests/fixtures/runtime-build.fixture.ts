@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { cp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { BuildIdentity } from "@noldova/teamrun-shell-protocol";
@@ -35,6 +35,8 @@ export class RuntimeBuildFixture implements AsyncDisposable {
       .replace(`productVersion = "${RuntimeBuild.identity.productVersion}"`, `productVersion = "${identity.productVersion}"`)
       .replace(`build = "${RuntimeBuild.identity.fingerprint}"`, `build = "${identity.fingerprint}"`);
     await writeFile(resources, text);
+    await mkdir(path.join(folder, "_build", "modules"), { recursive: true });
+    await writeFile(path.join(folder, "_build", "modules", "declarations.json"), "{\"formatVersion\":1,\"modules\":[]}\n");
     return new RuntimeBuildFixture(folder, identity, path.join(copy, "services", "runtime-entry.js"));
   }
 

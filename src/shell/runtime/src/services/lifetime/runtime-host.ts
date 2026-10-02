@@ -8,6 +8,7 @@
 
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import type { Writable } from "node:stream";
 
 import "@noldova/teamrun-foundation-core";
 import { type BuildIdentity, Failure, FailureCode, PreShellData, RuntimeHandover, ShellMethods } from "@noldova/teamrun-shell-protocol";
@@ -16,6 +17,7 @@ import { DataDirectoryState } from "../../enums/data-directory-state.js";
 import type { IIdleParticipant } from "../../interfaces/idle-participant.js";
 import { CapabilityToken } from "../../models/capability-token.js";
 import type { Endpoint } from "../../models/endpoint.js";
+import type { ModuleDeclaration } from "../../models/module-declaration.js";
 import { Refusal } from "../../models/refusal.js";
 import { RuntimeBuild } from "../../models/runtime-build.js";
 import { RuntimeDiscovery } from "../../models/runtime-discovery.js";
@@ -27,6 +29,10 @@ import { ShellDatabase } from "../database/shell-database.js";
 import { DiscoveryPublisher } from "../discovery/discovery-publisher.js";
 import { FolderProtectorFactory } from "../discovery/folder-protector-factory.js";
 import { RuntimeServer } from "../endpoint/runtime-server.js";
+import { ModuleDeclarationReader } from "../modules/module-declaration.reader.js";
+import { ModuleHost } from "../modules/module-host.js";
+import { ModulesMethod } from "../modules/modules-method.js";
+import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
 import { EventRegistry } from "../registry/event-registry.js";
 import { MethodRegistry } from "../registry/method-registry.js";
@@ -51,8 +57,16 @@ export class RuntimeHost implements IIdleParticipant {
   public readonly work: WorkTracker;
   public readonly methods: MethodRegistry = new MethodRegistry();
   public readonly events: EventRegistry;
+  public readonly modules: ModuleHost;
 
-  private constructor(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv, lock: OwnershipLock, database: ShellDatabase | null) {
+  private constructor(
+    options: RuntimeOptions,
+    platform: string,
+    environment: NodeJS.ProcessEnv,
+    lock: OwnershipLock,
+    database: ShellDatabase | null,
+    declarations: readonly ModuleDeclaration[],
+    diagnostics: Writable) {
     this.lock = lock;
     this.database = database;
     this.identity = RuntimeBuild.identity;
@@ -67,7 +81,9 @@ export class RuntimeHost implements IIdleParticipant {
     this.events = new EventRegistry(this.server);
     this.publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(platform, new SystemCommand(), environment));
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
+    this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, new PackageRuntimePartLoader(), diagnostics);
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
+    this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
     if (Object.isNull(database)) {
       this.server.refuse(new Refusal(
         new Failure(FailureCode.PreShellData, Resources.preShellData, new PreShellData(lock.dataDirectory.root).toJson()),
@@ -80,7 +96,8 @@ export class RuntimeHost implements IIdleParticipant {
     return this.server.sessionCount === 0 && this.work.isEmpty;
   }
 
-  public static async startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv): Promise<RuntimeHost> {
+  public static async startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv, diagnostics: Writable): Promise<RuntimeHost> {
+    const declarations = await ModuleDeclarationReader.readAsync(options.declarationsFile);
     const lock = OwnershipLock.acquire(options.dataDirectory);
     let database: ShellDatabase | null = null;
     try {
@@ -93,7 +110,7 @@ export class RuntimeHost implements IIdleParticipant {
       throw error;
     }
 
-    const host = new RuntimeHost(options, platform, environment, lock, database);
+    const host = new RuntimeHost(options, platform, environment, lock, database, declarations, diagnostics);
     try {
       await host.openAsync(platform);
     }
@@ -118,6 +135,8 @@ export class RuntimeHost implements IIdleParticipant {
   }
 
   private async openAsync(platform: string): Promise<void> {
+    if (!Object.isNull(this.database))
+      await this.modules.activateAsync();
     const endpoint = await this.listenAsync(platform);
     const discovery = new RuntimeDiscovery(
       endpoint.toString(),
@@ -140,6 +159,7 @@ export class RuntimeHost implements IIdleParticipant {
   private async performMoveAsideAsync(): Promise<void> {
     await DataDirectoryInspector.moveAsideAsync(this.lock);
     this.database = await ShellDatabase.openAsync(this.lock, []);
+    await this.modules.activateAsync();
     setImmediate(() => this.server.admit());
   }
 
@@ -158,8 +178,13 @@ export class RuntimeHost implements IIdleParticipant {
     this.work.cancelAll();
     try {
       await this.server.closeAsync();
-      if (!Object.isNull(this.discovery))
-        await this.publisher.withdrawAsync(this.discovery);
+      try {
+        await this.modules.deactivateAsync();
+      }
+      finally {
+        if (!Object.isNull(this.discovery))
+          await this.publisher.withdrawAsync(this.discovery);
+      }
     }
     finally {
       this.database?.close();

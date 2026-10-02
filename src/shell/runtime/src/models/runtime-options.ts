@@ -6,6 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 
@@ -17,11 +20,17 @@ export class RuntimeOptions {
   public readonly dataDirectory: DataDirectory;
   public readonly idleGraceMilliseconds: number;
   public readonly serverSettings: ServerSettings;
+  public readonly declarationsFile: string;
 
-  public constructor(dataDirectory: DataDirectory, idleGraceMilliseconds: number = Resources.idleGrace, serverSettings: ServerSettings = new ServerSettings()) {
+  public constructor(
+    dataDirectory: DataDirectory,
+    idleGraceMilliseconds: number = Resources.idleGrace,
+    serverSettings: ServerSettings = new ServerSettings(),
+    declarationsFile: string = RuntimeOptions.locateDeclarations()) {
     this.dataDirectory = dataDirectory;
     this.idleGraceMilliseconds = idleGraceMilliseconds;
     this.serverSettings = serverSettings;
+    this.declarationsFile = declarationsFile;
   }
 
   public static parse(entryArguments: readonly string[]): RuntimeOptions {
@@ -42,5 +51,9 @@ export class RuntimeOptions {
     if (Object.isUndefined(dataDirectory))
       throw new ArgumentException(Resources.dataDirectoryRequired, Resources.argumentsParameterName);
     return new RuntimeOptions(new DataDirectory(dataDirectory), idleGrace);
+  }
+
+  private static locateDeclarations(): string {
+    return path.join(path.dirname(fileURLToPath(import.meta.url)), ...Resources.installRootSegments, ...Resources.declarationsFileSegments);
   }
 }

@@ -37,8 +37,12 @@ export class Resources {
   public static readonly policyField: string = "policy";
   public static readonly descriptionsField: string = "descriptions";
   public static readonly locationField: string = "location";
+  public static readonly stateField: string = "state";
+  public static readonly causeField: string = "cause";
+  public static readonly modulesField: string = "modules";
   public static readonly stopMember: string = "stop";
   public static readonly moveAsideMember: string = "moveAside";
+  public static readonly modulesMember: string = "modules";
   public static readonly textParameterName: string = "text";
   public static readonly maximumFrameLengthParameterName: string = "maximumFrameLength";
 
@@ -48,6 +52,7 @@ export class Resources {
   public static readonly timeoutInvalid: string = "The time limit must be a positive integer of milliseconds.";
   public static readonly maximumFrameLengthInvalid: string = "The maximum frame length must be a positive integer.";
   public static readonly responseOutcomeMissing: string = "A response must carry a payload or a failure.";
+  public static readonly moduleCauseInvalid: string = "An active module has no cause, and a failed or blocked module has one that is not blank.";
   public static readonly responseOutcomeAmbiguous: string = "A response cannot carry both a payload and a failure.";
   public static readonly unknownField: string = "The field is not part of this message, which accepts no unknown fields.";
 

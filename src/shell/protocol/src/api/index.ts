@@ -7,6 +7,7 @@
  */
 
 export { FailureCode } from "../enums/failure-code.js";
+export { ModuleState } from "../enums/module-state.js";
 export { StopPolicy } from "../enums/stop-policy.js";
 export { WireMessageKind } from "../enums/wire-message-kind.js";
 export { ProtocolException } from "../exceptions/protocol.exception.js";
@@ -15,6 +16,8 @@ export { Cancel } from "../models/cancel.js";
 export { Event } from "../models/event.js";
 export { Failure } from "../models/failure.js";
 export { Handshake } from "../models/handshake.js";
+export { ModuleStatus } from "../models/module-status.js";
+export { ModuleStatusList } from "../models/module-status-list.js";
 export { PreShellData } from "../models/pre-shell-data.js";
 export { QualifiedName } from "../models/qualified-name.js";
 export { Request } from "../models/request.js";

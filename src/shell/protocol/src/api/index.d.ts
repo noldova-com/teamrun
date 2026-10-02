@@ -122,6 +122,26 @@ export declare enum FailureCode {
 }
 
 /**
+ * Where a module stands in the runtime, as `shell.modules` reports it.
+ */
+export declare enum ModuleState {
+  /**
+   * The module's runtime part, if any, and all its dependencies activated.
+   */
+  Active = "Active",
+
+  /**
+   * The module's runtime part could not be loaded or failed to activate.
+   */
+  Failed = "Failed",
+
+  /**
+   * A module the module depends on is not active, so it was not activated.
+   */
+  Blocked = "Blocked"
+}
+
+/**
  * How a runtime asked to stop by `shell.stop` treats work in progress.
  */
 export declare enum StopPolicy {
@@ -650,6 +670,139 @@ export declare class RunningWork {
 }
 
 /**
+ * Where one module stands in the runtime: an active module has no cause; a
+ * failed or blocked one has a cause that is safe to show, without a stack or
+ * a path outside the data directory.
+ */
+export declare class ModuleStatus {
+  /**
+   * The module's id.
+   */
+  public readonly id: string;
+
+  /**
+   * Where the module stands.
+   */
+  public readonly state: ModuleState;
+
+  /**
+   * Why the module is not active; `null` for an active module.
+   */
+  public readonly cause: string | null;
+
+  /**
+   * Creates the status.
+   *
+   * @param id The module's id; not whitespace only.
+   * @param state Where the module stands.
+   * @param cause `null` for an active module; otherwise text that is not
+   * whitespace only.
+   * @throws ArgumentException synchronously when the id is blank, an active
+   * module has a cause, or a failed or blocked module has none or a blank one.
+   *
+   * @example
+   * ```ts
+   * import { ModuleState, ModuleStatus } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const status: ModuleStatus = new ModuleStatus("notes", ModuleState.Blocked, "It depends on tasks, which is not active.");
+   * ```
+   */
+  public constructor(id: string, state: ModuleState, cause: string | null);
+
+  /**
+   * Reads the status from its wire form. Unknown fields are ignored.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The status.
+   * @throws JsonException synchronously when `id` or `state` is missing or
+   * invalid, or `cause` is not a string or does not match the state; its path
+   * names the field.
+   *
+   * @example
+   * ```ts
+   * import { ModuleStatus } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const status: ModuleStatus = ModuleStatus.fromJson({ id: "notes", state: "Active" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): ModuleStatus;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `id` and `state` fields, and `cause` when there is one.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { ModuleState, ModuleStatus } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new ModuleStatus("notes", ModuleState.Active, null).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The answer to `shell.modules`: every module of the build in activation
+ * order, with where it stands.
+ */
+export declare class ModuleStatusList {
+  /**
+   * The modules' statuses, in activation order.
+   */
+  public readonly modules: readonly ModuleStatus[];
+
+  /**
+   * Creates the list.
+   *
+   * @param modules The modules' statuses.
+   *
+   * @example
+   * ```ts
+   * import { ModuleState, ModuleStatus, ModuleStatusList } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const list: ModuleStatusList = new ModuleStatusList([new ModuleStatus("notes", ModuleState.Active, null)]);
+   * ```
+   */
+  public constructor(modules: readonly ModuleStatus[]);
+
+  /**
+   * Reads the list from its wire form. Unknown fields are ignored.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The list.
+   * @throws JsonException synchronously when `modules` is missing or not a
+   * list of objects, or a status in it is invalid; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { ModuleStatusList } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const list: ModuleStatusList = ModuleStatusList.fromJson({ modules: [{ id: "notes", state: "Active" }] });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): ModuleStatusList;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `modules` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { ModuleStatusList } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new ModuleStatusList([]).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
  * Where data written by a release that predates the shell was found, as a
  * `PreShellData` failure carries it in its details. Its wire form never
  * changes after protocol version 1.
@@ -724,6 +877,13 @@ export declare class ShellMethods {
    * shell aside, after a `PreShellData` failure.
    */
   public static readonly moveAside: QualifiedName;
+
+  /**
+   * `shell.modules`: asks the runtime where every module of its build
+   * stands; it answers with a `ModuleStatusList`. A client that never asks
+   * is unaffected.
+   */
+  public static readonly modules: QualifiedName;
 }
 
 /**

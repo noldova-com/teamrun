@@ -19,6 +19,10 @@ export class Resources {
   public static readonly productVersionParameterName: string = "productVersion";
   public static readonly protocolVersionParameterName: string = "protocolVersion";
   public static readonly buildParameterName: string = "build";
+  public static readonly displayNameParameterName: string = "displayName";
+  public static readonly dependenciesParameterName: string = "dependencies";
+  public static readonly runtimePackageParameterName: string = "runtimePackage";
+  public static readonly contributesParameterName: string = "contributes";
   public static readonly rootNotAbsolute: string = "The data directory must be an absolute path.";
   public static readonly migrationIdInvalid: string = "A migration id is lowercase letters and digits separated by single hyphens.";
   public static readonly moduleIdInvalid: string = "A module id is lowercase kebab-case and is not \"shell\".";
@@ -67,6 +71,9 @@ export class Resources {
   public static readonly backupPrefix: string = "shell-before-migration-";
   public static readonly backupExtension: string = ".sqlite";
   public static readonly discoveryFormatVersion: number = 1;
+  public static readonly declarationsFormatVersion: number = 1;
+  public static readonly declarationsFileSegments: readonly string[] = ["_build", "modules", "declarations.json"];
+  public static readonly installRootSegments: readonly string[] = ["..", "..", "..", ".."];
   public static readonly utf8Encoding: BufferEncoding = "utf8";
   public static readonly lineSeparator: string = "\n";
   public static readonly windowsPlatform: string = "win32";
@@ -95,6 +102,18 @@ export class Resources {
   public static readonly historyNewer: string = "The shell database was written by a newer build.";
   public static readonly tablesWithoutHistory: string = "The shell database has tables but no migration history.";
   public static readonly discoveryNotObject: string = "The discovery metadata is not a JSON object.";
+  public static readonly declarationsNotObject: string = "The module declarations are not a JSON object with a list of modules.";
+  public static readonly declarationNotObject: string = "A module declaration is not a JSON object.";
+  public static readonly moduleLoadFailed: string = "Its runtime part could not be loaded.";
+  public static readonly moduleActivationFailed: string = "Its runtime part failed to activate.";
+  public static readonly moduleDeactivationFailed: string = "One or more runtime parts failed to deactivate.";
+  public static readonly moduleDeactivationPartFailed: string = "Its runtime part failed to deactivate.";
+  public static readonly runtimePartMissing: string = "The package does not export a RuntimePart class whose instances can activate and deactivate.";
+  public static readonly runtimePartExport: "RuntimePart" = "RuntimePart";
+  public static readonly activateMember: "activateAsync" = "activateAsync";
+  public static readonly deactivateMember: "deactivateAsync" = "deactivateAsync";
+  public static readonly methodsKind: string = "methods";
+  public static readonly eventsKind: string = "events";
   public static readonly dataDirectoryVariable: string = "TEAMRUN_DATA_DIR";
   public static readonly defaultDataFolder: readonly string[] = [".noldova", "teamrun"];
   public static readonly developmentDataFolder: readonly string[] = ["_build", "data"];
@@ -203,6 +222,18 @@ export class Resources {
     return `The discovery metadata's ${name} is missing or invalid.`;
   }
 
+  public static formatDeclarationsVersion(version: unknown): string {
+    return `The module declarations have the unsupported format version ${String(version)}.`;
+  }
+
+  public static formatDeclarationField(name: string): string {
+    return `A module declaration's ${name} is missing or invalid.`;
+  }
+
+  public static formatDeclarationsUnreadable(file: string, reason: string): string {
+    return `The module declarations ${file} are not valid: ${reason}`;
+  }
+
   public static formatDiscoveryUnreadable(file: string, reason: string): string {
     return `The discovery file ${file} is not valid: ${reason}`;
   }
@@ -265,6 +296,38 @@ export class Resources {
 
   public static formatEventDeclared(name: string): string {
     return `The event ${name} is already declared.`;
+  }
+
+  public static formatServicePublished(name: string): string {
+    return `The service ${name} is already published.`;
+  }
+
+  public static formatNotContributed(moduleId: string, kind: string, name: string): string {
+    return `The module ${moduleId} does not declare ${name} among its ${kind}.`;
+  }
+
+  public static formatServiceNotOwned(moduleId: string, name: string): string {
+    return `The module ${moduleId} may publish services only under its own id, not ${name}.`;
+  }
+
+  public static formatServiceNotAllowed(moduleId: string, name: string): string {
+    return `The module ${moduleId} may use only the shell's services and those of the modules it depends on, not ${name}.`;
+  }
+
+  public static formatServiceMissing(name: string): string {
+    return `No service ${name} is published.`;
+  }
+
+  public static formatServiceType(name: string, type: string): string {
+    return `The service ${name} is not a ${type}.`;
+  }
+
+  public static formatModuleDiagnostic(moduleId: string, cause: string, detail: string): string {
+    return `The module ${moduleId}: ${cause}\n${detail}\n`;
+  }
+
+  public static formatModuleBlocked(dependency: string): string {
+    return `It depends on ${dependency}, which is not active.`;
   }
 
   public static formatEventWithdrawn(name: string): string {

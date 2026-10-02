@@ -1,0 +1,23 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import type { EventChannel } from "../models/event-channel.js";
+import type { IMethodHandler } from "./method-handler.js";
+
+export interface IRuntimePartContext {
+  readonly moduleId: string;
+  readonly moduleFolder: string;
+
+  registerMethod(name: string, handler: IMethodHandler): void;
+
+  declareEvent(name: string): EventChannel;
+
+  publishService(name: string, service: object): void;
+
+  getService<T extends object>(name: string, type: abstract new (...args: never[]) => T): T;
+}

@@ -15,6 +15,7 @@ export class ShellMethodsTests {
   public pinsTheCrossBuildMethodNames(): void {
     Assert.areEqual("shell.stop", ShellMethods.stop.text);
     Assert.areEqual("shell.moveAside", ShellMethods.moveAside.text);
-    Assert.isTrue(ShellMethods.stop.isShell && ShellMethods.moveAside.isShell);
+    Assert.areEqual("shell.modules", ShellMethods.modules.text);
+    Assert.isTrue(ShellMethods.stop.isShell && ShellMethods.moveAside.isShell && ShellMethods.modules.isShell);
   }
 }

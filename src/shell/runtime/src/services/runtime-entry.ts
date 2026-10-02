@@ -32,7 +32,7 @@ export class RuntimeEntry {
 
     let host: RuntimeHost;
     try {
-      host = await RuntimeHost.startAsync(options, platform, environment);
+      host = await RuntimeHost.startAsync(options, platform, environment, error);
     }
     catch (failure) {
       if (failure instanceof DataDirectoryOwnedException)
