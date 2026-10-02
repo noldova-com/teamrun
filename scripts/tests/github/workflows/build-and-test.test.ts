@@ -175,8 +175,13 @@ class BuildAndTestTests {
       assert.deepEqual([linux.status, windows.status, macos.status], [0, 0, 0], linux.stderr + windows.stderr + macos.stderr);
       assert.deepEqual(await doubles.readCallsAsync(), ["xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui", "npm run test:ui", "npm run test:ui"]);
       assert.ok(text.indexOf("      - name: Test\n") < text.indexOf("      - name: Test the UI workflows\n"));
-      assert.ok(text.includes("      - name: Keep the UI workflow results\n        if: always()\n"));
+      for (const [step, id] of [["Keep the UI workflow results", ""], ["Keep the main window screenshot", "        id: screenshot\n"], ["Summarize the UI workflows", ""]] as const)
+        assert.ok(text.includes(`      - name: ${step}\n${id}        if: always() && steps.ui.outcome != 'skipped'\n`), step);
+      assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n"));
       assert.ok(text.includes("          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}\n          path: _build/ui\n          retention-days: 14\n"));
+      assert.ok(text.includes("          path: _build/ui/main-window-*.png\n          archive: false\n          retention-days: 14\n"));
+      assert.equal(workflow.readStepScript("Summarize the UI workflows"), "node scripts/ui-summary.ts\n");
+      assert.ok(text.includes("          UI_TARGET: ${{ matrix.target }}\n          SCREENSHOT_URL: ${{ steps.screenshot.outputs.artifact-url }}\n"));
     });
 
     test("a failed UI workflow run fails its step", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {

@@ -19,6 +19,7 @@ export default defineConfig({
   forbidOnly: true,
   reporter: [
     ["list"],
-    ["html", { outputFolder: "../../../../../_build/ui/report", open: "never" }]
+    ["html", { outputFolder: "../../../../../_build/ui/report", open: "never" }],
+    ["json", { outputFile: "../../../../../_build/ui/report.json" }]
   ]
 });

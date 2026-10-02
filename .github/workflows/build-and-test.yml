@@ -165,6 +165,7 @@ jobs:
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Test the UI workflows
+        id: ui
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
             xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui
@@ -173,13 +174,30 @@ jobs:
           fi
 
       - name: Keep the UI workflow results
-        if: always()
+        if: always() && steps.ui.outcome != 'skipped'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ui-${{ matrix.runner }}-${{ matrix.architecture }}
           path: _build/ui
           retention-days: 14
           if-no-files-found: ignore
+
+      - name: Keep the main window screenshot
+        id: screenshot
+        if: always() && steps.ui.outcome != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: _build/ui/main-window-*.png
+          archive: false
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Summarize the UI workflows
+        if: always() && steps.ui.outcome != 'skipped'
+        env:
+          UI_TARGET: ${{ matrix.target }}
+          SCREENSHOT_URL: ${{ steps.screenshot.outputs.artifact-url }}
+        run: node scripts/ui-summary.ts
 
   caches:
     name: Remove outdated dependency caches

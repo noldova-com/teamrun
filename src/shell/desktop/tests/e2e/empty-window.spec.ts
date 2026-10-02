@@ -22,7 +22,7 @@ test.describe("the empty window", () => {
     await expect(window.locator("tr-panel-card")).toHaveCount(1);
     await expect(window.locator("tr-empty-window")).toHaveText(/TeamRun\s*No modules/);
     expect(await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
-    await desktop.checkpointAsync("empty-window");
+    await desktop.captureMainWindowAsync();
   });
 
   test("the window has no Node access and only the narrow bridge", async ({ desktop }) => {

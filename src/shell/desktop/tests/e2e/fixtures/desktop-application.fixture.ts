@@ -7,7 +7,7 @@
  */
 
 import { type ChildProcess, spawnSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -21,6 +21,7 @@ export default class DesktopApplicationFixture {
   private static readonly EXPECTED_OUTPUT: readonly RegExp[] = [/^\[\d+:\d+(?:\/\d+)?\.\d+:\w+:/, /^Debugger (?:listening|attached|ending)/, /^For help, see/];
   private static readonly PROFILE_PREFIX: string = "teamrun-ui-";
   private static readonly TRACE_FILE: string = "trace.zip";
+  private static readonly MAIN_WINDOW: string = "main-window";
 
   private readonly testInfo: TestInfo;
   private readonly profile: string;
@@ -79,10 +80,17 @@ export default class DesktopApplicationFixture {
       .toEqual([DesktopApplicationFixture.VIEWPORT_WIDTH, DesktopApplicationFixture.VIEWPORT_HEIGHT, 1]);
   }
 
-  public async checkpointAsync(name: string): Promise<void> {
+  public async checkpointAsync(name: string): Promise<Buffer> {
     const image = await this.window.screenshot({ scale: "css" });
     expect([image.readUInt32BE(16), image.readUInt32BE(20)]).toEqual([DesktopApplicationFixture.VIEWPORT_WIDTH, DesktopApplicationFixture.VIEWPORT_HEIGHT]);
     await this.testInfo.attach(name, { body: image, contentType: "image/png" });
+    return image;
+  }
+
+  public async captureMainWindowAsync(): Promise<void> {
+    const image = await this.checkpointAsync(DesktopApplicationFixture.MAIN_WINDOW);
+    const file = `${DesktopApplicationFixture.MAIN_WINDOW}-${process.platform}-${process.arch}.png`;
+    await writeFile(path.join(this.testInfo.project.outputDir, "..", file), image);
   }
 
   public async closeAsync(): Promise<number | null> {
