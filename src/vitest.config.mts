@@ -1,12 +1,12 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
+const compilerOptions: { paths: Record<string, string[]> } = JSON.parse(readFileSync(new URL("./tsconfig.json", import.meta.url), "utf8")).compilerOptions;
+
 export default defineConfig({
   resolve: {
-    alias: {
-      "@noldova/teamrun-shell-ui": fileURLToPath(new URL("./shell/ui/src/api/index.ts", import.meta.url)),
-      "@noldova/teamrun-shell-window": fileURLToPath(new URL("./shell/window/src/api/index.ts", import.meta.url))
-    }
+    alias: Object.fromEntries(Object.entries(compilerOptions.paths).map(([name, targets]) => [name, fileURLToPath(new URL(String(targets[0]), import.meta.url))]))
   }
 });
