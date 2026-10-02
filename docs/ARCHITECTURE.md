@@ -312,7 +312,7 @@ Preserve application identity, the existing install location and scope, and data
 
 TeamRun does not implement the following capabilities:
 
-- **Installing, removing and disabling modules:** the person choosing which modules run requires rules for dependent modules, saved layouts and kept data. Until then the build's list decides.
+- **Installing, removing and disabling modules:** the person choosing which modules run requires rules for dependent modules, saved layouts and kept data. Until then the build's list decides. A module directory, when added, delivers module packages with their own versions and declared compatibility through the application's one updater, not a separate update system.
 - **Modules by other authors:** code that Noldova did not write requires a trust model, isolation and a compatibility promise for the shell's published APIs. Until then those APIs may change with any release, because every module is rebuilt with it.
 - **A menu bar on Windows and Linux:** modules contribute to the main menu now, macOS shows it in its menu bar, and its items are reachable through command search; showing the menus inside the window needs a layout decision for the top row.
 - **Remote runtimes and synchronization:** remote execution must identify where the work and the files live and define authenticated transport. Synchronization needs portable identity, account mapping and conflict rules. Credentials and an external tool's session files are not replicated; reconnecting remotely and replicating state are different operations.
