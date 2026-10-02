@@ -7,11 +7,13 @@
  */
 
 import { type ChildProcess, spawnSync } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { type ElectronApplication, type Page, type TestInfo, _electron, expect } from "@playwright/test";
+
+import { DataDirectory, DiscoveryReader, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
 export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
@@ -21,31 +23,61 @@ export default class DesktopApplicationFixture {
   private static readonly EXPECTED_OUTPUT: readonly RegExp[] = [/^\[\d+:\d+(?:\/\d+)?\.\d+:\w+:/, /^Debugger (?:listening|attached|ending)/, /^For help, see/];
   private static readonly PLATFORM_LOG: RegExp = /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ Electron(?: Helper(?: \([A-Za-z]+\))?)?\[\d+:\d+\] /;
   private static readonly PLATFORM_LOG_ANNOTATION: string = "platform-log";
-  private static readonly PROFILE_PREFIX: string = "teamrun-ui-";
+  private static readonly ROOT_PREFIX: string = "teamrun-ui-";
+  private static readonly DATA_FOLDER: string = "data";
+  private static readonly DEVICE_FOLDER: string = "device";
+  private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
   private static readonly TRACE_FILE: string = "trace.zip";
   private static readonly MAIN_WINDOW: string = "main-window";
 
   private readonly testInfo: TestInfo;
-  private readonly profile: string;
   private readonly environment: Readonly<Record<string, string>>;
   private electronApplication: ElectronApplication | null = null;
   private page: Page | null = null;
   private childProcess: ChildProcess | null = null;
+  private readonly pendingCloses: Promise<void>[] = [];
 
   public readonly failures: string[] = [];
+  public readonly root: string;
+  public readonly dataDirectory: string;
 
-  private constructor(testInfo: TestInfo, profile: string, environment: Readonly<Record<string, string>>) {
+  private constructor(testInfo: TestInfo, root: string, environment: Readonly<Record<string, string>>) {
     this.testInfo = testInfo;
-    this.profile = profile;
+    this.root = root;
+    this.dataDirectory = path.join(root, DesktopApplicationFixture.DATA_FOLDER);
     this.environment = environment;
   }
 
-  public static async launchAsync(testInfo: TestInfo, environment: Readonly<Record<string, string>> = {}): Promise<DesktopApplicationFixture> {
-    const profile = await mkdtemp(path.join(os.tmpdir(), DesktopApplicationFixture.PROFILE_PREFIX));
-    const fixture = new DesktopApplicationFixture(testInfo, profile, environment);
+  public static async launchAsync(
+    testInfo: TestInfo,
+    environment: Readonly<Record<string, string>> = {},
+    dataFiles: Readonly<Record<string, string>> = {}): Promise<DesktopApplicationFixture> {
+    const root = await mkdtemp(path.join(os.tmpdir(), DesktopApplicationFixture.ROOT_PREFIX));
+    const fixture = new DesktopApplicationFixture(testInfo, root, environment);
+    await mkdir(fixture.dataDirectory);
+    for (const [name, text] of Object.entries(dataFiles))
+      await writeFile(path.join(fixture.dataDirectory, name), text);
     await fixture.startAsync();
     await fixture.recordEnvironmentAsync();
     return fixture;
+  }
+
+  public static async stopRuntimeAsync(dataDirectory: string): Promise<void> {
+    const discovery = await DiscoveryReader.readAsync(new DataDirectory(dataDirectory));
+    if (discovery === null || !DesktopApplicationFixture.isAlive(discovery.processId))
+      return;
+    process.kill(discovery.processId);
+    await expect.poll(() => DesktopApplicationFixture.isAlive(discovery.processId), { timeout: DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT }).toBe(false);
+  }
+
+  public static isAlive(processId: number): boolean {
+    try {
+      process.kill(processId, 0);
+      return true;
+    }
+    catch {
+      return false;
+    }
   }
 
   public get application(): ElectronApplication {
@@ -60,8 +92,15 @@ export default class DesktopApplicationFixture {
     return this.page;
   }
 
-  public async restartAsync(): Promise<void> {
+  public async reopenAsync(): Promise<void> {
+    expect(await this.closeAsync(true)).toBe(0);
+    await this.startAsync();
+  }
+
+  public async restartAsync(beforeStart?: () => Promise<void>): Promise<void> {
     expect(await this.closeAsync()).toBe(0);
+    await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
+    await beforeStart?.();
     await this.startAsync();
   }
 
@@ -94,13 +133,24 @@ export default class DesktopApplicationFixture {
     await writeFile(path.join(this.testInfo.project.outputDir, "..", file), image);
   }
 
-  public async closeAsync(): Promise<number | null> {
+  public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
-    const exited = new Promise<number | null>(resolve => child.once("exit", resolve));
-    await this.application.close();
+    const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
+    const closing = this.application.close();
+    const exitCode = await exited;
     this.electronApplication = null;
     this.page = null;
-    return child.exitCode ?? await exited;
+    if (keepRuntime)
+      this.pendingCloses.push(closing);
+    else {
+      await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
+      await closing;
+    }
+    return exitCode;
+  }
+
+  public async readRuntimeProcessIdAsync(): Promise<number | undefined> {
+    return (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.processId;
   }
 
   public async disposeAsync(): Promise<void> {
@@ -111,13 +161,20 @@ export default class DesktopApplicationFixture {
       await this.testInfo.attach(DesktopApplicationFixture.TRACE_FILE, { path: trace, contentType: "application/zip" });
     }
     if (isRunning)
-      await this.application.close();
-    await rm(this.profile, { recursive: true, force: true, maxRetries: 10 });
+      await this.closeAsync();
+    await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
+    await Promise.all(this.pendingCloses);
+    await rm(this.root, { recursive: true, force: true, maxRetries: 10 });
   }
 
   private async startAsync(): Promise<void> {
     const application = await _electron.launch({
-      args: [DesktopApplicationFixture.MAIN, `--user-data-dir=${this.profile}`, ...DesktopApplicationFixture.LAUNCH_ARGUMENTS],
+      args: [
+        DesktopApplicationFixture.MAIN,
+        `--data-dir=${this.dataDirectory}`,
+        `--device-dir=${path.join(this.root, DesktopApplicationFixture.DEVICE_FOLDER)}`,
+        ...DesktopApplicationFixture.LAUNCH_ARGUMENTS
+      ],
       env: Object.fromEntries(Object.entries({ ...process.env, ...this.environment }).filter((t): t is [string, string] => t[1] !== undefined))
     });
     application.process().stderr?.on("data", (data: Buffer) => this.readOutput(data.toString()));
@@ -136,6 +193,8 @@ export default class DesktopApplicationFixture {
     this.page = window;
     this.childProcess = application.process();
     await expect.poll(() => this.isVisibleAsync()).toBe(true);
+    await expect.poll(async () => (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.productVersion)
+      .toBe(RuntimeBuild.identity.productVersion);
   }
 
   private requireProcess(): ChildProcess {

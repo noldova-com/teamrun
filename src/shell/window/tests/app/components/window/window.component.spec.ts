@@ -49,6 +49,21 @@ describe("WindowComponent", () => {
     }]);
   });
 
+  it("shows the startup card instead of the workspace until the runtime is ready", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    bridge.startup = { kind: "PreShellData", details: ["/data/old"] };
+    const fixture = TestBed.createComponent(WindowComponent);
+    await fixture.whenStable();
+    const root: HTMLElement = fixture.nativeElement;
+
+    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-startup", "tr-status-bar"]);
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await fixture.whenStable();
+
+    expect(root.querySelector("tr-workspace")).not.toBeNull();
+    expect(root.querySelector("tr-startup")).toBeNull();
+  });
+
   it("answers close requests as saved and stops listening when destroyed", async () => {
     const bridge = DesktopBridgeFixture.install();
     const fixture = TestBed.createComponent(WindowComponent);
@@ -59,6 +74,6 @@ describe("WindowComponent", () => {
     expect(await TestBed.inject(LayoutStoreService).readAsync()).toEqual(TestBed.inject(LayoutService).layout().toJson());
     fixture.destroy();
 
-    expect(bridge.listenerCount).toBe(0);
+    expect(bridge.closeListenerCount).toBe(0);
   });
 });

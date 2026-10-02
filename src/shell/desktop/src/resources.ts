@@ -6,12 +6,54 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { ShellMethods } from "@noldova/teamrun-shell-protocol";
+
 export class Resources {
   public static readonly applicationName: string = "TeamRun";
   public static readonly appUserModelId: string = "com.noldova.teamrun";
   public static readonly readyChannel: string = "teamrun:ready";
   public static readonly closeRequestChannel: string = "teamrun:closeRequest";
   public static readonly closeAnswerChannel: string = "teamrun:closeAnswer";
+  public static readonly startupStateChannel: string = "teamrun:startupState";
+  public static readonly readStartupChannel: string = "teamrun:readStartup";
+  public static readonly startupActionChannel: string = "teamrun:startupAction";
+  public static readonly readLayoutChannel: string = "teamrun:readLayout";
+  public static readonly writeLayoutChannel: string = "teamrun:writeLayout";
+  public static readonly requestChannel: string = "teamrun:request";
+  public static readonly runtimeEventChannel: string = "teamrun:runtimeEvent";
+  public static readonly shellOwner: string = "shell";
+  public static readonly methodParameter: string = "method";
+  public static readonly windowShellMethods: readonly string[] = [ShellMethods.modules.text];
+  public static readonly untrustedRequest: string = "Only TeamRun's own window may call the runtime.";
+  public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
+  public static readonly payloadNotJson: string = "The payload must be a JSON value.";
+  public static readonly clientName: string = "desktop";
+  public static readonly moveAsideAction: string = "moveAside";
+  public static readonly stopWorkAction: string = "stopWork";
+  public static readonly waitAction: string = "wait";
+  public static readonly retryAction: string = "retry";
+  public static readonly kindField: string = "kind";
+  public static readonly detailsField: string = "details";
+  public static readonly dataDirectoryArgument: string = "--data-dir=";
+  public static readonly userDataArgument: string = "--user-data-dir=";
+  public static readonly userDataPath: "userData" = "userData";
+  public static readonly runAsNodeVariable: string = "ELECTRON_RUN_AS_NODE";
+  public static readonly runAsNodeValue: string = "1";
+  public static readonly workWaitInterval: number = 2000;
+  public static readonly deviceDirectoryArgument: string = "--device-dir=";
+  public static readonly windowsPlatform: string = "win32";
+  public static readonly localAppDataVariable: string = "LOCALAPPDATA";
+  public static readonly windowsLocalAppData: readonly string[] = ["AppData", "Local"];
+  public static readonly windowsDeviceFolder: readonly string[] = ["Noldova", "TeamRun"];
+  public static readonly macDeviceFolder: readonly string[] = ["Library", "Application Support", "Noldova", "TeamRun"];
+  public static readonly xdgStateVariable: string = "XDG_STATE_HOME";
+  public static readonly xdgStateDefault: readonly string[] = [".local", "state"];
+  public static readonly linuxDeviceFolder: readonly string[] = ["noldova", "teamrun"];
+  public static readonly deviceFileName: string = "device.json";
+  public static readonly deviceIdField: string = "id";
+  public static readonly createOnlyFlag: string = "wx";
+  public static readonly textEncoding: BufferEncoding = "utf8";
+  public static readonly uuidPattern: RegExp = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   public static readonly hashPrefix: string = "#";
   public static readonly queryPrefix: string = "?";
   public static readonly macPlatform: string = "darwin";
@@ -32,6 +74,16 @@ export class Resources {
   public static readonly secondInstanceEvent: "second-instance" = "second-instance";
   public static readonly windowAllClosedEvent: "window-all-closed" = "window-all-closed";
   public static readonly activateEvent: "activate" = "activate";
+  public static readonly willQuitEvent: "will-quit" = "will-quit";
+  public static readonly resizeEvent: "resize" = "resize";
+  public static readonly moveEvent: "move" = "move";
+  public static readonly maximizeEvent: "maximize" = "maximize";
+  public static readonly unmaximizeEvent: "unmaximize" = "unmaximize";
+  public static readonly boundsSaveDelay: number = 500;
+  public static readonly connectingShowLimit: number = 2_000;
+  public static readonly mainWindow: string = "main";
+  public static readonly runtimeNotConnected: string = "TeamRun is not connected to its runtime.";
+  public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout is not kept.";
   public static readonly windowMinimumWidth: number = 640;
   public static readonly windowMinimumHeight: number = 400;
   public static readonly windowWidth: number = 1280;
@@ -53,6 +105,30 @@ export class Resources {
   public static readonly invalidAppearance: string = "The window appearance is not valid.";
   public static readonly invalidColor: string = "A window color is a hexadecimal color or an rgb() or rgba() color.";
   public static readonly colorPattern: RegExp = /^(?:#[0-9A-Fa-f]{3,8}|rgba?\([0-9., %/]+\))$/;
+
+  public static formatInvalidDevice(file: string): string {
+    return `The device identity in ${file} is not valid; remove the file to give this device a new identity.`;
+  }
+
+  public static formatWindowStateFailed(method: string, message: string): string {
+    return `The runtime refused ${method}: ${message}`;
+  }
+
+  public static formatBoundsUnsaved(reason: string): string {
+    return `The window's bounds could not be saved: ${reason}`;
+  }
+
+  public static formatBoundsNotRestored(reason: string): string {
+    return `The window's saved bounds could not be restored, so it opens with its default bounds: ${reason}`;
+  }
+
+  public static formatMethodRefused(method: string): string {
+    return `The window may not call ${method}; the desktop calls the shell's methods itself.`;
+  }
+
+  public static formatDeviceUnavailable(reason: string): string {
+    return `This device's identity could not be read, so window bounds are not kept: ${reason}`;
+  }
 
   public static formatAppearanceRejected(reason: string): string {
     return `The window reported an appearance that is not valid, so it is shown without it: ${reason}`;

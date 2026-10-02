@@ -8,7 +8,7 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
@@ -47,6 +47,46 @@ export class DiscoveryPublisherTests {
     Assert.areEqual(lock.dataDirectory.discoveryFolder, protector.folders.join(","));
     Assert.areEqual("runtime.json", (await readdir(lock.dataDirectory.discoveryFolder)).join(","));
     Assert.areEqual(`${JSON.stringify(replacement.toJson())}\n`, await readFile(file, "utf8"));
+  }
+
+  @TestMethod
+  public async retriesTheRenameWhileTheOldFileIsHeld(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    using lock = OwnershipLock.acquire(new DataDirectory(folder.path));
+    let attempts = 0;
+    const publisher = new DiscoveryPublisher(lock, new FolderProtectorFixture(), (from, to) => {
+      attempts++;
+      return attempts < 3 ? Promise.reject(Object.assign(new Error("held"), { code: attempts === 1 ? "EPERM" : "EBUSY" })) : rename(from, to);
+    });
+
+    const file = await publisher.publishAsync(DiscoveryPublisherTests.DISCOVERY);
+
+    Assert.areEqual(3, attempts);
+    Assert.areEqual("runtime.json", (await readdir(lock.dataDirectory.discoveryFolder)).join(","));
+    Assert.areEqual(`${JSON.stringify(DiscoveryPublisherTests.DISCOVERY.toJson())}\n`, await readFile(file, "utf8"));
+  }
+
+  @TestMethod
+  public async removesItsNewFileWhenTheRenameKeepsFailing(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    using lock = OwnershipLock.acquire(new DataDirectory(folder.path));
+    let held = 0;
+    let broken = 0;
+    const heldPublisher = new DiscoveryPublisher(lock, new FolderProtectorFixture(), () => {
+      held++;
+      return Promise.reject(Object.assign(new Error("held"), { code: "EACCES" }));
+    });
+    const brokenPublisher = new DiscoveryPublisher(lock, new FolderProtectorFixture(), () => {
+      broken++;
+      return Promise.reject(Object.assign(new Error("broken"), { code: "EIO" }));
+    });
+
+    const heldFailure = await Assert.throwsAsync(() => heldPublisher.publishAsync(DiscoveryPublisherTests.DISCOVERY), Error);
+    const brokenFailure = await Assert.throwsAsync(() => brokenPublisher.publishAsync(DiscoveryPublisherTests.DISCOVERY), Error);
+    const left = await readdir(lock.dataDirectory.discoveryFolder);
+
+    Assert.areEqual("held 40, broken 1", `${heldFailure.message} ${held}, ${brokenFailure.message} ${broken}`);
+    Assert.areEqual(0, left.length);
   }
 
   @TestMethod

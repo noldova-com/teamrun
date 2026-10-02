@@ -1,0 +1,48 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: var(--tr-button-height);
+  margin: 0;
+  padding: 0 var(--tr-button-padding);
+  border: var(--tr-border-width) solid var(--tr-button-border);
+  border-radius: var(--tr-radius-small);
+  background-color: var(--tr-button);
+  color: var(--tr-button-text);
+  font: inherit;
+  font-size: var(--tr-text-label);
+  line-height: var(--tr-line-label);
+  white-space: nowrap;
+}
+
+:host(:not(:disabled):hover) {
+  background-color: var(--tr-button-hover);
+}
+
+:host(.tr-button-secondary) {
+  background-color: var(--tr-button-secondary);
+  color: var(--tr-button-secondary-text);
+}
+
+:host(.tr-button-secondary:not(:disabled):hover) {
+  background-color: var(--tr-button-secondary-hover);
+}
+
+:host(:focus-visible) {
+  outline: var(--tr-border-width) solid var(--tr-accent);
+  outline-offset: calc(var(--tr-border-width) * 2);
+}
+
+:host(:disabled) {
+  opacity: 0.5;
+  cursor: default;
+}

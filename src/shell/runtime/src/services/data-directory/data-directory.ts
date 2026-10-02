@@ -39,12 +39,24 @@ export class DataDirectory {
     return path.join(this.discoveryFolder, Resources.discoveryFileName);
   }
 
+  public get profileFolder(): string {
+    return path.join(this.root, Resources.profileFolderName);
+  }
+
   public get backupsFolder(): string {
     return path.join(this.root, Resources.backupsFolderName);
   }
 
   public get modulesFolder(): string {
     return path.join(this.root, Resources.modulesFolderName);
+  }
+
+  public get workFolder(): string {
+    return path.join(this.root, Resources.workFolderName);
+  }
+
+  public get logsFolder(): string {
+    return path.join(this.root, Resources.logsFolderName);
   }
 
   public locateModuleFolder(id: string): string {

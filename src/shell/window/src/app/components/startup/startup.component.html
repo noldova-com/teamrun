@@ -1,0 +1,48 @@
+<section class="tr-startup-card" role="status" aria-live="polite">
+  @switch (state().kind) {
+    @case (kinds.PreShellData) {
+      <h1 class="tr-startup-title">{{ resources.preShellDataTitle }}</h1>
+      <p class="tr-startup-detail">{{ state().details[0] }}</p>
+      <p>{{ resources.preShellDataText }}</p>
+      <div class="tr-startup-actions">
+        <button type="button" tr-button [disabled]="isActing()" (click)="act(resources.moveAsideAction)">{{ resources.moveAside }}</button>
+      </div>
+    }
+    @case (kinds.WorkInProgress) {
+      <h1 class="tr-startup-title">{{ resources.workInProgressTitle }}</h1>
+      <ul class="tr-startup-work">
+        @for (description of state().details; track $index) {
+          <li>{{ description }}</li>
+        }
+      </ul>
+      <p>{{ resources.workInProgressText }}</p>
+      <div class="tr-startup-actions">
+        <button type="button" tr-button [disabled]="isActing()" (click)="act(resources.waitAction)">{{ resources.waitForWork }}</button>
+        <button type="button" tr-button [variant]="secondary" [disabled]="isActing()" (click)="act(resources.stopWorkAction)">{{ resources.stopWork }}</button>
+      </div>
+    }
+    @case (kinds.WaitingForWork) {
+      <h1 class="tr-startup-title">{{ resources.waitingTitle }}</h1>
+      <ul class="tr-startup-work">
+        @for (description of state().details; track $index) {
+          <li>{{ description }}</li>
+        }
+      </ul>
+      <p>{{ resources.waitingText }}</p>
+    }
+    @case (kinds.NewerBuild) {
+      <h1 class="tr-startup-title">{{ resources.newerBuildTitle }}</h1>
+      <p>{{ resources.formatNewerBuild(state().details[0] ?? "") }}</p>
+    }
+    @case (kinds.Failed) {
+      <h1 class="tr-startup-title">{{ resources.failedTitle }}</h1>
+      <p class="tr-startup-detail">{{ state().details[0] }}</p>
+      <div class="tr-startup-actions">
+        <button type="button" tr-button [disabled]="isActing()" (click)="act(resources.retryAction)">{{ resources.tryAgain }}</button>
+      </div>
+    }
+    @default {
+      <p class="tr-startup-quiet">{{ resources.startingTitle }}</p>
+    }
+  }
+</section>

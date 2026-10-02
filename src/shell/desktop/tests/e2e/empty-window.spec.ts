@@ -34,11 +34,12 @@ test.describe("the empty window", () => {
       bridge: Object.keys(Reflect.get(globalThis, "teamrun") as object).sort()
     }));
 
-    expect(globals).toEqual({ require: "undefined", process: "undefined", module: "undefined", buffer: "undefined", bridge: ["answerClose", "notifyReady", "onCloseRequest", "platform"] });
+    expect(globals).toEqual({ require: "undefined", process: "undefined", module: "undefined", buffer: "undefined", bridge: ["actOnStartup", "answerClose", "notifyReady", "onCloseRequest", "onEvent", "onStartup", "platform", "readLayout", "readStartup", "request", "writeLayout"] });
   });
 
   test("the window row, status bar and panel card follow the default theme", async ({ desktop }) => {
     await desktop.useSuiteViewportAsync();
+    await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
     await expect.poll(() => desktop.window.evaluate(() => (document.querySelector("tr-panel-card") as Element).getBoundingClientRect().width)).toBe(1920 - 8);
     const measured = await desktop.window.evaluate(() => {
       const style = (selector: string): CSSStyleDeclaration => getComputedStyle(document.querySelector(selector) as Element);

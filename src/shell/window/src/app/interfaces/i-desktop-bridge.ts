@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { JsonObject } from "@noldova/teamrun-foundation-json";
+import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 
 export interface IDesktopBridge {
   readonly platform: string;
@@ -14,4 +14,11 @@ export interface IDesktopBridge {
   notifyReady(appearance: JsonObject): void;
   onCloseRequest(listener: (requestId: string) => void): () => void;
   answerClose(requestId: string, isSaved: boolean): Promise<boolean>;
+  readStartup(): Promise<unknown>;
+  onStartup(listener: (state: unknown) => void): () => void;
+  actOnStartup(action: string): Promise<boolean>;
+  readLayout(): Promise<unknown>;
+  writeLayout(layout: JsonObject): Promise<boolean>;
+  request(method: string, payload: JsonValue): Promise<unknown>;
+  onEvent(listener: (name: string, payload: unknown) => void): () => void;
 }

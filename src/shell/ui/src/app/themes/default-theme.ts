@@ -167,7 +167,9 @@ export class DefaultTheme {
       ["status-bar-height", "1.25rem"],
       ["status-bar-inset", "0.5rem"],
       ["status-bar-item-padding", "0.375rem"],
-      ["status-bar-item-gap", "0.25rem"]
+      ["status-bar-item-gap", "0.25rem"],
+      ["button-height", "1.625rem"],
+      ["button-padding", "0.5rem"]
     ]),
     new Map([["tab", "pill"]]));
 }

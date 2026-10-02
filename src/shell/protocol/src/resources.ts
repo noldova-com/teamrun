@@ -40,9 +40,16 @@ export class Resources {
   public static readonly stateField: string = "state";
   public static readonly causeField: string = "cause";
   public static readonly modulesField: string = "modules";
+  public static readonly deviceField: string = "device";
+  public static readonly windowField: string = "window";
+  public static readonly valueField: string = "value";
   public static readonly stopMember: string = "stop";
   public static readonly moveAsideMember: string = "moveAside";
   public static readonly modulesMember: string = "modules";
+  public static readonly readWindowBoundsMember: string = "readWindowBounds";
+  public static readonly writeWindowBoundsMember: string = "writeWindowBounds";
+  public static readonly readWindowLayoutMember: string = "readWindowLayout";
+  public static readonly writeWindowLayoutMember: string = "writeWindowLayout";
   public static readonly textParameterName: string = "text";
   public static readonly maximumFrameLengthParameterName: string = "maximumFrameLength";
 

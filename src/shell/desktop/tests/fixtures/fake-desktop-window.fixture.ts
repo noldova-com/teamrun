@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { BrowserWindowConstructorOptions, TitleBarOverlayOptions } from "electron";
+import type { BrowserWindowConstructorOptions, Rectangle, TitleBarOverlayOptions } from "electron";
 
 import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
 
@@ -26,6 +26,8 @@ export class FakeDesktopWindow implements IDesktopWindow {
   public isShown: boolean = false;
   public isGone: boolean = false;
   public isMinimizedNow: boolean = false;
+  public isMaximizedNow: boolean = false;
+  public bounds: Rectangle = { x: 100, y: 80, width: 1280, height: 800 };
 
   public constructor(options: BrowserWindowConstructorOptions, contentsId: number) {
     this.options = options;
@@ -43,6 +45,32 @@ export class FakeDesktopWindow implements IDesktopWindow {
 
   public setTitleBarOverlay(options: TitleBarOverlayOptions): void {
     this.overlay = options;
+  }
+
+  public getNormalBounds(): Rectangle {
+    return { ...this.bounds };
+  }
+
+  public setBounds(bounds: Partial<Rectangle>): void {
+    this.calls.push(`setBounds ${JSON.stringify(bounds)}`);
+    this.bounds = { ...this.bounds, ...bounds };
+  }
+
+  public center(): void {
+    this.calls.push("center");
+  }
+
+  public isMaximized(): boolean {
+    return this.isMaximizedNow;
+  }
+
+  public maximize(): void {
+    this.calls.push("maximize");
+    this.isMaximizedNow = true;
+  }
+
+  public change(event: string): void {
+    this.listeners.emit(event);
   }
 
   public isVisible(): boolean {

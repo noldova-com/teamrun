@@ -23,5 +23,30 @@ contextBridge.exposeInMainWorld("teamrun", {
   },
   answerClose(requestId: string, isSaved: boolean): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:closeAnswer", requestId, isSaved) as Promise<boolean>;
+  },
+  readStartup(): Promise<unknown> {
+    return ipcRenderer.invoke("teamrun:readStartup");
+  },
+  onStartup(listener: (state: unknown) => void): () => void {
+    const handler = (_event: IpcRendererEvent, state: unknown): void => listener(state);
+    ipcRenderer.on("teamrun:startupState", handler);
+    return () => ipcRenderer.removeListener("teamrun:startupState", handler);
+  },
+  actOnStartup(action: string): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:startupAction", action) as Promise<boolean>;
+  },
+  readLayout(): Promise<unknown> {
+    return ipcRenderer.invoke("teamrun:readLayout");
+  },
+  writeLayout(layout: unknown): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:writeLayout", layout) as Promise<boolean>;
+  },
+  request(method: string, payload: unknown): Promise<unknown> {
+    return ipcRenderer.invoke("teamrun:request", method, payload);
+  },
+  onEvent(listener: (name: string, payload: unknown) => void): () => void {
+    const handler = (_event: IpcRendererEvent, name: string, payload: unknown): void => listener(name, payload);
+    ipcRenderer.on("teamrun:runtimeEvent", handler);
+    return () => ipcRenderer.removeListener("teamrun:runtimeEvent", handler);
   }
 });

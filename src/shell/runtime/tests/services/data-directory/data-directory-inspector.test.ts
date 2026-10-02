@@ -33,6 +33,8 @@ export class DataDirectoryInspectorTests {
     const missing = await DataDirectoryInspector.inspectAsync(directory);
     using lock = OwnershipLock.acquire(directory);
     await mkdir(directory.discoveryFolder);
+    for (const folder of [directory.backupsFolder, directory.profileFolder, directory.modulesFolder, directory.workFolder, directory.logsFolder])
+      await mkdir(folder);
     await writeFile(`${directory.ownershipDatabase}-journal`, "");
 
     const runtimeOnly = await DataDirectoryInspector.inspectAsync(directory);
@@ -48,12 +50,13 @@ export class DataDirectoryInspectorTests {
     await using folder = await TemporaryFolderFixture.createAsync();
     const directory = new DataDirectory(folder.path);
     await writeFile(directory.shellDatabase, "");
+    await writeFile(`${directory.shellDatabase}-wal`, "");
     await mkdir(directory.modulesFolder);
 
     const inspection = await DataDirectoryInspector.inspectAsync(directory);
 
     Assert.areEqual(DataDirectoryState.Current, inspection.state);
-    Assert.areEqual("modules,shell.sqlite", inspection.entries.join(","));
+    Assert.areEqual("shell.sqlite,shell.sqlite-wal", inspection.entries.join(","));
   }
 
   @TestMethod

@@ -12,13 +12,15 @@ import { AppearanceService } from "@noldova/teamrun-shell-ui";
 
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { LayoutService } from "../../services/layout.service";
+import { StartupService } from "../../services/startup.service";
+import { StartupComponent } from "../startup/startup.component";
 import { StatusBarComponent } from "../status-bar/status-bar.component";
 import { WindowRowComponent } from "../window-row/window-row.component";
 import { WorkspaceComponent } from "../workspace/workspace.component";
 
 @Component({
   selector: "tr-window",
-  imports: [StatusBarComponent, WindowRowComponent, WorkspaceComponent],
+  imports: [StartupComponent, StatusBarComponent, WindowRowComponent, WorkspaceComponent],
   templateUrl: "./window.component.html",
   styleUrl: "./window.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -26,6 +28,8 @@ import { WorkspaceComponent } from "../workspace/workspace.component";
 export class WindowComponent {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly layout: LayoutService = inject(LayoutService);
+
+  protected readonly startup: StartupService = inject(StartupService);
 
   public constructor() {
     inject(AppearanceService);

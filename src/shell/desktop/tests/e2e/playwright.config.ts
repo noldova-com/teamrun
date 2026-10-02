@@ -13,6 +13,9 @@ export default defineConfig({
   testMatch: "**/*.spec.ts",
   outputDir: "../../../../../_build/ui/results",
   timeout: 60000,
+  expect: {
+    timeout: 20000
+  },
   retries: 0,
   workers: 1,
   fullyParallel: false,

@@ -14,6 +14,7 @@ import "@noldova/teamrun-foundation-core";
 import { type BuildIdentity, Failure, FailureCode, PreShellData, RuntimeHandover, ShellMethods } from "@noldova/teamrun-shell-protocol";
 
 import { DataDirectoryState } from "../../enums/data-directory-state.js";
+import { WindowStateKind } from "../../enums/window-state-kind.js";
 import type { IIdleParticipant } from "../../interfaces/idle-participant.js";
 import { CapabilityToken } from "../../models/capability-token.js";
 import type { Endpoint } from "../../models/endpoint.js";
@@ -26,6 +27,7 @@ import { Resources } from "../../resources.js";
 import { SystemCommand } from "../commands/system-command.js";
 import { DataDirectoryInspector } from "../data-directory/data-directory-inspector.js";
 import { ShellDatabase } from "../database/shell-database.js";
+import { ShellMigrations } from "../database/shell-migrations.js";
 import { DiscoveryPublisher } from "../discovery/discovery-publisher.js";
 import { FolderProtectorFactory } from "../discovery/folder-protector-factory.js";
 import { RuntimeServer } from "../endpoint/runtime-server.js";
@@ -36,6 +38,9 @@ import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader
 import { OwnershipLock } from "../ownership/ownership-lock.js";
 import { EventRegistry } from "../registry/event-registry.js";
 import { MethodRegistry } from "../registry/method-registry.js";
+import { WindowStateReadMethod } from "../window-state/window-state-read-method.js";
+import { WindowStateStore } from "../window-state/window-state-store.js";
+import { WindowStateWriteMethod } from "../window-state/window-state-write-method.js";
 import { WorkTracker } from "../work/work-tracker.js";
 import { IdleMonitor } from "./idle-monitor.js";
 import { MoveAsideMethod } from "./move-aside-method.js";
@@ -84,7 +89,9 @@ export class RuntimeHost implements IIdleParticipant {
     this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, new PackageRuntimePartLoader(), diagnostics);
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
-    if (Object.isNull(database)) {
+    if (!Object.isNull(database))
+      this.registerShellFacilities(database);
+    else {
       this.server.refuse(new Refusal(
         new Failure(FailureCode.PreShellData, Resources.preShellData, new PreShellData(lock.dataDirectory.root).toJson()),
         ShellMethods.moveAside));
@@ -103,7 +110,7 @@ export class RuntimeHost implements IIdleParticipant {
     try {
       const inspection = await DataDirectoryInspector.inspectAsync(options.dataDirectory);
       if (inspection.state !== DataDirectoryState.PreShell)
-        database = await ShellDatabase.openAsync(lock, []);
+        database = await ShellDatabase.openAsync(lock, ShellMigrations.all);
     }
     catch (error) {
       lock.release();
@@ -158,9 +165,18 @@ export class RuntimeHost implements IIdleParticipant {
 
   private async performMoveAsideAsync(): Promise<void> {
     await DataDirectoryInspector.moveAsideAsync(this.lock);
-    this.database = await ShellDatabase.openAsync(this.lock, []);
+    this.database = await ShellDatabase.openAsync(this.lock, ShellMigrations.all);
+    this.registerShellFacilities(this.database);
     await this.modules.activateAsync();
     setImmediate(() => this.server.admit());
+  }
+
+  private registerShellFacilities(database: ShellDatabase): void {
+    const store = new WindowStateStore(database);
+    this.methods.register(ShellMethods.readWindowBounds, new WindowStateReadMethod(store, WindowStateKind.Bounds));
+    this.methods.register(ShellMethods.writeWindowBounds, new WindowStateWriteMethod(store, WindowStateKind.Bounds));
+    this.methods.register(ShellMethods.readWindowLayout, new WindowStateReadMethod(store, WindowStateKind.Layout));
+    this.methods.register(ShellMethods.writeWindowLayout, new WindowStateWriteMethod(store, WindowStateKind.Layout));
   }
 
   private async listenAsync(platform: string): Promise<Endpoint> {

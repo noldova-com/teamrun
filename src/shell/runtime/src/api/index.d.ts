@@ -7,7 +7,7 @@
  */
 
 import type { EventEmitter } from "node:events";
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync, SQLInputValue, SQLOutputValue } from "node:sqlite";
 import type { Writable } from "node:stream";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
@@ -16,11 +16,12 @@ import type { BuildIdentity, Event, Failure, ModuleStatusList, PreShellData, Qua
 
 /**
  * What a data directory holds, judged from its top-level entries other than the
- * runtime's own ownership database and discovery folder.
+ * shell's own: the ownership database and the discovery, backups, desktop,
+ * modules, work and logs folders.
  */
 export declare enum DataDirectoryState {
   /**
-   * The directory is missing or holds nothing but the runtime's own entries.
+   * The directory is missing or holds nothing but the shell's own entries.
    */
   Empty = "Empty",
 
@@ -544,6 +545,11 @@ export declare class DataDirectory {
   public get discoveryFile(): string;
 
   /**
+   * The path of the desktop's Electron profile folder, `desktop`.
+   */
+  public get profileFolder(): string;
+
+  /**
    * The path of the database backups folder, `backups`.
    */
   public get backupsFolder(): string;
@@ -552,6 +558,16 @@ export declare class DataDirectory {
    * The path of the folder that holds every module's folder, `modules`.
    */
   public get modulesFolder(): string;
+
+  /**
+   * The path of the folder for work outside any project, `work`.
+   */
+  public get workFolder(): string;
+
+  /**
+   * The path of the logs folder, `logs`.
+   */
+  public get logsFolder(): string;
 
   /**
    * Returns the path of a module's folder, `modules/<id>`.
@@ -576,8 +592,8 @@ export declare class DataDirectory {
  */
 export declare class DataDirectoryInspector {
   /**
-   * Inspects the directory's top-level entries, ignoring the runtime's
-   * ownership database and discovery folder.
+   * Inspects the directory's top-level entries, ignoring the shell's own
+   * entries.
    *
    * @param dataDirectory The directory to inspect; it need not exist.
    * @returns A promise of the directory's state and entries.
@@ -715,6 +731,41 @@ export declare class ShellDatabase implements Disposable {
   public static openAsync(lock: OwnershipLock, migrations: readonly Migration[], moment?: Date): Promise<ShellDatabase>;
 
   /**
+   * Runs a query of the shell's own facilities and returns its first row.
+   *
+   * @param statement The SQL statement, with `?` placeholders.
+   * @param values The placeholders' values, in order.
+   * @returns The first row, or `undefined` when there is none.
+   * @throws Error synchronously when the statement fails or the database is closed.
+   * @example
+   * ```ts
+   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readBounds(database: ShellDatabase): unknown {
+   *   return database.read("SELECT bounds AS value FROM window_states WHERE device = ? AND window = ?", "device-1", "main")?.["value"];
+   * }
+   * ```
+   */
+  public read(statement: string, ...values: SQLInputValue[]): Record<string, SQLOutputValue> | undefined;
+
+  /**
+   * Runs a statement that changes the shell's own facilities.
+   *
+   * @param statement The SQL statement, with `?` placeholders.
+   * @param values The placeholders' values, in order.
+   * @throws Error synchronously when the statement fails or the database is closed.
+   * @example
+   * ```ts
+   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function forget(database: ShellDatabase): void {
+   *   database.run("DELETE FROM window_states WHERE device = ?", "device-1");
+   * }
+   * ```
+   */
+  public run(statement: string, ...values: SQLInputValue[]): void;
+
+  /**
    * Closes the database; closing again does nothing.
    *
    * @example
@@ -743,6 +794,7 @@ export declare class DiscoveryPublisher {
    *
    * @param lock The held ownership of the data directory.
    * @param protector Restricts the discovery folder when it is created.
+   * @param replaceFileAsync Renames a file over another; `fs.promises.rename` by default.
    * @example
    * ```ts
    * import { DiscoveryPublisher, PosixFolderProtector, type OwnershipLock } from "@noldova/teamrun-shell-runtime";
@@ -752,17 +804,22 @@ export declare class DiscoveryPublisher {
    * }
    * ```
    */
-  public constructor(lock: OwnershipLock, protector: IFolderProtector);
+  public constructor(lock: OwnershipLock, protector: IFolderProtector, replaceFileAsync?: (from: string, to: string) => Promise<void>);
 
   /**
    * Writes the metadata to a new owner-only file in the discovery folder and
    * renames it over the discovery file, so readers see the old or the new
    * metadata, never a partial file. The folder is created and protected when
-   * missing.
+   * missing. While another process holds the old file open, which on Windows
+   * makes the rename fail with `EPERM`, `EACCES` or `EBUSY`, the rename is
+   * retried for about two seconds; a rename that still fails removes the new
+   * file.
    *
    * @param discovery The metadata to publish.
    * @returns A promise of the discovery file's path.
    * @throws {OwnershipReleasedException} When the ownership was released.
+   * @throws {Error} The promise rejects with the rename's error when it fails
+   * for another reason or the old file stays held.
    * @throws {SystemCommandException} The promise rejects when the folder
    * cannot be protected.
    * @example

@@ -1,0 +1,60 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--tr-space-6);
+  overflow: auto;
+}
+
+.tr-startup-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-2);
+  box-sizing: border-box;
+  width: min(100%, 27.5rem);
+  padding: var(--tr-space-6);
+  border: var(--tr-border-width) solid var(--tr-card-border);
+  border-radius: var(--tr-radius-large);
+  background-color: var(--tr-panel);
+  color: var(--tr-text);
+  overflow-wrap: anywhere;
+}
+
+.tr-startup-title {
+  margin: 0;
+  font-size: var(--tr-text-panel);
+  font-weight: var(--tr-weight-emphasis);
+  line-height: var(--tr-line-panel);
+}
+
+p,
+ul {
+  margin: 0;
+}
+
+ul {
+  padding-left: var(--tr-space-6);
+}
+
+.tr-startup-detail,
+.tr-startup-quiet {
+  color: var(--tr-text-muted);
+}
+
+.tr-startup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tr-space-2);
+  margin-top: var(--tr-space-2);
+}

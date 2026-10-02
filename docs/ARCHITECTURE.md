@@ -216,7 +216,7 @@ SQLite is the authority for durable records. The shell and each module that keep
 |---|---|
 | Migration history and change records | Each database's owner, in that database |
 | Shortcuts, settings and their values per scope | The shell, in its database |
-| Layout, window bounds and a window part's view state | The shell keeps layout and window bounds in its database, written through the runtime; the owning module keeps a part's view state in the data directory. State tied to a display or a window is kept for the device and window that recorded it; transient state stays in memory |
+| Layout, window bounds and a window part's view state | The shell keeps layout and window bounds in its database, written through the runtime; the owning module keeps a part's view state in the data directory. State tied to a display or a window is kept for the device and window that recorded it. A device is identified by a random identity kept in the operating system's local application data, outside the data directory, so devices that share a data directory keep their own; the main window is `main`. Transient state stays in memory |
 | Drafts and other content the person wrote but did not send | The owning module's database, saved through its runtime part |
 | Credentials an external tool manages | That tool, accessed only through its supported interfaces |
 | Caches | Bounded and transient; never the durable source of truth |
@@ -231,11 +231,11 @@ Migrations are ordered, explicit and transactional:
 - Refuse unknown or newer schemas rather than resetting them.
 - Destructive rollback, backup retention and cleanup of owned files require explicit policies; no automatic deletion is assumed.
 
-TeamRun does not open data written by a release that predates the shell. The runtime refuses such a data directory, as it refuses an unknown schema, and neither migrates nor resets it. The window explains the refusal and offers to move that data aside: at the person's request, the runtime renames its folder, deletes nothing, and starts with an empty data directory.
+TeamRun does not open data written by a release that predates the shell. The runtime refuses such a data directory, as it refuses an unknown schema, and neither migrates nor resets it. The shell's own entries never count as such data, even before the shell's database exists: the ownership database and the `discovery`, `backups`, `desktop` (Electron's profile), `modules`, `work` and `logs` folders. The window explains the refusal and offers to move that data aside: at the person's request, the runtime renames its folder, deletes nothing, and starts with an empty data directory.
 
 ## 8. Window
 
-The window presents confirmed state and keeps only transient state locally. Durable state goes to its section 7 owner after a pause in changes and at close. All privileged requests cross the shell's preload bridge and desktop's authenticated connection; window parts receive no token, socket, process or file handle.
+The window presents confirmed state and keeps only transient state locally. Durable state goes to its section 7 owner after a pause in changes and at close. The window shows once its appearance is painted and, when the runtime is ready, its saved bounds are applied. A window whose runtime refuses, or is still connecting after two seconds, shows at once with its startup state and applies its bounds once the runtime is ready. Bounds that no display shows reopen at their saved size, centered. All privileged requests cross the shell's preload bridge and desktop's authenticated connection; window parts receive no token, socket, process or file handle.
 
 Snapshot loading and event delivery can overlap: a window part replays or reconciles relevant events against a loaded snapshot and uses selection generations so an old response cannot replace a newer selection. Reconnect reloads potentially missed state.
 

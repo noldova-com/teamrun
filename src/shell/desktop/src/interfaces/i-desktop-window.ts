@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { TitleBarOverlayOptions } from "electron";
+import type { Rectangle, TitleBarOverlayOptions } from "electron";
 
 import type { IPreventableEvent } from "./i-preventable-event.js";
 import type { IWindowContents } from "./i-window-contents.js";
@@ -17,6 +17,11 @@ export interface IDesktopWindow {
   loadFile(filePath: string): Promise<void>;
   setBackgroundColor(color: string): void;
   setTitleBarOverlay(options: TitleBarOverlayOptions): void;
+  getNormalBounds(): Rectangle;
+  setBounds(bounds: Partial<Rectangle>): void;
+  center(): void;
+  isMaximized(): boolean;
+  maximize(): void;
   isVisible(): boolean;
   isDestroyed(): boolean;
   isMinimized(): boolean;
@@ -25,5 +30,9 @@ export interface IDesktopWindow {
   focus(): void;
   close(): void;
   on(event: "close", listener: (event: IPreventableEvent) => void): unknown;
+  on(event: "resize", listener: () => void): unknown;
+  on(event: "move", listener: () => void): unknown;
+  on(event: "maximize", listener: () => void): unknown;
+  on(event: "unmaximize", listener: () => void): unknown;
   once(event: "closed", listener: () => void): unknown;
 }

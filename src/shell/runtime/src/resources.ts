@@ -31,12 +31,20 @@ export class Resources {
   public static readonly discoveryFolderName: string = "discovery";
   public static readonly discoveryFileName: string = "runtime.json";
   public static readonly backupsFolderName: string = "backups";
+  public static readonly profileFolderName: string = "desktop";
+  public static readonly modulesFolderName: string = "modules";
+  public static readonly workFolderName: string = "work";
+  public static readonly logsFolderName: string = "logs";
   public static readonly runtimeEntries: readonly string[] = [
     Resources.ownershipDatabaseFileName,
     `${Resources.ownershipDatabaseFileName}-journal`,
-    Resources.discoveryFolderName
+    Resources.discoveryFolderName,
+    Resources.backupsFolderName,
+    Resources.profileFolderName,
+    Resources.modulesFolderName,
+    Resources.workFolderName,
+    Resources.logsFolderName
   ];
-  public static readonly modulesFolderName: string = "modules";
   public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   public static readonly migrationIdPattern: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
   public static readonly reservedModuleId: string = "shell";
@@ -60,8 +68,16 @@ export class Resources {
   public static readonly nameColumn: string = "name";
   public static readonly positionColumn: string = "position";
   public static readonly idColumn: string = "id";
+  public static readonly valueColumn: string = "value";
+  public static readonly windowStatesMigration: string = "window-states";
+  public static readonly createWindowStatesStatement: string =
+    "CREATE TABLE window_states (device TEXT NOT NULL, window TEXT NOT NULL, bounds TEXT, layout TEXT, PRIMARY KEY (device, window)) STRICT";
   public static readonly errorCodeField: "errcode" = "errcode";
   public static readonly busyErrorCode: number = 5;
+  public static readonly fileErrorCodeField: "code" = "code";
+  public static readonly busyFileErrorCodes: readonly string[] = ["EPERM", "EACCES", "EBUSY"];
+  public static readonly replaceAttempts: number = 40;
+  public static readonly replaceRetryDelay: number = 50;
   public static readonly ownershipWaitMilliseconds: number = 250;
   public static readonly backupWakeMilliseconds: number = 25;
   public static readonly privateFileMode: number = 0o600;
@@ -384,5 +400,13 @@ export class Resources {
 
   public static formatArgumentInvalid(name: string, value: string): string {
     return `The argument ${name} ${value} is not valid.`;
+  }
+
+  public static formatReadWindowState(column: string): string {
+    return `SELECT ${column} AS value FROM window_states WHERE device = ? AND window = ?`;
+  }
+
+  public static formatWriteWindowState(column: string): string {
+    return `INSERT INTO window_states (device, window, ${column}) VALUES (?, ?, ?) ON CONFLICT (device, window) DO UPDATE SET ${column} = excluded.${column}`;
   }
 }

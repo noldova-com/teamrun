@@ -6,12 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+export { ButtonComponent } from "../app/components/button/button.component";
 export { DockingGuideComponent } from "../app/components/docking-guide/docking-guide.component";
 export { DockingPlateComponent } from "../app/components/docking-plate/docking-plate.component";
 export { IconButtonComponent } from "../app/components/icon-button/icon-button.component";
 export { PanelCardComponent } from "../app/components/panel-card/panel-card.component";
 export { SashComponent } from "../app/components/sash/sash.component";
 export { TabComponent } from "../app/components/tab/tab.component";
+export { ButtonVariant } from "../app/enums/button-variant";
 export { DockingDirection } from "../app/enums/docking-direction";
 export { FontChoice } from "../app/enums/font-choice";
 export { ModePreference } from "../app/enums/mode-preference";

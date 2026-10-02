@@ -27,7 +27,10 @@ export class DataDirectoryTests {
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "discovery"), directory.discoveryFolder);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "discovery", "runtime.json"), directory.discoveryFile);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "backups"), directory.backupsFolder);
+    Assert.areEqual(path.join(DataDirectoryTests.ROOT, "desktop"), directory.profileFolder);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "modules"), directory.modulesFolder);
+    Assert.areEqual(path.join(DataDirectoryTests.ROOT, "work"), directory.workFolder);
+    Assert.areEqual(path.join(DataDirectoryTests.ROOT, "logs"), directory.logsFolder);
   }
 
   @TestMethod

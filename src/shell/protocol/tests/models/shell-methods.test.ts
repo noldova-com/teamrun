@@ -18,4 +18,11 @@ export class ShellMethodsTests {
     Assert.areEqual("shell.modules", ShellMethods.modules.text);
     Assert.isTrue(ShellMethods.stop.isShell && ShellMethods.moveAside.isShell && ShellMethods.modules.isShell);
   }
+
+  @TestMethod
+  public namesTheWindowStateMethods(): void {
+    Assert.areEqual(
+      JSON.stringify(["shell.readWindowBounds", "shell.writeWindowBounds", "shell.readWindowLayout", "shell.writeWindowLayout"]),
+      JSON.stringify([ShellMethods.readWindowBounds, ShellMethods.writeWindowBounds, ShellMethods.readWindowLayout, ShellMethods.writeWindowLayout].map(t => t.text)));
+  }
 }

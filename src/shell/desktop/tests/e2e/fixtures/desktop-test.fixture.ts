@@ -10,10 +10,15 @@ import { test as base, expect } from "@playwright/test";
 
 import DesktopApplicationFixture from "./desktop-application.fixture.ts";
 
-export const test = base.extend<{ desktop: DesktopApplicationFixture; desktopEnvironment: Readonly<Record<string, string>> }>({
+export const test = base.extend<{
+  desktop: DesktopApplicationFixture;
+  desktopEnvironment: Readonly<Record<string, string>>;
+  desktopDataFiles: Readonly<Record<string, string>>;
+}>({
   desktopEnvironment: [{}, { option: true }],
-  desktop: async ({ desktopEnvironment }, use, testInfo) => {
-    const desktop = await DesktopApplicationFixture.launchAsync(testInfo, desktopEnvironment);
+  desktopDataFiles: [{}, { option: true }],
+  desktop: async ({ desktopEnvironment, desktopDataFiles }, use, testInfo) => {
+    const desktop = await DesktopApplicationFixture.launchAsync(testInfo, desktopEnvironment, desktopDataFiles);
     try {
       await use(desktop);
     }
