@@ -16,12 +16,13 @@ import SourceTreeFixture from "../../fixtures/source-tree.fixture.ts";
 import WorkflowFileFixture from "../../fixtures/workflow-file.fixture.ts";
 
 class BuildAndTestTests {
+  private static readonly SCRIPT_TIMEOUT: number = 30_000;
   private static readonly WORKFLOW: string = "build-and-test.yml";
   private static readonly TOOLCHAIN_STEP: string = "Verify the toolchain";
   private static readonly RESULT_STEP: string = "Require the selected verification to pass";
 
   public static register(): void {
-    test("the toolchain check passes only for the pinned Node.js and npm versions on the expected architecture", async t => {
+    test("the toolchain check passes only for the pinned Node.js and npm versions on the expected architecture", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.TOOLCHAIN_STEP);
       const cases: readonly (readonly [string, string, string, number])[] = [
         ["v26.7.0", "11.19.0", "arm64", 0],
@@ -57,7 +58,7 @@ class BuildAndTestTests {
       assert.ok(script.includes("test \"$(npm --version)\" = 11.19.0\n"));
     });
 
-    test("the aggregate check passes a documentation-only skip or a complete pass, and fails otherwise", async t => {
+    test("the aggregate check passes a documentation-only skip or a complete pass, and fails otherwise", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
       const cases: readonly (readonly [string, string, string, number, RegExp])[] = [
         ["success", "false", "skipped", 0, /^Only Markdown documentation changed/],
@@ -85,7 +86,7 @@ class BuildAndTestTests {
       }
     });
 
-    test("macOS targets stop Spotlight indexing before checking out", async t => {
+    test("macOS targets stop Spotlight indexing before checking out", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());

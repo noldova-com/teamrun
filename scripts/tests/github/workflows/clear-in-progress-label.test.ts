@@ -13,10 +13,11 @@ import CommandDoublesFixture from "../../fixtures/command-doubles.fixture.ts";
 import WorkflowFileFixture from "../../fixtures/workflow-file.fixture.ts";
 
 class ClearInProgressLabelTests {
+  private static readonly SCRIPT_TIMEOUT: number = 30_000;
   private static readonly WORKFLOW: string = "clear-in-progress-label.yml";
 
   public static register(): void {
-    test("closing a labelled issue removes its in progress label and reports a failed removal", async t => {
+    test("closing a labelled issue removes its in progress label and reports a failed removal", { timeout: ClearInProgressLabelTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(ClearInProgressLabelTests.WORKFLOW)).readStepScript("Remove the in progress label");
       for (const status of [0, 1]) {
         const doubles = await CommandDoublesFixture.createAsync();

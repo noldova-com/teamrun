@@ -13,10 +13,11 @@ import CommandDoublesFixture from "../../fixtures/command-doubles.fixture.ts";
 import WorkflowFileFixture from "../../fixtures/workflow-file.fixture.ts";
 
 class RequireLinkedIssueMergeGroupTests {
+  private static readonly SCRIPT_TIMEOUT: number = 30_000;
   private static readonly WORKFLOW: string = "require-linked-issue-merge-group.yml";
 
   public static register(): void {
-    test("a merge group passes the linked-issue check and says why in the summary", async t => {
+    test("a merge group passes the linked-issue check and says why in the summary", { timeout: RequireLinkedIssueMergeGroupTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(RequireLinkedIssueMergeGroupTests.WORKFLOW)).readStepScript("Accept the merge group's pull requests");
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());

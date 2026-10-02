@@ -19,6 +19,8 @@ import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
 class PackageCheckTests {
+  private static readonly BUILD_TIMEOUT: number = 60_000;
+
   public static register(): void {
     test("a tree without packages passes", async t => {
       const repository = await RepositoryFixture.createAsync();
@@ -31,7 +33,7 @@ class PackageCheckTests {
       assert.equal(check.title, "Packages");
     });
 
-    test("packages are built and installed", async t => {
+    test("packages are built and installed", { timeout: PackageCheckTests.BUILD_TIMEOUT }, async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await PackageTreeFixture.writeRootAsync(repository);

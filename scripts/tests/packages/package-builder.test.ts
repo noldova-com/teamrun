@@ -25,11 +25,12 @@ import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 
 class PackageBuilderTests {
+  private static readonly BUILD_TIMEOUT: number = 60_000;
   private static readonly ALPHA: PackageManifest = new PackageManifest("src/foundation/alpha", "@noldova/teamrun-foundation-alpha", []);
   private static readonly ROOT: RootManifest = new RootManifest("0.0.7", 3);
 
   public static register(): void {
-    test("a package is compiled, stamped, packed and installed, and its tests compile against the installed package", async t => {
+    test("a package is compiled, stamped, packed and installed, and its tests compile against the installed package", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {
       const layout = new BuildLayout((await PackageBuilderTests.createAsync(t, true)).directory);
       const archive = layout.locateArchive(PackageBuilderTests.ALPHA, "0.0.7");
       const builder = PackageBuilderTests.createBuilder(layout, new NpmCommand(new ProcessRunner(), process.env));
@@ -48,7 +49,7 @@ class PackageBuilderTests {
       assert.ok(existsSync(path.join(layout.locateTestOutput(PackageBuilderTests.ALPHA), "api", "index.test.js")));
     });
 
-    test("the installed package's source maps resolve to the package's real source files", async t => {
+    test("the installed package's source maps resolve to the package's real source files", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {
       const layout = new BuildLayout((await PackageBuilderTests.createAsync(t, true)).directory);
       const builder = PackageBuilderTests.createBuilder(layout, new NpmCommand(new ProcessRunner(), process.env));
 
@@ -68,7 +69,7 @@ class PackageBuilderTests {
       }
     });
 
-    test("types installed for the Angular project under src are never included in a package's compilation", async t => {
+    test("types installed for the Angular project under src are never included in a package's compilation", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuilderTests.createAsync(t, true);
       await repository.writeAsync({ "src/node_modules/@types/leak/index.d.ts": "declare const leaked: MissingType;\n" });
       const layout = new BuildLayout(repository.directory);
@@ -79,7 +80,7 @@ class PackageBuilderTests {
       assert.ok(existsSync(path.join(layout.locateInstalled(PackageBuilderTests.ALPHA), "api", "index.js")));
     });
 
-    test("a package without resources is installed without stamping them", async t => {
+    test("a package without resources is installed without stamping them", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {
       const layout = new BuildLayout((await PackageBuilderTests.createAsync(t, false)).directory);
 
       await PackageBuilderTests.createBuilder(layout, new NpmCommand(new ProcessRunner(), process.env))
@@ -99,7 +100,7 @@ class PackageBuilderTests {
       assert.equal(existsSync(layout.locateOutput(PackageBuilderTests.ALPHA)), false);
     });
 
-    test("compiler errors in a package or its tests fail with the compiler's output", async t => {
+    test("compiler errors in a package or its tests fail with the compiler's output", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuilderTests.createAsync(t, true);
       await repository.writeAsync({
         "src/foundation/alpha/src/broken.ts": "export const value: number = \"text\";\n",
@@ -113,7 +114,7 @@ class PackageBuilderTests {
         t => t instanceof PackageException && /^Compiling src\/foundation\/alpha\/tests failed with exit code \d+:\n.*broken\.test\.ts.*TS2322/s.test(t.message));
     });
 
-    test("failed packing or installing fails the build with npm's output", async t => {
+    test("failed packing or installing fails the build with npm's output", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {
       const layout = new BuildLayout((await PackageBuilderTests.createAsync(t, true)).directory);
       const failedPack = new NpmCommand(new ProcessRunnerFixture([], [new ProcessResult(1, "", "pack error\n")]), { npm_execpath: "npm-cli.js" });
       const failedInstall = new NpmCommand(new ProcessRunnerFixture([], [new ProcessResult(0, "", ""), new ProcessResult(7, "out\n", "install error\n")]), { npm_execpath: "npm-cli.js" });
