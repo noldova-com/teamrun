@@ -16,36 +16,47 @@ import { test } from "node:test";
 import ApiPipe from "../../api/api-pipe.ts";
 
 class ApiPipeTests {
+  private static readonly SOCKET_PATH_LIMIT: number = 100;
+
   public static register(): void {
-    test("Windows uses a named pipe with a unique name", () => {
-      const first = new ApiPipe("win32", "unused");
-      const second = new ApiPipe("win32", "unused");
+    test("Windows uses a named pipe with a unique name and needs no removal", async () => {
+      const first = await ApiPipe.createAsync("win32");
+      const second = await ApiPipe.createAsync("win32");
 
       assert.match(first.name, new RegExp(`^\\\\\\\\\\.\\\\pipe\\\\teamrun-api-${process.pid}-[0-9a-f]{12}$`));
       assert.notEqual(first.name, second.name);
+      await first.removeAsync();
     });
 
-    test("Linux and macOS use a socket file in the given folder, removed after use", async t => {
-      const directory = await mkdtemp(path.join(tmpdir(), "teamrun-pipe-"));
-      t.after(() => rm(directory, { recursive: true, force: true }));
-      const pipe = new ApiPipe("linux", directory);
+    test("Linux and macOS use a socket in a dedicated folder under the given root, removed with it", async t => {
+      const root = await mkdtemp(path.join(tmpdir(), "teamrun-pipe-"));
+      t.after(() => rm(root, { recursive: true, force: true }));
+      const pipe = await ApiPipe.createAsync("linux", root);
+      const folder = path.dirname(pipe.name);
       await writeFile(pipe.name, "");
 
-      assert.equal(path.dirname(pipe.name), directory);
-      assert.match(path.basename(pipe.name), /^teamrun-api-\d+-[0-9a-f]{12}\.sock$/);
+      assert.equal(path.dirname(folder), root);
+      assert.match(path.basename(folder), /^tr-api-[A-Za-z0-9]{6}$/);
+      assert.equal(path.basename(pipe.name), "api.sock");
       await pipe.removeAsync();
-      assert.equal(existsSync(pipe.name), false);
+      assert.equal(existsSync(folder), false);
       await pipe.removeAsync();
     });
 
-    test("a named pipe needs no removal", async t => {
-      const directory = await mkdtemp(path.join(tmpdir(), "teamrun-pipe-"));
-      t.after(() => rm(directory, { recursive: true, force: true }));
-      const marker = path.join(directory, "kept");
-      await writeFile(marker, "");
+    test("by default the socket path stays short whatever the temporary folder is", { skip: process.platform === "win32" ? "Windows uses a named pipe." : false }, async t => {
+      const original = process.env["TMPDIR"];
+      process.env["TMPDIR"] = path.join(path.sep, "x".repeat(ApiPipeTests.SOCKET_PATH_LIMIT));
+      t.after(() => {
+        if (original === undefined)
+          delete process.env["TMPDIR"];
+        else
+          process.env["TMPDIR"] = original;
+      });
+      const pipe = await ApiPipe.createAsync("linux");
+      t.after(() => pipe.removeAsync());
 
-      await new ApiPipe("win32", directory).removeAsync();
-      assert.equal(existsSync(marker), true);
+      assert.ok(pipe.name.length < ApiPipeTests.SOCKET_PATH_LIMIT, pipe.name);
+      assert.ok(existsSync(path.dirname(pipe.name)));
     });
   }
 }
