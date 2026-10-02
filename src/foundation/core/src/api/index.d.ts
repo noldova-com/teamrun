@@ -18,6 +18,28 @@ export declare type NameofSelector<T> = { readonly [TName in keyof T]-?: TName; 
  * @param name The member name, checked against the string keys of `T` at
  * compile time.
  * @returns The member name, unchanged.
+ * @example
+ * ```ts
+ * import { nameof } from "@noldova/teamrun-foundation-core";
+ *
+ * interface IUser {
+ *   readonly name: string;
+ *   readonly email: string;
+ * }
+ *
+ * export const emailField: string = nameof<IUser>("email");
+ * ```
+ * @example
+ * ```ts
+ * import { nameof } from "@noldova/teamrun-foundation-core";
+ *
+ * interface IUser {
+ *   readonly name: string;
+ * }
+ *
+ * // @ts-expect-error
+ * nameof<IUser>("phone");
+ * ```
  */
 export declare function nameof<T>(name: keyof T & string): string;
 
@@ -31,6 +53,16 @@ export declare function nameof<T>(name: keyof T & string): string;
  * @throws TypeError when the selector reads no member, more than one member or
  * a symbol member, or returns something other than the member it read. A
  * failure thrown by the selector is preserved as the `cause`.
+ * @example
+ * ```ts
+ * import { nameof } from "@noldova/teamrun-foundation-core";
+ *
+ * interface IUser {
+ *   readonly name: string;
+ * }
+ *
+ * export const nameField: string = nameof<IUser>(t => t.name);
+ * ```
  */
 export declare function nameof<T>(selector: (t: NameofSelector<T>) => keyof T & string): string;
 

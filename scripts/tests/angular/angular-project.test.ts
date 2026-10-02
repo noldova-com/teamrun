@@ -7,8 +7,9 @@
  */
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { utimes } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -49,29 +50,33 @@ class AngularProjectTests {
       assert.deepEqual(runner.captured, [[process.execPath, directory, AngularProjectTests.NPM, "ci", "--no-audit", "--no-fund"]]);
       assert.deepEqual(runner.runs, [[process.execPath, directory, path.join(directory, "node_modules", "playwright", "cli.js"), "install", "--only-shell", "chromium"]]);
       assert.equal(output.text, "Installing the Angular project in src/...\nInstalling the browser for the Angular tests...\n");
+      assert.equal(await readFile(path.join(directory, "node_modules", ".teamrun-install"), "utf8"), AngularProjectTests.formatRecord("{}\n"));
     });
 
-    test("an installed project is reinstalled only when its lockfile is newer than the installation", async t => {
+    test("an installed project is reinstalled only when its lockfile, platform or CPU differ from the recorded install", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
-      await repository.writeAsync({ "src/node_modules/.package-lock.json": "{}\n", "src/node_modules/@angular/cli/bin/ng.js": "" });
-      const lockfile = path.join(repository.directory, "src", "package-lock.json");
-      const installed = path.join(repository.directory, "src", "node_modules", ".package-lock.json");
-      await utimes(lockfile, new Date(2026, 0, 1), new Date(2026, 0, 1));
-      await utimes(installed, new Date(2026, 0, 2), new Date(2026, 0, 2));
+      await repository.writeAsync({ "src/node_modules/.teamrun-install": AngularProjectTests.formatRecord("{}\n"), "src/node_modules/@angular/cli/bin/ng.js": "" });
       const current = new ProcessRunnerFixture();
       await AngularProjectTests.create(repository, current).prepareAsync(new TextOutputFixture());
 
-      await utimes(lockfile, new Date(2026, 0, 3), new Date(2026, 0, 3));
+      await repository.writeAsync({ "src/package-lock.json": "{ \"lockfileVersion\": 3 }\n" });
       const changed = new ProcessRunnerFixture([], [new ProcessResult(0, "", "")]);
       await AngularProjectTests.create(repository, changed).prepareAsync(new TextOutputFixture());
+      const afterChange = await readFile(path.join(repository.directory, "src", "node_modules", ".teamrun-install"), "utf8");
+
+      await repository.writeAsync({ "src/node_modules/.teamrun-install": afterChange.replace(process.arch, "other-cpu") });
+      const otherCpu = new ProcessRunnerFixture([], [new ProcessResult(0, "", "")]);
+      await AngularProjectTests.create(repository, otherCpu).prepareAsync(new TextOutputFixture());
 
       assert.deepEqual([current.captured.length, current.runs.length], [0, 1]);
       assert.deepEqual([changed.captured.length, changed.runs.length], [1, 1]);
+      assert.equal(afterChange, AngularProjectTests.formatRecord("{ \"lockfileVersion\": 3 }\n"));
+      assert.equal(otherCpu.captured.length, 1);
     });
 
     test("a project without its CLI is reinstalled", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
-      await repository.writeAsync({ "src/node_modules/.package-lock.json": "{}\n" });
+      await repository.writeAsync({ "src/node_modules/.teamrun-install": AngularProjectTests.formatRecord("{}\n") });
       const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "", "")]);
 
       await AngularProjectTests.create(repository, runner).prepareAsync(new TextOutputFixture());
@@ -81,6 +86,7 @@ class AngularProjectTests {
 
     test("a failed install or browser install stops the preparation with the reason", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
+      await repository.writeAsync({ "src/node_modules/.package-lock.json": "{}\n" });
 
       await assert.rejects(
         AngularProjectTests.create(repository, new ProcessRunnerFixture([], [new ProcessResult(1, "", "npm ERR! lockfile out of date\n")])).prepareAsync(new TextOutputFixture()),
@@ -108,6 +114,10 @@ class AngularProjectTests {
     t.after(() => repository.disposeAsync());
     await repository.writeAsync({ "src/angular.json": "{}\n", "src/package-lock.json": "{}\n" });
     return repository;
+  }
+
+  private static formatRecord(lockfile: string): string {
+    return `${process.platform} ${process.arch} ${createHash("sha256").update(lockfile).digest("hex")}\n`;
   }
 
   private static create(repository: RepositoryFixture, runner: ProcessRunnerFixture): AngularProject {
