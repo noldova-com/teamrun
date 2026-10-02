@@ -129,9 +129,10 @@ export class RuntimeStartup {
   }
 
   private reconnect(): void {
+    if (Object.isNull(this.connection) || this.isClosed)
+      return;
     this.connection = null;
-    if (!this.isClosed)
-      void this.startAsync();
+    void this.startAsync();
   }
 
   private update(state: StartupState): void {

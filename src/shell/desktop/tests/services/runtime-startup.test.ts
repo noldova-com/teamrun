@@ -162,6 +162,19 @@ export class RuntimeStartupTests {
   }
 
   @TestMethod
+  public async ignoresTheEndOfARefusedConnection(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher(new PreShellDataFoundException(new PreShellData("/data/old")));
+    const startup = this.create(launcher);
+
+    await startup.startAsync();
+    launcher.listener?.onDisconnected();
+    await setImmediate();
+
+    Assert.areEqual(1, launcher.calls.length);
+    Assert.areEqual("PreShellData", startup.current.kind);
+  }
+
+  @TestMethod
   public async closesItsConnectionAndOneThatArrivesAfterClosing(): Promise<void> {
     const launcher = new FakeRuntimeLauncher();
     const startup = this.create(launcher);

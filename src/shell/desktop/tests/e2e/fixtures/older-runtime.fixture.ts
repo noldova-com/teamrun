@@ -39,7 +39,7 @@ export default class OlderRuntimeFixture {
       .replace(`productVersion = "${RuntimeBuild.identity.productVersion}"`, `productVersion = "${OlderRuntimeFixture.VERSION}"`)
       .replace(`build = "${RuntimeBuild.identity.fingerprint}"`, `build = "${RuntimeBuild.identity.fingerprint}-${OlderRuntimeFixture.VERSION}"`);
     await writeFile(resources, text);
-    const child = spawn(process.execPath, [path.join(copy, "services", "runtime-entry.js"), `--data-dir=${dataDirectory}`], { stdio: "ignore", windowsHide: true });
+    const child = spawn(process.execPath, [path.join(copy, "services", "runtime-entry.js"), "--data-dir", dataDirectory], { stdio: "ignore", windowsHide: true });
     const processId = child.pid ?? -1;
     await expect.poll(async () => (await DiscoveryReader.readAsync(new DataDirectory(dataDirectory)))?.productVersion, { timeout: OlderRuntimeFixture.START_TIMEOUT })
       .toBe(OlderRuntimeFixture.VERSION);
