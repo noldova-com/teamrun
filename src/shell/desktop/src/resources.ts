@@ -92,6 +92,9 @@ export class Resources {
   public static readonly unmaximizeEvent: "unmaximize" = "unmaximize";
   public static readonly boundsSaveDelay: number = 500;
   public static readonly connectingShowLimit: number = 2_000;
+  public static readonly paintShowLimit: number = 10_000;
+  public static readonly logLineSeparator: string = "\n";
+  public static readonly logFileMode: number = 0o600;
   public static readonly mainWindow: string = "main";
   public static readonly runtimeNotConnected: string = `${Resources.applicationName} is not connected to its runtime.`;
   public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout is not kept.";
@@ -166,6 +169,15 @@ export class Resources {
 
   public static formatAppearanceRejected(reason: string): string {
     return `The window reported an appearance that is not valid, so it is shown without it: ${reason}`;
+  }
+
+  public static formatDesktopLogUnavailable(reason: string): string {
+    return `The desktop's log could not be written, so its records go to standard error only: ${reason}`;
+  }
+
+  public static formatWindowShownUnpainted(seconds: number, isLoading: boolean, isCrashed: boolean): string {
+    const page = isCrashed ? "its page has crashed" : isLoading ? "its page is still loading" : "its page loaded but did not report its first paint";
+    return `The window was shown before it was painted, ${seconds} s after it opened, because ${page}.`;
   }
 
   public static formatWindowSize(name: string, minimum: number): string {

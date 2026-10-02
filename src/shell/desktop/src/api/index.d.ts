@@ -6,12 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { Writable } from "node:stream";
+
 import type { AppDetailsOptions, BrowserWindowConstructorOptions, MenuItemConstructorOptions, Rectangle, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { Event, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey } from "@noldova/teamrun-shell-protocol";
-import type { IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
+import type { DataDirectory, DiagnosticRedactor, IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -86,6 +88,11 @@ export interface IDesktopProcess {
    * The working directory the desktop started in, against which relative path arguments resolve.
    */
   readonly workingDirectory: string;
+
+  /**
+   * Standard error, which mirrors the desktop's log.
+   */
+  readonly errorOutput: Writable;
 
   /**
    * Starts another program, detached, for the hand-over to a newer build.
@@ -646,6 +653,56 @@ export interface IWindowContents {
    * ```
    */
   send(channel: string, ...values: unknown[]): void;
+
+  /**
+   * Tells whether the page is still loading.
+   *
+   * @returns Whether it is loading.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function isLoading(contents: IWindowContents): boolean {
+   *   return contents.isLoading();
+   * }
+   * ```
+   */
+  isLoading(): boolean;
+
+  /**
+   * Tells whether the page's renderer process has crashed.
+   *
+   * @returns Whether it has crashed.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function hasCrashed(contents: IWindowContents): boolean {
+   *   return contents.isCrashed();
+   * }
+   * ```
+   */
+  isCrashed(): boolean;
+}
+
+/**
+ * Where the desktop records what a person or a support request may need to know.
+ */
+export interface IDesktopLog {
+  /**
+   * Records a line.
+   *
+   * @param text What happened.
+   * @example
+   * ```ts
+   * import type { IDesktopLog } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function record(log: IDesktopLog): void {
+   *   log.write("The window's bounds could not be saved.");
+   * }
+   * ```
+   */
+  write(text: string): void;
 }
 
 /**
@@ -1654,8 +1711,106 @@ export declare class CloseCoordinator {
 }
 
 /**
+ * One open window: it shows once its page has painted and its startup has settled, or unpainted after a limit; asks
+ * its page to save before closing; and keeps its bounds.
+ */
+export declare class OpenWindow {
+  /**
+   * The native window.
+   */
+  public readonly window: IDesktopWindow;
+
+  /**
+   * Asks the page to save before the window closes.
+   */
+  public readonly coordinator: CloseCoordinator;
+
+  /**
+   * Restores and keeps the window's bounds.
+   */
+  public readonly bounds: WindowBoundsKeeper;
+
+  /**
+   * Takes charge of a window that is not yet shown.
+   *
+   * @param window The window, created hidden.
+   * @param displays The displays, for placing restored bounds.
+   * @param log Records why a window was shown unpainted and saves that failed.
+   * @example
+   * ```ts
+   * import { type IDesktopLog, type IDesktopWindow, type IDisplayHost, OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function track(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog): OpenWindow {
+   *   return new OpenWindow(window, displays, log);
+   * }
+   * ```
+   */
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog);
+
+  /**
+   * Notes that the page has painted, and shows the window if its startup has settled.
+   *
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function painted(open: OpenWindow): void {
+   *   open.markPainted();
+   * }
+   * ```
+   */
+  public markPainted(): void;
+
+  /**
+   * Settles the startup after a delay, whatever the runtime does by then.
+   *
+   * @param milliseconds The delay.
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function settleSoon(open: OpenWindow): void {
+   *   open.settleWithin(2_000);
+   * }
+   * ```
+   */
+  public settleWithin(milliseconds: number): void;
+
+  /**
+   * Notes that the startup has settled, and shows the window if its page has painted.
+   *
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function settled(open: OpenWindow): void {
+   *   open.settle();
+   * }
+   * ```
+   */
+  public settle(): void;
+
+  /**
+   * Shows the window after a limit even when its page has not painted by then, settling its startup, and records why:
+   * the page is still loading, has crashed, or loaded without reporting its paint.
+   *
+   * @param milliseconds The limit.
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function showWithin(open: OpenWindow): void {
+   *   open.showUnpaintedWithin(10_000);
+   * }
+   * ```
+   */
+  public showUnpaintedWithin(milliseconds: number): void;
+}
+
+/**
  * The desktop's main process: one sandboxed instance with one window, which it shows once the page has painted its
- * theme and closes once the page has saved.
+ * theme, or unpainted after ten seconds, and closes once the page has saved. It records its diagnostics in
+ * `logs/desktop.log` once the data directory is usable, and on standard error.
  */
 export declare class DesktopApplication {
   private constructor();
@@ -1912,6 +2067,65 @@ export declare class RuntimeWindowStateStore implements IWindowStateStore {
 }
 
 /**
+ * The desktop's log, `logs/desktop.log` in the data directory, mirrored to standard error. One desktop runs per data
+ * directory, so the desktop alone owns the file.
+ */
+export declare class DesktopLog implements IDesktopLog {
+  /**
+   * Creates the log; nothing is written to the file until it opens.
+   *
+   * @param directory The data directory whose `logs/desktop.log` the desktop owns.
+   * @param error Standard error, which receives every line, also before the file opens and when it cannot be written.
+   * @param redactor Removes the home folder and opaque values from every line.
+   * @param now The clock that stamps each line; the current time by default.
+   * @example
+   * ```ts
+   * import { homedir } from "node:os";
+   *
+   * import { DesktopLog } from "@noldova/teamrun-shell-desktop";
+   * import { DiagnosticRedactor, type DataDirectory } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createLog(directory: DataDirectory): DesktopLog {
+   *   return new DesktopLog(directory, process.stderr, new DiagnosticRedactor(homedir()));
+   * }
+   * ```
+   */
+  public constructor(directory: DataDirectory, error: Writable, redactor: DiagnosticRedactor, now?: () => Date);
+
+  /**
+   * Starts the file once the data directory is usable: keeps the previous start's log as `logs/desktop.previous.log`
+   * and starts `logs/desktop.log`. Only the first call does anything. When the file cannot be started, the log
+   * records why and goes on writing to standard error only.
+   *
+   * @example
+   * ```ts
+   * import type { DesktopLog } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function start(log: DesktopLog): void {
+   *   log.open();
+   * }
+   * ```
+   */
+  public open(): void;
+
+  /**
+   * Records a line, stamped with the time and redacted, on standard error and, once open, in the file. When the file
+   * cannot take a line, later lines go to standard error only, and the log records why there.
+   *
+   * @param text What happened.
+   * @example
+   * ```ts
+   * import type { DesktopLog } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function record(log: DesktopLog): void {
+   *   log.write("The window was shown before it was painted.");
+   * }
+   * ```
+   */
+  public write(text: string): void;
+}
+
+/**
  * Restores a window's saved bounds onto the displays that show it, then keeps them after each pause in moving,
  * resizing and maximizing, and on request before the window closes.
  */
@@ -1922,16 +2136,17 @@ export declare class WindowBoundsKeeper {
    * @param window The window.
    * @param displays The displays, for placing restored bounds.
    * @param saveDelay How long a pause in changes lasts before the bounds are saved, in milliseconds.
+   * @param log Records a save that failed.
    * @example
    * ```ts
-   * import { type IDesktopWindow, type IDisplayHost, WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
+   * import { type IDesktopLog, type IDesktopWindow, type IDisplayHost, WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
    *
-   * export function keep(window: IDesktopWindow, displays: IDisplayHost): WindowBoundsKeeper {
-   *   return new WindowBoundsKeeper(window, displays, 500);
+   * export function keep(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog): WindowBoundsKeeper {
+   *   return new WindowBoundsKeeper(window, displays, 500, log);
    * }
    * ```
    */
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number);
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog);
 
   /**
    * Keeps the bounds in the store from now on, and applies the bounds it holds: the saved position when a display

@@ -8,6 +8,7 @@
 
 export type { IApplicationHost } from "../interfaces/i-application-host.js";
 export type { IClipboardHost } from "../interfaces/i-clipboard-host.js";
+export type { IDesktopLog } from "../interfaces/i-desktop-log.js";
 export type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 export type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
 export type { IDisplayHost } from "../interfaces/i-display-host.js";
@@ -41,8 +42,10 @@ export { WindowAppearance } from "../models/window-appearance.js";
 export { WindowState } from "../models/window-state.js";
 export { CloseCoordinator } from "../services/close-coordinator.js";
 export { DesktopApplication } from "../services/desktop-application.js";
+export { DesktopLog } from "../services/desktop-log.js";
 export { DetachedStart } from "../services/detached-start.js";
 export { DeviceIdentity } from "../services/device-identity.js";
+export { OpenWindow } from "../services/open-window.js";
 export { RuntimeStartup } from "../services/runtime-startup.js";
 export { RuntimeWindowStateStore } from "../services/runtime-window-state-store.js";
 export { SenderPolicy } from "../services/sender-policy.js";

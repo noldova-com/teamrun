@@ -30,6 +30,7 @@ export class RuntimeApiTests {
       "DatabaseBackup",
       "DeclarationsFormatException",
       "DiscoveryFormatException",
+      "DiagnosticRedactor",
       "DiscoveryPublisher",
       "DiscoveryReader",
       "Endpoint",

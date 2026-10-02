@@ -29,6 +29,7 @@ DesktopApplication.start(
     execPath: process.execPath,
     homeFolder: homedir(),
     workingDirectory: process.cwd(),
+    errorOutput: process.stderr,
     startDetached: t => spawn(t, [], { detached: true, stdio: "ignore" }).unref()
   },
   import.meta.url,

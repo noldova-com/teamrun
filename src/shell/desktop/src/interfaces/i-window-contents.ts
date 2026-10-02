@@ -18,4 +18,6 @@ export interface IWindowContents {
   on(event: "will-attach-webview", listener: (event: IPreventableEvent) => void): unknown;
   setWindowOpenHandler(handler: () => WindowOpenHandlerResponse): void;
   send(channel: string, ...values: unknown[]): void;
+  isLoading(): boolean;
+  isCrashed(): boolean;
 }
