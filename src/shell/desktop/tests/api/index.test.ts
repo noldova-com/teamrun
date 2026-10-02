@@ -30,6 +30,7 @@ export class DesktopApiTests {
         "SenderPolicy",
         "StartupState",
         "StartupStateKind",
+        "TaskbarIdentity",
         "UtilityProcessStarter",
         "WindowAppearance",
         "WindowBoundsKeeper",

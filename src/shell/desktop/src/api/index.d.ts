@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { BrowserWindowConstructorOptions, MenuItemConstructorOptions, Rectangle, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
+import type { AppDetailsOptions, BrowserWindowConstructorOptions, MenuItemConstructorOptions, Rectangle, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
@@ -81,6 +81,11 @@ export interface IDesktopProcess {
    * The person's home folder.
    */
   readonly homeFolder: string;
+
+  /**
+   * The working directory the desktop started in, against which relative path arguments resolve.
+   */
+  readonly workingDirectory: string;
 
   /**
    * Starts another program, detached, for the hand-over to a newer build.
@@ -697,6 +702,21 @@ export interface IDesktopWindow {
    * ```
    */
   setTitleBarOverlay(options: TitleBarOverlayOptions): void;
+
+  /**
+   * Describes the window to the Windows taskbar: its app ID, its icon and the command that starts this build again.
+   *
+   * @param options The taskbar details.
+   * @example
+   * ```ts
+   * import { type IDesktopWindow, TaskbarIdentity } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function describe(window: IDesktopWindow): void {
+   *   window.setAppDetails(TaskbarIdentity.create(true, "/opt/teamrun/teamrun", "", [], "/opt/teamrun").toAppDetails());
+   * }
+   * ```
+   */
+  setAppDetails(options: AppDetailsOptions): void;
 
   /**
    * The window's bounds when it is neither maximized nor minimized.
@@ -1961,6 +1981,80 @@ export declare class WindowBoundsKeeper {
    * ```
    */
   public cancelSave(): void;
+}
+
+/**
+ * How a build presents itself to the Windows taskbar: the app ID its windows group under, the icon, and the command
+ * the taskbar and its jump list use to start this same build again. A development build has its own app ID, so it
+ * never mixes with an installed TeamRun.
+ */
+export declare class TaskbarIdentity {
+  /**
+   * The app user model ID.
+   */
+  public readonly appId: string;
+
+  /**
+   * The file whose icon the taskbar shows: the build's program.
+   */
+  public readonly iconPath: string;
+
+  /**
+   * The command line that starts this build again, each part quoted.
+   */
+  public readonly relaunchCommand: string;
+
+  /**
+   * Creates the identity.
+   *
+   * @param appId The app user model ID.
+   * @param iconPath The file whose icon the taskbar shows.
+   * @param relaunchCommand The command line that starts this build again.
+   * @throws {ArgumentException} When a part is blank.
+   * @example
+   * ```ts
+   * import { TaskbarIdentity } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const identity: TaskbarIdentity = new TaskbarIdentity("com.noldova.teamrun", "/opt/teamrun/teamrun", "\"/opt/teamrun/teamrun\"");
+   * ```
+   */
+  public constructor(appId: string, iconPath: string, relaunchCommand: string);
+
+  /**
+   * Describes the running build. A packaged build starts again by its program; a development build by Electron with
+   * its main script. Both keep the given `--data-dir=`, `--user-data-dir=` and `--device-dir=` arguments, resolved to
+   * absolute paths, so the relaunch reaches the running instance's single-instance lock from any working directory.
+   *
+   * @param isPackaged Whether the build is packaged.
+   * @param executablePath The running program.
+   * @param mainScript The desktop's main script, which a development build passes to Electron.
+   * @param argv The process's command-line arguments.
+   * @param workingDirectory The directory relative paths in the arguments resolve against.
+   * @returns The identity.
+   * @example
+   * ```ts
+   * import { TaskbarIdentity } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const identity: TaskbarIdentity = TaskbarIdentity.create(false, "/checkout/electron", "/checkout/main.js", ["--data-dir=data"], "/checkout");
+   * ```
+   */
+  public static create(isPackaged: boolean, executablePath: string, mainScript: string, argv: readonly string[], workingDirectory: string): TaskbarIdentity;
+
+  /**
+   * The details for `BrowserWindow.setAppDetails`.
+   *
+   * @returns The app ID, icon, relaunch command and the product's name as the relaunch entry's name.
+   * @example
+   * ```ts
+   * import type { AppDetailsOptions } from "electron";
+   * import type { TaskbarIdentity } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function detailsOf(identity: TaskbarIdentity): AppDetailsOptions {
+   *   return identity.toAppDetails();
+   * }
+   * ```
+   */
+  public toAppDetails(): AppDetailsOptions;
 }
 
 /**

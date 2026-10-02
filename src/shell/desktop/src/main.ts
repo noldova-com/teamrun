@@ -28,6 +28,7 @@ DesktopApplication.start(
     platform: process.platform,
     execPath: process.execPath,
     homeFolder: homedir(),
+    workingDirectory: process.cwd(),
     startDetached: t => spawn(t, [], { detached: true, stdio: "ignore" }).unref()
   },
   import.meta.url,

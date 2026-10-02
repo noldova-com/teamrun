@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { Rectangle, TitleBarOverlayOptions } from "electron";
+import type { AppDetailsOptions, Rectangle, TitleBarOverlayOptions } from "electron";
 
 import type { IPreventableEvent } from "./i-preventable-event.js";
 import type { IWindowContents } from "./i-window-contents.js";
@@ -17,6 +17,7 @@ export interface IDesktopWindow {
   loadFile(filePath: string): Promise<void>;
   setBackgroundColor(color: string): void;
   setTitleBarOverlay(options: TitleBarOverlayOptions): void;
+  setAppDetails(options: AppDetailsOptions): void;
   getNormalBounds(): Rectangle;
   setBounds(bounds: Partial<Rectangle>): void;
   center(): void;

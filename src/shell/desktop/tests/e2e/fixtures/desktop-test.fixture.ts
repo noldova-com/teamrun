@@ -15,17 +15,19 @@ export const test = base.extend<{
   desktop: DesktopApplicationFixture;
   desktopEnvironment: Readonly<Record<string, string>>;
   desktopDataFiles: Readonly<Record<string, string>>;
+  desktopArguments: readonly string[];
   desktopVariant: string | null;
 }>({
   desktopEnvironment: [{}, { option: true }],
   desktopDataFiles: [{}, { option: true }],
+  desktopArguments: [[], { option: true }],
   desktopVariant: [null, { option: true }],
-  desktop: async ({ desktopEnvironment, desktopDataFiles, desktopVariant }, use, testInfo) => {
+  desktop: async ({ desktopEnvironment, desktopDataFiles, desktopArguments, desktopVariant }, use, testInfo) => {
     let desktop: DesktopApplicationFixture | null = null;
     try {
       if (desktopVariant !== null)
         await BuildVariantFixture.swapInAsync(desktopVariant);
-      desktop = await DesktopApplicationFixture.launchAsync(testInfo, desktopEnvironment, desktopDataFiles);
+      desktop = await DesktopApplicationFixture.launchAsync(testInfo, desktopEnvironment, desktopDataFiles, desktopArguments);
       await use(desktop);
     }
     finally {
