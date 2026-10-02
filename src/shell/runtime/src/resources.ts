@@ -95,6 +95,105 @@ export class Resources {
   public static readonly historyNewer: string = "The shell database was written by a newer build.";
   public static readonly tablesWithoutHistory: string = "The shell database has tables but no migration history.";
   public static readonly discoveryNotObject: string = "The discovery metadata is not a JSON object.";
+  public static readonly dataDirectoryVariable: string = "TEAMRUN_DATA_DIR";
+  public static readonly defaultDataFolder: readonly string[] = [".noldova", "teamrun"];
+  public static readonly developmentDataFolder: readonly string[] = ["_build", "data"];
+  public static readonly preShellData: string = "This data directory holds data from a TeamRun release that predates the shell; move it aside to continue.";
+  public static readonly productVersion: string = "__VERSION__";
+  public static readonly build: string = "__BUILD__";
+  public static readonly linuxPlatform: string = "linux";
+  public static readonly loopbackHost: string = "127.0.0.1";
+  public static readonly tcpEndpointPrefix: string = "tcp://127.0.0.1:";
+  public static readonly portPattern: RegExp = /^[1-9]\d{0,4}$/;
+  public static readonly maximumPort: number = 65_535;
+  public static readonly socketFileName: string = "runtime.sock";
+  public static readonly maximumSocketPathLength: number = 103;
+  public static readonly tokenByteLength: number = 32;
+  public static readonly tokenDigestAlgorithm: string = "sha256";
+  public static readonly hexEncoding: BufferEncoding = "hex";
+  public static readonly dataEvent: string = "data";
+  public static readonly errorEvent: string = "error";
+  public static readonly closeEvent: string = "close";
+  public static readonly connectEvent: string = "connect";
+  public static readonly listeningEvent: string = "listening";
+  public static readonly spawnEvent: string = "spawn";
+  public static readonly abortEvent: string = "abort";
+  public static readonly ignoredOutput: "ignore" = "ignore";
+  public static readonly requestIdSeparator: string = ":";
+  public static readonly maximumFrameLength: number = 16 * 1024 * 1024;
+  public static readonly handshakeTimeout: number = 5_000;
+  public static readonly defaultRequestTimeout: number = 600_000;
+  public static readonly maximumRequestTimeout: number = 3_600_000;
+  public static readonly answerGrace: number = 5_000;
+  public static readonly closeGrace: number = 2_000;
+  public static readonly idleGrace: number = 30_000;
+  public static readonly launchTimeout: number = 20_000;
+  public static readonly launchPollInterval: number = 100;
+  public static readonly productVersionPattern: RegExp = /^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/;
+  public static readonly positiveIntegerPattern: RegExp = /^[1-9]\d{0,9}$/;
+  public static readonly versionSeparator: string = ".";
+  public static readonly versionPartWidth: number = 9;
+  public static readonly versionPadding: string = "0";
+  public static readonly dataDirectoryArgument: string = "--data-dir";
+  public static readonly idleGraceArgument: string = "--idle-grace";
+  public static readonly stopSignals: readonly NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
+  public static readonly usageExitCode: number = 2;
+  public static readonly ownedExitCode: number = 3;
+  public static readonly failureExitCode: number = 1;
+  public static readonly launchShell: string = "/bin/bash";
+  public static readonly launchDescriptors: string = "/proc/self/fd";
+  public static readonly launchShellArguments: readonly string[] = [
+    "--noprofile",
+    "--norc",
+    "-p",
+    "-c",
+    "set -e; shopt -s failglob; for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done; exec -- \"$@\"",
+    "teamrun-launch"
+  ];
+  public static readonly stoppedByIdle: string = "idle";
+  public static readonly stoppedByRequest: string = "request";
+  public static readonly stoppedBySignal: string = "signal";
+  public static readonly portParameterName: string = "port";
+  public static readonly pathParameterName: string = "path";
+  public static readonly textParameterName: string = "text";
+  public static readonly descriptionParameterName: string = "description";
+  public static readonly idleGraceParameterName: string = "idleGraceMilliseconds";
+  public static readonly maximumFrameLengthParameterName: string = "maximumFrameLength";
+  public static readonly handshakeTimeoutParameterName: string = "handshakeTimeout";
+  public static readonly defaultRequestTimeoutParameterName: string = "defaultRequestTimeout";
+  public static readonly maximumRequestTimeoutParameterName: string = "maximumRequestTimeout";
+  public static readonly callTimeoutParameterName: string = "callTimeout";
+  public static readonly answerGraceParameterName: string = "answerGrace";
+  public static readonly clientNameParameterName: string = "clientName";
+  public static readonly clientParameterName: string = "client";
+  public static readonly entryPathParameterName: string = "entryPath";
+  public static readonly launchTimeoutParameterName: string = "launchTimeout";
+  public static readonly pollIntervalParameterName: string = "pollInterval";
+  public static readonly argumentsParameterName: string = "arguments";
+  public static readonly portOutOfRange: string = "A port must be from 1 to 65535.";
+  public static readonly socketPathNotAbsolute: string = "A local socket's path must be absolute.";
+  public static readonly defaultRequestTimeoutTooLong: string = "The default time limit of a request cannot exceed its maximum.";
+  public static readonly endpointUnavailable: string = "The runtime's local endpoint has no address.";
+  public static readonly handshakeRequired: string = "A connection must begin with a handshake.";
+  public static readonly unauthorized: string = "The capability token is not valid for this runtime.";
+  public static readonly buildMismatch: string = "Another build of TeamRun owns this data directory.";
+  public static readonly otherBuildMayOnlyStop: string = "A connection from another build may only ask the runtime to stop.";
+  public static readonly unexpectedMessage: string = "Only requests and cancellations may follow the handshake.";
+  public static readonly invalidFrame: string = "The frame is not a valid message.";
+  public static readonly internalFailure: string = "The runtime failed to handle the request.";
+  public static readonly deadlineExceeded: string = "The request did not finish within its time limit.";
+  public static readonly cancelled: string = "The request was cancelled.";
+  public static readonly workInProgress: string = "Work is in progress; stopping now would interrupt it.";
+  public static readonly clientClosed: string = "The connection to the runtime is closed.";
+  public static readonly handshakeTimedOut: string = "The runtime did not answer the handshake in time.";
+  public static readonly handshakeRefused: string = "The runtime closed the connection during the handshake.";
+  public static readonly handshakeIdentityMismatch: string = "The runtime answered the handshake with another build's identity.";
+  public static readonly launchTimedOut: string = "The runtime did not start in time.";
+  public static readonly stopTimedOut: string = "The other build's runtime did not stop in time.";
+  public static readonly launchShellUnavailable: string = "Starting a program on Linux requires executable Bash at /bin/bash. Install Bash or restore its execute permissions.";
+  public static readonly launchDescriptorsUnavailable: string = "Starting a program on Linux requires access to /proc/self/fd. Ensure procfs is mounted at /proc and this process can read and traverse its descriptor directory.";
+  public static readonly dataDirectoryRequired: string = "The --data-dir argument is required.";
+  public static readonly usage: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>]";
 
   public static formatDiscoveryVersion(version: unknown): string {
     return `The discovery metadata has the unsupported format version ${String(version)}.`;
@@ -150,5 +249,77 @@ export class Resources {
 
   public static formatTemporaryName(fileName: string, unique: string): string {
     return `${fileName}.${unique}${Resources.temporarySuffix}`;
+  }
+
+  public static formatEndpointInvalid(text: string): string {
+    return `"${text}" is not a TeamRun endpoint.`;
+  }
+
+  public static formatSocketPathTooLong(socketPath: string): string {
+    return `The local socket path "${socketPath}" exceeds ${Resources.maximumSocketPathLength} bytes; use a data directory with a shorter path.`;
+  }
+
+  public static formatMethodRegistered(name: string): string {
+    return `The method ${name} is already registered.`;
+  }
+
+  public static formatEventDeclared(name: string): string {
+    return `The event ${name} is already declared.`;
+  }
+
+  public static formatEventWithdrawn(name: string): string {
+    return `The event ${name} is no longer declared.`;
+  }
+
+  public static formatUnknownMethod(name: string): string {
+    return `The method ${name} is not registered.`;
+  }
+
+  public static formatDuplicateRequest(id: string): string {
+    return `A request with the id ${id} is already running on this connection.`;
+  }
+
+  public static formatNoAnswer(method: string): string {
+    return `The runtime did not answer ${method} in time.`;
+  }
+
+  public static formatUnreachable(endpoint: string): string {
+    return `The runtime at ${endpoint} cannot be reached.`;
+  }
+
+  public static formatHandover(productVersion: string, executablePath: string): string {
+    return `TeamRun ${productVersion} at ${executablePath} owns this data directory and is newer; open that TeamRun instead.`;
+  }
+
+  public static formatWorkInProgress(descriptions: readonly string[]): string {
+    return `Work is in progress: ${descriptions.join("; ")}.`;
+  }
+
+  public static formatProductVersionInvalid(version: string): string {
+    return `"${version}" is not a product version of the form major.minor.patch.`;
+  }
+
+  public static formatStopRefused(message: string): string {
+    return `The other build's runtime refused to stop: ${message}`;
+  }
+
+  public static formatStartFailed(executablePath: string): string {
+    return `The runtime could not be started with ${executablePath}.`;
+  }
+
+  public static formatArgumentWithoutValue(name: string): string {
+    return `The argument ${name} needs a value.`;
+  }
+
+  public static formatPreShellFound(location: string): string {
+    return `The data directory ${location} holds data from a TeamRun release that predates the shell.`;
+  }
+
+  public static formatMoveAsideFailed(message: string): string {
+    return `The runtime could not move the old data aside: ${message}`;
+  }
+
+  public static formatArgumentInvalid(name: string, value: string): string {
+    return `The argument ${name} ${value} is not valid.`;
   }
 }

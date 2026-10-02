@@ -6,9 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { EventEmitter } from "node:events";
 import type { DatabaseSync } from "node:sqlite";
+import type { Writable } from "node:stream";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { BuildIdentity, Event, Failure, PreShellData, QualifiedName, Response, RunningWork, RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
 
 /**
  * What a data directory holds, judged from its top-level entries other than the
@@ -994,4 +998,1641 @@ export declare class OwnershipLock implements Disposable {
    * Releases the ownership.
    */
   public [Symbol.dispose](): void;
+}
+
+/**
+ * How a newer or older build relates to another, judged by product version.
+ */
+export declare enum BuildRelation {
+  /**
+   * The build's product version is higher.
+   */
+  Newer = "Newer",
+
+  /**
+   * Both builds have the same product version, as successive development builds do.
+   */
+  SameVersion = "SameVersion",
+
+  /**
+   * The build's product version is lower.
+   */
+  Older = "Older"
+}
+
+/**
+ * The transport of a runtime's local endpoint.
+ */
+export declare enum EndpointKind {
+  /**
+   * Loopback TCP, used on Windows.
+   */
+  Tcp = "Tcp",
+
+  /**
+   * A local Unix socket, used on macOS and Linux.
+   */
+  Socket = "Socket"
+}
+
+/**
+ * The exception thrown when a runtime cannot be reached, closes the connection or refuses it.
+ */
+export declare class ConnectionException extends Exception {
+  /**
+   * The failure the runtime answered with, or `null` when it could not be reached or closed the connection.
+   */
+  public readonly failure: Failure | null;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @param failure The runtime's failure, or `null` when there was none. Defaults to `null`.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { Failure, FailureCode } from "@noldova/teamrun-shell-protocol";
+   * import { ConnectionException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function refuse(): never {
+   *   const failure = new Failure(FailureCode.Unauthorized, "The capability token is not valid for this runtime.");
+   *   throw new ConnectionException(failure.message, failure);
+   * }
+   * ```
+   */
+  public constructor(message: string, failure?: Failure | null, options?: ExceptionOptions);
+}
+
+/**
+ * The exception thrown when a runtime cannot be started, does not start in time, or another build's runtime does not stop.
+ */
+export declare class LaunchException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { LaunchException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new LaunchException("The runtime did not start in time.");
+   * }
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
+ * The exception a method handler throws to answer its request with a specific failure.
+ */
+export declare class MethodFailureException extends Exception {
+  /**
+   * The failure the request is answered with.
+   */
+  public readonly failure: Failure;
+
+  /**
+   * Creates the exception.
+   *
+   * @param failure The failure to answer with; its message becomes the exception's message.
+   * @example
+   * ```ts
+   * import { Failure, FailureCode } from "@noldova/teamrun-shell-protocol";
+   * import { MethodFailureException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(path: string): never {
+   *   throw new MethodFailureException(new Failure(FailureCode.NotFound, `The note ${path} does not exist.`, { path }));
+   * }
+   * ```
+   */
+  public constructor(failure: Failure);
+}
+
+/**
+ * The exception thrown when the data directory holds data from a release that predates the shell. The runtime is refusing until the data is moved aside.
+ */
+export declare class PreShellDataFoundException extends Exception {
+  /**
+   * Where the old data is.
+   */
+  public readonly data: PreShellData;
+
+  /**
+   * Creates the exception.
+   *
+   * @param data Where the old data is.
+   * @example
+   * ```ts
+   * import { PreShellData } from "@noldova/teamrun-shell-protocol";
+   * import { PreShellDataFoundException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new PreShellDataFoundException(new PreShellData("/home/person/.noldova/teamrun"));
+   * }
+   * ```
+   */
+  public constructor(data: PreShellData);
+}
+
+/**
+ * The exception thrown when a method or event name is registered twice, or an event is published after it was withdrawn.
+ */
+export declare class RegistrationException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @example
+   * ```ts
+   * import { RegistrationException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new RegistrationException("The method notes.open is already registered.");
+   * }
+   * ```
+   */
+  public constructor(message: string);
+}
+
+/**
+ * The exception thrown when a newer build's runtime owns the data directory, so this older build hands the person over to it.
+ */
+export declare class RuntimeHandoverException extends Exception {
+  /**
+   * The newer runtime's build identity and the program it runs from.
+   */
+  public readonly handover: RuntimeHandover;
+
+  /**
+   * Creates the exception.
+   *
+   * @param handover The newer runtime's identity and program.
+   * @example
+   * ```ts
+   * import { type BuildIdentity, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
+   * import { RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function handOver(newer: BuildIdentity): never {
+   *   throw new RuntimeHandoverException(new RuntimeHandover(newer, "/opt/teamrun/teamrun"));
+   * }
+   * ```
+   */
+  public constructor(handover: RuntimeHandover);
+}
+
+/**
+ * The exception thrown when an older build's runtime refuses to stop because work is in progress, so the person must choose to wait or stop it.
+ */
+export declare class WorkInProgressException extends Exception {
+  /**
+   * The work in progress.
+   */
+  public readonly work: RunningWork;
+
+  /**
+   * Creates the exception.
+   *
+   * @param work The work the runtime reported.
+   * @example
+   * ```ts
+   * import { RunningWork } from "@noldova/teamrun-shell-protocol";
+   * import { WorkInProgressException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new WorkInProgressException(new RunningWork(["Indexing the project"]));
+   * }
+   * ```
+   */
+  public constructor(work: RunningWork);
+}
+
+/**
+ * Something whose idleness an {@link IdleMonitor} watches.
+ */
+export interface IIdleParticipant {
+  /**
+   * Whether nothing keeps the participant busy.
+   */
+  readonly isIdle: boolean;
+
+  /**
+   * Called when the participant has stayed idle for the monitor's whole grace period.
+   * @example
+   * ```ts
+   * import type { IIdleParticipant } from "@noldova/teamrun-shell-runtime";
+   *
+   * export class Session implements IIdleParticipant {
+   *   public isIdle: boolean = true;
+   *
+   *   public handleIdle(): void {
+   *     console.log("The session stayed idle for the whole grace period.");
+   *   }
+   * }
+   * ```
+   */
+  handleIdle(): void;
+}
+
+/**
+ * Handles requests for one registered method.
+ */
+export interface IMethodHandler {
+  /**
+   * Handles one request.
+   *
+   * @param context The request's payload and its cancellation signal, which aborts on cancellation, deadline or disconnect.
+   * @returns A promise of the response payload. Reject with {@link MethodFailureException} or a protocol exception to answer with a specific failure; a JSON reading error is answered as invalid parameters, and anything else as an internal failure.
+   * @example
+   * ```ts
+   * import type { JsonValue } from "@noldova/teamrun-foundation-json";
+   * import type { IMethodHandler, RequestContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export class EchoHandler implements IMethodHandler {
+   *   public async handleAsync(context: RequestContext): Promise<JsonValue> {
+   *     context.signal.throwIfAborted();
+   *     return { client: context.client, payload: context.payload };
+   *   }
+   * }
+   * ```
+   */
+  handleAsync(context: RequestContext): Promise<JsonValue>;
+}
+
+/**
+ * Receives what a {@link RuntimeClient} learns after its handshake.
+ */
+export interface IRuntimeClientListener {
+  /**
+   * Called for each event the runtime publishes to an authenticated connection of the same build.
+   *
+   * @param event The event.
+   * @example
+   * ```ts
+   * import type { Event } from "@noldova/teamrun-shell-protocol";
+   * import type { IRuntimeClientListener } from "@noldova/teamrun-shell-runtime";
+   *
+   * export class WindowListener implements IRuntimeClientListener {
+   *   public onEvent(event: Event): void {
+   *     console.log(event.name.text, event.payload);
+   *   }
+   *
+   *   public onDisconnected(): void {
+   *     console.log("The connection to the runtime closed.");
+   *   }
+   * }
+   * ```
+   */
+  onEvent(event: Event): void;
+
+  /**
+   * Called once when an established connection closes.
+   * @example
+   * ```ts
+   * import type { Event } from "@noldova/teamrun-shell-protocol";
+   * import type { IRuntimeClientListener } from "@noldova/teamrun-shell-runtime";
+   *
+   * export class WindowListener implements IRuntimeClientListener {
+   *   public onEvent(event: Event): void {
+   *     console.log(event.name.text, event.payload);
+   *   }
+   *
+   *   public onDisconnected(): void {
+   *     console.log("The connection to the runtime closed.");
+   *   }
+   * }
+   * ```
+   */
+  onDisconnected(): void;
+}
+
+/**
+ * A runtime's per-start capability token. It is compared through fixed-length digests in constant time.
+ */
+export declare class CapabilityToken {
+  /**
+   * The token's text, published only in protected discovery metadata.
+   */
+  public readonly value: string;
+
+  /**
+   * Creates a token from existing text.
+   *
+   * @param value The token's text.
+   * @throws {ArgumentException} When the text is empty or whitespace.
+   * @example
+   * ```ts
+   * import { CapabilityToken } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isValid(published: string, presented: string): boolean {
+   *   return new CapabilityToken(published).matches(presented);
+   * }
+   * ```
+   */
+  public constructor(value: string);
+
+  /**
+   * Creates a token of 32 random bytes in hexadecimal.
+   *
+   * @returns A new token.
+   * @example
+   * ```ts
+   * import { CapabilityToken } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const token = CapabilityToken.generate();
+   * ```
+   */
+  public static generate(): CapabilityToken;
+
+  /**
+   * Compares a candidate with the token in constant time, whatever its length.
+   *
+   * @param candidate The text a client presented.
+   * @returns `true` when the candidate is the token.
+   * @example
+   * ```ts
+   * import type { CapabilityToken } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function admits(token: CapabilityToken, presented: string): boolean {
+   *   return token.matches(presented);
+   * }
+   * ```
+   */
+  public matches(candidate: string): boolean;
+}
+
+/**
+ * Time limits of a {@link RuntimeClient}.
+ */
+export declare class ClientSettings {
+  /**
+   * How long the handshake may take, in milliseconds.
+   */
+  public readonly handshakeTimeout: number;
+
+  /**
+   * The default time limit of a call, in milliseconds.
+   */
+  public readonly callTimeout: number;
+
+  /**
+   * How long after a call's time limit the client still waits for the runtime's answer, in milliseconds.
+   */
+  public readonly answerGrace: number;
+
+  /**
+   * The largest frame the client reads or writes, in characters.
+   */
+  public readonly maximumFrameLength: number;
+
+  /**
+   * Creates the settings.
+   *
+   * @param handshakeTimeout Milliseconds for the handshake. Defaults to 5 seconds.
+   * @param callTimeout The default time limit of a call in milliseconds. Defaults to 10 minutes.
+   * @param answerGrace Milliseconds to wait for an answer after a call's limit. Defaults to 5 seconds.
+   * @param maximumFrameLength The largest frame in characters. Defaults to 16 MiB.
+   * @throws {ArgumentOutOfRangeException} When a value is not a positive integer.
+   * @example
+   * ```ts
+   * import { ClientSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const settings = new ClientSettings(2_000, 30_000);
+   * ```
+   */
+  public constructor(handshakeTimeout?: number, callTimeout?: number, answerGrace?: number, maximumFrameLength?: number);
+}
+
+/**
+ * A runtime's local endpoint: loopback TCP on Windows, a Unix socket elsewhere.
+ */
+export declare class Endpoint {
+  /**
+   * The endpoint's transport.
+   */
+  public readonly kind: EndpointKind;
+
+  /**
+   * The loopback port, or `null` for a socket.
+   */
+  public readonly port: number | null;
+
+  /**
+   * The socket's absolute path, or `null` for TCP.
+   */
+  public readonly path: string | null;
+
+  private constructor();
+
+  /**
+   * Creates a loopback TCP endpoint.
+   *
+   * @param port The port, from 1 to 65535.
+   * @returns The endpoint.
+   * @throws {ArgumentOutOfRangeException} When the port is out of range.
+   * @example
+   * ```ts
+   * import { Endpoint } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const endpoint = Endpoint.tcp(52100);
+   * ```
+   */
+  public static tcp(port: number): Endpoint;
+
+  /**
+   * Creates a Unix socket endpoint.
+   *
+   * @param socketPath The socket's absolute path.
+   * @returns The endpoint.
+   * @throws {ArgumentException} When the path is not absolute.
+   * @example
+   * ```ts
+   * import { Endpoint } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const endpoint = Endpoint.socket("/home/person/.noldova/teamrun/discovery/runtime.sock");
+   * ```
+   */
+  public static socket(socketPath: string): Endpoint;
+
+  /**
+   * Reads an endpoint from its text in discovery metadata.
+   *
+   * @param text `tcp://127.0.0.1:<port>` or a socket's absolute path.
+   * @returns The endpoint.
+   * @throws {ArgumentException} When the text is neither form.
+   * @example
+   * ```ts
+   * import { Endpoint } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const port = Endpoint.parse("tcp://127.0.0.1:52100").port;
+   * ```
+   */
+  public static parse(text: string): Endpoint;
+
+  /**
+   * Formats the endpoint for discovery metadata.
+   *
+   * @returns `tcp://127.0.0.1:<port>` or the socket's path.
+   * @example
+   * ```ts
+   * import { Endpoint } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const text = Endpoint.tcp(52100).toString();
+   * ```
+   */
+  public toString(): string;
+}
+
+/**
+ * A declared event's publishing side. Disposing it withdraws the event.
+ */
+export declare class EventChannel implements Disposable {
+  /**
+   * Creates the channel.
+   *
+   * @param publisher Publishes one payload.
+   * @param withdraw Withdraws the event's declaration.
+   * @example
+   * ```ts
+   * import type { JsonValue } from "@noldova/teamrun-foundation-json";
+   * import { EventChannel } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createChannel(published: JsonValue[], declared: Set<string>): EventChannel {
+   *   declared.add("notes.changed");
+   *   return new EventChannel(payload => published.push(payload), () => declared.delete("notes.changed"));
+   * }
+   * ```
+   */
+  public constructor(publisher: (payload: JsonValue) => void, withdraw: () => void);
+
+  /**
+   * Publishes the event to every authenticated connection of the runtime's build.
+   *
+   * @param payload The event's payload.
+   * @throws {RegistrationException} When the event was withdrawn.
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   * import type { EventRegistry } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function announce(events: EventRegistry, path: string): void {
+   *   const channel = events.declare(new QualifiedName("notes", "changed"));
+   *   channel.publish({ path });
+   *   channel[Symbol.dispose]();
+   * }
+   * ```
+   */
+  public publish(payload: JsonValue): void;
+
+  /**
+   * Withdraws the event's declaration.
+   */
+  public [Symbol.dispose](): void;
+}
+
+/**
+ * How a client starts or attaches to the runtime of one data directory.
+ */
+export declare class LaunchSettings {
+  /**
+   * The data directory whose runtime the client uses.
+   */
+  public readonly dataDirectory: DataDirectory;
+
+  /**
+   * The program that runs the runtime's entry, such as Node.js or Electron in Node mode.
+   */
+  public readonly executablePath: string;
+
+  /**
+   * The path of the runtime's entry script, {@link RuntimeEntry.entryPath}.
+   */
+  public readonly entryPath: string;
+
+  /**
+   * The environment a started runtime receives.
+   */
+  public readonly environment: NodeJS.ProcessEnv;
+
+  /**
+   * The platform, as in `process.platform`; Linux starts through the descriptor-closing Bash launcher.
+   */
+  public readonly platform: string;
+
+  /**
+   * How long a started runtime stays idle before it stops, in milliseconds.
+   */
+  public readonly idleGraceMilliseconds: number;
+
+  /**
+   * How long attaching may take, including a takeover, in milliseconds.
+   */
+  public readonly launchTimeout: number;
+
+  /**
+   * How often attaching looks again for the runtime, in milliseconds.
+   */
+  public readonly pollInterval: number;
+
+  /**
+   * The settings of the clients the launcher connects.
+   */
+  public readonly clientSettings: ClientSettings;
+
+  /**
+   * Creates the settings.
+   *
+   * @param dataDirectory The data directory.
+   * @param executablePath The program that runs the entry.
+   * @param entryPath The entry script's path.
+   * @param environment The started runtime's environment.
+   * @param platform The platform, as in `process.platform`.
+   * @param idleGraceMilliseconds The idle grace in milliseconds. Defaults to 30 seconds.
+   * @param launchTimeout The attach limit in milliseconds. Defaults to 20 seconds.
+   * @param pollInterval The polling interval in milliseconds. Defaults to 100 milliseconds.
+   * @param clientSettings The clients' settings. Defaults to {@link ClientSettings}' defaults.
+   * @throws {ArgumentException} When a path is empty or whitespace.
+   * @throws {ArgumentOutOfRangeException} When a duration is not a positive integer.
+   * @example
+   * ```ts
+   * import { DataDirectory, LaunchSettings, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const settings = new LaunchSettings(
+   *   new DataDirectory("/home/person/.noldova/teamrun"),
+   *   process.execPath,
+   *   RuntimeEntry.entryPath,
+   *   process.env,
+   *   process.platform);
+   * ```
+   */
+  public constructor(
+    dataDirectory: DataDirectory,
+    executablePath: string,
+    entryPath: string,
+    environment: NodeJS.ProcessEnv,
+    platform: string,
+    idleGraceMilliseconds?: number,
+    launchTimeout?: number,
+    pollInterval?: number,
+    clientSettings?: ClientSettings);
+}
+
+/**
+ * The program and arguments that start a detached runtime. On Linux it wraps the program in Bash that closes inherited descriptors above standard error, without startup files or inherited options.
+ */
+export declare class ProcessLaunchCommand {
+  /**
+   * The program to start.
+   */
+  public readonly executable: string;
+
+  /**
+   * The program's arguments, passed literally.
+   */
+  public readonly arguments: readonly string[];
+
+  /**
+   * Creates the command.
+   *
+   * @param platform The platform, as in `process.platform`.
+   * @param executablePath The program that runs the runtime.
+   * @param launchArguments Its arguments; the array is copied.
+   * @throws {ArgumentException} When the program's path is empty or whitespace.
+   * @throws {LaunchException} On Linux, when `/bin/bash` is not executable or `/proc/self/fd` cannot be read.
+   * @example
+   * ```ts
+   * import { spawn } from "node:child_process";
+   *
+   * import { ProcessLaunchCommand, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function start(dataDirectory: string): void {
+   *   const command = new ProcessLaunchCommand(process.platform, process.execPath, [RuntimeEntry.entryPath, "--data-dir", dataDirectory]);
+   *   spawn(command.executable, command.arguments, { detached: true, stdio: "ignore" }).unref();
+   * }
+   * ```
+   */
+  public constructor(platform: string, executablePath: string, launchArguments: readonly string[]);
+}
+
+/**
+ * What a refusing runtime answers every handshake with, and the one method a refused connection may call.
+ */
+export declare class Refusal {
+  /**
+   * The failure every handshake is answered with.
+   */
+  public readonly failure: Failure;
+
+  /**
+   * The only method a refused connection may call.
+   */
+  public readonly method: QualifiedName;
+
+  /**
+   * Creates the refusal.
+   *
+   * @param failure The handshake's failure.
+   * @param method The method a refused connection may call.
+   * @example
+   * ```ts
+   * import { Failure, FailureCode, PreShellData, ShellMethods } from "@noldova/teamrun-shell-protocol";
+   * import { Refusal, type RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function refuseUntilMoved(server: RuntimeServer, root: string): void {
+   *   const failure = new Failure(FailureCode.PreShellData, "Move the old data aside.", new PreShellData(root).toJson());
+   *   server.refuse(new Refusal(failure, ShellMethods.moveAside));
+   * }
+   * ```
+   */
+  public constructor(failure: Failure, method: QualifiedName);
+}
+
+/**
+ * A registered method handler. Disposing it removes the registration.
+ */
+export declare class Registration implements Disposable {
+  /**
+   * Creates the registration.
+   *
+   * @param release Removes the registration.
+   * @example
+   * ```ts
+   * import { Registration } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function track(names: Set<string>, name: string): Registration {
+   *   names.add(name);
+   *   return new Registration(() => names.delete(name));
+   * }
+   * ```
+   */
+  public constructor(release: () => void);
+
+  /**
+   * Removes the registration.
+   */
+  public [Symbol.dispose](): void;
+}
+
+/**
+ * One request as a method handler sees it.
+ */
+export declare class RequestContext {
+  /**
+   * The name the calling client gave in its connection's handshake, such as `desktop`.
+   */
+  public readonly client: string;
+
+  /**
+   * The request's payload, which the handler validates.
+   */
+  public readonly payload: JsonValue;
+
+  /**
+   * Aborts when the request is cancelled, reaches its deadline or its connection closes.
+   */
+  public readonly signal: AbortSignal;
+
+  /**
+   * Creates the context.
+   *
+   * @param client The calling client's name; it must contain a non-whitespace character.
+   * @param payload The payload.
+   * @param signal The cancellation signal.
+   * @throws {ArgumentException} When the client name is empty or whitespace only.
+   * @example
+   * ```ts
+   * import type { JsonValue } from "@noldova/teamrun-foundation-json";
+   * import { type IMethodHandler, RequestContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function callDirectlyAsync(handler: IMethodHandler, payload: JsonValue): Promise<JsonValue> {
+   *   return handler.handleAsync(new RequestContext("test", payload, AbortSignal.timeout(1_000)));
+   * }
+   * ```
+   */
+  public constructor(client: string, payload: JsonValue, signal: AbortSignal);
+}
+
+/**
+ * How a runtime process runs, read from its entry arguments.
+ */
+export declare class RuntimeOptions {
+  /**
+   * The data directory the runtime owns.
+   */
+  public readonly dataDirectory: DataDirectory;
+
+  /**
+   * How long the runtime stays without connections and work before it stops, in milliseconds.
+   */
+  public readonly idleGraceMilliseconds: number;
+
+  /**
+   * The server's limits.
+   */
+  public readonly serverSettings: ServerSettings;
+
+  /**
+   * Creates the options.
+   *
+   * @param dataDirectory The data directory.
+   * @param idleGraceMilliseconds The idle grace in milliseconds. Defaults to 30 seconds.
+   * @param serverSettings The server's limits. Defaults to {@link ServerSettings}' defaults.
+   * @example
+   * ```ts
+   * import { DataDirectory, RuntimeOptions, ServerSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const options = new RuntimeOptions(new DataDirectory("/home/person/.noldova/teamrun"), 60_000, new ServerSettings());
+   * ```
+   */
+  public constructor(dataDirectory: DataDirectory, idleGraceMilliseconds?: number, serverSettings?: ServerSettings);
+
+  /**
+   * Reads the options from entry arguments.
+   *
+   * @param entryArguments `--data-dir <absolute path>` and optionally `--idle-grace <milliseconds>`.
+   * @returns The options.
+   * @throws {ArgumentException} When the data directory is missing or not absolute, or an argument is unknown, lacks its value or is not valid.
+   * @example
+   * ```ts
+   * import { RuntimeOptions } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const options = RuntimeOptions.parse(["--data-dir", "/home/person/.noldova/teamrun", "--idle-grace", "60000"]);
+   * ```
+   */
+  public static parse(entryArguments: readonly string[]): RuntimeOptions;
+}
+
+/**
+ * Limits of a {@link RuntimeServer}.
+ */
+export declare class ServerSettings {
+  /**
+   * The largest frame the server reads or writes, in characters.
+   */
+  public readonly maximumFrameLength: number;
+
+  /**
+   * How long a connection may wait before its handshake, in milliseconds.
+   */
+  public readonly handshakeTimeout: number;
+
+  /**
+   * A request's time limit when it names none, in milliseconds.
+   */
+  public readonly defaultRequestTimeout: number;
+
+  /**
+   * The longest time limit a request may ask for, in milliseconds.
+   */
+  public readonly maximumRequestTimeout: number;
+
+  /**
+   * Creates the settings.
+   *
+   * @param maximumFrameLength The largest frame in characters. Defaults to 16 MiB.
+   * @param handshakeTimeout Milliseconds before a handshake. Defaults to 5 seconds.
+   * @param defaultRequestTimeout The default request limit in milliseconds. Defaults to 10 minutes.
+   * @param maximumRequestTimeout The longest request limit in milliseconds. Defaults to 1 hour.
+   * @throws {ArgumentOutOfRangeException} When a value is not a positive integer, or the default limit exceeds the longest.
+   * @example
+   * ```ts
+   * import { ServerSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const settings = new ServerSettings(1024 * 1024, 5_000, 60_000, 600_000);
+   * ```
+   */
+  public constructor(maximumFrameLength?: number, handshakeTimeout?: number, defaultRequestTimeout?: number, maximumRequestTimeout?: number);
+}
+
+/**
+ * One piece of work in progress that keeps the runtime from idling and that stopping would interrupt. Disposing it ends the work.
+ */
+export declare class WorkItem implements Disposable {
+  /**
+   * What the work is, as shown to the person.
+   */
+  public readonly description: string;
+
+  /**
+   * Creates the work item; {@link WorkTracker.begin} creates them.
+   *
+   * @param description What the work is.
+   * @param finish Ends the work.
+   * @throws {ArgumentException} When the description is empty or whitespace.
+   * @example
+   * ```ts
+   * import { WorkItem } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createItem(running: Set<WorkItem>): WorkItem {
+   *   const item = new WorkItem("Indexing the project", t => running.delete(t));
+   *   running.add(item);
+   *   return item;
+   * }
+   * ```
+   */
+  public constructor(description: string, finish: (item: WorkItem) => void);
+
+  /**
+   * Aborts when the runtime stops the work.
+   */
+  public get signal(): AbortSignal;
+
+  /**
+   * Asks the work to stop by aborting its signal.
+   * @example
+   * ```ts
+   * import type { WorkTracker } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function cancelLater(work: WorkTracker): void {
+   *   const item = work.begin("Indexing the project");
+   *   setTimeout(() => item.cancel(), 1_000);
+   * }
+   * ```
+   */
+  public cancel(): void;
+
+  /**
+   * Ends the work.
+   */
+  public [Symbol.dispose](): void;
+}
+
+/**
+ * Compares builds by product version.
+ */
+export declare class BuildComparer {
+  /**
+   * Compares one build with another.
+   *
+   * @param own The build doing the comparing.
+   * @param other The other build.
+   * @returns How the own build relates to the other.
+   * @throws {ArgumentException} When a product version is not of the form major.minor.patch.
+   * @example
+   * ```ts
+   * import type { BuildIdentity } from "@noldova/teamrun-shell-protocol";
+   * import { BuildComparer, BuildRelation } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isNewer(own: BuildIdentity, other: BuildIdentity): boolean {
+   *   return BuildComparer.compare(own, other) === BuildRelation.Newer;
+   * }
+   * ```
+   */
+  public static compare(own: BuildIdentity, other: BuildIdentity): BuildRelation;
+}
+
+/**
+ * A connection to a runtime. A connection to another build's runtime accepts only {@link RuntimeClient.stopAsync}.
+ */
+export declare class RuntimeClient {
+  /**
+   * The client's name, which prefixes its request ids.
+   */
+  public readonly clientName: string;
+
+  private constructor();
+
+  /**
+   * The other build's identity and program when the runtime belongs to another build, otherwise `null`.
+   */
+  public get handover(): RuntimeHandover | null;
+
+  /**
+   * Where the data from before the shell is when the runtime refuses until it is moved aside, otherwise `null`.
+   */
+  public get preShellData(): PreShellData | null;
+
+  /**
+   * Whether the connection is open.
+   */
+  public get isConnected(): boolean;
+
+  /**
+   * Connects and performs the handshake.
+   *
+   * @param endpoint The runtime's endpoint.
+   * @param token The capability token from discovery metadata.
+   * @param identity The client's build identity.
+   * @param clientName The client's name.
+   * @param listener Receives events and the disconnection.
+   * @param settings The time limits. Defaults to {@link ClientSettings}' defaults.
+   * @returns A promise of the connected client; its {@link handover} is set when the runtime belongs to another build, and its {@link preShellData} when the runtime refuses until old data is moved aside.
+   * @throws {ArgumentException} Synchronously rejected when the client name is empty or whitespace.
+   * @throws {ConnectionException} Rejected when the runtime cannot be reached, closes, refuses the token or does not answer in time.
+   * @example
+   * ```ts
+   * import { Endpoint, type IRuntimeClientListener, RuntimeBuild, RuntimeClient, type RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function connectAsync(discovery: RuntimeDiscovery, listener: IRuntimeClientListener): Promise<RuntimeClient> {
+   *   return RuntimeClient.connectAsync(Endpoint.parse(discovery.endpoint), discovery.token, RuntimeBuild.identity, "desktop", listener);
+   * }
+   * ```
+   */
+  public static connectAsync(
+    endpoint: Endpoint,
+    token: string,
+    identity: BuildIdentity,
+    clientName: string,
+    listener: IRuntimeClientListener,
+    settings?: ClientSettings): Promise<RuntimeClient>;
+
+  /**
+   * Sends a request and waits for its response.
+   *
+   * @param method The method's qualified name.
+   * @param payload The request's payload.
+   * @param timeoutMilliseconds The request's time limit in milliseconds. Defaults to the settings' call limit.
+   * @param signal Aborting it sends a cancellation; the response then reports it.
+   * @returns A promise of the response, successful or failed.
+   * @throws {ConnectionException} Rejected when the connection is closed or closes, or the runtime does not answer within the limit and its grace.
+   * @example
+   * ```ts
+   * import { QualifiedName, type Response } from "@noldova/teamrun-shell-protocol";
+   * import type { RuntimeClient } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function openNoteAsync(client: RuntimeClient, path: string, signal: AbortSignal): Promise<Response> {
+   *   return client.callAsync(new QualifiedName("notes", "open"), { path }, 30_000, signal);
+   * }
+   * ```
+   */
+  public callAsync(method: QualifiedName, payload: JsonValue, timeoutMilliseconds?: number, signal?: AbortSignal): Promise<Response>;
+
+  /**
+   * Asks the runtime to stop; the only request another build may send.
+   *
+   * @param policy Whether to stop only when no work is in progress, or to stop the work.
+   * @returns A promise of the response: success, or a conflict whose details list the work in progress.
+   * @throws {ConnectionException} Rejected as for {@link callAsync}.
+   * @example
+   * ```ts
+   * import { StopPolicy } from "@noldova/teamrun-shell-protocol";
+   * import type { RuntimeClient } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function stopIfIdleAsync(client: RuntimeClient): Promise<boolean> {
+   *   return !(await client.stopAsync(StopPolicy.IfIdle)).hasFailed;
+   * }
+   * ```
+   */
+  public stopAsync(policy: StopPolicy): Promise<Response>;
+
+  /**
+   * Asks a refusing runtime to move the data from before the shell aside; the only request a refused connection may send.
+   *
+   * @returns A promise of the response: success, after which the runtime serves new connections normally, or a failure.
+   * @throws {ConnectionException} Rejected as for {@link callAsync}.
+   * @example
+   * ```ts
+   * import type { RuntimeClient } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function moveAsideAsync(client: RuntimeClient): Promise<boolean> {
+   *   return client.preShellData !== null && !(await client.moveAsideAsync()).hasFailed;
+   * }
+   * ```
+   */
+  public moveAsideAsync(): Promise<Response>;
+
+  /**
+   * Closes the connection.
+   * @example
+   * ```ts
+   * import type { RuntimeClient } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function disconnect(client: RuntimeClient): void {
+   *   client.close();
+   * }
+   * ```
+   */
+  public close(): void;
+}
+
+/**
+ * Starts or attaches to the runtime of a data directory, taking over from an older build and handing over to a newer one.
+ */
+export declare class RuntimeLauncher {
+  /**
+   * Creates the launcher.
+   *
+   * @param settings How to start and attach.
+   * @param identity The client's build identity.
+   * @example
+   * ```ts
+   * import { type IRuntimeClientListener, type LaunchSettings, RuntimeBuild, type RuntimeClient, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function attachAsync(settings: LaunchSettings, listener: IRuntimeClientListener): Promise<RuntimeClient> {
+   *   return new RuntimeLauncher(settings, RuntimeBuild.identity).attachAsync("desktop", listener);
+   * }
+   * ```
+   */
+  public constructor(settings: LaunchSettings, identity: BuildIdentity);
+
+  /**
+   * Returns a connection to the data directory's runtime of this build, starting one when none runs. An older build's runtime is asked to stop and replaced.
+   *
+   * @param clientName The client's name.
+   * @param listener Receives events and the disconnection.
+   * @param policy What to do when an older runtime has work in progress. Defaults to {@link StopPolicy.IfIdle}.
+   * @returns A promise of the connected client.
+   * @throws {RuntimeHandoverException} Rejected when a newer build's runtime owns the directory.
+   * @throws {PreShellDataFoundException} Rejected when the runtime refuses until data from before the shell is moved aside.
+   * @throws {WorkInProgressException} Rejected when an older runtime has work in progress and the policy is to stop only if idle.
+   * @throws {LaunchException} Rejected when the runtime cannot start, does not start in time, or an older runtime refuses to stop or does not stop in time.
+   * @throws {ConnectionException} Rejected when the runtime refuses the connection.
+   * @example
+   * ```ts
+   * import { type IRuntimeClientListener, type LaunchSettings, RuntimeBuild, type RuntimeClient, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function attachAsync(settings: LaunchSettings, listener: IRuntimeClientListener): Promise<RuntimeClient> {
+   *   return new RuntimeLauncher(settings, RuntimeBuild.identity).attachAsync("desktop", listener);
+   * }
+   * ```
+   */
+  public attachAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy): Promise<RuntimeClient>;
+
+  /**
+   * Like {@link attachAsync}, but first moves data from before the shell aside when the runtime refuses because of it. Call it after the person agreed to the move.
+   *
+   * @param clientName The client's name.
+   * @param listener Receives events and the disconnection.
+   * @param policy What to do when an older runtime has work in progress. Defaults to {@link StopPolicy.IfIdle}.
+   * @returns A promise of the connected client, once the data is moved aside.
+   * @throws {LaunchException} Rejected when the runtime fails to move the data, or as for {@link attachAsync}.
+   * @throws {RuntimeHandoverException} Rejected as for {@link attachAsync}.
+   * @throws {WorkInProgressException} Rejected as for {@link attachAsync}.
+   * @example
+   * ```ts
+   * import { type IRuntimeClientListener, PreShellDataFoundException, type RuntimeClient, type RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function attachAsync(
+   *   launcher: RuntimeLauncher,
+   *   listener: IRuntimeClientListener,
+   *   confirmAsync: (location: string) => Promise<boolean>): Promise<RuntimeClient> {
+   *   try {
+   *     return await launcher.attachAsync("desktop", listener);
+   *   }
+   *   catch (error) {
+   *     if (!(error instanceof PreShellDataFoundException) || !await confirmAsync(error.data.location))
+   *       throw error;
+   *     return launcher.moveAsideAsync("desktop", listener);
+   *   }
+   * }
+   * ```
+   */
+  public moveAsideAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy): Promise<RuntimeClient>;
+}
+
+/**
+ * The runtime's endpoint server: handshake, requests routed through a method registry, events, deadlines, cancellation and frame limits.
+ */
+export declare class RuntimeServer implements IEventSink {
+  /**
+   * Creates the server.
+   *
+   * @param identity The runtime's build identity.
+   * @param token The capability token clients must present.
+   * @param handover What another build's client receives in its handshake answer.
+   * @param methods The registry requests are routed through.
+   * @param settings The server's limits.
+   * @param changed Called whenever a connection opens or closes.
+   * @example
+   * ```ts
+   * import { RuntimeHandover } from "@noldova/teamrun-shell-protocol";
+   * import { CapabilityToken, type MethodRegistry, RuntimeBuild, RuntimeServer, ServerSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createServer(methods: MethodRegistry, changed: () => void): RuntimeServer {
+   *   const identity = RuntimeBuild.identity;
+   *   return new RuntimeServer(identity, CapabilityToken.generate(), new RuntimeHandover(identity, process.execPath), methods, new ServerSettings(), changed);
+   * }
+   * ```
+   */
+  public constructor(
+    identity: BuildIdentity,
+    token: CapabilityToken,
+    handover: RuntimeHandover,
+    methods: MethodRegistry,
+    settings: ServerSettings,
+    changed: () => void);
+
+  /**
+   * The number of open connections, authenticated or not.
+   */
+  public get sessionCount(): number;
+
+  /**
+   * Listens on a loopback port the system assigns.
+   *
+   * @returns A promise of the endpoint.
+   * @throws {ConnectionException} Rejected when the server has no address.
+   * @example
+   * ```ts
+   * import type { Endpoint, RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function listenAsync(server: RuntimeServer): Promise<Endpoint> {
+   *   return server.listenTcpAsync();
+   * }
+   * ```
+   */
+  public listenTcpAsync(): Promise<Endpoint>;
+
+  /**
+   * Listens on a Unix socket, replacing a stale socket file.
+   *
+   * @param socketPath The socket's absolute path, at most 103 bytes.
+   * @returns A promise of the endpoint.
+   * @throws {ArgumentException} Rejected when the path is not absolute or too long.
+   * @example
+   * ```ts
+   * import path from "node:path";
+   *
+   * import type { DataDirectory, Endpoint, RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function listenAsync(server: RuntimeServer, directory: DataDirectory): Promise<Endpoint> {
+   *   return server.listenSocketAsync(path.join(directory.discoveryFolder, "runtime.sock"));
+   * }
+   * ```
+   */
+  public listenSocketAsync(socketPath: string): Promise<Endpoint>;
+
+  /**
+   * Starts refusing: every later handshake is answered with the refusal's failure, and the connection may call only the refusal's method.
+   *
+   * @param refusal The failure and the method allowed.
+   * @example
+   * ```ts
+   * import { Failure, FailureCode, PreShellData, ShellMethods } from "@noldova/teamrun-shell-protocol";
+   * import { Refusal, type RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function refuseUntilMoved(server: RuntimeServer, root: string): void {
+   *   const failure = new Failure(FailureCode.PreShellData, "Move the old data aside.", new PreShellData(root).toJson());
+   *   server.refuse(new Refusal(failure, ShellMethods.moveAside));
+   * }
+   * ```
+   */
+  public refuse(refusal: Refusal): void;
+
+  /**
+   * Stops refusing and ends the refused connections, which reconnect. Requests a refused connection sent before it ended stay refused.
+   * @example
+   * ```ts
+   * import type { RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function finishMoving(server: RuntimeServer): void {
+   *   server.admit();
+   * }
+   * ```
+   */
+  public admit(): void;
+
+  /**
+   * Sends an event to every authenticated connection of the runtime's build.
+   *
+   * @param event The event.
+   * @example
+   * ```ts
+   * import { Event, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   * import type { RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function announce(server: RuntimeServer, path: string): void {
+   *   server.broadcast(new Event(new QualifiedName("notes", "changed"), { path }));
+   * }
+   * ```
+   */
+  public broadcast(event: Event): void;
+
+  /**
+   * Stops accepting connections, ends the open ones and removes the socket file.
+   *
+   * @returns A promise that settles once the server has closed.
+   * @example
+   * ```ts
+   * import type { RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function shutDownAsync(server: RuntimeServer): Promise<void> {
+   *   await server.closeAsync();
+   * }
+   * ```
+   */
+  public closeAsync(): Promise<void>;
+}
+
+/**
+ * Something that delivers events to connected clients.
+ */
+export interface IEventSink {
+  /**
+   * Delivers an event.
+   *
+   * @param event The event.
+   * @example
+   * ```ts
+   * import { Event, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   * import type { IEventSink } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function announce(sink: IEventSink, path: string): void {
+   *   sink.broadcast(new Event(new QualifiedName("notes", "changed"), { path }));
+   * }
+   * ```
+   */
+  broadcast(event: Event): void;
+}
+
+/**
+ * Calls its participant once it has stayed idle for a whole grace period.
+ */
+export declare class IdleMonitor implements Disposable {
+  /**
+   * Creates the monitor, unarmed.
+   *
+   * @param graceMilliseconds The grace period in milliseconds.
+   * @param participant The participant to watch.
+   * @throws {ArgumentOutOfRangeException} When the grace is not a positive integer.
+   * @example
+   * ```ts
+   * import { type IIdleParticipant, IdleMonitor } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function watch(participant: IIdleParticipant): IdleMonitor {
+   *   const monitor = new IdleMonitor(30_000, participant);
+   *   monitor.check();
+   *   return monitor;
+   * }
+   * ```
+   */
+  public constructor(graceMilliseconds: number, participant: IIdleParticipant);
+
+  /**
+   * Whether a grace period is running.
+   */
+  public get isArmed(): boolean;
+
+  /**
+   * Starts the grace period when the participant is idle and none runs, or cancels it when the participant is busy.
+   * @example
+   * ```ts
+   * import { type IIdleParticipant, IdleMonitor } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function watch(participant: IIdleParticipant): IdleMonitor {
+   *   const monitor = new IdleMonitor(30_000, participant);
+   *   monitor.check();
+   *   return monitor;
+   * }
+   * ```
+   */
+  public check(): void;
+
+  /**
+   * Cancels a running grace period and stops watching; later checks do nothing.
+   */
+  public [Symbol.dispose](): void;
+}
+
+/**
+ * The runtime of one data directory: ownership, the shell's database, the endpoint, discovery, registries, work and idle shutdown.
+ */
+export declare class RuntimeHost implements IIdleParticipant {
+  /**
+   * The runtime's build identity.
+   */
+  public readonly identity: BuildIdentity;
+
+  /**
+   * The work in progress.
+   */
+  public readonly work: WorkTracker;
+
+  /**
+   * The registry requests are routed through; `shell.stop` is registered, and `shell.moveAside` when the runtime started refusing.
+   */
+  public readonly methods: MethodRegistry;
+
+  /**
+   * The registry of events published to clients.
+   */
+  public readonly events: EventRegistry;
+
+  private constructor();
+
+  /**
+   * Whether the runtime has no connection and no work in progress.
+   */
+  public get isIdle(): boolean;
+
+  /**
+   * Takes ownership, opens the shell's database, listens and publishes discovery. When the directory holds data from before the shell, the runtime refuses instead: every handshake is answered with a {@link FailureCode.PreShellData} failure whose details give the location, and only `shell.moveAside` is served until it has moved the data aside and opened the database. Concurrent `shell.moveAside` requests share one move, and a request after the move succeeds without moving anything.
+   *
+   * @param options How the runtime runs.
+   * @param platform The platform, as in `process.platform`; Windows listens on loopback TCP, others on a socket in the discovery folder.
+   * @param environment The environment the discovery folder's protection uses.
+   * @returns A promise of the running host.
+   * @throws {DataDirectoryOwnedException} Rejected when another runtime owns the directory.
+   * @example
+   * ```ts
+   * import { RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function runAsync(entryArguments: readonly string[]): Promise<string> {
+   *   const host = await RuntimeHost.startAsync(RuntimeOptions.parse(entryArguments), process.platform, process.env);
+   *   return host.waitForStopAsync();
+   * }
+   * ```
+   */
+  public static startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv): Promise<RuntimeHost>;
+
+  /**
+   * Stops the runtime because it stayed idle.
+   * @example
+   * ```ts
+   * import type { RuntimeHost } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function stopAsIfIdle(host: RuntimeHost): void {
+   *   host.handleIdle();
+   * }
+   * ```
+   */
+  public handleIdle(): void;
+
+  /**
+   * Stops the runtime: cancels work, ends connections, withdraws discovery, closes the database and releases ownership. Later calls do nothing.
+   *
+   * @param reason Why the runtime stops; {@link waitForStopAsync} resolves with it.
+   * @example
+   * ```ts
+   * import type { RuntimeHost } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function stopForUpdate(host: RuntimeHost): void {
+   *   host.requestStop("update");
+   * }
+   * ```
+   */
+  public requestStop(reason: string): void;
+
+  /**
+   * Waits until the runtime has stopped.
+   *
+   * @returns A promise of the stop's reason, rejected with the error when stopping failed.
+   * @example
+   * ```ts
+   * import { RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function runAsync(entryArguments: readonly string[]): Promise<string> {
+   *   const host = await RuntimeHost.startAsync(RuntimeOptions.parse(entryArguments), process.platform, process.env);
+   *   return host.waitForStopAsync();
+   * }
+   * ```
+   */
+  public waitForStopAsync(): Promise<string>;
+}
+
+/**
+ * Routes requests to the handlers registered for their methods.
+ */
+export declare class MethodRegistry {
+  /**
+   * Registers a handler.
+   *
+   * @param name The method's qualified name.
+   * @param handler Its handler.
+   * @returns The registration; disposing it removes the handler.
+   * @throws {RegistrationException} When the name is registered.
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   * import type { MethodRegistry, Registration } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function serveEcho(methods: MethodRegistry): Registration {
+   *   return methods.register(new QualifiedName("notes", "echo"), { handleAsync: context => Promise.resolve(context.payload) });
+   * }
+   * ```
+   */
+  public register(name: QualifiedName, handler: IMethodHandler): Registration;
+
+  /**
+   * Finds a method's handler.
+   *
+   * @param name The method's qualified name.
+   * @returns The handler, or `undefined` when none is registered.
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   * import type { MethodRegistry } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isServed(methods: MethodRegistry): boolean {
+   *   return methods.find(new QualifiedName("notes", "open")) !== undefined;
+   * }
+   * ```
+   */
+  public find(name: QualifiedName): IMethodHandler | undefined;
+}
+
+/**
+ * Declares the events a runtime publishes.
+ */
+export declare class EventRegistry {
+  /**
+   * Creates the registry.
+   *
+   * @param sink Delivers published events.
+   * @example
+   * ```ts
+   * import { EventRegistry, type RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createEvents(server: RuntimeServer): EventRegistry {
+   *   return new EventRegistry(server);
+   * }
+   * ```
+   */
+  public constructor(sink: IEventSink);
+
+  /**
+   * Declares an event.
+   *
+   * @param name The event's qualified name.
+   * @returns The channel that publishes it; disposing it withdraws the event.
+   * @throws {RegistrationException} When the name is declared.
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   * import type { EventRegistry } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function announce(events: EventRegistry, path: string): void {
+   *   const channel = events.declare(new QualifiedName("notes", "changed"));
+   *   channel.publish({ path });
+   *   channel[Symbol.dispose]();
+   * }
+   * ```
+   */
+  public declare(name: QualifiedName): EventChannel;
+}
+
+/**
+ * The runtime process's entry.
+ */
+export declare class RuntimeEntry {
+  /**
+   * The entry script's path, to start the runtime with.
+   */
+  public static get entryPath(): string;
+
+  /**
+   * Runs the runtime until it stops.
+   *
+   * @param entryArguments The entry arguments, as {@link RuntimeOptions.parse} reads them.
+   * @param platform The platform, as in `process.platform`.
+   * @param environment The environment.
+   * @param signals Emits `SIGINT` and `SIGTERM`, which stop the runtime.
+   * @param error Receives usage and failure messages.
+   * @returns A promise of the exit code: 0 after a stop, 1 when the runtime failed to start, 2 for invalid arguments and 3 when another runtime owns the directory.
+   * @example
+   * ```ts
+   * import { RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function mainAsync(): Promise<void> {
+   *   process.exitCode = await RuntimeEntry.runAsync(process.argv.slice(2), process.platform, process.env, process, process.stderr);
+   * }
+   * ```
+   */
+  public static runAsync(entryArguments: readonly string[], platform: string, environment: NodeJS.ProcessEnv, signals: EventEmitter, error: Writable): Promise<number>;
+}
+
+/**
+ * Tracks the work in progress.
+ */
+export declare class WorkTracker {
+  /**
+   * Creates the tracker.
+   *
+   * @param changed Called whenever work begins or ends.
+   * @example
+   * ```ts
+   * import { type IdleMonitor, WorkTracker } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createTracker(idle: IdleMonitor): WorkTracker {
+   *   return new WorkTracker(() => idle.check());
+   * }
+   * ```
+   */
+  public constructor(changed: () => void);
+
+  /**
+   * Whether no work is in progress.
+   */
+  public get isEmpty(): boolean;
+
+  /**
+   * The descriptions of the work in progress, in the order it began.
+   */
+  public get descriptions(): readonly string[];
+
+  /**
+   * Begins work.
+   *
+   * @param description What the work is, as shown to the person.
+   * @returns The work item; disposing it ends the work.
+   * @throws {ArgumentException} When the description is empty or whitespace.
+   * @example
+   * ```ts
+   * import type { WorkTracker } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function indexAsync(work: WorkTracker, index: (signal: AbortSignal) => Promise<void>): Promise<void> {
+   *   const item = work.begin("Indexing the project");
+   *   try {
+   *     await index(item.signal);
+   *   }
+   *   finally {
+   *     item[Symbol.dispose]();
+   *   }
+   * }
+   * ```
+   */
+  public begin(description: string): WorkItem;
+
+  /**
+   * Asks all work in progress to stop by aborting each item's signal.
+   * @example
+   * ```ts
+   * import type { WorkTracker } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function cancelEverything(work: WorkTracker): void {
+   *   work.cancelAll();
+   * }
+   * ```
+   */
+  public cancelAll(): void;
+}
+
+/**
+ * Chooses the data directory a desktop or CLI uses.
+ */
+export declare class DataDirectoryLocator {
+  /**
+   * Chooses the data directory: the explicit one when given; otherwise `~/.noldova/teamrun` for a packaged build; otherwise `TEAMRUN_DATA_DIR` or, without it, `_build/data` in the checkout, so development and test runs never use the person's directory.
+   *
+   * @param isPackaged Whether this is a packaged build.
+   * @param environment The environment that may set `TEAMRUN_DATA_DIR`.
+   * @param homeFolder The person's home folder.
+   * @param checkoutRoot The repository checkout a development build runs from.
+   * @param explicit A data directory the person or a test gave, if any; empty or whitespace counts as none.
+   * @returns The data directory.
+   * @throws {ArgumentException} When the chosen path is not absolute.
+   * @example
+   * ```ts
+   * import { homedir } from "node:os";
+   *
+   * import { type DataDirectory, DataDirectoryLocator } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function locate(isPackaged: boolean, checkoutRoot: string): DataDirectory {
+   *   return DataDirectoryLocator.locate(isPackaged, process.env, homedir(), checkoutRoot);
+   * }
+   * ```
+   */
+  public static locate(isPackaged: boolean, environment: NodeJS.ProcessEnv, homeFolder: string, checkoutRoot: string, explicit?: string): DataDirectory;
+}
+
+/**
+ * This build of the runtime and its clients.
+ */
+export declare class RuntimeBuild {
+  /**
+   * The build's identity: the stamped product version, the supported protocol version and the build fingerprint.
+   */
+  public static readonly identity: BuildIdentity;
 }

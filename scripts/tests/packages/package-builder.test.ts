@@ -49,6 +49,16 @@ class PackageBuilderTests {
       assert.ok(existsSync(path.join(layout.locateTestOutput(PackageBuilderTests.ALPHA), "api", "index.test.js")));
     });
 
+    test("the build fingerprint is stamped into the package's resources", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {
+      const repository = await PackageBuilderTests.createAsync(t, false);
+      await repository.writeAsync({ "src/foundation/alpha/src/resources.ts": "export default class Resources {\n  public static readonly build: string = \"__BUILD__\";\n}\n" });
+      const layout = new BuildLayout(repository.directory);
+
+      await PackageBuilderTests.createBuilder(layout, new NpmCommand(new ProcessRunner(), process.env)).buildSourceAsync(PackageBuilderTests.ALPHA, [layout.locateArchive(PackageBuilderTests.ALPHA, "0.0.7")]);
+
+      assert.match(await readFile(path.join(layout.locateInstalled(PackageBuilderTests.ALPHA), "resources.js"), "utf8"), /build = "fixture-fingerprint";/);
+    });
+
     test("the installed package's source maps resolve to the package's real source files", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {
       const layout = new BuildLayout((await PackageBuilderTests.createAsync(t, true)).directory);
       const builder = PackageBuilderTests.createBuilder(layout, new NpmCommand(new ProcessRunner(), process.env));
@@ -135,7 +145,7 @@ class PackageBuilderTests {
   }
 
   private static createBuilder(layout: BuildLayout, npm: NpmCommand): PackageBuilder {
-    return new PackageBuilder(layout, PackageBuilderTests.ROOT, new ProcessRunner(), npm);
+    return new PackageBuilder(layout, PackageBuilderTests.ROOT, new ProcessRunner(), npm, "fixture-fingerprint");
   }
 }
 

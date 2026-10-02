@@ -8,6 +8,8 @@
   "license": "MIT",
   "dependencies": {
     "@noldova/teamrun-foundation-core": "__VERSION__",
-    "@noldova/teamrun-foundation-exceptions": "__VERSION__"
+    "@noldova/teamrun-foundation-exceptions": "__VERSION__",
+    "@noldova/teamrun-foundation-json": "__VERSION__",
+    "@noldova/teamrun-shell-protocol": "__VERSION__"
   }
 }

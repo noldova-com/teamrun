@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
@@ -31,6 +31,8 @@ export default class PackageBuild {
   private static readonly TESTS_FOLDER: string = "tests";
   private static readonly PROJECT_FILE: string = "tsconfig.json";
   private static readonly STALE: string = "stale";
+  private static readonly RESOURCES_FILE: string = "resources.ts";
+  private static readonly BUILD_PLACEHOLDER: string = "__BUILD__";
 
   private readonly layout: BuildLayout;
   private readonly catalog: PackageCatalog;
@@ -51,12 +53,13 @@ export default class PackageBuild {
 
     const rootManifest = await RootManifest.readAsync(this.layout.root);
     const version = rootManifest.productVersion;
-    const builder = new PackageBuilder(this.layout, rootManifest, this.runner, new NpmCommand(this.runner, this.environment));
     const archives = packages.map(t => this.layout.locateArchive(t, version));
     const common = await this.hashCommonInputsAsync();
+    const fingerprint = await this.hashFingerprintAsync(packages, common);
+    const builder = new PackageBuilder(this.layout, rootManifest, this.runner, new NpmCommand(this.runner, this.environment), fingerprint);
     const archiveHashes = new Map<string, string>();
     for (const manifest of packages) {
-      const inputs = await this.hashSourceInputsAsync(manifest, packages, common, archiveHashes);
+      const inputs = await this.hashSourceInputsAsync(manifest, packages, common, fingerprint, archiveHashes);
       const artifacts = this.listSourceArtifacts(manifest, version);
       const isCurrent = await PackageBuild.isCurrentAsync(this.layout.locateRecord(manifest), inputs, artifacts);
       if (!isCurrent)
@@ -88,10 +91,11 @@ export default class PackageBuild {
 
     const version = (await RootManifest.readAsync(this.layout.root)).productVersion;
     const common = await this.hashCommonInputsAsync();
+    const fingerprint = await this.hashFingerprintAsync(packages, common);
     const archiveHashes = new Map<string, string>();
     const stale: string[] = [];
     for (const manifest of packages) {
-      const inputs = await this.hashSourceInputsAsync(manifest, packages, common, archiveHashes);
+      const inputs = await this.hashSourceInputsAsync(manifest, packages, common, fingerprint, archiveHashes);
       const isCurrent = await PackageBuild.isCurrentAsync(this.layout.locateRecord(manifest), inputs, this.listSourceArtifacts(manifest, version));
       if (!isCurrent)
         stale.push(manifest.name);
@@ -145,16 +149,33 @@ export default class PackageBuild {
     return ContentHash.ofParts(parts);
   }
 
+  private async hashFingerprintAsync(packages: readonly PackageManifest[], common: string): Promise<string> {
+    const parts = [common];
+    for (const manifest of packages)
+      parts.push(`${manifest.name} ${await this.hashPackageSourceAsync(manifest)}`);
+    return ContentHash.ofParts(parts);
+  }
+
+  private async hashPackageSourceAsync(manifest: PackageManifest): Promise<string> {
+    return ContentHash.ofParts([
+      await ContentHash.ofFileAsync(this.layout.locateSource(manifest, PackageBuild.MANIFEST_FILE)),
+      await ContentHash.ofTreeAsync(this.layout.locateSource(manifest, PackageBuild.SOURCE_FOLDER))
+    ]);
+  }
+
   private async hashSourceInputsAsync(
     manifest: PackageManifest,
     packages: readonly PackageManifest[],
     common: string,
+    fingerprint: string,
     archiveHashes: ReadonlyMap<string, string>): Promise<string> {
     const dependencies = PackageBuild.collectDependencies(manifest, packages).map(t => `${t} ${archiveHashes.get(t)}`);
+    const resources = this.layout.locateSource(manifest, PackageBuild.SOURCE_FOLDER, PackageBuild.RESOURCES_FILE);
+    const stampsBuild = existsSync(resources) && (await readFile(resources, "utf8")).includes(PackageBuild.BUILD_PLACEHOLDER);
     return ContentHash.ofParts([
       common,
-      await ContentHash.ofFileAsync(this.layout.locateSource(manifest, PackageBuild.MANIFEST_FILE)),
-      await ContentHash.ofTreeAsync(this.layout.locateSource(manifest, PackageBuild.SOURCE_FOLDER)),
+      await this.hashPackageSourceAsync(manifest),
+      ...(stampsBuild ? [fingerprint] : []),
       ...dependencies
     ]);
   }
