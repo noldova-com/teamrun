@@ -107,6 +107,7 @@ export class Resources {
   public static readonly moduleLoadFailed: string = "Its runtime part could not be loaded.";
   public static readonly moduleActivationFailed: string = "Its runtime part failed to activate.";
   public static readonly moduleDeactivationFailed: string = "One or more runtime parts failed to deactivate.";
+  public static readonly moduleDeactivationPartFailed: string = "Its runtime part failed to deactivate.";
   public static readonly runtimePartMissing: string = "The package does not export a RuntimePart class whose instances can activate and deactivate.";
   public static readonly runtimePartExport: "RuntimePart" = "RuntimePart";
   public static readonly activateMember: "activateAsync" = "activateAsync";
@@ -319,6 +320,10 @@ export class Resources {
 
   public static formatServiceType(name: string, type: string): string {
     return `The service ${name} is not a ${type}.`;
+  }
+
+  public static formatModuleDiagnostic(moduleId: string, cause: string, detail: string): string {
+    return `The module ${moduleId}: ${cause}\n${detail}\n`;
   }
 
   public static formatModuleBlocked(dependency: string): string {

@@ -15,6 +15,7 @@ import { DataDirectory, EventRegistry, type IRuntimePart, MethodRegistry, Module
 
 import { RuntimePartFixture } from "../../fixtures/runtime-part.fixture.js";
 import { RuntimePartLoaderFixture } from "../../fixtures/runtime-part-loader.fixture.js";
+import { TextOutputFixture } from "../../fixtures/text-output.fixture.js";
 
 @TestClass
 export class ModuleHostTests {
@@ -49,6 +50,7 @@ export class ModuleHostTests {
   @TestMethod
   public async recordsFailuresWithSafeCausesAndBlocksTheirDependents(): Promise<void> {
     const methods = new MethodRegistry();
+    const diagnostics = new TextOutputFixture();
     const log: string[] = [];
     const parts = new Map<string, IRuntimePart | Error>([
       ["broken-runtime", new Error("Cannot find module /home/person/secret/broken.js")],
@@ -64,10 +66,11 @@ export class ModuleHostTests {
       ModuleHostTests.declare("orphan", ["missing"], null),
       ModuleHostTests.declare("first", ["second"], null),
       ModuleHostTests.declare("second", ["first"], null)
-    ], parts, methods);
+    ], parts, methods, diagnostics);
 
     await host.activateAsync();
     await host.deactivateAsync();
+    const written = diagnostics.text;
 
     Assert.areEqual(
       [
@@ -81,6 +84,8 @@ export class ModuleHostTests {
       host.report.modules.map(t => JSON.stringify(t.toJson())).join(","));
     Assert.isUndefined(methods.find(new QualifiedName("failing", "run")));
     Assert.areEqual("activate failing", log.join(","));
+    Assert.isTrue(written.startsWith("The module broken: Its runtime part could not be loaded.\nError: Cannot find module /home/person/secret/broken.js\n"), written);
+    Assert.isTrue(written.includes("The module failing: Its runtime part failed to activate.\nError: at /home/person/secret/failing.js:3\n"), written);
   }
 
   @TestMethod
@@ -88,6 +93,7 @@ export class ModuleHostTests {
     const methods = new MethodRegistry();
     const log: string[] = [];
     const failure = new Error("The notes cannot be saved.");
+    const diagnostics = new TextOutputFixture();
     const parts = new Map<string, IRuntimePart>([
       ["tasks-runtime", new RuntimePartFixture("tasks", log, t => t.registerMethod("tasks.list", { handleAsync: async () => [] }))],
       ["notes-runtime", new RuntimePartFixture("notes", log, t => t.registerMethod("notes.list", { handleAsync: async () => [] }), failure)]
@@ -95,7 +101,7 @@ export class ModuleHostTests {
     const host = ModuleHostTests.create([
       ModuleHostTests.declare("tasks", [], "tasks-runtime", ["tasks.list"]),
       ModuleHostTests.declare("notes", ["tasks"], "notes-runtime", ["notes.list"])
-    ], parts, methods);
+    ], parts, methods, diagnostics);
     await host.activateAsync();
 
     const exception = await Assert.throwsAsync(() => host.deactivateAsync(), AggregateError);
@@ -106,6 +112,7 @@ export class ModuleHostTests {
     Assert.areEqual<unknown>(failure, exception.errors[0]);
     Assert.isUndefined(methods.find(new QualifiedName("notes", "list")));
     Assert.isUndefined(methods.find(new QualifiedName("tasks", "list")));
+    Assert.isTrue(diagnostics.text.startsWith("The module notes: Its runtime part failed to deactivate.\nError: The notes cannot be saved.\n"));
   }
 
   private static declare(id: string, dependencies: readonly string[], runtimePackage: string | null, methods: readonly string[] = []): ModuleDeclaration {
@@ -115,12 +122,14 @@ export class ModuleHostTests {
   private static create(
     declarations: readonly ModuleDeclaration[],
     parts: ReadonlyMap<string, IRuntimePart | Error>,
-    methods: MethodRegistry = new MethodRegistry()): ModuleHost {
+    methods: MethodRegistry = new MethodRegistry(),
+    diagnostics: TextOutputFixture = new TextOutputFixture()): ModuleHost {
     return new ModuleHost(
       declarations,
       new DataDirectory(path.resolve("teamrun-data")),
       methods,
       new EventRegistry({ broadcast: () => undefined }),
-      new RuntimePartLoaderFixture(parts));
+      new RuntimePartLoaderFixture(parts),
+      diagnostics);
   }
 }

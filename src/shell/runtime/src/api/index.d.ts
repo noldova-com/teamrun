@@ -2694,19 +2694,21 @@ export declare class RuntimeHost implements IIdleParticipant {
    * @param options How the runtime runs.
    * @param platform The platform, as in `process.platform`; Windows listens on loopback TCP, others on a socket in the discovery folder.
    * @param environment The environment the discovery folder's protection uses.
+   * @param diagnostics Receives the full error of each module part that cannot be loaded, activated or deactivated.
    * @returns A promise of the running host.
+   * @throws {DeclarationsFormatException} Rejected, before taking ownership, when the build's module declarations cannot be read.
    * @throws {DataDirectoryOwnedException} Rejected when another runtime owns the directory.
    * @example
    * ```ts
    * import { RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
    *
    * export async function runAsync(entryArguments: readonly string[]): Promise<string> {
-   *   const host = await RuntimeHost.startAsync(RuntimeOptions.parse(entryArguments), process.platform, process.env);
+   *   const host = await RuntimeHost.startAsync(RuntimeOptions.parse(entryArguments), process.platform, process.env, process.stderr);
    *   return host.waitForStopAsync();
    * }
    * ```
    */
-  public static startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv): Promise<RuntimeHost>;
+  public static startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv, diagnostics: Writable): Promise<RuntimeHost>;
 
   /**
    * Stops the runtime because it stayed idle.
@@ -2745,7 +2747,7 @@ export declare class RuntimeHost implements IIdleParticipant {
    * import { RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
    *
    * export async function runAsync(entryArguments: readonly string[]): Promise<string> {
-   *   const host = await RuntimeHost.startAsync(RuntimeOptions.parse(entryArguments), process.platform, process.env);
+   *   const host = await RuntimeHost.startAsync(RuntimeOptions.parse(entryArguments), process.platform, process.env, process.stderr);
    *   return host.waitForStopAsync();
    * }
    * ```
@@ -2918,16 +2920,18 @@ export declare class ModuleHost {
    * @param methods The registry the modules' methods join.
    * @param events The registry the modules' events join.
    * @param loader Loads runtime parts.
+   * @param diagnostics Receives the full error of each part that cannot be
+   * loaded, activated or deactivated, which the module statuses leave out.
    * @example
    * ```ts
    * import { DataDirectory, type EventRegistry, MethodRegistry, ModuleHost, PackageRuntimePartLoader } from "@noldova/teamrun-shell-runtime";
    *
    * export function createHost(events: EventRegistry): ModuleHost {
-   *   return new ModuleHost([], new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new PackageRuntimePartLoader());
+   *   return new ModuleHost([], new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new PackageRuntimePartLoader(), process.stderr);
    * }
    * ```
    */
-  public constructor(declarations: readonly ModuleDeclaration[], dataDirectory: DataDirectory, methods: MethodRegistry, events: EventRegistry, loader: IRuntimePartLoader);
+  public constructor(declarations: readonly ModuleDeclaration[], dataDirectory: DataDirectory, methods: MethodRegistry, events: EventRegistry, loader: IRuntimePartLoader, diagnostics: Writable);
 
   /**
    * Where every module stands, in activation order, as `shell.modules`

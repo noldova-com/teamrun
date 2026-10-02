@@ -8,6 +8,7 @@
 
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import type { Writable } from "node:stream";
 
 import "@noldova/teamrun-foundation-core";
 import { type BuildIdentity, Failure, FailureCode, PreShellData, RuntimeHandover, ShellMethods } from "@noldova/teamrun-shell-protocol";
@@ -64,7 +65,8 @@ export class RuntimeHost implements IIdleParticipant {
     environment: NodeJS.ProcessEnv,
     lock: OwnershipLock,
     database: ShellDatabase | null,
-    declarations: readonly ModuleDeclaration[]) {
+    declarations: readonly ModuleDeclaration[],
+    diagnostics: Writable) {
     this.lock = lock;
     this.database = database;
     this.identity = RuntimeBuild.identity;
@@ -79,7 +81,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.events = new EventRegistry(this.server);
     this.publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(platform, new SystemCommand(), environment));
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
-    this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, new PackageRuntimePartLoader());
+    this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, new PackageRuntimePartLoader(), diagnostics);
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
     if (Object.isNull(database)) {
@@ -94,7 +96,7 @@ export class RuntimeHost implements IIdleParticipant {
     return this.server.sessionCount === 0 && this.work.isEmpty;
   }
 
-  public static async startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv): Promise<RuntimeHost> {
+  public static async startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv, diagnostics: Writable): Promise<RuntimeHost> {
     const declarations = await ModuleDeclarationReader.readAsync(options.declarationsFile);
     const lock = OwnershipLock.acquire(options.dataDirectory);
     let database: ShellDatabase | null = null;
@@ -108,7 +110,7 @@ export class RuntimeHost implements IIdleParticipant {
       throw error;
     }
 
-    const host = new RuntimeHost(options, platform, environment, lock, database, declarations);
+    const host = new RuntimeHost(options, platform, environment, lock, database, declarations, diagnostics);
     try {
       await host.openAsync(platform);
     }

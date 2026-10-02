@@ -16,6 +16,7 @@ import { BuildIdentity, ModuleStatusList, QualifiedName, Request, ShellMethods, 
 import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
 
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
+import { TextOutputFixture } from "../../fixtures/text-output.fixture.js";
 
 @TestClass
 export class RuntimeHostTests {
@@ -165,7 +166,7 @@ export class RuntimeHostTests {
     return RuntimeHostTests.runAsync(async fixture => {
       const otherPlatform = process.platform === "win32" ? "linux" : "win32";
 
-      await Assert.throwsAsync(() => RuntimeHost.startAsync(new RuntimeOptions(fixture.dataDirectory), otherPlatform, {}), Error);
+      await Assert.throwsAsync(() => RuntimeHost.startAsync(new RuntimeOptions(fixture.dataDirectory), otherPlatform, {}, new TextOutputFixture()), Error);
 
       Assert.isFalse(OwnershipLock.isOwned(fixture.dataDirectory));
       Assert.isFalse(existsSync(fixture.dataDirectory.discoveryFile));
@@ -204,6 +205,7 @@ export class RuntimeHostTests {
         "{\"modules\":[{\"id\":\"notes\",\"state\":\"Active\"},{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its runtime part could not be loaded.\"}]}",
         JSON.stringify(ModuleStatusList.fromJson(responses[1]?.payload).toJson()));
       Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "deactivated")));
+      Assert.isTrue(fixture.diagnostics.text.startsWith("The module broken: Its runtime part could not be loaded.\nError [ERR_MODULE_NOT_FOUND]"));
     });
   }
 

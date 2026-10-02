@@ -6,6 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { Writable } from "node:stream";
+import { inspect } from "node:util";
+
 import "@noldova/teamrun-foundation-core";
 import { ModuleState, ModuleStatus, ModuleStatusList } from "@noldova/teamrun-shell-protocol";
 
@@ -26,6 +29,7 @@ export class ModuleHost {
   private readonly methods: MethodRegistry;
   private readonly events: EventRegistry;
   private readonly loader: IRuntimePartLoader;
+  private readonly diagnostics: Writable;
   private readonly statuses: Map<string, ModuleStatus> = new Map();
   private readonly activations: ModuleActivation[] = [];
 
@@ -36,12 +40,14 @@ export class ModuleHost {
     dataDirectory: DataDirectory,
     methods: MethodRegistry,
     events: EventRegistry,
-    loader: IRuntimePartLoader) {
+    loader: IRuntimePartLoader,
+    diagnostics: Writable) {
     this.declarations = declarations;
     this.dataDirectory = dataDirectory;
     this.methods = methods;
     this.events = events;
     this.loader = loader;
+    this.diagnostics = diagnostics;
   }
 
   public get report(): ModuleStatusList {
@@ -60,6 +66,7 @@ export class ModuleHost {
         await activation.part.deactivateAsync();
       }
       catch (error) {
+        this.writeDiagnostic(activation.context.moduleId, Resources.moduleDeactivationPartFailed, error);
         failures.push(error);
       }
       finally {
@@ -94,7 +101,8 @@ export class ModuleHost {
     try {
       part = await this.loader.loadAsync(declaration.runtimePackage);
     }
-    catch {
+    catch (error) {
+      this.writeDiagnostic(declaration.id, Resources.moduleLoadFailed, error);
       return new ModuleStatus(declaration.id, ModuleState.Failed, Resources.moduleLoadFailed);
     }
 
@@ -102,11 +110,16 @@ export class ModuleHost {
     try {
       await part.activateAsync(context);
     }
-    catch {
+    catch (error) {
       context[Symbol.dispose]();
+      this.writeDiagnostic(declaration.id, Resources.moduleActivationFailed, error);
       return new ModuleStatus(declaration.id, ModuleState.Failed, Resources.moduleActivationFailed);
     }
     this.activations.push(new ModuleActivation(context, part));
     return new ModuleStatus(declaration.id, ModuleState.Active, null);
+  }
+
+  private writeDiagnostic(moduleId: string, cause: string, error: unknown): void {
+    this.diagnostics.write(Resources.formatModuleDiagnostic(moduleId, cause, inspect(error)));
   }
 }
