@@ -32,7 +32,7 @@
     "build": "node scripts/build.ts",
     "start": "node scripts/desktop/start.ts",
     "test": "node scripts/test.ts",
-    "test:ui": "tsc --project src/shell/desktop/tests/e2e && node scripts/desktop/development-binary.ts && playwright test --config src/shell/desktop/tests/e2e/playwright.config.ts"
+    "test:ui": "node scripts/ui-workflows.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

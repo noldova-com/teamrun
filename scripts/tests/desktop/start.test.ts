@@ -11,30 +11,16 @@ import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { copyFile, mkdir, readFile, symlink } from "node:fs/promises";
 import path from "node:path";
-import type { Writable } from "node:stream";
 import { test } from "node:test";
 
-import DevelopmentBinary from "../../desktop/development-binary.ts";
 import SandboxHelper from "../../desktop/sandbox-helper.ts";
 import Start from "../../desktop/start.ts";
+import PreparedBinaryFixture from "../fixtures/prepared-binary.fixture.ts";
 import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
 import ProductIdentityFixture from "../fixtures/product-identity.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import SourceTreeFixture from "../fixtures/source-tree.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
-
-class PreparedBinaryFixture extends DevelopmentBinary {
-  public static readonly EXECUTABLE: string = path.resolve("development-app", "fixture-studio");
-
-  public constructor() {
-    super(path.resolve("repository"), new ProcessRunnerFixture());
-  }
-
-  public override async prepareAsync(report: Writable): Promise<string> {
-    report.write("prepared\n");
-    return PreparedBinaryFixture.EXECUTABLE;
-  }
-}
 
 class StartTests {
   private static readonly RESTRICTION: string = "/proc/sys/kernel/apparmor_restrict_unprivileged_userns";

@@ -242,12 +242,6 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build the test build for the UI workflows
-        run: |
-          npm run build -- --test --without notes --without clock --output _build/variants/no-modules
-          npm run build -- --test --without clock --output _build/variants/without-clock
-          npm run build -- --test
-
       - name: Let Electron's sandbox start on Linux
         if: runner.os == 'Linux'
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
