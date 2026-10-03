@@ -214,7 +214,7 @@ export default class DesktopApplicationFixture {
     this.awaitedProcessIds = [];
     if (running.length === 0)
       return;
-    const described = running.map(t => `${t.name} (${t.processId})`).join(", ");
+    const described = running.map(t => `${t.processId} ${t.command}`).join("; ");
     throw new Error(`TeamRun's processes ${described} still run ${DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT / 1000} s after it closed, so its folder ${this.root} is kept.`);
   }
 
