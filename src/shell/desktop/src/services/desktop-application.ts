@@ -22,6 +22,7 @@ import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import type { IElectron } from "../interfaces/i-electron.js";
 import type { IIpcEvent } from "../interfaces/i-ipc-event.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
+import type { IWindowContents } from "../interfaces/i-window-contents.js";
 import { StartupStateKind } from "../enums/startup-state-kind.js";
 import { DesktopSettings } from "../models/desktop-settings.js";
 import { MenuBar } from "../models/menu-bar.js";
@@ -45,6 +46,14 @@ import { WindowFactory } from "./window-factory.js";
 import { WindowRecovery } from "./window-recovery.js";
 
 export class DesktopApplication {
+  private static readonly EDITS: ReadonlyMap<string, (contents: IWindowContents) => void> = new Map<string, (contents: IWindowContents) => void>([
+    ["undo", t => t.undo()],
+    ["redo", t => t.redo()],
+    ["cut", t => t.cut()],
+    ["copy", t => t.copy()],
+    ["paste", t => t.paste()],
+    ["selectAll", t => t.selectAll()]
+  ]);
   private static readonly UNOWNED_STATES: readonly StartupStateKind[] = [StartupStateKind.Connecting, StartupStateKind.PreShellData, StartupStateKind.Failed];
 
   private readonly electron: IElectron;
@@ -164,6 +173,7 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.readBuildChannel, event => Object.isNull(this.findTrusted(event)) ? null : RuntimeBuild.identity.toJson());
     this.electron.ipcMain.handle(Resources.copyTextChannel, (event, text) => Object.isNull(this.findTrusted(event)) ? false : this.copyText(text));
     this.electron.ipcMain.handle(Resources.openLogFolderChannel, event => Object.isNull(this.findTrusted(event)) ? false : this.openLogFolderAsync());
+    this.electron.ipcMain.handle(Resources.editChannel, (event, action) => this.edit(event, action));
     this.electron.app.on(Resources.activateEvent, () => {
       if (this.windows.size === 0)
         this.open();
@@ -350,6 +360,15 @@ export class DesktopApplication {
       return DesktopApplication.fail(FailureCode.Unavailable, Resources.deviceNotIdentified);
     const response = await this.callAsync(ShellMethods.writeWindowLayout, new WindowStateWrite(new WindowStateKey(device, Resources.mainWindow), value).toJson());
     return response.hasFailed ? response.toJson() : { [Resources.payloadField]: null };
+  }
+
+  private edit(event: IIpcEvent, action: unknown): boolean {
+    const open = this.findTrusted(event);
+    const run = Object.isString(action) ? DesktopApplication.EDITS.get(action) : undefined;
+    if (Object.isNull(open) || Object.isUndefined(run))
+      return false;
+    run(open.window.webContents);
+    return true;
   }
 
   private copyText(text: unknown): boolean {

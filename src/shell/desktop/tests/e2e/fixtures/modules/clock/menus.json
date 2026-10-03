@@ -1,0 +1,22 @@
+{
+  "places": [
+    {
+      "name": "clock.controls",
+      "title": "Clock"
+    }
+  ],
+  "groups": [
+    {
+      "name": "clock.ticking",
+      "place": "clock.controls",
+      "items": [
+        {
+          "command": "clock.tick"
+        },
+        {
+          "command": "clock.pause"
+        }
+      ]
+    }
+  ]
+}
