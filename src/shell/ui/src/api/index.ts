@@ -20,6 +20,8 @@ export { QuickInputComponent } from "../app/components/quick-input/quick-input.c
 export { SashComponent } from "../app/components/sash/sash.component";
 export { TabComponent } from "../app/components/tab/tab.component";
 export { TooltipComponent } from "../app/components/tooltip/tooltip.component";
+export { ToolbarItemDirective } from "../app/components/toolbar/toolbar-item.directive";
+export { ToolbarDirective } from "../app/components/toolbar/toolbar.directive";
 export { TooltipDirective } from "../app/components/tooltip/tooltip.directive";
 export { ButtonVariant } from "../app/enums/button-variant";
 export { DockingDirection } from "../app/enums/docking-direction";
@@ -29,6 +31,7 @@ export { OverlayAlignment } from "../app/enums/overlay-alignment";
 export { PanelSurface } from "../app/enums/panel-surface";
 export { SashOrientation } from "../app/enums/sash-orientation";
 export { ThemeMode } from "../app/enums/theme-mode";
+export { ToolbarOrientation } from "../app/enums/toolbar-orientation";
 export { ThemeException } from "../app/exceptions/theme.exception";
 export { ColorToken } from "../app/models/color-token";
 export { OverlayAnchoring } from "../app/models/overlay-anchoring";
