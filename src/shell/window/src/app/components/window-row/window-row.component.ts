@@ -6,7 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, ElementRef, afterNextRender, inject } from "@angular/core";
+import { ChangeDetectionStrategy, Component, ElementRef, afterNextRender, afterRenderEffect, inject } from "@angular/core";
+
+import { AppearanceService } from "@noldova/teamrun-shell-ui";
 
 import { WindowAppearance } from "../../models/window-appearance";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
@@ -28,6 +30,15 @@ export class WindowRowComponent {
 
   public constructor() {
     const host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+    const appearance = inject(AppearanceService);
+    let isReported = false;
     afterNextRender(() => this.bridge.notifyReady(WindowAppearance.read(host)));
+    afterRenderEffect(() => {
+      appearance.theme();
+      appearance.mode();
+      if (isReported)
+        this.bridge.notifyAppearance(WindowAppearance.read(host));
+      isReported = true;
+    });
   }
 }
