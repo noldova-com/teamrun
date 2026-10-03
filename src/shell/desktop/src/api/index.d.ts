@@ -539,59 +539,6 @@ export interface IDockHost {
 }
 
 /**
- * The system's light or dark appearance, as Electron's `nativeTheme` provides it.
- */
-export interface IThemeHost {
-  /**
-   * Whether the system asks applications for dark colors.
-   */
-  readonly shouldUseDarkColors: boolean;
-
-  /**
-   * Whether the system's own surfaces, such as the Windows taskbar, are dark.
-   */
-  readonly shouldUseDarkColorsForSystemIntegratedUI: boolean;
-
-  /**
-   * Listens for a change of the system's appearance.
-   *
-   * @param event The event's name.
-   * @param listener Called after each change.
-   * @returns Electron's own return value, which the desktop does not use.
-   * @example
-   * ```ts
-   * import type { IThemeHost } from "@noldova/teamrun-shell-desktop";
-   *
-   * export function follow(theme: IThemeHost, changes: boolean[]): void {
-   *   theme.on("updated", () => changes.push(theme.shouldUseDarkColors));
-   * }
-   * ```
-   */
-  on(event: "updated", listener: () => void): unknown;
-
-  /**
-   * Stops a listener that `on` added.
-   *
-   * @param event The event's name.
-   * @param listener The listener `on` received.
-   * @returns Electron's own return value, which the desktop does not use.
-   * @example
-   * ```ts
-   * import type { IThemeHost } from "@noldova/teamrun-shell-desktop";
-   *
-   * export function followOnce(theme: IThemeHost, listener: () => void): void {
-   *   const once = (): void => {
-   *     theme.removeListener("updated", once);
-   *     listener();
-   *   };
-   *   theme.on("updated", once);
-   * }
-   * ```
-   */
-  removeListener(event: "updated", listener: () => void): unknown;
-}
-
-/**
  * Decides the permissions web contents ask for, as an Electron session provides it.
  */
 export interface IPermissionHost {
@@ -987,21 +934,6 @@ export interface IDesktopWindow {
   setAppDetails(options: AppDetailsOptions): void;
 
   /**
-   * Shows an image as the window's icon in its frame and in the taskbar, on Windows and Linux.
-   *
-   * @param iconPath The image's absolute path: an `.ico` file on Windows, a PNG image on Linux.
-   * @example
-   * ```ts
-   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
-   *
-   * export function showIcon(window: IDesktopWindow, iconPath: string): void {
-   *   window.setIcon(iconPath);
-   * }
-   * ```
-   */
-  setIcon(iconPath: string): void;
-
-  /**
    * The window's bounds when it is neither maximized nor minimized.
    *
    * @returns The bounds in screen pixels.
@@ -1351,11 +1283,6 @@ export interface IElectron {
    * The system's file manager, for opening the log folder.
    */
   readonly shell: IShellHost;
-
-  /**
-   * The system's light or dark appearance, for the application's icons.
-   */
-  readonly theme: IThemeHost;
 
   /**
    * Native message boxes, for a window whose page cannot draw.

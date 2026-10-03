@@ -49,7 +49,7 @@ The shell's default theme defines the values in this document: the colors below 
 
 Every color uses a theme token. The default theme's light and dark colors start from the table below; provide complete initial tokens before painting themed content. Section 9 governs module tokens.
 
-The application's icon follows the operating system's appearance, not the theme. Each window on Windows and Linux shows the light or dark icon and switches when the system's appearance changes; on Windows the taskbar's own appearance decides, and the taskbar shows the same icon. macOS shows one icon in the Dock.
+The application shows one icon in light and dark mode, whatever the theme or the operating system's appearance. On Windows and Linux it is the outlined icon, a white shape with a dark outline that stays readable on both backgrounds, on the window, the taskbar and the program file. macOS shows the Dock icon.
 
 The table specifies normal-state colors. Check actual composited foreground/background pairs in hover, selection and overlay states under section 7; correct the mapping or use a verified fallback when needed. Decorative borders may remain subtle; boundaries needed to identify controls must meet non-text contrast requirements.
 

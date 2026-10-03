@@ -26,7 +26,6 @@ export type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 export type { ISenderFrame } from "../interfaces/i-sender-frame.js";
 export type { ISessionHost } from "../interfaces/i-session-host.js";
 export type { IShellHost } from "../interfaces/i-shell-host.js";
-export type { IThemeHost } from "../interfaces/i-theme-host.js";
 export type { IUtilityProcessHost } from "../interfaces/i-utility-process-host.js";
 export type { IUtilityProcess } from "../interfaces/i-utility-process.js";
 export type { IWindowContents } from "../interfaces/i-window-contents.js";
