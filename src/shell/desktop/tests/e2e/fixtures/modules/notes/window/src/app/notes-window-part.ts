@@ -9,7 +9,7 @@
 import { JsonReader } from "@noldova/teamrun-foundation-json";
 import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 import {
-  CommandContribution, DockSide, DocumentContribution, type IWindowPart, type IWindowPartContext, StatusBarItemContribution, StatusBarItemState, StatusBarSide, TopBarActionContribution,
+  CommandContribution, DockSide, DocumentContribution, type IWindowPart, type IWindowPartContext, MenuRowContribution, StatusBarItemContribution, StatusBarItemState, StatusBarSide, TopBarActionContribution,
   TopBarActionState, ViewContribution
 } from "@noldova/teamrun-shell-window";
 
@@ -80,6 +80,7 @@ export class NotesWindowPart implements IWindowPart {
       NotesState.wrapsLines.update(t => !t);
       return null;
     }, () => true, () => NotesState.wrapsLines()));
+    context.provideMenuGroup("notes.mainRecent", () => [1, 2].map(week => new MenuRowContribution("notes.openNote", { week, title: `Week ${week}` }, `Week ${week}`)));
     context.registerTopBarAction(new TopBarActionContribution("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote")));
     await context.postNotificationAsync(new NotificationPost(
       QualifiedName.parse("notes.saveFailed"), null, "Note 2 couldn't be saved", "The disk is full.", NotificationSeverity.Error, null,

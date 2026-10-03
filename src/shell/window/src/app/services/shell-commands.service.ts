@@ -30,6 +30,7 @@ import { CommandSearchService } from "./command-search.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { EditTargetService } from "./edit-target.service";
 import { LayoutService } from "./layout.service";
+import { ToolbarService } from "./toolbar.service";
 import { TabStripService } from "./tab-strip.service";
 
 @Injectable({ providedIn: "root" })
@@ -41,6 +42,10 @@ export class ShellCommandsService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly document: Document = inject(DOCUMENT);
   private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
+
+  private get toolbars(): ToolbarService {
+    return this.environment.get(ToolbarService);
+  }
 
   public readonly commands: readonly CommandContribution[] = [
     this.tabCommand(Resources.closeTabCommand, Resources.closeTabTitle, Resources.closeGlyph, t => this.close(t), () => true),
@@ -77,6 +82,19 @@ export class ShellCommandsService {
     new CommandContribution(Resources.openSettingsCommand, Resources.openSettingsTitle, Resources.settingsGlyph, null,
       () => this.done(() => this.layout.openDocument(ShellDocuments.settingsTab)),
       () => this.layout.registry().hasDocument(ShellDocuments.settings.name)),
+    new CommandContribution(Resources.toggleToolbarCommand, Resources.toggleToolbarTitle, Resources.focusToolbarsGlyph, null,
+      commandArguments => this.done(() => {
+        const name = this.toolbarOf(commandArguments);
+        if (!Object.isNull(name))
+          this.toolbars.setShown(name, !this.toolbars.isShown(name));
+      }),
+      commandArguments => !Object.isNull(this.toolbarOf(commandArguments)),
+      commandArguments => {
+        const name = this.toolbarOf(commandArguments);
+        return !Object.isNull(name) && this.toolbars.isShown(name);
+      }),
+    new CommandContribution(Resources.focusToolbarsCommand, Resources.focusToolbarsTitle, Resources.focusToolbarsGlyph, null,
+      () => this.done(() => this.focusToolbars()), () => this.toolbars.rows().length > 0),
     new CommandContribution(Resources.resetLayoutCommand, Resources.resetLayoutLabel, Resources.resetLayoutGlyph, null, () => this.done(() => this.layout.reset())),
     ...Object.values(BottomDockSpan).map(span => new CommandContribution(Resources.bottomSpanCommands[span], Resources.bottomSpanLabels[span], Resources.bottomSpanGlyphs[span], null,
       () => this.done(() => this.layout.setBottomSpan(span)), () => true, () => this.layout.layout().bottomSpan === span)),
@@ -131,6 +149,15 @@ export class ShellCommandsService {
     const tab = Object.isUndefined(key) ? this.layout.currentGroup().active : layout.groups.flatMap(t => t.tabs).find(t => t.key === key) ?? null;
     const group = Object.isNull(tab) ? null : layout.groupOf(tab);
     return Object.isNull(tab) || Object.isNull(group) ? null : new TabTarget(tab, group);
+  }
+
+  private toolbarOf(commandArguments: JsonValue): string | null {
+    const name = Object.isNull(commandArguments) ? undefined : JsonReader.fromValue(commandArguments).readOptionalString(Resources.toolbarArgument);
+    return !Object.isUndefined(name) && this.toolbars.isKnown(name) ? name : null;
+  }
+
+  private focusToolbars(): void {
+    this.document.querySelector<HTMLElement>(Resources.toolbarItemSelector)?.focus();
   }
 
   private groupOf(commandArguments: JsonValue): number | null {

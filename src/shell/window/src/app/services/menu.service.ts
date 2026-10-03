@@ -41,6 +41,10 @@ export class MenuService {
     this.activeValue.set([...moduleIds]);
   }
 
+  public declaresDynamicGroup(moduleId: string, group: string): boolean {
+    return this.declarations.some(t => t.moduleId === moduleId && t.groups.some(u => u.name === group && u.isDynamic));
+  }
+
   public provideGroup(group: string, provider: (context: JsonObject) => readonly MenuItem[]): () => void {
     this.providers.update(t => new Map([...t, [group, provider]]));
     return () => this.providers.update(t => new Map([...t].filter(u => u[0] !== group)));
@@ -67,6 +71,8 @@ export class MenuService {
       const place = this.findPlace(item.submenu);
       return Object.isNull(place) || this.resolve(place.name, context).length === 0 ? [] : [new SubmenuRow(place.name, place.title, place.icon)];
     }
+    if (!Object.isNull(item.choice))
+      return this.resolveChoice(item.choice, context);
     const name = String(item.command);
     const commandArguments = { ...context, ...item.commandArguments };
     const command = this.commands.commands().find(t => t.name === name);
@@ -77,5 +83,14 @@ export class MenuService {
     const check = Object.isNull(command.isChecked) ? MenuCheck.None : group.isExclusive ? MenuCheck.Radio : MenuCheck.Checkbox;
     return [new CommandRow(name, commandArguments, item.label ?? command.title, command.icon, this.commands.keyLabel(name), this.commands.isEnabled(name, commandArguments), check,
       command.isChecked?.(commandArguments) ?? false)];
+  }
+
+  private resolveChoice(placeName: string, context: JsonObject): readonly SubmenuRow[] {
+    const place = this.findPlace(placeName);
+    const rows = Object.isNull(place) ? [] : this.resolve(place.name, context).flatMap(t => t.rows);
+    if (Object.isNull(place) || rows.length === 0)
+      return [];
+    const checked = rows.find(t => !t.isSubmenu && t.isChecked);
+    return [new SubmenuRow(place.name, checked?.title ?? place.title, place.icon)];
   }
 }

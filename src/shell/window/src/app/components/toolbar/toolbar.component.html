@@ -1,0 +1,47 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<span #grip class="tr-toolbar-grip" aria-hidden="true" [trTooltip]="resources.toolbarGripLabel" [trTooltipSide]="below" (pointerdown)="drag.begin(toolbar().name, $event)"></span>
+<div #content class="tr-toolbar-content" trToolbar [trToolbarLabel]="toolbar().title">
+  @for (section of shown(); track section.group; let first = $first) {
+    @if (!first) {
+      <span class="tr-toolbar-separator" role="separator" aria-orientation="vertical"></span>
+    }
+    <div class="tr-toolbar-section" [attr.data-group]="section.group">
+      @for (row of section.rows; track $index) {
+        @if (row.isSubmenu) {
+          <tr-place-menu #nested [place]="row.place" />
+          <button tr-toolbar-button trToolbarItem class="tr-toolbar-item" [attr.data-submenu]="row.place" [label]="row.title" [icon]="row.icon" [isShowingLabel]="true"
+            [hasMenu]="true" [trMenuTriggerFor]="nested.menu()"></button>
+        } @else {
+          <button tr-toolbar-button trToolbarItem class="tr-toolbar-item" [attr.data-command]="row.command" [label]="row.title" [icon]="row.icon"
+            [pressed]="row.check === menuCheck.None ? undefined : row.isChecked" [isUnavailable]="!row.isEnabled" [trTooltip]="tooltipOf(row)"
+            [trTooltipSide]="below" (click)="run(row)"></button>
+        }
+      }
+    </div>
+  }
+  @if (overflowing().length > 0) {
+    <tr-place-menu #overflow [rows]="overflowing()" />
+    <button tr-toolbar-button trToolbarItem class="tr-toolbar-item tr-toolbar-overflow" [label]="resources.toolbarOverflowLabel" [icon]="resources.toolbarOverflowGlyph"
+      [trMenuTriggerFor]="overflow.menu()" [trTooltip]="resources.toolbarOverflowLabel" [trTooltipSide]="below"></button>
+  }
+</div>
+<div #ghost class="tr-toolbar-ghost" aria-hidden="true">
+  @for (section of toolbar().sections; track section.group; let first = $first) {
+    @if (!first) {
+      <span class="tr-toolbar-separator"></span>
+    }
+    <div class="tr-toolbar-ghost-section">
+      @for (row of section.rows; track $index) {
+        <button tr-toolbar-button tabindex="-1" [label]="row.title" [icon]="row.icon" [isShowingLabel]="row.isSubmenu" [hasMenu]="row.isSubmenu"></button>
+      }
+    </div>
+  }
+  <button tr-toolbar-button tabindex="-1" class="tr-toolbar-ghost-overflow" [label]="resources.toolbarOverflowLabel" [icon]="resources.toolbarOverflowGlyph"></button>
+</div>

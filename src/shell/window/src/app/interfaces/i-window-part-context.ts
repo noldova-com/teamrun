@@ -6,11 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { NotificationPost, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import type { CommandContribution } from "../models/command-contribution";
 import type { DocumentContribution } from "../models/document-contribution";
+import type { MenuRowContribution } from "../models/menu-row-contribution";
 import type { NotificationHandle } from "../models/notification-handle";
 import type { StatusBarItem } from "../models/status-bar-item";
 import type { StatusBarItemContribution } from "../models/status-bar-item-contribution";
@@ -25,6 +26,7 @@ export interface IWindowPartContext {
   registerCommand(command: CommandContribution): void;
   registerStatusBarItem(item: StatusBarItemContribution): StatusBarItem;
   registerTopBarAction(action: TopBarActionContribution): TopBarAction;
+  provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuRowContribution[]): () => void;
   isAllowed(name: string): boolean;
   runCommandAsync(name: string, commandArguments?: JsonValue): Promise<JsonValue>;
   postNotificationAsync(post: NotificationPost): Promise<NotificationHandle>;

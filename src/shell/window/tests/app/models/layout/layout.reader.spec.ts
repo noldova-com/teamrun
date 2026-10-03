@@ -16,6 +16,7 @@ import { Dock } from "../../../../src/app/models/layout/dock";
 import { DocumentGroup } from "../../../../src/app/models/layout/document-group";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { LayoutReader } from "../../../../src/app/models/layout/layout.reader";
+import { ToolbarLayout } from "../../../../src/app/models/layout/toolbar-layout";
 import { TabGroup } from "../../../../src/app/models/layout/tab-group";
 import { ViewTab } from "../../../../src/app/models/layout/view-tab";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
@@ -74,6 +75,16 @@ describe("LayoutReader", () => {
 
     expect([bottomSpan, LayoutReader.read(older).bottomSpan]).toEqual(["Full", BottomDockSpan.Full]);
     expect(failure(saved({}, documents, 1, "Wide")).path).toBe("$.bottomSpan");
+  });
+
+  it("reads the toolbar arrangement when the layout has one, and refuses one that is not valid", () => {
+    const arrangement = { rows: [{ toolbars: ["notes.main", "notes.second"] }], hidden: ["notes.spare"] };
+
+    expect(LayoutReader.read({ ...saved(), toolbars: arrangement }).toolbars).toEqual(new ToolbarLayout([["notes.main", "notes.second"]], ["notes.spare"]));
+    expect(LayoutReader.read(saved()).toolbars).toBe(ToolbarLayout.EMPTY);
+    expect(LayoutReader.read({ ...saved(), toolbars: arrangement }).toJson()).toEqual({ ...saved(), toolbars: arrangement });
+    expect(failure({ ...saved(), toolbars: { rows: [{ toolbars: [] }], hidden: [] } }).path).toBe("$");
+    expect(failure({ ...saved(), toolbars: { rows: [{ toolbars: ["main"] }], hidden: [] } }).message).toBe("$: The value does not describe a valid part of a layout.");
   });
 
   it("writes back what it read, including views whose modules are absent", () => {

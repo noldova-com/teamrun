@@ -17,6 +17,7 @@ import { Dock } from "../../../../src/app/models/layout/dock";
 import { DocumentGroup } from "../../../../src/app/models/layout/document-group";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { LayoutReader } from "../../../../src/app/models/layout/layout.reader";
+import { ToolbarLayout } from "../../../../src/app/models/layout/toolbar-layout";
 import { SplitHandle } from "../../../../src/app/models/layout/split-handle";
 import type { SplitNode } from "../../../../src/app/models/layout/split.node";
 import { TabGroup } from "../../../../src/app/models/layout/tab-group";
@@ -237,6 +238,17 @@ describe("Layout", () => {
     expect(between.openView(terminal, registry).toggleDock(DockSide.Bottom).openDocument(plan).bottomSpan).toBe(BottomDockSpan.Between);
     expect(between.reset(registry).bottomSpan).toBe(BottomDockSpan.Full);
     expect(between.withBottomSpan(BottomDockSpan.Full).bottomSpan).toBe(BottomDockSpan.Full);
+  });
+
+  it("keeps the toolbar arrangement through every change, writes it only once it holds a choice, and returns to the declared defaults on a reset", () => {
+    const arranged = initial.withToolbars(new ToolbarLayout([["notes.main"]], ["notes.second"]));
+
+    expect(initial.toolbars).toBe(ToolbarLayout.EMPTY);
+    expect(initial.withToolbars(ToolbarLayout.EMPTY)).toBe(initial);
+    expect(arranged.withBottomSpan(BottomDockSpan.Between).openView(terminal, registry).toggleDock(DockSide.Bottom).openDocument(plan).toolbars).toEqual(arranged.toolbars);
+    expect(arranged.toJson()["toolbars"]).toEqual({ rows: [{ toolbars: ["notes.main"] }], hidden: ["notes.second"] });
+    expect(initial.toJson()).not.toHaveProperty("toolbars");
+    expect(arranged.reset(registry).toolbars).toBe(ToolbarLayout.EMPTY);
   });
 
   it("resizes a split through its handle", () => {

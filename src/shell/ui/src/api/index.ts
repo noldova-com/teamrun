@@ -23,6 +23,7 @@ export { SelectComponent } from "../app/components/select/select.component";
 export { TabComponent } from "../app/components/tab/tab.component";
 export { TextFieldComponent } from "../app/components/text-field/text-field.component";
 export { TooltipComponent } from "../app/components/tooltip/tooltip.component";
+export { ToolbarButtonComponent } from "../app/components/toolbar-button/toolbar-button.component";
 export { ToolbarItemDirective } from "../app/components/toolbar/toolbar-item.directive";
 export { ToolbarDirective } from "../app/components/toolbar/toolbar.directive";
 export { TooltipDirective } from "../app/components/tooltip/tooltip.directive";

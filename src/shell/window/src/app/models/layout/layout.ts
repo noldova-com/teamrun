@@ -21,6 +21,7 @@ import type { LayoutNode } from "./layout.node";
 import { SplitNode } from "./split.node";
 import type { Tab } from "./tab";
 import { TabGroup } from "./tab-group";
+import { ToolbarLayout } from "./toolbar-layout";
 import type { ViewRegistry } from "./view-registry";
 import { ViewTab } from "./view-tab";
 
@@ -29,8 +30,9 @@ export class Layout {
   public readonly middle: LayoutNode;
   public readonly documents: TabGroup;
   public readonly bottomSpan: BottomDockSpan;
+  public readonly toolbars: ToolbarLayout;
 
-  public constructor(docks: readonly Dock[], middle: LayoutNode | null, bottomSpan: BottomDockSpan = BottomDockSpan.Full) {
+  public constructor(docks: readonly Dock[], middle: LayoutNode | null, bottomSpan: BottomDockSpan = BottomDockSpan.Full, toolbars: ToolbarLayout = ToolbarLayout.EMPTY) {
     const documents = middle?.groups.filter(t => t.isDocuments) ?? [];
     const [document] = documents;
     if (Object.isNull(middle) || Object.isUndefined(document) || documents.length !== 1)
@@ -55,6 +57,7 @@ export class Layout {
     this.middle = middle;
     this.documents = document;
     this.bottomSpan = bottomSpan;
+    this.toolbars = toolbars;
   }
 
   public static createDefault(registry: ViewRegistry): Layout {
@@ -167,7 +170,11 @@ export class Layout {
   }
 
   public withBottomSpan(span: BottomDockSpan): Layout {
-    return span === this.bottomSpan ? this : new Layout(this.docks, this.middle, span);
+    return span === this.bottomSpan ? this : new Layout(this.docks, this.middle, span, this.toolbars);
+  }
+
+  public withToolbars(toolbars: ToolbarLayout): Layout {
+    return toolbars === this.toolbars ? this : new Layout(this.docks, this.middle, this.bottomSpan, toolbars);
   }
 
   public resizeSplit(split: SplitNode): Layout {
@@ -192,7 +199,8 @@ export class Layout {
       [Resources.versionField]: Resources.layoutFormatVersion,
       [Resources.docksField]: Object.fromEntries(this.docks.map(t => [t.side, t.toJson()])),
       [Resources.middleField]: this.middle.toJson(),
-      [Resources.bottomSpanField]: this.bottomSpan
+      [Resources.bottomSpanField]: this.bottomSpan,
+      ...this.toolbars.isEmpty ? {} : { [Resources.toolbarsField]: this.toolbars.toJson() }
     };
   }
 
@@ -226,6 +234,6 @@ export class Layout {
   }
 
   private copy(docks: readonly Dock[], middle: LayoutNode | null): Layout {
-    return middle === this.middle && docks.every(t => t === this.dock(t.side)) ? this : new Layout(docks, middle, this.bottomSpan);
+    return middle === this.middle && docks.every(t => t === this.dock(t.side)) ? this : new Layout(docks, middle, this.bottomSpan, this.toolbars);
   }
 }

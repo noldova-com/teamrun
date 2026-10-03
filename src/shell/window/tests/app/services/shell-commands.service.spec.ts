@@ -19,6 +19,7 @@ import type { LayoutService } from "../../../src/app/services/layout.service";
 import { CommandSearchService } from "../../../src/app/services/command-search.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
 import { TabStripService } from "../../../src/app/services/tab-strip.service";
+import { ToolbarService } from "../../../src/app/services/toolbar.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../fixtures/layout-service.fixture";
@@ -55,6 +56,10 @@ describe("ShellCommandsService", () => {
     return command(name).isEnabled(commandArguments);
   }
 
+  function checked(name: string, commandArguments: JsonValue): boolean {
+    return command(name).isChecked?.(commandArguments) ?? false;
+  }
+
   const tab = (key: string): JsonValue => ({ tab: key });
 
   it("offers the shell's tab and layout commands, each with a title and an icon and none with a default key", () => {
@@ -62,7 +67,7 @@ describe("ShellCommandsService", () => {
       "shell.closeTab", "shell.keepTab", "shell.closeOtherTabs", "shell.closeTabsToTheRight", "shell.closeAllTabs", "shell.moveTabLeft", "shell.moveTabRight",
       "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight",
       "shell.dockTabBottom", "shell.moveTabToGroup", "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut",
-      "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
+      "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.toggleToolbar", "shell.focusToolbars", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
     expect(service.commands.every(t => t.title.length > 0 && t.icon !== null)).toBe(true);
     expect(service.commands.filter(t => t.defaultKey !== null)).toEqual([]);
@@ -237,6 +242,43 @@ describe("ShellCommandsService", () => {
     await runAsync("shell.showCommands");
 
     expect(open).toHaveBeenCalledOnce();
+  });
+
+  it("shows or hides the toolbar it names, checked while shown, and is enabled only for a toolbar that exists", async () => {
+    const toolbars = TestBed.inject(ToolbarService);
+    const known = vi.spyOn(toolbars, "isKnown").mockImplementation(name => name === "notes.main");
+    const shown = vi.spyOn(toolbars, "isShown").mockReturnValue(true);
+    const setShown = vi.spyOn(toolbars, "setShown").mockImplementation(() => undefined);
+    const main = { toolbar: "notes.main" };
+    const missing = { toolbar: "notes.none" };
+
+    expect([enabled("shell.toggleToolbar", main), enabled("shell.toggleToolbar", missing), enabled("shell.toggleToolbar"), enabled("shell.toggleToolbar", {})]).toEqual([true, false, false, false]);
+    expect([checked("shell.toggleToolbar", main), checked("shell.toggleToolbar", missing), checked("shell.toggleToolbar", null)]).toEqual([true, false, false]);
+    await runAsync("shell.toggleToolbar", main);
+    expect(setShown).toHaveBeenLastCalledWith("notes.main", false);
+    shown.mockReturnValue(false);
+    await runAsync("shell.toggleToolbar", main);
+    expect(setShown).toHaveBeenLastCalledWith("notes.main", true);
+    setShown.mockClear();
+    await runAsync("shell.toggleToolbar", missing);
+    expect(setShown).not.toHaveBeenCalled();
+    expect(known).toHaveBeenCalled();
+  });
+
+  it("focuses the first toolbar item, and is enabled only while a toolbar is shown", async () => {
+    const rows = vi.spyOn(TestBed.inject(ToolbarService), "rows");
+    const item = document.createElement("button");
+    item.className = "tr-toolbar-item";
+    item.tabIndex = 0;
+    document.body.append(item);
+
+    expect(enabled("shell.focusToolbars")).toBe(false);
+    rows.mockReturnValue([[]]);
+    expect(enabled("shell.focusToolbars")).toBe(true);
+    await runAsync("shell.focusToolbars");
+    expect(document.activeElement).toBe(item);
+    item.remove();
+    await runAsync("shell.focusToolbars");
   });
 
   it("shows and hides each dock and resets the layout", async () => {

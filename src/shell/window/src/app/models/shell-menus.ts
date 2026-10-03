@@ -27,6 +27,7 @@ export class ShellMenus {
     new MenuPlace(Resources.tabMoveToMenu, Resources.moveToLabel, false, Resources.moveToGlyph),
     new MenuPlace(Resources.tabSplitMenu, Resources.splitLabel, false, Resources.splitGlyph),
     new MenuPlace(Resources.tabDockMenu, Resources.dockLabel, false, Resources.dockGlyph),
+    new MenuPlace(Resources.toolbarsMenu, Resources.toolbarsMenuTitle, false),
     new MenuPlace(Resources.appMenu, Resources.appMenuTitle, false)
   ];
   private static readonly EDITING: MenuGroup = new MenuGroup(Resources.editingGroup, Resources.editMenu, false,
@@ -37,6 +38,8 @@ export class ShellMenus {
     new MenuGroup(Resources.docksGroup, Resources.viewMenu, false,
       Object.values(DockSide).map(t => MenuItem.ofCommand(Resources.toggleDockCommands[t], {}, Resources.dockRowLabels[t]))),
     new MenuGroup(Resources.bottomDockGroup, Resources.viewMenu, true, Object.values(BottomDockSpan).map(t => MenuItem.ofCommand(Resources.bottomSpanCommands[t]))),
+    new MenuGroup(Resources.viewToolbarsGroup, Resources.viewMenu, false, [MenuItem.ofSubmenu(Resources.toolbarsMenu)]),
+    MenuGroup.dynamic(Resources.toolbarListGroup, Resources.toolbarsMenu, false),
     new MenuGroup(Resources.layoutGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.resetLayoutCommand)]),
     new MenuGroup(Resources.tabArrangeGroup, Resources.tabMenu, false, [
       MenuItem.ofCommand(Resources.keepTabCommand, {}, Resources.keepLabel),

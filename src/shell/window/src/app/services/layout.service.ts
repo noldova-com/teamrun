@@ -21,6 +21,7 @@ import type { DropTarget } from "../models/layout/drop-target";
 import { Layout } from "../models/layout/layout";
 import { LayoutGeometry } from "../models/layout/layout-geometry";
 import { LayoutReader } from "../models/layout/layout.reader";
+import type { ToolbarLayout } from "../models/layout/toolbar-layout";
 import type { SplitHandle } from "../models/layout/split-handle";
 import type { Tab } from "../models/layout/tab";
 import type { TabGroup } from "../models/layout/tab-group";
@@ -127,6 +128,10 @@ export class LayoutService {
 
   public resizeSplit(handle: SplitHandle, leadingLength: number): void {
     this.update(this.layoutState().resizeSplit(handle.resize(leadingLength)));
+  }
+
+  public setToolbars(toolbars: ToolbarLayout): void {
+    this.update(this.layoutState().withToolbars(toolbars));
   }
 
   public reset(): void {

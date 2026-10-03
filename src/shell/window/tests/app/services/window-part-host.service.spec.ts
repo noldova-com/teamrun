@@ -23,6 +23,7 @@ import { Layout } from "../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../src/app/models/layout/view-registry";
 import { ViewTab } from "../../../src/app/models/layout/view-tab";
 import { ViewType } from "../../../src/app/models/layout/view-type";
+import type { MenuItem } from "../../../src/app/models/menu-item";
 import { StatusBarItemContribution } from "../../../src/app/models/status-bar-item-contribution";
 import { StatusBarItemState } from "../../../src/app/models/status-bar-item-state";
 import { TopBarActionContribution } from "../../../src/app/models/top-bar-action-contribution";
@@ -34,6 +35,7 @@ import { BarItemsService } from "../../../src/app/services/bar-items.service";
 import { CommandService } from "../../../src/app/services/command.service";
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../src/app/services/layout.service";
+import { MenuService } from "../../../src/app/services/menu.service";
 import { TabLabelService } from "../../../src/app/services/tab-label.service";
 import { SettingsService } from "../../../src/app/services/settings.service";
 import { WindowPartHostService } from "../../../src/app/services/window-part-host.service";
@@ -490,6 +492,20 @@ describe("WindowPartHostService", () => {
 
     expect(await host.requestAsync("notes.read", { id: 1 })).toEqual({ title: "Note 1" });
     expect(heard).toEqual([["notes.changed", { id: 1 }]]);
+  });
+
+  it("asks the menu service whether a module declares a dynamic menu group and passes on the items of a group it supplies", () => {
+    const { host } = start([], []);
+    const menus = TestBed.inject(MenuService);
+    const withdraw = vi.fn();
+    const declares = vi.spyOn(menus, "declaresDynamicGroup").mockReturnValue(true);
+    const provide = vi.spyOn(menus, "provideGroup").mockReturnValue(withdraw);
+    const provider = (): readonly MenuItem[] => [];
+
+    expect(host.declaresDynamicMenuGroup("notes", "notes.recent")).toBe(true);
+    expect(host.provideMenuGroup("notes.recent", provider)).toBe(withdraw);
+    expect(declares).toHaveBeenCalledWith("notes", "notes.recent");
+    expect(provide).toHaveBeenCalledWith("notes.recent", provider);
   });
 
   it("does nothing before the runtime is ready", async () => {

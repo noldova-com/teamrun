@@ -16,6 +16,7 @@ import type { CommandRow } from "../../models/command-row";
 import type { MenuSection } from "../../models/menu-section";
 import { CommandService } from "../../services/command.service";
 import { MenuService } from "../../services/menu.service";
+import { Resources } from "../../../resources";
 
 @Component({
   selector: "tr-place-menu",
@@ -28,12 +29,13 @@ export class PlaceMenuComponent {
   private readonly commands: CommandService = inject(CommandService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
 
-  public readonly place = input.required<string>();
+  public readonly place = input<string>(Resources.noPlace);
+  public readonly rows = input<readonly MenuSection[] | null>(null);
   public readonly context = input<JsonObject>({});
   public readonly menu: Signal<TemplateRef<unknown>> = viewChild.required<TemplateRef<unknown>>("placeMenu");
 
   protected readonly menuCheck: typeof MenuCheck = MenuCheck;
-  protected readonly sections: Signal<readonly MenuSection[]> = computed(() => this.menus.resolve(this.place(), this.context()));
+  protected readonly sections: Signal<readonly MenuSection[]> = computed(() => this.rows() ?? this.menus.resolve(this.place(), this.context()));
 
   protected run(row: CommandRow): void {
     this.commands.runAsync(row.command, row.commandArguments).catch((error: unknown) => this.errors.handleError(error));

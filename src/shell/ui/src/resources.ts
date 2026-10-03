@@ -115,6 +115,10 @@ export class Resources {
     "menu-item-inset",
     "menu-item-padding",
     "menu-trail-gap",
+    "toolbar-row",
+    "toolbar-button",
+    "toolbar-button-padding",
+    "toolbar-gap",
     "menu-separator-spacing",
     "tooltip-width",
     "tooltip-padding",
@@ -232,6 +236,9 @@ export class Resources {
   public static readonly valueAttribute: string = "data-value";
   public static readonly previewDescription: string = "Preview";
   public static readonly submenuGlyph: string = "chevron_right";
+  public static readonly toolbarChevronGlyph: string = "expand_more";
+  public static readonly menuPopup: string = "menu";
+  public static readonly trueValue: string = "true";
   public static readonly quickInputIdPrefix: string = "tr-quick-input-";
   public static readonly quickInputOptionSeparator: string = "-option-";
   public static readonly quickInputFieldSelector: string = ".tr-quick-input-field";
