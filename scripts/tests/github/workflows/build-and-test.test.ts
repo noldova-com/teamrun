@@ -110,10 +110,10 @@ class BuildAndTestTests {
         ["skipped", "", "", "failure", "", "skipped", 1, /^$/],
         ["skipped", "", "", "cancelled", "", "skipped", 1, /^$/]
       ];
-      for (const [index, [tested, verified, testedRun, changes, runCode, validation, status, summary]] of cases.entries()) {
+      await Promise.all([...cases.entries()].map(async ([index, [tested, verified, testedRun, changes, runCode, validation, status, summary]]) => {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
-        await doubles.runAsync("touch summary.md\n");
+        await writeFile(path.join(doubles.directory, "summary.md"), "");
 
         const result = await doubles.runAsync(script, {
           TESTED_RESULT: tested, VERIFIED: verified, TESTED_RUN: testedRun, CHANGES_RESULT: changes, RUN_CODE: runCode, VALIDATION_RESULT: validation,
@@ -125,14 +125,14 @@ class BuildAndTestTests {
         assert.match(await doubles.readFileAsync("summary.md"), summary);
         if (status !== 0)
           assert.match(result.stdout, /^::error::/);
-      }
+      }));
     });
 
     test("the aggregate check names the jobs a passing pull request run left to the merge queue", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      await doubles.runAsync("touch summary.md\n");
+      await writeFile(path.join(doubles.directory, "summary.md"), "");
 
       const result = await doubles.runAsync(script, {
         TESTED_RESULT: "skipped", VERIFIED: "", TESTED_RUN: "", CHANGES_RESULT: "success", RUN_CODE: "true", VALIDATION_RESULT: "success",
@@ -278,15 +278,14 @@ class BuildAndTestTests {
           `echo change > change.txt\ngit add change.txt\n${commit} -m squash\n`,
         none: ""
       };
-      const repositories = new Map<string, { readonly directory: string; readonly base: string; readonly tree: string }>();
-      for (const [name, history] of Object.entries(histories)) {
+      const repositories = new Map(await Promise.all(Object.entries(histories).map(async ([name, history]) => {
         const repository = await CommandDoublesFixture.createAsync();
         t.after(() => repository.disposeAsync());
         const prepared = await repository.runAsync(history.length === 0 ? "true\n" : `${history}git rev-parse base 'HEAD^{tree}'\n`);
         assert.equal(prepared.status, 0, `${name}: ${prepared.stderr}`);
         const [base = "b".repeat(40), tree = "a".repeat(40)] = prepared.stdout.trim().split("\n").filter(line => line.length > 0);
-        repositories.set(name, { directory: repository.directory, base, tree });
-      }
+        return [name, { directory: repository.directory, base, tree }] as const;
+      })));
       interface ICase {
         readonly name: string;
         readonly history?: string;
@@ -321,7 +320,7 @@ class BuildAndTestTests {
         { name: "an unreadable pull request", pullStatus: 1, reason: "The pull request could not be read" },
         { name: "an unlisted run", runsStatus: 1, reason: "The pull request's runs could not be listed" }
       ];
-      for (const item of cases) {
+      await Promise.all(cases.map(async item => {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
         const repository = repositories.get(item.history ?? "squash");
@@ -356,7 +355,7 @@ class BuildAndTestTests {
         const downloads = (await doubles.readCallsAsync()).filter(call => call.startsWith("gh run download"));
         const reachesDownload = item.latest === undefined && item.history === undefined && item.headRef === undefined && item.pullStatus === undefined && item.runsStatus === undefined;
         assert.equal(downloads.length, reachesDownload ? 1 : 0, item.name);
-      }
+      }));
     });
 
     test("a passing pull request run records the tree it tested for its attempt, and an invalid tree fails the record", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {

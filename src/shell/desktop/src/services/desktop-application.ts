@@ -104,7 +104,7 @@ export class DesktopApplication {
       { ...process.env, [Resources.runAsNodeVariable]: Resources.runAsNodeValue },
       process.platform);
     const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
-    const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform, electron.theme);
+    const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform);
     const log = new DesktopLog(dataDirectory, process.errorOutput, new DiagnosticRedactor(process.homeFolder));
     new DesktopApplication(
       electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, icons).run();

@@ -14,6 +14,7 @@ import path from "node:path";
 import { test, type TestContext } from "node:test";
 
 import Test from "../test.ts";
+import AngularReportRunnerFixture from "./fixtures/angular-report-runner.fixture.ts";
 import ProcessRunnerFixture from "./fixtures/process-runner.fixture.ts";
 import ProductIdentityFixture from "./fixtures/product-identity.fixture.ts";
 import RepositoryFixture from "./fixtures/repository.fixture.ts";
@@ -21,11 +22,13 @@ import SourceTreeFixture from "./fixtures/source-tree.fixture.ts";
 import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 
 class TestTests {
+  private static readonly REPORT: string = JSON.stringify({ testResults: [] });
+
   public static register(): void {
     test("the complete gate runs every check in order and writes the step summary", async t => {
       const repository = await TestTests.createRepositoryAsync(t);
       const summaryPath = path.join(repository.directory, "summary.md");
-      const runner = new ProcessRunnerFixture([0, 0]);
+      const runner = new AngularReportRunnerFixture(TestTests.REPORT, [0, 0]);
       const output = new TextOutputFixture();
 
       const exitCode = await new Test(repository.directory, runner, output, { GITHUB_STEP_SUMMARY: summaryPath }).runAsync([]);
@@ -44,7 +47,7 @@ class TestTests {
 
     test("a failing check fails the gate after the remaining checks have run", async t => {
       const repository = await TestTests.createRepositoryAsync(t);
-      const runner = new ProcessRunnerFixture([1, 0]);
+      const runner = new AngularReportRunnerFixture(TestTests.REPORT, [1, 0]);
       const output = new TextOutputFixture();
 
       const exitCode = await new Test(repository.directory, runner, output, {}).runAsync([]);
@@ -133,7 +136,8 @@ class TestTests {
     await repository.writeAsync({
       "README.md": "# TeamRun\n",
       "package.json": `${JSON.stringify(ProductIdentityFixture.manifest(), null, 2)}\n`,
-      "src/modules/checkpoints/README.md": "# Checkpoints\n"
+      "src/modules/checkpoints/README.md": "# Checkpoints\n",
+      "src/angular.json": `${JSON.stringify({ projects: { teamrun: { architect: { test: { options: { include: ["shell/*/tests/**/*.spec.ts"] } } } } } })}\n`
     });
     return repository;
   }

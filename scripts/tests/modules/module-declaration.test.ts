@@ -21,7 +21,7 @@ class ModuleDeclarationTests {
     displayName: "Notes",
     parts: ["runtime", "window"],
     dependencies: ["tasks", "git-hub2"],
-    contributes: { methods: ["notes.list"], commands: ["notes.newNote"], views: ["notes.list", "notes.outlineView"], themes: [] }
+    contributes: { methods: ["notes.list"], commands: ["notes.newNote"], views: ["notes.list", "notes.outlineView"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"], themes: [] }
   };
 
   public static register(): void {
@@ -48,7 +48,7 @@ class ModuleDeclarationTests {
         displayName: "Notes",
         dependencies: ["tasks", "git-hub2"],
         runtimePackage: "@noldova/teamrun-modules-notes-runtime",
-        contributes: { methods: ["notes.list"], commands: ["notes.newNote"], views: ["notes.list", "notes.outlineView"], themes: [] }
+        contributes: { methods: ["notes.list"], commands: ["notes.newNote"], views: ["notes.list", "notes.outlineView"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"], themes: [] }
       });
       assert.equal(fixture.isFixture, true);
       assert.equal(fixture.runtimePackage, null);

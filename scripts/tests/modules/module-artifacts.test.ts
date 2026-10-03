@@ -41,7 +41,11 @@ class ModuleArtifactsTests {
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
         "package.json": JSON.stringify({ teamrun: { modules: ["notes", "tasks"] } }),
-        "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", parts: ["window"], dependencies: ["tasks"], contributes: { views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], menus: ["notes.templates"] } }),
+        "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", parts: ["window"], dependencies: ["tasks"], contributes: {
+          views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"],
+          menus: ["notes.templates"]
+        }
+      }),
         "src/modules/notes/menus.json": JSON.stringify(ModuleArtifactsTests.MENUS),
         "src/modules/notes/window/src/api/index.ts": "export {};\n",
         "src/modules/tasks/module.json": JSON.stringify({ id: "tasks", displayName: "Tasks", parts: ["runtime"], dependencies: [], contributes: {} }),
@@ -72,18 +76,19 @@ class ModuleArtifactsTests {
         modules: [
           { id: "tasks", displayName: "Tasks", dependencies: [], runtimePackage: "@noldova/teamrun-modules-tasks-runtime", contributes: {} },
           { id: "clock", displayName: "Clock", dependencies: [], runtimePackage: null, contributes: {} },
-          {
-            id: "notes", displayName: "Notes", dependencies: ["tasks"], runtimePackage: null,
-            contributes: { views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], menus: ["notes.templates"] }
+          { id: "notes", displayName: "Notes", dependencies: ["tasks"], runtimePackage: null, contributes: {
+            views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"],
+            menus: ["notes.templates"]
           }
+        }
         ]
       });
       assert.equal(await readFile(artifacts.windowPartsFile, "utf8"), [
         ModuleArtifactsTests.LICENSE_HEADER,
         ModuleArtifactsTests.SOURCE_IMPORT,
         "export const windowPartSources: readonly WindowPartSource[] = [",
-        "  new WindowPartSource(\"clock\", \"Clock\", [], [], [], () => import(\"../shell/desktop/tests/e2e/fixtures/modules/clock/window/src/api/index\").then(t => t.windowPart)),",
-        "  new WindowPartSource(\"notes\", \"Notes\", [\"tasks\"], [\"notes.list\",\"notes.outline\"], [\"notes.newNote\"], () => import(\"../modules/notes/window/src/api/index\").then(t => t.windowPart))",
+        "  new WindowPartSource(\"clock\", \"Clock\", [], [], [], [], [], () => import(\"../shell/desktop/tests/e2e/fixtures/modules/clock/window/src/api/index\").then(t => t.windowPart)),",
+        "  new WindowPartSource(\"notes\", \"Notes\", [\"tasks\"], [\"notes.list\",\"notes.outline\"], [\"notes.newNote\"], [\"notes.count\"], [\"notes.compose\"], () => import(\"../modules/notes/window/src/api/index\").then(t => t.windowPart))",
         "];",
         "",
         "export const moduleMenus: readonly MenuDeclarations[] = [",

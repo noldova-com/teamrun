@@ -12,6 +12,8 @@
       "notes.output", "notes.debug"
     ],
     "documents": ["notes.note"],
+    "statusBarItems": ["notes.count"],
+    "topBarActions": ["notes.compose"],
     "menus": ["notes.listItem", "notes.templates", "notes.tools"]
   }
 }

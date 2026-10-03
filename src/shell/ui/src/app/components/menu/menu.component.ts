@@ -10,8 +10,6 @@ import { DOCUMENT } from "@angular/common";
 import { CdkMenu, CdkTargetMenuAim } from "@angular/cdk/menu";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, type WritableSignal, inject, signal } from "@angular/core";
 
-import { ScreenPoint } from "../../models/screen-point";
-import { PointerPositionService } from "../../services/pointer-position.service";
 import { Resources } from "../../../resources";
 
 @Component({
@@ -27,42 +25,28 @@ import { Resources } from "../../../resources";
 })
 export class MenuComponent {
   protected readonly isPointerStill: WritableSignal<boolean> = signal(true);
-  private origin: ScreenPoint | null = inject(PointerPositionService).position;
 
   public constructor() {
     const host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
     const document = inject(DOCUMENT);
-    const blocked: Element[] = [];
-    const isStill = (event: MouseEvent): boolean => {
-      const point = ScreenPoint.of(event);
-      this.origin ??= point;
-      return point.equals(this.origin);
+    const held: Element[] = [];
+    const holdEnter = (event: MouseEvent): void => {
+      event.stopPropagation();
+      held.push(event.target as Element);
+    };
+    const stop = (): void => {
+      host.removeEventListener(Resources.mouseenterEvent, holdEnter, true);
+      document.removeEventListener(Resources.pointermoveEvent, release, true);
     };
     const release = (): void => {
+      stop();
       this.isPointerStill.set(false);
-      host.removeEventListener(Resources.mouseenterEvent, holdEnter, true);
-      document.removeEventListener(Resources.pointermoveEvent, watchMove, true);
-      for (const element of blocked.splice(0))
+      for (const element of held.splice(0))
         if (element.matches(Resources.hoverSelector))
           element.dispatchEvent(new MouseEvent(Resources.mouseenterEvent));
     };
-    const holdEnter = (event: MouseEvent): void => {
-      if (!isStill(event)) {
-        release();
-        return;
-      }
-      event.stopPropagation();
-      blocked.push(event.target as Element);
-    };
-    const watchMove = (event: PointerEvent): void => {
-      if (!isStill(event))
-        release();
-    };
     host.addEventListener(Resources.mouseenterEvent, holdEnter, true);
-    document.addEventListener(Resources.pointermoveEvent, watchMove, true);
-    inject(DestroyRef).onDestroy(() => {
-      host.removeEventListener(Resources.mouseenterEvent, holdEnter, true);
-      document.removeEventListener(Resources.pointermoveEvent, watchMove, true);
-    });
+    document.addEventListener(Resources.pointermoveEvent, release, true);
+    inject(DestroyRef).onDestroy(stop);
   }
 }

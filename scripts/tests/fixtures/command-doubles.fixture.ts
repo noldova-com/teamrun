@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { spawnSync, type SpawnSyncReturns } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -24,6 +24,8 @@ export default class CommandDoublesFixture {
   private static readonly WINDOWS_PLATFORM: string = "win32";
   private static readonly WINDOWS_BASH: string = "../../../bin/bash.exe";
   private static readonly SYSTEM_SEARCH_PATH: readonly string[] = ["/usr/bin", "/bin"];
+
+  private static bash: string | null = null;
 
   private readonly root: string;
   private readonly responses: Map<string, string[]> = new Map<string, string[]>();
@@ -84,7 +86,7 @@ export default class CommandDoublesFixture {
     return readFile(path.join(this.directory, name), "utf8");
   }
 
-  public async runAsync(script: string, environment: Readonly<Record<string, string>> = {}): Promise<SpawnSyncReturns<string>> {
+  public async runAsync(script: string, environment: Readonly<Record<string, string>> = {}): Promise<CommandResult> {
     for (const [command, responses] of this.responses)
       await this.writeDoubleAsync(command, ["case \"$*\" in", ...responses, "esac", "echo \"Unexpected call: $0 $*\" >&2", "exit 127"]);
     for (const command of this.forwarded)
@@ -92,12 +94,20 @@ export default class CommandDoublesFixture {
 
     const scriptPath = path.join(this.directory, CommandDoublesFixture.SCRIPT_NAME);
     await writeFile(scriptPath, script);
-    return spawnSync(CommandDoublesFixture.locateBash(), [...CommandDoublesFixture.BASH_OPTIONS, scriptPath], {
+    const child = spawn(CommandDoublesFixture.locateBash(), [...CommandDoublesFixture.BASH_OPTIONS, scriptPath], {
       cwd: this.directory,
       env: { ...process.env, ...environment, PATH: this.formatSearchPath() },
-      encoding: "utf8",
       timeout: CommandDoublesFixture.TIMEOUT
     });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (text: string) => stdout += text);
+    child.stderr.setEncoding("utf8").on("data", (text: string) => stderr += text);
+    const status = await new Promise<number | null>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", code => resolve(code));
+    });
+    return { status, stdout, stderr };
   }
 
   public async disposeAsync(): Promise<void> {
@@ -109,11 +119,12 @@ export default class CommandDoublesFixture {
   }
 
   private static locateBash(): string {
-    if (process.platform !== CommandDoublesFixture.WINDOWS_PLATFORM)
-      return ExecutableLocator.locate("bash");
-    const gitPath = spawnSync("git", ["--exec-path"], { encoding: "utf8", timeout: CommandDoublesFixture.TIMEOUT }).stdout.trim();
-    return path.resolve(gitPath, CommandDoublesFixture.WINDOWS_BASH);
+    CommandDoublesFixture.bash ??= process.platform === CommandDoublesFixture.WINDOWS_PLATFORM
+      ? path.resolve(spawnSync("git", ["--exec-path"], { encoding: "utf8", timeout: CommandDoublesFixture.TIMEOUT }).stdout.trim(), CommandDoublesFixture.WINDOWS_BASH)
+      : ExecutableLocator.locate("bash");
+    return CommandDoublesFixture.bash;
   }
+
 
   private static toShellPath(file: string): string {
     return file.replaceAll("\\", "/");
@@ -137,4 +148,10 @@ export default class CommandDoublesFixture {
     const lines = ["#!/bin/sh", `printf '%s\\n' "${command} $*" >> ${log}`, ...body, ""];
     await writeFile(path.join(this.binaryDirectory, command), lines.join("\n"), { mode: CommandDoublesFixture.EXECUTABLE_MODE });
   }
+}
+
+export interface CommandResult {
+  readonly status: number | null;
+  readonly stdout: string;
+  readonly stderr: string;
 }

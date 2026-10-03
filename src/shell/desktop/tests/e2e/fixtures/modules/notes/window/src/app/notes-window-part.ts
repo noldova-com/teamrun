@@ -7,7 +7,10 @@
  */
 
 import { JsonReader } from "@noldova/teamrun-foundation-json";
-import { CommandContribution, DockSide, DocumentContribution, type IWindowPart, type IWindowPartContext, ViewContribution } from "@noldova/teamrun-shell-window";
+import {
+  CommandContribution, DockSide, DocumentContribution, type IWindowPart, type IWindowPartContext, StatusBarItemContribution, StatusBarItemState, StatusBarSide, TopBarActionContribution,
+  TopBarActionState, ViewContribution
+} from "@noldova/teamrun-shell-window";
 
 import { NotesState } from "./notes-state";
 
@@ -54,9 +57,11 @@ export class NotesWindowPart implements IWindowPart {
     context.openDocument("notes.note", "1", "Note 1");
     context.openDocument("notes.note", "2", "Note 2");
     let count = 2;
+    const counter = context.registerStatusBarItem(new StatusBarItemContribution("notes.count", StatusBarSide.Left, new StatusBarItemState("2 notes")));
     context.registerCommand(new CommandContribution("notes.newNote", "New note", "note_add", "Mod+Alt+N", async () => {
       count++;
       context.openDocument("notes.note", String(count), `Note ${count}`);
+      counter.update(new StatusBarItemState(`${count} notes`));
       return count;
     }));
     context.registerCommand(new CommandContribution("notes.openNote", "Open note", "open_in_new", null, async commandArguments => {
@@ -72,6 +77,7 @@ export class NotesWindowPart implements IWindowPart {
       NotesState.wrapsLines.update(t => !t);
       return null;
     }, () => true, () => NotesState.wrapsLines()));
+    context.registerTopBarAction(new TopBarActionContribution("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote")));
     if (!JsonReader.fromValue(await context.requestAsync("notes.manyTabs", null)).readBoolean("isMany"))
       return;
     for (const [name, title, icon, side] of NotesWindowPart.MANY_VIEWS)
@@ -79,6 +85,7 @@ export class NotesWindowPart implements IWindowPart {
         () => import("./components/notes-outline/notes-outline.component").then(t => t.NotesOutlineComponent)));
     NotesWindowPart.MANY_TITLES.forEach((title, index) => context.openDocument("notes.note", String(index + 3), title));
     count += NotesWindowPart.MANY_TITLES.length;
+    counter.update(new StatusBarItemState(`${count} notes`));
   }
 
   public async deactivateAsync(): Promise<void> {
