@@ -186,8 +186,8 @@ describe("NotificationsComponent", () => {
     expect(rows[0]?.querySelector(".tr-notifications-text")?.textContent).toBe("Plan.md");
     expect(rows[0]?.querySelector(".tr-notifications-meta")?.textContent).toMatch(/^Notes · \d{1,2}:05/);
     expect(rows[1]?.querySelector(".tr-notifications-meta")?.textContent).toMatch(/^clock · /);
-    expect(rows[1]?.querySelector("progress")?.hasAttribute("value")).toBe(false);
-    expect(rows[2]?.querySelector("progress")?.getAttribute("value")).toBe("0.25");
+    expect(rows[1]?.querySelector("tr-progress")?.hasAttribute("aria-valuenow")).toBe(false);
+    expect(rows[2]?.querySelector("tr-progress")?.getAttribute("aria-valuenow")).toBe("0.25");
     expect([...rows[0]?.querySelectorAll<HTMLButtonElement>(".tr-notifications-action") ?? []].map(t => [t.textContent?.trim(), t.disabled]))
       .toEqual([["Run notes.undo", false], ["Run clock.reset", true]]);
     expect(rows[0]?.querySelector<HTMLButtonElement>("button.tr-notifications-open")?.disabled).toBe(false);

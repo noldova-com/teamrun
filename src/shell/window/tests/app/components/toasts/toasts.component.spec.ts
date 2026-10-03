@@ -100,7 +100,7 @@ describe("ToastsComponent", () => {
     expect(first?.querySelector(".tr-toast-text")?.textContent).toBe("The disk is full.");
     expect([...first?.querySelectorAll<HTMLButtonElement>(".tr-toast-action") ?? []].map(t => t.disabled)).toEqual([false, true]);
     expect(second?.querySelector("span.tr-toast-title")?.textContent).toBe("Title 1");
-    expect(second?.querySelector("progress")?.hasAttribute("value")).toBe(false);
+    expect(second?.querySelector("tr-progress")?.hasAttribute("aria-valuenow")).toBe(false);
     expect(second?.querySelector(".tr-toast-close")?.getAttribute("aria-label")).toBe("Close");
     await expectTooltipAsync(second?.querySelector<HTMLElement>(".tr-toast-close"), "Close");
     expect(regions).toEqual([["polite", "Title 1"], ["assertive", "Title 2. The disk is full."]]);

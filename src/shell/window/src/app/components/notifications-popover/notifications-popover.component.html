@@ -22,7 +22,7 @@
             <span class="tr-notifications-text">{{ notification.post.text }}</span>
           }
           @if (isIndeterminate(notification) || progressOf(notification) !== null) {
-            <progress class="tr-notifications-progress" max="1" [attr.value]="progressOf(notification)" [attr.aria-label]="notification.post.title"></progress>
+            <tr-progress [value]="progressOf(notification)" [label]="notification.post.title" />
           }
           <span class="tr-notifications-meta">{{ moduleName(notification) }} · {{ timeOf(notification) }}</span>
           @if (notification.post.actions.length > 0) {

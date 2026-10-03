@@ -12,7 +12,7 @@ import {
 
 import "@noldova/teamrun-foundation-core";
 import { type CommandRun, type Notification, NotificationPost, NotificationSeverity } from "@noldova/teamrun-shell-protocol";
-import { ButtonComponent, ButtonVariant, CheckboxComponent, IconButtonComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
+import { ButtonComponent, ButtonVariant, CheckboxComponent, IconButtonComponent, ProgressComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { WindowPartTokens } from "../../models/window-part-tokens";
 import type { WindowPartSource } from "../../models/window-part-source";
@@ -21,7 +21,7 @@ import { Resources } from "../../../resources";
 
 @Component({
   selector: "tr-notifications-popover",
-  imports: [ButtonComponent, CheckboxComponent, IconButtonComponent, TooltipDirective],
+  imports: [ButtonComponent, CheckboxComponent, IconButtonComponent, ProgressComponent, TooltipDirective],
   templateUrl: "./notifications-popover.component.html",
   styleUrl: "./notifications-popover.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
