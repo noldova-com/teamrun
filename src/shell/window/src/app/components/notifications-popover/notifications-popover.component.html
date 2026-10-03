@@ -2,13 +2,7 @@
   <h2 class="tr-notifications-title">{{ resources.notificationsTitle }}</h2>
   <button type="button" tr-button class="tr-notifications-clear" [variant]="secondary" [disabled]="!hasFinished()" (click)="clear()">{{ resources.clearAllLabel }}</button>
 </div>
-<label class="tr-notifications-quiet">
-  <span class="tr-notifications-quiet-control">
-    <input type="checkbox" class="tr-notifications-quiet-box" [checked]="isQuiet()" (change)="setQuiet($event)" />
-    <span class="material-symbols-rounded tr-notifications-quiet-mark" aria-hidden="true">{{ resources.checkGlyph }}</span>
-  </span>
-  <span>{{ resources.doNotDisturbLabel }}</span>
-</label>
+<tr-checkbox class="tr-notifications-quiet" [checked]="isQuiet()" (checkedChange)="setQuiet($event)">{{ resources.doNotDisturbLabel }}</tr-checkbox>
 @if (notifications().length === 0) {
   <p class="tr-notifications-empty">{{ resources.noNotifications }}</p>
 }

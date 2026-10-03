@@ -13,6 +13,7 @@ export class ShellMigrations {
   public static readonly all: readonly Migration[] = [
     new Migration(Resources.windowStatesMigration, [Resources.createWindowStatesStatement]),
     new Migration(Resources.quietDevicesMigration, [Resources.createQuietDevicesStatement]),
-    new Migration(Resources.settingsMigration, [Resources.createSettingValuesStatement, Resources.createSettingScopesStatement, Resources.copyQuietDevicesStatement])
+    new Migration(Resources.settingsMigration, [Resources.createSettingValuesStatement, Resources.createSettingScopesStatement, Resources.copyQuietDevicesStatement]),
+    new Migration(Resources.quietDevicesMovedMigration, [Resources.forgetDoNotDisturbStatement, Resources.copyQuietDevicesStatement, Resources.dropQuietDevicesStatement])
   ];
 }

@@ -55,7 +55,6 @@ export class Resources {
     ShellMethods.dismissNotification.text,
     ShellMethods.markNotificationsRead.text,
     ShellMethods.clearNotifications.text,
-    ShellMethods.setDoNotDisturb.text,
     ShellMethods.settings.text,
     ShellMethods.setSetting.text,
     ShellMethods.resetSetting.text
@@ -165,7 +164,6 @@ export class Resources {
   public static readonly mainWindow: string = "main";
   public static readonly runtimeNotConnected: string = `${Resources.applicationName} is not connected to its runtime.`;
   public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout and Do not disturb are not kept.";
-  public static readonly isOnField: string = "isOn";
   public static readonly descriptionsField: string = "descriptions";
   public static readonly isWaitingField: string = "isWaiting";
   public static readonly windowMinimumWidth: number = 640;
