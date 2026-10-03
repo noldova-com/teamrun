@@ -318,15 +318,18 @@ test.describe("docking", () => {
     await expect(tab(window, outline)).toBeFocused();
   });
 
-  test("Reset the layout returns the views to their default places", async ({ desktop }) => {
+  test("Reset the layout, run from command search, returns the views to their default places", async ({ desktop }) => {
     const window = desktop.window;
     const initial = await describeGroupsAsync(window);
     await dragOntoPlateAsync(window, notes, clock, "Bottom");
     await window.mouse.up();
     await expect.poll(() => describeGroupsAsync(window)).not.toEqual(initial);
 
-    await tab(window, notes).click({ button: "right" });
-    await window.getByRole("menuitem", { name: "Reset the layout" }).click();
+    await tab(window, notes).click();
+    await window.keyboard.press("ControlOrMeta+Shift+KeyP");
+    await window.keyboard.type("Reset the layout");
+    await expect(window.getByRole("option").first()).toHaveAttribute("data-item", "shell.resetLayout");
+    await window.keyboard.press("Enter");
 
     await expect.poll(() => describeGroupsAsync(window)).toEqual(initial);
   });

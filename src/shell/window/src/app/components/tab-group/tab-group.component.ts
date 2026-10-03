@@ -24,17 +24,18 @@ import type { Tab } from "../../models/layout/tab";
 import type { TabGroup } from "../../models/layout/tab-group";
 import { CommandService } from "../../services/command.service";
 import { LayoutService } from "../../services/layout.service";
+import { TabDestinationsService } from "../../services/tab-destinations.service";
 import { TabDragService } from "../../services/tab-drag.service";
 import { TabLabelService } from "../../services/tab-label.service";
 import { TabStripService } from "../../services/tab-strip.service";
-import { TabMenuComponent } from "../tab-menu/tab-menu.component";
+import { PlaceMenuComponent } from "../place-menu/place-menu.component";
 import { TabScrollerDirective } from "./tab-scroller.directive";
 
 @Component({
   selector: "tr-tab-group",
   imports: [
-    ContextMenuTriggerDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, PanelCardComponent,
-    TabComponent, TabMenuComponent, TabScrollerDirective, TooltipDirective
+    ContextMenuTriggerDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, PanelCardComponent, PlaceMenuComponent,
+    TabComponent, TabScrollerDirective, TooltipDirective
   ],
   templateUrl: "./tab-group.component.html",
   styleUrl: "./tab-group.component.scss",
@@ -85,6 +86,7 @@ export class TabGroupComponent {
 
   public constructor() {
     const strips = inject(TabStripService);
+    inject(TabDestinationsService);
     effect(() => strips.setOverflowing(this.group().id, this.scroller()?.isOverflowing() ?? false));
     effect(() => {
       const trigger = this.overflowTrigger();

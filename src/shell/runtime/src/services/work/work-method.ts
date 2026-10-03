@@ -7,7 +7,6 @@
  */
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { WorkReport } from "@noldova/teamrun-shell-protocol";
 
 import type { IMethodHandler } from "../../interfaces/method-handler.js";
 import type { RequestContext } from "../../models/request-context.js";
@@ -21,6 +20,6 @@ export class WorkMethod implements IMethodHandler {
   }
 
   public handleAsync(_context: RequestContext): Promise<JsonValue> {
-    return Promise.resolve(new WorkReport(this.work.descriptions).toJson());
+    return Promise.resolve(this.work.report.toJson());
   }
 }

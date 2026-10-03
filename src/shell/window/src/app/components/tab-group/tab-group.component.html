@@ -22,7 +22,7 @@ LICENSE file in the root directory of this source tree.
         <div class="tr-tab-group-strip" role="tablist" data-drop-tabs (keydown)="onStripKey($event)">
           @for (tab of group().tabs; track tab.key; let index = $index) {
             @let label = labels.of(tab);
-            <tr-tab-menu #menu [tab]="tab" />
+            <tr-place-menu #menu [place]="resources.tabMenu" [context]="{ tab: tab.key }" />
             <tr-tab [label]="label.title" [icon]="label.icon" [selected]="tab.equals(group().active)" [preview]="tab.equals(group().preview)" [attr.data-tab-index]="index"
               [attr.id]="tabId(index)" [attr.data-tab-key]="tab.key" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, index)" [class.tr-tab-dragged]="tab.equals(drag.dragging())"
               [trTooltip]="label.title" [trTooltipSide]="below" [trTooltipTruncated]="true"
@@ -53,7 +53,7 @@ LICENSE file in the root directory of this source tree.
   }
   <ng-template #groupActions>
     @if (group().active; as active) {
-      <tr-tab-menu #actions [tab]="active" />
+      <tr-place-menu #actions [place]="resources.tabMenu" [context]="{ tab: active.key }" />
       <button type="button" tr-icon-button class="tr-tab-group-menu" [icon]="resources.panelActionsGlyph" [label]="resources.panelActionsLabel"
         [trTooltip]="resources.panelActionsLabel" [trTooltipSide]="below" [trMenuTriggerFor]="actions.menu()" [trMenuAlignment]="end"></button>
     }

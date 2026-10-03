@@ -8,7 +8,7 @@
 
 :host {
   display: block;
-  flex: none;
+  grid-column: 1 / -1;
   height: var(--tr-border-width);
   margin-block: var(--tr-menu-separator-spacing);
   background-color: var(--tr-menu-separator);

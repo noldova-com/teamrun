@@ -128,6 +128,7 @@ export class Resources {
   public static readonly installRootSegments: readonly string[] = ["..", "..", "..", ".."];
   public static readonly utf8Encoding: BufferEncoding = "utf8";
   public static readonly lineSeparator: string = "\n";
+  public static readonly lineBreakPattern: RegExp = /\r?\n/;
   public static readonly windowsPlatform: string = "win32";
   public static readonly systemRootVariable: string = "SystemRoot";
   public static readonly systemFolderName: string = "System32";
@@ -547,6 +548,10 @@ export class Resources {
 
   public static formatModuleDiagnostic(moduleId: string, cause: string, detail: string): string {
     return `The module ${moduleId}: ${cause}\n${detail}\n`;
+  }
+
+  public static formatModuleLogLine(moduleId: string, line: string): string {
+    return `${moduleId}: ${line}\n`;
   }
 
   public static formatModuleBlocked(dependency: string): string {
