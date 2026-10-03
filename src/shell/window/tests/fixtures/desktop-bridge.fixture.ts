@@ -16,6 +16,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly listeners: Set<(requestId: string) => void> = new Set();
   private readonly startupListeners: Set<(state: unknown) => void> = new Set();
   private readonly eventListeners: Set<(name: string, payload: unknown) => void> = new Set();
+  private readonly openedListeners: Set<(id: number) => void> = new Set();
 
   public readonly platform: string;
   public readonly appearances: JsonObject[] = [];
@@ -57,7 +58,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   }
 
   public get listenerCount(): number {
-    return this.listeners.size + this.startupListeners.size + this.eventListeners.size;
+    return this.listeners.size + this.startupListeners.size + this.eventListeners.size + this.openedListeners.size;
   }
 
   public get closeListenerCount(): number {
@@ -128,6 +129,16 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public openLogFolder(): Promise<boolean> {
     this.logFolderOpens++;
     return this.logFolderOpened;
+  }
+
+  public onNotificationOpened(listener: (id: number) => void): () => void {
+    this.openedListeners.add(listener);
+    return () => this.openedListeners.delete(listener);
+  }
+
+  public publishNotificationOpened(id: number): void {
+    for (const listener of this.openedListeners)
+      listener(id);
   }
 
   public publishEvent(name: string, payload: unknown): void {

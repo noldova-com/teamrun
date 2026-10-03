@@ -15,6 +15,7 @@ import type { IDialogHost } from "./i-dialog-host.js";
 import type { IDisplayHost } from "./i-display-host.js";
 import type { IIpcHost } from "./i-ipc-host.js";
 import type { IMenuHost } from "./i-menu-host.js";
+import type { INotificationHost } from "./i-notification-host.js";
 import type { ISessionHost } from "./i-session-host.js";
 import type { IShellHost } from "./i-shell-host.js";
 
@@ -27,6 +28,7 @@ export interface IElectron {
   readonly clipboard: IClipboardHost;
   readonly shell: IShellHost;
   readonly dialog: IDialogHost;
+  readonly notifications: INotificationHost;
 
   createWindow(options: BrowserWindowConstructorOptions): IDesktopWindow;
 }
