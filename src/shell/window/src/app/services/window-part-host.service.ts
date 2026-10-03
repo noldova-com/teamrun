@@ -26,6 +26,7 @@ import { TabLabel } from "../models/layout/tab-label";
 import { ViewRegistry } from "../models/layout/view-registry";
 import { ViewTab } from "../models/layout/view-tab";
 import { ViewType } from "../models/layout/view-type";
+import { ShellDocuments } from "../models/shell-documents";
 import { ModuleFailure } from "../models/module-failure";
 import { PendingDocument } from "../models/pending-document";
 import type { StartupState } from "../models/startup-state";
@@ -71,6 +72,7 @@ export class WindowPartHostService implements IWindowPartHost {
   public readonly generation: Signal<number> = this.generationValue.asReadonly();
 
   public constructor() {
+    this.labels.register(ShellDocuments.settings.name, ShellDocuments.settingsLabel);
     const destroyRef = inject(DestroyRef);
     destroyRef.onDestroy(this.bridge.onStartup(t => this.follow(t)));
     destroyRef.onDestroy(this.bridge.onEvent((name, payload) => this.receiveCommands(name, payload)));
@@ -78,6 +80,9 @@ export class WindowPartHostService implements IWindowPartHost {
   }
 
   public findContribution(tab: Tab): ContributionMatch | null {
+    const shellDocument = tab instanceof DocumentTab ? ShellDocuments.all.find(t => t.name === tab.name) : undefined;
+    if (!Object.isUndefined(shellDocument))
+      return new ContributionMatch(shellDocument.loadComponent, null);
     for (const activation of this.activations) {
       const contributions = tab instanceof DocumentTab ? activation.context.documents : activation.context.views;
       const contribution = contributions.find(t => t.name === tab.name);
@@ -177,7 +182,7 @@ export class WindowPartHostService implements IWindowPartHost {
       this.labels.register(view.name, new TabLabel(view.failure.displayName, Resources.moduleFailureGlyph));
     this.layout.setRegistry(new ViewRegistry(
       [...views.map(t => new ViewType(t.name, t.defaultSide, t.isShownByDefault)), ...failed.map(t => new ViewType(t.name, DockSide.Left, false))],
-      this.activations.flatMap(t => t.context.documents.map(u => u.name))));
+      [...ShellDocuments.all.map(t => t.name), ...this.activations.flatMap(t => t.context.documents.map(u => u.name))]));
   }
 
   private follow(state: StartupState): void {

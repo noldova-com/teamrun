@@ -81,6 +81,7 @@ The table specifies normal-state colors. Check actual composited foreground/back
 | `--tr-button-secondary`, `--tr-button-secondary-text`, `--tr-button-secondary-hover` | `button.secondary*` | #E5E5E5, #3B3B3B, #CCCCCC | transparent, #CCCCCC, #2B2B2B | Secondary button |
 | `--tr-dropdown`, `--tr-dropdown-border`, `--tr-dropdown-list` | `dropdown.*`, fallback `input.*` | #FFFFFF, #858585, #FFFFFF | #313131, #858585, #1F1F1F | Select and options list |
 | `--tr-list-active`, `--tr-list-active-text` | `list.activeSelection*` | #E8E8E8, #000000 | #04395E, #FFFFFF | Chosen or keyboard-active option |
+| `--tr-list-highlight` | `list.highlightForeground` | #0066BF | #2AAAFF | Search matches, underlined so color is not their only cue |
 | `--tr-button-border` | `button.border` | #0000001A | #FFFFFF1A | Decorative edge where the button fill already identifies the control |
 | `--tr-setting-title` | `settings.headerForeground`, fallback `foreground` | #1F1F1F | #FFFFFF | Settings titles |
 | `--tr-hover-widget`, `--tr-hover-widget-border` | `editorHoverWidget.*`, fallback `editorWidget.background` / `widget.border` | #F8F8F8, #3B3B3B33 | #202020, #CCCCCC33 | Tooltip surface |
@@ -160,6 +161,7 @@ Use spacing tokens of 0.25, 0.5, 0.75, 1 and 1.5rem with section 8's component m
   | Command | Windows and Linux | macOS |
   |---|---|---|
   | Show all commands | Ctrl+Shift+P | ⇧⌘P |
+  | Open Settings | Ctrl+, | ⌘, |
   | Close the tab | Ctrl+W | ⌘W |
   | Show the next tab | Ctrl+Tab, Ctrl+PageDown | ⌃⇥, ⌥⌘→ |
   | Show the previous tab | Ctrl+Shift+Tab, Ctrl+PageUp | ⌃⇧⇥, ⌥⌘← |
@@ -214,6 +216,10 @@ This table assigns geometry and radius tokens under sections 1, 3 and 7, with th
 | Choice pills (toggle group) | 1.375rem minimum visual height; 0.5rem side padding; 0.25rem gaps; small radius | Panel, 600 | Selected or hover fill, no decorative border/check; separate semantic selected state |
 | Settings item | Padding 0.75rem 0.875rem 1.125rem; description gap 0.1875rem; control gap 0.5625rem; medium radius | Panel; title 600 | Subtle hover surface; text and controls wrap |
 | Settings heading | Automatic height; 0.625rem surrounding space, 0.9375rem start inset | Settings group heading, 600 | Heading foreground; grows with its proportional line height |
+| Settings document | Search field above, preferred width 37.5rem; page list 12.5rem wide beside content at most 50rem wide; 1rem top and 1.5rem side padding | Panel | A document in the middle group; the page list and the content scroll separately |
+| Settings page list | Tree-row geometry, rows 0.25rem apart | Panel | Hover surface; the current page uses the selected fill and is marked as the current page; while searching, no page is current and choosing one ends the search |
+| Settings search | Text-field geometry | Panel | Filters every page by title, description and name as the person types; matches use the list highlight, underlined; results are grouped under their pages' headings, then their groups; with no match a sentence says so |
+| Modified marker | 0.625rem filled dot before the setting's title | — | Accent foreground; named "Modified" with the same tooltip, so its shape and name carry it, not its color; shown with the row's Reset while a value is stored, even one equal to the default |
 | Icon button | 1.375rem visual pad around a 1rem glyph; small radius | Accessible name | Toolbar hover; pointer hit region at least 24px unless a documented exception applies |
 | Toolbar | A horizontal or vertical strip; its items keep their own geometry | Accessible name | No surface of its own; one tab stop with the keyboard of section 7; items added or removed while it shows join or leave it; dragging belongs to the strip's owner |
 | Docking guide | 2.5rem square around a 1.5rem glyph; small radius; a group's center target and split arrows share a medium-radius plate with 0.125rem gaps, moved clear of the side guides | Accessible action name | Raised surface; shown while a view's tab is dragged; primary-button fill and text for the chosen target, whose landing area is previewed with the docking-preview fill, a 1px docking-preview border and the large radius |

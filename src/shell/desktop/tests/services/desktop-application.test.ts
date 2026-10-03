@@ -23,6 +23,7 @@ import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShel
 import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
+import { FakeAppearanceStore } from "../fixtures/fake-appearance-store.fixture.js";
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import { FakeDockHost } from "../fixtures/fake-dock-host.fixture.js";
 import type { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
@@ -582,6 +583,46 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async opensItsWindowWithTheDevicesLastAppearanceAndKeepsTheOneItsWindowReports(): Promise<void> {
+    const appearance = new FakeAppearanceStore();
+    appearance.kept = { "shell.mode": "Dark" };
+    const process = new FakeDesktopProcess("darwin", ["--device-dir=/devices/this"]);
+    const electron = await DesktopApplicationTests.startReadyAsync("darwin", undefined, undefined, undefined, process, appearance);
+    const event = DesktopApplicationTests.trustedEvent("darwin");
+
+    electron.ipcMain.send("teamrun:keepAppearance", { sender: { id: 1 }, senderFrame: null }, { "shell.mode": "System" });
+    electron.ipcMain.send("teamrun:keepAppearance", event, ["shell.mode"]);
+    electron.ipcMain.send("teamrun:keepAppearance", event, { "shell.theme": "x".repeat(4100) });
+    electron.ipcMain.send("teamrun:keepAppearance", event, { "shell.mode": "Light" });
+    DesktopApplicationTests.firstWindow(electron).destroy();
+    electron.app.emit("activate");
+
+    Assert.areEqual(JSON.stringify(["/devices/this"]), JSON.stringify(appearance.folders));
+    Assert.areEqual(JSON.stringify(["--teamrun-appearance={\"shell.mode\":\"Dark\"}"]), JSON.stringify(electron.windows[0]?.options.webPreferences?.additionalArguments));
+    Assert.areEqual(JSON.stringify([{ "shell.mode": "Light" }]), JSON.stringify(appearance.writes));
+    Assert.areEqual(JSON.stringify(["--teamrun-appearance={\"shell.mode\":\"Light\"}"]), JSON.stringify(electron.windows[1]?.options.webPreferences?.additionalArguments));
+    Assert.areEqual(2, DesktopApplicationTests.readErrors(process, "The window's appearance preferences are not valid, so they are not kept").length);
+  }
+
+  @TestMethod
+  public async opensItsWindowInTheDefaultAppearanceWhenTheLastOneCannotBeReadAndReportsOneItCannotKeep(): Promise<void> {
+    const appearance = new FakeAppearanceStore();
+    appearance.readFailure = new SyntaxError("Unexpected end of JSON input");
+    appearance.writeFailure = new Error("The disk is full.");
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", undefined, undefined, undefined, process, appearance);
+
+    electron.ipcMain.send("teamrun:keepAppearance", DesktopApplicationTests.trustedEvent("linux"), { "shell.mode": "Dark" });
+    await Condition.waitAsync(() => DesktopApplicationTests.readErrors(process, "The device's appearance could not be kept").length > 0);
+
+    Assert.areEqual(JSON.stringify([]), JSON.stringify(DesktopApplicationTests.firstWindow(electron).options.webPreferences?.additionalArguments));
+    Assert.areEqual(JSON.stringify(["The device's last appearance could not be read, so the window starts in the default appearance: SyntaxError: Unexpected end of JSON input"]),
+      JSON.stringify(DesktopApplicationTests.readErrors(process, "The device's last appearance")));
+    Assert.areEqual(JSON.stringify(["The device's appearance could not be kept for the next start: Error: The disk is full."]),
+      JSON.stringify(DesktopApplicationTests.readErrors(process, "The device's appearance could not be kept")));
+  }
+
+  @TestMethod
   public async opensAWindowWhenActivatedWithoutOne(): Promise<void> {
     const electron = await DesktopApplicationTests.startReadyAsync("darwin");
 
@@ -615,7 +656,8 @@ export class DesktopApplicationTests {
         nodeIntegration: false,
         nodeIntegrationInWorker: false,
         webSecurity: true,
-        spellcheck: false
+        spellcheck: false,
+        additionalArguments: []
       }
     }), JSON.stringify({ ...window.options, titleBarOverlay: undefined, trafficLightPosition: undefined, icon: undefined }));
     Assert.areEqual(settings.windowIndexPath, window.loadedFile);
@@ -1496,12 +1538,13 @@ export class DesktopApplicationTests {
     electron: FakeElectron,
     process: FakeDesktopProcess,
     launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher(),
-    device: FakeDeviceIdentity = new FakeDeviceIdentity()): LaunchSettings[] {
+    device: FakeDeviceIdentity = new FakeDeviceIdentity(),
+    appearance: FakeAppearanceStore = new FakeAppearanceStore()): LaunchSettings[] {
     const settings: LaunchSettings[] = [];
     DesktopApplication.start(electron, process, DesktopApplicationTests.MODULE_URL, t => {
       settings.push(t);
       return launcher;
-    }, t => device.readAsync(t));
+    }, t => device.readAsync(t), t => appearance.create(t));
     return settings;
   }
 
@@ -1510,8 +1553,9 @@ export class DesktopApplicationTests {
     launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher(),
     electron: FakeElectron = new FakeElectron(),
     device: FakeDeviceIdentity = new FakeDeviceIdentity(),
-    process: FakeDesktopProcess = new FakeDesktopProcess(platform)): Promise<FakeElectron> {
-    DesktopApplicationTests.start(electron, process, launcher, device);
+    process: FakeDesktopProcess = new FakeDesktopProcess(platform),
+    appearance: FakeAppearanceStore = new FakeAppearanceStore()): Promise<FakeElectron> {
+    DesktopApplicationTests.start(electron, process, launcher, device, appearance);
     await electron.app.becomeReadyAsync();
     await setImmediate();
     return electron;

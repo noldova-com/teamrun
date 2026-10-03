@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+export type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
 export type { IApplicationHost } from "../interfaces/i-application-host.js";
 export type { IClipboardHost } from "../interfaces/i-clipboard-host.js";
 export type { ICloseGuard } from "../interfaces/i-close-guard.js";
@@ -50,6 +51,7 @@ export { SenderInfo } from "../models/sender-info.js";
 export { StartupState } from "../models/startup-state.js";
 export { WindowAppearance } from "../models/window-appearance.js";
 export { WindowState } from "../models/window-state.js";
+export { AppearanceStore } from "../services/appearance-store.js";
 export { CloseCoordinator } from "../services/close-coordinator.js";
 export { DesktopApplication } from "../services/desktop-application.js";
 export { DesktopLog } from "../services/desktop-log.js";

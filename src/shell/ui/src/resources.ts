@@ -51,6 +51,7 @@ export class Resources {
     new ColorToken("--tr-dropdown-list", "dropdown.listBackground", "input.background"),
     new ColorToken("--tr-list-active", "list.activeSelectionBackground"),
     new ColorToken("--tr-list-active-text", "list.activeSelectionForeground"),
+    new ColorToken("--tr-list-highlight", "list.highlightForeground"),
     new ColorToken("--tr-button-border", "button.border"),
     new ColorToken("--tr-setting-title", "settings.headerForeground", "foreground"),
     new ColorToken("--tr-hover-widget", "editorHoverWidget.background", "editorWidget.background"),
@@ -136,7 +137,23 @@ export class Resources {
     "button-height",
     "button-padding",
     "checkbox-size",
-    "toast-width"
+    "toast-width",
+    "text-field-width",
+    "select-width",
+    "number-field-width",
+    "setting-marker",
+    "tree-row-height",
+    "settings-search-width",
+    "settings-pages-width",
+    "settings-content-width",
+    "dropdown-padding",
+    "dropdown-row-height",
+    "dropdown-row-padding",
+    "settings-item-padding",
+    "settings-item-description-gap",
+    "settings-item-control-gap",
+    "settings-heading-space",
+    "settings-heading-inset"
   ];
   public static readonly shapes: ReadonlyMap<string, readonly string[]> = new Map([["tab", ["pill"]]]);
   public static readonly defaultThemeId: string = "shell.default";
@@ -216,6 +233,11 @@ export class Resources {
   public static readonly dialogTitleIdPrefix: string = "tr-dialog-title-";
   public static readonly dialogTitleIdToken: string = "tr-dialog-title-id";
   public static readonly noLimit: string = "none";
+  public static readonly dropdownPaneClass: string = "tr-dropdown-pane";
+  public static readonly listboxSelector: string = "[role=listbox]";
+  public static readonly tabKey: string = "Tab";
+  public static readonly spaceKey: string = " ";
+  public static readonly valueAttribute: string = "data-value";
   public static readonly previewDescription: string = "Preview";
   public static readonly submenuGlyph: string = "chevron_right";
   public static readonly quickInputIdPrefix: string = "tr-quick-input-";
@@ -234,6 +256,7 @@ export class Resources {
   public static readonly escapeKey: string = "Escape";
   public static readonly keydownEvent: "keydown" = "keydown";
   public static readonly checkedGlyph: string = "check";
+  public static readonly selectGlyph: string = "expand_more";
   public static readonly menuItemRole: string = "menuitem";
   public static readonly menuItemRadioRole: string = "menuitemradio";
   public static readonly menuItemCheckboxRole: string = "menuitemcheckbox";

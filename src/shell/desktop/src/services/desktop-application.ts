@@ -19,6 +19,7 @@ import {
 import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
+import type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
 import type { IElectron } from "../interfaces/i-electron.js";
 import type { IIpcEvent } from "../interfaces/i-ipc-event.js";
 import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
@@ -72,6 +73,9 @@ export class DesktopApplication {
   private readonly notifier: SystemNotifier;
   private readonly quit: QuitCoordinator;
   private readonly readDeviceAsync: (folder: string) => Promise<string>;
+  private readonly deviceFolder: string;
+  private readonly appearanceStore: IAppearanceStore;
+  private appearance: JsonObject | null = null;
   private readonly windows: Map<number, OpenWindow> = new Map();
   private readonly restored: WeakSet<OpenWindow> = new WeakSet();
   private device: Promise<string | null> = Promise.resolve(null);
@@ -87,9 +91,13 @@ export class DesktopApplication {
     log: DesktopLog,
     launcher: IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
+    createAppearanceStore: (folder: string) => IAppearanceStore,
     icons: AppIcons) {
     this.electron = electron;
     this.readDeviceAsync = readDeviceAsync;
+    this.deviceFolder = DesktopApplication.readArgument(process.argv, Resources.deviceDirectoryArgument)
+      ?? DeviceIdentity.locateFolder(process.platform, process.env, process.homeFolder);
+    this.appearanceStore = createAppearanceStore(this.deviceFolder);
     this.process = process;
     this.settings = settings;
     this.taskbar = taskbar;
@@ -109,7 +117,8 @@ export class DesktopApplication {
     process: IDesktopProcess,
     moduleUrl: string,
     createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
-    readDeviceAsync: (folder: string) => Promise<string>): void {
+    readDeviceAsync: (folder: string) => Promise<string>,
+    createAppearanceStore: (folder: string) => IAppearanceStore): void {
     const moduleDirectory = dirname(fileURLToPath(moduleUrl));
     const isPackaged = DesktopApplication.isPackagedBuild(electron, process);
     const dataDirectory = DataDirectoryLocator.locate(
@@ -130,7 +139,7 @@ export class DesktopApplication {
     const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform);
     const log = new DesktopLog(dataDirectory, process.errorOutput, new DiagnosticRedactor(process.homeFolder));
     new DesktopApplication(
-      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, icons).run();
+      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, createAppearanceStore, icons).run();
   }
 
   private run(): void {
@@ -154,9 +163,7 @@ export class DesktopApplication {
     const session = this.electron.session.defaultSession;
     ApplicationMenu.install(this.electron.menu, this.settings);
     this.electron.app.dock?.setIcon(this.icons.dock);
-    const deviceFolder = DesktopApplication.readArgument(this.process.argv, Resources.deviceDirectoryArgument)
-      ?? DeviceIdentity.locateFolder(this.process.platform, this.process.env, this.process.homeFolder);
-    this.device = this.readDeviceAsync(deviceFolder).then(t => {
+    this.device = this.readDeviceAsync(this.deviceFolder).then(t => {
       this.knownDevice = t;
       return t;
     }).catch((error: unknown) => {
@@ -167,6 +174,7 @@ export class DesktopApplication {
     session.setPermissionCheckHandler(() => false);
     this.electron.ipcMain.on(Resources.readyChannel, (event, appearance) => this.show(event, appearance));
     this.electron.ipcMain.on(Resources.appearanceChannel, (event, appearance) => this.repaint(event, appearance));
+    this.electron.ipcMain.on(Resources.keepAppearanceChannel, (event, preferences) => this.keepAppearance(event, preferences));
     this.electron.ipcMain.on(Resources.menuBarChannel, (event, menuBar) => this.showMenuBar(event, menuBar));
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
     this.electron.ipcMain.handle(Resources.quitAnswerChannel, (event, choice) => this.answerQuit(event, choice));
@@ -184,12 +192,42 @@ export class DesktopApplication {
       if (this.windows.size === 0)
         this.open();
     });
-    this.open();
-    void this.startup.startAsync();
+    void this.readAppearanceAsync().then(() => {
+      this.open();
+      void this.startup.startAsync();
+    });
+  }
+
+  private async readAppearanceAsync(): Promise<void> {
+    try {
+      this.appearance = await this.appearanceStore.readAsync();
+    }
+    catch (error) {
+      this.log.write(Resources.formatAppearanceUnread(String(error)));
+    }
+  }
+
+  private keepAppearance(event: IIpcEvent, preferences: unknown): void {
+    if (Object.isNull(this.findTrusted(event)))
+      return;
+    let json: JsonObject;
+    try {
+      json = JsonReader.fromValue(preferences).toJson();
+    }
+    catch (error) {
+      this.log.write(Resources.formatPreferencesRejected(String(error)));
+      return;
+    }
+    if (JSON.stringify(json).length > Resources.appearanceLimit) {
+      this.log.write(Resources.formatPreferencesRejected(Resources.appearanceTooLarge));
+      return;
+    }
+    this.appearance = json;
+    this.appearanceStore.writeAsync(json).catch((error: unknown) => this.log.write(Resources.formatAppearanceUnsaved(String(error))));
   }
 
   private open(): void {
-    const window = this.factory.create(WindowState.createDefault());
+    const window = this.factory.create(WindowState.createDefault(), this.appearance);
     const contentsId = window.webContents.id;
     const open = new OpenWindow(window, this.electron.screen, this.log, this.quit);
     window.webContents.on(Resources.didStartLoadingEvent, () => this.notifier.hold());

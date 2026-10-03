@@ -37,6 +37,7 @@ describe("DesktopBridgeService", () => {
     readBuild: (): Promise<unknown> => Promise.resolve(null),
     copyText: (): Promise<boolean> => Promise.resolve(true),
     openLogFolder: (): Promise<boolean> => Promise.resolve(true),
+    keepAppearance: (): void => undefined,
     onNotificationOpened: (): (() => void) => () => undefined,
     onQuitQuestion: (): (() => void) => () => undefined,
     answerQuit: (): Promise<boolean> => Promise.resolve(true),
@@ -60,6 +61,7 @@ describe("DesktopBridgeService", () => {
     ["no readBuild", { ...complete, readBuild: null }],
     ["no copyText", { ...complete, copyText: null }],
     ["no openLogFolder", { ...complete, openLogFolder: null }],
+    ["no keepAppearance", { ...complete, keepAppearance: null }],
     ["no onNotificationOpened", { ...complete, onNotificationOpened: null }],
     ["no onQuitQuestion", { ...complete, onQuitQuestion: null }],
     ["no answerQuit", { ...complete, answerQuit: null }],
@@ -224,6 +226,17 @@ describe("DesktopBridgeService", () => {
     bridge.publishNotificationOpened(3);
 
     expect(opened).toEqual([2]);
+  });
+
+  it("passes on the device's last appearance and keeps the window's", () => {
+    const bridge = DesktopBridgeFixture.install();
+    bridge.appearance = { "shell.mode": "Dark" };
+    const service = TestBed.inject(DesktopBridgeService);
+
+    service.keepAppearance({ "shell.mode": "Light" });
+
+    expect(service.initialAppearance).toEqual({ "shell.mode": "Dark" });
+    expect(bridge.keptAppearances).toEqual([{ "shell.mode": "Light" }]);
   });
 
   it("passes on the question about work in progress or its end, answers it and writes a module's log lines through the desktop", async () => {
