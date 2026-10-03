@@ -788,6 +788,33 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async writesBoundsMovedWhileTheRuntimeWasGoneOnceItIsReadyAgain(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    const second = new FakeRuntimeConnection();
+    let reconnect: (connection: FakeRuntimeConnection) => void = () => undefined;
+    const launcher = new FakeRuntimeLauncher(first, new Promise<FakeRuntimeConnection>(resolve => {
+      reconnect = resolve;
+    }));
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    await DesktopApplicationTests.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
+
+    launcher.listener?.onDisconnected();
+    window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+    window.change("move");
+    await delay(700);
+    const writesWhileGone = [...first.calls, ...second.calls].filter(t => t === "shell.writeWindowBounds").length;
+    reconnect(second);
+    await DesktopApplicationTests.waitAsync(() => second.calls.includes("shell.writeWindowBounds"));
+
+    Assert.areEqual(0, writesWhileGone);
+    Assert.areEqual(JSON.stringify({ x: 40, y: 60, width: 900, height: 640, maximized: false }), JSON.stringify(second.states.get(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`)));
+    Assert.areEqual(0, DesktopApplicationTests.readErrors(process, "The window's bounds").length);
+  }
+
+  @TestMethod
   public async tellsOnlyItsOwnWindowWhichBuildItIs(): Promise<void> {
     const electron = await DesktopApplicationTests.startReadyAsync("linux");
 

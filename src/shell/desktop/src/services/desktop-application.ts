@@ -217,7 +217,9 @@ export class DesktopApplication {
     const kind = this.startup.current.kind;
     if (kind === StartupStateKind.Connecting)
       return;
-    if (kind === StartupStateKind.Ready && !this.restored.has(open)) {
+    if (kind === StartupStateKind.Ready && this.restored.has(open))
+      await open.bounds.saveUnsavedAsync().catch((error: unknown) => this.log.write(Resources.formatBoundsUnsaved(String(error))));
+    else if (kind === StartupStateKind.Ready) {
       this.restored.add(open);
       const device = await this.device;
       if (!Object.isNull(device))
