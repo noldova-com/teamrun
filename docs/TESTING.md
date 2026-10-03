@@ -43,7 +43,7 @@ Use owned disposable files, repositories, databases and profiles. Cleanup runs o
 
 Scoped mock clocks may exercise long deadlines without changing production defaults. Wait for work to start; check before/at the deadline and retain real process/socket cleanup checks. Use a real-time guard and restore timers on success/failure. Global mocks require serial execution or process isolation; clock advancement proves neither wall time nor native termination.
 
-Angular tests install a throwing `ErrorHandler` through the unit-test builder's provider configuration. Unexpected framework errors must fail the run; a test of an expected error asserts it explicitly. Specs that depend on styles, storage, preferences or document focus establish their own initial state and restore it after pending effects and fixtures are destroyed. A passing assertion alongside an unhandled framework error is not a pass.
+Angular tests install a throwing `ErrorHandler` through the unit-test builder's provider configuration. Unexpected framework errors must fail the run; a test of an expected error asserts it explicitly. Specs that depend on styles, storage, preferences or document focus establish their own initial state and restore it after pending effects and fixtures are destroyed. Spec files share a page, so a spec leaves no application, painted appearance or element running or mounted after it. The kit's global stylesheet is part of each spec file's initial state: before each file runs, a setup file waits for the page's stylesheet to finish loading, adds it when the page has none, and fails the file when it does not load or does not finish loading within its limit. A passing assertion alongside an unhandled framework error is not a pass.
 
 ### Flakiness and races
 
@@ -59,7 +59,7 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
 
 Assertions compare values according to a documented operation; truthiness or formatted strings must not replace the required value comparison. Structured assertion failures retain meaningful expected and actual values and their cause, subject to redaction.
 
-Results record stable identities, outcomes, durations and failure/skip details for every test and data row. Distinguish executed, skipped, unselected and unreached tests; reconcile totals with discovery and selection.
+Results record stable identities, outcomes, durations and failure/skip details for every test and data row. Distinguish executed, skipped, unselected and unreached tests; reconcile totals with discovery and selection. The Angular run reconciles the spec files in Vitest's JSON report with the files its test target's include patterns match under src/, and fails naming any it did not run; it refuses a test target that excludes files, since it does not apply exclusions.
 
 Console output groups package/file/class results and prints details as each class completes. Reduced-detail mode hides passing tests and entirely passing classes. Final totals and GitHub summaries cover the whole run.
 
