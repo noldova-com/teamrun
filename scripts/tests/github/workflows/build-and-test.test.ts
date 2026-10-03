@@ -392,7 +392,7 @@ class BuildAndTestTests {
       assert.notEqual((await failing.runAsync(script, { GITHUB_REPOSITORY: "noldova-com/teamrun", ROOT_HASH: "rootnew", SOURCE_HASH: "srcnew", GITHUB_OUTPUT: "outputs.txt" })).status, 0);
     });
 
-    test("the slow targets run their tests and their UI workflows as parallel jobs that each build natively", async () => {
+    test("the Windows targets run their tests and their UI workflows as parallel jobs that each build natively", async () => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
       const text = workflow.text;
       const legs = BuildAndTestTests.readLegs(text);
@@ -404,8 +404,7 @@ class BuildAndTestTests {
         ["Windows x64, UI workflows", "workflows"],
         ["Windows ARM64, tests", "tests"],
         ["Windows ARM64, UI workflows", "workflows"],
-        ["macOS x64, tests", "tests"],
-        ["macOS x64, UI workflows", "workflows"],
+        ["macOS x64", "all"],
         ["macOS ARM64", "all"]
       ]);
       for (const leg of legs)

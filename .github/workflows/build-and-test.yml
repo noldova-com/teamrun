@@ -182,14 +182,9 @@ jobs:
             part: workflows
             runner: windows-11-arm
             architecture: arm64
-          - label: macOS x64, tests
+          - label: macOS x64
             target: macOS x64
-            part: tests
-            runner: macos-15-intel
-            architecture: x64
-          - label: macOS x64, UI workflows
-            target: macOS x64
-            part: workflows
+            part: all
             runner: macos-15-intel
             architecture: x64
           - label: macOS ARM64
