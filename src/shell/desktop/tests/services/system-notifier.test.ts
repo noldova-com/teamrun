@@ -139,6 +139,19 @@ export class SystemNotifierTests {
     Assert.areEqual("Alarm,Posted after the read", host.created.map(t => t.title).join(","));
   }
 
+  @TestMethod
+  public showsNothingFromAMutedModuleAndNothingItPostedWhileMutedOnceUnmuted(): void {
+    const { host, notifier } = SystemNotifierTests.create();
+    notifier.begin(notifier.epoch, SystemNotifierTests.DEVICE, 0);
+    const alarm = SystemNotifierTests.notification(1, 1, "Alarm");
+    const saved = SystemNotifierTests.notification(2, 2, "Saved", null, null, "notes.saved");
+
+    notifier.receive(new NotificationBroadcast([saved, alarm], [], ["clock"], 2));
+    notifier.receive(SystemNotifierTests.broadcast([], SystemNotifierTests.notification(3, 3, "Alarm later"), saved, alarm));
+
+    Assert.areEqual("Saved,Alarm later", host.created.map(t => t.title).join(","));
+  }
+
   private static create(): { host: FakeNotificationHost; notifier: SystemNotifier; log: FakeDesktopLog; opened: number[]; focus: { isFocused: boolean } } {
     const host = new FakeNotificationHost();
     const log = new FakeDesktopLog();
@@ -149,11 +162,12 @@ export class SystemNotifierTests {
   }
 
   private static broadcast(quietDevices: readonly string[], ...notifications: Notification[]): NotificationBroadcast {
-    return new NotificationBroadcast(notifications, quietDevices, Math.max(0, ...notifications.map(t => t.sequence)));
+    return new NotificationBroadcast(notifications, quietDevices, [], Math.max(0, ...notifications.map(t => t.sequence)));
   }
 
-  private static notification(id: number, sequence: number, title: string, text: string | null = null, progress: number | typeof NotificationPost.indeterminate | null = null): Notification {
+  private static notification(id: number, sequence: number, title: string, text: string | null = null, progress: number | typeof NotificationPost.indeterminate | null = null,
+    kind: string = "clock.alarm"): Notification {
     return new Notification(
-      id, sequence, new NotificationPost(QualifiedName.parse("clock.alarm"), null, title, text, NotificationSeverity.Info, null, [], progress), "2026-10-03T08:00:00.000Z", false);
+      id, sequence, new NotificationPost(QualifiedName.parse(kind), null, title, text, NotificationSeverity.Info, null, [], progress), "2026-10-03T08:00:00.000Z", false);
   }
 }

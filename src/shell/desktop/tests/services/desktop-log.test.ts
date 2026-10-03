@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -52,6 +52,21 @@ export class DesktopLogTests {
       Assert.areEqual("desktop.log,desktop.previous.log", (await readdir(directory.logsFolder)).sort().join(","));
       Assert.areEqual("2026-10-02T23:40:01.250Z third\n2026-10-02T23:40:01.250Z third again\n", await readFile(directory.desktopLog, "utf8"));
       Assert.areEqual("2026-10-02T23:40:01.250Z second\n2026-10-02T23:40:01.250Z second again\n", await readFile(directory.previousDesktopLog, "utf8"));
+    });
+  }
+
+  @TestMethod
+  public async becomesThePreviousLogInsteadOfPassingItsSizeLimit(): Promise<void> {
+    await DesktopLogTests.runAsync(async (folder, directory) => {
+      const log = new DesktopLog(directory, new FakeDesktopProcess("linux").errorOutput, new DiagnosticRedactor(folder), () => DesktopLogTests.MOMENT);
+      log.open();
+
+      for (let i = 0; i < 5; i++)
+        log.write(`${i}${"word ".repeat(60000)}`);
+
+      Assert.isTrue((await stat(directory.desktopLog)).size <= 1048576);
+      Assert.isTrue((await readFile(directory.desktopLog, "utf8")).includes(" 4word"));
+      Assert.isTrue((await readFile(directory.previousDesktopLog, "utf8")).includes(" 3word"));
     });
   }
 
