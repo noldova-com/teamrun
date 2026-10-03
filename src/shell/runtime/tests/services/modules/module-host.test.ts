@@ -12,7 +12,10 @@ import path from "node:path";
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { QualifiedName } from "@noldova/teamrun-shell-protocol";
-import { CommandRegistry, DataDirectory, EventRegistry, type IRuntimePart, MethodRegistry, Migration, ModuleDatabase, ModuleDatabaseException, ModuleDeclaration, ModuleHost, NotificationCenter } from "@noldova/teamrun-shell-runtime";
+import {
+  CommandRegistry, DataDirectory, DiagnosticRedactor, EventRegistry, type IRuntimePart, MethodRegistry, Migration, ModuleDatabase, ModuleDatabaseException, ModuleDeclaration, ModuleHost,
+  NotificationCenter, WorkTracker
+} from "@noldova/teamrun-shell-runtime";
 
 import { RuntimePartFixture } from "../../fixtures/runtime-part.fixture.js";
 import { RuntimePartLoaderFixture } from "../../fixtures/runtime-part-loader.fixture.js";
@@ -201,6 +204,40 @@ export class ModuleHostTests {
     Assert.throws(() => database?.readAll("SELECT title FROM notes"), Error);
   }
 
+  @TestMethod
+  public async givesPartsTheLogAndTheWorkAndEndsAModulesWorkWhenItDeactivatesOrFailsToActivate(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
+    const diagnostics = new TextOutputFixture();
+    let changes = 0;
+    const work = new WorkTracker(() => changes++);
+    const signals: AbortSignal[] = [];
+    const parts = new Map<string, IRuntimePart>([
+      ["notes-runtime", new RuntimePartFixture("notes", [], t => {
+        t.log.write(`Opened ${path.resolve("home", "person", "notes")}`);
+        signals.push(t.beginWork("Saving the notes").signal);
+      })],
+      ["failing-runtime", new RuntimePartFixture("failing", [], t => {
+        signals.push(t.beginWork("Starting up").signal);
+        throw new Error("activation failed");
+      })]
+    ]);
+    const host = ModuleHostTests.create(
+      [ModuleHostTests.declare("notes", [], "notes-runtime"), ModuleHostTests.declare("failing", [], "failing-runtime")],
+      parts, new MethodRegistry(), diagnostics, path.resolve("teamrun-data"), work);
+
+    await host.activateAsync(settings.service);
+    const active = work.descriptions.join(",");
+    const failedAborted = signals[1]?.aborted === true;
+    await host.deactivateAsync();
+
+    Assert.areEqual("Saving the notes", active);
+    Assert.isTrue(failedAborted);
+    Assert.isTrue(signals[0]?.aborted === true);
+    Assert.isTrue(work.isEmpty);
+    Assert.areEqual(4, changes);
+    Assert.isTrue(diagnostics.text.startsWith(`notes: Opened ${path.join("~", "notes")}\n`), diagnostics.text);
+  }
+
   private static declare(id: string, dependencies: readonly string[], runtimePackage: string | null, methods: readonly string[] = []): ModuleDeclaration {
     return new ModuleDeclaration(id, id, dependencies, runtimePackage, new Map([["methods", [...methods, `${id}.run`]]]));
   }
@@ -210,7 +247,8 @@ export class ModuleHostTests {
     parts: ReadonlyMap<string, IRuntimePart | Error>,
     methods: MethodRegistry = new MethodRegistry(),
     diagnostics: TextOutputFixture = new TextOutputFixture(),
-    root: string = path.resolve("teamrun-data")): ModuleHost {
+    root: string = path.resolve("teamrun-data"),
+    work: WorkTracker = new WorkTracker(() => undefined)): ModuleHost {
     return new ModuleHost(
       declarations,
       new DataDirectory(root),
@@ -219,6 +257,8 @@ export class ModuleHostTests {
       new CommandRegistry(),
       new NotificationCenter(() => undefined, () => new Date()),
       new RuntimePartLoaderFixture(parts),
-      diagnostics);
+      diagnostics,
+      work,
+      new DiagnosticRedactor(path.resolve("home", "person")));
   }
 }
