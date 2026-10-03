@@ -40,6 +40,19 @@ export class LogFileTests {
   }
 
   @TestMethod
+  public cutsAMultibyteRecordUnderItsByteLimitAtACharacterBoundary(): void {
+    const log = new LogFile("log", "previous", new DiagnosticRedactor("/home/person"), () => LogFileTests.MOMENT, LogFileTests.LIMIT);
+
+    const euros = log.format("€ ".repeat(LogFileTests.LIMIT));
+    const faces = log.format("😀 ".repeat(LogFileTests.LIMIT));
+
+    Assert.areEqual(`${LogFileTests.STAMP} € € € \n`, euros);
+    Assert.areEqual(`${LogFileTests.STAMP} 😀 😀 😀\n`, faces);
+    Assert.isTrue(Buffer.byteLength(euros) <= LogFileTests.LIMIT / 4);
+    Assert.isTrue(Buffer.byteLength(faces) <= LogFileTests.LIMIT / 4);
+  }
+
+  @TestMethod
   public becomesThePreviousFileInsteadOfPassingItsLimit(): Promise<void> {
     return LogFileTests.runAsync(async (log, file, previous) => {
       const lines = Array.from({ length: 9 }, (_, i) => log.format(`record ${i + 1}`));
@@ -57,16 +70,18 @@ export class LogFileTests {
   }
 
   @TestMethod
-  public keepsTheFileWithinItsLimitWhenThePreviousCannotBeReplaced(): Promise<void> {
+  public keepsTheFileAndThrowsWhenThePreviousCannotBeReplaced(): Promise<void> {
     return LogFileTests.runAsync(async (log, file, previous) => {
-      await mkdir(path.join(previous, "held"), { recursive: true });
       const lines = Array.from({ length: 5 }, (_, i) => log.format(`record ${i + 1}`));
       log.open();
-
-      for (const line of lines)
+      for (const line of lines.slice(0, 4))
         log.append(line);
+      await mkdir(path.join(previous, "held"), { recursive: true });
 
-      Assert.areEqual(lines[4], await readFile(file, "utf8"));
+      Assert.throws(() => log.append(lines[4] ?? ""), Error);
+      Assert.throws(() => log.open(), Error);
+
+      Assert.areEqual(lines.slice(0, 4).join(""), await readFile(file, "utf8"));
     });
   }
 

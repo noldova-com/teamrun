@@ -15,6 +15,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import { DataDirectory, OwnershipLock, OwnershipReleasedException, RuntimeLog } from "@noldova/teamrun-shell-runtime";
 
 import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
+import { TextOutputFixture } from "../../fixtures/text-output.fixture.js";
 
 @TestClass
 export class RuntimeLogTests {
@@ -69,15 +70,18 @@ export class RuntimeLogTests {
   }
 
   @TestMethod
-  public failsTheDiagnosticsStreamWhenTheLogCannotBeWritten(): Promise<void> {
+  public reportsOnceAndStopsWritingWhenTheLogCannotBeWritten(): Promise<void> {
     return RuntimeLogTests.runAsync(async lock => {
-      const log = await RuntimeLogTests.openAsync(lock, null);
+      const error = new TextOutputFixture();
+      const log = await RuntimeLog.openAsync(lock, null, () => new Date(RuntimeLogTests.STAMP), error);
       await rm(lock.dataDirectory.logsFolder, { recursive: true });
-      const failure = new Promise<unknown>(resolve => log.diagnostics.once("error", resolve));
 
-      log.diagnostics.write("Lost");
+      await new Promise<void>(resolve => log.diagnostics.write("Lost", () => resolve()));
+      log.writeLine("Lost too");
+      await log.closeAsync();
 
-      Assert.isTrue(await failure instanceof Error);
+      Assert.isTrue(error.text.startsWith(`${RuntimeLogTests.STAMP} The runtime's log could not be written, so it is no longer written to: Error: `));
+      Assert.areEqual(1, error.text.trimEnd().split("\n").length);
     });
   }
 
@@ -100,17 +104,15 @@ export class RuntimeLogTests {
   }
 
   @TestMethod
-  public startsANewLogWhenThePreviousCannotBeReplaced(): Promise<void> {
+  public keepsTheCurrentLogAndRejectsWhenThePreviousCannotBeReplaced(): Promise<void> {
     return RuntimeLogTests.runAsync(async lock => {
       const directory = lock.dataDirectory;
       await mkdir(path.join(directory.previousRuntimeLog, "held"), { recursive: true });
       await writeFile(directory.runtimeLog, "older run\n");
 
-      const log = await RuntimeLogTests.openAsync(lock, null);
-      log.writeLine("new run");
-      await log.closeAsync();
+      await Assert.throwsAsync(() => RuntimeLogTests.openAsync(lock, null), Error);
 
-      Assert.areEqual(`${RuntimeLogTests.STAMP} new run\n`, await readFile(directory.runtimeLog, "utf8"));
+      Assert.areEqual("older run\n", await readFile(directory.runtimeLog, "utf8"));
     });
   }
 

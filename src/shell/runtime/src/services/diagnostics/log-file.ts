@@ -33,9 +33,13 @@ export class LogFile {
   }
 
   public format(text: string): string {
-    const line = `${this.now().toISOString()} ${this.redactor.redact(text)}`;
+    const bytes = Buffer.from(`${this.now().toISOString()} ${this.redactor.redact(text)}`, Resources.utf8Encoding);
     const room = Math.floor(this.limit / Resources.logRecordShare) - Resources.lineSeparator.length;
-    return `${line.length > room ? line.slice(0, room) : line}${Resources.lineSeparator}`;
+    let end = Math.min(bytes.length, room);
+    while (end < bytes.length && (bytes.readUInt8(end) & Resources.utf8ContinuationMask) === Resources.utf8ContinuationBits)
+      end--;
+
+    return `${bytes.toString(Resources.utf8Encoding, 0, end)}${Resources.lineSeparator}`;
   }
 
   public open(): void {
@@ -57,8 +61,9 @@ export class LogFile {
     try {
       renameSync(this.file, this.previousFile);
     }
-    catch {
-      return;
+    catch (failure) {
+      if ((failure as NodeJS.ErrnoException).code !== Resources.missingFileErrorCode)
+        throw failure;
     }
   }
 }

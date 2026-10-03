@@ -119,6 +119,9 @@ export class Resources {
   public static readonly privateFileMode: number = 0o600;
   public static readonly logSizeLimit: number = 1048576;
   public static readonly logRecordShare: number = 4;
+  public static readonly missingFileErrorCode: string = "ENOENT";
+  public static readonly utf8ContinuationMask: number = 0xC0;
+  public static readonly utf8ContinuationBits: number = 0x80;
   public static readonly privateFolderMode: number = 0o700;
   public static readonly exclusiveWriteFlag: string = "wx";
   public static readonly temporarySuffix: string = ".tmp";
@@ -596,6 +599,10 @@ export class Resources {
 
   public static formatStartLogNameInvalid(name: string): string {
     return `"${name}" is not the name of a start log.`;
+  }
+
+  public static formatRuntimeLogUnavailable(reason: string): string {
+    return `The runtime's log could not be written, so it is no longer written to: ${reason}`;
   }
 
   public static formatStartLogName(unique: string): string {

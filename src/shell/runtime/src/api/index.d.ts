@@ -1068,7 +1068,7 @@ export declare class LogFile {
    * Stamps and redacts a record.
    *
    * @param text The record, possibly of several lines, without its line ending.
-   * @returns The line to write: the time, the redacted record, cut to its size limit, and a line ending.
+   * @returns The line to write: the time, the redacted record, cut to a quarter of the size limit in bytes at a character boundary, and a line ending.
    * @example
    * ```ts
    * import type { LogFile } from "@noldova/teamrun-shell-runtime";
@@ -1081,9 +1081,9 @@ export declare class LogFile {
   public format(text: string): string;
 
   /**
-   * Starts an empty file. The existing file becomes the previous file, replacing it; when that fails the new file starts anyway.
+   * Starts an empty file. The existing file, if there is one, becomes the previous file, replacing it. When it cannot, the failure is thrown and the existing file keeps what it holds.
    *
-   * @throws {Error} Thrown when the file cannot be written.
+   * @throws {Error} Thrown when the existing file cannot become the previous file or the file cannot be written.
    * @example
    * ```ts
    * import type { LogFile } from "@noldova/teamrun-shell-runtime";
@@ -1099,7 +1099,7 @@ export declare class LogFile {
    * Appends a line. When it would take the file over its size limit, the file first becomes the previous file.
    *
    * @param line The line from {@link LogFile.format}.
-   * @throws {Error} Thrown when the file cannot be written.
+   * @throws {Error} Thrown when the file cannot become the previous file, in which case it keeps what it holds, or cannot be written.
    * @example
    * ```ts
    * import type { LogFile } from "@noldova/teamrun-shell-runtime";
@@ -3236,11 +3236,12 @@ export declare class RuntimeLog {
   private constructor();
 
   /**
-   * Opens a new log. The current log becomes the previous one, replacing it; when that fails the new log starts anyway. Start logs other than the runtime's own are removed, and those that cannot be removed are left.
+   * Opens a new log. The current log becomes the previous one, replacing it; when that fails the open is rejected and the current log keeps what it holds. Start logs other than the runtime's own are removed, and those that cannot be removed are left.
    *
    * @param lock The held ownership of the data directory.
    * @param ownStartLogName The start log of the launcher that started this runtime, which is kept, or `null`.
    * @param now Returns the time to stamp a line with; the current time by default.
+   * @param error Receives the report when the log can no longer be written; standard error by default.
    * @returns A promise of the open log.
    * @throws {OwnershipReleasedException} Rejected when the ownership was released.
    * @example
@@ -3254,10 +3255,10 @@ export declare class RuntimeLog {
    * }
    * ```
    */
-  public static openAsync(lock: OwnershipLock, ownStartLogName: string | null, now?: () => Date): Promise<RuntimeLog>;
+  public static openAsync(lock: OwnershipLock, ownStartLogName: string | null, now?: () => Date, error?: Writable): Promise<RuntimeLog>;
 
   /**
-   * Writes one line at once, as when the process is about to end; nothing is written after the log closes. A line that cannot be written is thrown.
+   * Writes one line at once, as when the process is about to end; nothing is written after the log closes. When a line cannot be written, the failure is reported once on the error stream and nothing more is written to the log.
    *
    * @param text The line, without its line ending.
    * @example
