@@ -8,24 +8,19 @@
 
 import { join } from "node:path";
 
-import type { IThemeHost } from "../interfaces/i-theme-host.js";
 import { Resources } from "../resources.js";
 
 export class AppIcons {
   private readonly folder: string;
   private readonly platform: string;
-  private readonly theme: IThemeHost;
 
-  public constructor(folder: string, platform: string, theme: IThemeHost) {
+  public constructor(folder: string, platform: string) {
     this.folder = folder;
     this.platform = platform;
-    this.theme = theme;
   }
 
   public get window(): string {
-    if (this.platform === Resources.windowsPlatform)
-      return join(this.folder, this.theme.shouldUseDarkColorsForSystemIntegratedUI ? Resources.windowsDarkIcon : Resources.windowsLightIcon);
-    return join(this.folder, this.theme.shouldUseDarkColors ? Resources.darkIcon : Resources.lightIcon);
+    return join(this.folder, this.platform === Resources.windowsPlatform ? Resources.windowsIcon : Resources.windowIcon);
   }
 
   public get dock(): string {

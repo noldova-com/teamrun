@@ -81,7 +81,7 @@ Declare supported versions and any capability negotiation. Reject incompatible v
 
 Application icons and fonts live in `assets/icons` and `assets/fonts`, with their license notices. A module's own assets live in `src/modules/<id>/assets`. Shared styles, including font-face declarations, live in `src/shell/ui/src/styles`.
 
-Mode-specific icons use `dark` or `light` for the intended background. PNG names include their square pixel size, such as `icon-dark-128.png` or `icon-light-512.png`. Purpose-specific icons use a descriptive variant, such as `icon-dock-512.png`; ICO files contain multiple resolutions and omit a single-size suffix.
+The application icon is `icon-dark`: a white shape with a dark outline, which suits light and dark backgrounds alike. PNG names include their square pixel size, such as `icon-dark-128.png` or `icon-dark-512.png`. Purpose-specific icons use a descriptive variant, such as `icon-dock-512.png`; ICO files contain multiple resolutions and omit a single-size suffix.
 
 A package's `package.json` sits at the package root, with the `src/` and `tests/` folders beside it. Each folder has its own TypeScript configuration at its root, and `resources.ts` sits at the root of `src/`; tests mirror the full path.
 

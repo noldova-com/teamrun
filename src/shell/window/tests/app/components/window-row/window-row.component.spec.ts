@@ -6,11 +6,19 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { AppearanceService, DefaultTheme, ModePreference, type Theme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
 import { WindowRowComponent } from "../../../../src/app/components/window-row/window-row.component";
+import { CommandContribution } from "../../../../src/app/models/command-contribution";
+import { TopBarAction } from "../../../../src/app/models/top-bar-action";
+import { TopBarActionContribution } from "../../../../src/app/models/top-bar-action-contribution";
+import { TopBarActionState } from "../../../../src/app/models/top-bar-action-state";
+import { BarItemsService } from "../../../../src/app/services/bar-items.service";
+import { CommandService } from "../../../../src/app/services/command.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { FixtureTheme } from "../../../../../ui/tests/fixtures/fixture-theme";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
@@ -46,6 +54,43 @@ describe("WindowRowComponent", () => {
         expect(style.color).toBe(AppearanceFixture.readColor(theme, mode, "titleBar.activeForeground"));
         AppearanceFixture.expectLook(style.height, theme, "window-row-height", "height");
       });
+
+  it("shows the modules' top bar actions in order as icon buttons that run their commands, outside the drag region", async () => {
+    const runs: JsonValue[] = [];
+    const errors: unknown[] = [];
+    TestBed.configureTestingModule({ providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }] });
+    DesktopBridgeFixture.install("win32");
+    apply();
+    const action = (name: string, state: TopBarActionState): TopBarAction => new TopBarAction(new TopBarActionContribution(name, state), () => undefined);
+    const compose = action("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote", { commandArguments: { title: "Plan" } }));
+    TestBed.inject(CommandService).setCommands([
+      new CommandContribution("notes.newNote", "New note", null, null, async t => {
+        runs.push(t);
+        return null;
+      }),
+      new CommandContribution("notes.fail", "Fail", null, null, () => Promise.reject(new Error("The note was not created.")))
+    ]);
+    TestBed.inject(BarItemsService).set([], [
+      compose,
+      action("notes.print", new TopBarActionState("print", "Print", "notes.print")),
+      action("notes.share", new TopBarActionState("share", "Share", "notes.newNote", { isHidden: true })),
+      action("notes.broken", new TopBarActionState("error", "Broken", "notes.fail"))
+    ]);
+
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    fixture.detectChanges();
+    const buttons: HTMLButtonElement[] = [...fixture.nativeElement.querySelectorAll("button.tr-window-row-action")];
+    buttons[0]?.click();
+    buttons[2]?.click();
+    await fixture.whenStable();
+
+    expect(buttons.map(t => [t.getAttribute("data-tr-item"), t.getAttribute("aria-label"), t.disabled])).toEqual([
+      ["notes.compose", "New note", false], ["notes.print", "Print", true], ["notes.broken", "Broken", false]
+    ]);
+    expect(getComputedStyle(buttons[0] ?? fixture.nativeElement).getPropertyValue("app-region")).toBe("no-drag");
+    expect(runs).toEqual([{ title: "Plan" }]);
+    expect(errors.map(t => String(t))).toEqual(["Error: The note was not created."]);
+  });
 
   it("is a drag region that leaves the native controls' space free on Windows and Linux", () => {
     DesktopBridgeFixture.install("win32");

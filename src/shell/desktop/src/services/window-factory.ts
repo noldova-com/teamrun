@@ -61,8 +61,6 @@ export class WindowFactory {
     const window = this.electron.createWindow(options);
     if (this.settings.platform === Resources.windowsPlatform)
       window.setAppDetails(this.describe());
-    if (!this.settings.isMac)
-      this.followTheme(window);
     const contents = window.webContents;
     contents.on(Resources.willNavigateEvent, (event, url) => {
       if (!this.policy.isWindowUrl(url))
@@ -82,16 +80,6 @@ export class WindowFactory {
     window.setBackgroundColor(appearance.background);
     if (!this.settings.isMac)
       window.setTitleBarOverlay({ color: appearance.titleBar, symbolColor: appearance.titleBarText, height: appearance.titleBarHeight });
-  }
-
-  private followTheme(window: IDesktopWindow): void {
-    const update = (): void => {
-      window.setIcon(this.icons.window);
-      if (this.settings.platform === Resources.windowsPlatform)
-        window.setAppDetails(this.describe());
-    };
-    this.electron.theme.on(Resources.themeUpdatedEvent, update);
-    window.once(Resources.closedEvent, () => this.electron.theme.removeListener(Resources.themeUpdatedEvent, update));
   }
 
   private describe(): AppDetailsOptions {

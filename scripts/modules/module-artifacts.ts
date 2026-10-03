@@ -28,6 +28,8 @@ export default class ModuleArtifacts {
   private static readonly SOURCE_PREFIX: string = "src/";
   private static readonly VIEWS_KIND: string = "views";
   private static readonly COMMANDS_KIND: string = "commands";
+  private static readonly STATUS_BAR_ITEMS_KIND: string = "statusBarItems";
+  private static readonly TOP_BAR_ACTIONS_KIND: string = "topBarActions";
   private static readonly SOURCE_IMPORT: string = "import { WindowPartSource } from \"@noldova/teamrun-shell-window\";\n";
   private static readonly OUTPUT_DECLARATIONS_SEGMENTS: readonly string[] = ["modules", "declarations.json"];
 
@@ -58,6 +60,8 @@ export default class ModuleArtifacts {
       .map(t => `  new WindowPartSource(${JSON.stringify(t.id)}, ${JSON.stringify(t.displayName)}, ${JSON.stringify(t.dependencies)}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.VIEWS_KIND) ?? [])}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.COMMANDS_KIND) ?? [])}, `
+        + `${JSON.stringify(t.contributions.get(ModuleArtifacts.STATUS_BAR_ITEMS_KIND) ?? [])}, `
+        + `${JSON.stringify(t.contributions.get(ModuleArtifacts.TOP_BAR_ACTIONS_KIND) ?? [])}, `
         + `() => import("../${String(t.windowEntry).slice(ModuleArtifacts.SOURCE_PREFIX.length)}").then(t => t.windowPart))`);
     const list = sources.length === 0 ? "[]" : `[\n${sources.join(",\n")}\n]`;
     await ModuleArtifacts.writeFileAsync(

@@ -6,7 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, ElementRef, EnvironmentInjector, type Signal, afterNextRender, computed, inject, input } from "@angular/core";
+import {
+  ChangeDetectionStrategy, Component, DestroyRef, ElementRef, EnvironmentInjector, type Signal, afterNextRender, computed, effect, inject, input, viewChild
+} from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import {
@@ -19,9 +21,11 @@ import type { DockSide } from "../../enums/dock-side";
 import type { GroupFrame } from "../../models/layout/group-frame";
 import type { Tab } from "../../models/layout/tab";
 import type { TabGroup } from "../../models/layout/tab-group";
+import { CommandService } from "../../services/command.service";
 import { LayoutService } from "../../services/layout.service";
 import { TabDragService } from "../../services/tab-drag.service";
 import { TabLabelService } from "../../services/tab-label.service";
+import { TabStripService } from "../../services/tab-strip.service";
 import { TabMenuComponent } from "../tab-menu/tab-menu.component";
 import { TabScrollerDirective } from "./tab-scroller.directive";
 
@@ -40,12 +44,16 @@ import { TabScrollerDirective } from "./tab-scroller.directive";
     "[style.left.rem]": "frame().bounds.x",
     "[style.top.rem]": "frame().bounds.y",
     "[style.width.rem]": "frame().bounds.width",
-    "[style.height.rem]": "frame().bounds.height"
+    "[style.height.rem]": "frame().bounds.height",
+    "(focusin)": "layout.focusGroup(group().id)"
   }
 })
 export class TabGroupComponent {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
+  private readonly commands: CommandService = inject(CommandService);
+  private readonly scroller: Signal<TabScrollerDirective> = viewChild.required(TabScrollerDirective);
+  private readonly overflowTrigger: Signal<MenuTriggerDirective | undefined> = viewChild("overflowTrigger", { read: MenuTriggerDirective });
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly below: OverlaySide = OverlaySide.below;
@@ -64,6 +72,19 @@ export class TabGroupComponent {
 
   public readonly frame = input.required<GroupFrame>();
 
+  public constructor() {
+    const strips = inject(TabStripService);
+    effect(() => strips.setOverflowing(this.group().id, this.scroller().isOverflowing()));
+    effect(() => {
+      const trigger = this.overflowTrigger();
+      if (!Object.isUndefined(trigger) && strips.takeListRequest(this.group().id)) {
+        trigger.open();
+        trigger.getMenu()?.focusFirstItem(Resources.keyboardFocusOrigin);
+      }
+    });
+    inject(DestroyRef).onDestroy(() => strips.setOverflowing(this.group().id, false));
+  }
+
   protected choose(tab: Tab): void {
     this.layout.activate(tab);
     afterNextRender(() => {
@@ -71,6 +92,10 @@ export class TabGroupComponent {
         if (element.dataset[Resources.tabKeyData] === tab.key)
           element.focus();
     }, { injector: this.environment });
+  }
+
+  protected keep(tab: Tab): void {
+    this.commands.run(Resources.keepTabCommand, { [Resources.tabArgument]: tab.key });
   }
 
   protected closeAll(): void {

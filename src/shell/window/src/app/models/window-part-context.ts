@@ -14,24 +14,31 @@ import type { IDocumentOptions } from "../interfaces/i-document-options";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
 import type { CommandContribution } from "./command-contribution";
 import type { DocumentContribution } from "./document-contribution";
+import { StatusBarItem } from "./status-bar-item";
+import type { StatusBarItemContribution } from "./status-bar-item-contribution";
+import { TopBarAction } from "./top-bar-action";
+import type { TopBarActionContribution } from "./top-bar-action-contribution";
 import type { ViewContribution } from "./view-contribution";
+import type { WindowPartSource } from "./window-part-source";
 import { Resources } from "../../resources";
 
 export class WindowPartContext implements IWindowPartContext {
   private readonly host: IWindowPartHost;
   private readonly owners: readonly string[];
-  private readonly commandNames: readonly string[];
+  private readonly source: WindowPartSource;
   private readonly commandList: CommandContribution[] = [];
+  private readonly statusBarItemList: StatusBarItem[] = [];
+  private readonly topBarActionList: TopBarAction[] = [];
   private readonly viewList: ViewContribution[] = [];
   private readonly documentList: DocumentContribution[] = [];
   private readonly subscriptions: (() => void)[] = [];
 
   public readonly moduleId: string;
 
-  public constructor(moduleId: string, dependencies: readonly string[], commandNames: readonly string[], host: IWindowPartHost) {
-    this.moduleId = moduleId;
-    this.owners = [moduleId, ...dependencies];
-    this.commandNames = [...commandNames];
+  public constructor(source: WindowPartSource, host: IWindowPartHost) {
+    this.moduleId = source.moduleId;
+    this.owners = [source.moduleId, ...source.dependencies];
+    this.source = source;
     this.host = host;
   }
 
@@ -45,6 +52,14 @@ export class WindowPartContext implements IWindowPartContext {
 
   public get commands(): readonly CommandContribution[] {
     return this.commandList;
+  }
+
+  public get statusBarItems(): readonly StatusBarItem[] {
+    return this.source.statusBarItemNames.flatMap(t => this.statusBarItemList.filter(u => u.name === t));
+  }
+
+  public get topBarActions(): readonly TopBarAction[] {
+    return this.source.topBarActionNames.flatMap(t => this.topBarActionList.filter(u => u.name === t));
   }
 
   public registerView(view: ViewContribution): void {
@@ -61,12 +76,31 @@ export class WindowPartContext implements IWindowPartContext {
 
   public registerCommand(command: CommandContribution): void {
     this.requireOwn(command.name);
-    if (!this.commandNames.includes(command.name))
+    if (!this.source.commandNames.includes(command.name))
       throw new WindowPartAccessException(Resources.formatUndeclaredCommand(this.moduleId, command.name));
     if (this.host.isCommandRegistered(command.name))
       throw new WindowPartAccessException(Resources.formatCommandRegistered(command.name));
     this.commandList.push(command);
     this.host.refresh();
+  }
+
+  public registerStatusBarItem(item: StatusBarItemContribution): StatusBarItem {
+    this.requireDeclared(item.name, this.source.statusBarItemNames, this.statusBarItemList, Resources.statusBarItemKind);
+    const registered = new StatusBarItem(item, t => {
+      if (!Object.isNull(t.command))
+        this.requireAllowed(t.command);
+    });
+    this.statusBarItemList.push(registered);
+    this.host.refresh();
+    return registered;
+  }
+
+  public registerTopBarAction(action: TopBarActionContribution): TopBarAction {
+    this.requireDeclared(action.name, this.source.topBarActionNames, this.topBarActionList, Resources.topBarActionKind);
+    const registered = new TopBarAction(action, t => this.requireAllowed(t.command));
+    this.topBarActionList.push(registered);
+    this.host.refresh();
+    return registered;
   }
 
   public runCommandAsync(name: string, commandArguments: JsonValue = null): Promise<JsonValue> {
@@ -105,12 +139,22 @@ export class WindowPartContext implements IWindowPartContext {
     this.viewList.length = 0;
     this.documentList.length = 0;
     this.commandList.length = 0;
+    this.statusBarItemList.length = 0;
+    this.topBarActionList.length = 0;
     this.host.refresh();
   }
 
   private requireOwn(name: string): void {
     if (!name.startsWith(`${this.moduleId}${Resources.contributionSeparator}`))
       throw new WindowPartAccessException(Resources.formatForeignContribution(this.moduleId, name));
+  }
+
+  private requireDeclared(name: string, declared: readonly string[], registered: readonly { readonly name: string }[], kind: string): void {
+    this.requireOwn(name);
+    if (!declared.includes(name))
+      throw new WindowPartAccessException(Resources.formatUndeclaredContribution(this.moduleId, kind, name));
+    if (registered.some(t => t.name === name))
+      throw new WindowPartAccessException(Resources.formatContributionRegistered(kind, name));
   }
 
   private requireAllowed(name: string): void {

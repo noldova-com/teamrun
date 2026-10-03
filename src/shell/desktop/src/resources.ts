@@ -76,12 +76,9 @@ export class Resources {
   public static readonly linuxPlatform: string = "linux";
   public static readonly desktopFileSuffix: string = ".desktop";
   public static readonly iconFolderSegments: readonly string[] = "__ICONS_FOLDER__".split(Resources.folderSeparator);
-  public static readonly windowsDarkIcon: string = "icon-dark.ico";
-  public static readonly windowsLightIcon: string = "icon-light.ico";
-  public static readonly darkIcon: string = "icon-dark-512.png";
-  public static readonly lightIcon: string = "icon-light-512.png";
+  public static readonly windowsIcon: string = "icon-dark.ico";
+  public static readonly windowIcon: string = "icon-dark-512.png";
   public static readonly dockIcon: string = "icon-dock-512.png";
-  public static readonly themeUpdatedEvent: "updated" = "updated";
   public static readonly preloadFileName: string = "preload.cjs";
   public static readonly repositoryRootSegments: readonly string[] = ["..", "..", ".."];
   public static readonly windowIndexSegments: readonly string[] = ["_build", "window", "browser", "index.html"];

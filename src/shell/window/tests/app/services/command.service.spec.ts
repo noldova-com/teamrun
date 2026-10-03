@@ -15,6 +15,7 @@ import { CommandNotFoundException } from "../../../src/app/exceptions/command-no
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { ShortcutBinding } from "../../../src/app/models/shortcut-binding";
 import { CommandService } from "../../../src/app/services/command.service";
+import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 
 describe("CommandService", () => {
@@ -56,7 +57,9 @@ describe("CommandService", () => {
     expect(await service.runAsync("notes.newNote")).toBe("notes.newNote");
     await expect(service.runAsync("clock.tick")).rejects.toThrowError(CommandNotFoundException);
     expect(runs).toEqual(["notes.newNote {\"folder\":\"inbox\"}", "notes.newNote null"]);
-    expect(service.commands().map(t => t.name)).toEqual(["notes.newNote"]);
+    const shell = TestBed.inject(ShellCommandsService).commands;
+    expect(service.commands().slice(0, shell.length)).toEqual(shell);
+    expect(service.commands().slice(shell.length).map(t => t.name)).toEqual(["notes.newNote"]);
   });
 
   it("runs the command a key press is bound to and keeps the browser from handling it", async () => {
@@ -108,6 +111,42 @@ describe("CommandService", () => {
     await vi.waitFor(() => expect(errors.map(t => (t as Error).message)).toEqual(["notes.newNote failed"]));
     expect(runs).toEqual(["notes.newNote null"]);
     expect(service.shortcuts().keyOf("notes.newNote")?.text).toBe("F6");
+  });
+
+  it("leaves the key of a disabled command to the page, and says which commands are enabled for given arguments", async () => {
+    const service = start("win32");
+    let isOn = false;
+    service.setCommands([new CommandContribution("notes.archive", "Archive", null, "Mod+Alt+A", async () => {
+      runs.push("notes.archive");
+      return null;
+    }, t => isOn || t !== null)]);
+
+    const off = press({ key: "a", code: "KeyA", ctrlKey: true, altKey: true });
+    isOn = true;
+    const on = press({ key: "a", code: "KeyA", ctrlKey: true, altKey: true });
+
+    await vi.waitFor(() => expect(runs).toEqual(["notes.archive"]));
+    expect([off.defaultPrevented, on.defaultPrevented]).toEqual([false, true]);
+    expect([service.isEnabled("notes.archive"), service.isEnabled("notes.archive", { id: 1 })]).toEqual([true, true]);
+    expect(() => service.isEnabled("notes.gone")).toThrowError(CommandNotFoundException);
+  });
+
+  it("labels a command's key for the platform, and has none for a command without one", () => {
+    const service = start("darwin");
+    service.setCommands([command("notes.newNote", "Mod+Alt+N"), command("notes.sync", null)]);
+
+    expect([service.keyLabel("notes.newNote"), service.keyLabel("notes.sync")]).toEqual(["⌥⌘N", null]);
+  });
+
+  it("runs a command by name and reports its failure", async () => {
+    const service = start("win32");
+    service.setCommands([command("notes.newNote", null, true)]);
+
+    service.run("notes.newNote", { folder: "inbox" });
+    service.run("notes.gone");
+
+    await vi.waitFor(() => expect(errors.map(t => (t as Error).constructor.name).sort()).toEqual(["CommandNotFoundException", "Error"]));
+    expect(runs).toEqual(["notes.newNote {\"folder\":\"inbox\"}"]);
   });
 
   it("stops listening when the window closes", () => {
