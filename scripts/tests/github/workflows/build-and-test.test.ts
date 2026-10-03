@@ -14,6 +14,7 @@ import { test } from "node:test";
 import CommandDoublesFixture from "../../fixtures/command-doubles.fixture.ts";
 import SourceTreeFixture from "../../fixtures/source-tree.fixture.ts";
 import WorkflowFileFixture from "../../fixtures/workflow-file.fixture.ts";
+import WorkflowSimulation from "../../fixtures/workflow-simulation.fixture.ts";
 
 class BuildAndTestTests {
   private static readonly SCRIPT_TIMEOUT: number = 30_000;
@@ -23,6 +24,15 @@ class BuildAndTestTests {
   private static readonly RESULT_STEP: string = "Require the selected verification to pass";
   private static readonly LOOKUP_STEP: string = "Look up the merge group run";
   private static readonly PLAN_STEP: string = "List the targets without a current cache";
+  private static readonly UI_STEP: string = "Test the UI workflows";
+  private static readonly SUMMARY_STEP: string = "Summarize the UI workflows";
+  private static readonly UPLOAD_ACTION: string = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1";
+  private static readonly UPLOADS: readonly (readonly [string, string, string, readonly string[]])[] = [
+    ["Keep the UI workflow results", "Keep the UI workflow results again", "Keep the UI workflow results a last time",
+      ["name: ui-${{ matrix.runner }}-${{ matrix.architecture }}", "path: _build/ui", "retention-days: 14", "if-no-files-found: ignore"]],
+    ["Keep the main window screenshot", "Keep the main window screenshot again", "Keep the main window screenshot a last time",
+      ["path: _build/ui/main-window-*.png", "archive: false", "retention-days: 14", "if-no-files-found: warn"]]
+  ];
   private static readonly SHA: string = "0123456789abcdef0123456789abcdef01234567";
   private static readonly RUNS_QUERY: string = "api repos/noldova-com/teamrun/actions/workflows/build-and-test.yml/runs?event=merge_group" +
     "&head_sha=0123456789abcdef0123456789abcdef01234567&status=success&per_page=100 --jq .workflow_runs[] | select(.event == \"merge_group\" and " +
@@ -509,13 +519,77 @@ class BuildAndTestTests {
       assert.deepEqual([linux.status, windows.status, macos.status], [0, 0, 0], linux.stderr + windows.stderr + macos.stderr);
       assert.deepEqual(await doubles.readCallsAsync(), ["xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui", "npm run test:ui", "npm run test:ui"]);
       assert.ok(text.indexOf("      - name: Test\n") < text.indexOf("      - name: Test the UI workflows\n"));
-      for (const [step, id] of [["Keep the UI workflow results", ""], ["Keep the main window screenshot", "        id: screenshot\n"], ["Summarize the UI workflows", ""]] as const)
-        assert.ok(text.includes(`      - name: ${step}\n${id}        if: always() && steps.ui.outcome != 'skipped'\n`), step);
       assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n"));
-      assert.ok(text.includes("          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}\n          path: _build/ui\n          retention-days: 14\n"));
-      assert.ok(text.includes("          path: _build/ui/main-window-*.png\n          archive: false\n          retention-days: 14\n"));
       assert.equal(workflow.readStepScript("Summarize the UI workflows"), "node scripts/ui-summary.ts\n");
-      assert.ok(text.includes("          UI_TARGET: ${{ matrix.target }}\n          SCREENSHOT_URL: ${{ steps.screenshot.outputs.artifact-url }}\n"));
+      assert.ok(text.includes("          UI_TARGET: ${{ matrix.target }}\n          SCREENSHOT_URL: ${{ steps.screenshot-last.outputs.artifact-url || steps.screenshot-again.outputs.artifact-url || steps.screenshot.outputs.artifact-url }}\n"));
+      assert.ok(text.includes("          SCREENSHOT_UPLOAD_FAILED: ${{ steps.screenshot-last.outcome == 'failure' }}\n"));
+    });
+
+    test("each upload of the UI results is tried three times with a pause, with the same settings", async () => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const simulation = new WorkflowSimulation(workflow.text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
+
+      for (const [first, again, last, settings] of BuildAndTestTests.UPLOADS) {
+        const attempts = [simulation.find(first), simulation.find(again), simulation.find(last)];
+        const pause = `Wait before keeping the ${first.slice("Keep the ".length)}`;
+
+        assert.deepEqual(attempts.map(t => t.uses), attempts.map(() => BuildAndTestTests.UPLOAD_ACTION));
+        assert.deepEqual(attempts.map(t => t.continueOnError), [true, true, true]);
+        assert.deepEqual(attempts[0]?.settings, settings);
+        assert.deepEqual(attempts[1]?.settings, [...settings, "overwrite: true"]);
+        assert.deepEqual(attempts[2]?.settings, [...settings, "overwrite: true"]);
+        assert.equal(workflow.readStepScript(`${pause} again`), "sleep 15\n");
+        assert.equal(workflow.readStepScript(`${pause} a last time`), "sleep 15\n");
+      }
+    });
+
+    test("an upload that fails and then succeeds is tried again once and keeps the job green", async () => {
+      const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
+
+      const result = simulation.run({ "Keep the UI workflow results": "failure", "Keep the main window screenshot": "failure", "Keep the main window screenshot again": "failure" });
+
+      assert.equal(result.isJobFailed, false);
+      assert.deepEqual(result.ran, [
+        "Test the UI workflows",
+        "Keep the UI workflow results", "Wait before keeping the UI workflow results again", "Keep the UI workflow results again",
+        "Keep the main window screenshot", "Wait before keeping the main window screenshot again", "Keep the main window screenshot again",
+        "Wait before keeping the main window screenshot a last time", "Keep the main window screenshot a last time",
+        "Summarize the UI workflows"
+      ]);
+    });
+
+    test("an upload that fails every time warns, leaves the job green and tells the summary", async t => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const simulation = new WorkflowSimulation(workflow.text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
+      const failures = Object.fromEntries(BuildAndTestTests.UPLOADS.flatMap(([first, again, last]) => [[first, "failure"], [again, "failure"], [last, "failure"]]));
+      const doubles = await CommandDoublesFixture.createAsync();
+      t.after(() => doubles.disposeAsync());
+
+      const result = simulation.run(failures);
+      const results = await doubles.runAsync(workflow.readStepScript("Warn that the UI workflow results were not kept"));
+      const screenshot = await doubles.runAsync(workflow.readStepScript("Warn that the main window screenshot was not kept"));
+
+      assert.equal(result.isJobFailed, false);
+      assert.ok(result.ran.includes("Warn that the UI workflow results were not kept"));
+      assert.ok(result.ran.includes("Warn that the main window screenshot was not kept"));
+      assert.equal(result.ran.at(-1), "Summarize the UI workflows");
+      assert.deepEqual([results.status, screenshot.status], [0, 0]);
+      assert.equal(results.stdout, "::warning title=The UI workflow results were not kept::The upload failed three times, so they are not attached. The tests are not affected.\n");
+      assert.equal(screenshot.stdout, "::warning title=The main window screenshot was not kept::The upload failed three times, so it is not attached. The tests are not affected.\n");
+    });
+
+    test("uploads that succeed run no retry and no warning, and failed tests still fail the job", async () => {
+      const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
+
+      const passed = simulation.run({});
+      const failed = simulation.run({ [BuildAndTestTests.UI_STEP]: "failure" });
+
+      assert.deepEqual(passed.ran, [BuildAndTestTests.UI_STEP, "Keep the UI workflow results", "Keep the main window screenshot", BuildAndTestTests.SUMMARY_STEP]);
+      assert.equal(passed.isJobFailed, false);
+      assert.equal(failed.isJobFailed, true);
+      assert.deepEqual(failed.ran, passed.ran);
+      assert.equal(simulation.find(BuildAndTestTests.UI_STEP).continueOnError, false);
+      assert.equal(simulation.find(BuildAndTestTests.SUMMARY_STEP).continueOnError, false);
     });
 
     test("the UI workflows build their own test builds, so the workflow builds none", async () => {

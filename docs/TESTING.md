@@ -144,7 +144,7 @@ The shared desktop UI suite uses a 1920 × 1080 renderer viewport at one device 
 
 Screenshots are review evidence only. They are not compared pixel by pixel, and there are no screenshot baselines; behavior, computed-style, contrast and accessibility checks prove the UI. A PR that changes the appearance links its before and after screenshots.
 
-CI reports expose identities, steps, outcomes, screenshots and traces under an explicit artifact-retention policy. Preserve startup, execution, capture and cleanup failures. Section 8 governs committed evidence; results apply only to the recorded build/environment.
+CI reports expose identities, steps, outcomes, screenshots and traces under an explicit artifact-retention policy. Uploading them is review evidence, not verification: a failed upload is tried three times with a pause, and when it still fails the job warns and, if the checks and workflows passed, stays green; the summary says when the screenshot link is missing because its upload failed. Failed tests still fail the job. Preserve startup, execution, capture and cleanup failures. Section 8 governs committed evidence; results apply only to the recorded build/environment.
 
 GitHub summaries include UI outcomes, duration and bounded failure details beside package results, with complete totals. Link a separate main-window PNG per target for browser viewing; retain downloadable HTML reports and traces without separate hosting.
 

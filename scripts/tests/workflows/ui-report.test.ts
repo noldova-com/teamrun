@@ -50,6 +50,8 @@ class UiReportTests {
         "[Main window screenshot](https://github.com/noldova-com/teamrun/actions/runs/1/artifacts/2)\n");
       assert.ok(report.formatSummary("Linux x64", undefined).endsWith("\n\nNo main-window screenshot was kept.\n"));
       assert.ok(report.formatSummary("Linux x64", "").endsWith("\n\nNo main-window screenshot was kept.\n"));
+      assert.ok(report.formatSummary("Linux x64", "", true).endsWith("\n\nNo main-window screenshot link: its upload failed.\n"));
+      assert.ok(report.formatSummary("Linux x64", "https://example.com/a", true).endsWith("[Main window screenshot](https://example.com/a)\n"));
     });
 
     test("the summary lists at most twenty failures, escaped, and counts the rest", () => {

@@ -286,7 +286,9 @@ jobs:
           fi
 
       - name: Keep the UI workflow results
+        id: results
         if: always() && steps.ui.outcome != 'skipped'
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ui-${{ matrix.runner }}-${{ matrix.architecture }}
@@ -294,9 +296,47 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      - name: Wait before keeping the UI workflow results again
+        if: always() && steps.ui.outcome != 'skipped' && steps.results.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the UI workflow results again
+        id: results-again
+        if: always() && steps.ui.outcome != 'skipped' && steps.results.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: _build/ui
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the UI workflow results a last time
+        if: always() && steps.ui.outcome != 'skipped' && steps.results-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the UI workflow results a last time
+        id: results-last
+        if: always() && steps.ui.outcome != 'skipped' && steps.results-again.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: _build/ui
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Warn that the UI workflow results were not kept
+        if: always() && steps.ui.outcome != 'skipped' && steps.results-last.outcome == 'failure'
+        run: |
+          echo "::warning title=The UI workflow results were not kept::The upload failed three times, so they are not attached. The tests are not affected."
+
       - name: Keep the main window screenshot
         id: screenshot
         if: always() && steps.ui.outcome != 'skipped'
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           path: _build/ui/main-window-*.png
@@ -304,11 +344,49 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+      - name: Wait before keeping the main window screenshot again
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the main window screenshot again
+        id: screenshot-again
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: _build/ui/main-window-*.png
+          archive: false
+          retention-days: 14
+          if-no-files-found: warn
+          overwrite: true
+
+      - name: Wait before keeping the main window screenshot a last time
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the main window screenshot a last time
+        id: screenshot-last
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-again.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: _build/ui/main-window-*.png
+          archive: false
+          retention-days: 14
+          if-no-files-found: warn
+          overwrite: true
+
+      - name: Warn that the main window screenshot was not kept
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-last.outcome == 'failure'
+        run: |
+          echo "::warning title=The main window screenshot was not kept::The upload failed three times, so it is not attached. The tests are not affected."
+
       - name: Summarize the UI workflows
         if: always() && steps.ui.outcome != 'skipped'
         env:
           UI_TARGET: ${{ matrix.target }}
-          SCREENSHOT_URL: ${{ steps.screenshot.outputs.artifact-url }}
+          SCREENSHOT_URL: ${{ steps.screenshot-last.outputs.artifact-url || steps.screenshot-again.outputs.artifact-url || steps.screenshot.outputs.artifact-url }}
+          SCREENSHOT_UPLOAD_FAILED: ${{ steps.screenshot-last.outcome == 'failure' }}
         run: node scripts/ui-summary.ts
 
   cache-plan:
