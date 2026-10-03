@@ -23,5 +23,6 @@ test.describe("settings", () => {
     await expect(desktop.window.locator("[data-fixture-content=clock-ticks]")).toHaveText("Ticks: 2");
     await desktop.reopenAsync();
     await expect(step()).toHaveText("Step: 2");
+    await desktop.checkpointAsync("settings-module-step");
   });
 });
