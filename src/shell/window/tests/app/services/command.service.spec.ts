@@ -131,6 +131,21 @@ describe("CommandService", () => {
     expect(() => service.isEnabled("notes.gone")).toThrowError(CommandNotFoundException);
   });
 
+  it("counts a command whose enabled check throws as disabled, reports the failure and leaves its key to the page", () => {
+    const service = start("linux");
+    service.setCommands([new CommandContribution("notes.openNote", "Open note", null, "Mod+Alt+O", async () => {
+      runs.push("notes.openNote");
+      return null;
+    }, () => {
+      throw new Error("The arguments name no note.");
+    })]);
+
+    const pressed = press({ key: "o", code: "KeyO", ctrlKey: true, altKey: true });
+
+    expect([service.isEnabled("notes.openNote"), pressed.defaultPrevented, runs.length]).toEqual([false, false, 0]);
+    expect(errors.map(t => (t as Error).message)).toEqual(["The arguments name no note.", "The arguments name no note."]);
+  });
+
   it("labels a command's key for the platform, and has none for a command without one", () => {
     const service = start("darwin");
     service.setCommands([command("notes.newNote", "Mod+Alt+N"), command("notes.sync", null)]);

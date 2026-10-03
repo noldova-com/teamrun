@@ -35,7 +35,7 @@ export class CommandSearchComponent {
   protected readonly search: CommandSearchService = inject(CommandSearchService);
   protected readonly query: WritableSignal<string> = signal(String.empty);
   protected readonly items: Signal<readonly QuickInputItem[]> = computed(() => {
-    const enabled = this.commands.commands().filter(t => t.isEnabled(null));
+    const enabled = this.commands.commands().filter(t => this.commands.isEnabled(t.name));
     return String.isNullOrWhitespace(this.query()) ? this.unfiltered(enabled) : this.filtered(enabled, this.query());
   });
 
