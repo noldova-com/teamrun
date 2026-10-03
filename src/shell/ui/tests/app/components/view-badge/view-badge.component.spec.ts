@@ -9,31 +9,31 @@
 import { Component, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
-import { BadgeComponent } from "../../../../src/app/components/badge/badge.component";
+import { ViewBadgeComponent } from "../../../../src/app/components/view-badge/view-badge.component";
 import { DefaultTheme } from "../../../../src/app/themes/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({
-  imports: [BadgeComponent],
-  template: `<tr-badge [count]="count()" />`
+  imports: [ViewBadgeComponent],
+  template: `<tr-view-badge [count]="count()" />`
 })
-class BadgeHostComponent {
+class ViewBadgeHostComponent {
   public readonly count = signal<number | null>(3);
 }
 
-describe("BadgeComponent", () => {
-  let fixture: ComponentFixture<BadgeHostComponent>;
+describe("ViewBadgeComponent", () => {
+  let fixture: ComponentFixture<ViewBadgeHostComponent>;
 
   beforeEach(async () => {
     AppearanceFixture.apply();
-    fixture = TestBed.createComponent(BadgeHostComponent);
+    fixture = TestBed.createComponent(ViewBadgeHostComponent);
     await fixture.whenStable();
   });
 
   afterEach(() => AppearanceFixture.reset());
 
   function badge(): HTMLElement {
-    return fixture.nativeElement.querySelector("tr-badge");
+    return fixture.nativeElement.querySelector("tr-view-badge");
   }
 
   async function showAsync(count: number | null): Promise<void> {
@@ -48,7 +48,7 @@ describe("BadgeComponent", () => {
     await showAsync(null);
 
     expect(shown).toEqual(["3", "99", "99+"]);
-    expect([badge().textContent?.trim(), badge().classList.contains("tr-badge-dot"), badge().getAttribute("aria-hidden")]).toEqual(["", true, "true"]);
+    expect([badge().textContent?.trim(), badge().classList.contains("tr-view-badge-dot"), badge().getAttribute("aria-hidden")]).toEqual(["", true, "true"]);
   });
 
   for (const mode of AppearanceFixture.modes)
@@ -58,11 +58,11 @@ describe("BadgeComponent", () => {
         const style = getComputedStyle(badge());
 
         expect([style.backgroundColor, style.color]).toEqual([AppearanceFixture.readColor(theme, mode, "button.background"), AppearanceFixture.readColor(theme, mode, "button.foreground")]);
-        AppearanceFixture.expectLook(style.height, theme, "badge", "height");
-        AppearanceFixture.expectLook(style.paddingLeft, theme, "badge-padding", "padding-left");
-        AppearanceFixture.expectLook(style.fontSize, theme, "badge-text", "font-size");
+        AppearanceFixture.expectLook(style.height, theme, "view-badge", "height");
+        AppearanceFixture.expectLook(style.paddingLeft, theme, "view-badge-padding", "padding-left");
+        AppearanceFixture.expectLook(style.fontSize, theme, "view-badge-text", "font-size");
         await showAsync(null);
-        AppearanceFixture.expectLook(getComputedStyle(badge()).width, theme, "badge-dot", "width");
+        AppearanceFixture.expectLook(getComputedStyle(badge()).width, theme, "view-badge-dot", "width");
       });
 
   for (const mode of AppearanceFixture.modes)

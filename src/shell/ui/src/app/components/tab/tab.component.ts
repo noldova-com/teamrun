@@ -9,11 +9,11 @@
 import { ChangeDetectionStrategy, Component, type Signal, ViewEncapsulation, computed, input, output } from "@angular/core";
 
 import { Resources } from "../../../resources";
-import { BadgeComponent } from "../badge/badge.component";
+import { ViewBadgeComponent } from "../view-badge/view-badge.component";
 
 @Component({
   selector: "tr-tab",
-  imports: [BadgeComponent],
+  imports: [ViewBadgeComponent],
   templateUrl: "./tab.component.html",
   styleUrl: "./tab.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,

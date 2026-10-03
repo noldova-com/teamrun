@@ -4,7 +4,7 @@
   }
   <span class="tr-tab-label" data-truncates>{{ label() }}</span>
   @if (badge() !== null) {
-    <tr-badge class="tr-tab-badge" [count]="badgeCount()" />
+    <tr-view-badge class="tr-tab-badge" [count]="badgeCount()" />
   }
   @if (closable() || working()) {
     <span class="tr-tab-action">

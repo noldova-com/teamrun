@@ -61,15 +61,15 @@ test.describe("activity bar", () => {
     const clockTab = window.locator("tr-tab[data-tab-key=\"view/clock.face\"]");
     const clockIcon = window.locator("tr-dock[data-side=Right] .tr-dock-strip-view[data-view=\"view/clock.face\"]");
     await expect(clockTab).toHaveAccessibleName("Clock");
-    await expect(clockTab.locator("tr-badge")).toHaveCount(0);
+    await expect(clockTab.locator("tr-view-badge")).toHaveCount(0);
 
     await window.locator("[data-fixture-content=notes-list]").click();
     await window.keyboard.press("ControlOrMeta+Alt+KeyT");
-    await expect(clockTab.locator("tr-badge")).toHaveText("1");
+    await expect(clockTab.locator("tr-view-badge")).toHaveText("1");
     await expect(clockTab).toHaveAccessibleName("Clock, 1 ticks");
     await setDockStyleAsync(window, "shell.rightDockStyle", "Icons");
 
-    await expect(clockIcon.locator("tr-badge")).toHaveText("1");
+    await expect(clockIcon.locator("tr-view-badge")).toHaveText("1");
     await expect(clockIcon).toHaveAccessibleName("Clock, 1 ticks");
     await desktop.checkpointAsync("view-badge");
   });

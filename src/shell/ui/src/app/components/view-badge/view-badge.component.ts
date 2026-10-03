@@ -13,17 +13,17 @@ import "@noldova/teamrun-foundation-core";
 import { Resources } from "../../../resources";
 
 @Component({
-  selector: "tr-badge",
-  templateUrl: "./badge.component.html",
-  styleUrl: "./badge.component.scss",
+  selector: "tr-view-badge",
+  templateUrl: "./view-badge.component.html",
+  styleUrl: "./view-badge.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    "class": "tr-badge",
+    "class": "tr-view-badge",
     "aria-hidden": "true",
-    "[class.tr-badge-dot]": "isDot()"
+    "[class.tr-view-badge-dot]": "isDot()"
   }
 })
-export class BadgeComponent {
+export class ViewBadgeComponent {
   public readonly count = input<number | null>(null);
   public readonly isDot: Signal<boolean> = computed(() => Object.isNull(this.count()));
   public readonly text: Signal<string> = computed(() => {

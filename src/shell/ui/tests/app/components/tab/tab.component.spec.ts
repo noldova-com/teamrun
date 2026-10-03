@@ -62,14 +62,14 @@ describe("TabComponent", () => {
   }
 
   it("shows a badge after its label and adds its description to its name", () => {
-    const bare = [part("tr-badge"), tab().getAttribute("aria-label")];
+    const bare = [part("tr-view-badge"), tab().getAttribute("aria-label")];
     host.badge.set("3 unread");
     host.badgeCount.set(3);
     fixture.detectChanges();
 
     expect(bare).toEqual([null, "Readme"]);
-    expect([part("tr-badge")?.textContent?.trim(), tab().getAttribute("aria-label")]).toEqual(["3", "Readme, 3 unread"]);
-    expect((part(".tr-tab-label")?.getBoundingClientRect().right ?? Infinity) <= (part("tr-badge")?.getBoundingClientRect().left ?? 0)).toBe(true);
+    expect([part("tr-view-badge")?.textContent?.trim(), tab().getAttribute("aria-label")]).toEqual(["3", "Readme, 3 unread"]);
+    expect((part(".tr-tab-label")?.getBoundingClientRect().right ?? Infinity) <= (part("tr-view-badge")?.getBoundingClientRect().left ?? 0)).toBe(true);
   });
 
   function update(change: () => void): void {
