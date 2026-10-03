@@ -21,6 +21,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import { DetachedStartReply, DetachedStartRequest, UtilityProcessStarter } from "@noldova/teamrun-shell-desktop";
 import { type IProcessStarter, LaunchException } from "@noldova/teamrun-shell-runtime";
 
+import { Condition } from "../fixtures/condition.fixture.js";
 import { FakeUtilityProcessHost } from "../fixtures/fake-utility-process-host.fixture.js";
 import { LinkedUtilityProcessHost } from "../fixtures/linked-utility-process-host.fixture.js";
 import { PlatformFixture } from "../fixtures/platform.fixture.js";
@@ -103,10 +104,10 @@ export class UtilityProcessStarterTests {
       Assert.areEqual(0, desktop.code, desktop.errors);
       const runtime = UtilityProcessStarterTests.readProcessId(desktop.output, "runtime");
       Assert.isTrue(desktop.outputLag < 2_000, `the desktop's output ended ${desktop.outputLag} ms after it exited`);
-      Assert.isTrue(await UtilityProcessStarterTests.waitForExitAsync(UtilityProcessStarterTests.readProcessId(desktop.output, "utility")), "the utility process ended after the start");
+      await Condition.waitAsync(() => !UtilityProcessStarterTests.isRunning(UtilityProcessStarterTests.readProcessId(desktop.output, "utility")));
       Assert.isTrue(UtilityProcessStarterTests.isRunning(runtime), "the runtime outlives the desktop");
       process.kill(runtime);
-      Assert.isTrue(await UtilityProcessStarterTests.waitForExitAsync(runtime));
+      await Condition.waitAsync(() => !UtilityProcessStarterTests.isRunning(runtime));
     }
     finally {
       await rm(root, { recursive: true, force: true, maxRetries: 40, retryDelay: 50 });
@@ -121,7 +122,7 @@ export class UtilityProcessStarterTests {
       const desktop = await UtilityProcessStarterTests.runDesktopAsync("utility-orphan-main.fixture.js", root);
 
       Assert.areEqual(0, desktop.code, desktop.errors);
-      Assert.isTrue(await UtilityProcessStarterTests.waitForExitAsync(UtilityProcessStarterTests.readProcessId(desktop.output, "utility")), "the unacknowledged starter ended with its desktop");
+      await Condition.waitAsync(() => !UtilityProcessStarterTests.isRunning(UtilityProcessStarterTests.readProcessId(desktop.output, "utility")));
     }
     finally {
       await rm(root, { recursive: true, force: true, maxRetries: 40, retryDelay: 50 });
@@ -162,13 +163,4 @@ export class UtilityProcessStarterTests {
     }
   }
 
-  private static async waitForExitAsync(processId: number): Promise<boolean> {
-    const deadline = Date.now() + 5_000;
-    while (UtilityProcessStarterTests.isRunning(processId)) {
-      if (Date.now() >= deadline)
-        return false;
-      await new Promise(resolve => setTimeout(resolve, 25));
-    }
-    return true;
-  }
 }
