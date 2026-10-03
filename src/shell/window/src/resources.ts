@@ -129,6 +129,14 @@ export class Resources {
   public static readonly moveEarlierLabel: string = "Move left";
   public static readonly moveLaterLabel: string = "Move right";
   public static readonly resetLayoutLabel: string = "Reset the layout";
+  public static readonly bottomSpanCommands: Readonly<Record<BottomDockSpan, string>> = {
+    [BottomDockSpan.Full]: "shell.spanBottomDock",
+    [BottomDockSpan.Between]: "shell.fitBottomDockBetween"
+  };
+  public static readonly bottomSpanGlyphs: Readonly<Record<BottomDockSpan, string>> = {
+    [BottomDockSpan.Full]: "width_full",
+    [BottomDockSpan.Between]: "width_normal"
+  };
   public static readonly bottomSpanLabels: Readonly<Record<BottomDockSpan, string>> = {
     [BottomDockSpan.Full]: "Bottom dock across the window",
     [BottomDockSpan.Between]: "Bottom dock between the side docks"
