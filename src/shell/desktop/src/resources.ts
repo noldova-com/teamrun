@@ -105,6 +105,28 @@ export class Resources {
   public static readonly unmaximizeEvent: "unmaximize" = "unmaximize";
   public static readonly boundsSaveDelay: number = 500;
   public static readonly connectingShowLimit: number = 2_000;
+  public static readonly paintShowLimit: number = 10_000;
+  public static readonly logLineSeparator: string = "\n";
+  public static readonly logFileMode: number = 0o600;
+  public static readonly reloadCrashLimit: number = 10_000;
+  public static readonly rendererEndLimit: number = 5_000;
+  public static readonly renderProcessGoneEvent: "render-process-gone" = "render-process-gone";
+  public static readonly unresponsiveEvent: "unresponsive" = "unresponsive";
+  public static readonly responsiveEvent: "responsive" = "responsive";
+  public static readonly cleanExitReason: string = "clean-exit";
+  public static readonly warningBoxType: "warning" = "warning";
+  public static readonly windowStopped: string = `${Resources.applicationName}'s window stopped unexpectedly.`;
+  public static readonly windowStoppedDetail: string = "Reload it to continue. Your layout comes back from the last save.";
+  public static readonly windowStoppedAgainDetail: string = "It stopped again right after it was reloaded. The log folder has what it recorded.";
+  public static readonly windowNotResponding: string = `${Resources.applicationName}'s window isn't responding.`;
+  public static readonly windowNotRespondingDetail: string = "You can wait for it or reload it.";
+  public static readonly reloadButton: string = "Reload";
+  public static readonly quitButton: string = "Quit";
+  public static readonly waitButton: string = "Wait";
+  public static readonly openLogFolderButton: string = "Open log folder";
+  public static readonly windowUnresponsive: string = "The window's page stopped responding.";
+  public static readonly windowResponsiveAgain: string = "The window's page responds again.";
+  public static readonly windowStoppedAgainRecord: string = "The window's page stopped again within 10 s of a reload, so the person was offered the log folder instead of another reload.";
   public static readonly mainWindow: string = "main";
   public static readonly runtimeNotConnected: string = `${Resources.applicationName} is not connected to its runtime.`;
   public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout is not kept.";
@@ -123,6 +145,7 @@ export class Resources {
   public static readonly payloadField: string = "payload";
   public static readonly replyNeedsOneOutcome: string = "A start reply carries either a process id or a failure.";
   public static readonly starterEnded: string = "The runtime starter ended before it started the runtime.";
+  public static readonly starterAcknowledgement: string = "acknowledged";
   public static readonly starterServiceName: string = `${Resources.applicationName} runtime starter`;
   public static readonly utilityEntryRelativePath: string = "../utility-entry.js";
   public static readonly ignoredStdio: "ignore" = "ignore";
@@ -157,6 +180,10 @@ export class Resources {
     return `The window's bounds could not be saved: ${reason}`;
   }
 
+  public static formatBoundsLostAtClose(reason: string): string {
+    return `The window closed without saving its bounds, because the runtime could not be reached; the last position is lost: ${reason}`;
+  }
+
   public static formatBoundsNotRestored(reason: string): string {
     return `The window's saved bounds could not be restored, so it opens with its default bounds: ${reason}`;
   }
@@ -179,6 +206,35 @@ export class Resources {
 
   public static formatAppearanceRejected(reason: string): string {
     return `The window reported an appearance that is not valid, so it is shown without it: ${reason}`;
+  }
+
+  public static formatDesktopLogUnavailable(reason: string): string {
+    return `The desktop's log could not be written, so its records go to standard error only: ${reason}`;
+  }
+
+  public static formatWindowShownUnpainted(seconds: number, isLoading: boolean, isCrashed: boolean): string {
+    const page = isCrashed ? "its page has crashed" : isLoading ? "its page is still loading" : "its page loaded but did not report its first paint";
+    return `The window was shown before it was painted, ${seconds} s after it opened, because ${page}.`;
+  }
+
+  public static formatRendererGone(reason: string, exitCode: number): string {
+    return `The window's page stopped: ${reason}, exit code ${exitCode}.`;
+  }
+
+  public static formatRendererEnded(processId: number): string {
+    return `The window's page did not stop when asked, so the desktop ended its process ${processId}.`;
+  }
+
+  public static formatNoRendererToEnd(processId: number): string {
+    return `The window's page did not stop when asked and has no renderer process of its own to end (${processId}), so the desktop reloads it.`;
+  }
+
+  public static formatRendererNotEnded(reason: string): string {
+    return `The window's page did not stop when asked, and its process could not be ended, so the desktop reloads it: ${reason}`;
+  }
+
+  public static formatRecoveryChoice(choice: string): string {
+    return `The person chose ${choice}.`;
   }
 
   public static formatWindowSize(name: string, minimum: number): string {

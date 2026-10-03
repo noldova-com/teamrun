@@ -97,9 +97,10 @@ jobs:
           [ "$status" = completed ] || refuse "The pull request's last run has not finished"
           [ "$conclusion" = success ] || refuse "The pull request's last run did not succeed"
           timeout 60s gh run download "$run" --repo "$GITHUB_REPOSITORY" --name "tested-tree-$attempt" --dir tested-tree || refuse "The pull request's last run left no record of the tree it tested"
-          read -r recorded run_code < tested-tree/tested-tree.txt || refuse "The record of the pull request's last run could not be read"
+          read -r recorded run_code complete < tested-tree/tested-tree.txt || refuse "The record of the pull request's last run could not be read"
           [[ "$recorded" =~ ^[0-9a-f]{40}$ ]] || refuse "The record of the pull request's last run is malformed"
           [ "$run_code" = true ] || refuse "The pull request's last run checked only the documents"
+          [ "$complete" = true ] || refuse "The pull request's last run did not run every build and test job"
           [ "$recorded" = "$tree" ] || refuse "The pull request's last run tested a different tree (main moved or the pull request changed)"
           echo 'verified=true' >> "$GITHUB_OUTPUT"
           echo "run=$url/attempts/$attempt" >> "$GITHUB_OUTPUT"
@@ -113,6 +114,9 @@ jobs:
     outputs:
       run-code: ${{ steps.scope.outputs.run-code }}
       tree: ${{ steps.tree.outputs.tree }}
+      legs: ${{ steps.legs.outputs.legs }}
+      deferred: ${{ steps.legs.outputs.deferred }}
+      complete: ${{ steps.legs.outputs.complete }}
     steps:
       - name: Check out the change history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -133,6 +137,35 @@ jobs:
           tree=$(git rev-parse 'HEAD^{tree}')
           echo "tree=$tree" >> "$GITHUB_OUTPUT"
 
+      - name: List the build and test jobs
+        id: legs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          legs=''
+          deferred=''
+          while IFS='|' read -r label target part runner architecture pull_request; do
+            if [ "$EVENT_NAME" = pull_request ] && [ "$pull_request" = deferred ]; then
+              deferred="$deferred${deferred:+, }$label"
+              continue
+            fi
+            legs="$legs${legs:+,}{\"label\":\"$label\",\"target\":\"$target\",\"part\":\"$part\",\"runner\":\"$runner\",\"architecture\":\"$architecture\"}"
+          done <<'LEGS'
+          Linux x64|Linux x64|all|ubuntu-24.04|x64|runs
+          Linux ARM64|Linux ARM64|all|ubuntu-24.04-arm|arm64|runs
+          Windows x64, tests|Windows x64|tests|windows-2025|x64|runs
+          Windows x64, UI workflows|Windows x64|workflows|windows-2025|x64|runs
+          Windows ARM64, tests|Windows ARM64|tests|windows-11-arm|arm64|runs
+          Windows ARM64, UI workflows|Windows ARM64|workflows|windows-11-arm|arm64|runs
+          macOS x64, tests|macOS x64|tests|macos-15-intel|x64|runs
+          macOS x64, UI workflows|macOS x64|workflows|macos-15-intel|x64|deferred
+          macOS ARM64|macOS ARM64|all|macos-15|arm64|runs
+          LEGS
+          echo "legs=[$legs]" >> "$GITHUB_OUTPUT"
+          echo "deferred=$deferred" >> "$GITHUB_OUTPUT"
+          echo "complete=$([ -z "$deferred" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Check the documents
         run: npm test -- documents
 
@@ -145,31 +178,13 @@ jobs:
         run: node scripts/classify-changes.ts
 
   validate:
-    name: Build and test (${{ matrix.target }})
+    name: Build and test (${{ matrix.label }})
     needs: changes
     if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - target: Linux x64
-            runner: ubuntu-24.04
-            architecture: x64
-          - target: Linux ARM64
-            runner: ubuntu-24.04-arm
-            architecture: arm64
-          - target: Windows x64
-            runner: windows-2025
-            architecture: x64
-          - target: Windows ARM64
-            runner: windows-11-arm
-            architecture: arm64
-          - target: macOS x64
-            runner: macos-15-intel
-            architecture: x64
-          - target: macOS ARM64
-            runner: macos-15
-            architecture: arm64
+        include: ${{ fromJSON(needs.changes.outputs.legs) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     steps:
@@ -237,17 +252,20 @@ jobs:
           exit 1
 
       - name: Build
+        if: matrix.part != 'workflows'
         run: npm run build
 
       - name: Test
+        if: matrix.part != 'workflows'
         run: npm test
 
       - name: Let Electron's sandbox start on Linux
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && matrix.part != 'tests'
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Test the UI workflows
         id: ui
+        if: matrix.part != 'tests'
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
             xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui
@@ -256,7 +274,9 @@ jobs:
           fi
 
       - name: Keep the UI workflow results
+        id: results
         if: always() && steps.ui.outcome != 'skipped'
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ui-${{ matrix.runner }}-${{ matrix.architecture }}
@@ -264,9 +284,47 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      - name: Wait before keeping the UI workflow results again
+        if: always() && steps.ui.outcome != 'skipped' && steps.results.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the UI workflow results again
+        id: results-again
+        if: always() && steps.ui.outcome != 'skipped' && steps.results.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: _build/ui
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the UI workflow results a last time
+        if: always() && steps.ui.outcome != 'skipped' && steps.results-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the UI workflow results a last time
+        id: results-last
+        if: always() && steps.ui.outcome != 'skipped' && steps.results-again.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: _build/ui
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Warn that the UI workflow results were not kept
+        if: always() && steps.ui.outcome != 'skipped' && steps.results-last.outcome == 'failure'
+        run: |
+          echo "::warning title=The UI workflow results were not kept::The upload failed three times, so they are not attached. The tests are not affected."
+
       - name: Keep the main window screenshot
         id: screenshot
         if: always() && steps.ui.outcome != 'skipped'
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           path: _build/ui/main-window-*.png
@@ -274,11 +332,49 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+      - name: Wait before keeping the main window screenshot again
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the main window screenshot again
+        id: screenshot-again
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: _build/ui/main-window-*.png
+          archive: false
+          retention-days: 14
+          if-no-files-found: warn
+          overwrite: true
+
+      - name: Wait before keeping the main window screenshot a last time
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the main window screenshot a last time
+        id: screenshot-last
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-again.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: _build/ui/main-window-*.png
+          archive: false
+          retention-days: 14
+          if-no-files-found: warn
+          overwrite: true
+
+      - name: Warn that the main window screenshot was not kept
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-last.outcome == 'failure'
+        run: |
+          echo "::warning title=The main window screenshot was not kept::The upload failed three times, so it is not attached. The tests are not affected."
+
       - name: Summarize the UI workflows
         if: always() && steps.ui.outcome != 'skipped'
         env:
           UI_TARGET: ${{ matrix.target }}
-          SCREENSHOT_URL: ${{ steps.screenshot.outputs.artifact-url }}
+          SCREENSHOT_URL: ${{ steps.screenshot-last.outputs.artifact-url || steps.screenshot-again.outputs.artifact-url || steps.screenshot.outputs.artifact-url }}
+          SCREENSHOT_UPLOAD_FAILED: ${{ steps.screenshot-last.outcome == 'failure' }}
         run: node scripts/ui-summary.ts
 
   cache-plan:
@@ -468,6 +564,7 @@ jobs:
           CHANGES_RESULT: ${{ needs.changes.result }}
           RUN_CODE: ${{ needs.changes.outputs.run-code }}
           VALIDATION_RESULT: ${{ needs.validate.result }}
+          DEFERRED: ${{ needs.changes.outputs.deferred }}
         run: |
           set -euo pipefail
           case "$TESTED_RESULT:$VERIFIED:${TESTED_RUN:+cited}:$CHANGES_RESULT:$RUN_CODE:$VALIDATION_RESULT" in
@@ -482,7 +579,11 @@ jobs:
               echo 'Only Markdown documentation changed: the document checks passed, and the build and test targets were skipped.' >> "$GITHUB_STEP_SUMMARY"
               ;;
             skipped:::success:true:success | success:false::success:true:success)
-              echo 'The document checks passed, and the build and tests passed on every target.' >> "$GITHUB_STEP_SUMMARY"
+              if [ -n "$DEFERRED" ]; then
+                echo "The document checks passed, and the build and tests passed on every target. These jobs run only in the merge queue: $DEFERRED." >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo 'The document checks passed, and the build and tests passed on every target.' >> "$GITHUB_STEP_SUMMARY"
+              fi
               ;;
             *)
               echo '::error::The document checks, the change classification or a build and test target did not complete successfully.'
@@ -495,6 +596,7 @@ jobs:
         env:
           TREE: ${{ needs.changes.outputs.tree }}
           RUN_CODE: ${{ needs.changes.outputs.run-code }}
+          COMPLETE: ${{ needs.changes.outputs.complete }}
         run: |
           set -euo pipefail
           if [[ ! "$TREE" =~ ^[0-9a-f]{40}$ ]]; then
@@ -502,7 +604,7 @@ jobs:
             exit 1
           fi
           mkdir -p tested-tree
-          echo "$TREE $RUN_CODE" > tested-tree/tested-tree.txt
+          echo "$TREE $RUN_CODE $COMPLETE" > tested-tree/tested-tree.txt
 
       - name: Keep the record of the tested tree
         if: github.event_name == 'pull_request'

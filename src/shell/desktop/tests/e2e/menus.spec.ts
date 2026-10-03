@@ -152,8 +152,7 @@ test.describe("menus", () => {
     await shortRow.scrollIntoViewIfNeeded();
     await shortRow.hover();
     await expect(tooltip).toHaveCount(0);
-    await window.waitForTimeout(300);
-    await expect(tooltip).toHaveCount(0);
+    expect(await shortRow.locator(".tr-menu-item-label").evaluate(t => t.scrollWidth <= t.clientWidth)).toBe(true);
 
     await longRow.click();
     await expect(list).toHaveCount(0);

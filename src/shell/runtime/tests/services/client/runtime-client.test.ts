@@ -8,7 +8,6 @@
 
 import { once } from "node:events";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
@@ -48,7 +47,7 @@ export class RuntimeClientTests {
       const client = await RuntimeClientTests.connectAsync(fixture, listener);
       const response = await client.callAsync(RuntimeClientTests.ECHO, { path: "notes.md" });
       fixture.server.broadcast(new Event(RuntimeClientTests.ECHO, "changed"));
-      await RuntimeClientTests.waitForAsync(() => listener.events.length === 1);
+      await listener.waitForEventsAsync(1);
 
       Assert.areEqual("desktop", client.clientName);
       Assert.isTrue(client.isConnected);
@@ -82,8 +81,10 @@ export class RuntimeClientTests {
   @TestMethod
   public cancelsACallThroughItsSignal(): Promise<void> {
     return RuntimeClientTests.runAsync(async (fixture, listener) => {
+      const started = Promise.withResolvers<void>();
       fixture.methods.register(RuntimeClientTests.WAIT, {
         handleAsync: async (context: RequestContext): Promise<JsonValue> => {
+          started.resolve();
           await once(context.signal, "abort");
           return null;
         }
@@ -92,7 +93,7 @@ export class RuntimeClientTests {
       const controller = new AbortController();
 
       const call = client.callAsync(RuntimeClientTests.WAIT, null, 5_000, controller.signal);
-      await delay(50);
+      await started.promise;
       controller.abort();
       const response = await call;
       const early = await client.callAsync(RuntimeClientTests.WAIT, null, 5_000, controller.signal);
@@ -320,15 +321,6 @@ export class RuntimeClientTests {
     if (fixture.endpoint === null)
       throw new Error("The server is not listening.");
     return fixture.endpoint;
-  }
-
-  private static async waitForAsync(condition: () => boolean): Promise<void> {
-    const deadline = Date.now() + 3_000;
-    while (!condition()) {
-      if (Date.now() >= deadline)
-        throw new Error("The condition did not hold in time.");
-      await delay(10);
-    }
   }
 
   private static async runAsync(test: (fixture: RuntimeServerFixture, listener: ClientListenerFixture) => Promise<void>): Promise<void> {

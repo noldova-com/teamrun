@@ -50,7 +50,7 @@ export class ExecutionFixture {
 
   public async resolvesLater(): Promise<void> {
     await new Promise<void>(t => {
-      setTimeout(t, 5);
+      setImmediate(t);
     });
   }
 

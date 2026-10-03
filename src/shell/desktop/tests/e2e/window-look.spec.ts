@@ -49,11 +49,19 @@ async function thumbChangesOnHoverAsync(window: Page, area: Locator, axis: "vert
       ? { x: left + element.clientWidth, y: top, width: element.offsetWidth - element.clientWidth - element.clientLeft * 2, height: element.clientHeight }
       : { x: left, y: top + element.clientHeight, width: element.clientWidth, height: element.offsetHeight - element.clientHeight - element.clientTop * 2 };
   }, axis);
+  const thumbColor = (): Promise<string> => area.evaluate(t => getComputedStyle(t).color);
+  const shown = await window.evaluate(() => {
+    const probe = document.body.appendChild(document.createElement("div"));
+    probe.style.color = "var(--tr-scrollbar)";
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
   await window.mouse.move(1, 1);
-  await window.waitForTimeout(400);
+  await expect.poll(thumbColor).toBe("rgba(0, 0, 0, 0)");
   const rest = await window.screenshot({ clip });
   await area.hover({ position: { x: 20, y: 10 } });
-  await window.waitForTimeout(400);
+  await expect.poll(thumbColor).toBe(shown);
   return !rest.equals(await window.screenshot({ clip }));
 }
 
@@ -78,8 +86,7 @@ test.describe("the window's look", () => {
     await short.scrollIntoViewIfNeeded();
     await short.hover();
     await expect(tooltip(window)).toHaveCount(0);
-    await window.waitForTimeout(300);
-    await expect(tooltip(window)).toHaveCount(0);
+    expect(await short.locator(".tr-tab-label").evaluate(t => t.scrollWidth <= t.clientWidth)).toBe(true);
   });
 
   test("a collapsed dock names its views in tooltips beside its strip", async ({ desktop }) => {

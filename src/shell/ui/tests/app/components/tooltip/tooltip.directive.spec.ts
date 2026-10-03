@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { FocusMonitor } from "@angular/cdk/a11y";
 import { Component, signal, viewChild } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { userEvent } from "vitest/browser";
@@ -109,15 +110,22 @@ describe("TooltipDirective", () => {
     await userEvent.hover(anchor());
     const shown = await shownAsync();
 
-    anchor().dispatchEvent(new PointerEvent("pointerleave", { relatedTarget: shown }));
-    await new Promise(resolve => setTimeout(resolve, 20));
-    expect(tooltip()).not.toBeNull();
-    shown.parentElement?.dispatchEvent(new PointerEvent("pointerleave", { relatedTarget: anchor() }));
-    await new Promise(resolve => setTimeout(resolve, 20));
-    expect(tooltip()).not.toBeNull();
-    shown.parentElement?.dispatchEvent(new PointerEvent("pointerleave", { relatedTarget: document.body }));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      anchor().dispatchEvent(new PointerEvent("pointerleave", { relatedTarget: shown }));
+      vi.runAllTimers();
+      expect(tooltip()).not.toBeNull();
+      shown.parentElement?.dispatchEvent(new PointerEvent("pointerleave", { relatedTarget: anchor() }));
+      vi.runAllTimers();
+      expect(tooltip()).not.toBeNull();
+      shown.parentElement?.dispatchEvent(new PointerEvent("pointerleave", { relatedTarget: document.body }));
+      vi.runAllTimers();
 
-    await vi.waitFor(() => expect(tooltip()).toBeNull());
+      expect(tooltip()).toBeNull();
+    }
+    finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows nothing when the pointer passes over its anchor before the tooltip ever opened", async () => {
@@ -126,11 +134,13 @@ describe("TooltipDirective", () => {
     fresh.detectChanges();
     const target: HTMLElement = fresh.nativeElement.querySelector(".anchor");
 
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     target.dispatchEvent(new PointerEvent("pointerenter"));
     target.dispatchEvent(new PointerEvent("pointerleave", { relatedTarget: document.body }));
     target.dispatchEvent(new PointerEvent("pointerenter"));
     target.dispatchEvent(new PointerEvent("pointerleave"));
-    await new Promise(resolve => setTimeout(resolve, 20));
+    vi.runAllTimers();
+    vi.useRealTimers();
     const shown = tooltip();
     fresh.destroy();
 
@@ -204,8 +214,12 @@ describe("TooltipDirective", () => {
   });
 
   it("does not show on a focus that does not come from the keyboard", async () => {
+    const origins: (string | null)[] = [];
+    const watching = TestBed.inject(FocusMonitor).monitor(anchor()).subscribe(t => origins.push(t));
+
     anchor().focus();
-    await new Promise(resolve => setTimeout(resolve, 20));
+    await vi.waitFor(() => expect(origins).toEqual(["program"]));
+    watching.unsubscribe();
 
     expect(tooltip()).toBeNull();
   });

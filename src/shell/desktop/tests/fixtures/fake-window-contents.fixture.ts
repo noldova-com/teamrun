@@ -19,6 +19,10 @@ export class FakeWindowContents implements IWindowContents {
 
   public readonly id: number;
   public readonly sent: unknown[][] = [];
+  public loading: boolean = false;
+  public crashed: boolean = false;
+  public osProcessId: number = 4242;
+  public readonly calls: string[] = [];
 
   public constructor(id: number) {
     this.id = id;
@@ -35,6 +39,30 @@ export class FakeWindowContents implements IWindowContents {
 
   public send(channel: string, ...values: unknown[]): void {
     this.sent.push([channel, ...values]);
+  }
+
+  public isLoading(): boolean {
+    return this.loading;
+  }
+
+  public isCrashed(): boolean {
+    return this.crashed;
+  }
+
+  public reload(): void {
+    this.calls.push("reload");
+  }
+
+  public forcefullyCrashRenderer(): void {
+    this.calls.push("crash");
+  }
+
+  public getOSProcessId(): number {
+    return this.osProcessId;
+  }
+
+  public goAway(reason: string, exitCode: number = 0): void {
+    this.listeners.emit("render-process-gone", {}, { reason, exitCode });
   }
 
   public navigate(event: string, url?: string): boolean {

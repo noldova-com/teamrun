@@ -7,10 +7,13 @@
  */
 
 import path from "node:path";
+import { Writable } from "node:stream";
 
 import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
 
 export class FakeDesktopProcess implements IDesktopProcess {
+  private written: string = "";
+
   public readonly argv: readonly string[];
   public readonly env: NodeJS.ProcessEnv;
   public readonly platform: string;
@@ -18,7 +21,16 @@ export class FakeDesktopProcess implements IDesktopProcess {
   public readonly homeFolder: string;
   public readonly workingDirectory: string = path.resolve("work");
   public isDefaultApp: boolean = false;
+  public readonly errorOutput: Writable = new Writable({
+    write: (chunk: Buffer, _encoding, callback): void => {
+      this.written += chunk.toString();
+      callback();
+    }
+  });
   public readonly started: string[] = [];
+  public readonly ended: number[] = [];
+  public readonly processId: number = 1000;
+  public endFailure: Error | null = null;
 
   public constructor(platform: string, argv: readonly string[] = [], env: NodeJS.ProcessEnv = {}, homeFolder: string = "/home/person") {
     this.platform = platform;
@@ -27,7 +39,17 @@ export class FakeDesktopProcess implements IDesktopProcess {
     this.homeFolder = homeFolder;
   }
 
+  public get errors(): string {
+    return this.written;
+  }
+
   public startDetached(executablePath: string): void {
     this.started.push(executablePath);
+  }
+
+  public endProcess(processId: number): void {
+    if (this.endFailure !== null)
+      throw this.endFailure;
+    this.ended.push(processId);
   }
 }

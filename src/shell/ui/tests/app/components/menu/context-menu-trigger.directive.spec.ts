@@ -14,6 +14,8 @@ import { ContextMenuTriggerDirective } from "../../../../src/app/components/menu
 import { MenuItemComponent } from "../../../../src/app/components/menu/menu-item.component";
 import { MenuTriggerDirective } from "../../../../src/app/components/menu/menu-trigger.directive";
 import { MenuComponent } from "../../../../src/app/components/menu/menu.component";
+import { ThemeMode } from "../../../../src/app/enums/theme-mode";
+import { DefaultTheme } from "../../../../src/app/themes/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({
@@ -130,6 +132,48 @@ describe("ContextMenuTriggerDirective", () => {
     expect([shifted.defaultPrevented, menuKey.defaultPrevented]).toEqual([true, true]);
     expect([box?.left, box?.top]).toEqual([host.left, host.bottom]);
     expect(menu()).not.toBeNull();
+  });
+
+  it("opens no submenu and shows no hover for a pointer resting where its menu opens, until the pointer moves", async () => {
+    key({ key: "ContextMenu" });
+    await settledAsync();
+    const measured = menu()?.querySelector(".more")?.getBoundingClientRect() as DOMRect;
+    await userEvent.keyboard("{Escape}");
+    await settledAsync();
+    await userEvent.hover(document.documentElement, { position: { x: measured.left + measured.width / 2, y: measured.top + measured.height / 2 } });
+    key({ key: "ContextMenu" });
+    await settledAsync();
+    const more = menu()?.querySelector(".more") as HTMLElement;
+    await vi.waitFor(() => expect(more.matches(":hover")).toBe(true));
+    await settledAsync();
+    const stillBackground = getComputedStyle(more, "::before").backgroundColor;
+    const isSubmenuOpenWhileStill = menu("submenu") !== null;
+
+    await userEvent.hover(more, { position: { x: 8, y: 4 } });
+    await vi.waitFor(() => expect(menu("submenu")).not.toBeNull());
+
+    expect(isSubmenuOpenWhileStill).toBe(false);
+    expect(stillBackground).toBe("rgba(0, 0, 0, 0)");
+    expect(getComputedStyle(more, "::before").backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "list.hoverBackground"));
+  });
+
+  it("leaves the row the pointer rested on alone when the pointer moves to another row", async () => {
+    key({ key: "ContextMenu" });
+    await settledAsync();
+    const measured = menu()?.querySelector(".more")?.getBoundingClientRect() as DOMRect;
+    await userEvent.keyboard("{Escape}");
+    await settledAsync();
+    await userEvent.hover(document.documentElement, { position: { x: measured.left + measured.width / 2, y: measured.top + measured.height / 2 } });
+    key({ key: "ContextMenu" });
+    await settledAsync();
+    await vi.waitFor(() => expect(menu()?.querySelector(".more")?.matches(":hover")).toBe(true));
+    const alpha = menu()?.querySelector(".alpha") as HTMLElement;
+
+    await userEvent.hover(alpha);
+    await vi.waitFor(() => expect(getComputedStyle(alpha, "::before").backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "list.hoverBackground")));
+    await settledAsync();
+
+    expect(menu("submenu")).toBeNull();
   });
 
   it("closes with Escape and after running a row, returning focus to its host", async () => {
