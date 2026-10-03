@@ -65,6 +65,10 @@ export class CommandService {
     return this.ask(() => this.find(name).isApplicable(commandArguments));
   }
 
+  public titleOf(name: string): string {
+    return this.find(name).title;
+  }
+
   public keyLabel(name: string): string | null {
     return this.shortcuts().keyOf(this.find(name).name)?.label(this.bridge.platform) ?? null;
   }

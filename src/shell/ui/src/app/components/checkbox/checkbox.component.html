@@ -1,0 +1,7 @@
+<label class="tr-checkbox-label">
+  <span class="tr-checkbox-control">
+    <input type="checkbox" class="tr-checkbox-box" [checked]="checked()" [disabled]="disabled()" (change)="toggle($event)" />
+    <span class="tr-checkbox-mark material-symbols-rounded" aria-hidden="true">{{ resources.checkedGlyph }}</span>
+  </span>
+  <span class="tr-checkbox-text"><ng-content /></span>
+</label>
