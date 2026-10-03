@@ -38,6 +38,16 @@ describe("TypographyPainter", () => {
     expect(element.style.getPropertyValue("--tr-font-mono")).toBe("ui-monospace, \"Cascadia Mono\", Consolas, monospace");
   });
 
+  it("erases everything it painted and nothing else", () => {
+    const element = document.createElement("div");
+    element.style.setProperty("--other", "kept");
+    TypographyPainter.paint(element, new Typography(12, 17, 15));
+
+    TypographyPainter.erase(element);
+
+    expect([...element.style]).toEqual(["--other"]);
+  });
+
   for (const panelSize of AppearanceFixture.panelSizes)
     it(`makes panel ${panelSize} pixels and derives the label size and line heights at the root`, () => {
       AppearanceFixture.apply(undefined, undefined, panelSize);

@@ -79,8 +79,9 @@ describe("AppearanceService", () => {
     expect(document.documentElement.getAttribute("data-tr-tab-shape")).toBe("pill");
   });
 
-  it("follows the system when it changes, and stops listening when destroyed", () => {
+  it("follows the system when it changes, and when destroyed stops listening and erases what it painted, keeping the rest", () => {
     const service = TestBed.inject(AppearanceService);
+    document.documentElement.style.setProperty("--other", "kept");
     TestBed.tick();
 
     scheme.change(false);
@@ -92,7 +93,8 @@ describe("AppearanceService", () => {
     TestBed.resetTestingModule();
     scheme.change(true);
 
-    expect(variable("--tr-window")).toBe("#F8F8F8");
+    expect([...document.documentElement.style]).toEqual(["--other"]);
+    expect(document.documentElement.hasAttribute("data-tr-tab-shape")).toBe(false);
   });
 
   it("uses a chosen mode regardless of the system", () => {
@@ -123,5 +125,19 @@ describe("AppearanceService", () => {
     expect(variable("--tr-text-message")).toBe("12px");
     expect(variable("--tr-font-sans")).toBe("system-ui, \"Segoe UI\", Roboto, sans-serif");
     expect(Number.parseFloat(getComputedStyle(document.documentElement).fontSize)).toBeCloseTo(16 * 18 / 13, 3);
+  });
+});
+
+describe("AppearanceService in a shared page", () => {
+  it("paints the root for the spec that uses it", () => {
+    TestBed.inject(AppearanceService);
+    TestBed.tick();
+
+    expect(document.documentElement.style.getPropertyValue("--tr-window")).not.toBe("");
+  });
+
+  it("leaves the root clean for the next spec", () => {
+    expect(document.documentElement.style.length).toBe(0);
+    expect(document.documentElement.hasAttribute("data-tr-tab-shape")).toBe(false);
   });
 });
