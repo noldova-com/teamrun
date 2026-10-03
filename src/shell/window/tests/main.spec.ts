@@ -14,14 +14,21 @@ describe("main", () => {
 
   it("names the page after the product and starts the window in the page's tr-window element", async () => {
     const bridge = DesktopBridgeFixture.install();
-    const host = document.createElement("tr-window");
-    document.body.append(host);
+    const host = document.body.appendChild(document.createElement("tr-window"));
 
-    await import("../src/main");
-    await new Promise(t => requestAnimationFrame(() => requestAnimationFrame(t)));
+    const { application } = await import("../src/main");
+    await application.whenStable();
+    const content = host.querySelector("tr-empty-window")?.textContent;
+    application.destroy();
+    host.remove();
 
-    expect(host.querySelector("tr-empty-window")?.textContent).toContain("No modules");
+    expect(content).toContain("No modules");
     expect(bridge.appearances.length).toBe(1);
     expect(document.title).toBe(Resources.productName);
+  });
+
+  it("leaves no application running for the specs after it", () => {
+    expect(document.documentElement.style.length).toBe(0);
+    expect(document.querySelector("tr-window")).toBeNull();
   });
 });

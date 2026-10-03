@@ -11,6 +11,8 @@
       "notes.timeline", "notes.references", "notes.activity", "notes.comments", "notes.reviews", "notes.history", "notes.terminal", "notes.problems",
       "notes.output", "notes.debug"
     ],
-    "documents": ["notes.note"]
+    "documents": ["notes.note"],
+    "statusBarItems": ["notes.count"],
+    "topBarActions": ["notes.compose"]
   }
 }

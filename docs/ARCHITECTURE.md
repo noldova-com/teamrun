@@ -96,7 +96,7 @@ Each module declares itself in `module.json` at its folder's root, with exactly 
 | `displayName` | The name people see |
 | `parts` | Its parts, each once: `runtime`, `window` or `cli`, each with a folder of that name |
 | `dependencies` | The ids of the modules it depends on |
-| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `views`, `documents` and `themes`, each of the form `<id>.<name>` with a camelCase name |
+| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `views`, `documents`, `statusBarItems`, `topBarActions` and `themes`, each of the form `<id>.<name>` with a camelCase name |
 
 A module without parts may leave the file out until it gains one. Dependencies form no cycle, and a build includes every module a listed module depends on. The build validates the declarations, orders them after their dependencies and writes them for the runtime, which reads them from `_build/modules/declarations.json` in the repository it is installed in, as the desktop finds the window's build there; the packaged layout is decided with packaging. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
 
@@ -138,10 +138,10 @@ The shell owns registration, collisions, user overrides, persistence and removal
 |---|---|---|
 | Views | Content for a panel, in a dock or in the middle, with its title and icon | Docks, splits, hides and restores it |
 | Documents | Content for a tab in the middle, with its title and the breadcrumb the top bar shows for it | Opens, arranges, previews and restores tabs |
-| Commands | Named actions, each with a title, an optional icon and an optional default key, from its window part or its runtime part | Runs them by name, with optional JSON arguments, from shortcuts and, later, menus, the top bar, the status bar and search |
+| Commands | Named actions, each with a title, an optional icon and an optional default key, from its window part or its runtime part | Runs them by name, with optional JSON arguments, from shortcuts, the top bar and the status bar and, later, menus and search |
 | Shortcuts | A default key for a command | Dispatches keys to commands, reports collisions and applies the person's bindings |
-| Top bar | Actions for the window's top row | Shows them in declared order beside the window controls and the active document's breadcrumb |
-| Status bar | Items for its left or right side: text and icon, a tooltip and a command | Shows them along the bottom of the window, by side and declared order |
+| Top bar | Actions for the window's top row, from its window part: an icon, a title and a command to run, which it may update or hide | Shows them as icon buttons beside the window controls and the active document's breadcrumb, in module order and then declared order; an action whose command is not registered is disabled. The shell's own top bar actions are shell components, not registrations |
+| Status bar | Items for its left or right side, from its window part: text, an icon or both, a tooltip and optionally a command to run, which it may update or hide | Shows them along the bottom of the window by side, in module order and then declared order, with the shell's own items, which are shell components rather than registrations, at the right end; an item with a command is a button, disabled while the command is not registered. An item runs a command and opens no popover of its own; a module that needs one waits for the shell to offer it |
 | Main menu | Items for the application menus (File, Edit, View, Help) or a menu of its own | Builds the menus and shows them in the macOS menu bar; their items are also reachable through command search. Without contributed menus, macOS shows a standard application, Edit and Window menu, so Quit, Copy and Paste work |
 | Context menus | Items for the shell's context and panel menus and for its own | Shows them in declared order |
 | Notifications | Operating-system notifications: a title, text and the command that opening one runs | Shows them through the operating system's notification service when the person's settings allow it |
@@ -165,7 +165,9 @@ A key is written as any of `Mod`, `Ctrl`, `Alt` and `Shift` joined by `+` to one
 
 Menus show a key by the platform's convention: macOS symbols in the order ⌃⌥⇧⌘ before the key, and elsewhere names such as `Ctrl+Alt+Shift+K`.
 
-The window keeps one keyboard listener on the document, after every element's own. A key an input, editor or terminal handled, a key during text composition, and a repeated key are left alone; a key bound to a command runs it and goes no further. Keys go to commands in this order: the person's bindings first, then default keys in module order, as `shell.modules` reports it, with a module's runtime commands before its window commands. The first holder keeps a key and each refused command is recorded as a collision. The person's bindings are applied as described, but until Settings exists none are stored and the collisions are not shown.
+The shell's own actions are commands too, named `shell.*`: closing, keeping and moving tabs, splitting and docking them, showing and hiding docks, resetting the layout and showing all of a group's tabs. A tab command acts on the tab its `tab` argument names, or else on the current tab, the active tab of the group that last held focus or had a tab activated; the shell's menus run the same commands. A command may say whether it is enabled for given arguments.
+
+The window keeps one keyboard listener on the document, after every element's own. A key an input, editor or terminal handled, a key during text composition, a repeated key and the key of a command that is not enabled are left alone; a key bound to an enabled command runs it and goes no further. Keys go to commands in this order: the person's bindings first, then the shell's default keys, then default keys in module order, as `shell.modules` reports it, with a module's runtime commands before its window commands. The first holder keeps a key and each refused command is recorded as a collision. The person's bindings are applied as described, but until Settings exists none are stored and the collisions are not shown.
 
 ### Setting scopes
 

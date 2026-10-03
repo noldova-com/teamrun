@@ -23,6 +23,7 @@ import { LayoutGeometry } from "../models/layout/layout-geometry";
 import { LayoutReader } from "../models/layout/layout.reader";
 import type { SplitHandle } from "../models/layout/split-handle";
 import type { Tab } from "../models/layout/tab";
+import type { TabGroup } from "../models/layout/tab-group";
 import { ViewRegistry } from "../models/layout/view-registry";
 import { LayoutStoreService } from "./layout-store.service";
 import { StartupService } from "./startup.service";
@@ -36,6 +37,7 @@ export class LayoutService {
   private readonly layoutState: WritableSignal<Layout> = signal(Layout.createDefault(this.registryState()));
   private readonly width: WritableSignal<number> = signal(0);
   private readonly height: WritableSignal<number> = signal(0);
+  private readonly currentGroupId: WritableSignal<number | null> = signal(null);
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saved: Layout | null = null;
   private writing: Promise<void> = Promise.resolve();
@@ -43,6 +45,10 @@ export class LayoutService {
   public readonly layout: Signal<Layout> = this.layoutState.asReadonly();
   public readonly registry: Signal<ViewRegistry> = this.registryState.asReadonly();
   public readonly geometry: Signal<LayoutGeometry> = computed(() => new LayoutGeometry(this.width(), this.height(), this.layoutState(), this.registryState()));
+  public readonly currentGroup: Signal<TabGroup> = computed(() => {
+    const id = this.currentGroupId();
+    return (Object.isNull(id) ? null : this.layoutState().group(id)) ?? this.layoutState().documents;
+  });
 
   public constructor() {
     inject(DestroyRef).onDestroy(() => this.clearSaveTimer());
@@ -90,6 +96,13 @@ export class LayoutService {
 
   public activate(tab: Tab): void {
     this.update(this.layoutState().activate(tab));
+    const group = this.layoutState().groupOf(tab);
+    if (!Object.isNull(group))
+      this.focusGroup(group.id);
+  }
+
+  public focusGroup(id: number): void {
+    this.currentGroupId.set(id);
   }
 
   public close(tab: Tab): void {

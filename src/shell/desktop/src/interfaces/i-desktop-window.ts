@@ -19,7 +19,6 @@ export interface IDesktopWindow {
   setBackgroundColor(color: string): void;
   setTitleBarOverlay(options: TitleBarOverlayOptions): void;
   setAppDetails(options: AppDetailsOptions): void;
-  setIcon(iconPath: string): void;
   getNormalBounds(): Rectangle;
   setBounds(bounds: Partial<Rectangle>): void;
   center(): void;

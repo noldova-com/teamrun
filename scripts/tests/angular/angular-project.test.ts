@@ -17,6 +17,7 @@ import AngularProject from "../../angular/angular-project.ts";
 import ProcessResult from "../../processes/process-result.ts";
 import ProcessException from "../../processes/process.exception.ts";
 import NpmCommand from "../../toolchain/npm-command.ts";
+import AngularReportRunnerFixture from "../fixtures/angular-report-runner.fixture.ts";
 import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
@@ -96,16 +97,57 @@ class AngularProjectTests {
         new ProcessException("Installing the browser for the Angular tests failed with exit code 2."));
     });
 
-    test("the tests run the Angular CLI in src/ and report its result", async t => {
+    test("the tests run the Angular CLI in src/ with a JSON report, and give its result and the spec files it ran", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
-      const passing = new ProcessRunnerFixture([0]);
-      const failing = new ProcessRunnerFixture([1]);
-
-      assert.equal(await AngularProjectTests.create(repository, passing).testAsync(), true);
-      assert.equal(await AngularProjectTests.create(repository, failing).testAsync(), false);
-
       const directory = path.join(repository.directory, "src");
-      assert.deepEqual(passing.runs, [[process.execPath, directory, path.join(directory, "node_modules", "@angular", "cli", "bin", "ng.js"), "test"]]);
+      const report = path.join(repository.directory, "_build", "angular-tests.json");
+      const reporting = new AngularReportRunnerFixture(JSON.stringify({ testResults: [{ name: path.join(directory, "shell", "b.spec.ts") }, { name: path.join(directory, "a.spec.ts") }] }), [0]);
+      await repository.writeAsync({ "_build/angular-tests.json": "stale" });
+
+      const run = await AngularProjectTests.create(repository, reporting).testAsync();
+      const silent = await AngularProjectTests.create(repository, new ProcessRunnerFixture([1])).testAsync();
+
+      assert.deepEqual([run.isSuccessful, run.collected], [true, ["a.spec.ts", "shell/b.spec.ts"]]);
+      assert.deepEqual([silent.isSuccessful, silent.exitCode, silent.collected], [false, 1, null]);
+      assert.deepEqual(reporting.runs, [[process.execPath, directory, path.join(directory, "node_modules", "@angular", "cli", "bin", "ng.js"), "test", "--reporters=default", "--reporters=json", "--output-file", report]]);
+    });
+
+    test("a report that is not JSON or lists no test files is refused", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+
+      await assert.rejects(AngularProjectTests.create(repository, new AngularReportRunnerFixture("{", [0])).testAsync(), new ProcessException("angular-tests.json could not be read as JSON."));
+      await assert.rejects(AngularProjectTests.create(repository, new AngularReportRunnerFixture("{\"testResults\":[{}]}", [0])).testAsync(),
+        new ProcessException(`The Angular test report ${path.join("_build", "angular-tests.json")} lists no test files.`));
+    });
+
+    test("the spec files are those the test target's include patterns match under src/", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      await repository.writeAsync({
+        "src/angular.json": JSON.stringify({ projects: { tools: {}, teamrun: { architect: { test: { options: { include: ["shell/*/tests/**/*.spec.ts", "modules/*/tests/*.spec.ts"] } } } } } }),
+        "src/shell/ui/tests/b.spec.ts": "", "src/shell/ui/tests/deep/a.spec.ts": "", "src/shell/ui/tests/helper.ts": "", "src/modules/notes/tests/n.spec.ts": "", "src/other/x.spec.ts": ""
+      });
+
+      assert.deepEqual(await AngularProjectTests.create(repository, new ProcessRunnerFixture()).specFilesAsync(),
+        ["modules/notes/tests/n.spec.ts", "shell/ui/tests/b.spec.ts", "shell/ui/tests/deep/a.spec.ts"]);
+    });
+
+    test("a workspace without include patterns for its test target, with exclude patterns, or that is not JSON, is refused", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      const project = AngularProjectTests.create(repository, new ProcessRunnerFixture());
+      const refused = new ProcessException("src/angular.json names no spec files for its test target.");
+
+      await assert.rejects(project.specFilesAsync(), refused);
+      for (const include of [[], [1], "shell"]) {
+        await repository.writeAsync({ "src/angular.json": JSON.stringify({ projects: { teamrun: { architect: { test: { options: { include } } } } } }) });
+        await assert.rejects(project.specFilesAsync(), refused);
+      }
+      await repository.writeAsync({ "src/angular.json": JSON.stringify({ projects: { teamrun: { architect: { test: { options: { include: ["**/*.spec.ts"], exclude: ["old/**"] } } } } } }) });
+      await assert.rejects(project.specFilesAsync(),
+        new ProcessException("src/angular.json excludes files from its test target, and the check of the spec files run does not apply exclusions."));
+      await repository.writeAsync({ "src/angular.json": JSON.stringify({ projects: [] }) });
+      await assert.rejects(project.specFilesAsync(), refused);
+      await repository.writeAsync({ "src/angular.json": "{" });
+      await assert.rejects(project.specFilesAsync(), new ProcessException("angular.json could not be read as JSON."));
     });
 
     test("the window is built with the Angular CLI in src/, and a failed build stops with its exit code", async t => {
