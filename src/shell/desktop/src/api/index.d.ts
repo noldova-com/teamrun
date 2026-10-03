@@ -6,12 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { AppDetailsOptions, BrowserWindowConstructorOptions, MenuItemConstructorOptions, Rectangle, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
+import type { Writable } from "node:stream";
+
+import type { AppDetailsOptions, BrowserWindowConstructorOptions, MenuItemConstructorOptions, MessageBoxOptions, MessageBoxReturnValue, Rectangle, RenderProcessGoneDetails, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { Event, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey } from "@noldova/teamrun-shell-protocol";
-import type { IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
+import type { DataDirectory, DiagnosticRedactor, IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -94,6 +96,16 @@ export interface IDesktopProcess {
   readonly isDefaultApp: boolean;
 
   /**
+   * Standard error, which mirrors the desktop's log.
+   */
+  readonly errorOutput: Writable;
+
+  /**
+   * The desktop's own process id, which it never ends.
+   */
+  readonly processId: number;
+
+  /**
    * Starts another program, detached, for the hand-over to a newer build.
    *
    * @param executablePath The program.
@@ -107,6 +119,22 @@ export interface IDesktopProcess {
    * ```
    */
   startDetached(executablePath: string): void;
+
+  /**
+   * Ends another process at once, for a window's page that did not stop when asked.
+   *
+   * @param processId The process.
+   * @throws Error synchronously when the process cannot be ended, for example because it is gone.
+   * @example
+   * ```ts
+   * import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function end(process: IDesktopProcess, processId: number): void {
+   *   process.endProcess(processId);
+   * }
+   * ```
+   */
+  endProcess(processId: number): void;
 }
 
 /**
@@ -717,6 +745,23 @@ export interface IWindowContents {
   on(event: "will-attach-webview", listener: (event: IPreventableEvent) => void): unknown;
 
   /**
+   * Listens for the page's renderer process having gone, for any reason including a clean exit.
+   *
+   * @param event The event's name.
+   * @param listener Receives Electron's event, which the desktop does not use, and why the process went.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function watch(contents: IWindowContents, record: (reason: string) => void): void {
+   *   contents.on("render-process-gone", (_event, details) => record(details.reason));
+   * }
+   * ```
+   */
+  on(event: "render-process-gone", listener: (event: unknown, details: RenderProcessGoneDetails) => void): unknown;
+
+  /**
    * Decides what happens when the page asks to open a window.
    *
    * @param handler Returns the decision.
@@ -746,12 +791,135 @@ export interface IWindowContents {
    * ```
    */
   send(channel: string, ...values: unknown[]): void;
+
+  /**
+   * Tells whether the page is still loading.
+   *
+   * @returns Whether it is loading.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function isLoading(contents: IWindowContents): boolean {
+   *   return contents.isLoading();
+   * }
+   * ```
+   */
+  isLoading(): boolean;
+
+  /**
+   * Tells whether the page's renderer process has crashed.
+   *
+   * @returns Whether it has crashed.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function hasCrashed(contents: IWindowContents): boolean {
+   *   return contents.isCrashed();
+   * }
+   * ```
+   */
+  isCrashed(): boolean;
+
+  /**
+   * Loads the page again, starting a new renderer process when the old one has gone.
+   *
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function reload(contents: IWindowContents): void {
+   *   contents.reload();
+   * }
+   * ```
+   */
+  reload(): void;
+
+  /**
+   * Ends the page's renderer process at once, which recovers a page that no longer responds before a reload.
+   *
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function restart(contents: IWindowContents): void {
+   *   contents.forcefullyCrashRenderer();
+   *   contents.reload();
+   * }
+   * ```
+   */
+  forcefullyCrashRenderer(): void;
+
+  /**
+   * Returns the operating system's id of the page's renderer process.
+   *
+   * @returns The process id.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function rendererOf(contents: IWindowContents): number {
+   *   return contents.getOSProcessId();
+   * }
+   * ```
+   */
+  getOSProcessId(): number;
+}
+
+/**
+ * Native message boxes, as Electron's `dialog` provides them; the desktop uses them only when its window's page cannot
+ * draw.
+ */
+export interface IDialogHost {
+  /**
+   * Shows a message box on a window, or on its own when the window is gone.
+   *
+   * @param windowId The window's id.
+   * @param options The box's message, buttons and, when it may be dismissed from code, its abort signal.
+   * @returns A promise of the chosen button's index, or the cancel button's when the box was dismissed.
+   * @example
+   * ```ts
+   * import type { IDialogHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function askAsync(dialog: IDialogHost, windowId: number): Promise<boolean> {
+   *   const { response } = await dialog.showMessageBox(windowId, { message: "Reload?", buttons: ["Reload", "Quit"], cancelId: 1 });
+   *   return response === 0;
+   * }
+   * ```
+   */
+  showMessageBox(windowId: number, options: MessageBoxOptions): Promise<MessageBoxReturnValue>;
+}
+
+/**
+ * Where the desktop records what a person or a support request may need to know.
+ */
+export interface IDesktopLog {
+  /**
+   * Records a line.
+   *
+   * @param text What happened.
+   * @example
+   * ```ts
+   * import type { IDesktopLog } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function record(log: IDesktopLog): void {
+   *   log.write("The window's bounds could not be saved.");
+   * }
+   * ```
+   */
+  write(text: string): void;
 }
 
 /**
  * A native window, as Electron's `BrowserWindow` provides it.
  */
 export interface IDesktopWindow {
+  /**
+   * The window's id, which a message box names as its parent.
+   */
+  readonly id: number;
+
   /**
    * The window's web contents.
    */
@@ -1011,8 +1179,8 @@ export interface IDesktopWindow {
   close(): void;
 
   /**
-   * Listens for the window being asked to close, which the listener may cancel, or for the window being resized,
-   * moved, maximized or restored from maximized.
+   * Listens for the window being asked to close, which the listener may cancel; for the window being resized, moved,
+   * maximized or restored from maximized; or for its page no longer responding or responding again.
    *
    * @param event The event's name.
    * @param listener Receives the cancellable event when the window is asked to close; called with nothing otherwise.
@@ -1031,6 +1199,8 @@ export interface IDesktopWindow {
   on(event: "move", listener: () => void): unknown;
   on(event: "maximize", listener: () => void): unknown;
   on(event: "unmaximize", listener: () => void): unknown;
+  on(event: "unresponsive", listener: () => void): unknown;
+  on(event: "responsive", listener: () => void): unknown;
 
   /**
    * Listens once for the window having closed.
@@ -1068,6 +1238,23 @@ export interface IParentPort {
    * ```
    */
   postMessage(message: unknown): void;
+
+  /**
+   * Listens once for the parent process's next message.
+   *
+   * @param event The event's name.
+   * @param listener Called when the message arrives.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IParentPort } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function onAcknowledged(port: IParentPort, acknowledged: () => void): void {
+   *   port.once("message", acknowledged);
+   * }
+   * ```
+   */
+  once(event: "message", listener: () => void): unknown;
 }
 
 /**
@@ -1169,6 +1356,11 @@ export interface IElectron {
    * The system's light or dark appearance, for the application's icons.
    */
   readonly theme: IThemeHost;
+
+  /**
+   * Native message boxes, for a window whose page cannot draw.
+   */
+  readonly dialog: IDialogHost;
 
   /**
    * The displays, for placing a window on one that shows it.
@@ -1774,8 +1966,162 @@ export declare class CloseCoordinator {
 }
 
 /**
+ * One open window: it shows once its page has painted and its startup has settled, or unpainted after a limit; asks
+ * its page to save before closing; and keeps its bounds.
+ */
+export declare class OpenWindow {
+  /**
+   * The native window.
+   */
+  public readonly window: IDesktopWindow;
+
+  /**
+   * Asks the page to save before the window closes.
+   */
+  public readonly coordinator: CloseCoordinator;
+
+  /**
+   * Restores and keeps the window's bounds.
+   */
+  public readonly bounds: WindowBoundsKeeper;
+
+  /**
+   * Takes charge of a window that is not yet shown.
+   *
+   * @param window The window, created hidden.
+   * @param displays The displays, for placing restored bounds.
+   * @param log Records why a window was shown unpainted and saves that failed.
+   * @example
+   * ```ts
+   * import { type IDesktopLog, type IDesktopWindow, type IDisplayHost, OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function track(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog): OpenWindow {
+   *   return new OpenWindow(window, displays, log);
+   * }
+   * ```
+   */
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog);
+
+  /**
+   * Notes that the page has painted, and shows the window if its startup has settled.
+   *
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function painted(open: OpenWindow): void {
+   *   open.markPainted();
+   * }
+   * ```
+   */
+  public markPainted(): void;
+
+  /**
+   * Settles the startup after a delay, whatever the runtime does by then.
+   *
+   * @param milliseconds The delay.
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function settleSoon(open: OpenWindow): void {
+   *   open.settleWithin(2_000);
+   * }
+   * ```
+   */
+  public settleWithin(milliseconds: number): void;
+
+  /**
+   * Notes that the startup has settled, and shows the window if its page has painted.
+   *
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function settled(open: OpenWindow): void {
+   *   open.settle();
+   * }
+   * ```
+   */
+  public settle(): void;
+
+  /**
+   * Shows the window after a limit even when its page has not painted by then, settling its startup, and records why:
+   * the page is still loading, has crashed, or loaded without reporting its paint.
+   *
+   * @param milliseconds The limit.
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function showWithin(open: OpenWindow): void {
+   *   open.showUnpaintedWithin(10_000);
+   * }
+   * ```
+   */
+  public showUnpaintedWithin(milliseconds: number): void;
+
+  /**
+   * Shows the window now, painted or not, settling its startup.
+   *
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function showAtOnce(open: OpenWindow): void {
+   *   open.showNow();
+   * }
+   * ```
+   */
+  public showNow(): void;
+}
+
+/**
+ * Keeps a window usable when its page's renderer process is gone or stops responding. It records each episode, its
+ * outcome and the person's choice in the desktop log, and asks with a native message box, because the page cannot draw:
+ * a gone page offers Reload or Quit, or the log folder and Quit when it went again soon after a reload, so a page that
+ * fails while loading never becomes a loop; a page that stops responding offers Wait or Reload once per episode, and the
+ * box closes when the page responds again. Reload ends the page's renderer and reloads once it has gone; a renderer that
+ * has not gone within a limit has its process ended, and a page with no renderer process of its own to end, or whose
+ * process cannot be ended, is reloaded at once.
+ */
+export declare class WindowRecovery {
+  /**
+   * Starts watching a window.
+   *
+   * @param open The window.
+   * @param dialog Shows the message boxes.
+   * @param log Records each episode, its outcome and the person's choice.
+   * @param process Ends a renderer process that did not stop when asked.
+   * @param quit Quits the application.
+   * @param openLogFolderAsync Opens the log folder; its promise tells whether it opened.
+   * @param reloadCrashLimit How soon after a reload a page that goes again is offered the log folder instead, in
+   * milliseconds.
+   * @param rendererEndLimit How long a renderer asked to stop may take before its process is ended, in milliseconds.
+   * @example
+   * ```ts
+   * import { type IDesktopLog, type IDesktopProcess, type IDialogHost, type OpenWindow, WindowRecovery } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function recover(open: OpenWindow, dialog: IDialogHost, log: IDesktopLog, desktop: IDesktopProcess): WindowRecovery {
+   *   return new WindowRecovery(open, dialog, log, desktop, () => process.exit(0), () => Promise.resolve(true), 10_000, 5_000);
+   * }
+   * ```
+   */
+  public constructor(
+    open: OpenWindow,
+    dialog: IDialogHost,
+    log: IDesktopLog,
+    process: IDesktopProcess,
+    quit: () => void,
+    openLogFolderAsync: () => Promise<boolean>,
+    reloadCrashLimit: number,
+    rendererEndLimit: number);
+}
+
+/**
  * The desktop's main process: one sandboxed instance with one window, which it shows once the page has painted its
- * theme and closes once the page has saved.
+ * theme, or unpainted after ten seconds, and closes once the page has saved. It records its diagnostics in
+ * `logs/desktop.log` once the data directory is usable, and on standard error.
  */
 export declare class DesktopApplication {
   private constructor();
@@ -1973,6 +2319,26 @@ export declare class WindowStateException extends Exception {
 }
 
 /**
+ * The exception thrown when a window's state cannot be read or kept because the runtime cannot be reached: the desktop
+ * has no connection, or the connection failed. A refusal from the runtime is a {@link WindowStateException} instead.
+ */
+export declare class WindowStateUnavailableException extends WindowStateException {
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @param options The connection's failure, if any.
+   * @example
+   * ```ts
+   * import { WindowStateUnavailableException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: WindowStateUnavailableException = new WindowStateUnavailableException("TeamRun is not connected to its runtime.");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
  * Keeps one window's state, its bounds or its layout, in the shell's database through the runtime.
  */
 export declare class RuntimeWindowStateStore implements IWindowStateStore {
@@ -1999,7 +2365,8 @@ export declare class RuntimeWindowStateStore implements IWindowStateStore {
    * Reads the kept state.
    *
    * @returns A promise of the state, or `null` when none is kept.
-   * @throws WindowStateException as a rejection when there is no connection or the runtime refuses.
+   * @throws WindowStateUnavailableException as a rejection when the runtime cannot be reached.
+   * @throws WindowStateException as a rejection when the runtime refuses.
    * @throws JsonException as a rejection when the runtime's answer is not a window state.
    * @example
    * ```ts
@@ -2018,7 +2385,8 @@ export declare class RuntimeWindowStateStore implements IWindowStateStore {
    *
    * @param value The state.
    * @returns A promise that settles once the runtime kept it.
-   * @throws WindowStateException as a rejection when there is no connection or the runtime refuses.
+   * @throws WindowStateUnavailableException as a rejection when the runtime cannot be reached.
+   * @throws WindowStateException as a rejection when the runtime refuses.
    * @example
    * ```ts
    * import type { RuntimeWindowStateStore } from "@noldova/teamrun-shell-desktop";
@@ -2032,6 +2400,65 @@ export declare class RuntimeWindowStateStore implements IWindowStateStore {
 }
 
 /**
+ * The desktop's log, `logs/desktop.log` in the data directory, mirrored to standard error. One desktop runs per data
+ * directory, so the desktop alone owns the file.
+ */
+export declare class DesktopLog implements IDesktopLog {
+  /**
+   * Creates the log; nothing is written to the file until it opens.
+   *
+   * @param directory The data directory whose `logs/desktop.log` the desktop owns.
+   * @param error Standard error, which receives every line, also before the file opens and when it cannot be written.
+   * @param redactor Removes the home folder and opaque values from every line.
+   * @param now The clock that stamps each line; the current time by default.
+   * @example
+   * ```ts
+   * import { homedir } from "node:os";
+   *
+   * import { DesktopLog } from "@noldova/teamrun-shell-desktop";
+   * import { DiagnosticRedactor, type DataDirectory } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createLog(directory: DataDirectory): DesktopLog {
+   *   return new DesktopLog(directory, process.stderr, new DiagnosticRedactor(homedir()));
+   * }
+   * ```
+   */
+  public constructor(directory: DataDirectory, error: Writable, redactor: DiagnosticRedactor, now?: () => Date);
+
+  /**
+   * Starts the file once the data directory is usable: keeps the previous start's log as `logs/desktop.previous.log`
+   * and starts `logs/desktop.log`. Only the first call does anything. When the file cannot be started, the log
+   * records why and goes on writing to standard error only.
+   *
+   * @example
+   * ```ts
+   * import type { DesktopLog } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function start(log: DesktopLog): void {
+   *   log.open();
+   * }
+   * ```
+   */
+  public open(): void;
+
+  /**
+   * Records a line, stamped with the time and redacted, on standard error and, once open, in the file. When the file
+   * cannot take a line, later lines go to standard error only, and the log records why there.
+   *
+   * @param text What happened.
+   * @example
+   * ```ts
+   * import type { DesktopLog } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function record(log: DesktopLog): void {
+   *   log.write("The window was shown before it was painted.");
+   * }
+   * ```
+   */
+  public write(text: string): void;
+}
+
+/**
  * Restores a window's saved bounds onto the displays that show it, then keeps them after each pause in moving,
  * resizing and maximizing, and on request before the window closes.
  */
@@ -2042,16 +2469,17 @@ export declare class WindowBoundsKeeper {
    * @param window The window.
    * @param displays The displays, for placing restored bounds.
    * @param saveDelay How long a pause in changes lasts before the bounds are saved, in milliseconds.
+   * @param log Records a save that failed.
    * @example
    * ```ts
-   * import { type IDesktopWindow, type IDisplayHost, WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
+   * import { type IDesktopLog, type IDesktopWindow, type IDisplayHost, WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
    *
-   * export function keep(window: IDesktopWindow, displays: IDisplayHost): WindowBoundsKeeper {
-   *   return new WindowBoundsKeeper(window, displays, 500);
+   * export function keep(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog): WindowBoundsKeeper {
+   *   return new WindowBoundsKeeper(window, displays, 500, log);
    * }
    * ```
    */
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number);
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog);
 
   /**
    * Keeps the bounds in the store from now on, and applies the bounds it holds: the saved position when a display
@@ -2073,7 +2501,8 @@ export declare class WindowBoundsKeeper {
 
   /**
    * Saves the window's current bounds at once, cancelling a pending save; does nothing before a store is set or
-   * after the window is gone.
+   * after the window is gone. Bounds that could not be kept stay unsaved for {@link WindowBoundsKeeper.saveUnsavedAsync}.
+   * A save after a move or resize that finds the runtime unreachable keeps the bounds unsaved without reporting it.
    *
    * @returns A promise that settles once the bounds are kept.
    * @throws The store's failure as a rejection.
@@ -2087,6 +2516,23 @@ export declare class WindowBoundsKeeper {
    * ```
    */
   public saveAsync(): Promise<void>;
+
+  /**
+   * Saves the window's newest bounds when an earlier save could not keep them, for example while the runtime was
+   * unreachable; does nothing otherwise.
+   *
+   * @returns A promise that settles once the bounds are kept, or at once when nothing is unsaved.
+   * @throws The store's failure as a rejection.
+   * @example
+   * ```ts
+   * import type { WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function catchUpAsync(keeper: WindowBoundsKeeper): Promise<void> {
+   *   return keeper.saveUnsavedAsync();
+   * }
+   * ```
+   */
+  public saveUnsavedAsync(): Promise<void>;
 
   /**
    * Cancels a pending save.
@@ -2372,7 +2818,7 @@ export declare class UtilityProcessStarter implements IProcessStarter {
   public static get entryPath(): string;
 
   /**
-   * Asks a new utility process to start a program detached and returns the program's process id; the utility process ends after it answers.
+   * Asks a new utility process to start a program detached and returns the program's process id. The desktop acknowledges the answer, and the utility process ends only then, so its exit never arrives before its answer.
    *
    * @param executable The program to run.
    * @param launchArguments The program's arguments.
@@ -2398,12 +2844,12 @@ export declare class UtilityProcessStarter implements IProcessStarter {
  */
 export declare class DetachedStart {
   /**
-   * Answers one start request; a failure is answered, never thrown.
+   * Answers one start request and waits for the parent process to acknowledge the answer, so that the utility process ends only after its answer arrived; a failure is answered, never thrown.
    *
    * @param message The start request.
    * @param port The utility process's parent port.
    * @param starter Starts the program. Defaults to the runtime package's `ChildProcessStarter`.
-   * @returns A promise that settles once the answer is sent.
+   * @returns A promise that settles once the parent process acknowledges the answer.
    * @example
    * ```ts
    * import { DetachedStart, type IParentPort } from "@noldova/teamrun-shell-desktop";

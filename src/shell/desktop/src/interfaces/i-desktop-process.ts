@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { Writable } from "node:stream";
+
 export interface IDesktopProcess {
   readonly argv: readonly string[];
   readonly env: NodeJS.ProcessEnv;
@@ -14,6 +16,9 @@ export interface IDesktopProcess {
   readonly homeFolder: string;
   readonly workingDirectory: string;
   readonly isDefaultApp: boolean;
+  readonly errorOutput: Writable;
+  readonly processId: number;
 
   startDetached(executablePath: string): void;
+  endProcess(processId: number): void;
 }

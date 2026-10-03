@@ -8,6 +8,8 @@
 
 import "@noldova/teamrun-foundation-core";
 
+import { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
+import type { IDesktopLog } from "../interfaces/i-desktop-log.js";
 import type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
 import type { IDisplayHost } from "../interfaces/i-display-host.js";
 import type { IWindowStateStore } from "../interfaces/i-window-state-store.js";
@@ -19,13 +21,16 @@ export class WindowBoundsKeeper {
   private readonly window: IDesktopWindow;
   private readonly displays: IDisplayHost;
   private readonly saveDelay: number;
+  private readonly log: IDesktopLog;
   private store: IWindowStateStore | null = null;
   private timer: NodeJS.Timeout | null = null;
+  private hasUnsaved: boolean = false;
 
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number) {
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog) {
     this.window = window;
     this.displays = displays;
     this.saveDelay = saveDelay;
+    this.log = log;
     const changed = (): void => this.scheduleSave();
     window.on(Resources.resizeEvent, changed);
     window.on(Resources.moveEvent, changed);
@@ -55,7 +60,14 @@ export class WindowBoundsKeeper {
     if (Object.isNull(this.store) || this.window.isDestroyed())
       return;
     const bounds = this.window.getNormalBounds();
+    this.hasUnsaved = true;
     await this.store.writeAsync(new WindowState(bounds.x, bounds.y, bounds.width, bounds.height, this.window.isMaximized()).toJson());
+    this.hasUnsaved = false;
+  }
+
+  public async saveUnsavedAsync(): Promise<void> {
+    if (this.hasUnsaved)
+      await this.saveAsync();
   }
 
   public cancelSave(): void {
@@ -68,6 +80,9 @@ export class WindowBoundsKeeper {
     if (Object.isNull(this.store))
       return;
     this.cancelSave();
-    this.timer = setTimeout(() => void this.saveAsync().catch((error: unknown) => process.stderr.write(`${Resources.formatBoundsUnsaved(String(error))}\n`)), this.saveDelay);
+    this.timer = setTimeout(() => void this.saveAsync().catch((error: unknown) => {
+      if (!(error instanceof WindowStateUnavailableException))
+        this.log.write(Resources.formatBoundsUnsaved(String(error)));
+    }), this.saveDelay);
   }
 }

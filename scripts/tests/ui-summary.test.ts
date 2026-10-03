@@ -37,6 +37,20 @@ class UiSummaryTests {
       assert.equal(log.text, summary);
     });
 
+    test("the summary says so when the screenshot link is missing because its upload failed", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await repository.writeAsync({ "_build/ui/report.json": UiSummaryTests.REPORT });
+      const summaryPath = path.join(repository.directory, "summary.md");
+
+      const exitCode = await new UiSummary(repository.directory, new TextOutputFixture()).runAsync({
+        GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "macOS x64", SCREENSHOT_URL: "", SCREENSHOT_UPLOAD_FAILED: "true"
+      });
+
+      assert.equal(exitCode, 0);
+      assert.ok((await readFile(summaryPath, "utf8")).endsWith("\n\nNo main-window screenshot link: its upload failed.\n"));
+    });
+
     test("a missing or malformed report is summarized as a failure", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());

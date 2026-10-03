@@ -13,6 +13,7 @@ import type { IElectron, ISessionHost } from "@noldova/teamrun-shell-desktop";
 import { FakeApplicationHost } from "./fake-application-host.fixture.js";
 import { FakeClipboardHost } from "./fake-clipboard-host.fixture.js";
 import { FakeDesktopWindow } from "./fake-desktop-window.fixture.js";
+import { FakeDialogHost } from "./fake-dialog-host.fixture.js";
 import { FakeDisplayHost } from "./fake-display-host.fixture.js";
 import { FakeIpcHost } from "./fake-ipc-host.fixture.js";
 import { FakeMenuHost } from "./fake-menu-host.fixture.js";
@@ -30,6 +31,7 @@ export class FakeElectron implements IElectron {
   public readonly clipboard: FakeClipboardHost = new FakeClipboardHost();
   public readonly shell: FakeShellHost = new FakeShellHost();
   public readonly theme: FakeThemeHost = new FakeThemeHost();
+  public readonly dialog: FakeDialogHost = new FakeDialogHost();
   public readonly windows: FakeDesktopWindow[] = [];
 
   public constructor(hasLock: boolean = true, isPackaged: boolean = false) {

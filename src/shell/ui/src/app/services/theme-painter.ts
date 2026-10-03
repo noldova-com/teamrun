@@ -34,6 +34,17 @@ export class ThemePainter {
     }
   }
 
+  public erase(element: HTMLElement): void {
+    const style = element.style;
+    style.removeProperty(Resources.colorSchemeProperty);
+    for (const token of Resources.colorTokens)
+      style.removeProperty(token.variable);
+    for (const name of Resources.lookTokens)
+      style.removeProperty(Resources.formatLookVariable(name));
+    for (const [control] of Resources.shapes)
+      element.removeAttribute(Resources.formatShapeAttribute(control));
+  }
+
   private requireValue(value: string | undefined, name: string): string {
     if (Object.isUndefined(value))
       throw new ThemeException(Resources.formatMissingThemeValue(this.defaultTheme.id, name));

@@ -16,12 +16,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import "@noldova/teamrun-foundation-core";
-import { JsonException } from "@noldova/teamrun-foundation-json";
+import { JsonException, JsonReader } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { DetachedStartReply, DetachedStartRequest, UtilityProcessStarter } from "@noldova/teamrun-shell-desktop";
-import { LaunchException } from "@noldova/teamrun-shell-runtime";
+import { type IProcessStarter, LaunchException } from "@noldova/teamrun-shell-runtime";
 
+import { Condition } from "../fixtures/condition.fixture.js";
 import { FakeUtilityProcessHost } from "../fixtures/fake-utility-process-host.fixture.js";
+import { LinkedUtilityProcessHost } from "../fixtures/linked-utility-process-host.fixture.js";
 import { PlatformFixture } from "../fixtures/platform.fixture.js";
 
 @TestClass
@@ -46,7 +48,24 @@ export class UtilityProcessStarterTests {
       Assert.areEqual(
         JSON.stringify(new DetachedStartRequest("C:\\TeamRun\\TeamRun.exe", ["entry.js"], "C:\\data\\start.log", environment).toJson()),
         JSON.stringify(fork?.process.messages[0]));
+      Assert.areEqual("acknowledged", fork?.process.messages[1]);
     });
+  }
+
+  @TestMethod
+  public async reportsAStartedProgramWhenTheStarterEndsTheMomentItMay(): Promise<void> {
+    const programs: string[] = [];
+    const program: IProcessStarter = {
+      startAsync: executable => {
+        programs.push(executable);
+        return Promise.resolve(5120);
+      }
+    };
+
+    const processId = await new UtilityProcessStarter(new LinkedUtilityProcessHost(program), "utility-entry.js").startAsync("node", [], {}, "start.log");
+
+    Assert.areEqual(5120, processId);
+    Assert.areEqual("node", programs.join(","));
   }
 
   @TestMethod
@@ -66,6 +85,7 @@ export class UtilityProcessStarterTests {
       (await Assert.throwsAsync(() => failing, LaunchException)).message);
     Assert.areEqual("The runtime starter ended before it started the runtime.", (await Assert.throwsAsync(() => ending, LaunchException)).message);
     await Assert.throwsAsync(() => garbled, JsonException);
+    Assert.areEqual("acknowledged,,acknowledged", host.forks.map(t => t.process.messages[1] ?? "").join(","));
   }
 
   @TestMethod
@@ -79,36 +99,58 @@ export class UtilityProcessStarterTests {
   public async keepsTheDesktopsHandlesOutOfTheRuntimeOnWindows(): Promise<void> {
     const root = await mkdtemp(path.join(tmpdir(), "tr-utility-"));
     try {
-      const electron = String(createRequire(import.meta.url)("electron"));
-      const main = fileURLToPath(new URL("../fixtures/utility-start-main.fixture.js", import.meta.url));
-      const environment = { ...process.env };
-      delete environment["ELECTRON_RUN_AS_NODE"];
-      const desktop = spawn(electron, [main, root], { stdio: ["ignore", "pipe", "pipe"], env: environment });
-      let output = "";
-      let errors = "";
-      desktop.stdout.setEncoding("utf8").on("data", (chunk: string) => output += chunk);
-      desktop.stderr.setEncoding("utf8").on("data", (chunk: string) => errors += chunk);
-      const ended = once(desktop.stdout, "end").then(() => Date.now());
-      const timer = setTimeout(() => desktop.kill(), UtilityProcessStarterTests.START_TIMEOUT);
+      const desktop = await UtilityProcessStarterTests.runDesktopAsync("utility-start-main.fixture.js", root);
 
-      const [code] = await once(desktop, "exit");
-      const exited = Date.now();
-      const endedAt = await ended;
-      clearTimeout(timer);
-
-      Assert.areEqual(0, code, errors);
-      const started: unknown = JSON.parse(output.trim());
-      const runtime = Number(Object.isObject(started) && "runtime" in started ? started.runtime : NaN);
-      const utility = Number(Object.isObject(started) && "utility" in started ? started.utility : NaN);
-      Assert.isTrue(endedAt - exited < 2_000, `the desktop's output ended ${endedAt - exited} ms after it exited`);
-      Assert.isFalse(UtilityProcessStarterTests.isRunning(utility), "the utility process ended after the start");
+      Assert.areEqual(0, desktop.code, desktop.errors);
+      const runtime = UtilityProcessStarterTests.readProcessId(desktop.output, "runtime");
+      Assert.isTrue(desktop.outputLag < 2_000, `the desktop's output ended ${desktop.outputLag} ms after it exited`);
+      await Condition.waitAsync(() => !UtilityProcessStarterTests.isRunning(UtilityProcessStarterTests.readProcessId(desktop.output, "utility")));
       Assert.isTrue(UtilityProcessStarterTests.isRunning(runtime), "the runtime outlives the desktop");
       process.kill(runtime);
-      Assert.isTrue(await UtilityProcessStarterTests.waitForExitAsync(runtime));
+      await Condition.waitAsync(() => !UtilityProcessStarterTests.isRunning(runtime));
     }
     finally {
       await rm(root, { recursive: true, force: true, maxRetries: 40, retryDelay: 50 });
     }
+  }
+
+  @PlatformFixture.windowsOnly()
+  @TestMethod
+  public async endsAStarterWhoseDesktopEndedBeforeAcknowledgingOnWindows(): Promise<void> {
+    const root = await mkdtemp(path.join(tmpdir(), "tr-utility-"));
+    try {
+      const desktop = await UtilityProcessStarterTests.runDesktopAsync("utility-orphan-main.fixture.js", root);
+
+      Assert.areEqual(0, desktop.code, desktop.errors);
+      await Condition.waitAsync(() => !UtilityProcessStarterTests.isRunning(UtilityProcessStarterTests.readProcessId(desktop.output, "utility")));
+    }
+    finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 40, retryDelay: 50 });
+    }
+  }
+
+  private static async runDesktopAsync(fixture: string, root: string): Promise<{ code: unknown; output: string; errors: string; outputLag: number }> {
+    const electron = String(createRequire(import.meta.url)("electron"));
+    const main = fileURLToPath(new URL(`../fixtures/${fixture}`, import.meta.url));
+    const environment = { ...process.env };
+    delete environment["ELECTRON_RUN_AS_NODE"];
+    const desktop = spawn(electron, [main, root], { stdio: ["ignore", "pipe", "pipe"], env: environment });
+    let output = "";
+    let errors = "";
+    desktop.stdout.setEncoding("utf8").on("data", (chunk: string) => output += chunk);
+    desktop.stderr.setEncoding("utf8").on("data", (chunk: string) => errors += chunk);
+    const ended = once(desktop.stdout, "end").then(() => Date.now());
+    const timer = setTimeout(() => desktop.kill(), UtilityProcessStarterTests.START_TIMEOUT);
+
+    const [code] = await once(desktop, "exit");
+    const exited = Date.now();
+    const endedAt = await ended;
+    clearTimeout(timer);
+    return { code, output, errors, outputLag: endedAt - exited };
+  }
+
+  private static readProcessId(output: string, name: string): number {
+    return JsonReader.fromValue(JSON.parse(output.trim())).readInteger(name);
   }
 
   private static isRunning(processId: number): boolean {
@@ -121,13 +163,4 @@ export class UtilityProcessStarterTests {
     }
   }
 
-  private static async waitForExitAsync(processId: number): Promise<boolean> {
-    const deadline = Date.now() + 5_000;
-    while (UtilityProcessStarterTests.isRunning(processId)) {
-      if (Date.now() >= deadline)
-        return false;
-      await new Promise(resolve => setTimeout(resolve, 25));
-    }
-    return true;
-  }
 }

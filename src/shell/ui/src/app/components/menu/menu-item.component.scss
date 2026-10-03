@@ -41,6 +41,10 @@
   background-color: var(--tr-hover);
 }
 
+:host-context(.tr-menu-pointer-still):hover:not(:focus-visible, [aria-expanded="true"])::before {
+  background-color: transparent;
+}
+
 :host([aria-current="true"])::before {
   background-color: var(--tr-selected);
 }

@@ -17,12 +17,14 @@ export class DesktopApiTests {
       JSON.stringify([
         "CloseCoordinator",
         "DesktopApplication",
+        "DesktopLog",
         "DesktopSettings",
         "DetachedStart",
         "DetachedStartReply",
         "DetachedStartRequest",
         "DeviceIdentity",
         "DeviceIdentityException",
+        "OpenWindow",
         "RuntimeStartup",
         "RuntimeWindowStateStore",
         "ScreenArea",
@@ -34,8 +36,10 @@ export class DesktopApiTests {
         "UtilityProcessStarter",
         "WindowAppearance",
         "WindowBoundsKeeper",
+        "WindowRecovery",
         "WindowState",
-        "WindowStateException"
+        "WindowStateException",
+        "WindowStateUnavailableException"
       ]),
       JSON.stringify(Object.keys(api).sort()));
   }

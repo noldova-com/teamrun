@@ -9,6 +9,8 @@
 import { Component, type Signal, computed, inject } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
+import { TooltipDirective } from "@noldova/teamrun-shell-ui";
+
 import { TabGroupComponent } from "../../../../src/app/components/tab-group/tab-group.component";
 import { DockSide } from "../../../../src/app/enums/dock-side";
 import { PanelEdge } from "../../../../src/app/enums/panel-edge";
@@ -114,8 +116,9 @@ describe("TabGroupComponent", () => {
     const target = tab(1, 1);
     const tooltip = (): HTMLElement | null => document.querySelector<HTMLElement>(".cdk-overlay-container tr-tooltip");
 
+    const decided = vi.spyOn(TooltipDirective.prototype, "show");
     target.dispatchEvent(new PointerEvent("pointerenter"));
-    await new Promise(resolve => setTimeout(resolve));
+    await vi.waitFor(() => expect(decided).toHaveBeenCalled());
     const isShownWhenFitting = !Object.isNull(tooltip());
     target.dispatchEvent(new PointerEvent("pointerleave"));
     target.style.maxWidth = "3rem";
