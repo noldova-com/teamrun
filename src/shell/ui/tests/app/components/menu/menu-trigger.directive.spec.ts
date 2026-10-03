@@ -184,7 +184,7 @@ describe("MenuTriggerDirective", () => {
   });
 
   it("opens a submenu on hover flush against its menu, its first row level with the trigger row, keeps it open when its row is clicked or chosen again, and runs a row in it", async () => {
-    trigger().click();
+    await userEvent.click(trigger());
     await settledAsync();
     await userEvent.hover(row("beta"));
     await vi.waitFor(() => expect(menu("submenu")).not.toBeNull());
