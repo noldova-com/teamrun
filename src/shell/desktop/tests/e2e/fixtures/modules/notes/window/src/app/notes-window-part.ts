@@ -15,6 +15,7 @@ import {
 import { NotesState } from "./notes-state";
 
 export class NotesWindowPart implements IWindowPart {
+  private static readonly SORTINGS: readonly [string, string, string][] = [["notes.sortByTitle", "Sort by title", "title"], ["notes.sortByWeek", "Sort by week", "week"]];
   private static readonly MANY_VIEWS: readonly [string, string, string, DockSide][] = [
     ["notes.search", "Search", "search", DockSide.Left],
     ["notes.changes", "Source control", "account_tree", DockSide.Left],
@@ -69,10 +70,11 @@ export class NotesWindowPart implements IWindowPart {
       context.openDocument("notes.note", `week-${note.readInteger("week")}`, note.readString("title"));
       return null;
     }, commandArguments => JsonReader.fromValue(commandArguments).hasField("week")));
-    context.registerCommand(new CommandContribution("notes.sortBy", "Sort by", "sort", null, async commandArguments => {
-      NotesState.sortBy.set(JsonReader.fromValue(commandArguments).readString("by"));
-      return null;
-    }, () => true, commandArguments => NotesState.sortBy() === JsonReader.fromValue(commandArguments).readString("by")));
+    for (const [name, title, by] of NotesWindowPart.SORTINGS)
+      context.registerCommand(new CommandContribution(name, title, null, null, async () => {
+        NotesState.sortBy.set(by);
+        return null;
+      }, () => true, () => NotesState.sortBy() === by));
     context.registerCommand(new CommandContribution("notes.wrapLines", "Wrap lines", "wrap_text", null, async () => {
       NotesState.wrapsLines.update(t => !t);
       return null;

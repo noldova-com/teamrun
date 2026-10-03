@@ -57,16 +57,10 @@
       "exclusive": true,
       "items": [
         {
-          "command": "notes.sortBy",
-          "arguments": {
-            "by": "title"
-          }
+          "command": "notes.sortByTitle"
         },
         {
-          "command": "notes.sortBy",
-          "arguments": {
-            "by": "week"
-          }
+          "command": "notes.sortByWeek"
         }
       ]
     },
@@ -85,16 +79,10 @@
       "exclusive": true,
       "items": [
         {
-          "command": "notes.sortBy",
-          "arguments": {
-            "by": "title"
-          }
+          "command": "notes.sortByTitle"
         },
         {
-          "command": "notes.sortBy",
-          "arguments": {
-            "by": "week"
-          }
+          "command": "notes.sortByWeek"
         }
       ]
     }
