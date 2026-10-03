@@ -32,7 +32,7 @@ export default class AngularProject {
   private static readonly OUTPUT_FILE_OPTION: string = "--output-file";
   private static readonly REPORT_SEGMENTS: readonly string[] = ["_build", "angular-tests.json"];
   private static readonly TEST_TARGET: string = "test";
-  private static readonly INCLUDE_PATH: readonly string[] = ["architect", AngularProject.TEST_TARGET, "options", "include"];
+  private static readonly OPTIONS_PATH: readonly string[] = ["architect", AngularProject.TEST_TARGET, "options"];
   private static readonly BUILD_ARGUMENTS: readonly string[] = ["build"];
   private static readonly OUTPUT_PATH_OPTION: string = "--output-path";
   private static readonly NO_PROJECT: string = "No Angular project under src/; there is nothing to prepare.\n";
@@ -101,9 +101,12 @@ export default class AngularProject {
   public async specFilesAsync(): Promise<readonly string[]> {
     const workspace = await AngularProject.readJsonAsync(path.join(this.directory, AngularProject.WORKSPACE_FILE));
     const projects = AngularProject.field(workspace, "projects");
-    const include = (typeof projects === "object" && projects !== null ? Object.values(projects) : [])
-      .map(t => AngularProject.INCLUDE_PATH.reduce<unknown>((value, name) => AngularProject.field(value, name), t))
+    const options = (typeof projects === "object" && projects !== null ? Object.values(projects) : [])
+      .map(t => AngularProject.OPTIONS_PATH.reduce<unknown>((value, name) => AngularProject.field(value, name), t))
       .find(t => t !== undefined);
+    if (AngularProject.field(options, "exclude") !== undefined)
+      throw new ProcessException(`src/${AngularProject.WORKSPACE_FILE} excludes files from its ${AngularProject.TEST_TARGET} target, and the check of the spec files run does not apply exclusions.`);
+    const include = AngularProject.field(options, "include");
     if (!Array.isArray(include) || include.length === 0 || include.some(t => typeof t !== "string"))
       throw new ProcessException(`src/${AngularProject.WORKSPACE_FILE} names no spec files for its ${AngularProject.TEST_TARGET} target.`);
     const files: string[] = [];

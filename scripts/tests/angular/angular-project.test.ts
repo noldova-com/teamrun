@@ -131,7 +131,7 @@ class AngularProjectTests {
         ["modules/notes/tests/n.spec.ts", "shell/ui/tests/b.spec.ts", "shell/ui/tests/deep/a.spec.ts"]);
     });
 
-    test("a workspace without include patterns for its test target, or that is not JSON, is refused", async t => {
+    test("a workspace without include patterns for its test target, with exclude patterns, or that is not JSON, is refused", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
       const project = AngularProjectTests.create(repository, new ProcessRunnerFixture());
       const refused = new ProcessException("src/angular.json names no spec files for its test target.");
@@ -141,6 +141,9 @@ class AngularProjectTests {
         await repository.writeAsync({ "src/angular.json": JSON.stringify({ projects: { teamrun: { architect: { test: { options: { include } } } } } }) });
         await assert.rejects(project.specFilesAsync(), refused);
       }
+      await repository.writeAsync({ "src/angular.json": JSON.stringify({ projects: { teamrun: { architect: { test: { options: { include: ["**/*.spec.ts"], exclude: ["old/**"] } } } } } }) });
+      await assert.rejects(project.specFilesAsync(),
+        new ProcessException("src/angular.json excludes files from its test target, and the check of the spec files run does not apply exclusions."));
       await repository.writeAsync({ "src/angular.json": JSON.stringify({ projects: [] }) });
       await assert.rejects(project.specFilesAsync(), refused);
       await repository.writeAsync({ "src/angular.json": "{" });
