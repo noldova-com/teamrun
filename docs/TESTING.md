@@ -52,7 +52,7 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
 - **Deterministic tests.** A test waits on an event or a condition, never a fixed sleep. A limit only bounds a hang: it is generous and is never what the test checks. A test is never retried, and a flaky test is never skipped or quarantined as the fix.
 - **No races in the code.** Code never relies on the order of independent events, such as a process's exit against its message, or a window closing against a save. The order is made explicit, for example with a reply or an acknowledgement. Each such fix comes with a test that forces the bad order and fails on the old code.
 - **Flakiness is a bug.** A flaky or racy failure seen anywhere, locally or in CI, gets its own bug issue and a small fix PR right away, never folded into other work.
-- **Stop the line.** While `main` has a known flaky or failing test, no other pull request enters the merge queue until it is fixed.
+- **Stop the line.** While a known flaky or failing test affects `main`'s or pull requests' normal CI runs, or while `main` itself is broken, no other pull request enters the merge queue until it is fixed. A failure found only under artificial load, such as a deliberately slowed machine, or confined to an area the waiting pull requests don't touch, gets a high-priority bug issue and its own fix pull request, and merging continues.
 - **Repeated native runs.** A change to startup, shutdown, processes, windows or inter-process messages passes its affected tests ten times in a row natively on Windows, Linux and macOS before review.
 
 ## 4. Results and reporting
