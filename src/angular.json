@@ -30,6 +30,9 @@
               "modules/*/window/tests/**/*.spec.ts"
             ],
             "providersFile": "shell/ui/tests/test-providers.ts",
+            "setupFiles": [
+              "shell/ui/tests/kit-stylesheet.setup.ts"
+            ],
             "watch": false,
             "coverage": true,
             "coverageInclude": [
