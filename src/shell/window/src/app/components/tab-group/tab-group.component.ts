@@ -105,7 +105,8 @@ export class TabGroupComponent {
   protected onStripKey(event: KeyboardEvent): void {
     const tabs = this.group().tabs;
     const current = tabs.findIndex(t => t.equals(this.group().active));
-    const tab = tabs[this.indexFor(event.key, current, tabs.length)];
+    const key = event.ctrlKey || event.metaKey || event.altKey ? String.empty : event.key;
+    const tab = tabs[this.indexFor(key, current, tabs.length)];
     if (Object.isUndefined(tab))
       return;
     event.preventDefault();

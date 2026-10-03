@@ -18,13 +18,17 @@ export class ShortcutMap {
   private readonly entries: (readonly [KeyChord, string])[] = [];
   private readonly collisionList: ShortcutCollision[] = [];
 
-  public constructor(commands: readonly CommandContribution[], bindings: readonly ShortcutBinding[], platform: string) {
+  public constructor(shellKeys: readonly (readonly [KeyChord, string])[], commands: readonly CommandContribution[], bindings: readonly ShortcutBinding[], platform: string) {
     this.platform = platform;
     const names = new Set(commands.map(t => t.name));
     const bound = new Set(bindings.map(t => t.command));
     for (const binding of bindings) {
       if (!Object.isNull(binding.key) && names.has(binding.command))
         this.assign(binding.key, binding.command);
+    }
+    for (const [key, command] of shellKeys) {
+      if (names.has(command) && !bound.has(command))
+        this.assign(key, command);
     }
     for (const command of commands) {
       if (!Object.isNull(command.defaultKey) && !bound.has(command.name))
