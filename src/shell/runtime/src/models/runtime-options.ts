@@ -22,13 +22,15 @@ export class RuntimeOptions {
   public readonly serverSettings: ServerSettings;
   public readonly declarationsFile: string;
   public readonly startLogName: string | null;
+  public readonly takeoverMilliseconds: number;
 
   public constructor(
     dataDirectory: DataDirectory,
     idleGraceMilliseconds: number = Resources.idleGrace,
     serverSettings: ServerSettings = new ServerSettings(),
     declarationsFile: string = RuntimeOptions.locateDeclarations(),
-    startLogName: string | null = null) {
+    startLogName: string | null = null,
+    takeoverMilliseconds: number = Resources.takeover) {
     if (!Object.isNull(startLogName) && !Resources.startLogNamePattern.test(startLogName))
       throw new ArgumentException(Resources.formatStartLogNameInvalid(startLogName), Resources.startLogNameParameterName);
 
@@ -37,6 +39,7 @@ export class RuntimeOptions {
     this.serverSettings = serverSettings;
     this.declarationsFile = declarationsFile;
     this.startLogName = startLogName;
+    this.takeoverMilliseconds = takeoverMilliseconds;
   }
 
   public static parse(entryArguments: readonly string[]): RuntimeOptions {

@@ -273,6 +273,8 @@ export class Resources {
   public static readonly answerGrace: number = 5_000;
   public static readonly closeGrace: number = 2_000;
   public static readonly idleGrace: number = 30_000;
+  public static readonly takeover: number = 5_000;
+  public static readonly takeoverInterval: number = 50;
   public static readonly launchTimeout: number = 20_000;
   public static readonly launchPollInterval: number = 100;
   public static readonly productVersionPattern: RegExp = /^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/;
