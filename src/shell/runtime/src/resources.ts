@@ -455,6 +455,14 @@ export class Resources {
     return `${Resources.productName} ${productVersion} at ${executablePath} owns this data directory and is newer; open that ${Resources.productName} instead.`;
   }
 
+  public static formatNoRuntime(root: string): string {
+    return `No runtime is running for ${root}.`;
+  }
+
+  public static formatBuildMismatch(productVersion: string, executablePath: string): string {
+    return `${Resources.productName} ${productVersion} at ${executablePath} owns this data directory; it is another build, and taking it over was not asked for.`;
+  }
+
   public static formatWorkInProgress(descriptions: readonly string[]): string {
     return `Work is in progress: ${descriptions.join("; ")}.`;
   }

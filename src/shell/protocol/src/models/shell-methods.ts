@@ -13,6 +13,7 @@ export class ShellMethods {
   public static readonly stop: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.stopMember);
   public static readonly moveAside: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.moveAsideMember);
   public static readonly modules: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.modulesMember);
+  public static readonly work: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.workMember);
   public static readonly commands: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.commandsMember);
   public static readonly runCommand: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.runCommandMember);
   public static readonly notifications: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.notificationsMember);

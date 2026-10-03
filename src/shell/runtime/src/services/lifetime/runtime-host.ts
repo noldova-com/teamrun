@@ -53,6 +53,7 @@ import { MethodRegistry } from "../registry/method-registry.js";
 import { WindowStateReadMethod } from "../window-state/window-state-read-method.js";
 import { WindowStateStore } from "../window-state/window-state-store.js";
 import { WindowStateWriteMethod } from "../window-state/window-state-write-method.js";
+import { WorkMethod } from "../work/work-method.js";
 import { WorkTracker } from "../work/work-tracker.js";
 import { IdleMonitor } from "./idle-monitor.js";
 import { MoveAsideMethod } from "./move-aside-method.js";
@@ -110,6 +111,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics);
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
+    this.methods.register(ShellMethods.work, new WorkMethod(this.work));
     this.methods.register(ShellMethods.commands, new CommandsMethod(this.commands));
     this.methods.register(ShellMethods.runCommand, new RunCommandMethod(this.commands));
     if (!Object.isNull(database))

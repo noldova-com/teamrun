@@ -15,10 +15,13 @@ import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Failure, FailureCode, PreShellData, QualifiedName, ShellMethods, StopPolicy } from "@noldova/teamrun-shell-protocol";
 import {
+  AttachOptions,
+  BuildMismatchException,
   ConnectionException,
   LaunchException,
   LaunchSettings,
   MethodFailureException,
+  NoRuntimeException,
   OwnershipLock,
   PreShellDataFoundException,
   Refusal,
@@ -164,6 +167,49 @@ export class RuntimeLauncherTests {
       const exception = await Assert.throwsAsync(() => new RuntimeLauncher(settings, newer).attachAsync("desktop", new ClientListenerFixture()), WorkInProgressException);
 
       Assert.areEqual("Indexing the project", exception.work.descriptions.join(","));
+      Assert.isTrue(OwnershipLock.isOwned(fixture.dataDirectory), "the runtime keeps running");
+    });
+  }
+
+  @TestMethod
+  public startsNothingWhenToldNotToStart(): Promise<void> {
+    return RuntimeLauncherTests.runWithHostAsync(async fixture => {
+      const settings = new LaunchSettings(fixture.dataDirectory, path.join(fixture.root, "missing-program"), RuntimeEntry.entryPath, {}, process.platform, 1_000, 1_000, 25);
+
+      const exception = await Assert.throwsAsync(
+        () => new RuntimeLauncher(settings, RuntimeBuild.identity).attachAsync("cli", new ClientListenerFixture(), StopPolicy.IfIdle, new AttachOptions(false)),
+        NoRuntimeException);
+
+      Assert.areEqual(`No runtime is running for ${fixture.dataDirectory.root}.`, exception.message);
+      Assert.isFalse(existsSync(fixture.dataDirectory.logsFolder), "no start was tried");
+    });
+  }
+
+  @TestMethod
+  public attachesToARunningRuntimeWhenToldNotToStart(): Promise<void> {
+    return RuntimeLauncherTests.runWithHostAsync(async (fixture, settings) => {
+      const host = await fixture.startAsync();
+
+      const client = await new RuntimeLauncher(settings, RuntimeBuild.identity).attachAsync("cli", new ClientListenerFixture(), StopPolicy.IfIdle, new AttachOptions(false));
+
+      Assert.isTrue(client.isConnected);
+      Assert.isFalse((await client.stopAsync(StopPolicy.IfIdle)).hasFailed);
+      Assert.areEqual("request", await host.waitForStopAsync());
+    });
+  }
+
+  @TestMethod
+  public refusesAnotherBuildsRuntimeWhenToldNotToTakeOver(): Promise<void> {
+    return RuntimeLauncherTests.runWithHostAsync(async (fixture, settings) => {
+      await fixture.startAsync();
+      const newer = new BuildIdentity("999.0.0", BuildIdentity.supportedProtocolVersion, "newer-build");
+
+      const exception = await Assert.throwsAsync(
+        () => new RuntimeLauncher(settings, newer).attachAsync("cli", new ClientListenerFixture(), StopPolicy.IfIdle, new AttachOptions(true, false)),
+        BuildMismatchException);
+
+      Assert.areEqual(RuntimeBuild.identity.fingerprint, exception.handover.identity.fingerprint);
+      Assert.areEqual(process.execPath, exception.handover.executablePath);
       Assert.isTrue(OwnershipLock.isOwned(fixture.dataDirectory), "the runtime keeps running");
     });
   }
