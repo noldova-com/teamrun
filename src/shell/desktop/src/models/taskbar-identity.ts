@@ -7,6 +7,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 
 import type { AppDetailsOptions } from "electron";
@@ -53,7 +54,8 @@ export class TaskbarIdentity {
   }
 
   private static identifyCheckout(checkout: string): string {
-    const hash = createHash(Resources.checkoutHashAlgorithm).update(checkout).digest(Resources.hexEncoding).slice(0, Resources.checkoutHashLength);
+    const folder = existsSync(checkout) ? realpathSync(checkout) : checkout;
+    const hash = createHash(Resources.checkoutHashAlgorithm).update(folder).digest(Resources.hexEncoding).slice(0, Resources.checkoutHashLength);
     return `${Resources.developmentAppUserModelId}${Resources.idSeparator}${hash}`;
   }
 }

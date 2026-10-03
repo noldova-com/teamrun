@@ -55,6 +55,16 @@ class FakeNotificationService {
   }
 }
 
+
+async function expectTooltipAsync(button: HTMLElement | null | undefined, text: string): Promise<void> {
+  const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === text);
+  button?.dispatchEvent(new PointerEvent("pointerenter"));
+  await vi.waitFor(() => expect(tooltip()).toBeDefined());
+  button?.dispatchEvent(new PointerEvent("pointerleave"));
+  await vi.waitFor(() => expect(tooltip()).toBeUndefined());
+  expect(button?.hasAttribute("title")).toBe(false);
+}
+
 describe("NotificationsComponent", () => {
   const run = (name: string): CommandRun => new Run(QualifiedName.parse(name), null);
   const notification = (
@@ -76,7 +86,7 @@ describe("NotificationsComponent", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: NotificationService, useValue: service },
-        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] },
+        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
     });
@@ -115,6 +125,7 @@ describe("NotificationsComponent", () => {
     expect(empty).toEqual(["notifications", "Notifications"]);
     expect([item(fixture).querySelector(".tr-notifications-icon")?.textContent, item(fixture).querySelector(".tr-notifications-count")?.textContent]).toEqual(["notifications_off", "9+"]);
     expect(quietLabel()).toBe("Notifications, 12 unread, Do not disturb");
+    await expectTooltipAsync(item(fixture), "Notifications, 12 unread, Do not disturb");
   });
 
   it("opens its list, marking everything read only when something is unread, and closes on a second click, Escape and a click outside", async () => {
@@ -197,6 +208,7 @@ describe("NotificationsComponent", () => {
     (await openAsync(fixture)).querySelector<HTMLButtonElement>("button.tr-notifications-open")?.click();
     await fixture.whenStable();
     const list = await openAsync(fixture);
+    await expectTooltipAsync(list.querySelector<HTMLButtonElement>(".tr-notifications-dismiss"), "Dismiss");
     list.querySelector<HTMLButtonElement>(".tr-notifications-dismiss")?.click();
     list.querySelector<HTMLButtonElement>(".tr-notifications-clear")?.click();
     list.querySelector<HTMLInputElement>(".tr-notifications-quiet-box")?.click();

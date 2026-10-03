@@ -36,9 +36,13 @@ export class SplitSashComponent {
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly orientation: Signal<SashOrientation> = computed(() => this.handle().split.axis === SplitAxis.Horizontal ? SashOrientation.Vertical : SashOrientation.Horizontal);
-  protected readonly value: Signal<number> = computed(() => Math.round(this.handle().leadingLength * this.appearance.typography().rootSize));
+  protected readonly value: Signal<number> = computed(() => this.pixels(this.handle().leadingLength));
 
   public readonly handle = input.required<SplitHandle>();
+
+  protected pixels(length: number): number {
+    return Math.round(length * this.appearance.typography().rootSize);
+  }
 
   protected resize(delta: number): void {
     this.layout.resizeSplit(this.handle(), this.handle().leadingLength + delta / this.appearance.typography().rootSize);

@@ -63,7 +63,7 @@ class StubWindowPartHost {
 }
 
 describe("TabContentComponent", () => {
-  const context = new WindowPartContext(new WindowPartSource("notes", "Notes", [], [], [], [], [], [], () => Promise.reject(new Error("unused"))), {
+  const context = new WindowPartContext(new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused"))), {
     requestAsync: () => Promise.resolve(null),
     onEvent: () => () => undefined,
     openDocument: () => undefined,

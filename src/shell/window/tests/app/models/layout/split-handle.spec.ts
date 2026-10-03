@@ -35,5 +35,6 @@ describe("SplitHandle", () => {
 
   it("keeps the split when there is no space beyond the minimums", () => {
     expect(new SplitHandle(split, 0, new Bounds(10, 0, 0.25, 20), 10, 10, 0).resize(15)).toBe(split);
+    expect([new SplitHandle(split, 0, new Bounds(10, 0, 0.25, 20), 10, 10, -5).maximumLength, handle.minimumLength, handle.maximumLength]).toEqual([10, 10, 40]);
   });
 });

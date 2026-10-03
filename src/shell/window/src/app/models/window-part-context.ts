@@ -66,13 +66,13 @@ export class WindowPartContext implements IWindowPartContext {
   }
 
   public registerView(view: ViewContribution): void {
-    this.requireOwn(view.name);
+    this.requireDeclared(view.name, this.source.viewNames, this.viewList, Resources.viewKind);
     this.viewList.push(view);
     this.host.refresh();
   }
 
   public registerDocument(document: DocumentContribution): void {
-    this.requireOwn(document.name);
+    this.requireDeclared(document.name, this.source.documentNames, this.documentList, Resources.documentKind);
     this.documentList.push(document);
     this.host.refresh();
   }

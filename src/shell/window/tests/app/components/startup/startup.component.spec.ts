@@ -49,6 +49,7 @@ describe("StartupComponent", () => {
     expect(card?.getAttribute("role")).toBe("status");
     expect(card?.getAttribute("aria-live")).toBe("polite");
     expect(buttons(fixture)).toEqual([]);
+    expect((fixture.nativeElement as HTMLElement).classList.contains("tr-scroll-reveal")).toBe(true);
   });
 
   it("explains data from before the shell and moves it aside on request", async () => {

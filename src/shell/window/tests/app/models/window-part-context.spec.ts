@@ -127,7 +127,7 @@ describe("WindowPartContext", () => {
 
   beforeEach(() => {
     host = new FakeWindowPartHost();
-    const source = new WindowPartSource("notes", "Notes", ["tasks"], [], ["notes.newNote", "notes.taken"], ["notes.count", "notes.sync"], ["notes.compose", "notes.share"], ["notes.saved"],
+    const source = new WindowPartSource("notes", "Notes", ["tasks"], ["notes.list"], ["notes.note"], ["notes.newNote", "notes.taken"], ["notes.count", "notes.sync"], ["notes.compose", "notes.share"], ["notes.saved"],
       () => Promise.reject<IWindowPart>(new Error("unused")));
     context = new WindowPartContext(source, host);
   });
@@ -189,6 +189,8 @@ describe("WindowPartContext", () => {
     expect(context.views.map(t => t.name)).toEqual(["notes.list"]);
     expect(context.documents.map(t => t.name)).toEqual(["notes.note"]);
     expect(host.calls).toEqual(["refresh", "refresh"]);
+    expect(() => context.registerView(view("notes.list"))).toThrowError("The view notes.list is already registered.");
+    expect(() => context.registerDocument(new DocumentContribution("notes.note", load))).toThrowError("The document notes.note is already registered.");
   });
 
   it("registers its declared commands, refuses others and runs its own and its dependencies' commands", async () => {
@@ -250,9 +252,11 @@ describe("WindowPartContext", () => {
     expect(host.calls).toEqual(["refresh", "refresh"]);
   });
 
-  it("refuses another module's views, documents and documents to open", () => {
+  it("refuses another module's views, documents and documents to open, and its own that it does not declare or registers twice", () => {
     expect(() => context.registerView(view("clock.face"))).toThrowError(WindowPartAccessException);
     expect(() => context.registerDocument(new DocumentContribution("notesx.note", load))).toThrowError(WindowPartAccessException);
+    expect(() => context.registerView(view("notes.outline"))).toThrowError("The module notes does not declare the view notes.outline.");
+    expect(() => context.registerDocument(new DocumentContribution("notes.page", load))).toThrowError("The module notes does not declare the document notes.page.");
     expect(() => context.openDocument("clock.page", "1", "Page")).toThrowError(WindowPartAccessException);
     expect(() => context.keepDocument("clock.page", "1")).toThrowError(WindowPartAccessException);
     expect(context.views).toEqual([]);
