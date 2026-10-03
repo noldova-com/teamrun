@@ -106,7 +106,6 @@ test.describe("notifications", () => {
   });
 
   test("a toast follows the component table, never takes focus and closes on Close", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
     await tickWithFocusAsync(desktop);
@@ -138,7 +137,6 @@ test.describe("notifications", () => {
   });
 
   test("the bell and its list follow the component table", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
 

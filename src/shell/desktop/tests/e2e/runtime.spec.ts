@@ -20,7 +20,6 @@ test.describe("data from before the shell", () => {
   test.use({ desktopDataFiles: { "conversations.json": "[]" } });
 
   test("TeamRun explains the refusal and moves the data aside when asked", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
 
     await expect(window.getByRole("heading", { name: "Data from an earlier TeamRun" })).toBeVisible();

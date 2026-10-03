@@ -18,7 +18,6 @@ const colors = {
 
 test.describe("the empty window", () => {
   test("TeamRun starts with no module and shows the empty window", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
 
     await expect(window).toHaveTitle("TeamRun");
@@ -41,7 +40,6 @@ test.describe("the empty window", () => {
   });
 
   test("the window row, status bar and panel card follow the default theme", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
     await expect.poll(() => desktop.window.evaluate(() => (document.querySelector("tr-panel-card") as Element).getBoundingClientRect().width)).toBe(1920 - 8);
     const measured = await desktop.window.evaluate(() => {

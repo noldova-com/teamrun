@@ -22,7 +22,6 @@ function isCollapsedAsync(window: Page, side: string): Promise<boolean> {
 
 test.describe("the shell's keys", () => {
   test("move between a group's tabs both ways and wrap, close the tab, and show or hide each dock", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await note(window, 2).click();
     await expect(note(window, 2)).toBeFocused();
@@ -49,6 +48,7 @@ test.describe("the shell's keys", () => {
       await window.keyboard.press(key);
       await expect.poll(() => isCollapsedAsync(window, side)).toBe(collapsed);
     }
+    await desktop.checkpointAsync("shell-keys");
   });
 
   test("the tab menu and command search show the keys by the platform's convention", async ({ desktop }) => {
