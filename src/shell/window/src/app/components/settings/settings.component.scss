@@ -1,0 +1,128 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: var(--tr-space-4) var(--tr-space-6) 0;
+}
+
+.tr-settings-search {
+  display: flex;
+  flex: none;
+  padding-bottom: var(--tr-space-4);
+}
+
+.tr-settings-search-field {
+  width: var(--tr-settings-search-width);
+}
+
+.tr-settings-body {
+  display: flex;
+  flex: auto;
+  gap: var(--tr-space-6);
+  min-height: 0;
+}
+
+.tr-settings-pages {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--tr-space-1);
+  width: var(--tr-settings-pages-width);
+  overflow-y: auto;
+}
+
+.tr-settings-page {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--tr-tree-row-height);
+  margin: 0;
+  padding: 0 var(--tr-space-2);
+  border: none;
+  border-radius: var(--tr-radius-small);
+  background-color: transparent;
+  color: var(--tr-text);
+  font: inherit;
+  text-align: start;
+}
+
+.tr-settings-page:hover {
+  background-color: var(--tr-hover);
+}
+
+.tr-settings-page-current,
+.tr-settings-page-current:hover {
+  background-color: var(--tr-selected);
+}
+
+.tr-settings-content {
+  flex: auto;
+  min-width: 0;
+  max-width: var(--tr-settings-content-width);
+  overflow-y: auto;
+  padding-bottom: var(--tr-space-6);
+}
+
+.tr-settings-group-title,
+.tr-settings-result-title {
+  margin: var(--tr-settings-heading-space) 0;
+  padding-inline-start: var(--tr-settings-heading-inset);
+  color: var(--tr-setting-title);
+  font-size: var(--tr-text-heading);
+  font-weight: 600;
+  line-height: var(--tr-line-heading);
+}
+
+.tr-settings-group + .tr-settings-group,
+.tr-settings-result + .tr-settings-result {
+  margin-top: var(--tr-space-6);
+}
+
+.tr-settings-result-group {
+  margin: var(--tr-space-3) 0 0;
+  padding-inline-start: var(--tr-settings-heading-inset);
+  color: var(--tr-text-muted);
+  font-size: var(--tr-text-label);
+  font-weight: 600;
+  line-height: var(--tr-line-label);
+}
+
+.tr-settings-explanation,
+.tr-settings-empty {
+  margin: 0 0 var(--tr-space-3);
+  padding-inline-start: var(--tr-settings-heading-inset);
+  color: var(--tr-text);
+}
+
+.tr-settings-shortcuts {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tr-settings-shortcuts :is(th, td) {
+  padding: var(--tr-space-2);
+  border-bottom: var(--tr-border-width) solid var(--tr-card-border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.tr-settings-shortcuts th {
+  font-weight: 600;
+}
+
+.tr-settings-collision {
+  display: block;
+  color: var(--tr-text-muted);
+  font-size: var(--tr-text-label);
+  line-height: var(--tr-line-label);
+}

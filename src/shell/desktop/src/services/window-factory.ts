@@ -8,6 +8,8 @@
 
 import type { AppDetailsOptions, BrowserWindowConstructorOptions } from "electron";
 
+import type { JsonObject } from "@noldova/teamrun-foundation-json";
+
 import type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
 import type { IElectron } from "../interfaces/i-electron.js";
 import type { DesktopSettings } from "../models/desktop-settings.js";
@@ -33,7 +35,7 @@ export class WindowFactory {
     this.icons = icons;
   }
 
-  public create(state: WindowState): IDesktopWindow {
+  public create(state: WindowState, appearance: JsonObject | null): IDesktopWindow {
     const options: BrowserWindowConstructorOptions = {
       width: state.width,
       height: state.height,
@@ -49,7 +51,8 @@ export class WindowFactory {
         nodeIntegration: false,
         nodeIntegrationInWorker: false,
         webSecurity: true,
-        spellcheck: false
+        spellcheck: false,
+        additionalArguments: Object.isNull(appearance) ? [] : [`${Resources.appearanceArgument}${JSON.stringify(appearance)}`]
       }
     };
     if (this.settings.isMac)

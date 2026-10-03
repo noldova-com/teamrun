@@ -43,6 +43,7 @@ export class FixtureTheme {
     ["dropdown.listBackground", "#A01F10"],
     ["list.activeSelectionBackground", "#A02010"],
     ["list.activeSelectionForeground", "#A02110"],
+    ["list.highlightForeground", "#A0F110"],
     ["button.border", "#A02210"],
     ["settings.headerForeground", "#A02310"],
     ["editorHoverWidget.background", "#A02410"],
@@ -102,6 +103,7 @@ export class FixtureTheme {
     ["dropdown.listBackground", "#201FA0"],
     ["list.activeSelectionBackground", "#2020A0"],
     ["list.activeSelectionForeground", "#2021A0"],
+    ["list.highlightForeground", "#20F1A0"],
     ["button.border", "#2022A0"],
     ["settings.headerForeground", "#2023A0"],
     ["editorHoverWidget.background", "#2024A0"],
@@ -183,7 +185,23 @@ export class FixtureTheme {
     ["button-height", "1.875rem"],
     ["button-padding", "0.75rem"],
     ["checkbox-size", "1.25rem"],
-    ["toast-width", "25rem"]
+    ["toast-width", "25rem"],
+    ["text-field-width", "15rem"],
+    ["select-width", "22.5rem"],
+    ["number-field-width", "6rem"],
+    ["setting-marker", "0.75rem"],
+    ["tree-row-height", "1.875rem"],
+    ["settings-search-width", "40rem"],
+    ["settings-pages-width", "15rem"],
+    ["settings-content-width", "55rem"],
+    ["dropdown-padding", "0.375rem"],
+    ["dropdown-row-height", "1.875rem"],
+    ["dropdown-row-padding", "0.75rem"],
+    ["settings-item-padding", "1rem 1.125rem 1.25rem"],
+    ["settings-item-description-gap", "0.25rem"],
+    ["settings-item-control-gap", "0.75rem"],
+    ["settings-heading-space", "0.75rem"],
+    ["settings-heading-inset", "1.125rem"]
   ]);
   private static readonly SHAPES: ReadonlyMap<string, string> = new Map([["tab", "pill"]]);
 
