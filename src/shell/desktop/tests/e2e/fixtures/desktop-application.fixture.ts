@@ -34,6 +34,7 @@ export default class DesktopApplicationFixture {
   private static readonly DEVICE_FOLDER: string = "device";
   private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
   private static readonly OWNERSHIP_INTERVAL: number = 50;
+  private static readonly NOT_A_DATABASE: number = 26;
   private static readonly CLIENT_NAME: string = "ui-test";
   private static readonly PROCESS_EXIT_TIMEOUT: number = 30_000;
   private static readonly REMOVE_RETRIES: number = 3;
@@ -99,7 +100,7 @@ export default class DesktopApplicationFixture {
       ? await DesktopApplicationFixture.askToStopAsync(discovery)
       : "it had already withdrawn its discovery file";
     const deadline = Date.now() + DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT;
-    while (OwnershipLock.isOwned(directory)) {
+    while (DesktopApplicationFixture.isOwned(directory)) {
       if (Date.now() >= deadline) {
         const seconds = DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT / 1000;
         if (discovery === null)
@@ -364,6 +365,17 @@ export default class DesktopApplicationFixture {
     if (this.childProcess === null)
       throw new Error("TeamRun was not started.");
     return this.childProcess;
+  }
+
+  private static isOwned(directory: DataDirectory): boolean {
+    try {
+      return OwnershipLock.isOwned(directory);
+    }
+    catch (error) {
+      if ((error as { errcode?: unknown }).errcode === DesktopApplicationFixture.NOT_A_DATABASE)
+        return false;
+      throw error;
+    }
   }
 
   private static async askToStopAsync(discovery: RuntimeDiscovery): Promise<string> {

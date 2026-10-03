@@ -8,7 +8,7 @@
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -30,6 +30,26 @@ test.describe("the harness's teardown", () => {
     });
     return holder;
   };
+
+  test("finds no runtime to stop in a directory whose ownership file is not a database, and fails on any other error reading it", async () => {
+    const folder = await mkdtemp(path.join(os.tmpdir(), "teamrun-teardown-"));
+    try {
+      const corrupt = path.join(folder, "corrupt");
+      const unreadable = path.join(folder, "unreadable");
+      await mkdir(corrupt);
+      await writeFile(new DataDirectory(corrupt).ownershipDatabase, "This is not a database.");
+      await mkdir(new DataDirectory(unreadable).ownershipDatabase, { recursive: true });
+
+      await DesktopApplicationFixture.stopRuntimeAsync(corrupt);
+      const failure = await DesktopApplicationFixture.stopRuntimeAsync(unreadable).then(() => null, (error: unknown) => error);
+
+      expect(failure).toMatchObject({ errcode: expect.any(Number) });
+      expect((failure as { errcode: number }).errcode).not.toBe(26);
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true, maxRetries: 10 });
+    }
+  });
 
   test("waits until every process has left the process list, however long it runs", async ({}, testInfo) => {
     const folder = await mkdtemp(path.join(os.tmpdir(), "teamrun-teardown-"));
