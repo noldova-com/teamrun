@@ -96,7 +96,7 @@ Each module declares itself in `module.json` at its folder's root, with exactly 
 | `displayName` | The name people see |
 | `parts` | Its parts, each once: `runtime`, `window` or `cli`, each with a folder of that name |
 | `dependencies` | The ids of the modules it depends on |
-| `contributes` | The names it registers, listed by kind: `methods`, `events`, `views`, `documents` and `themes`, each of the form `<id>.<name>` with a camelCase name |
+| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `views`, `documents` and `themes`, each of the form `<id>.<name>` with a camelCase name |
 
 A module without parts may leave the file out until it gains one. Dependencies form no cycle, and a build includes every module a listed module depends on. The build validates the declarations, orders them after their dependencies and writes them for the runtime, which reads them from `_build/modules/declarations.json` in the repository it is installed in, as the desktop finds the window's build there; the packaged layout is decided with packaging. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
 
@@ -138,8 +138,8 @@ The shell owns registration, collisions, user overrides, persistence and removal
 |---|---|---|
 | Views | Content for a panel, in a dock or in the middle, with its title and icon | Docks, splits, hides and restores it |
 | Documents | Content for a tab in the middle, with its title and the breadcrumb the top bar shows for it | Opens, arranges, previews and restores tabs |
-| Commands | Named actions | Runs them from menus, shortcuts, the top bar, the status bar and search |
-| Shortcuts | A default key for a command | Reports collisions and applies the person's bindings |
+| Commands | Named actions, each with a title, an optional icon and an optional default key, from its window part or its runtime part | Runs them by name, with optional JSON arguments, from shortcuts and, later, menus, the top bar, the status bar and search |
+| Shortcuts | A default key for a command | Dispatches keys to commands, reports collisions and applies the person's bindings |
 | Top bar | Actions for the window's top row | Shows them in declared order beside the window controls and the active document's breadcrumb |
 | Status bar | Items for its left or right side: text and icon, a tooltip and a command | Shows them along the bottom of the window, by side and declared order |
 | Main menu | Items for the application menus (File, Edit, View, Help) or a menu of its own | Builds the menus and shows them in the macOS menu bar; their items are also reachable through command search. Without contributed menus, macOS shows a standard application, Edit and Window menu, so Quit, Copy and Paste work |
@@ -152,6 +152,20 @@ The shell owns registration, collisions, user overrides, persistence and removal
 | CLI | Commands | Reads the command line and runs the command |
 
 When two default shortcuts collide, the one registered first keeps the key, Settings shows the collision, and the person's binding decides. A saved layout keeps the place of a view or document whose module is absent and shows it again when the module returns.
+
+### Commands and shortcuts
+
+A module declares each command's name in `contributes.commands`; a part registers it with its title, icon, default key and handler, and a name the declaration lacks is refused. A window part's command runs in the window. A runtime part's command runs in the runtime: the window lists them with `shell.commands` after `shell.modules` and runs one with `shell.runCommand`, passing its arguments to the handler. Both kinds are withdrawn when their module deactivates.
+
+A key is written as any of `Mod`, `Ctrl`, `Alt` and `Shift` joined by `+` to one key, such as `Mod+Shift+K`. `Mod` is Ctrl on Windows and Linux and Cmd on macOS; `Ctrl` is Control everywhere; there is no token for the Windows, Super or Meta key. Letters match the key's value, falling back to its place when the layout's value is not a Latin letter; digits, punctuation and Space match the key's place, since Shift and layouts change their value. A default key needs Mod, Ctrl or Alt, or is a function key, so that typing is never taken, and may not be a key that editing or the operating system owns on any platform:
+
+- editing: Mod+A, C, V, X, Z and Y, and Mod+Shift+Z;
+- macOS: Mod+Q, W, H, M, Comma, Tab and Space, and Mod+Alt+Escape;
+- Windows and Linux: Alt+F4, Alt+Tab and Mod+Escape.
+
+Menus show a key by the platform's convention: macOS symbols in the order ⌃⌥⇧⌘ before the key, and elsewhere names such as `Ctrl+Alt+Shift+K`.
+
+The window keeps one keyboard listener on the document, after every element's own. A key an input, editor or terminal handled, a key during text composition, and a repeated key are left alone; a key bound to a command runs it and goes no further. Keys go to commands in this order: the person's bindings first, then default keys in module order, as `shell.modules` reports it, with a module's runtime commands before its window commands. The first holder keeps a key and each refused command is recorded as a collision. The person's bindings are applied as described, but until Settings exists none are stored and the collisions are not shown.
 
 ### Setting scopes
 

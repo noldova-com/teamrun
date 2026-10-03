@@ -7,7 +7,7 @@
  */
 
 import { JsonReader } from "@noldova/teamrun-foundation-json";
-import { DockSide, DocumentContribution, type IWindowPart, type IWindowPartContext, ViewContribution } from "@noldova/teamrun-shell-window";
+import { CommandContribution, DockSide, DocumentContribution, type IWindowPart, type IWindowPartContext, ViewContribution } from "@noldova/teamrun-shell-window";
 
 export class NotesWindowPart implements IWindowPart {
   private static readonly MANY_VIEWS: readonly [string, string, string, DockSide][] = [
@@ -51,12 +51,19 @@ export class NotesWindowPart implements IWindowPart {
       () => import("./components/note/note.component").then(t => t.NoteComponent)));
     context.openDocument("notes.note", "1", "Note 1");
     context.openDocument("notes.note", "2", "Note 2");
+    let count = 2;
+    context.registerCommand(new CommandContribution("notes.newNote", "New note", "note_add", "Mod+Alt+N", async () => {
+      count++;
+      context.openDocument("notes.note", String(count), `Note ${count}`);
+      return count;
+    }));
     if (!JsonReader.fromValue(await context.requestAsync("notes.manyTabs", null)).readBoolean("isMany"))
       return;
     for (const [name, title, icon, side] of NotesWindowPart.MANY_VIEWS)
       context.registerView(new ViewContribution(name, title, icon, side, true,
         () => import("./components/notes-outline/notes-outline.component").then(t => t.NotesOutlineComponent)));
     NotesWindowPart.MANY_TITLES.forEach((title, index) => context.openDocument("notes.note", String(index + 3), title));
+    count += NotesWindowPart.MANY_TITLES.length;
   }
 
   public async deactivateAsync(): Promise<void> {

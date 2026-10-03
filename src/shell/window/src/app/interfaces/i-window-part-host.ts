@@ -17,5 +17,9 @@ export interface IWindowPartHost {
 
   keepDocument(moduleId: string, name: string, instance: string): void;
 
+  isCommandRegistered(name: string): boolean;
+
+  runCommandAsync(name: string, commandArguments: JsonValue): Promise<JsonValue>;
+
   refresh(): void;
 }

@@ -1079,6 +1079,19 @@ export declare class ShellMethods {
   public static readonly modules: QualifiedName;
 
   /**
+   * `shell.commands`: asks the runtime for the commands its active modules'
+   * runtime parts registered; it answers with a `CommandList`.
+   */
+  public static readonly commands: QualifiedName;
+
+  /**
+   * `shell.runCommand`: runs a runtime command; its payload is a
+   * `CommandRun` and its answer whatever the command returns. A command that
+   * is not registered fails with `NotFound`.
+   */
+  public static readonly runCommand: QualifiedName;
+
+  /**
    * `shell.readWindowBounds`: reads the bounds the desktop kept for a
    * window; its payload is a `WindowStateKey` and its answer a
    * `WindowStateValue`.
@@ -1102,6 +1115,457 @@ export declare class ShellMethods {
    * `WindowStateWrite`.
    */
   public static readonly writeWindowLayout: QualifiedName;
+}
+
+/**
+ * A key as a keyboard event reports it: what `KeyChord.matches` compares.
+ * A DOM `KeyboardEvent` satisfies it.
+ */
+export interface IKeyStroke {
+  /**
+   * The key's value, such as `k`, `K`, `Enter` or `~`.
+   */
+  readonly key: string;
+
+  /**
+   * The physical key, such as `KeyK` or `Backquote`.
+   */
+  readonly code: string;
+
+  /**
+   * Whether Control is held.
+   */
+  readonly ctrlKey: boolean;
+
+  /**
+   * Whether Alt, or Option on macOS, is held.
+   */
+  readonly altKey: boolean;
+
+  /**
+   * Whether Shift is held.
+   */
+  readonly shiftKey: boolean;
+
+  /**
+   * Whether Cmd on macOS, or the Windows or Super key, is held.
+   */
+  readonly metaKey: boolean;
+}
+
+/**
+ * One key a chord ends with: a letter, a digit, a punctuation key, a named
+ * key or a function key. Letters match the key's value, falling back to the
+ * physical key when the layout's value is not a Latin letter; digits,
+ * punctuation and Space match the physical key, since Shift and layouts
+ * change their value; named and function keys match their value.
+ */
+export declare class KeyName {
+  /**
+   * The key's name in a chord's text, such as `K`, `1`, `Comma`, `Enter` or
+   * `F2`.
+   */
+  public readonly token: string;
+
+  /**
+   * Whether the key is one of F1 to F24.
+   */
+  public readonly isFunctionKey: boolean;
+
+  private constructor();
+
+  /**
+   * Finds a key by its name.
+   *
+   * @param token The name, as a chord's text writes it.
+   * @returns The key, or `undefined` when the name is not one.
+   *
+   * @example
+   * ```ts
+   * import { KeyName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const comma: KeyName | undefined = KeyName.find("Comma");
+   * ```
+   */
+  public static find(token: string): KeyName | undefined;
+
+  /**
+   * Tells whether a stroke is this key, whatever modifiers it has.
+   *
+   * @param stroke The key a keyboard event reports.
+   * @returns `true` when the stroke is this key.
+   *
+   * @example
+   * ```ts
+   * import { KeyName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const isK: boolean = KeyName.find("K")?.matches({ key: "k", code: "KeyK", ctrlKey: true, altKey: false, shiftKey: false, metaKey: false }) === true;
+   * ```
+   */
+  public matches(stroke: IKeyStroke): boolean;
+
+  /**
+   * Returns what menus show for the key.
+   *
+   * @param isMac Whether to follow macOS's convention, which shows symbols
+   * such as `↩` for Enter.
+   * @returns The label.
+   *
+   * @example
+   * ```ts
+   * import { KeyName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const label: string | undefined = KeyName.find("Escape")?.label(false);
+   * ```
+   */
+  public label(isMac: boolean): string;
+}
+
+/**
+ * A key with its modifiers, written as text such as `Mod+Shift+K`: any of
+ * `Mod`, `Ctrl`, `Alt` and `Shift` joined by `+` to one key. `Mod` is Ctrl
+ * on Windows and Linux and Cmd on macOS; `Ctrl` is Control everywhere. There
+ * is no token for the Windows, Super or Meta key.
+ */
+export declare class KeyChord {
+  /**
+   * Whether the chord holds Mod: Ctrl on Windows and Linux, Cmd on macOS.
+   */
+  public readonly hasMod: boolean;
+
+  /**
+   * Whether the chord holds Control.
+   */
+  public readonly hasCtrl: boolean;
+
+  /**
+   * Whether the chord holds Alt, or Option on macOS.
+   */
+  public readonly hasAlt: boolean;
+
+  /**
+   * Whether the chord holds Shift.
+   */
+  public readonly hasShift: boolean;
+
+  /**
+   * The key the chord ends with.
+   */
+  public readonly key: KeyName;
+
+  /**
+   * The chord's text with its modifiers in the order Mod, Ctrl, Alt, Shift.
+   */
+  public readonly text: string;
+
+  private constructor();
+
+  /**
+   * Reads a chord from its text, with its modifiers in any order.
+   *
+   * @param text The chord, such as `Mod+Shift+K`.
+   * @param parameterName The parameter a failure names; `key` by default.
+   * @returns The chord.
+   * @throws ArgumentException synchronously when the text is not a chord: an
+   * unknown or repeated modifier, an unknown key, or both Mod and Ctrl.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const chord: KeyChord = KeyChord.parse("Shift+Mod+K");
+   * ```
+   */
+  public static parse(text: string, parameterName?: string): KeyChord;
+
+  /**
+   * Reads a chord a command may have as its default key. A default needs
+   * Mod, Ctrl or Alt, or a function key, so that typing is never taken, and
+   * must not be a key that editing or the operating system owns on any
+   * platform: Mod+A, C, V, X, Z and Y and Mod+Shift+Z; on macOS Mod+Q, W,
+   * H, M, Comma, Tab and Space and Mod+Alt+Escape; on Windows and Linux
+   * Alt+F4, Alt+Tab and Mod+Escape.
+   *
+   * @param text The chord.
+   * @param parameterName The parameter a failure names; `key` by default.
+   * @returns The chord.
+   * @throws ArgumentException synchronously when the text is not a chord,
+   * has no modifier that guards typing, or is reserved; the message says
+   * which.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const chord: KeyChord = KeyChord.parseDefault("Mod+Alt+N");
+   * ```
+   */
+  public static parseDefault(text: string, parameterName?: string): KeyChord;
+
+  /**
+   * Tells whether a keyboard event is this chord on a platform. The
+   * modifiers must match exactly.
+   *
+   * @param stroke The key a keyboard event reports.
+   * @param platform The platform, as in `process.platform`; `darwin` reads
+   * Mod as Cmd.
+   * @returns `true` when the stroke is this chord.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const pressed: boolean = KeyChord.parse("Mod+K").matches({ key: "k", code: "KeyK", ctrlKey: false, altKey: false, shiftKey: false, metaKey: true }, "darwin");
+   * ```
+   */
+  public matches(stroke: IKeyStroke, platform: string): boolean;
+
+  /**
+   * Tells whether two chords are the same keys on a platform: on Windows and
+   * Linux Mod and Ctrl are the same key.
+   *
+   * @param other The other chord.
+   * @param platform The platform, as in `process.platform`.
+   * @returns `true` when both chords press the same keys there.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const same: boolean = KeyChord.parse("Mod+K").isSameOn(KeyChord.parse("Ctrl+K"), "win32");
+   * ```
+   */
+  public isSameOn(other: KeyChord, platform: string): boolean;
+
+  /**
+   * Returns what menus show for the chord, by the platform's convention:
+   * macOS symbols in the order ⌃⌥⇧⌘ followed by the key, such as `⌥⇧⌘K`;
+   * elsewhere names joined by `+`, such as `Ctrl+Alt+Shift+K`.
+   *
+   * @param platform The platform, as in `process.platform`.
+   * @returns The label.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const label: string = KeyChord.parse("Mod+Shift+K").label("darwin");
+   * ```
+   */
+  public label(platform: string): string;
+
+  /**
+   * Returns the chord's text.
+   *
+   * @returns The text, as `text` holds it.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const text: string = KeyChord.parse("Shift+Mod+K").toString();
+   * ```
+   */
+  public toString(): string;
+}
+
+/**
+ * A command a runtime part registered, as `shell.commands` reports it.
+ */
+export declare class CommandInfo {
+  /**
+   * The command's name, `<module id>.<name>`.
+   */
+  public readonly name: QualifiedName;
+
+  /**
+   * What menus and search show for the command.
+   */
+  public readonly title: string;
+
+  /**
+   * The command's icon, a Material Symbols name; `null` when it has none.
+   */
+  public readonly icon: string | null;
+
+  /**
+   * The key the command asks for, or `null`.
+   */
+  public readonly defaultKey: KeyChord | null;
+
+  /**
+   * Creates the information.
+   *
+   * @param name The command's name.
+   * @param title The title; not whitespace only.
+   * @param icon The icon, not whitespace only, or `null`.
+   * @param defaultKey The default key, or `null`.
+   * @throws ArgumentException synchronously when the title or the icon is
+   * blank.
+   *
+   * @example
+   * ```ts
+   * import { CommandInfo, KeyChord, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const command: CommandInfo = new CommandInfo(QualifiedName.parse("clock.tick"), "Tick", "timer", KeyChord.parseDefault("Mod+Alt+T"));
+   * ```
+   */
+  public constructor(name: QualifiedName, title: string, icon: string | null, defaultKey: KeyChord | null);
+
+  /**
+   * Reads the information from its wire form. Unknown fields are ignored.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The information.
+   * @throws JsonException synchronously when `name` or `title` is missing or
+   * invalid, or `icon` or `defaultKey` is invalid; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { CommandInfo } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const command: CommandInfo = CommandInfo.fromJson({ name: "clock.tick", title: "Tick", defaultKey: "Mod+Alt+T" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): CommandInfo;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `name` and `title` fields, and `icon` and `defaultKey` when
+   * the command has them.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { CommandInfo, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new CommandInfo(QualifiedName.parse("clock.tick"), "Tick", null, null).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The runtime commands of the active modules, in registration order: the
+ * answer to `shell.commands`.
+ */
+export declare class CommandList {
+  /**
+   * The commands.
+   */
+  public readonly commands: readonly CommandInfo[];
+
+  /**
+   * Creates the list.
+   *
+   * @param commands The commands, copied.
+   *
+   * @example
+   * ```ts
+   * import { CommandList } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const list: CommandList = new CommandList([]);
+   * ```
+   */
+  public constructor(commands: readonly CommandInfo[]);
+
+  /**
+   * Reads the list from its wire form. Unknown fields are ignored.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The list.
+   * @throws JsonException synchronously when `commands` is missing or an
+   * entry is invalid; its path names the entry.
+   *
+   * @example
+   * ```ts
+   * import { CommandList } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const list: CommandList = CommandList.fromJson({ commands: [{ name: "clock.tick", title: "Tick" }] });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): CommandList;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `commands` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { CommandList } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new CommandList([]).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A request to run a runtime command: the payload of `shell.runCommand`.
+ */
+export declare class CommandRun {
+  /**
+   * The command's name.
+   */
+  public readonly name: QualifiedName;
+
+  /**
+   * The command's arguments; `null` when it takes none.
+   */
+  public readonly commandArguments: JsonValue;
+
+  /**
+   * Creates the request.
+   *
+   * @param name The command's name.
+   * @param commandArguments The arguments.
+   *
+   * @example
+   * ```ts
+   * import { CommandRun, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const run: CommandRun = new CommandRun(QualifiedName.parse("clock.tick"), null);
+   * ```
+   */
+  public constructor(name: QualifiedName, commandArguments: JsonValue);
+
+  /**
+   * Reads the request from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The request.
+   * @throws JsonException synchronously when `name` or `arguments` is
+   * missing or invalid, or a field is unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { CommandRun } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const run: CommandRun = CommandRun.fromJson({ name: "clock.tick", arguments: { by: 2 } });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): CommandRun;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `name` and `arguments` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { CommandRun, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new CommandRun(QualifiedName.parse("clock.tick"), null).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
 }
 
 /**

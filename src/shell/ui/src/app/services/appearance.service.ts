@@ -36,7 +36,11 @@ export class AppearanceService {
   public constructor() {
     const listener = (event: MediaQueryListEvent): void => this.isSystemDark.set(event.matches);
     this.systemScheme.addEventListener(Resources.changeEvent, listener);
-    inject(DestroyRef).onDestroy(() => this.systemScheme.removeEventListener(Resources.changeEvent, listener));
+    inject(DestroyRef).onDestroy(() => {
+      this.systemScheme.removeEventListener(Resources.changeEvent, listener);
+      this.painter.erase(this.root);
+      TypographyPainter.erase(this.root);
+    });
     effect(() => this.painter.paint(this.root, this.themeState(), this.mode()));
     effect(() => TypographyPainter.paint(this.root, this.typographyState()));
   }

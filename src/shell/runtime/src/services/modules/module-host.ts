@@ -19,6 +19,7 @@ import { ModuleActivation } from "../../models/module-activation.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
 import { Resources } from "../../resources.js";
 import type { DataDirectory } from "../data-directory/data-directory.js";
+import type { CommandRegistry } from "../registry/command-registry.js";
 import { ModuleDatabase } from "../database/module-database.js";
 import type { EventRegistry } from "../registry/event-registry.js";
 import type { MethodRegistry } from "../registry/method-registry.js";
@@ -30,6 +31,7 @@ export class ModuleHost {
   private readonly dataDirectory: DataDirectory;
   private readonly methods: MethodRegistry;
   private readonly events: EventRegistry;
+  private readonly commands: CommandRegistry;
   private readonly loader: IRuntimePartLoader;
   private readonly diagnostics: Writable;
   private readonly statuses: Map<string, ModuleStatus> = new Map();
@@ -42,12 +44,14 @@ export class ModuleHost {
     dataDirectory: DataDirectory,
     methods: MethodRegistry,
     events: EventRegistry,
+    commands: CommandRegistry,
     loader: IRuntimePartLoader,
     diagnostics: Writable) {
     this.declarations = declarations;
     this.dataDirectory = dataDirectory;
     this.methods = methods;
     this.events = events;
+    this.commands = commands;
     this.loader = loader;
     this.diagnostics = diagnostics;
   }
@@ -120,7 +124,7 @@ export class ModuleHost {
         return new ModuleStatus(declaration.id, ModuleState.Failed, cause);
       }
 
-    const context = new ModuleContext(declaration, this.dataDirectory, this.methods, this.events, this.services, database);
+    const context = new ModuleContext(declaration, this.dataDirectory, this.methods, this.events, this.commands, this.services, database);
     try {
       await part.activateAsync(context);
     }

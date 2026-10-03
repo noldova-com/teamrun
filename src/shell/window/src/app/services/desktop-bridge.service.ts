@@ -23,6 +23,10 @@ import { Resources } from "../../resources";
 export class DesktopBridgeService {
   private readonly bridge: IDesktopBridge = DesktopBridgeService.find();
 
+  public get platform(): string {
+    return this.bridge.platform;
+  }
+
   public get isMac(): boolean {
     return this.bridge.platform === Resources.macPlatform;
   }

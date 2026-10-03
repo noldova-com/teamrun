@@ -26,6 +26,7 @@ class BuildAndTestTests {
   private static readonly PLAN_STEP: string = "List the targets without a current cache";
   private static readonly UI_STEP: string = "Test the UI workflows";
   private static readonly SUMMARY_STEP: string = "Summarize the UI workflows";
+  private static readonly LEGS_STEP: string = "List the build and test jobs";
   private static readonly WHOLE_LEG: Readonly<Record<string, string>> = { part: "all" };
   private static readonly UPLOAD_ACTION: string = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1";
   private static readonly UPLOADS: readonly (readonly [string, string, string, readonly string[]])[] = [
@@ -116,7 +117,7 @@ class BuildAndTestTests {
 
         const result = await doubles.runAsync(script, {
           TESTED_RESULT: tested, VERIFIED: verified, TESTED_RUN: testedRun, CHANGES_RESULT: changes, RUN_CODE: runCode, VALIDATION_RESULT: validation,
-          EVENT_NAME: index === 5 ? "merge_group" : "push",
+          EVENT_NAME: index === 5 ? "merge_group" : "push", DEFERRED: "",
           GITHUB_STEP_SUMMARY: "summary.md"
         });
 
@@ -125,6 +126,22 @@ class BuildAndTestTests {
         if (status !== 0)
           assert.match(result.stdout, /^::error::/);
       }
+    });
+
+    test("the aggregate check names the jobs a passing pull request run left to the merge queue", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
+      const doubles = await CommandDoublesFixture.createAsync();
+      t.after(() => doubles.disposeAsync());
+      await doubles.runAsync("touch summary.md\n");
+
+      const result = await doubles.runAsync(script, {
+        TESTED_RESULT: "skipped", VERIFIED: "", TESTED_RUN: "", CHANGES_RESULT: "success", RUN_CODE: "true", VALIDATION_RESULT: "success",
+        EVENT_NAME: "pull_request", DEFERRED: "macOS x64, UI workflows", GITHUB_STEP_SUMMARY: "summary.md"
+      });
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(await doubles.readFileAsync("summary.md"),
+        "The document checks passed, and the build and tests passed on every target. These jobs run only in the merge queue: macOS x64, UI workflows.\n");
     });
 
     test("macOS targets stop Spotlight indexing before checking out", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
@@ -283,7 +300,7 @@ class BuildAndTestTests {
       }
       const cases: readonly ICase[] = [
         { name: "a reuse" },
-        { name: "a different tree", record: `${"e".repeat(40)} true`, reason: "The pull request's last run tested a different tree (main moved or the pull request changed)" },
+        { name: "a different tree", record: `${"e".repeat(40)} true true`, reason: "The pull request's last run tested a different tree (main moved or the pull request changed)" },
         { name: "a failed run", latest: `123 1 completed failure ${runUrl}`, reason: "The pull request's last run did not succeed" },
         { name: "a cancelled run", latest: `123 1 completed cancelled ${runUrl}`, reason: "The pull request's last run did not succeed" },
         { name: "a run in progress", latest: `123 1 in_progress null ${runUrl}`, reason: "The pull request's last run has not finished" },
@@ -292,8 +309,10 @@ class BuildAndTestTests {
         { name: "no run for the head", latest: "", reason: "The pull request has no run of this workflow for its head" },
         { name: "a missing record", downloadStatus: 1, reason: "The pull request's last run left no record of the tree it tested" },
         { name: "an unreadable record", record: null, reason: "The record of the pull request's last run could not be read" },
-        { name: "a malformed record", record: "not-a-tree true", reason: "The record of the pull request's last run is malformed" },
-        { name: "a document-only run", record: "TREE false", reason: "The pull request's last run checked only the documents" },
+        { name: "a malformed record", record: "not-a-tree true true", reason: "The record of the pull request's last run is malformed" },
+        { name: "a document-only run", record: "TREE false false", reason: "The pull request's last run checked only the documents" },
+        { name: "a run that left jobs to the merge queue", record: "TREE true false", reason: "The pull request's last run did not run every build and test job" },
+        { name: "a record without the jobs it ran", record: "TREE true", reason: "The pull request's last run did not run every build and test job" },
         { name: "two commits on the base", history: "twoCommits", reason: "The merge group holds more than one commit on its base" },
         { name: "a merge commit", history: "merge", reason: "The merge group holds more than one commit on its base" },
         { name: "a base off main", history: "offMain", reason: "The merge group is built on another merge group, not on main" },
@@ -309,7 +328,7 @@ class BuildAndTestTests {
         assert.ok(repository !== undefined, item.name);
         await cp(repository.directory, doubles.directory, { recursive: true });
         const { base, tree } = repository;
-        const record = item.record === undefined ? `${tree} true` : item.record?.replace("TREE", tree) ?? null;
+        const record = item.record === undefined ? `${tree} true true` : item.record?.replace("TREE", tree) ?? null;
         await writeFile(path.join(doubles.directory, "outputs.txt"), "");
         if (record !== null) {
           await mkdir(path.join(doubles.directory, "tested-tree"));
@@ -348,14 +367,14 @@ class BuildAndTestTests {
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
 
-      const result = await doubles.runAsync(script, { TREE: tree, RUN_CODE: "true" });
+      const result = await doubles.runAsync(script, { TREE: tree, RUN_CODE: "true", COMPLETE: "false" });
       const written = await doubles.readFileAsync("tested-tree/tested-tree.txt");
       const empty = await CommandDoublesFixture.createAsync();
       t.after(() => empty.disposeAsync());
-      const invalid = await empty.runAsync(script, { TREE: "", RUN_CODE: "true" });
+      const invalid = await empty.runAsync(script, { TREE: "", RUN_CODE: "true", COMPLETE: "true" });
 
       assert.equal(result.status, 0, result.stderr);
-      assert.equal(written, `${tree} true\n`);
+      assert.equal(written, `${tree} true false\n`);
       assert.equal(invalid.status, 1);
       assert.equal(invalid.stdout, "::error::The classification did not record the tested tree.\n");
       assert.equal((await empty.runAsync("test -e tested-tree\n")).status, 1);
@@ -408,26 +427,59 @@ class BuildAndTestTests {
       const text = workflow.text;
       const legs = BuildAndTestTests.readLegs(text);
 
-      assert.deepEqual(legs.map(t => [t.label, t.part]), [
-        ["Linux x64", "all"],
-        ["Linux ARM64", "all"],
-        ["Windows x64, tests", "tests"],
-        ["Windows x64, UI workflows", "workflows"],
-        ["Windows ARM64, tests", "tests"],
-        ["Windows ARM64, UI workflows", "workflows"],
-        ["macOS x64, tests", "tests"],
-        ["macOS x64, UI workflows", "workflows"],
-        ["macOS ARM64", "all"]
+      assert.deepEqual(legs.map(t => [t.label, t.part, t.pullRequest]), [
+        ["Linux x64", "all", "runs"],
+        ["Linux ARM64", "all", "runs"],
+        ["Windows x64, tests", "tests", "runs"],
+        ["Windows x64, UI workflows", "workflows", "runs"],
+        ["Windows ARM64, tests", "tests", "runs"],
+        ["Windows ARM64, UI workflows", "workflows", "runs"],
+        ["macOS x64, tests", "tests", "runs"],
+        ["macOS x64, UI workflows", "workflows", "deferred"],
+        ["macOS ARM64", "all", "runs"]
       ]);
       for (const leg of legs)
         assert.equal(leg.label, leg.part === "all" ? leg.target : `${leg.target}, ${leg.part === "tests" ? "tests" : "UI workflows"}`);
       assert.ok(text.includes("    name: Build and test (${{ matrix.label }})\n    needs: changes\n"));
+      assert.ok(text.includes("      matrix:\n        include: ${{ fromJSON(needs.changes.outputs.legs) }}\n    runs-on: ${{ matrix.runner }}\n"));
+      assert.ok(text.includes("      legs: ${{ steps.legs.outputs.legs }}\n      deferred: ${{ steps.legs.outputs.deferred }}\n      complete: ${{ steps.legs.outputs.complete }}\n"));
       for (const step of ["Build", "Test"])
         assert.ok(text.includes(`      - name: ${step}\n        if: matrix.part != 'workflows'\n`), step);
       assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n        if: matrix.part != 'tests'\n"));
       for (const step of ["Check out the revision", "Set up Node.js", "Restore the installed dependencies", "Restore the Angular project's installed dependencies", "Install Electron"])
         assert.ok(!new RegExp(`      - name: ${step}\\n        if: [^\\n]*matrix\\.part`).test(text), step);
       assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [tested, changes, validate]\n    if: always()\n"));
+    });
+
+    test("a pull request leaves macOS x64's UI workflows to the merge queue, and every other run lists every job", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const script = workflow.readStepScript(BuildAndTestTests.LEGS_STEP);
+      const all = BuildAndTestTests.readLegs(workflow.text).map(({ label, target, part, runner, architecture }) => ({ label, target, part, runner, architecture }));
+
+      for (const event of ["pull_request", "merge_group", "push", "workflow_dispatch"]) {
+        const doubles = await CommandDoublesFixture.createAsync();
+        t.after(() => doubles.disposeAsync());
+        await writeFile(path.join(doubles.directory, "outputs.txt"), "");
+
+        const result = await doubles.runAsync(script, { EVENT_NAME: event, GITHUB_OUTPUT: "outputs.txt" });
+        const outputs = new Map((await doubles.readFileAsync("outputs.txt")).trimEnd().split("\n").map(line => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]));
+
+        assert.equal(result.status, 0, `${event}: ${result.stderr}`);
+        assert.equal(result.stdout, "", event);
+        assert.deepEqual([...outputs.keys()], ["legs", "deferred", "complete"], event);
+        if (event === "pull_request") {
+          assert.deepEqual(JSON.parse(outputs.get("legs") ?? ""), all.filter(t => t.label !== "macOS x64, UI workflows"));
+          assert.equal(outputs.get("deferred"), "macOS x64, UI workflows");
+          assert.equal(outputs.get("complete"), "false");
+        }
+        else {
+          assert.deepEqual(JSON.parse(outputs.get("legs") ?? ""), all, event);
+          assert.equal(outputs.get("deferred"), "", event);
+          assert.equal(outputs.get("complete"), "true", event);
+        }
+      }
+      assert.equal(all.length, 9);
+      assert.ok(workflow.text.includes(`      - name: ${BuildAndTestTests.LEGS_STEP}\n        id: legs\n        env:\n          EVENT_NAME: \${{ github.event_name }}\n`));
     });
 
     test("the plan's targets are the validated targets", async () => {
@@ -704,9 +756,9 @@ class BuildAndTestTests {
     });
   }
 
-  private static readLegs(text: string): readonly { label: string; target: string; part: string; runner: string; architecture: string }[] {
-    return [...text.matchAll(/ {10}- label: (.+)\n {12}target: (.+)\n {12}part: (.+)\n {12}runner: (.+)\n {12}architecture: (.+)\n/g)]
-      .map(t => ({ label: t[1] ?? "", target: t[2] ?? "", part: t[3] ?? "", runner: t[4] ?? "", architecture: t[5] ?? "" }));
+  private static readLegs(text: string): readonly { label: string; target: string; part: string; runner: string; architecture: string; pullRequest: string }[] {
+    return [...text.matchAll(/^ {10}([^|\n]+)\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)$/gm)]
+      .map(t => ({ label: t[1] ?? "", target: t[2] ?? "", part: t[3] ?? "", runner: t[4] ?? "", architecture: t[5] ?? "", pullRequest: t[6] ?? "" }));
   }
 }
 

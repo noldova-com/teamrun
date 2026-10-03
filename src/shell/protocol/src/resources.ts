@@ -43,6 +43,78 @@ export class Resources {
   public static readonly deviceField: string = "device";
   public static readonly windowField: string = "window";
   public static readonly valueField: string = "value";
+  public static readonly titleField: string = "title";
+  public static readonly iconField: string = "icon";
+  public static readonly defaultKeyField: string = "defaultKey";
+  public static readonly commandsField: string = "commands";
+  public static readonly argumentsField: string = "arguments";
+  public static readonly commandsMember: string = "commands";
+  public static readonly runCommandMember: string = "runCommand";
+  public static readonly keyParameterName: string = "key";
+  public static readonly commandTitleInvalid: string = "A command's title must not be blank.";
+  public static readonly commandIconInvalid: string = "A command's icon, when it has one, must not be blank.";
+  public static readonly macPlatform: string = "darwin";
+  public static readonly standardPlatform: string = "win32";
+  public static readonly keySeparator: string = "+";
+  public static readonly modToken: string = "Mod";
+  public static readonly ctrlToken: string = "Ctrl";
+  public static readonly altToken: string = "Alt";
+  public static readonly shiftToken: string = "Shift";
+  public static readonly modifierTokens: readonly string[] = [Resources.modToken, Resources.ctrlToken, Resources.altToken, Resources.shiftToken];
+  public static readonly macControlSymbol: string = "\u2303";
+  public static readonly macOptionSymbol: string = "\u2325";
+  public static readonly macShiftSymbol: string = "\u21E7";
+  public static readonly macCommandSymbol: string = "\u2318";
+  public static readonly controlLabel: string = "Ctrl";
+  public static readonly altLabel: string = "Alt";
+  public static readonly shiftLabel: string = "Shift";
+  public static readonly asciiLetterPattern: RegExp = /^[A-Za-z]$/;
+  public static readonly letterKeys: readonly string[] = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+  public static readonly digitKeys: readonly string[] = [..."0123456789"];
+  public static readonly letterCodePrefix: string = "Key";
+  public static readonly digitCodePrefix: string = "Digit";
+  public static readonly functionKeyPrefix: string = "F";
+  public static readonly functionKeyCount: number = 24;
+  public static readonly spaceKey: string = "Space";
+  public static readonly punctuationKeys: readonly (readonly [string, string])[] = [
+    ["Backquote", "`"],
+    ["Minus", "-"],
+    ["Equal", "="],
+    ["BracketLeft", "["],
+    ["BracketRight", "]"],
+    ["Backslash", "\\"],
+    ["Semicolon", ";"],
+    ["Quote", "'"],
+    ["Comma", ","],
+    ["Period", "."],
+    ["Slash", "/"]
+  ];
+  public static readonly namedKeys: readonly (readonly [string, string, string])[] = [
+    ["Enter", "\u21A9", "Enter"],
+    ["Escape", "\u238B", "Esc"],
+    ["Tab", "\u21E5", "Tab"],
+    ["Space", "Space", "Space"],
+    ["Backspace", "\u232B", "Backspace"],
+    ["Delete", "\u2326", "Delete"],
+    ["Insert", "Insert", "Insert"],
+    ["Home", "\u2196", "Home"],
+    ["End", "\u2198", "End"],
+    ["PageUp", "\u21DE", "PageUp"],
+    ["PageDown", "\u21DF", "PageDown"],
+    ["ArrowUp", "\u2191", "Up"],
+    ["ArrowDown", "\u2193", "Down"],
+    ["ArrowLeft", "\u2190", "Left"],
+    ["ArrowRight", "\u2192", "Right"]
+  ];
+  public static readonly editingKeys: readonly string[] = ["Mod+A", "Mod+C", "Mod+V", "Mod+X", "Mod+Z", "Mod+Y", "Mod+Shift+Z"];
+  public static readonly macSystemKeys: readonly string[] = ["Mod+Q", "Mod+W", "Mod+H", "Mod+M", "Mod+Comma", "Mod+Tab", "Mod+Space", "Mod+Alt+Escape"];
+  public static readonly standardSystemKeys: readonly string[] = ["Alt+F4", "Alt+Tab", "Mod+Escape"];
+  public static readonly reservedKeys: readonly (readonly [string, string, readonly string[]])[] = [
+    [Resources.macPlatform, "editing", Resources.editingKeys],
+    [Resources.standardPlatform, "editing", Resources.editingKeys],
+    [Resources.macPlatform, "macOS", Resources.macSystemKeys],
+    [Resources.standardPlatform, "Windows and Linux", Resources.standardSystemKeys]
+  ];
   public static readonly stopMember: string = "stop";
   public static readonly moveAsideMember: string = "moveAside";
   public static readonly modulesMember: string = "modules";
@@ -62,6 +134,22 @@ export class Resources {
   public static readonly moduleCauseInvalid: string = "An active module has no cause, and a failed or blocked module has one that is not blank.";
   public static readonly responseOutcomeAmbiguous: string = "A response cannot carry both a payload and a failure.";
   public static readonly unknownField: string = "The field is not part of this message, which accepts no unknown fields.";
+
+  public static formatKeyInvalid(text: string): string {
+    return `"${text}" is not a key. A key is any of Mod, Ctrl, Alt and Shift joined by "+" to one key, such as K, 1, Comma, Enter or F2; Mod is Ctrl on Windows and Linux and Cmd on macOS.`;
+  }
+
+  public static formatKeyAmbiguous(text: string): string {
+    return `"${text}" names both Mod and Ctrl, which are the same key on Windows and Linux.`;
+  }
+
+  public static formatKeyNeedsModifier(text: string): string {
+    return `The default key ${text} needs Mod, Ctrl or Alt, or a function key, so that typing is never taken.`;
+  }
+
+  public static formatKeyReserved(text: string, owner: string): string {
+    return `The key ${text} is reserved for ${owner} and cannot be a command's default.`;
+  }
 
   public static formatFrameTooLarge(maximumFrameLength: number): string {
     return `A frame exceeds the maximum length of ${maximumFrameLength} characters.`;
