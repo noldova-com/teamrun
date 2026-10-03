@@ -10,7 +10,7 @@ import { ChangeDetectionStrategy, Component, ErrorHandler, type Signal, inject }
 
 import "@noldova/teamrun-foundation-core";
 import { type CommandRun, type Notification, NotificationPost, type NotificationSeverity } from "@noldova/teamrun-shell-protocol";
-import { ButtonComponent, ButtonVariant, IconButtonComponent } from "@noldova/teamrun-shell-ui";
+import { ButtonComponent, ButtonVariant, IconButtonComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { NotificationService } from "../../services/notification.service";
 import { ToastService } from "../../services/toast.service";
@@ -18,7 +18,7 @@ import { Resources } from "../../../resources";
 
 @Component({
   selector: "tr-toasts",
-  imports: [ButtonComponent, IconButtonComponent],
+  imports: [ButtonComponent, IconButtonComponent, TooltipDirective],
   templateUrl: "./toasts.component.html",
   styleUrl: "./toasts.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush

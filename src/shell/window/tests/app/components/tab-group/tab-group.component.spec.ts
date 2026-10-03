@@ -42,6 +42,16 @@ class TabGroupHostComponent {
   public readonly frames: Signal<readonly GroupFrame[]> = computed(() => this.layout.geometry().frames);
 }
 
+
+async function expectTooltipAsync(button: HTMLElement | null | undefined, text: string): Promise<void> {
+  const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === text);
+  button?.dispatchEvent(new PointerEvent("pointerenter"));
+  await vi.waitFor(() => expect(tooltip()).toBeDefined());
+  button?.dispatchEvent(new PointerEvent("pointerleave"));
+  await vi.waitFor(() => expect(tooltip()).toBeUndefined());
+  expect(button?.hasAttribute("title")).toBe(false);
+}
+
 describe("TabGroupComponent", () => {
   beforeEach(() => {
     DesktopBridgeFixture.install();
@@ -189,6 +199,7 @@ describe("TabGroupComponent", () => {
     expect(group(0).querySelector(".tr-tab-group-hide")).toBeNull();
     const hide = group(corner ?? -1).querySelector<HTMLButtonElement>(".tr-tab-group-hide");
     expect(hide?.getAttribute("aria-label")).toBe(Resources.hideDockLabels[DockSide.Left]);
+    await expectTooltipAsync(hide, Resources.hideDockLabels[DockSide.Left]);
     hide?.click();
     update();
 
@@ -199,6 +210,7 @@ describe("TabGroupComponent", () => {
     await renderAsync();
     const actions = group(0).querySelector<HTMLButtonElement>(".tr-tab-group-menu");
     expect(actions?.getAttribute("aria-label")).toBe(Resources.panelActionsLabel);
+    await expectTooltipAsync(actions, Resources.panelActionsLabel);
     actions?.click();
     update();
     await fixture.whenStable();
@@ -262,6 +274,7 @@ describe("TabGroupComponent", () => {
     expect(group(1).querySelector(".tr-tab-group-overflow")).toBeNull();
     const overflow = group(0).querySelector<HTMLButtonElement>(".tr-tab-group-overflow");
     expect(overflow?.getAttribute("aria-label")).toBe(Resources.overflowLabel);
+    await expectTooltipAsync(overflow, Resources.overflowLabel);
     overflow?.click();
     update();
     await fixture.whenStable();

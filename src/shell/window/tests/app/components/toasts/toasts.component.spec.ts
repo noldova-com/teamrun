@@ -34,6 +34,16 @@ class FakeNotificationService {
   }
 }
 
+
+async function expectTooltipAsync(button: HTMLElement | null | undefined, text: string): Promise<void> {
+  const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === text);
+  button?.dispatchEvent(new PointerEvent("pointerenter"));
+  await vi.waitFor(() => expect(tooltip()).toBeDefined());
+  button?.dispatchEvent(new PointerEvent("pointerleave"));
+  await vi.waitFor(() => expect(tooltip()).toBeUndefined());
+  expect(button?.hasAttribute("title")).toBe(false);
+}
+
 describe("ToastsComponent", () => {
   const run = (name: string): CommandRun => new CommandRun(QualifiedName.parse(name), null);
   let notifications: FakeNotificationService;
@@ -89,6 +99,7 @@ describe("ToastsComponent", () => {
     expect(second?.querySelector("span.tr-toast-title")?.textContent).toBe("Title 1");
     expect(second?.querySelector("progress")?.hasAttribute("value")).toBe(false);
     expect(second?.querySelector(".tr-toast-close")?.getAttribute("aria-label")).toBe("Close");
+    await expectTooltipAsync(second?.querySelector<HTMLElement>(".tr-toast-close"), "Close");
     expect(regions).toEqual([["polite", "Title 1"], ["assertive", "Title 2. The disk is full."]]);
   });
 
