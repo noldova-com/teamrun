@@ -174,6 +174,36 @@ describe("TabGroupComponent", () => {
     expect(begin).toHaveBeenCalledWith(LayoutFixture.search, expect.any(PointerEvent));
   });
 
+  it("moves focus to the tab that becomes active when the focused tab closes, and leaves focus in another group alone", async () => {
+    await renderAsync();
+    const key = (element: Element | null): string | undefined => (element as HTMLElement | null)?.dataset["tabKey"];
+    const focused = tabs(0).find(t => t.getAttribute("aria-selected") === "true");
+    focused?.focus();
+
+    focused?.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
+    update();
+    await fixture.whenStable();
+
+    expect(key(document.activeElement)).toBe(layout.layout().documents.active?.key);
+    tab(1, 1).focus();
+    tab(0, 0).querySelector<HTMLElement>(".tr-tab-close")?.click();
+    update();
+    await fixture.whenStable();
+    expect(key(document.activeElement)).toBe(LayoutFixture.search.key);
+  });
+
+  it("moves focus to the current group's active tab when the focused tab was the last of its group", async () => {
+    await renderAsync(prepared.splitGroup(LayoutFixture.search, 1, PanelEdge.Bottom));
+    const alone = [...document.querySelectorAll<HTMLElement>(`tr-tab[data-tab-key="${LayoutFixture.search.key}"]`)][0];
+    alone?.focus();
+
+    alone?.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
+    update();
+    await fixture.whenStable();
+
+    expect((document.activeElement as HTMLElement | null)?.dataset["tabKey"]).toBe(layout.currentGroup().active?.key);
+  });
+
   it("marks where a dragged tab would land and dims the dragged tab", async () => {
     await renderAsync();
     let under: Element | null = null;

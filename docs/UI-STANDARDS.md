@@ -68,7 +68,7 @@ The table specifies normal-state colors. Check actual composited foreground/back
 | `--tr-icon-color` | `icon.foreground`, fallback `foreground` | #3B3B3B | #CCCCCC | Interface icons |
 | `--tr-card-border` | `surface.border`, fallback `widget.border` | #E5E5E5 | #252526 | Decorative panel border |
 | `--tr-border` | `sideBarSectionHeader.border` | #E5E5E5 | #2B2B2B | Section dividers |
-| `--tr-accent` | `focusBorder`, contrast-adjusted | #005FB8 | #4DAAFC | Focus, drop guides and active resize indicators |
+| `--tr-accent` | `focusBorder`, contrast-adjusted | #005FB8 | #4DAAFC | Focus and active resize indicators |
 | `--tr-link` | `textLink.foreground` | #005FB8 | #4DAAFC | Links |
 | `--tr-hover` | `list.hoverBackground` | #F2F2F2 | #2A2D2E | Row, tab and menu-item hover |
 | `--tr-selected` | `list.inactiveSelectionBackground`, fallback `list.activeSelectionBackground` | #E4E6F1 | #37373D | Selected rows, tabs and choice pills |
@@ -77,7 +77,7 @@ The table specifies normal-state colors. Check actual composited foreground/back
 | `--tr-scrollbar-active` | `scrollbarSlider.hoverBackground`, fallback `scrollbarSlider.background` | #646464B3 | #646464B3 | Scrollbar thumb while dragged |
 | `--tr-title-bar`, `--tr-title-bar-text` | `titleBar.activeBackground`, `titleBar.activeForeground` | #F8F8F8, #1E1E1E | #181818, #CCCCCC | Native title-bar integration |
 | `--tr-input`, `--tr-input-border`, `--tr-input-text`, `--tr-placeholder` | `input.*`, with contrast-checked border fallback | #FFFFFF, #858585, #3B3B3B, #767676 | #313131, #858585, #CCCCCC, #989898 | Fields and selects; placeholders are not substitutes for labels |
-| `--tr-button`, `--tr-button-text`, `--tr-button-hover` | `button.*` | #005FB8, #FFFFFF, #0258A8 | #0078D4, #FFFFFF, #026EC1 | Primary button |
+| `--tr-button`, `--tr-button-text`, `--tr-button-hover` | `button.*` | #005FB8, #FFFFFF, #0258A8 | #0078D4, #FFFFFF, #026EC1 | Primary button and the chosen docking guide |
 | `--tr-button-secondary`, `--tr-button-secondary-text`, `--tr-button-secondary-hover` | `button.secondary*` | #E5E5E5, #3B3B3B, #CCCCCC | transparent, #CCCCCC, #2B2B2B | Secondary button |
 | `--tr-dropdown`, `--tr-dropdown-border`, `--tr-dropdown-list` | `dropdown.*`, fallback `input.*` | #FFFFFF, #858585, #FFFFFF | #313131, #858585, #1F1F1F | Select and options list |
 | `--tr-list-active`, `--tr-list-active-text` | `list.activeSelection*` | #E8E8E8, #000000 | #04395E, #FFFFFF | Chosen or keyboard-active option |
@@ -213,7 +213,7 @@ This table assigns geometry and radius tokens under sections 1, 3 and 7, with th
 | Settings item | Padding 0.75rem 0.875rem 1.125rem; description gap 0.1875rem; control gap 0.5625rem; medium radius | Panel; title 600 | Subtle hover surface; text and controls wrap |
 | Settings heading | Automatic height; 0.625rem surrounding space, 0.9375rem start inset | Settings group heading, 600 | Heading foreground; grows with its proportional line height |
 | Icon button | 1.375rem visual pad around a 1rem glyph; small radius | Accessible name | Toolbar hover; pointer hit region at least 24px unless a documented exception applies |
-| Docking guide | 2.5rem square around a 1.5rem glyph; small radius; a group's center target and split arrows share a medium-radius plate with 0.125rem gaps, moved clear of the side guides | Accessible action name | Raised surface; shown while a view's tab is dragged; accent for the chosen target, whose landing area is previewed with the docking-preview fill, a 1px docking-preview border and the large radius |
+| Docking guide | 2.5rem square around a 1.5rem glyph; small radius; a group's center target and split arrows share a medium-radius plate with 0.125rem gaps, moved clear of the side guides | Accessible action name | Raised surface; shown while a view's tab is dragged; primary-button fill and text for the chosen target, whose landing area is previewed with the docking-preview fill, a 1px docking-preview border and the large radius |
 | Progress | 2px bar; 1rem spinner; reveal after 300ms where delay avoids flicker | Accessible status | Progress token; empty track; completion/error remain understandable without animation |
 | Word wrap | Icon-button geometry; 1rem wrap glyph | Accessible name | Initially off; precedes Copy or diff collapse; pressed state exposed; Enter/Space activate |
 | Inline code | Text metrics; small radius | Code | Inline-code token |
