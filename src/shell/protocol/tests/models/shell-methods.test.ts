@@ -28,8 +28,11 @@ export class ShellMethodsTests {
   @TestMethod
   public namesTheNotificationMethods(): void {
     Assert.areEqual(
-      JSON.stringify(["shell.notifications", "shell.postNotification", "shell.updateNotification", "shell.dismissNotification"]),
-      JSON.stringify([ShellMethods.notifications, ShellMethods.postNotification, ShellMethods.updateNotification, ShellMethods.dismissNotification].map(t => t.text)));
+      JSON.stringify(["shell.notifications", "shell.postNotification", "shell.updateNotification", "shell.dismissNotification", "shell.markNotificationsRead", "shell.clearNotifications", "shell.setDoNotDisturb"]),
+      JSON.stringify([
+        ShellMethods.notifications, ShellMethods.postNotification, ShellMethods.updateNotification, ShellMethods.dismissNotification,
+        ShellMethods.markNotificationsRead, ShellMethods.clearNotifications, ShellMethods.setDoNotDisturb
+      ].map(t => t.text)));
   }
 
   @TestMethod

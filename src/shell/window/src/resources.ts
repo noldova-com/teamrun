@@ -9,7 +9,7 @@
 import type { FocusOrigin } from "@angular/cdk/a11y";
 
 import "@noldova/teamrun-foundation-core";
-import { ModuleState } from "@noldova/teamrun-shell-protocol";
+import { ModuleState, NotificationSeverity } from "@noldova/teamrun-shell-protocol";
 import { DockingDirection, OverlaySide } from "@noldova/teamrun-shell-ui";
 
 import { BottomDockSpan } from "./app/enums/bottom-dock-span";
@@ -370,6 +370,38 @@ export class Resources {
 
   public static formatUndeclaredCommand(moduleId: string, name: string): string {
     return `The module ${moduleId} does not declare the command ${name}.`;
+  }
+
+  public static readonly isOnField: string = "isOn";
+  public static readonly notificationsGlyph: string = "notifications";
+  public static readonly notificationsOffGlyph: string = "notifications_off";
+  public static readonly notificationsTitle: string = "Notifications";
+  public static readonly clearAllLabel: string = "Clear all";
+  public static readonly doNotDisturbLabel: string = "Do not disturb";
+  public static readonly noNotifications: string = "No notifications";
+  public static readonly dismissLabel: string = "Dismiss";
+  public static readonly checkGlyph: string = "check";
+  public static readonly unreadLimit: number = 9;
+  public static readonly severityGlyphs: Readonly<Record<NotificationSeverity, string>> = {
+    [NotificationSeverity.Info]: "info",
+    [NotificationSeverity.Success]: "check_circle",
+    [NotificationSeverity.Warning]: "warning",
+    [NotificationSeverity.Error]: "error"
+  };
+  public static readonly severityNames: Readonly<Record<NotificationSeverity, string>> = {
+    [NotificationSeverity.Info]: "Information",
+    [NotificationSeverity.Success]: "Success",
+    [NotificationSeverity.Warning]: "Warning",
+    [NotificationSeverity.Error]: "Error"
+  };
+
+  public static formatUnreadCount(count: number): string {
+    return count > Resources.unreadLimit ? `${Resources.unreadLimit}+` : String(count);
+  }
+
+  public static formatNotificationsLabel(unread: number, isQuiet: boolean): string {
+    const state = isQuiet ? ", Do not disturb" : "";
+    return unread === 0 ? `Notifications${state}` : `Notifications, ${unread} unread${state}`;
   }
 
   public static formatUndeclaredContribution(moduleId: string, kind: string, name: string): string {

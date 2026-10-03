@@ -30,9 +30,9 @@ test.describe("the status bar and the top bar", () => {
     await expect(count).toHaveText("3 notes");
     await expect(count.getByRole("button")).toHaveCount(0);
     await expect(compose).toHaveAttribute("aria-label", "New note");
-    await expect(window.locator(".tr-status-bar-right > *")).toHaveCount(2);
+    await expect(window.locator(".tr-status-bar-right > *")).toHaveCount(3);
     expect(await window.locator(".tr-status-bar-right > *").evaluateAll(t => t.map(u => u.getAttribute("data-tr-item") ?? u.tagName.toLowerCase())))
-      .toEqual(["clock.ticks", "tr-module-failures"]);
+      .toEqual(["clock.ticks", "tr-notifications", "tr-module-failures"]);
 
     const look = await window.evaluate(() => {
       const style = (selector: string): CSSStyleDeclaration => getComputedStyle(document.querySelector(selector) as Element);
@@ -60,6 +60,6 @@ test.describe("the status bar and the top bar", () => {
     await expect(window.locator("tr-module-failures button")).toBeVisible();
     await expect(window.locator("tr-status-bar-item[data-tr-item=\"clock.ticks\"]")).toHaveCount(0);
     await expect(window.locator("tr-status-bar-item[data-tr-item=\"notes.count\"]")).toHaveText("2 notes");
-    expect(await window.locator(".tr-status-bar-right > *").evaluateAll(t => t.map(u => u.tagName.toLowerCase()))).toEqual(["tr-module-failures"]);
+    expect(await window.locator(".tr-status-bar-right > *").evaluateAll(t => t.map(u => u.tagName.toLowerCase()))).toEqual(["tr-notifications", "tr-module-failures"]);
   });
 });

@@ -1,0 +1,178 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-2);
+  box-sizing: border-box;
+  width: min(var(--tr-popover-width), calc(100vw - var(--tr-space-4)));
+  max-height: calc(100vh - var(--tr-space-6) * 2);
+  padding: var(--tr-space-3);
+  border: var(--tr-border-width) solid var(--tr-menu-border);
+  border-radius: var(--tr-radius-large);
+  background-color: var(--tr-menu);
+  box-shadow: var(--tr-shadow-large);
+  font-size: var(--tr-text-panel);
+  line-height: var(--tr-line-panel);
+}
+
+:host > * {
+  color: var(--tr-menu-text);
+}
+
+:host(:focus) {
+  outline: none;
+}
+
+.tr-notifications-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tr-space-2);
+}
+
+.tr-notifications-title {
+  margin: 0;
+  font-size: inherit;
+  font-weight: var(--tr-weight-emphasis);
+  line-height: inherit;
+}
+
+.tr-notifications-quiet {
+  display: flex;
+  align-items: center;
+  gap: var(--tr-space-2);
+}
+
+.tr-notifications-quiet-control {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+}
+
+.tr-notifications-quiet-box {
+  box-sizing: border-box;
+  width: var(--tr-checkbox-size);
+  height: var(--tr-checkbox-size);
+  margin: 0;
+  border: var(--tr-border-width) solid var(--tr-checkbox-border);
+  border-radius: var(--tr-radius-small);
+  background-color: var(--tr-checkbox);
+  appearance: none;
+}
+
+.tr-notifications-quiet-box:focus-visible {
+  outline: var(--tr-border-width) solid var(--tr-accent);
+  outline-offset: var(--tr-border-width);
+}
+
+.tr-notifications-quiet-mark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--tr-text);
+  font-size: var(--tr-icon);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.tr-notifications-quiet-box:checked + .tr-notifications-quiet-mark {
+  visibility: visible;
+}
+
+.tr-notifications-empty {
+  margin: 0;
+  color: var(--tr-text-muted);
+}
+
+.tr-notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-2);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.tr-notifications-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--tr-space-2);
+}
+
+.tr-notifications-severity {
+  color: var(--tr-icon-color);
+  font-size: var(--tr-icon);
+  line-height: var(--tr-line-panel);
+}
+
+.tr-notifications-row[data-severity="Error"] .tr-notifications-severity {
+  color: var(--tr-error);
+}
+
+.tr-notifications-row[data-severity="Success"] .tr-notifications-severity {
+  color: var(--tr-added);
+}
+
+.tr-notifications-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-1);
+  min-width: 0;
+}
+
+.tr-notifications-row-title {
+  font-weight: var(--tr-weight-emphasis);
+  overflow-wrap: anywhere;
+}
+
+.tr-notifications-open {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tr-link);
+  font: inherit;
+  font-weight: var(--tr-weight-emphasis);
+  text-align: start;
+  cursor: pointer;
+}
+
+.tr-notifications-open:disabled {
+  color: inherit;
+  cursor: default;
+}
+
+.tr-notifications-open:focus-visible {
+  outline: var(--tr-border-width) solid var(--tr-accent);
+}
+
+.tr-notifications-text {
+  overflow-wrap: anywhere;
+}
+
+.tr-notifications-meta {
+  color: var(--tr-text-muted);
+}
+
+.tr-notifications-progress {
+  width: 100%;
+  height: var(--tr-space-1);
+  accent-color: var(--tr-progress);
+}
+
+.tr-notifications-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tr-space-2);
+}

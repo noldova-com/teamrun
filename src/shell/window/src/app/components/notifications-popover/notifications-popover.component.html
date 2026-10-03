@@ -1,0 +1,46 @@
+<div class="tr-notifications-header">
+  <h2 class="tr-notifications-title">{{ resources.notificationsTitle }}</h2>
+  <button type="button" tr-button class="tr-notifications-clear" [variant]="secondary" [disabled]="!hasFinished()" (click)="clear()">{{ resources.clearAllLabel }}</button>
+</div>
+<label class="tr-notifications-quiet">
+  <span class="tr-notifications-quiet-control">
+    <input type="checkbox" class="tr-notifications-quiet-box" [checked]="isQuiet()" (change)="setQuiet($event)" />
+    <span class="material-symbols-rounded tr-notifications-quiet-mark" aria-hidden="true">{{ resources.checkGlyph }}</span>
+  </span>
+  <span>{{ resources.doNotDisturbLabel }}</span>
+</label>
+@if (notifications().length === 0) {
+  <p class="tr-notifications-empty">{{ resources.noNotifications }}</p>
+}
+@else {
+  <ul class="tr-notifications-list tr-scroll-reveal">
+    @for (notification of notifications(); track notification.id) {
+      <li class="tr-notifications-row" [attr.data-notification]="notification.id" [attr.data-severity]="notification.post.severity">
+        <span class="material-symbols-rounded tr-notifications-severity" role="img" [attr.aria-label]="severityName(notification.post.severity)">{{ glyph(notification.post.severity) }}</span>
+        <div class="tr-notifications-body">
+          @if (notification.post.open !== null) {
+            <button type="button" class="tr-notifications-row-title tr-notifications-open" [disabled]="!isAvailable(notification.post.open)" (click)="run(notification.post.open)">{{ notification.post.title }}</button>
+          }
+          @else {
+            <span class="tr-notifications-row-title">{{ notification.post.title }}</span>
+          }
+          @if (notification.post.text !== null) {
+            <span class="tr-notifications-text">{{ notification.post.text }}</span>
+          }
+          @if (isIndeterminate(notification) || progressOf(notification) !== null) {
+            <progress class="tr-notifications-progress" max="1" [attr.value]="progressOf(notification)" [attr.aria-label]="notification.post.title"></progress>
+          }
+          <span class="tr-notifications-meta">{{ moduleName(notification) }} · {{ timeOf(notification) }}</span>
+          @if (notification.post.actions.length > 0) {
+            <div class="tr-notifications-actions">
+              @for (action of notification.post.actions; track $index) {
+                <button type="button" tr-button class="tr-notifications-action" [variant]="secondary" [disabled]="!isAvailable(action.command)" (click)="run(action.command)">{{ action.title }}</button>
+              }
+            </div>
+          }
+        </div>
+        <button type="button" tr-icon-button class="tr-notifications-dismiss" [icon]="resources.closeGlyph" [label]="resources.dismissLabel" [attr.title]="resources.dismissLabel" (click)="dismiss(notification)"></button>
+      </li>
+    }
+  </ul>
+}

@@ -1085,7 +1085,8 @@ export declare class PreShellData {
  */
 export declare class ShellEvents {
   /**
-   * `shell.notifications`: the runtime's notifications changed; its payload is the whole `NotificationList`.
+   * `shell.notifications`: the runtime's notifications or a device's Do not disturb changed; its payload is a
+   * `NotificationBroadcast`.
    */
   public static readonly notifications: QualifiedName;
 }
@@ -1127,7 +1128,8 @@ export declare class ShellMethods {
   public static readonly runCommand: QualifiedName;
 
   /**
-   * `shell.notifications`: asks the runtime for its notifications; it answers with a `NotificationList`.
+   * `shell.notifications`: asks the runtime for its notifications; its payload is a `NotificationsQuery` and its answer a
+   * `NotificationState` for that device.
    */
   public static readonly notifications: QualifiedName;
 
@@ -1148,6 +1150,23 @@ export declare class ShellMethods {
    * is ignored.
    */
   public static readonly dismissNotification: QualifiedName;
+
+  /**
+   * `shell.markNotificationsRead`: marks every notification read, as opening the notifications list does; it takes no payload.
+   */
+  public static readonly markNotificationsRead: QualifiedName;
+
+  /**
+   * `shell.clearNotifications`: removes every notification that reports no work in progress, as the list's Clear all does;
+   * it takes no payload.
+   */
+  public static readonly clearNotifications: QualifiedName;
+
+  /**
+   * `shell.setDoNotDisturb`: turns Do not disturb on or off for a device; its payload is a `DoNotDisturbChange`. The flag is
+   * notification state, kept per device in the shell database, not a general preference.
+   */
+  public static readonly setDoNotDisturb: QualifiedName;
 
   /**
    * `shell.readWindowBounds`: reads the bounds the desktop kept for a
@@ -1889,7 +1908,8 @@ export declare class Notification {
 }
 
 /**
- * The runtime's notifications, newest first: the answer of `shell.notifications` and the payload of its event.
+ * The runtime's notifications, newest first, as the runtime holds them; `NotificationState` and `NotificationBroadcast` carry
+ * them on the wire.
  */
 export declare class NotificationList {
   /**
@@ -2063,6 +2083,271 @@ export declare class NotificationReference {
    * import { NotificationReference } from "@noldova/teamrun-shell-protocol";
    *
    * export const json: JsonObject = new NotificationReference(1).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A device's question for the runtime's notifications: the payload of `shell.notifications`, which the desktop sends for its
+ * window, adding its own device.
+ */
+export declare class NotificationsQuery {
+  /**
+   * The device whose Do not disturb the answer reports.
+   */
+  public readonly device: string;
+
+  /**
+   * Creates the query.
+   *
+   * @param device The device's id.
+   * @throws ArgumentException synchronously when the device is blank.
+   *
+   * @example
+   * ```ts
+   * import { NotificationsQuery } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const query: NotificationsQuery = new NotificationsQuery("laptop");
+   * ```
+   */
+  public constructor(device: string);
+
+  /**
+   * Reads the query from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The query.
+   * @throws JsonException synchronously when `device` is missing or invalid, or a field is unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { NotificationsQuery } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const query: NotificationsQuery = NotificationsQuery.fromJson({ device: "laptop" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): NotificationsQuery;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `device` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { NotificationsQuery } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new NotificationsQuery("laptop").toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * Turns Do not disturb on or off for a device: the payload of `shell.setDoNotDisturb`, which the desktop sends for its
+ * window, adding its own device.
+ */
+export declare class DoNotDisturbChange {
+  /**
+   * The device.
+   */
+  public readonly device: string;
+
+  /**
+   * Whether Do not disturb is on.
+   */
+  public readonly isOn: boolean;
+
+  /**
+   * Creates the change.
+   *
+   * @param device The device's id.
+   * @param isOn Whether Do not disturb is on.
+   * @throws ArgumentException synchronously when the device is blank.
+   *
+   * @example
+   * ```ts
+   * import { DoNotDisturbChange } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const change: DoNotDisturbChange = new DoNotDisturbChange("laptop", true);
+   * ```
+   */
+  public constructor(device: string, isOn: boolean);
+
+  /**
+   * Reads the change from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The change.
+   * @throws JsonException synchronously when `device` or `isOn` is missing or invalid, or a field is unknown; its path names
+   * the field.
+   *
+   * @example
+   * ```ts
+   * import { DoNotDisturbChange } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const change: DoNotDisturbChange = DoNotDisturbChange.fromJson({ device: "laptop", isOn: false });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): DoNotDisturbChange;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `device` and `isOn` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { DoNotDisturbChange } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new DoNotDisturbChange("laptop", true).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The notifications as one device sees them: the answer of `shell.notifications`, and what the desktop forwards to its window
+ * for each `shell.notifications` event.
+ */
+export declare class NotificationState {
+  /**
+   * The notifications, newest first.
+   */
+  public readonly notifications: readonly Notification[];
+
+  /**
+   * Whether Do not disturb is on for the device.
+   */
+  public readonly isDoNotDisturb: boolean;
+
+  /**
+   * Creates the state.
+   *
+   * @param notifications The notifications, newest first.
+   * @param isDoNotDisturb Whether Do not disturb is on for the device.
+   *
+   * @example
+   * ```ts
+   * import { NotificationState } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const state: NotificationState = new NotificationState([], false);
+   * ```
+   */
+  public constructor(notifications: readonly Notification[], isDoNotDisturb: boolean);
+
+  /**
+   * Reads the state from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The state.
+   * @throws JsonException synchronously when a field is missing, invalid or unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { NotificationState } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const state: NotificationState = NotificationState.fromJson({ notifications: [], isDoNotDisturb: true });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): NotificationState;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `notifications` and `isDoNotDisturb` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { NotificationState } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new NotificationState([], false).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The payload of the `shell.notifications` event: the notifications and the devices with Do not disturb on. The desktop
+ * forwards it to its window as the state for its own device.
+ */
+export declare class NotificationBroadcast {
+  /**
+   * The notifications, newest first.
+   */
+  public readonly notifications: readonly Notification[];
+
+  /**
+   * The devices with Do not disturb on.
+   */
+  public readonly quietDevices: readonly string[];
+
+  /**
+   * Creates the broadcast.
+   *
+   * @param notifications The notifications, newest first.
+   * @param quietDevices The devices with Do not disturb on.
+   * @throws ArgumentException synchronously when a device is blank.
+   *
+   * @example
+   * ```ts
+   * import { NotificationBroadcast } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const broadcast: NotificationBroadcast = new NotificationBroadcast([], ["laptop"]);
+   * ```
+   */
+  public constructor(notifications: readonly Notification[], quietDevices: readonly string[]);
+
+  /**
+   * Reads the broadcast from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The broadcast.
+   * @throws JsonException synchronously when a field is missing, invalid or unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { NotificationBroadcast } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const broadcast: NotificationBroadcast = NotificationBroadcast.fromJson({ notifications: [], quietDevices: [] });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): NotificationBroadcast;
+
+  /**
+   * Returns the state one device sees.
+   *
+   * @param device The device's id.
+   * @returns The notifications, with Do not disturb on when the device is among the quiet ones.
+   *
+   * @example
+   * ```ts
+   * import { NotificationBroadcast, type NotificationState } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const state: NotificationState = new NotificationBroadcast([], ["laptop"]).stateFor("laptop");
+   * ```
+   */
+  public stateFor(device: string): NotificationState;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `notifications` and `quietDevices` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { NotificationBroadcast } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new NotificationBroadcast([], []).toJson();
    * ```
    */
   public toJson(): JsonObject;
