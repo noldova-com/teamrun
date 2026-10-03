@@ -19,6 +19,7 @@ export default class ProcessListFixture {
   private static readonly POSIX_ROW: RegExp = /^\s*(\d+)\s+(.+)$/;
   private static readonly ID_ROW: RegExp = /^\s*(\d+)\s*$/;
   private static readonly DESCRIBED_ROW: RegExp = /^\s*(\d+)\s+(.*?)\s*$/;
+  private static readonly PROCESSOR_TIME: RegExp = /^\s*(?:(?:(\d+)-)?(\d+):)?(\d+):(\d+(?:\.\d+)?)\s*$/m;
 
   public static readNames(processIds: readonly number[]): ReadonlyMap<number, string> {
     const isWindows = process.platform === "win32";
@@ -88,6 +89,20 @@ export default class ProcessListFixture {
       : await ProcessListFixture.runAsync("ps", ["-ww", "-o", "pid=,args=", "-p", processIds.join(",")]);
     const described = new Map(output.split(/\r?\n/).map(t => ProcessListFixture.DESCRIBED_ROW.exec(t)).filter(t => t !== null).map(t => [Number(t[1]), t[2] ?? ""]));
     return processIds.map(t => `${t} ${described.get(t) ?? "(gone)"}`).join("; ");
+  }
+
+  public static async readProcessorMillisecondsAsync(processId: number): Promise<number | null> {
+    if (process.platform === "win32") {
+      const output = await ProcessListFixture.runAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+        `Microsoft.PowerShell.Management\\Get-Process -Id ${processId} -ErrorAction SilentlyContinue | Microsoft.PowerShell.Core\\ForEach-Object { [long]$_.TotalProcessorTime.TotalMilliseconds }`]);
+      const row = ProcessListFixture.ID_ROW.exec(output);
+      return row === null ? null : Number(row[1]);
+    }
+    const time = ProcessListFixture.PROCESSOR_TIME.exec(await ProcessListFixture.runAsync("ps", ["-o", "time=", "-p", String(processId)]));
+    if (time === null)
+      return null;
+    const [days, hours, minutes, seconds] = time.slice(1).map(t => Number(t ?? 0));
+    return Math.round(((((days ?? 0) * 24 + (hours ?? 0)) * 60 + (minutes ?? 0)) * 60 + (seconds ?? 0)) * 1000);
   }
 
   private static async describeOnWindowsAsync(processIds: readonly number[]): Promise<string> {
