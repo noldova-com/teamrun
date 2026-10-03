@@ -1,0 +1,16 @@
+{
+  "name": "@noldova/teamrun-shell-cli",
+  "version": "__VERSION__",
+  "private": true,
+  "type": "module",
+  "main": "api/index.js",
+  "types": "api/index.d.ts",
+  "license": "MIT",
+  "dependencies": {
+    "@noldova/teamrun-foundation-core": "__VERSION__",
+    "@noldova/teamrun-foundation-exceptions": "__VERSION__",
+    "@noldova/teamrun-foundation-json": "__VERSION__",
+    "@noldova/teamrun-shell-protocol": "__VERSION__",
+    "@noldova/teamrun-shell-runtime": "__VERSION__"
+  }
+}
