@@ -84,7 +84,28 @@ export class Resources {
   public static readonly readQuietDevicesStatement: string = "SELECT device FROM quiet_devices";
   public static readonly addQuietDeviceStatement: string = "INSERT INTO quiet_devices (device) VALUES (?) ON CONFLICT (device) DO NOTHING";
   public static readonly removeQuietDeviceStatement: string = "DELETE FROM quiet_devices WHERE device = ?";
+  public static readonly settingsMigration: string = "settings";
+  public static readonly createSettingValuesStatement: string =
+    "CREATE TABLE setting_values (name TEXT NOT NULL, scope_name TEXT NOT NULL, scope_id TEXT NOT NULL, device TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (name, scope_name, scope_id, device)) STRICT";
+  public static readonly copyQuietDevicesStatement: string =
+    "INSERT INTO setting_values (name, scope_name, scope_id, device, value) SELECT 'shell.doNotDisturb', '', '', device, 'true' FROM quiet_devices";
+  public static readonly createSettingScopesStatement: string =
+    "CREATE TABLE setting_scopes (scope_name TEXT NOT NULL, scope_id TEXT NOT NULL, parent_name TEXT NOT NULL, parent_id TEXT NOT NULL, PRIMARY KEY (scope_name, scope_id)) STRICT";
+  public static readonly readSettingStatement: string = "SELECT value FROM setting_values WHERE name = ? AND scope_name = ? AND scope_id = ? AND device = ?";
+  public static readonly readSettingDevicesStatement: string = "SELECT device, value FROM setting_values WHERE name = ? AND scope_name = '' AND scope_id = '' AND device <> ''";
+  public static readonly writeSettingStatement: string =
+    "INSERT INTO setting_values (name, scope_name, scope_id, device, value) VALUES (?, ?, ?, ?, ?) ON CONFLICT (name, scope_name, scope_id, device) DO UPDATE SET value = excluded.value";
+  public static readonly resetSettingStatement: string = "DELETE FROM setting_values WHERE name = ? AND scope_name = ? AND scope_id = ? AND device = ?";
+  public static readonly readScopeParentStatement: string = "SELECT parent_name, parent_id FROM setting_scopes WHERE scope_name = ? AND scope_id = ?";
+  public static readonly writeScopeParentStatement: string =
+    "INSERT INTO setting_scopes (scope_name, scope_id, parent_name, parent_id) VALUES (?, ?, ?, ?) ON CONFLICT (scope_name, scope_id) DO UPDATE SET parent_name = excluded.parent_name, parent_id = excluded.parent_id";
+  public static readonly removeScopeParentStatement: string = "DELETE FROM setting_scopes WHERE scope_name = ? AND scope_id = ?";
+  public static readonly removeScopeValuesStatement: string = "DELETE FROM setting_values WHERE scope_name = ? AND scope_id = ?";
   public static readonly deviceColumn: string = "device";
+  public static readonly parentNameColumn: string = "parent_name";
+  public static readonly parentIdColumn: string = "parent_id";
+  public static readonly applicationScope: string = "";
+  public static readonly sharedDevice: string = "";
   public static readonly createWindowStatesStatement: string =
     "CREATE TABLE window_states (device TEXT NOT NULL, window TEXT NOT NULL, bounds TEXT, layout TEXT, PRIMARY KEY (device, window)) STRICT";
   public static readonly errorCodeField: "errcode" = "errcode";
@@ -153,6 +174,53 @@ export class Resources {
   public static readonly commandsKind: string = "commands";
   public static readonly notificationsKind: string = "notifications";
   public static readonly notificationLimit: number = 100;
+  public static readonly settingsKind: string = "settings";
+  public static readonly themeSetting: string = "theme";
+  public static readonly modeSetting: string = "mode";
+  public static readonly interfaceFontSetting: string = "interfaceFont";
+  public static readonly codeFontSetting: string = "codeFont";
+  public static readonly panelSizeSetting: string = "panelSize";
+  public static readonly messageSizeSetting: string = "messageSize";
+  public static readonly codeSizeSetting: string = "codeSize";
+  public static readonly doNotDisturbSetting: string = "doNotDisturb";
+  public static readonly mutedModulesSetting: string = "mutedModules";
+  public static readonly appearancePage: string = "Appearance";
+  public static readonly notificationsPage: string = "Notifications";
+  public static readonly themeGroup: string = "Theme";
+  public static readonly textGroup: string = "Text";
+  public static readonly notificationsGroup: string = "Notifications";
+  public static readonly defaultThemeId: string = "shell.default";
+  public static readonly defaultThemeTitle: string = "Default";
+  public static readonly themeTitle: string = "Theme";
+  public static readonly themeDescription: string = `The colors and look of ${Resources.productName}.`;
+  public static readonly modeTitle: string = "Mode";
+  public static readonly modeDescription: string = "Light, dark, or following the operating system.";
+  public static readonly modeOptions: readonly (readonly [string, string])[] = [["Light", "Light"], ["Dark", "Dark"], ["System", "System"]];
+  public static readonly defaultMode: string = "System";
+  public static readonly interfaceFontTitle: string = "Interface font";
+  public static readonly interfaceFontDescription: string = "The font of menus, panels and prose.";
+  public static readonly codeFontTitle: string = "Code font";
+  public static readonly codeFontDescription: string = "The font of code and terminals.";
+  public static readonly fontOptions: readonly (readonly [string, string])[] = [["Noldova", "Noldova"], ["System", "System"]];
+  public static readonly defaultFont: string = "Noldova";
+  public static readonly panelSizeTitle: string = "Interface text size";
+  public static readonly panelSizeDescription: string = "The size of interface text, in pixels; spacing and controls scale with it.";
+  public static readonly messageSizeTitle: string = "Message text size";
+  public static readonly messageSizeDescription: string = "The size of prose you read and write, in pixels.";
+  public static readonly codeSizeTitle: string = "Code text size";
+  public static readonly codeSizeDescription: string = "The size of code, in pixels.";
+  public static readonly minimumTextSize: number = 12;
+  public static readonly maximumTextSize: number = 18;
+  public static readonly textSizeStep: number = 1;
+  public static readonly defaultPanelSize: number = 13;
+  public static readonly defaultMessageSize: number = 14;
+  public static readonly defaultCodeSize: number = 14;
+  public static readonly doNotDisturbTitle: string = "Do not disturb";
+  public static readonly doNotDisturbDescription: string = "Holds back notifications on this device; they still collect in the list.";
+  public static readonly mutedModulesTitle: string = "Muted modules";
+  public static readonly mutedModulesDescription: string = "Modules whose notifications are not shown.";
+  public static readonly settingScopesKind: string = "settingScopes";
+  public static readonly settingsField: string = "settings";
   public static readonly nameParameterName: string = "name";
   public static readonly defaultKeyParameterName: string = "defaultKey";
   public static readonly dataDirectoryVariable: string = "__DATA_DIRECTORY_VARIABLE__";
@@ -401,6 +469,42 @@ export class Resources {
 
   public static formatServicePublished(name: string): string {
     return `The service ${name} is already published.`;
+  }
+
+  public static formatSettingUnknown(name: string): string {
+    return `No setting named ${name} is declared.`;
+  }
+
+  public static formatSettingValueInvalid(name: string): string {
+    return `The value is not one the setting ${name} accepts.`;
+  }
+
+  public static formatSettingNeedsDevice(name: string): string {
+    return `The setting ${name} is kept per device and needs a device, without a scope.`;
+  }
+
+  public static formatSettingScopeNotAllowed(name: string, scope: string): string {
+    return `The setting ${name} cannot be set for the scope ${scope}.`;
+  }
+
+  public static formatSettingNotReadable(moduleId: string, name: string): string {
+    return `The module ${moduleId} may only read its own settings, its dependencies' and the shell's, not ${name}.`;
+  }
+
+  public static formatSettingNotWritable(moduleId: string, name: string): string {
+    return `The module ${moduleId} may only change its own settings, not ${name}.`;
+  }
+
+  public static formatSettingScopeNotOwned(moduleId: string, scope: string): string {
+    return `The module ${moduleId} may only describe the scopes it declares, its dependencies' as parents, not ${scope}.`;
+  }
+
+  public static formatSettingValueIgnored(name: string, scope: string, device: string): string {
+    return `The stored value of the setting ${name} for the scope "${scope}" and device "${device}" no longer fits its definition; it is kept and ignored.\n`;
+  }
+
+  public static formatSettingOwnerInvalid(moduleId: string, name: string): string {
+    return `The module ${moduleId} declares the setting ${name}, which it does not own.`;
   }
 
   public static formatNotContributed(moduleId: string, kind: string, name: string): string {

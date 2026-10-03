@@ -48,7 +48,8 @@ class ModuleDeclarationTests {
         displayName: "Notes",
         dependencies: ["tasks", "git-hub2"],
         runtimePackage: "@noldova/teamrun-modules-notes-runtime",
-        contributes: { methods: ["notes.list"], commands: ["notes.newNote"], notifications: ["notes.saved"], views: ["notes.list", "notes.outlineView"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"], themes: [] }
+        contributes: { methods: ["notes.list"], commands: ["notes.newNote"], notifications: ["notes.saved"], views: ["notes.list", "notes.outlineView"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"], themes: [] },
+        settings: []
       });
       assert.equal(fixture.isFixture, true);
       assert.equal(fixture.runtimePackage, null);

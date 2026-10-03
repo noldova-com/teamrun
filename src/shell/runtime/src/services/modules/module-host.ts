@@ -10,7 +10,7 @@ import type { Writable } from "node:stream";
 import { inspect } from "node:util";
 
 import "@noldova/teamrun-foundation-core";
-import { ModuleState, ModuleStatus, ModuleStatusList } from "@noldova/teamrun-shell-protocol";
+import { ModuleState, ModuleStatus, ModuleStatusList, type SettingDefinition } from "@noldova/teamrun-shell-protocol";
 
 import type { IRuntimePart } from "../../interfaces/runtime-part.js";
 import type { IRuntimePartLoader } from "../../interfaces/runtime-part-loader.js";
@@ -26,6 +26,7 @@ import { ModuleDatabase } from "../database/module-database.js";
 import type { EventRegistry } from "../registry/event-registry.js";
 import type { MethodRegistry } from "../registry/method-registry.js";
 import { ServiceRegistry } from "../registry/service-registry.js";
+import type { SettingsService } from "../settings/settings-service.js";
 import { ModuleContext } from "./module-context.js";
 
 export class ModuleHost {
@@ -67,9 +68,13 @@ export class ModuleHost {
     return new ModuleStatusList([...this.statuses.values()]);
   }
 
-  public async activateAsync(): Promise<void> {
+  public get settingDefinitions(): readonly SettingDefinition[] {
+    return this.declarations.flatMap(t => t.settings);
+  }
+
+  public async activateAsync(settings: SettingsService): Promise<void> {
     for (const declaration of this.order())
-      this.statuses.set(declaration.id, await this.activateModuleAsync(declaration));
+      this.statuses.set(declaration.id, await this.activateModuleAsync(declaration, settings));
   }
 
   public async deactivateAsync(): Promise<void> {
@@ -104,7 +109,7 @@ export class ModuleHost {
     return ordered;
   }
 
-  private async activateModuleAsync(declaration: ModuleDeclaration): Promise<ModuleStatus> {
+  private async activateModuleAsync(declaration: ModuleDeclaration, settings: SettingsService): Promise<ModuleStatus> {
     const blocker = declaration.dependencies.find(t => this.statuses.get(t)?.state !== ModuleState.Active);
     if (!Object.isUndefined(blocker))
       return new ModuleStatus(declaration.id, ModuleState.Blocked, Resources.formatModuleBlocked(blocker));
@@ -131,7 +136,8 @@ export class ModuleHost {
         return new ModuleStatus(declaration.id, ModuleState.Failed, cause);
       }
 
-    const context = new ModuleContext(declaration, this.dataDirectory, this.methods, this.events, this.commands, this.notifications, this.notificationPolicy, this.services, database);
+    const context = new ModuleContext(
+      declaration, this.dataDirectory, this.methods, this.events, this.commands, this.notifications, this.notificationPolicy, this.services, settings, database);
     try {
       await part.activateAsync(context);
     }

@@ -96,9 +96,9 @@ Each module declares itself in `module.json` at its folder's root, with exactly 
 | `displayName` | The name people see |
 | `parts` | Its parts, each once: `runtime`, `window` or `cli`, each with a folder of that name |
 | `dependencies` | The ids of the modules it depends on |
-| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `notifications`, `views`, `documents`, `statusBarItems`, `topBarActions`, `menus` and `themes`, each of the form `<id>.<name>` with a camelCase name |
+| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `notifications`, `views`, `documents`, `statusBarItems`, `topBarActions`, `menus`, `themes`, `settings` and `settingScopes`, each of the form `<id>.<name>` with a camelCase name |
 
-A module without parts may leave the file out until it gains one. Dependencies form no cycle, and a build includes every module a listed module depends on. The build validates the declarations, orders them after their dependencies and writes them for the runtime, which reads them from `_build/modules/declarations.json` in the repository it is installed in, as the desktop finds the window's build there; the packaged layout is decided with packaging. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
+A module that contributes settings defines them in `settings.json` beside `module.json`, as section 5 describes. A module without parts may leave the file out until it gains one. Dependencies form no cycle, and a build includes every module a listed module depends on. The build validates the declarations, orders them after their dependencies and writes them for the runtime, which reads them from `_build/modules/declarations.json` in the repository it is installed in, as the desktop finds the window's build there; the packaged layout is decided with packaging. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
 
 ### Lifecycle
 
@@ -181,6 +181,22 @@ A module adds groups to the shell's places, its own and those of the modules it 
 A window part opens its own places and its dependencies' as context menus with the `trMenu` directive, giving a place and a context object. The context is merged into each item's arguments, the item's own fields winning, so one declared item acts on whatever the menu was opened on.
 
 The shell's own groups put Close the tab in File, and command search, showing or hiding each dock, the bottom dock across the window or between the side docks, and Reset the layout in View. On macOS the window gives the desktop the main menu's rows whenever they change, and the desktop builds the native menu bar from them: a row shows its key without taking it from the window, so the window's key handling stays the only one, and choosing a row runs it in the window. The Edit and Window menus keep the system's own items, with their keys, before the shell's and modules' rows.
+
+### Settings
+
+A module defines each setting it contributes in `settings.json`, an object whose only field, `settings`, lists them. A setting has exactly these fields, and the build refuses a file whose settings differ from those `module.json` declares:
+
+| Field | Holds |
+|---|---|
+| `name` | The setting's name, `<id>.<name>` |
+| `title`, `description` | What Settings shows for it |
+| `type` | Its `kind` and that kind's limits: `Boolean`; `Choice` with `options`, each a `value` and a `title`; `Number` with `minimum`, `maximum` and `step`; `Text` with `maxLength`; or `Modules`, a list of distinct module ids |
+| `default` | A value its type accepts |
+| `locality` | `Shared`, one value for every device that shares the data directory, or `Device`, a value per device |
+| `scopes` | The setting scopes that may override it, its module's own or a dependency's; a device setting has none |
+| `page`, `group` | Where Settings shows it |
+
+The shell keeps the values in its database and reports every change with the event `shell.settingsChanged`, whose payload is the changed key, the value now in effect and whether a value is stored for the key, false after a reset. A part reads the settings of its module, its dependencies and the shell, and changes only its own module's. A window reads them all with `shell.settings` and changes them with `shell.setSetting` and `shell.resetSetting`; the desktop adds its device to these requests and passes a device's change only to that device's windows. A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
 
 ### Setting scopes
 

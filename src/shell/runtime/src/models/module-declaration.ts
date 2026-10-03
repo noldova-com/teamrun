@@ -7,7 +7,8 @@
  */
 
 import "@noldova/teamrun-foundation-core";
-import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
+import { ArgumentException, ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
+import { SettingDefinition } from "@noldova/teamrun-shell-protocol";
 
 import { DeclarationsFormatException } from "../exceptions/declarations-format.exception.js";
 import { Resources } from "../resources.js";
@@ -18,22 +19,28 @@ export class ModuleDeclaration {
   public readonly dependencies: readonly string[];
   public readonly runtimePackage: string | null;
   public readonly contributions: ReadonlyMap<string, readonly string[]>;
+  public readonly settings: readonly SettingDefinition[];
 
   public constructor(
     id: string,
     displayName: string,
     dependencies: readonly string[],
     runtimePackage: string | null,
-    contributions: ReadonlyMap<string, readonly string[]>) {
+    contributions: ReadonlyMap<string, readonly string[]>,
+    settings: readonly SettingDefinition[] = []) {
     if (!Resources.moduleIdPattern.test(id) || id === Resources.reservedModuleId)
       throw new ArgumentException(Resources.moduleIdInvalid, Resources.idParameterName);
     ArgumentException.throwIfNullOrWhitespace(displayName, Resources.displayNameParameterName);
+    const foreign = settings.find(t => t.name.owner !== id);
+    if (!Object.isUndefined(foreign))
+      throw new ArgumentException(Resources.formatSettingOwnerInvalid(id, foreign.name.text), Resources.settingsField);
 
     this.id = id;
     this.displayName = displayName;
     this.dependencies = [...dependencies];
     this.runtimePackage = runtimePackage;
     this.contributions = new Map([...contributions].map(([kind, names]) => [kind, [...names]]));
+    this.settings = [...settings];
   }
 
   public static fromJson(value: unknown): ModuleDeclaration {
@@ -52,11 +59,23 @@ export class ModuleDeclaration {
       ModuleDeclaration.readText("displayName" in value ? value.displayName : undefined, Resources.displayNameParameterName),
       ModuleDeclaration.readNames("dependencies" in value ? value.dependencies : undefined, Resources.dependenciesParameterName),
       Object.isNull(runtimePackage) ? null : ModuleDeclaration.readText(runtimePackage, Resources.runtimePackageParameterName),
-      new Map(Object.entries(contributes).map(([kind, names]) => [kind, ModuleDeclaration.readNames(names, Resources.contributesParameterName)])));
+      new Map(Object.entries(contributes).map(([kind, names]) => [kind, ModuleDeclaration.readNames(names, Resources.contributesParameterName)])),
+      ModuleDeclaration.readSettings("settings" in value ? value.settings : []));
   }
 
   public listContributions(kind: string): readonly string[] {
     return this.contributions.get(kind) ?? [];
+  }
+
+  private static readSettings(value: unknown): readonly SettingDefinition[] {
+    if (!Array.isArray(value))
+      throw new DeclarationsFormatException(Resources.formatDeclarationField(Resources.settingsField));
+    try {
+      return value.map(t => SettingDefinition.fromJson(t));
+    }
+    catch (error) {
+      throw new DeclarationsFormatException(Resources.formatDeclarationField(Resources.settingsField), new ExceptionOptions(error));
+    }
   }
 
   private static readText(value: unknown, name: string): string {

@@ -748,6 +748,52 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async addsThisDeviceToItsWindowsSettingsRequests(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    for (const name of ["shell.settings", "shell.setSetting", "shell.resetSetting"])
+      connection.answers.set(name, Response.success("r", name));
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    const answers = [
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", {}),
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", { name: "shell.panelSize", value: 15 }),
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.resetSetting", { name: "shell.panelSize", device: "another" })
+    ];
+    const sent = connection.calls.flatMap((t, index) => t.includes("Setting") || t === "shell.settings" ? [connection.payloads[index]] : []);
+
+    Assert.areEqual("shell.settings,shell.setSetting,shell.resetSetting", answers.map(t => t.payload).join(","));
+    Assert.areEqual(JSON.stringify([
+      { device: FakeDeviceIdentity.ID },
+      { name: "shell.panelSize", value: 15, device: FakeDeviceIdentity.ID },
+      { name: "shell.panelSize", device: FakeDeviceIdentity.ID }
+    ]), JSON.stringify(sent));
+  }
+
+  @TestMethod
+  public async refusesASettingsRequestWithoutAnObjectOrADevice(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const device = new FakeDeviceIdentity();
+    device.failure = new Error("The identity file is not JSON.");
+    const anonymous = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new FakeRuntimeConnection()), new FakeElectron(), device);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    const failures = [
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", null),
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", [1]),
+      await DesktopApplicationTests.requestAsync(anonymous, event, "shell.settings", {})
+    ].map(t => t.failure?.toJson());
+
+    Assert.areEqual(JSON.stringify([
+      { code: "InvalidMessage", message: "A settings request's payload must be a JSON object." },
+      { code: "InvalidMessage", message: "A settings request's payload must be a JSON object." },
+      { code: "Unavailable", message: "This device has no identity, so its settings cannot be read or changed." }
+    ]), JSON.stringify(failures));
+    Assert.isFalse(connection.calls.some(t => t.includes("etting")));
+  }
+
+  @TestMethod
   public async refusesRequestsItsWindowMayNotMake(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
@@ -939,6 +985,28 @@ export class DesktopApplicationTests {
     Assert.areEqual(
       JSON.stringify([["teamrun:runtimeEvent", "notes.changed", { path: "/notes/a.md" }]]),
       JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
+  }
+
+  @TestMethod
+  public async passesASettingChangeOnlyToTheDeviceItConcernsWithoutItsDevice(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher();
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    const changed = new QualifiedName("shell", "settingsChanged");
+
+    launcher.listener?.onEvent(new Event(changed, { name: "shell.mode", value: "Dark", isSet: true }));
+    launcher.listener?.onEvent(new Event(changed, { name: "shell.panelSize", device: FakeDeviceIdentity.ID, value: 13, isSet: false }));
+    launcher.listener?.onEvent(new Event(changed, { name: "shell.panelSize", device: "another", value: 16, isSet: true }));
+    launcher.listener?.onEvent(new Event(changed, { value: 17 }));
+
+    Assert.areEqual(
+      JSON.stringify([
+        ["teamrun:runtimeEvent", "shell.settingsChanged", { name: "shell.mode", value: "Dark", isSet: true }],
+        ["teamrun:runtimeEvent", "shell.settingsChanged", { name: "shell.panelSize", value: 13, isSet: false }]
+      ]),
+      JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.settingsChanged could not be passed to the window").length);
   }
 
   @TestMethod
