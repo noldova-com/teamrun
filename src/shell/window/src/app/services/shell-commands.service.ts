@@ -20,6 +20,7 @@ import { CommandContribution } from "../models/command-contribution";
 import { SideDropTarget } from "../models/layout/side-drop-target";
 import { SplitDropTarget } from "../models/layout/split-drop-target";
 import type { Tab } from "../models/layout/tab";
+import type { TabGroup } from "../models/layout/tab-group";
 import { TabDropTarget } from "../models/layout/tab-drop-target";
 import { TabTarget } from "../models/tab-target";
 import { Resources } from "../../resources";
@@ -37,7 +38,7 @@ export class ShellCommandsService {
 
   public readonly commands: readonly CommandContribution[] = [
     this.tabCommand(Resources.closeTabCommand, Resources.closeTabTitle, Resources.closeGlyph, t => this.close(t), () => true),
-    this.tabCommand(Resources.keepTabCommand, Resources.keepTabTitle, Resources.keepGlyph, t => this.layout.keep(t.tab), t => t.tab.equals(t.group.preview)),
+    this.tabCommand(Resources.keepTabCommand, Resources.keepTabTitle, Resources.keepGlyph, t => this.layout.keep(t.tab), t => t.isPreview, t => t.isPreview),
     this.tabCommand(Resources.closeOtherTabsCommand, Resources.closeOtherTabsTitle, Resources.closeOthersGlyph,
       t => this.closeKeeping(t.group.tabs.filter(u => !u.equals(t.tab)), t.tab), t => t.group.tabs.length > 1),
     this.tabCommand(Resources.closeTabsToTheRightCommand, Resources.closeTabsToTheRightTitle, Resources.closeToTheRightGlyph,
@@ -50,9 +51,17 @@ export class ShellCommandsService {
     this.tabCommand(Resources.nextTabCommand, Resources.nextTabTitle, Resources.nextTabGlyph, t => this.show(t, 1), t => t.group.tabs.length > 1),
     this.tabCommand(Resources.previousTabCommand, Resources.previousTabTitle, Resources.previousTabGlyph, t => this.show(t, -1), t => t.group.tabs.length > 1),
     ...Object.values(PanelEdge).map(edge => this.tabCommand(Resources.splitTabCommands[edge], Resources.splitTabTitles[edge], Resources.splitGlyphs[edge],
-      t => this.place(t.tab, new SplitDropTarget(t.group.id, edge)), t => t.canSplit)),
+      t => this.place(t.tab, new SplitDropTarget(t.group.id, edge)), t => t.canSplit, t => t.tab.isMovable)),
     ...Object.values(DockSide).map(side => this.tabCommand(Resources.dockTabCommands[side], Resources.dockTabTitles[side], Resources.dockGlyphs[side],
-      t => this.place(t.tab, new SideDropTarget(side)), t => t.tab.isMovable)),
+      t => this.place(t.tab, new SideDropTarget(side)), t => t.tab.isMovable, t => t.tab.isMovable)),
+    new CommandContribution(Resources.moveTabToGroupCommand, Resources.moveTabToGroupTitle, Resources.moveToGlyph, null,
+      commandArguments => this.done(() => {
+        const move = this.moveOf(commandArguments);
+        if (!Object.isNull(move))
+          this.place(move.target.tab, new TabDropTarget(move.group.id, move.group.tabs.length));
+      }),
+      commandArguments => !Object.isNull(this.moveOf(commandArguments)), null,
+      commandArguments => this.targetOf(commandArguments)?.tab.isMovable ?? false),
     ...Object.values(DockSide).map(side => new CommandContribution(Resources.toggleDockCommands[side], Resources.toggleDockTitles[side], Resources.hideDockGlyphs[side], null,
       () => this.done(() => this.layout.toggleDock(side)), () => true, () => this.layout.layout().dock(side).isExpanded)),
     new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, null,
@@ -76,17 +85,33 @@ export class ShellCommandsService {
     return Resources.shellKeys.flatMap(([command, standard, mac]) => (platform === Resources.macPlatform ? mac : standard).map(t => [KeyChord.parse(t), command] as const));
   }
 
-  private tabCommand(name: string, title: string, icon: string, run: (target: TabTarget) => void, isEnabled: (target: TabTarget) => boolean): CommandContribution {
+  private tabCommand(name: string, title: string, icon: string, run: (target: TabTarget) => void, isEnabled: (target: TabTarget) => boolean,
+    isApplicable: (target: TabTarget) => boolean = ShellCommandsService.always): CommandContribution {
+    const holds = (commandArguments: JsonValue, rule: (target: TabTarget) => boolean): boolean => {
+      const target = this.targetOf(commandArguments);
+      return !Object.isNull(target) && rule(target);
+    };
     return new CommandContribution(name, title, icon, null,
       commandArguments => this.done(() => {
         const target = this.targetOf(commandArguments);
         if (!Object.isNull(target) && isEnabled(target))
           run(target);
       }),
-      commandArguments => {
-        const target = this.targetOf(commandArguments);
-        return !Object.isNull(target) && isEnabled(target);
-      });
+      commandArguments => holds(commandArguments, isEnabled), null,
+      commandArguments => holds(commandArguments, isApplicable));
+  }
+
+  private static always(): boolean {
+    return true;
+  }
+
+  private moveOf(commandArguments: JsonValue): { readonly target: TabTarget; readonly group: TabGroup } | null {
+    const target = this.targetOf(commandArguments);
+    if (Object.isNull(target) || Object.isNull(commandArguments))
+      return null;
+    const reader = JsonReader.fromValue(commandArguments);
+    const group = reader.hasField(Resources.groupArgument) ? this.layout.layout().group(reader.readInteger(Resources.groupArgument)) : null;
+    return Object.isNull(group) || !group.accepts(target.tab) || group.has(target.tab) ? null : { target, group };
   }
 
   private targetOf(commandArguments: JsonValue): TabTarget | null {

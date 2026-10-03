@@ -58,7 +58,8 @@ describe("ShellCommandsService", () => {
   it("offers the shell's tab and layout commands, each with a title and an icon and none with a default key", () => {
     expect(service.commands.map(t => t.name)).toEqual([
       "shell.closeTab", "shell.keepTab", "shell.closeOtherTabs", "shell.closeTabsToTheRight", "shell.closeAllTabs", "shell.moveTabLeft", "shell.moveTabRight",
-      "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight", "shell.dockTabBottom",
+      "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight",
+      "shell.dockTabBottom", "shell.moveTabToGroup",
       "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.showCommands", "shell.resetLayout", "shell.spanBottomDock",
       "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
@@ -126,6 +127,31 @@ describe("ShellCommandsService", () => {
     expect(layout.layout().groupOf(search)?.tabs).toEqual([search]);
     await runAsync("shell.dockTabBottom", tab(search.key));
     expect(layout.layout().sideOf(layout.layout().groupOf(search)?.id ?? -1)).toBe(DockSide.Bottom);
+  });
+
+  it("leaves out what can never apply to a tab: Keep open on a kept tab, and moving, splitting or docking a document", () => {
+    const applies = (name: string, commandArguments: JsonValue): boolean => command(name).isApplicable(commandArguments);
+
+    expect([applies("shell.keepTab", tab(settings.key)), applies("shell.keepTab", tab(plan.key))]).toEqual([true, false]);
+    expect(["shell.splitTabLeft", "shell.dockTabLeft", "shell.moveTabToGroup"].map(t => [applies(t, tab(plan.key)), applies(t, tab(search.key))]))
+      .toEqual([[false, true], [false, true], [false, true]]);
+    expect([applies("shell.closeTab", tab(plan.key)), applies("shell.closeTab", tab("missing")), applies("shell.moveTabToGroup", tab("missing"))])
+      .toEqual([true, false, false]);
+  });
+
+  it("moves a tab to another group that accepts it, and to no other", async () => {
+    const other = layout.layout().groupOf(changes)?.id ?? -1;
+    const own = layout.layout().groupOf(search)?.id ?? -1;
+    const documents = layout.layout().documents.id;
+    const move = (key: string, group?: number): JsonValue => Object.isUndefined(group) ? { tab: key } : { tab: key, group };
+
+    expect([move(search.key, other), move(search.key, own), move(search.key, documents), move(plan.key, other), move(search.key), move(search.key, 999), null]
+      .map(t => enabled("shell.moveTabToGroup", t))).toEqual([true, false, true, false, false, false, false]);
+    await runAsync("shell.moveTabToGroup", move(search.key, other));
+    await runAsync("shell.moveTabToGroup", move(search.key, other));
+
+    expect(layout.layout().groupOf(search)?.id).toBe(other);
+    expect(layout.layout().groupOf(search)?.tabs.at(-1)).toEqual(search);
   });
 
   it("keys the most-used commands by the platform's conventions, each key once and each command one of its own", () => {

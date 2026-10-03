@@ -58,9 +58,9 @@ test.describe("the menu bar on Windows and Linux", () => {
     await window.keyboard.press("Escape");
     await window.keyboard.press("Escape");
     const view = await openBarMenuAsync(window, "View");
-    await expect(view.getByRole("menuitemcheckbox", { name: "Show or hide the left dock" })).toHaveAttribute("aria-checked", "true");
-    await view.getByRole("menuitemcheckbox", { name: "Show or hide the left dock" }).click();
-    await expect((await openBarMenuAsync(window, "View")).getByRole("menuitemcheckbox", { name: "Show or hide the left dock" })).toHaveAttribute("aria-checked", "false");
+    await expect(view.getByRole("menuitemcheckbox", { name: "Left dock" })).toHaveAttribute("aria-checked", "true");
+    await view.getByRole("menuitemcheckbox", { name: "Left dock" }).click();
+    await expect((await openBarMenuAsync(window, "View")).getByRole("menuitemcheckbox", { name: "Left dock" })).toHaveAttribute("aria-checked", "false");
     await window.keyboard.press("Escape");
     await window.keyboard.press("Escape");
 

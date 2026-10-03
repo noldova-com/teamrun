@@ -30,6 +30,10 @@ export class TabTarget {
     return this.index === this.group.tabs.length - 1;
   }
 
+  public get isPreview(): boolean {
+    return this.tab.equals(this.group.preview);
+  }
+
   public get canSplit(): boolean {
     return this.tab.isMovable && (this.group.isDocuments || this.group.tabs.length > 1);
   }

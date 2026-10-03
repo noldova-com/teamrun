@@ -8,6 +8,7 @@
 
 import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
+import { PanelEdge } from "../enums/panel-edge";
 import { MenuDeclarations } from "./menu-declarations";
 import { MenuGroup } from "./menu-group";
 import { MenuItem } from "./menu-item";
@@ -22,12 +23,35 @@ export class ShellMenus {
     new MenuPlace(Resources.windowMenu, Resources.windowMenuTitle, true),
     new MenuPlace(Resources.helpMenu, Resources.helpMenuTitle, true),
     new MenuPlace(Resources.tabMenu, Resources.tabMenuTitle, false),
+    new MenuPlace(Resources.tabMoveToMenu, Resources.moveToLabel, false, Resources.moveToGlyph),
+    new MenuPlace(Resources.tabSplitMenu, Resources.splitLabel, false, Resources.splitGlyph),
+    new MenuPlace(Resources.tabDockMenu, Resources.dockLabel, false, Resources.dockGlyph),
     new MenuPlace(Resources.appMenu, Resources.appMenuTitle, false)
   ], [
     new MenuGroup(Resources.closeGroup, Resources.fileMenu, false, [MenuItem.ofCommand(Resources.closeTabCommand)]),
     new MenuGroup(Resources.searchGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.showCommandsCommand)]),
-    new MenuGroup(Resources.docksGroup, Resources.viewMenu, false, Object.values(DockSide).map(t => MenuItem.ofCommand(Resources.toggleDockCommands[t]))),
+    new MenuGroup(Resources.docksGroup, Resources.viewMenu, false,
+      Object.values(DockSide).map(t => MenuItem.ofCommand(Resources.toggleDockCommands[t], {}, Resources.dockRowLabels[t]))),
     new MenuGroup(Resources.bottomDockGroup, Resources.viewMenu, true, Object.values(BottomDockSpan).map(t => MenuItem.ofCommand(Resources.bottomSpanCommands[t]))),
-    new MenuGroup(Resources.layoutGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.resetLayoutCommand)])
+    new MenuGroup(Resources.layoutGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.resetLayoutCommand)]),
+    new MenuGroup(Resources.tabArrangeGroup, Resources.tabMenu, false, [
+      MenuItem.ofCommand(Resources.keepTabCommand, {}, Resources.keepLabel),
+      MenuItem.ofSubmenu(Resources.tabMoveToMenu),
+      MenuItem.ofSubmenu(Resources.tabSplitMenu),
+      MenuItem.ofSubmenu(Resources.tabDockMenu),
+      MenuItem.ofCommand(Resources.moveTabLeftCommand, {}, Resources.moveEarlierLabel),
+      MenuItem.ofCommand(Resources.moveTabRightCommand, {}, Resources.moveLaterLabel)
+    ]),
+    new MenuGroup(Resources.tabCloseGroup, Resources.tabMenu, false, [
+      MenuItem.ofCommand(Resources.closeTabCommand, {}, Resources.closeTabLabel),
+      MenuItem.ofCommand(Resources.closeOtherTabsCommand, {}, Resources.closeOthersLabel),
+      MenuItem.ofCommand(Resources.closeTabsToTheRightCommand, {}, Resources.closeToTheRightLabel),
+      MenuItem.ofCommand(Resources.closeAllTabsCommand, {}, Resources.closeAllLabel)
+    ]),
+    MenuGroup.dynamic(Resources.tabDestinationsGroup, Resources.tabMoveToMenu, false),
+    new MenuGroup(Resources.tabSplitGroup, Resources.tabSplitMenu, false,
+      Object.values(PanelEdge).map(t => MenuItem.ofCommand(Resources.splitTabCommands[t], {}, Resources.splitLabels[t]))),
+    new MenuGroup(Resources.tabDockGroup, Resources.tabDockMenu, false,
+      Object.values(DockSide).map(t => MenuItem.ofCommand(Resources.dockTabCommands[t], {}, Resources.dockLabels[t])))
   ]);
 }

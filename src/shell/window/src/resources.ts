@@ -155,6 +155,11 @@ export class Resources {
     [PanelEdge.Top]: "arrow_upward",
     [PanelEdge.Bottom]: "arrow_downward"
   };
+  public static readonly dockRowLabels: Readonly<Record<DockSide, string>> = {
+    [DockSide.Left]: "Left dock",
+    [DockSide.Right]: "Right dock",
+    [DockSide.Bottom]: "Bottom dock"
+  };
   public static readonly dockLabels: Readonly<Record<DockSide, string>> = {
     [DockSide.Left]: "Dock left",
     [DockSide.Right]: "Dock right",
@@ -303,6 +308,8 @@ export class Resources {
   public static readonly placeParameter: string = "place";
   public static readonly itemsParameter: string = "items";
   public static readonly emptyMenuGroup: string = "A menu group has at least one item.";
+  public static readonly itemsInDynamicGroup: string = "A dynamic menu group has no declared items; its owner supplies them.";
+  public static readonly labelParameter: string = "label";
   public static readonly placesField: string = "places";
   public static readonly groupsField: string = "groups";
   public static readonly nameField: string = "name";
@@ -342,6 +349,17 @@ export class Resources {
   public static readonly helpMenuTitle: string = "Help";
   public static readonly tabMenuTitle: string = "Tab";
   public static readonly closeGroup: string = "shell.close";
+  public static readonly tabMoveToMenu: string = "shell.tabMoveTo";
+  public static readonly tabSplitMenu: string = "shell.tabSplit";
+  public static readonly tabDockMenu: string = "shell.tabDock";
+  public static readonly tabArrangeGroup: string = "shell.tabArrange";
+  public static readonly tabCloseGroup: string = "shell.tabClose";
+  public static readonly tabDestinationsGroup: string = "shell.tabDestinations";
+  public static readonly tabSplitGroup: string = "shell.tabSplitEdges";
+  public static readonly tabDockGroup: string = "shell.tabDockSides";
+  public static readonly moveTabToGroupCommand: string = "shell.moveTabToGroup";
+  public static readonly moveTabToGroupTitle: string = "Move the tab to another group";
+  public static readonly groupArgument: string = "group";
   public static readonly searchGroup: string = "shell.search";
   public static readonly docksGroup: string = "shell.docks";
   public static readonly bottomDockGroup: string = "shell.bottomDock";
