@@ -28,6 +28,7 @@ export class Resources {
     new ColorToken("--tr-card-border", "surface.border", "widget.border"),
     new ColorToken("--tr-border", "sideBarSectionHeader.border"),
     new ColorToken("--tr-accent", "focusBorder"),
+    new ColorToken("--tr-sash-active", "sash.hoverBorder", "focusBorder"),
     new ColorToken("--tr-link", "textLink.foreground"),
     new ColorToken("--tr-hover", "list.hoverBackground"),
     new ColorToken("--tr-selected", "list.inactiveSelectionBackground", "list.activeSelectionBackground"),
