@@ -69,6 +69,7 @@ export class Resources {
   public static readonly runAsNodeValue: string = "1";
   public static readonly workWaitInterval: number = 2000;
   public static readonly deviceDirectoryArgument: string = "--device-dir=";
+  public static readonly handoverArguments: readonly string[] = [Resources.dataDirectoryArgument, Resources.userDataArgument, Resources.deviceDirectoryArgument];
   public static readonly windowsPlatform: string = "win32";
   public static readonly localAppDataVariable: string = "LOCALAPPDATA";
   public static readonly windowsLocalAppData: readonly string[] = ["AppData", "Local"];
