@@ -16,6 +16,7 @@ export class WindowPartSource {
   public readonly displayName: string;
   public readonly dependencies: readonly string[];
   public readonly viewNames: readonly string[];
+  public readonly documentNames: readonly string[];
   public readonly commandNames: readonly string[];
   public readonly statusBarItemNames: readonly string[];
   public readonly topBarActionNames: readonly string[];
@@ -27,6 +28,7 @@ export class WindowPartSource {
     displayName: string,
     dependencies: readonly string[],
     viewNames: readonly string[],
+    documentNames: readonly string[],
     commandNames: readonly string[],
     statusBarItemNames: readonly string[],
     topBarActionNames: readonly string[],
@@ -39,6 +41,7 @@ export class WindowPartSource {
     this.displayName = displayName;
     this.dependencies = [...dependencies];
     this.viewNames = [...viewNames];
+    this.documentNames = [...documentNames];
     this.commandNames = [...commandNames];
     this.statusBarItemNames = [...statusBarItemNames];
     this.topBarActionNames = [...topBarActionNames];

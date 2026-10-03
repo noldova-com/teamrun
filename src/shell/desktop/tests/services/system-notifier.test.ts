@@ -18,6 +18,18 @@ export class SystemNotifierTests {
   private static readonly DEVICE: string = "laptop";
 
   @TestMethod
+  public showsAPostThatArrivesCompleteButNotOneStillInProgress(): void {
+    const { host, notifier } = SystemNotifierTests.create();
+    notifier.begin(notifier.epoch, SystemNotifierTests.DEVICE, 0);
+
+    notifier.receive(SystemNotifierTests.broadcast(
+      [], SystemNotifierTests.notification(3, 3, "Exported", null, 1), SystemNotifierTests.notification(2, 2, "Exporting", null, 0.5),
+      SystemNotifierTests.notification(1, 1, "Indexing", null, NotificationPost.indeterminate)));
+
+    Assert.areEqual("Exported", host.created.map(t => t.title).join(","));
+  }
+
+  @TestMethod
   public showsOnlyWhatFollowsTheReadEvenFromABroadcastThatCameFirst(): void {
     const { host, notifier } = SystemNotifierTests.create();
     const epoch = notifier.epoch;
@@ -140,7 +152,7 @@ export class SystemNotifierTests {
     return new NotificationBroadcast(notifications, quietDevices, Math.max(0, ...notifications.map(t => t.sequence)));
   }
 
-  private static notification(id: number, sequence: number, title: string, text: string | null = null, progress: number | null = null): Notification {
+  private static notification(id: number, sequence: number, title: string, text: string | null = null, progress: number | typeof NotificationPost.indeterminate | null = null): Notification {
     return new Notification(
       id, sequence, new NotificationPost(QualifiedName.parse("clock.alarm"), null, title, text, NotificationSeverity.Info, null, [], progress), "2026-10-03T08:00:00.000Z", false);
   }

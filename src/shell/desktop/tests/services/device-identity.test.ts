@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -37,6 +37,20 @@ export class DeviceIdentityTests {
       Assert.isTrue(/^[0-9a-f-]{36}$/.test(first));
       Assert.areEqual(first, second);
       Assert.areEqual(JSON.stringify({ id: first }), (await readFile(path.join(device, "device.json"), "utf8")).trim());
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async givesDesktopsThatStartTogetherOneIdentityAndLeavesNoDraft(): Promise<void> {
+    const folder = await mkdtemp(path.join(os.tmpdir(), "teamrun-device-"));
+    try {
+      const ids = await Promise.all(Array.from({ length: 8 }, () => DeviceIdentity.readOrCreateAsync(folder)));
+
+      Assert.areEqual(1, new Set(ids).size);
+      Assert.areEqual("device.json", (await readdir(folder)).join(","));
     }
     finally {
       await rm(folder, { recursive: true, force: true });

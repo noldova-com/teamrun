@@ -149,9 +149,17 @@ describe("QuickInputComponent", () => {
     expect([bare?.querySelector(".tr-quick-input-icon"), bare?.querySelector(".tr-quick-input-detail"), bare?.querySelector(".tr-quick-input-key")]).toEqual([null, null, null]);
   });
 
-  it("takes its margin, padding and gap from the theme and fits its options in its height", () => {
+  it("takes its outline, margin, padding and gap from the theme and fits its options in its height", () => {
     const style = getComputedStyle(fixture.nativeElement.querySelector("tr-quick-input"));
     const list = fixture.nativeElement.querySelector("[role=listbox]") as HTMLElement;
+    const probe = document.body.appendChild(document.createElement("div"));
+    probe.style.border = "1px solid var(--tr-widget-border)";
+    const outline = getComputedStyle(probe).borderTopColor;
+    probe.style.border = "1px solid var(--tr-menu-border)";
+    const menuBorder = getComputedStyle(probe).borderTopColor;
+    probe.remove();
+
+    expect([style.borderTopColor, outline === menuBorder]).toEqual([outline, false]);
 
     const theme = DefaultTheme.theme;
 

@@ -14,7 +14,6 @@ import { SplitSashComponent } from "../../../../src/app/components/split-sash/sp
 import { Layout } from "../../../../src/app/models/layout/layout";
 import type { SplitHandle } from "../../../../src/app/models/layout/split-handle";
 import { LayoutService } from "../../../../src/app/services/layout.service";
-import { Resources } from "../../../../src/resources";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
@@ -72,7 +71,9 @@ describe("SplitSashComponent", () => {
 
     expect(host.style.left).toBe(`${handle?.bounds.x}rem`);
     expect(host.style.width).toBe(`${handle?.bounds.width}rem`);
-    expect(sash().getAttribute("aria-label")).toBe(Resources.resizeSplitLabel);
+    expect(sash().getAttribute("aria-label")).toBe("Resize the pane on the left");
+    expect([sash().getAttribute("aria-valuemin"), sash().getAttribute("aria-valuemax")])
+      .toEqual([String(Math.round((handle?.minimumLength ?? 0) * 16)), String(Math.round((handle?.maximumLength ?? 0) * 16))]);
     expect(sash().getAttribute("aria-orientation")).toBe("vertical");
     expect(sash().getAttribute("aria-valuenow")).toBe(String(Math.round((handle?.leadingLength ?? 0) * 16)));
 
@@ -86,6 +87,7 @@ describe("SplitSashComponent", () => {
     const before = layout.geometry().handles[0]?.leadingLength ?? 0;
 
     expect(sash().getAttribute("aria-orientation")).toBe("horizontal");
+    expect(sash().getAttribute("aria-label")).toBe("Resize the pane above");
     press("ArrowUp");
 
     expect(layout.geometry().handles[0]?.leadingLength).toBeCloseTo(before - 0.5);
