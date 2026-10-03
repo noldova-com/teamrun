@@ -8,6 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 
+import type { IDesktopLog } from "../interfaces/i-desktop-log.js";
 import type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
 import type { IDisplayHost } from "../interfaces/i-display-host.js";
 import type { IWindowStateStore } from "../interfaces/i-window-state-store.js";
@@ -19,13 +20,15 @@ export class WindowBoundsKeeper {
   private readonly window: IDesktopWindow;
   private readonly displays: IDisplayHost;
   private readonly saveDelay: number;
+  private readonly log: IDesktopLog;
   private store: IWindowStateStore | null = null;
   private timer: NodeJS.Timeout | null = null;
 
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number) {
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog) {
     this.window = window;
     this.displays = displays;
     this.saveDelay = saveDelay;
+    this.log = log;
     const changed = (): void => this.scheduleSave();
     window.on(Resources.resizeEvent, changed);
     window.on(Resources.moveEvent, changed);
@@ -68,6 +71,6 @@ export class WindowBoundsKeeper {
     if (Object.isNull(this.store))
       return;
     this.cancelSave();
-    this.timer = setTimeout(() => void this.saveAsync().catch((error: unknown) => process.stderr.write(`${Resources.formatBoundsUnsaved(String(error))}\n`)), this.saveDelay);
+    this.timer = setTimeout(() => void this.saveAsync().catch((error: unknown) => this.log.write(Resources.formatBoundsUnsaved(String(error)))), this.saveDelay);
   }
 }

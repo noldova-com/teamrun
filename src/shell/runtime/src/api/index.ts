@@ -67,6 +67,7 @@ export { DatabaseBackup } from "../services/database/database-backup.js";
 export { MigratedDatabase } from "../services/database/migrated-database.js";
 export { ModuleDatabase } from "../services/database/module-database.js";
 export { ShellDatabase } from "../services/database/shell-database.js";
+export { DiagnosticRedactor } from "../services/diagnostics/diagnostic-redactor.js";
 export { DiscoveryPublisher } from "../services/discovery/discovery-publisher.js";
 export { DiscoveryReader } from "../services/discovery/discovery-reader.js";
 export { FolderProtectorFactory } from "../services/discovery/folder-protector-factory.js";

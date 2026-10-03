@@ -17,6 +17,7 @@ import { ListenerRegistry } from "./listener-registry.fixture.js";
 export class FakeDesktopWindow implements IDesktopWindow {
   private readonly listeners: ListenerRegistry = new ListenerRegistry();
 
+  public readonly id: number;
   public readonly options: BrowserWindowConstructorOptions;
   public readonly webContents: FakeWindowContents;
   public readonly calls: string[] = [];
@@ -32,6 +33,7 @@ export class FakeDesktopWindow implements IDesktopWindow {
   public bounds: Rectangle = { x: 100, y: 80, width: 1280, height: 800 };
 
   public constructor(options: BrowserWindowConstructorOptions, contentsId: number) {
+    this.id = contentsId;
     this.options = options;
     this.webContents = new FakeWindowContents(contentsId);
   }

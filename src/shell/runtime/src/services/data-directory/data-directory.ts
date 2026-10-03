@@ -68,6 +68,14 @@ export class DataDirectory {
     return path.join(this.logsFolder, Resources.previousRuntimeLogFileName);
   }
 
+  public get desktopLog(): string {
+    return path.join(this.logsFolder, Resources.desktopLogFileName);
+  }
+
+  public get previousDesktopLog(): string {
+    return path.join(this.logsFolder, Resources.previousDesktopLogFileName);
+  }
+
   public locateModuleDatabase(id: string): string {
     return path.join(this.locateModuleFolder(id), `${id}${Resources.moduleDatabaseExtension}`);
   }

@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import { type Event, Failure, FailureCode, QualifiedName, Response, type RuntimeHandover, ShellMethods, WindowStateKey, WindowStateValue, WindowStateWrite } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, type DataDirectory, DataDirectoryLocator, LaunchSettings, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import type { IElectron } from "../interfaces/i-electron.js";
@@ -29,14 +29,18 @@ import { WindowState } from "../models/window-state.js";
 import { Resources } from "../resources.js";
 import { AppIcons } from "./app-icons.js";
 import { ApplicationMenu } from "./application-menu.js";
+import { DesktopLog } from "./desktop-log.js";
 import { DeviceIdentity } from "./device-identity.js";
 import { OpenWindow } from "./open-window.js";
 import { RuntimeStartup } from "./runtime-startup.js";
 import { RuntimeWindowStateStore } from "./runtime-window-state-store.js";
 import { SenderPolicy } from "./sender-policy.js";
 import { WindowFactory } from "./window-factory.js";
+import { WindowRecovery } from "./window-recovery.js";
 
 export class DesktopApplication {
+  private static readonly UNOWNED_STATES: readonly StartupStateKind[] = [StartupStateKind.Connecting, StartupStateKind.PreShellData, StartupStateKind.Failed];
+
   private readonly electron: IElectron;
   private readonly process: IDesktopProcess;
   private readonly settings: DesktopSettings;
@@ -44,6 +48,7 @@ export class DesktopApplication {
   private readonly isPackaged: boolean;
   private readonly icons: AppIcons;
   private readonly dataDirectory: DataDirectory;
+  private readonly log: DesktopLog;
   private readonly policy: SenderPolicy;
   private readonly factory: WindowFactory;
   private readonly startup: RuntimeStartup;
@@ -58,6 +63,7 @@ export class DesktopApplication {
     settings: DesktopSettings,
     taskbar: TaskbarIdentity,
     dataDirectory: DataDirectory,
+    log: DesktopLog,
     launcher: IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
     icons: AppIcons) {
@@ -69,6 +75,7 @@ export class DesktopApplication {
     this.isPackaged = DesktopApplication.isPackagedBuild(electron, process);
     this.icons = icons;
     this.dataDirectory = dataDirectory;
+    this.log = log;
     this.policy = new SenderPolicy(settings.windowUrl);
     this.factory = new WindowFactory(settings, this.policy, electron, taskbar, icons);
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t));
@@ -98,8 +105,9 @@ export class DesktopApplication {
       process.platform);
     const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
     const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform, electron.theme);
+    const log = new DesktopLog(dataDirectory, process.errorOutput, new DiagnosticRedactor(process.homeFolder));
     new DesktopApplication(
-      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, createLauncher(launchSettings), readDeviceAsync, icons).run();
+      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, icons).run();
   }
 
   private run(): void {
@@ -126,7 +134,7 @@ export class DesktopApplication {
     const deviceFolder = DesktopApplication.readArgument(this.process.argv, Resources.deviceDirectoryArgument)
       ?? DeviceIdentity.locateFolder(this.process.platform, this.process.env, this.process.homeFolder);
     this.device = this.readDeviceAsync(deviceFolder).catch((error: unknown) => {
-      process.stderr.write(`${Resources.formatDeviceUnavailable(String(error))}\n`);
+      this.log.write(Resources.formatDeviceUnavailable(String(error)));
       return null;
     });
     session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
@@ -152,14 +160,18 @@ export class DesktopApplication {
   private open(): void {
     const window = this.factory.create(WindowState.createDefault());
     const contentsId = window.webContents.id;
-    const open = new OpenWindow(window, this.electron.screen);
+    const open = new OpenWindow(window, this.electron.screen, this.log);
+    new WindowRecovery(open, this.electron.dialog, this.log, this.process, () => this.electron.app.quit(), () => this.openLogFolderAsync(), Resources.reloadCrashLimit, Resources.rendererEndLimit);
     this.windows.set(contentsId, open);
     window.once(Resources.closedEvent, () => this.windows.delete(contentsId));
     open.settleWithin(Resources.connectingShowLimit);
+    open.showUnpaintedWithin(Resources.paintShowLimit);
     void this.prepareAsync(open);
   }
 
   private publish(state: StartupState): void {
+    if (!DesktopApplication.UNOWNED_STATES.includes(state.kind))
+      this.log.open();
     for (const open of this.windows.values())
       if (!open.window.isDestroyed()) {
         open.window.webContents.send(Resources.startupStateChannel, state.toJson());
@@ -209,7 +221,7 @@ export class DesktopApplication {
       this.restored.add(open);
       const device = await this.device;
       if (!Object.isNull(device))
-        await open.bounds.restoreAsync(this.createBoundsStore(device)).catch((error: unknown) => process.stderr.write(`${Resources.formatBoundsNotRestored(String(error))}\n`));
+        await open.bounds.restoreAsync(this.createBoundsStore(device)).catch((error: unknown) => this.log.write(Resources.formatBoundsNotRestored(String(error))));
     }
     open.settle();
   }
@@ -250,12 +262,12 @@ export class DesktopApplication {
       await mkdir(folder, { recursive: true });
     }
     catch (error) {
-      process.stderr.write(`${Resources.formatLogFolderNotOpened(String(error))}\n`);
+      this.log.write(Resources.formatLogFolderNotOpened(String(error)));
       return false;
     }
     const failure = await this.electron.shell.openPath(folder);
     if (failure.length > 0)
-      process.stderr.write(`${Resources.formatLogFolderNotOpened(failure)}\n`);
+      this.log.write(Resources.formatLogFolderNotOpened(failure));
     return failure.length === 0;
   }
 
@@ -279,7 +291,7 @@ export class DesktopApplication {
       this.factory.paint(open.window, WindowAppearance.fromJson(appearance));
     }
     catch (error) {
-      process.stderr.write(`${Resources.formatAppearanceRejected(String(error))}\n`);
+      this.log.write(Resources.formatAppearanceRejected(String(error)));
     }
     open.markPainted();
   }

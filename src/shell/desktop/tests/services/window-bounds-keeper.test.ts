@@ -13,6 +13,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import { type IWindowStateStore, WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
 
 import { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
+import { FakeDesktopLog } from "../fixtures/fake-desktop-log.fixture.js";
 import { FakeDisplayHost } from "../fixtures/fake-display-host.fixture.js";
 
 class MemoryStore implements IWindowStateStore {
@@ -41,7 +42,7 @@ export class WindowBoundsKeeperTests {
   @TestMethod
   public async restoresSavedBoundsThatADisplayShows(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5);
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
 
     await keeper.restoreAsync(new MemoryStore({ x: 200, y: 100, width: 1000, height: 700, maximized: true }));
 
@@ -51,7 +52,7 @@ export class WindowBoundsKeeperTests {
   @TestMethod
   public async centersSavedBoundsThatNoDisplayShows(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5);
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
 
     await keeper.restoreAsync(new MemoryStore({ x: 5000, y: 100, width: 1000, height: 700, maximized: false }));
 
@@ -62,8 +63,8 @@ export class WindowBoundsKeeperTests {
   public async keepsTheDefaultBoundsWhenNoneWereSavedOrTheyAreNotValid(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
 
-    await new WindowBoundsKeeper(window, new FakeDisplayHost(), 5).restoreAsync(new MemoryStore(null));
-    await Assert.throwsAsync(() => new WindowBoundsKeeper(window, new FakeDisplayHost(), 5).restoreAsync(new MemoryStore({ width: 10 })), JsonException);
+    await new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog()).restoreAsync(new MemoryStore(null));
+    await Assert.throwsAsync(() => new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog()).restoreAsync(new MemoryStore({ width: 10 })), JsonException);
 
     Assert.areEqual("[]", JSON.stringify(window.calls));
   }
@@ -72,7 +73,7 @@ export class WindowBoundsKeeperTests {
   public async savesOnceAfterAPauseInChanges(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const store = new MemoryStore(null);
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5);
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
 
     window.change("move");
     await keeper.restoreAsync(store);
@@ -89,7 +90,7 @@ export class WindowBoundsKeeperTests {
   public async savesAtOnceWhenAskedAndNotAfterTheWindowIsGone(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const store = new MemoryStore(null);
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5);
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
 
     await keeper.saveAsync();
     await keeper.restoreAsync(store);
@@ -107,19 +108,13 @@ export class WindowBoundsKeeperTests {
     const window = new FakeDesktopWindow({}, 1);
     const store = new MemoryStore(null);
     store.failure = new Error("The runtime is gone.");
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 1);
-    const written: string[] = [];
-    const write = process.stderr.write;
-    process.stderr.write = ((text: string): boolean => written.push(text) > 0) as typeof process.stderr.write;
-    try {
-      await keeper.restoreAsync(store);
-      window.change("resize");
-      await delay(20);
-    }
-    finally {
-      process.stderr.write = write;
-    }
+    const log = new FakeDesktopLog();
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 1, log);
 
-    Assert.areEqual(JSON.stringify(["The window's bounds could not be saved: Error: The runtime is gone.\n"]), JSON.stringify(written));
+    await keeper.restoreAsync(store);
+    window.change("resize");
+    await delay(20);
+
+    Assert.areEqual(JSON.stringify(["The window's bounds could not be saved: Error: The runtime is gone."]), JSON.stringify(log.lines));
   }
 }

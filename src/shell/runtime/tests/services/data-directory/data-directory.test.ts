@@ -29,6 +29,8 @@ export class DataDirectoryTests {
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "logs"), directory.logsFolder);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "logs", "runtime.log"), directory.runtimeLog);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "logs", "runtime.previous.log"), directory.previousRuntimeLog);
+    Assert.areEqual(path.join(DataDirectoryTests.ROOT, "logs", "desktop.log"), directory.desktopLog);
+    Assert.areEqual(path.join(DataDirectoryTests.ROOT, "logs", "desktop.previous.log"), directory.previousDesktopLog);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "backups"), directory.backupsFolder);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "desktop"), directory.profileFolder);
     Assert.areEqual(path.join(DataDirectoryTests.ROOT, "modules"), directory.modulesFolder);
