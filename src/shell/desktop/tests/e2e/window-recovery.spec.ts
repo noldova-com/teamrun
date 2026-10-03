@@ -31,11 +31,12 @@ test("a window whose page stops asks with a native box, comes back when the pers
 
   await expect.poll(() => desktop.application.evaluate(() => Reflect.get(globalThis, "teamrunAskedBoxes") as string[]))
     .toEqual(["TeamRun's window stopped unexpectedly. Reload/Quit"]);
-  await expect.poll(() => desktop.application.evaluate(({ BrowserWindow }) => {
+  await expect.poll(() => desktop.application.evaluate(async ({ BrowserWindow }) => {
     const contents = BrowserWindow.getAllWindows()[0]?.webContents;
-    return contents !== undefined && !contents.isCrashed() && !contents.isLoading();
-  })).toBe(true);
-  await expect(window.locator("tr-empty-window")).toHaveText(/TeamRun\s*No modules/);
+    if (contents === undefined || contents.isCrashed() || contents.isLoading())
+      return "";
+    return String(await contents.executeJavaScript("document.querySelector('tr-empty-window')?.textContent ?? ''"));
+  })).toMatch(/TeamRun\s*No modules/);
   expect(await desktop.isVisibleAsync()).toBe(true);
   const log = await readFile(path.join(desktop.dataDirectory, "logs", "desktop.log"), "utf8");
   expect(log).toMatch(/^\S+ The window's page stopped: (?:crashed|killed|abnormal-exit), exit code -?\d+\.\n\S+ The person chose Reload\.\n$/);
