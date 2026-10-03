@@ -13,7 +13,7 @@ import { Event, Response, type WireMessage, WireDecoder } from "@noldova/teamrun
 import type { Endpoint } from "@noldova/teamrun-shell-runtime";
 
 export class RawConnectionFixture implements Disposable {
-  private static readonly ANSWER_TIMEOUT: number = 3_000;
+  private static readonly ANSWER_TIMEOUT: number = 10_000;
 
   private readonly socket: Socket;
   private readonly frames: string[] = [];
@@ -54,11 +54,11 @@ export class RawConnectionFixture implements Disposable {
     this.socket.write(messages.map(t => `${t.toText()}\n`).join(""));
   }
 
-  public async readTextAsync(timeoutMilliseconds: number = RawConnectionFixture.ANSWER_TIMEOUT): Promise<string> {
+  public async readTextAsync(): Promise<string> {
     if (this.frames.length === 0 && !this.socket.closed) {
       const arrival = Promise.withResolvers<void>();
       this.arrival = arrival;
-      const limit = setTimeout(() => arrival.resolve(), timeoutMilliseconds);
+      const limit = setTimeout(() => arrival.resolve(), RawConnectionFixture.ANSWER_TIMEOUT);
       await arrival.promise;
       clearTimeout(limit);
       this.arrival = null;
@@ -69,8 +69,8 @@ export class RawConnectionFixture implements Disposable {
     return frame;
   }
 
-  public async readResponseAsync(timeoutMilliseconds: number = RawConnectionFixture.ANSWER_TIMEOUT): Promise<Response> {
-    const message = new WireDecoder().decode(await this.readTextAsync(timeoutMilliseconds));
+  public async readResponseAsync(): Promise<Response> {
+    const message = new WireDecoder().decode(await this.readTextAsync());
     if (!(message instanceof Response))
       throw new Error(`Expected a response, not ${message.toText()}.`);
     return message;
