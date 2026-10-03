@@ -16,7 +16,7 @@ import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.f
 describe("EmptyWindowComponent", () => {
   afterEach(() => AppearanceFixture.reset());
 
-  it("shows the product name and that there are no modules, in muted text", () => {
+  it("shows the product name and that there are no modules, in muted text a small space apart", () => {
     AppearanceFixture.apply();
     const fixture = TestBed.createComponent(EmptyWindowComponent);
     fixture.detectChanges();
@@ -24,5 +24,6 @@ describe("EmptyWindowComponent", () => {
 
     expect([...root.querySelectorAll("p")].map(t => t.textContent)).toEqual(["TeamRun", "No modules"]);
     expect(getComputedStyle(root).color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "teamrun.mutedForeground"));
+    AppearanceFixture.expectLook(getComputedStyle(root).rowGap, DefaultTheme.theme, "space-1", "row-gap", "gap");
   });
 });

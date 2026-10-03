@@ -8,7 +8,7 @@
 
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { link, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
@@ -32,7 +32,10 @@ export class DeviceIdentity {
     const file = path.join(folder, Resources.deviceFileName);
     if (!existsSync(file)) {
       await mkdir(folder, { recursive: true });
-      await writeFile(file, `${JSON.stringify({ [Resources.deviceIdField]: randomUUID() })}\n`, { flag: Resources.createOnlyFlag });
+      const draft = `${file}.${randomUUID()}`;
+      await writeFile(draft, `${JSON.stringify({ [Resources.deviceIdField]: randomUUID() })}\n`, { flag: Resources.createOnlyFlag });
+      await link(draft, file).catch(() => undefined);
+      await rm(draft, { force: true });
     }
     let id: string;
     try {

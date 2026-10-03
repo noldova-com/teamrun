@@ -14,7 +14,7 @@ LICENSE file in the root directory of this source tree.
           @let label = labels.of(tab);
           <tr-tab-menu #menu [tab]="tab" />
           <tr-tab [label]="label.title" [icon]="label.icon" [selected]="tab.equals(group().active)" [preview]="tab.equals(group().preview)" [attr.data-tab-index]="index"
-            [attr.data-tab-key]="tab.key" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, index)" [class.tr-tab-dragged]="tab.equals(drag.dragging())"
+            [attr.id]="tabId(index)" [attr.data-tab-key]="tab.key" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, index)" [class.tr-tab-dragged]="tab.equals(drag.dragging())"
             [trTooltip]="label.title" [trTooltipSide]="below" [trTooltipTruncated]="true"
             [trContextMenuTriggerFor]="menu.menu()" (activate)="layout.activate(tab)" (close)="close(tab)" (pointerdown)="drag.begin(tab, $event)" (dblclick)="keep(tab)" />
         }
@@ -23,7 +23,7 @@ LICENSE file in the root directory of this source tree.
       <div #actionBar class="tr-tab-group-actions" [class.tr-tab-group-actions-shell]="isShell()">
         @if (scroller.isOverflowing()) {
           <button #overflowTrigger="trMenuTriggerFor" type="button" tr-icon-button class="tr-tab-group-overflow" [icon]="resources.overflowGlyph"
-            [label]="resources.overflowLabel" [trMenuTriggerFor]="overflow" [trMenuAlignment]="end"></button>
+            [label]="resources.overflowLabel" [trTooltip]="resources.overflowLabel" [trTooltipSide]="below" [trMenuTriggerFor]="overflow" [trMenuAlignment]="end"></button>
           <ng-template #overflow>
             <tr-menu class="tr-tab-group-overflow-menu">
               <button tr-menu-item class="tr-tab-group-overflow-close-all" [icon]="resources.closeAllGlyph" [label]="resources.closeAllLabel" (triggered)="closeAll()"></button>
@@ -39,16 +39,16 @@ LICENSE file in the root directory of this source tree.
         @if (group().active; as active) {
           <tr-tab-menu #actions [tab]="active" />
           <button type="button" tr-icon-button class="tr-tab-group-menu" [icon]="resources.panelActionsGlyph" [label]="resources.panelActionsLabel"
-            [trMenuTriggerFor]="actions.menu()" [trMenuAlignment]="end"></button>
+            [trTooltip]="resources.panelActionsLabel" [trTooltipSide]="below" [trMenuTriggerFor]="actions.menu()" [trMenuAlignment]="end"></button>
         }
         @if (hideSide(); as side) {
           <button type="button" tr-icon-button class="tr-tab-group-hide" [icon]="resources.hideDockGlyphs[side]" [label]="resources.hideDockLabels[side]"
-            (click)="layout.toggleDock(side)"></button>
+            [trTooltip]="resources.hideDockLabels[side]" [trTooltipSide]="below" (click)="layout.toggleDock(side)"></button>
         }
       </div>
     </div>
   </div>
-  <div class="tr-tab-group-body" role="tabpanel">
+  <div class="tr-tab-group-body" role="tabpanel" [attr.id]="panelId()" [attr.aria-labelledby]="activeTabId()">
     <ng-content />
   </div>
 </tr-panel-card>
