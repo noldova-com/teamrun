@@ -72,7 +72,7 @@ async function runCommandAsync(window: Page, title: string): Promise<void> {
 }
 
 test.describe("toolbars", () => {
-  test("a module's toolbars stand in rows under the window row, 2rem high, with their groups apart and each kind of item", async ({ desktop }) => {
+  test("a module's toolbars stand in rows under the window row, 2.25rem high, with their groups apart and each kind of item", async ({ desktop }) => {
     const window = desktop.window;
     const main = toolbar(window, "notes.main");
 
@@ -91,11 +91,30 @@ test.describe("toolbars", () => {
       const row = document.querySelector("tr-window-row")?.getBoundingClientRect();
       return { rem, heights: rows.map(t => t.height), top: rows[0]?.top, windowRowBottom: row?.bottom, button: [button?.width, button?.height], stacked: rows[1]?.top === rows[0]?.bottom };
     });
-    expect(measured.heights).toEqual([measured.rem * 2, measured.rem * 2]);
+    expect(measured.heights).toEqual([measured.rem * 2.25, measured.rem * 2.25]);
     expect(measured.top).toBe(measured.windowRowBottom);
     expect(measured.button).toEqual([measured.rem * 1.75, measured.rem * 1.75]);
     expect(measured.stacked).toBe(true);
     await expect(window.locator(".tr-toolbar-row").first().locator("tr-toolbar").first().locator(".tr-toolbar-grip")).toHaveAttribute("aria-hidden", "true");
+    const grips = await window.evaluate(() => {
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const rows = [...document.querySelectorAll(".tr-toolbar-row")];
+      const grip = rows.map(t => t.querySelector(".tr-toolbar-grip")?.getBoundingClientRect());
+      const button = rows.map(t => t.querySelector(".tr-toolbar-item")?.getBoundingClientRect());
+      const bounds = rows.map(t => t.getBoundingClientRect());
+      return {
+        rem,
+        heights: grip.map(t => t?.height),
+        buttons: button.map(t => t?.height),
+        tops: grip.map((t, i) => (t?.top ?? 0) - bounds[i]!.top),
+        bottoms: grip.map((t, i) => bounds[i]!.bottom - (t?.bottom ?? 0)),
+        gap: (grip[1]?.top ?? 0) - (grip[0]?.bottom ?? 0)
+      };
+    });
+    expect(grips.heights).toEqual(grips.buttons);
+    expect(grips.tops).toEqual(grips.bottoms);
+    expect(grips.gap).toBe(grips.rem * 0.5);
+    await desktop.checkpointAsync("toolbars");
   });
 
   test("a button runs its command, a dropdown opens its place, a choice shows and changes the checked row, a toggle shows its state and a dynamic group's rows run", async ({ desktop }) => {
@@ -192,6 +211,7 @@ test.describe("toolbars", () => {
     await expect(window.locator(".tr-toolbar-drop-row")).toBeVisible();
     await window.mouse.up();
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.spare"], ["notes.main", "notes.second"]]);
+    await desktop.checkpointAsync("toolbars-stacked");
 
     await dragAsync(window, "notes.main", rows => ({ x: first(rows).left + 8, y: first(rows).top + first(rows).height / 2 }));
     await expect(window.locator(".tr-toolbar-drop")).toBeVisible();
@@ -207,7 +227,6 @@ test.describe("toolbars", () => {
     expect(before).toEqual([["notes.main", "notes.spare"]]);
 
     await desktop.reopenAsync();
-    await desktop.useSuiteViewportAsync();
 
     await expect.poll(() => arrangementOf(desktop.window)).toEqual(before);
     await runCommandAsync(desktop.window, "Reset the layout");

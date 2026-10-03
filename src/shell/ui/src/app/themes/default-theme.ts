@@ -167,7 +167,7 @@ export class DefaultTheme {
       ["menu-item-inset", "0.25rem"],
       ["menu-item-padding", "0.5rem"],
       ["menu-trail-gap", "2rem"],
-      ["toolbar-row", "2rem"],
+      ["toolbar-row", "2.25rem"],
       ["toolbar-button", "1.75rem"],
       ["toolbar-button-padding", "0.375rem"],
       ["toolbar-gap", "0.5rem"],
