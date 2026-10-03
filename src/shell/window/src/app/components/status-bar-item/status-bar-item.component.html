@@ -1,0 +1,21 @@
+@let current = state();
+@if (current.command; as command) {
+  <button type="button" class="tr-status-bar-item" [disabled]="!isAvailable(command)" [attr.aria-label]="current.text ? null : current.tooltip"
+    [trTooltip]="current.label" [trTooltipTruncated]="!current.tooltip" (click)="run(command, current.commandArguments)">
+    @if (current.icon) {
+      <span class="material-symbols-rounded tr-status-bar-item-icon" aria-hidden="true">{{ current.icon }}</span>
+    }
+    @if (current.text) {
+      <span class="tr-status-bar-item-text">{{ current.text }}</span>
+    }
+  </button>
+} @else {
+  <span class="tr-status-bar-item" role="status" [attr.aria-label]="current.text ? null : current.tooltip" [trTooltip]="current.label" [trTooltipTruncated]="!current.tooltip">
+    @if (current.icon) {
+      <span class="material-symbols-rounded tr-status-bar-item-icon" aria-hidden="true">{{ current.icon }}</span>
+    }
+    @if (current.text) {
+      <span class="tr-status-bar-item-text">{{ current.text }}</span>
+    }
+  </span>
+}

@@ -11,6 +11,7 @@ import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import { JsonException, JsonReader } from "@noldova/teamrun-foundation-json";
 
 import { Resources } from "../../../resources";
+import { BottomDockSpan } from "../../enums/bottom-dock-span";
 import { DockSide } from "../../enums/dock-side";
 import { SplitAxis } from "../../enums/split-axis";
 import { Dock } from "./dock";
@@ -50,7 +51,8 @@ export class LayoutReader {
     const docks = json.readObject(Resources.docksField);
     const read = Object.values(DockSide).map(t => this.readDock(t, docks.readObject(t)));
     const middle = this.readNode(json.readObject(Resources.middleField));
-    return LayoutReader.construct(json, () => new Layout(read, middle));
+    const span = json.hasField(Resources.bottomSpanField) ? json.readOneOf(Resources.bottomSpanField, Object.values(BottomDockSpan)) : BottomDockSpan.Full;
+    return LayoutReader.construct(json, () => new Layout(read, middle, span));
   }
 
   private readDock(side: DockSide, json: JsonReader): Dock {

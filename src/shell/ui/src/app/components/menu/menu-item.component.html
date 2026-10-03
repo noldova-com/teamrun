@@ -2,6 +2,12 @@
   <span class="tr-menu-item-icon material-symbols-rounded" aria-hidden="true">{{ glyph }}</span>
 }
 <span class="tr-menu-item-label" data-truncates>{{ label() }}</span>
+@if (shortcut(); as keys) {
+  <span class="tr-menu-item-shortcut">{{ keys }}</span>
+}
+@if (checked()) {
+  <span class="tr-menu-item-check material-symbols-rounded" aria-hidden="true">{{ resources.checkedGlyph }}</span>
+}
 @if (hasSubmenu) {
   <span class="tr-menu-item-chevron material-symbols-rounded" aria-hidden="true">{{ resources.submenuGlyph }}</span>
 }

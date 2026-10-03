@@ -9,10 +9,12 @@
 import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
+import { BottomDockSpan } from "../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { PanelEdge } from "../../../src/app/enums/panel-edge";
 import { Layout } from "../../../src/app/models/layout/layout";
 import { LayoutReader } from "../../../src/app/models/layout/layout.reader";
+import { ViewTab } from "../../../src/app/models/layout/view-tab";
 import { SideDropTarget } from "../../../src/app/models/layout/side-drop-target";
 import { SplitDropTarget } from "../../../src/app/models/layout/split-drop-target";
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
@@ -121,6 +123,19 @@ describe("LayoutService", () => {
     expect(service.layout().isOpen(LayoutFixture.files)).toBe(true);
   });
 
+  it("makes the group of an activated or focused tab the current group, keeping it when an absent tab is activated", async () => {
+    await loadAsync(prepared());
+    expect(service.currentGroup()).toBe(service.layout().documents);
+
+    service.activate(LayoutFixture.files);
+    const left = service.layout().groupOf(LayoutFixture.files);
+    service.activate(new ViewTab("gone.view"));
+
+    expect(service.currentGroup()).toBe(left);
+    service.focusGroup(service.layout().documents.id);
+    expect(service.currentGroup()).toBe(service.layout().documents);
+  });
+
   it("resizes a split through its handle", async () => {
     await loadAsync(prepared());
     service.setViewport(160, 80);
@@ -132,6 +147,17 @@ describe("LayoutService", () => {
     service.resizeSplit(handle, handle.leadingLength + 4);
 
     expect(service.geometry().handles[0]?.leadingLength).toBeCloseTo(handle.leadingLength + 4);
+  });
+
+  it("spans the bottom dock across the window or keeps it between the side docks", async () => {
+    await loadAsync(prepared().openView(LayoutFixture.terminal, LayoutFixture.createRegistry()));
+    service.setViewport(160, 80);
+    const full = service.geometry().dock(DockSide.Bottom).width;
+
+    service.setBottomSpan(BottomDockSpan.Between);
+
+    expect(service.layout().bottomSpan).toBe(BottomDockSpan.Between);
+    expect(service.geometry().dock(DockSide.Bottom).width).toBeLessThan(full);
   });
 
   it("resets the layout to the default and keeps open documents", async () => {

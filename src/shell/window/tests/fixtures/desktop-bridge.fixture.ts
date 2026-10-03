@@ -19,13 +19,18 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public readonly platform: string;
   public readonly appearances: JsonObject[] = [];
+  public readonly changes: JsonObject[] = [];
   public readonly answers: string[] = [];
   public readonly actions: string[] = [];
   public startup: unknown = { kind: "Ready", details: [] };
   public layout: unknown = null;
   public readonly requests: [string, JsonValue][] = [];
   public answer: unknown = { payload: null };
-  public readonly responses: Map<string, unknown> = new Map<string, unknown>([["shell.modules", { payload: { modules: [] } }], ["shell.commands", { payload: { commands: [] } }]]);
+  public readonly responses: Map<string, unknown> = new Map<string, unknown>([
+    ["shell.modules", { payload: { modules: [] } }],
+    ["shell.commands", { payload: { commands: [] } }],
+    ["shell.notifications", { payload: { notifications: [], isDoNotDisturb: false } }]
+  ]);
   public build: unknown = { productVersion: "1.2.3", fingerprint: "abc123" };
   public readonly copied: string[] = [];
   public isCopyAccepted: boolean = true;
@@ -60,6 +65,10 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public notifyReady(appearance: JsonObject): void {
     this.appearances.push(appearance);
+  }
+
+  public notifyAppearance(appearance: JsonObject): void {
+    this.changes.push(appearance);
   }
 
   public onCloseRequest(listener: (requestId: string) => void): () => void {

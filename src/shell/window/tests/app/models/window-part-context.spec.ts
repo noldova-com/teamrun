@@ -8,15 +8,24 @@
 
 import { Component, type Type } from "@angular/core";
 
+import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { WindowPartAccessException } from "../../../src/app/exceptions/window-part-access.exception";
 import type { IWindowPartHost } from "../../../src/app/interfaces/i-window-part-host";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
+import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
+import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
 import { DocumentContribution } from "../../../src/app/models/document-contribution";
+import { StatusBarItemContribution } from "../../../src/app/models/status-bar-item-contribution";
+import { StatusBarItemState } from "../../../src/app/models/status-bar-item-state";
+import { TopBarActionContribution } from "../../../src/app/models/top-bar-action-contribution";
+import { TopBarActionState } from "../../../src/app/models/top-bar-action-state";
 import { ViewContribution } from "../../../src/app/models/view-contribution";
 import { WindowPartContext } from "../../../src/app/models/window-part-context";
+import { WindowPartSource } from "../../../src/app/models/window-part-source";
 
 @Component({ template: "" })
 class ListComponent {
@@ -54,6 +63,20 @@ class FakeWindowPartHost implements IWindowPartHost {
     return Promise.resolve({ name, commandArguments });
   }
 
+  public postNotificationAsync(post: NotificationPost): Promise<number> {
+    this.calls.push(`post ${post.title}`);
+    return Promise.resolve(this.calls.length);
+  }
+
+  public updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
+    this.calls.push(`update ${id} ${post.title}`);
+    return Promise.resolve();
+  }
+
+  public dismissNotification(id: number): void {
+    this.calls.push(`dismiss ${id}`);
+  }
+
   public refresh(): void {
     this.calls.push("refresh");
   }
@@ -65,6 +88,9 @@ class FakeWindowPartHost implements IWindowPartHost {
 }
 
 describe("WindowPartContext", () => {
+  const notification = (kind: string, title: string, action: string | null): NotificationPost => new NotificationPost(
+    QualifiedName.parse(kind), null, title, null, NotificationSeverity.Info, null,
+    action === null ? [] : [new NotificationAction("Show", new CommandRun(QualifiedName.parse(action), null))], null);
   const load = (): Promise<Type<unknown>> => Promise.resolve(ListComponent);
   const view = (name: string): ViewContribution => new ViewContribution(name, "Notes", "sticky_note_2", DockSide.Left, true, load);
   let host: FakeWindowPartHost;
@@ -72,7 +98,34 @@ describe("WindowPartContext", () => {
 
   beforeEach(() => {
     host = new FakeWindowPartHost();
-    context = new WindowPartContext("notes", ["tasks"], ["notes.newNote", "notes.taken"], host);
+    const source = new WindowPartSource("notes", "Notes", ["tasks"], [], ["notes.newNote", "notes.taken"], ["notes.count", "notes.sync"], ["notes.compose", "notes.share"], ["notes.saved"],
+      () => Promise.reject<IWindowPart>(new Error("unused")));
+    context = new WindowPartContext(source, host);
+  });
+
+  it("posts, updates and dismisses its declared notifications, and dismisses the rest when withdrawn", async () => {
+    const first = await context.postNotificationAsync(notification("notes.saved", "Saved", "tasks.show"));
+    const second = await context.postNotificationAsync(notification("notes.saved", "Saved again", "notes.newNote"));
+    await first.updateAsync(notification("notes.saved", "Saved twice", null));
+    first.dismiss();
+    first.dismiss();
+    context.withdraw();
+    second.dismiss();
+
+    expect([first.id, second.id]).toEqual([1, 2]);
+    expect(host.calls).toEqual(["post Saved", "post Saved again", "update 1 Saved twice", "dismiss 1", "dismiss 2", "refresh"]);
+  });
+
+  it("refuses a notification of another module, an undeclared kind or another module's command, before and on update", async () => {
+    const posted = await context.postNotificationAsync(notification("notes.saved", "Saved", null));
+
+    await expect(context.postNotificationAsync(notification("tasks.due", "Due", null))).rejects.toThrowError(WindowPartAccessException);
+    await expect(context.postNotificationAsync(notification("notes.deleted", "Deleted", null)))
+      .rejects.toThrowError("The module notes does not declare the notification kind notes.deleted.");
+    await expect(context.postNotificationAsync(notification("notes.saved", "Saved", "calendar.show"))).rejects.toThrowError(WindowPartAccessException);
+    await expect(posted.updateAsync(new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Info,
+      new CommandRun(QualifiedName.parse("clock.open"), null), [], null))).rejects.toThrowError(WindowPartAccessException);
+    expect(host.calls).toEqual(["post Saved"]);
   });
 
   it("registers its module's own views and documents and has the host refresh after each", () => {
@@ -101,6 +154,47 @@ describe("WindowPartContext", () => {
     expect(await context.runCommandAsync("notes.newNote")).toEqual({ name: "notes.newNote", commandArguments: null });
     expect(() => context.runCommandAsync("clock.tick")).toThrowError(WindowPartAccessException);
     expect(host.calls).toEqual(["refresh", "run tasks.add", "run notes.newNote"]);
+  });
+
+  it("registers its declared status bar items in declared order and lets them change within its own and its dependencies' commands", () => {
+    const sync = context.registerStatusBarItem(new StatusBarItemContribution("notes.sync", StatusBarSide.Right, new StatusBarItemState("Synced", { command: "tasks.sync" })));
+    const count = context.registerStatusBarItem(new StatusBarItemContribution("notes.count", StatusBarSide.Left, new StatusBarItemState("2 notes")));
+
+    count.update(new StatusBarItemState("3 notes", { command: "notes.newNote" }));
+
+    expect(context.statusBarItems).toEqual([count, sync]);
+    expect([count.name, count.side, count.state().text, sync.side]).toEqual(["notes.count", StatusBarSide.Left, "3 notes", StatusBarSide.Right]);
+    expect(() => count.update(new StatusBarItemState("4 notes", { command: "clock.tick" }))).toThrowError(WindowPartAccessException);
+    expect(count.state().text).toBe("3 notes");
+    expect(host.calls).toEqual(["refresh", "refresh"]);
+  });
+
+  it("refuses a status bar item it does not declare, owns twice or another module owns, or one whose command it may not run", () => {
+    const item = (name: string, command?: string): StatusBarItemContribution =>
+      new StatusBarItemContribution(name, StatusBarSide.Left, new StatusBarItemState("Notes", Object.isUndefined(command) ? {} : { command }));
+    context.registerStatusBarItem(item("notes.count"));
+
+    expect(() => context.registerStatusBarItem(item("notes.words"))).toThrowError("The module notes does not declare the status bar item notes.words.");
+    expect(() => context.registerStatusBarItem(item("notes.count"))).toThrowError("The status bar item notes.count is already registered.");
+    expect(() => context.registerStatusBarItem(item("clock.ticks"))).toThrowError(WindowPartAccessException);
+    expect(() => context.registerStatusBarItem(item("notes.sync", "clock.tick"))).toThrowError(WindowPartAccessException);
+    expect(context.statusBarItems.map(t => t.name)).toEqual(["notes.count"]);
+  });
+
+  it("registers its declared top bar actions in declared order and refuses others and other modules' commands", () => {
+    const share = context.registerTopBarAction(new TopBarActionContribution("notes.share", new TopBarActionState("share", "Share", "tasks.share")));
+    const compose = context.registerTopBarAction(new TopBarActionContribution("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote")));
+
+    compose.update(new TopBarActionState("note_add", "New note", "notes.newNote", { isHidden: true }));
+
+    expect(context.topBarActions).toEqual([compose, share]);
+    expect([compose.name, compose.state().isHidden]).toEqual(["notes.compose", true]);
+    expect(() => compose.update(new TopBarActionState("timer", "Tick", "clock.tick"))).toThrowError(WindowPartAccessException);
+    expect(() => context.registerTopBarAction(new TopBarActionContribution("notes.print", new TopBarActionState("print", "Print", "notes.newNote"))))
+      .toThrowError("The module notes does not declare the top bar action notes.print.");
+    expect(() => context.registerTopBarAction(new TopBarActionContribution("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote"))))
+      .toThrowError("The top bar action notes.compose is already registered.");
+    expect(host.calls).toEqual(["refresh", "refresh"]);
   });
 
   it("refuses another module's views, documents and documents to open", () => {
@@ -146,12 +240,14 @@ describe("WindowPartContext", () => {
     const heard: JsonValue[] = [];
     context.registerView(view("notes.list"));
     context.registerDocument(new DocumentContribution("notes.note", load));
+    context.registerStatusBarItem(new StatusBarItemContribution("notes.count", StatusBarSide.Left, new StatusBarItemState("2 notes")));
+    context.registerTopBarAction(new TopBarActionContribution("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote")));
     context.onEvent("notes.changed", t => heard.push(t));
 
     context.withdraw();
     host.publish("notes.changed", 1);
 
-    expect([context.views, context.documents, heard, host.listeners.size]).toEqual([[], [], [], 0]);
-    expect(host.calls).toEqual(["refresh", "refresh", "refresh"]);
+    expect([context.views, context.documents, context.statusBarItems, context.topBarActions, heard, host.listeners.size]).toEqual([[], [], [], [], [], 0]);
+    expect(host.calls).toEqual(["refresh", "refresh", "refresh", "refresh", "refresh"]);
   });
 });

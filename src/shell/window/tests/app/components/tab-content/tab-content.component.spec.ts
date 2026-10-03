@@ -20,6 +20,7 @@ import type { Tab } from "../../../../src/app/models/layout/tab";
 import { ViewTab } from "../../../../src/app/models/layout/view-tab";
 import { ModuleFailure } from "../../../../src/app/models/module-failure";
 import { WindowPartContext } from "../../../../src/app/models/window-part-context";
+import { WindowPartSource } from "../../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { TabLabelService } from "../../../../src/app/services/tab-label.service";
 import { WindowPartHostService } from "../../../../src/app/services/window-part-host.service";
@@ -62,13 +63,16 @@ class StubWindowPartHost {
 }
 
 describe("TabContentComponent", () => {
-  const context = new WindowPartContext("notes", [], [], {
+  const context = new WindowPartContext(new WindowPartSource("notes", "Notes", [], [], [], [], [], [], () => Promise.reject(new Error("unused"))), {
     requestAsync: () => Promise.resolve(null),
     onEvent: () => () => undefined,
     openDocument: () => undefined,
     keepDocument: () => undefined,
     isCommandRegistered: () => false,
     runCommandAsync: () => Promise.resolve(null),
+    postNotificationAsync: () => Promise.resolve(1),
+    updateNotificationAsync: () => Promise.resolve(),
+    dismissNotification: () => undefined,
     refresh: () => undefined
   });
   let host: StubWindowPartHost;

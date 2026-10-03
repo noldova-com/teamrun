@@ -7,6 +7,8 @@
     "methods": ["clock.time", "clock.record"],
     "events": ["clock.ticked"],
     "commands": ["clock.tick"],
-    "views": ["clock.face"]
+    "notifications": ["clock.alarm", "clock.sync"],
+    "views": ["clock.face"],
+    "statusBarItems": ["clock.ticks"]
   }
 }

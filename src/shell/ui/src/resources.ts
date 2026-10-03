@@ -123,7 +123,8 @@ export class Resources {
     "status-bar-item-height",
     "status-bar-item-gap",
     "button-height",
-    "button-padding"
+    "button-padding",
+    "checkbox-size"
   ];
   public static readonly shapes: ReadonlyMap<string, readonly string[]> = new Map([["tab", ["pill"]]]);
   public static readonly defaultThemeId: string = "shell.default";
@@ -195,6 +196,9 @@ export class Resources {
   public static readonly menuPaneClass: string = "tr-menu-pane";
   public static readonly previewDescription: string = "Preview";
   public static readonly submenuGlyph: string = "chevron_right";
+  public static readonly checkedGlyph: string = "check";
+  public static readonly menuItemRole: string = "menuitem";
+  public static readonly menuItemRadioRole: string = "menuitemradio";
   public static readonly contextMenuKey: string = "ContextMenu";
   public static readonly menuKey: string = "F10";
   public static readonly clickEvent: string = "click";

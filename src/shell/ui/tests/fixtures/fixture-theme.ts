@@ -175,7 +175,8 @@ export class FixtureTheme {
     ["status-bar-item-height", "1.125rem"],
     ["status-bar-item-gap", "0.375rem"],
     ["button-height", "1.875rem"],
-    ["button-padding", "0.75rem"]
+    ["button-padding", "0.75rem"],
+    ["checkbox-size", "1.25rem"]
   ]);
   private static readonly SHAPES: ReadonlyMap<string, string> = new Map([["tab", "pill"]]);
 

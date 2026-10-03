@@ -15,6 +15,13 @@ export class ShellMethods {
   public static readonly modules: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.modulesMember);
   public static readonly commands: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.commandsMember);
   public static readonly runCommand: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.runCommandMember);
+  public static readonly notifications: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.notificationsMember);
+  public static readonly postNotification: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.postNotificationMember);
+  public static readonly updateNotification: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.updateNotificationMember);
+  public static readonly dismissNotification: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.dismissNotificationMember);
+  public static readonly markNotificationsRead: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.markNotificationsReadMember);
+  public static readonly clearNotifications: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.clearNotificationsMember);
+  public static readonly setDoNotDisturb: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.setDoNotDisturbMember);
   public static readonly readWindowBounds: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.readWindowBoundsMember);
   public static readonly writeWindowBounds: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.writeWindowBoundsMember);
   public static readonly readWindowLayout: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.readWindowLayoutMember);

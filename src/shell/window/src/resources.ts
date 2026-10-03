@@ -6,10 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { FocusOrigin } from "@angular/cdk/a11y";
+
 import "@noldova/teamrun-foundation-core";
-import { ModuleState } from "@noldova/teamrun-shell-protocol";
+import { ModuleState, NotificationSeverity } from "@noldova/teamrun-shell-protocol";
 import { DockingDirection, OverlaySide } from "@noldova/teamrun-shell-ui";
 
+import { BottomDockSpan } from "./app/enums/bottom-dock-span";
 import { DockSide } from "./app/enums/dock-side";
 import { PanelEdge } from "./app/enums/panel-edge";
 import { SplitAxis } from "./app/enums/split-axis";
@@ -64,6 +67,7 @@ export class Resources {
   public static readonly dropGroupData: string = "dropGroup";
   public static readonly dropSideSelector: string = "[data-drop-side]";
   public static readonly dropSideData: string = "dropSide";
+  public static readonly dropSpanData: string = "dropSpan";
   public static readonly dropTabsSelector: string = "[data-drop-tabs]";
   public static readonly dropPlateSelector: string = "[data-drop-plate]";
   public static readonly directionSelector: string = "[data-direction]";
@@ -125,6 +129,10 @@ export class Resources {
   public static readonly moveEarlierLabel: string = "Move left";
   public static readonly moveLaterLabel: string = "Move right";
   public static readonly resetLayoutLabel: string = "Reset the layout";
+  public static readonly bottomSpanLabels: Readonly<Record<BottomDockSpan, string>> = {
+    [BottomDockSpan.Full]: "Bottom dock across the window",
+    [BottomDockSpan.Between]: "Bottom dock between the side docks"
+  };
   public static readonly documentsGroupLabel: string = "Documents";
   public static readonly groupLabelJoiner: string = ", ";
   public static readonly splitLabels: Readonly<Record<PanelEdge, string>> = {
@@ -149,6 +157,56 @@ export class Resources {
     [DockSide.Right]: "dock_to_right",
     [DockSide.Bottom]: "dock_to_bottom"
   };
+  public static readonly closeTabCommand: string = "shell.closeTab";
+  public static readonly keepTabCommand: string = "shell.keepTab";
+  public static readonly closeOtherTabsCommand: string = "shell.closeOtherTabs";
+  public static readonly closeTabsToTheRightCommand: string = "shell.closeTabsToTheRight";
+  public static readonly closeAllTabsCommand: string = "shell.closeAllTabs";
+  public static readonly moveTabLeftCommand: string = "shell.moveTabLeft";
+  public static readonly moveTabRightCommand: string = "shell.moveTabRight";
+  public static readonly resetLayoutCommand: string = "shell.resetLayout";
+  public static readonly showAllTabsCommand: string = "shell.showAllTabs";
+  public static readonly splitTabCommands: Readonly<Record<PanelEdge, string>> = {
+    [PanelEdge.Left]: "shell.splitTabLeft",
+    [PanelEdge.Right]: "shell.splitTabRight",
+    [PanelEdge.Top]: "shell.splitTabUp",
+    [PanelEdge.Bottom]: "shell.splitTabDown"
+  };
+  public static readonly dockTabCommands: Readonly<Record<DockSide, string>> = {
+    [DockSide.Left]: "shell.dockTabLeft",
+    [DockSide.Right]: "shell.dockTabRight",
+    [DockSide.Bottom]: "shell.dockTabBottom"
+  };
+  public static readonly toggleDockCommands: Readonly<Record<DockSide, string>> = {
+    [DockSide.Left]: "shell.toggleLeftDock",
+    [DockSide.Right]: "shell.toggleRightDock",
+    [DockSide.Bottom]: "shell.toggleBottomDock"
+  };
+  public static readonly closeTabTitle: string = "Close the tab";
+  public static readonly keepTabTitle: string = "Keep the tab open";
+  public static readonly closeOtherTabsTitle: string = "Close the other tabs";
+  public static readonly closeTabsToTheRightTitle: string = "Close the tabs to the right";
+  public static readonly closeAllTabsTitle: string = "Close all tabs in the group";
+  public static readonly moveTabLeftTitle: string = "Move the tab left";
+  public static readonly moveTabRightTitle: string = "Move the tab right";
+  public static readonly splitTabTitles: Readonly<Record<PanelEdge, string>> = {
+    [PanelEdge.Left]: "Split the tab left",
+    [PanelEdge.Right]: "Split the tab right",
+    [PanelEdge.Top]: "Split the tab up",
+    [PanelEdge.Bottom]: "Split the tab down"
+  };
+  public static readonly dockTabTitles: Readonly<Record<DockSide, string>> = {
+    [DockSide.Left]: "Dock the tab left",
+    [DockSide.Right]: "Dock the tab right",
+    [DockSide.Bottom]: "Dock the tab at the bottom"
+  };
+  public static readonly toggleDockTitles: Readonly<Record<DockSide, string>> = {
+    [DockSide.Left]: "Show or hide the left dock",
+    [DockSide.Right]: "Show or hide the right dock",
+    [DockSide.Bottom]: "Show or hide the bottom dock"
+  };
+  public static readonly tabArgument: string = "tab";
+  public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly hideDockLabels: Readonly<Record<DockSide, string>> = {
     [DockSide.Left]: "Hide the left dock",
     [DockSide.Right]: "Hide the right dock",
@@ -177,6 +235,7 @@ export class Resources {
   public static readonly rootField: string = "root";
   public static readonly sizeField: string = "size";
   public static readonly collapsedField: string = "collapsed";
+  public static readonly bottomSpanField: string = "bottomSpan";
   public static readonly axisField: string = "axis";
   public static readonly childrenField: string = "children";
   public static readonly weightField: string = "weight";
@@ -192,6 +251,14 @@ export class Resources {
   public static readonly nameParameter: string = "name";
   public static readonly titleParameter: string = "title";
   public static readonly iconParameter: string = "icon";
+  public static readonly textParameter: string = "text";
+  public static readonly tooltipParameter: string = "tooltip";
+  public static readonly commandParameter: string = "command";
+  public static readonly statusBarItemKind: string = "status bar item";
+  public static readonly topBarActionKind: string = "top bar action";
+  public static readonly notificationKind: string = "notification kind";
+  public static readonly statusBarItemEmpty: string = "A status bar item shows text, an icon or both.";
+  public static readonly statusBarItemUnnamed: string = "A status bar item that shows only an icon needs a tooltip, which is also its accessible name.";
   public static readonly defaultKeyParameter: string = "defaultKey";
   public static readonly invalidContributionName: string = "A contribution name has the form <module id>.<name>.";
   public static readonly invalidModuleId: string = "A module id is lowercase kebab-case.";
@@ -294,6 +361,46 @@ export class Resources {
 
   public static formatUndeclaredCommand(moduleId: string, name: string): string {
     return `The module ${moduleId} does not declare the command ${name}.`;
+  }
+
+  public static readonly isOnField: string = "isOn";
+  public static readonly notificationsGlyph: string = "notifications";
+  public static readonly notificationsOffGlyph: string = "notifications_off";
+  public static readonly notificationsTitle: string = "Notifications";
+  public static readonly clearAllLabel: string = "Clear all";
+  public static readonly doNotDisturbLabel: string = "Do not disturb";
+  public static readonly noNotifications: string = "No notifications";
+  public static readonly dismissLabel: string = "Dismiss";
+  public static readonly checkGlyph: string = "check";
+  public static readonly unreadLimit: number = 9;
+  public static readonly severityGlyphs: Readonly<Record<NotificationSeverity, string>> = {
+    [NotificationSeverity.Info]: "info",
+    [NotificationSeverity.Success]: "check_circle",
+    [NotificationSeverity.Warning]: "warning",
+    [NotificationSeverity.Error]: "error"
+  };
+  public static readonly severityNames: Readonly<Record<NotificationSeverity, string>> = {
+    [NotificationSeverity.Info]: "Information",
+    [NotificationSeverity.Success]: "Success",
+    [NotificationSeverity.Warning]: "Warning",
+    [NotificationSeverity.Error]: "Error"
+  };
+
+  public static formatUnreadCount(count: number): string {
+    return count > Resources.unreadLimit ? `${Resources.unreadLimit}+` : String(count);
+  }
+
+  public static formatNotificationsLabel(unread: number, isQuiet: boolean): string {
+    const state = isQuiet ? ", Do not disturb" : "";
+    return unread === 0 ? `Notifications${state}` : `Notifications, ${unread} unread${state}`;
+  }
+
+  public static formatUndeclaredContribution(moduleId: string, kind: string, name: string): string {
+    return `The module ${moduleId} does not declare the ${kind} ${name}.`;
+  }
+
+  public static formatContributionRegistered(kind: string, name: string): string {
+    return `The ${kind} ${name} is already registered.`;
   }
 
   public static formatCommandRegistered(name: string): string {

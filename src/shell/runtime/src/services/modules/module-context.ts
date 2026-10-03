@@ -7,7 +7,7 @@
  */
 
 import "@noldova/teamrun-foundation-core";
-import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+import { type NotificationPost, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { ModuleDatabaseException } from "../../exceptions/module-database.exception.js";
 import { RegistrationException } from "../../exceptions/registration.exception.js";
@@ -17,9 +17,12 @@ import type { IModuleDatabase } from "../../interfaces/module-database.js";
 import type { IRuntimePartContext } from "../../interfaces/runtime-part-context.js";
 import type { EventChannel } from "../../models/event-channel.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
+import { NotificationHandle } from "../../models/notification-handle.js";
 import type { RuntimeCommand } from "../../models/runtime-command.js";
 import { Resources } from "../../resources.js";
 import type { DataDirectory } from "../data-directory/data-directory.js";
+import type { NotificationCenter } from "../notifications/notification-center.js";
+import type { NotificationPolicy } from "../notifications/notification-policy.js";
 import type { CommandRegistry } from "../registry/command-registry.js";
 import type { EventRegistry } from "../registry/event-registry.js";
 import type { MethodRegistry } from "../registry/method-registry.js";
@@ -30,6 +33,8 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
   private readonly methods: MethodRegistry;
   private readonly events: EventRegistry;
   private readonly commands: CommandRegistry;
+  private readonly notifications: NotificationCenter;
+  private readonly notificationPolicy: NotificationPolicy;
   private readonly services: ServiceRegistry;
   private readonly registrations: Disposable[] = [];
   private readonly moduleDatabase?: IModuleDatabase;
@@ -42,6 +47,8 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     methods: MethodRegistry,
     events: EventRegistry,
     commands: CommandRegistry,
+    notifications: NotificationCenter,
+    notificationPolicy: NotificationPolicy,
     services: ServiceRegistry,
     database?: IModuleDatabase) {
     this.declaration = declaration;
@@ -50,6 +57,8 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     this.methods = methods;
     this.events = events;
     this.commands = commands;
+    this.notifications = notifications;
+    this.notificationPolicy = notificationPolicy;
     this.services = services;
     this.moduleFolder = dataDirectory.locateModuleFolder(declaration.id);
   }
@@ -79,6 +88,12 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     this.registrations.push(this.commands.register(command));
   }
 
+  public postNotification(post: NotificationPost): NotificationHandle {
+    this.notificationPolicy.requireDeclared(this.declaration, post);
+    const id = this.notifications.post(post);
+    return new NotificationHandle(id, t => this.updateNotification(id, t), () => this.notifications.dismiss(id));
+  }
+
   public publishService(name: string, service: object): void {
     const qualified = QualifiedName.parse(name);
     if (qualified.owner !== this.declaration.id)
@@ -103,6 +118,13 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
   public [Symbol.dispose](): void {
     for (const registration of this.registrations.splice(0).reverse())
       registration[Symbol.dispose]();
+    this.notifications.dismissOwnedBy(this.declaration.id);
+  }
+
+  private updateNotification(id: number, post: NotificationPost): void {
+    this.notificationPolicy.requireDeclared(this.declaration, post);
+    if (!this.notifications.update(id, post))
+      throw new RegistrationException(Resources.formatNotificationNotFound(id));
   }
 
   private requireContributed(kind: string, name: string): QualifiedName {

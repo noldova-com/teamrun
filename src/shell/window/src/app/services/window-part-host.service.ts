@@ -10,7 +10,9 @@ import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal,
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { type CommandInfo, CommandList, CommandRun, ModuleState, ModuleStatus, ModuleStatusList, ShellMethods } from "@noldova/teamrun-shell-protocol";
+import {
+  type CommandInfo, CommandList, CommandRun, ModuleState, ModuleStatus, ModuleStatusList, type NotificationPost, NotificationReference, NotificationUpdate, ShellMethods
+} from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../enums/dock-side";
 import type { IWindowPart } from "../interfaces/i-window-part";
@@ -31,6 +33,7 @@ import { WindowPartContext } from "../models/window-part-context";
 import type { WindowPartSource } from "../models/window-part-source";
 import { WindowPartTokens } from "../models/window-part-tokens";
 import { Resources } from "../../resources";
+import { BarItemsService } from "./bar-items.service";
 import { CommandService } from "./command.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { DocumentOpenerService } from "./document-opener.service";
@@ -44,6 +47,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly opener: DocumentOpenerService = inject(DocumentOpenerService);
   private readonly labels: TabLabelService = inject(TabLabelService);
   private readonly commands: CommandService = inject(CommandService);
+  private readonly bars: BarItemsService = inject(BarItemsService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
   private readonly activations: WindowPartActivation[] = [];
@@ -108,11 +112,25 @@ export class WindowPartHostService implements IWindowPartHost {
     return this.commands.runAsync(name, commandArguments);
   }
 
+  public async postNotificationAsync(post: NotificationPost): Promise<number> {
+    return NotificationReference.fromJson(await this.bridge.requestAsync(ShellMethods.postNotification.text, post.toJson())).id;
+  }
+
+  public async updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
+    await this.bridge.requestAsync(ShellMethods.updateNotification.text, new NotificationUpdate(id, post).toJson());
+  }
+
+  public dismissNotification(id: number): void {
+    this.bridge.requestAsync(ShellMethods.dismissNotification.text, new NotificationReference(id).toJson()).catch((error: unknown) => this.errors.handleError(error));
+  }
+
   public refresh(): void {
     this.commands.setCommands(this.moduleOrder.flatMap(t => [
       ...this.runtimeCommands.filter(u => u.name.startsWith(`${t}${Resources.contributionSeparator}`)),
       ...this.activations.find(u => u.context.moduleId === t)?.context.commands ?? []
     ]));
+    const ordered = this.moduleOrder.flatMap(t => this.activations.filter(u => u.context.moduleId === t));
+    this.bars.set(ordered.flatMap(t => t.context.statusBarItems), ordered.flatMap(t => t.context.topBarActions));
     const views = this.activations.flatMap(t => t.context.views);
     for (const view of views)
       this.labels.register(view.name, new TabLabel(view.title, view.icon));
@@ -213,7 +231,7 @@ export class WindowPartHostService implements IWindowPartHost {
       return new ModuleStatus(moduleId, ModuleState.Failed, Resources.windowPartLoadFailed);
     }
 
-    const activation = new WindowPartActivation(new WindowPartContext(moduleId, source.dependencies, source.commandNames, this), part);
+    const activation = new WindowPartActivation(new WindowPartContext(source, this), part);
     this.activations.push(activation);
     try {
       await part.activateAsync(activation.context);

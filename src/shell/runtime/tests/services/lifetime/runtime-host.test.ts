@@ -14,7 +14,9 @@ import { pathToFileURL } from "node:url";
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, CommandList, CommandRun, FailureCode, ModuleStatusList, QualifiedName, Request, type Response, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateWrite } from "@noldova/teamrun-shell-protocol";
+import {
+  BuildIdentity, CommandList, CommandRun, FailureCode, ModuleStatusList, DoNotDisturbChange, NotificationBroadcast, NotificationPost, NotificationReference, NotificationSeverity, NotificationState, NotificationUpdate, NotificationsQuery, QualifiedName, Request, type Response, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateWrite
+} from "@noldova/teamrun-shell-protocol";
 import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
 
 import type { RawConnectionFixture } from "../../fixtures/raw-connection.fixture.js";
@@ -310,6 +312,83 @@ export class RuntimeHostTests {
   }
 
   @TestMethod
+  public listsPostsUpdatesAndDismissesNotificationsAndReportsEachChange(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["clock", RuntimeHostTests.createNotificationPart()]]));
+      const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      const alarm = (title: string, kind: string = "clock.alarm"): NotificationPost =>
+        new NotificationPost(QualifiedName.parse(kind), "window", title, null, NotificationSeverity.Warning, null, [], null);
+
+      const listed = await RuntimeHostTests.callAsync(connection, "desktop:1", ShellMethods.notifications, new NotificationsQuery("laptop").toJson());
+      connection.sendMessages(new Request("desktop:2", ShellMethods.postNotification, alarm("Posted").toJson()));
+      const posted = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      connection.sendMessages(new Request("desktop:3", ShellMethods.updateNotification, new NotificationUpdate(2, alarm("Updated")).toJson()));
+      const updated = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      const missing = await RuntimeHostTests.callAsync(connection, "desktop:4", ShellMethods.updateNotification, new NotificationUpdate(9, alarm("Gone")).toJson());
+      const otherKind = await RuntimeHostTests.callAsync(connection, "desktop:11", ShellMethods.updateNotification, new NotificationUpdate(1, alarm("Other", "clock.other")).toJson());
+      const foreign = new NotificationPost(
+        QualifiedName.parse("clock.alarm"), "window", "Foreign", null, NotificationSeverity.Info, new CommandRun(QualifiedName.parse("calendar.show"), null), [], null);
+      const foreignUpdate = await RuntimeHostTests.callAsync(connection, "desktop:12", ShellMethods.updateNotification, new NotificationUpdate(1, foreign).toJson());
+      const undeclared = await RuntimeHostTests.callAsync(connection, "desktop:6", ShellMethods.postNotification, alarm("Other", "clock.other").toJson());
+      const absent = await RuntimeHostTests.callAsync(connection, "desktop:7", ShellMethods.postNotification, alarm("Due", "calendar.due").toJson());
+      const invalid = await RuntimeHostTests.callAsync(connection, "desktop:8", ShellMethods.postNotification, { kind: "clock.alarm" });
+      connection.sendMessages(new Request("desktop:9", ShellMethods.dismissNotification, new NotificationReference(2).toJson()));
+      const dismissed = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      const again = await RuntimeHostTests.callAsync(connection, "desktop:10", ShellMethods.dismissNotification, new NotificationReference(2).toJson());
+      host.requestStop("test");
+      await host.waitForStopAsync();
+
+      const titles = (payload: unknown): string => NotificationBroadcast.fromJson(payload).notifications.map(t => `${t.id}:${t.post.title}`).join(",");
+      Assert.areEqual("1:Synced|false", `${NotificationState.fromJson(listed.payload).notifications.map(t => `${t.id}:${t.post.title}`).join(",")}|${String(NotificationState.fromJson(listed.payload).isDoNotDisturb)}`);
+      Assert.areEqual("shell.notifications|2:Posted,1:Synced|{\"id\":2}", `${posted[0].name.text}|${titles(posted[0].payload)}|${JSON.stringify(posted[1].payload)}`);
+      Assert.areEqual("2:Updated,1:Synced|null", `${titles(updated[0].payload)}|${JSON.stringify(updated[1].payload)}`);
+      Assert.areEqual(`${FailureCode.NotFound}|Notification 9 is gone; it was dismissed or its module stopped.`, `${missing.failure?.code}|${missing.failure?.message}`);
+      Assert.areEqual(`${FailureCode.InvalidParams}|Notification 1 is of the kind clock.alarm, which an update keeps.`, `${otherKind.failure?.code}|${otherKind.failure?.message}`);
+      Assert.areEqual(
+        `${FailureCode.InvalidParams}|The module clock may not offer the command calendar.show in a notification; it must be its own or a dependency's.`,
+        `${foreignUpdate.failure?.code}|${foreignUpdate.failure?.message}`);
+      Assert.areEqual(`${FailureCode.InvalidParams}|The module clock does not declare clock.other among its notifications.`, `${undeclared.failure?.code}|${undeclared.failure?.message}`);
+      Assert.areEqual("The notification kind calendar.due belongs to calendar, which is not an active module.", absent.failure?.message);
+      Assert.areEqual(FailureCode.InvalidParams, invalid.failure?.code);
+      Assert.areEqual("1:Synced|null|null", `${titles(dismissed[0].payload)}|${JSON.stringify(dismissed[1].payload)}|${JSON.stringify(again.payload)}`);
+    });
+  }
+
+  @TestMethod
+  public keepsDoNotDisturbPerDeviceAcrossARestartAndMarksReadAndClears(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const declarations = await fixture.writeModulesAsync([["clock", RuntimeHostTests.createNotificationPart()]]);
+      const first = await fixture.startAsync(30_000, declarations);
+      const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+
+      connection.sendMessages(new Request("desktop:1", ShellMethods.setDoNotDisturb, new DoNotDisturbChange("laptop", true).toJson()));
+      const quiet = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      connection.sendMessages(new Request("desktop:2", ShellMethods.markNotificationsRead, null));
+      const read = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      connection.sendMessages(new Request("desktop:3", ShellMethods.clearNotifications, null));
+      const cleared = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      first.requestStop("test");
+      await first.waitForStopAsync();
+      const second = await fixture.startAsync(30_000, declarations);
+      const [again] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      const laptop = await RuntimeHostTests.callAsync(again, "desktop:4", ShellMethods.notifications, new NotificationsQuery("laptop").toJson());
+      const desk = await RuntimeHostTests.callAsync(again, "desktop:5", ShellMethods.notifications, new NotificationsQuery("desk").toJson());
+      const invalid = await RuntimeHostTests.callAsync(again, "desktop:6", ShellMethods.setDoNotDisturb, { isOn: true });
+      again.sendMessages(new Request("desktop:7", ShellMethods.setDoNotDisturb, new DoNotDisturbChange("laptop", false).toJson()));
+      const loud = [await again.readEventAsync(), await again.readResponseAsync()] as const;
+      second.requestStop("test");
+      await second.waitForStopAsync();
+
+      Assert.areEqual("laptop|null", `${NotificationBroadcast.fromJson(quiet[0].payload).quietDevices.join(",")}|${JSON.stringify(quiet[1].payload)}`);
+      Assert.areEqual("true", NotificationBroadcast.fromJson(read[0].payload).notifications.map(t => String(t.isRead)).join(","));
+      Assert.areEqual("0", String(NotificationBroadcast.fromJson(cleared[0].payload).notifications.length));
+      Assert.areEqual("true,false", [NotificationState.fromJson(laptop.payload).isDoNotDisturb, NotificationState.fromJson(desk.payload).isDoNotDisturb].join(","));
+      Assert.areEqual("|null", `${NotificationBroadcast.fromJson(loud[0].payload).quietDevices.join(",")}|${JSON.stringify(loud[1].payload)}`);
+      Assert.areEqual(FailureCode.InvalidParams, invalid.failure?.code);
+    });
+  }
+
+  @TestMethod
   public servesAClientThatNeverAsksForModules(): Promise<void> {
     return RuntimeHostTests.runAsync(async fixture => {
       const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["notes", RuntimeHostTests.PART]]));
@@ -374,6 +453,24 @@ export class RuntimeHostTests {
   private static async callAsync(connection: RawConnectionFixture, id: string, method: QualifiedName, payload: JsonValue): Promise<Response> {
     connection.sendMessages(new Request(id, method, payload));
     return await connection.readResponseAsync();
+  }
+
+  private static createNotificationPart(): string {
+    const protocol = import.meta.resolve("@noldova/teamrun-shell-protocol");
+    return [
+      `import { CommandRun, NotificationAction, NotificationPost, QualifiedName } from ${JSON.stringify(protocol)};`,
+      "",
+      "export class RuntimePart {",
+      "  async activateAsync(context) {",
+      "    const tick = new NotificationAction(\"Tick\", new CommandRun(QualifiedName.parse(\"clock.tick\"), null));",
+      "    context.postNotification(new NotificationPost(QualifiedName.parse(\"clock.alarm\"), null, \"Synced\", null, \"Success\", null, [tick], 1));",
+      "  }",
+      "",
+      "  async deactivateAsync() {",
+      "  }",
+      "}",
+      ""
+    ].join("\n");
   }
 
   private static createCommandPart(): string {

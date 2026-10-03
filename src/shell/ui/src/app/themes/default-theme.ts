@@ -175,7 +175,8 @@ export class DefaultTheme {
       ["status-bar-item-padding", "0.375rem"],
       ["status-bar-item-gap", "0.25rem"],
       ["button-height", "1.625rem"],
-      ["button-padding", "0.5rem"]
+      ["button-padding", "0.5rem"],
+      ["checkbox-size", "1.125rem"]
     ]),
     new Map([["tab", "pill"]]));
 }

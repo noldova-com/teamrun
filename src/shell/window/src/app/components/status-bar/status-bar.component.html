@@ -1,4 +1,12 @@
-<div class="tr-status-bar-side tr-status-bar-left"></div>
+<div class="tr-status-bar-side tr-status-bar-left">
+  @for (item of bars.leftItems(); track item.name) {
+    <tr-status-bar-item [item]="item" />
+  }
+</div>
 <div class="tr-status-bar-side tr-status-bar-right">
+  @for (item of bars.rightItems(); track item.name) {
+    <tr-status-bar-item [item]="item" />
+  }
+  <tr-notifications />
   <tr-module-failures />
 </div>

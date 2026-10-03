@@ -9,6 +9,11 @@
 import { TestBed } from "@angular/core/testing";
 
 import { StatusBarComponent } from "../../../../src/app/components/status-bar/status-bar.component";
+import { StatusBarSide } from "../../../../src/app/enums/status-bar-side";
+import { StatusBarItem } from "../../../../src/app/models/status-bar-item";
+import { StatusBarItemContribution } from "../../../../src/app/models/status-bar-item-contribution";
+import { StatusBarItemState } from "../../../../src/app/models/status-bar-item-state";
+import { BarItemsService } from "../../../../src/app/services/bar-items.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { WindowPartHostFixture } from "../../../fixtures/window-part-host.fixture";
@@ -30,12 +35,26 @@ describe("StatusBarComponent", () => {
     return fixture.nativeElement;
   }
 
-  it("has an empty left and right side", () => {
+  it("has an empty left side and the notifications bell on its right side", () => {
     const bar = render();
 
     expect([...bar.children].map(t => t.className)).toEqual(["tr-status-bar-side tr-status-bar-left", "tr-status-bar-side tr-status-bar-right"]);
-    expect(bar.textContent).toBe("");
+    expect(bar.children[0]?.textContent).toBe("");
+    expect(bar.querySelector(".tr-status-bar-right button.tr-notifications-item")?.getAttribute("aria-label")).toBe("Notifications");
     expect(bar.getAttribute("data-tr-chrome")).toBe("bottom");
+  });
+
+  it("shows the modules' items on their sides in order, with the shell's own items at the right end", () => {
+    const item = (name: string, side: StatusBarSide): StatusBarItem =>
+      new StatusBarItem(new StatusBarItemContribution(name, side, new StatusBarItemState(name)), () => undefined);
+    TestBed.inject(BarItemsService).set(
+      [item("notes.count", StatusBarSide.Left), item("clock.ticks", StatusBarSide.Right), item("notes.sync", StatusBarSide.Right), item("clock.zone", StatusBarSide.Left)], []);
+
+    const bar = render();
+    const names = (side: Element | undefined): readonly (string | null)[] => [...side?.children ?? []].map(t => t.getAttribute("data-tr-item") ?? t.tagName.toLowerCase());
+
+    expect(names(bar.children[0])).toEqual(["notes.count", "clock.zone"]);
+    expect(names(bar.children[1])).toEqual(["clock.ticks", "notes.sync", "tr-notifications", "tr-module-failures"]);
   });
 
   for (const mode of AppearanceFixture.modes)

@@ -50,9 +50,38 @@ export class Resources {
   public static readonly argumentsField: string = "arguments";
   public static readonly commandsMember: string = "commands";
   public static readonly runCommandMember: string = "runCommand";
+  public static readonly notificationsMember: string = "notifications";
+  public static readonly postNotificationMember: string = "postNotification";
+  public static readonly updateNotificationMember: string = "updateNotification";
+  public static readonly dismissNotificationMember: string = "dismissNotification";
+  public static readonly markNotificationsReadMember: string = "markNotificationsRead";
+  public static readonly clearNotificationsMember: string = "clearNotifications";
+  public static readonly keyField: string = "key";
+  public static readonly textField: string = "text";
+  public static readonly severityField: string = "severity";
+  public static readonly openField: string = "open";
+  public static readonly actionsField: string = "actions";
+  public static readonly progressField: string = "progress";
+  public static readonly commandField: string = "command";
+  public static readonly postField: string = "post";
+  public static readonly postedAtField: string = "postedAt";
+  public static readonly isReadField: string = "isRead";
+  public static readonly notificationsField: string = "notifications";
+  public static readonly isOnField: string = "isOn";
+  public static readonly isDoNotDisturbField: string = "isDoNotDisturb";
+  public static readonly quietDevicesField: string = "quietDevices";
+  public static readonly setDoNotDisturbMember: string = "setDoNotDisturb";
   public static readonly keyParameterName: string = "key";
   public static readonly commandTitleInvalid: string = "A command's title must not be blank.";
   public static readonly commandIconInvalid: string = "A command's icon, when it has one, must not be blank.";
+  public static readonly notificationKeyInvalid: string = "A notification's key, when it has one, must not be blank.";
+  public static readonly notificationTitleInvalid: string = "A notification's title must not be blank.";
+  public static readonly notificationTextInvalid: string = "A notification's text, when it has one, must not be blank.";
+  public static readonly notificationProgressInvalid: string = "A notification's progress must be indeterminate or a number from 0 to 1.";
+  public static readonly notificationActionTitleInvalid: string = "A notification action's title must not be blank.";
+  public static readonly notificationIdInvalid: string = "A notification's id must be a whole number from 1.";
+  public static readonly notificationTimeInvalid: string = "A notification's time must be a date and time.";
+  public static readonly quietDeviceInvalid: string = "A device with Do not disturb on must have an id.";
   public static readonly macPlatform: string = "darwin";
   public static readonly standardPlatform: string = "win32";
   public static readonly keySeparator: string = "+";
@@ -134,6 +163,10 @@ export class Resources {
   public static readonly moduleCauseInvalid: string = "An active module has no cause, and a failed or blocked module has one that is not blank.";
   public static readonly responseOutcomeAmbiguous: string = "A response cannot carry both a payload and a failure.";
   public static readonly unknownField: string = "The field is not part of this message, which accepts no unknown fields.";
+
+  public static formatNotificationActionsTooMany(maximum: number): string {
+    return `A notification has at most ${maximum} actions.`;
+  }
 
   public static formatKeyInvalid(text: string): string {
     return `"${text}" is not a key. A key is any of Mod, Ctrl, Alt and Shift joined by "+" to one key, such as K, 1, Comma, Enter or F2; Mod is Ctrl on Windows and Linux and Cmd on macOS.`;

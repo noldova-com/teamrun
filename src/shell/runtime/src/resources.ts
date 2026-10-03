@@ -79,6 +79,12 @@ export class Resources {
   public static readonly idColumn: string = "id";
   public static readonly valueColumn: string = "value";
   public static readonly windowStatesMigration: string = "window-states";
+  public static readonly quietDevicesMigration: string = "quiet-devices";
+  public static readonly createQuietDevicesStatement: string = "CREATE TABLE quiet_devices (device TEXT PRIMARY KEY) STRICT";
+  public static readonly readQuietDevicesStatement: string = "SELECT device FROM quiet_devices";
+  public static readonly addQuietDeviceStatement: string = "INSERT INTO quiet_devices (device) VALUES (?) ON CONFLICT (device) DO NOTHING";
+  public static readonly removeQuietDeviceStatement: string = "DELETE FROM quiet_devices WHERE device = ?";
+  public static readonly deviceColumn: string = "device";
   public static readonly createWindowStatesStatement: string =
     "CREATE TABLE window_states (device TEXT NOT NULL, window TEXT NOT NULL, bounds TEXT, layout TEXT, PRIMARY KEY (device, window)) STRICT";
   public static readonly errorCodeField: "errcode" = "errcode";
@@ -145,6 +151,8 @@ export class Resources {
   public static readonly methodsKind: string = "methods";
   public static readonly eventsKind: string = "events";
   public static readonly commandsKind: string = "commands";
+  public static readonly notificationsKind: string = "notifications";
+  public static readonly notificationLimit: number = 100;
   public static readonly nameParameterName: string = "name";
   public static readonly defaultKeyParameterName: string = "defaultKey";
   public static readonly dataDirectoryVariable: string = "__DATA_DIRECTORY_VARIABLE__";
@@ -361,6 +369,22 @@ export class Resources {
 
   public static formatCommandRegistered(name: string): string {
     return `The command ${name} is already registered.`;
+  }
+
+  public static formatNotificationKindChanged(id: number, kind: string): string {
+    return `Notification ${id} is of the kind ${kind}, which an update keeps.`;
+  }
+
+  public static formatNotificationModuleInactive(moduleId: string, kind: string): string {
+    return `The notification kind ${kind} belongs to ${moduleId}, which is not an active module.`;
+  }
+
+  public static formatNotificationCommandNotAllowed(moduleId: string, command: string): string {
+    return `The module ${moduleId} may not offer the command ${command} in a notification; it must be its own or a dependency's.`;
+  }
+
+  public static formatNotificationNotFound(id: number): string {
+    return `Notification ${id} is gone; it was dismissed or its module stopped.`;
   }
 
   public static formatCommandNotFound(name: string): string {

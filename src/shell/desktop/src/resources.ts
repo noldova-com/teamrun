@@ -22,6 +22,7 @@ export class Resources {
   public static readonly iconPathParameter: string = "iconPath";
   public static readonly relaunchCommandParameter: string = "relaunchCommand";
   public static readonly readyChannel: string = "teamrun:ready";
+  public static readonly appearanceChannel: string = "teamrun:appearance";
   public static readonly closeRequestChannel: string = "teamrun:closeRequest";
   public static readonly closeAnswerChannel: string = "teamrun:closeAnswer";
   public static readonly startupStateChannel: string = "teamrun:startupState";
@@ -37,7 +38,18 @@ export class Resources {
   public static readonly copyTextLimit: number = 65536;
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
-  public static readonly windowShellMethods: readonly string[] = [ShellMethods.modules.text, ShellMethods.commands.text, ShellMethods.runCommand.text];
+  public static readonly windowShellMethods: readonly string[] = [
+    ShellMethods.modules.text,
+    ShellMethods.commands.text,
+    ShellMethods.runCommand.text,
+    ShellMethods.notifications.text,
+    ShellMethods.postNotification.text,
+    ShellMethods.updateNotification.text,
+    ShellMethods.dismissNotification.text,
+    ShellMethods.markNotificationsRead.text,
+    ShellMethods.clearNotifications.text,
+    ShellMethods.setDoNotDisturb.text
+  ];
   public static readonly untrustedRequest: string = `Only ${Resources.applicationName}'s own window may call the runtime.`;
   public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
   public static readonly payloadNotJson: string = "The payload must be a JSON value.";
@@ -75,12 +87,9 @@ export class Resources {
   public static readonly linuxPlatform: string = "linux";
   public static readonly desktopFileSuffix: string = ".desktop";
   public static readonly iconFolderSegments: readonly string[] = "__ICONS_FOLDER__".split(Resources.folderSeparator);
-  public static readonly windowsDarkIcon: string = "icon-dark.ico";
-  public static readonly windowsLightIcon: string = "icon-light.ico";
-  public static readonly darkIcon: string = "icon-dark-512.png";
-  public static readonly lightIcon: string = "icon-light-512.png";
+  public static readonly windowsIcon: string = "icon-dark.ico";
+  public static readonly windowIcon: string = "icon-dark-512.png";
   public static readonly dockIcon: string = "icon-dock-512.png";
-  public static readonly themeUpdatedEvent: "updated" = "updated";
   public static readonly preloadFileName: string = "preload.cjs";
   public static readonly repositoryRootSegments: readonly string[] = ["..", "..", ".."];
   public static readonly windowIndexSegments: readonly string[] = ["_build", "window", "browser", "index.html"];
@@ -129,7 +138,8 @@ export class Resources {
   public static readonly windowStoppedAgainRecord: string = "The window's page stopped again within 10 s of a reload, so the person was offered the log folder instead of another reload.";
   public static readonly mainWindow: string = "main";
   public static readonly runtimeNotConnected: string = `${Resources.applicationName} is not connected to its runtime.`;
-  public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout is not kept.";
+  public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout and Do not disturb are not kept.";
+  public static readonly isOnField: string = "isOn";
   public static readonly windowMinimumWidth: number = 640;
   public static readonly windowMinimumHeight: number = 400;
   public static readonly windowWidth: number = 1280;
@@ -174,6 +184,10 @@ export class Resources {
 
   public static formatWindowStateFailed(method: string, message: string): string {
     return `The runtime refused ${method}: ${message}`;
+  }
+
+  public static formatEventNotForwarded(name: string, reason: string): string {
+    return `The runtime's event ${name} could not be passed to the window: ${reason}`;
   }
 
   public static formatBoundsUnsaved(reason: string): string {

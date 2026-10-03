@@ -9,6 +9,7 @@
 import { ArgumentException, ArgumentOutOfRangeException } from "@noldova/teamrun-foundation-exceptions";
 import { JsonException } from "@noldova/teamrun-foundation-json";
 
+import { BottomDockSpan } from "../../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../../src/app/enums/dock-side";
 import { SplitAxis } from "../../../../src/app/enums/split-axis";
 import { Dock } from "../../../../src/app/models/layout/dock";
@@ -24,10 +25,11 @@ describe("LayoutReader", () => {
   const gone = new ViewTab("gone.view");
   const documents = { tabs: [], active: null, documents: true };
   const dock = (root: unknown = null, size: unknown = null, collapsed: unknown = false): Record<string, unknown> => ({ root, size, collapsed });
-  const saved = (docks: Record<string, unknown> = {}, middle: unknown = documents, version: unknown = 1): Record<string, unknown> => ({
+  const saved = (docks: Record<string, unknown> = {}, middle: unknown = documents, version: unknown = 1, bottomSpan: unknown = "Full"): Record<string, unknown> => ({
     version,
     docks: { Left: dock(), Right: dock(), Bottom: dock(), ...docks },
-    middle
+    middle,
+    bottomSpan
   });
   const group = (...tabs: readonly unknown[]): Record<string, unknown> => ({ tabs, active: 0 });
   const failure = (value: unknown): JsonException => {
@@ -57,14 +59,21 @@ describe("LayoutReader", () => {
       { tabs: [{ document: "notes.note", instance: "plan" }, { view: "git.changes" }], active: 0, documents: true, weight: 0.5 },
       { tabs: [{ view: "terminal.shell", instance: "2" }], active: 0, weight: 0.5 }
     ]
-  });
+  }, 1, "Between");
 
   it("reads every dock and the middle, numbering groups and splits in reading order", () => {
     expect(LayoutReader.read(full)).toEqual(new Layout([
       new Dock(DockSide.Left, createSplit(1, SplitAxis.Vertical, [new TabGroup(2, [files, search], search), new TabGroup(3, [gone], gone)], [1, 3]), 30, false),
       new Dock(DockSide.Right, null, null, true),
       new Dock(DockSide.Bottom, new TabGroup(4, [terminal], terminal), 12.5, false)
-    ], createSplit(5, SplitAxis.Horizontal, [new DocumentGroup([plan, changes], plan), new TabGroup(6, [secondTerminal], secondTerminal)], [1, 1])));
+    ], createSplit(5, SplitAxis.Horizontal, [new DocumentGroup([plan, changes], plan), new TabGroup(6, [secondTerminal], secondTerminal)], [1, 1]), BottomDockSpan.Between));
+  });
+
+  it("reads a layout saved without a bottom dock span as full width, and refuses an unknown span", () => {
+    const { bottomSpan, ...older } = saved();
+
+    expect([bottomSpan, LayoutReader.read(older).bottomSpan]).toEqual(["Full", BottomDockSpan.Full]);
+    expect(failure(saved({}, documents, 1, "Wide")).path).toBe("$.bottomSpan");
   });
 
   it("writes back what it read, including views whose modules are absent", () => {

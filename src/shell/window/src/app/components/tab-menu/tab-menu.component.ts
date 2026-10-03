@@ -12,17 +12,17 @@ import {
 } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
+import { BottomDockSpan } from "../../enums/bottom-dock-span";
 import { DockSide } from "../../enums/dock-side";
 import { PanelEdge } from "../../enums/panel-edge";
-import type { DropTarget } from "../../models/layout/drop-target";
-import { SideDropTarget } from "../../models/layout/side-drop-target";
-import { SplitDropTarget } from "../../models/layout/split-drop-target";
 import type { Tab } from "../../models/layout/tab";
 import { TabDropTarget } from "../../models/layout/tab-drop-target";
 import type { TabGroup } from "../../models/layout/tab-group";
+import { CommandService } from "../../services/command.service";
 import { LayoutService } from "../../services/layout.service";
 import { TabLabelService } from "../../services/tab-label.service";
 
@@ -34,6 +34,7 @@ import { TabLabelService } from "../../services/tab-label.service";
 })
 export class TabMenuComponent {
   private readonly layout: LayoutService = inject(LayoutService);
+  private readonly commands: CommandService = inject(CommandService);
   private readonly labels: TabLabelService = inject(TabLabelService);
   private readonly document: Document = inject(DOCUMENT);
   private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
@@ -41,18 +42,35 @@ export class TabMenuComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly edges: readonly PanelEdge[] = Object.values(PanelEdge);
   protected readonly sides: readonly DockSide[] = Object.values(DockSide);
+  protected readonly spans: readonly BottomDockSpan[] = Object.values(BottomDockSpan);
   protected readonly group: Signal<TabGroup | null> = computed(() => this.layout.layout().groupOf(this.tab()));
   protected readonly destinations: Signal<readonly TabGroup[]> = computed(() => this.layout.layout().groups.filter(t => t.accepts(this.tab()) && !t.has(this.tab())));
 
   public readonly tab = input.required<Tab>();
   public readonly menu: Signal<TemplateRef<unknown>> = viewChild.required<TemplateRef<unknown>>("tabMenu");
 
-  protected indexIn(group: TabGroup): number {
-    return group.tabs.findIndex(t => t.equals(this.tab()));
+  protected isEnabled(command: string): boolean {
+    return this.commands.isEnabled(command, this.target());
   }
 
-  protected canSplit(group: TabGroup): boolean {
-    return group.isDocuments || group.tabs.length > 1;
+  protected keyOf(command: string): string | null {
+    return this.commands.keyLabel(command);
+  }
+
+  protected run(command: string): void {
+    this.commands.run(command, this.target());
+  }
+
+  protected isSpan(span: BottomDockSpan): boolean {
+    return this.layout.layout().bottomSpan === span;
+  }
+
+  protected setBottomSpan(span: BottomDockSpan): void {
+    this.layout.setBottomSpan(span);
+  }
+
+  protected canSplit(): boolean {
+    return this.isEnabled(Resources.splitTabCommands[PanelEdge.Left]);
   }
 
   protected labelOf(group: TabGroup): string {
@@ -60,58 +78,13 @@ export class TabMenuComponent {
   }
 
   protected moveTo(group: TabGroup): void {
-    this.move(new TabDropTarget(group.id, group.tabs.length));
-  }
-
-  protected split(group: TabGroup, edge: PanelEdge): void {
-    this.move(new SplitDropTarget(group.id, edge));
-  }
-
-  protected dock(side: DockSide): void {
-    this.move(new SideDropTarget(side));
-  }
-
-  protected shift(group: TabGroup, offset: number): void {
-    this.move(new TabDropTarget(group.id, this.indexIn(group) + (offset > 0 ? offset + 1 : offset)));
-  }
-
-  protected close(): void {
-    const group = this.group();
-    this.layout.close(this.tab());
-    const next = Object.isNull(group) ? null : this.layout.layout().group(group.id)?.active ?? null;
-    if (!Object.isNull(next))
-      this.focusTab(next);
-  }
-
-  protected closeOthers(group: TabGroup): void {
-    this.layout.closeTabs(group.tabs.filter(t => !t.equals(this.tab())));
-    this.focusTab(this.tab());
-  }
-
-  protected closeToTheRight(group: TabGroup): void {
-    this.layout.closeTabs(group.tabs.slice(this.indexIn(group) + 1));
-    this.focusTab(this.tab());
-  }
-
-  protected closeAll(group: TabGroup): void {
-    this.layout.closeTabs(group.tabs);
-  }
-
-  protected keep(): void {
-    this.layout.keep(this.tab());
-  }
-
-  protected reset(): void {
-    this.layout.reset();
-  }
-
-  private move(target: DropTarget): void {
-    this.layout.place(this.tab(), target);
-    this.focusTab(this.tab());
-  }
-
-  private focusTab(tab: Tab): void {
+    const tab = this.tab();
+    this.layout.place(tab, new TabDropTarget(group.id, group.tabs.length));
     afterNextRender(() => [...this.document.querySelectorAll<HTMLElement>(Resources.tabKeySelector)]
       .find(t => t.dataset[Resources.tabKeyData] === tab.key)?.focus(), { injector: this.environment });
+  }
+
+  private target(): JsonValue {
+    return { [Resources.tabArgument]: this.tab().key };
   }
 }
