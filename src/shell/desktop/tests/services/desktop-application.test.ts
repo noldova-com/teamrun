@@ -679,7 +679,7 @@ export class DesktopApplicationTests {
     const started = Date.now();
 
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
-    await delay(500);
+    await setImmediate();
     const isShownEarly = window.isShown;
     await DesktopApplicationTests.waitAsync(() => window.isShown, 2_000);
     const waited = Date.now() - started;

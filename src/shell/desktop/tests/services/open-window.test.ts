@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { setTimeout as delay } from "node:timers/promises";
-
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { type IWindowStateStore, OpenWindow, WindowStateException, WindowStateUnavailableException } from "@noldova/teamrun-shell-desktop";
@@ -73,7 +71,7 @@ export class OpenWindowTests {
     for (const window of windows)
       new OpenWindow(window, new FakeDisplayHost(), log).showUnpaintedWithin(20);
     const isShownEarly = windows.some(t => t.isShown);
-    await delay(80);
+    await Condition.waitAsync(() => windows.every(t => t.isShown) && log.lines.length === 3);
 
     Assert.isFalse(isShownEarly);
     Assert.areEqual(JSON.stringify([["show"], ["show"], ["show"]]), JSON.stringify(windows.map(t => t.calls)));
@@ -94,7 +92,8 @@ export class OpenWindowTests {
 
     open.markPainted();
     const isShownBeforeSettling = window.isShown;
-    await delay(80);
+    const fence = OpenWindowTests.startFence(30);
+    await Condition.waitAsync(() => window.isShown && fence.isShown);
 
     Assert.isFalse(isShownBeforeSettling);
     Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
@@ -110,9 +109,16 @@ export class OpenWindowTests {
     open.showUnpaintedWithin(20);
 
     window.destroy();
-    await delay(60);
+    const fence = OpenWindowTests.startFence(20);
+    await Condition.waitAsync(() => fence.isShown);
 
     Assert.areEqual("[]", JSON.stringify(window.calls));
     Assert.areEqual(0, log.lines.length);
+  }
+
+  private static startFence(milliseconds: number): FakeDesktopWindow {
+    const fence = new FakeDesktopWindow({}, 99);
+    new OpenWindow(fence, new FakeDisplayHost(), new FakeDesktopLog()).showUnpaintedWithin(milliseconds);
+    return fence;
   }
 }
