@@ -166,6 +166,7 @@ export class FixtureTheme {
     ["menu-item-height", "1.875rem"],
     ["menu-item-inset", "0.375rem"],
     ["menu-item-padding", "0.625rem"],
+    ["menu-trail-gap", "2rem"],
     ["menu-separator-spacing", "0.375rem"],
     ["tooltip-width", "30rem"],
     ["tooltip-padding", "0.25rem 0.625rem"],
