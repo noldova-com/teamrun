@@ -48,8 +48,15 @@ export class Resources {
     ShellMethods.dismissNotification.text,
     ShellMethods.markNotificationsRead.text,
     ShellMethods.clearNotifications.text,
-    ShellMethods.setDoNotDisturb.text
+    ShellMethods.setDoNotDisturb.text,
+    ShellMethods.settings.text,
+    ShellMethods.setSetting.text,
+    ShellMethods.resetSetting.text
   ];
+  public static readonly deviceMethods: readonly string[] = [ShellMethods.settings.text, ShellMethods.setSetting.text, ShellMethods.resetSetting.text];
+  public static readonly deviceField: string = "device";
+  public static readonly settingsNeedDevice: string = "This device has no identity, so its settings cannot be read or changed.";
+  public static readonly settingsPayloadNotObject: string = "A settings request's payload must be a JSON object.";
   public static readonly untrustedRequest: string = `Only ${Resources.applicationName}'s own window may call the runtime.`;
   public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
   public static readonly payloadNotJson: string = "The payload must be a JSON value.";
