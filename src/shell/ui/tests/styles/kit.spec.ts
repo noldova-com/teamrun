@@ -31,14 +31,26 @@ import { AppearanceFixture } from "../fixtures/appearance.fixture";
 class MenuHostComponent {
 }
 
+@Component({
+  imports: [MenuComponent, MenuItemComponent],
+  template: `
+    <tr-menu>
+      <button tr-menu-item label="Files"></button>
+      <button tr-menu-item label="Search"></button>
+    </tr-menu>
+  `
+})
+class TextMenuHostComponent {
+}
+
 describe("kit styles", () => {
   afterEach(async () => {
     await userEvent.keyboard("{Escape}");
     AppearanceFixture.reset();
   });
 
-  async function openMenu(): Promise<HTMLElement> {
-    const fixture = TestBed.createComponent(MenuHostComponent);
+  async function openMenu(host: typeof MenuHostComponent | typeof TextMenuHostComponent = MenuHostComponent): Promise<HTMLElement> {
+    const fixture = TestBed.createComponent(host);
     fixture.detectChanges();
     await fixture.whenStable();
     return fixture.nativeElement.querySelector("tr-menu");
@@ -153,6 +165,18 @@ describe("kit styles", () => {
 
     expect(disabled?.getAttribute("aria-disabled")).toBe("true");
     expect(getComputedStyle(disabled ?? panel).cursor).toBe("default");
+  });
+
+  it("line up a menu row without an icon with the rows that have one, and indent no row in a menu without icons", async () => {
+    AppearanceFixture.apply();
+    const starts = (panel: HTMLElement): number[] => [...panel.querySelectorAll(".tr-menu-item-label")].map(t => t.getBoundingClientRect().left);
+
+    const [withIcon, withoutIcon] = starts(await openMenu());
+    const text = await openMenu(TextMenuHostComponent);
+    const item = text.querySelector<HTMLElement>("[tr-menu-item]") ?? text;
+
+    expect(withoutIcon).toBe(withIcon);
+    expect(starts(text)).toEqual([0, 1].map(() => item.getBoundingClientRect().left + Number.parseFloat(getComputedStyle(item).paddingLeft)));
   });
 
   for (const panelSize of AppearanceFixture.panelSizes)
