@@ -266,6 +266,14 @@ Each start writes the runtime's standard error to its own `logs/start-<UUID>.log
 
 The desktop keeps its own diagnostics in `logs/desktop.log`, with the same redaction and each line timestamped, and mirrors every line to its standard error. Its single-instance lock allows one desktop per data directory, so the desktop alone owns the file. It starts the file once a runtime owns the data directory, keeping the previous start's file as `logs/desktop.previous.log`; until then, and while the directory is not usable (not yet located, holding data from before the shell, or not writable), its records go to standard error only. Logging never stops the desktop from starting.
 
+### Command line
+
+- The command line runs on TeamRun's own program in Node mode and connects as the client `cli`, so it is always the same build as a runtime it starts. [Its document](../src/shell/cli/README.md) owns its commands, options, output and exit codes.
+- It starts a runtime for a command that needs one, unless asked not to. Reporting the runtime's state never starts one.
+- It refuses another build's runtime and names it, unless asked to take over; it then takes over only an older build's idle runtime, never stopping work. The rule that the person is never asked to find and quit another TeamRun is the desktop's.
+- It reports data from before the shell and never moves it.
+- Run from a development checkout through the checkout's launcher, it uses the checkout's data directory. Without that launcher it is a packaged build.
+
 ## 7. State and persistence
 
 SQLite is the authority for durable records. The shell and each module that keeps records have their own database file in the data directory: the shell's for its facilities, and each module's in its folder (section 3). The ownership database of section 6 is separate.
