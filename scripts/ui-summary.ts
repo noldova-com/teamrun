@@ -19,6 +19,8 @@ export default class UiSummary {
   private static readonly SUMMARY_VARIABLE: string = "GITHUB_STEP_SUMMARY";
   private static readonly TARGET_VARIABLE: string = "UI_TARGET";
   private static readonly SCREENSHOT_VARIABLE: string = "SCREENSHOT_URL";
+  private static readonly UPLOAD_FAILED_VARIABLE: string = "SCREENSHOT_UPLOAD_FAILED";
+  private static readonly TRUE: string = "true";
   private static readonly SETTINGS_REQUIRED: string = "GITHUB_STEP_SUMMARY and UI_TARGET must name the step summary file and the target.\n";
   private static readonly NO_REPORT: string = "The UI workflows produced no report.";
 
@@ -42,7 +44,7 @@ export default class UiSummary {
     if (!existsSync(reportPath))
       return await this.failAsync(summaryPath, target, UiSummary.NO_REPORT);
     try {
-      const summary = UiReport.parse(await readFile(reportPath, "utf8")).formatSummary(target, environment[UiSummary.SCREENSHOT_VARIABLE]);
+      const summary = UiReport.parse(await readFile(reportPath, "utf8")).formatSummary(target, environment[UiSummary.SCREENSHOT_VARIABLE], environment[UiSummary.UPLOAD_FAILED_VARIABLE] === UiSummary.TRUE);
       await appendFile(summaryPath, summary);
       this.output.write(summary);
       return 0;

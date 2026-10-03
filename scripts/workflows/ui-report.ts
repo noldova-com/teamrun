@@ -61,7 +61,7 @@ export default class UiReport {
       platformLogLines);
   }
 
-  public formatSummary(target: string, screenshotUrl: string | undefined): string {
+  public formatSummary(target: string, screenshotUrl: string | undefined, isUploadFailed: boolean = false): string {
     const lines = [
       `### UI workflows: ${UiReport.escape(target)}`,
       "",
@@ -69,7 +69,7 @@ export default class UiReport {
       "|---|---|---|---|---|---|",
       `| ${this.passed} | ${this.failed} | ${this.flaky} | ${this.skipped} | ${(this.durationMs / 1000).toFixed(1)} s | ${this.platformLogLines} |`,
       "",
-      screenshotUrl === undefined || screenshotUrl.length === 0 ? "No main-window screenshot was kept." : `[Main window screenshot](${encodeURI(screenshotUrl)})`
+      screenshotUrl === undefined || screenshotUrl.length === 0 ? (isUploadFailed ? "No main-window screenshot link: its upload failed." : "No main-window screenshot was kept.") : `[Main window screenshot](${encodeURI(screenshotUrl)})`
     ];
     if (this.failures.length > 0) {
       lines.push("", `<details><summary>Failures (${this.failures.length})</summary>`, "");
