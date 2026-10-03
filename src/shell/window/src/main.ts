@@ -9,10 +9,12 @@
 import type { ApplicationRef } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
 
-import { windowPartSources } from "../../../generated/window-parts";
+import { moduleMenus, windowPartSources } from "../../../generated/window-parts";
 import { WindowComponent } from "./app/components/window/window.component";
 import { WindowPartTokens } from "./app/models/window-part-tokens";
 import { Resources } from "./resources";
 
 document.title = Resources.productName;
-export const application: ApplicationRef = await bootstrapApplication(WindowComponent, { providers: [{ provide: WindowPartTokens.sources, useValue: windowPartSources }] });
+export const application: ApplicationRef = await bootstrapApplication(WindowComponent, {
+  providers: [{ provide: WindowPartTokens.sources, useValue: windowPartSources }, { provide: WindowPartTokens.menus, useValue: moduleMenus }]
+});

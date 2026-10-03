@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+export { MenuDirective } from "../app/directives/menu.directive";
 export { DockSide } from "../app/enums/dock-side";
 export { StatusBarSide } from "../app/enums/status-bar-side";
 export type { IDocumentOptions } from "../app/interfaces/i-document-options";
@@ -16,6 +17,7 @@ export type { IWindowPartContext } from "../app/interfaces/i-window-part-context
 export { CommandContribution } from "../app/models/command-contribution";
 export { NotificationHandle } from "../app/models/notification-handle";
 export { DocumentContribution } from "../app/models/document-contribution";
+export { MenuDeclarations } from "../app/models/menu-declarations";
 export { StatusBarItem } from "../app/models/status-bar-item";
 export { StatusBarItemContribution } from "../app/models/status-bar-item-contribution";
 export { StatusBarItemState } from "../app/models/status-bar-item-state";
