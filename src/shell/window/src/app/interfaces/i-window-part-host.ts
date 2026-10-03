@@ -7,7 +7,7 @@
  */
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
+import type { NotificationPost, SettingChange, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 export interface IWindowPartHost {
   requestAsync(method: string, payload: JsonValue): Promise<JsonValue>;
@@ -27,6 +27,14 @@ export interface IWindowPartHost {
   updateNotificationAsync(id: number, post: NotificationPost): Promise<void>;
 
   dismissNotification(id: number): void;
+
+  readSetting(name: string): JsonValue | undefined;
+
+  writeSettingAsync(name: string, value: JsonValue, scope: SettingScope | null): Promise<void>;
+
+  resetSettingAsync(name: string, scope: SettingScope | null): Promise<void>;
+
+  onSettingChanged(listener: (change: SettingChange) => void): () => void;
 
   refresh(): void;
 }

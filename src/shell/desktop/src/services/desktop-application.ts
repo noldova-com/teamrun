@@ -13,8 +13,8 @@ import { fileURLToPath } from "node:url";
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
-  DoNotDisturbChange, type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, Response, type RuntimeHandover, ShellEvents, ShellMethods,
-  WindowStateKey, WindowStateValue, WindowStateWrite
+  DoNotDisturbChange, type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, Response, type RuntimeHandover, SettingChange, SettingKey,
+  ShellEvents, ShellMethods, WindowStateKey, WindowStateValue, WindowStateWrite
 } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
@@ -197,7 +197,8 @@ export class DesktopApplication {
   }
 
   private forward(event: Event): void {
-    const payload = event.name.text === ShellEvents.notifications.text ? this.readStateForDevice(event) : event.payload;
+    const payload = event.name.text === ShellEvents.notifications.text ? this.readStateForDevice(event)
+      : event.name.text === ShellEvents.settingsChanged.text ? this.readSettingForDevice(event) : event.payload;
     if (Object.isUndefined(payload))
       return;
     for (const open of this.windows.values())
@@ -237,7 +238,31 @@ export class DesktopApplication {
       return DesktopApplication.fail(FailureCode.Unauthorized, Resources.formatMethodRefused(name.text));
     if (name.text === ShellMethods.notifications.text || name.text === ShellMethods.setDoNotDisturb.text)
       return await this.requestForDeviceAsync(name, value);
+    if (Resources.deviceMethods.includes(name.text))
+      return await this.requestSettingsForDeviceAsync(name, value);
     return (await this.callAsync(name, value)).toJson();
+  }
+
+  private readSettingForDevice(event: Event): JsonValue | undefined {
+    try {
+      const change = SettingChange.fromJson(event.payload);
+      if (Object.isNull(change.key.device))
+        return event.payload;
+      return change.key.device === this.knownDevice ? new SettingChange(new SettingKey(change.key.name, change.key.scope), change.value, change.isSet).toJson() : undefined;
+    }
+    catch (error) {
+      this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
+      return undefined;
+    }
+  }
+
+  private async requestSettingsForDeviceAsync(name: QualifiedName, value: JsonValue): Promise<JsonObject> {
+    if (!Object.isObject(value) || Array.isArray(value))
+      return DesktopApplication.fail(FailureCode.InvalidMessage, Resources.settingsPayloadNotObject);
+    const device = await this.device;
+    if (Object.isNull(device))
+      return DesktopApplication.fail(FailureCode.Unavailable, Resources.settingsNeedDevice);
+    return (await this.callAsync(name, { ...value, [Resources.deviceField]: device })).toJson();
   }
 
   private readStateForDevice(event: Event): JsonObject | undefined {

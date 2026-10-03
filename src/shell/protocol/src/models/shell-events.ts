@@ -11,4 +11,5 @@ import { QualifiedName } from "./qualified-name.js";
 
 export class ShellEvents {
   public static readonly notifications: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.notificationsMember);
+  public static readonly settingsChanged: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.settingsChangedMember);
 }

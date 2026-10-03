@@ -12,4 +12,5 @@ export default interface IModuleDeclarationJson {
   readonly dependencies: readonly string[];
   readonly runtimePackage: string | null;
   readonly contributes: Readonly<Record<string, readonly string[]>>;
+  readonly settings: readonly Readonly<Record<string, unknown>>[];
 }

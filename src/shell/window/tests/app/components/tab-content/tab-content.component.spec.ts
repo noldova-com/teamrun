@@ -73,6 +73,10 @@ describe("TabContentComponent", () => {
     postNotificationAsync: () => Promise.resolve(1),
     updateNotificationAsync: () => Promise.resolve(),
     dismissNotification: () => undefined,
+    readSetting: () => undefined,
+    writeSettingAsync: () => Promise.resolve(),
+    resetSettingAsync: () => Promise.resolve(),
+    onSettingChanged: () => () => undefined,
     refresh: () => undefined
   });
   let host: StubWindowPartHost;

@@ -33,7 +33,7 @@ export class RuntimePart implements IRuntimePart {
     const ticked = context.declareEvent(Resources.tickedEvent);
     context.registerCommand(new RuntimeCommand(Resources.tickCommand, Resources.tickTitle, Resources.tickIcon, Resources.tickKey, {
       handleAsync: async () => {
-        this.ticks++;
+        this.ticks += Number(context.settings.read(Resources.tickStepSetting));
         ticked.publish({ ticks: this.ticks });
         context.postNotification(new NotificationPost(
           QualifiedName.parse(Resources.alarmKind), Resources.tickedKey, Resources.tickedTitle, `Ticks: ${this.ticks}`, NotificationSeverity.Success, null, [], null));

@@ -14,6 +14,7 @@ import { RegistrationException } from "../../exceptions/registration.exception.j
 import { ServiceAccessException } from "../../exceptions/service-access.exception.js";
 import type { IMethodHandler } from "../../interfaces/method-handler.js";
 import type { IModuleDatabase } from "../../interfaces/module-database.js";
+import type { IModuleSettings } from "../../interfaces/module-settings.js";
 import type { IRuntimePartContext } from "../../interfaces/runtime-part-context.js";
 import type { EventChannel } from "../../models/event-channel.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
@@ -27,6 +28,8 @@ import type { CommandRegistry } from "../registry/command-registry.js";
 import type { EventRegistry } from "../registry/event-registry.js";
 import type { MethodRegistry } from "../registry/method-registry.js";
 import type { ServiceRegistry } from "../registry/service-registry.js";
+import { ModuleSettings } from "../settings/module-settings.js";
+import type { SettingsService } from "../settings/settings-service.js";
 
 export class ModuleContext implements IRuntimePartContext, Disposable {
   private readonly declaration: ModuleDeclaration;
@@ -40,6 +43,7 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
   private readonly moduleDatabase?: IModuleDatabase;
 
   public readonly moduleFolder: string;
+  public readonly settings: IModuleSettings;
 
   public constructor(
     declaration: ModuleDeclaration,
@@ -50,6 +54,7 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     notifications: NotificationCenter,
     notificationPolicy: NotificationPolicy,
     services: ServiceRegistry,
+    settings: SettingsService,
     database?: IModuleDatabase) {
     this.declaration = declaration;
     if (!Object.isUndefined(database))
@@ -61,6 +66,7 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     this.notificationPolicy = notificationPolicy;
     this.services = services;
     this.moduleFolder = dataDirectory.locateModuleFolder(declaration.id);
+    this.settings = new ModuleSettings(declaration, settings, this.registrations);
   }
 
   public get moduleId(): string {
