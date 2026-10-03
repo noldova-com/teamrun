@@ -11,7 +11,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { setTimeout as delay, setImmediate } from "node:timers/promises";
+import { setImmediate } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
@@ -19,6 +19,7 @@ import { BuildIdentity, Event, Failure, FailureCode, PreShellData, QualifiedName
 import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeBuild, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
 import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
 
+import { Condition } from "../fixtures/condition.fixture.js";
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import { FakeDockHost } from "../fixtures/fake-dock-host.fixture.js";
 import type { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
@@ -193,7 +194,7 @@ export class DesktopApplicationTests {
 
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent(platform), DesktopApplicationTests.APPEARANCE);
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent(platform), DesktopApplicationTests.APPEARANCE);
-    await DesktopApplicationTests.waitAsync(() => window.isShown);
+    await Condition.waitAsync(() => window.isShown);
 
     Assert.areEqual("#181818", window.backgroundColor);
     Assert.areEqual(overlay, JSON.stringify(window.overlay));
@@ -207,7 +208,7 @@ export class DesktopApplicationTests {
     const window = DesktopApplicationTests.firstWindow(electron);
 
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), { background: "red" });
-    await DesktopApplicationTests.waitAsync(() => window.isShown);
+    await Condition.waitAsync(() => window.isShown);
 
     Assert.isNull(window.backgroundColor);
     Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
@@ -248,7 +249,7 @@ export class DesktopApplicationTests {
     Assert.areEqual("teamrun:closeRequest", request?.[0]);
     Assert.isFalse(window.isGone);
     Assert.isTrue(electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), request?.[1], true) === true);
-    await DesktopApplicationTests.waitAsync(() => window.isGone);
+    await Condition.waitAsync(() => window.isGone);
   }
 
   @TestMethod
@@ -491,7 +492,7 @@ export class DesktopApplicationTests {
     const window = DesktopApplicationTests.firstWindow(electron);
 
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
-    await DesktopApplicationTests.waitAsync(() => window.isShown);
+    await Condition.waitAsync(() => window.isShown);
 
     Assert.areEqual(JSON.stringify(["setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}", "show"]), JSON.stringify(window.calls));
   }
@@ -575,7 +576,7 @@ export class DesktopApplicationTests {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopApplicationTests.trustedEvent("linux");
-    await DesktopApplicationTests.waitAsync(() => connection.calls.length > 0);
+    await Condition.waitAsync(() => connection.calls.length > 0);
 
     const unconnected = await DesktopApplicationTests.invokeAsync(refused, "teamrun:writeLayout", event, { version: 1 });
     connection.isFailing = true;
@@ -640,7 +641,7 @@ export class DesktopApplicationTests {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopApplicationTests.trustedEvent("linux");
-    await DesktopApplicationTests.waitAsync(() => connection.calls.length > 0);
+    await Condition.waitAsync(() => connection.calls.length > 0);
 
     const unconnected = await DesktopApplicationTests.requestAsync(refused, event, "notes.open", null);
     connection.rejection = new ConnectionException("The connection to the runtime closed.");
@@ -679,12 +680,12 @@ export class DesktopApplicationTests {
     const started = Date.now();
 
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
-    await delay(500);
+    await setImmediate();
     const isShownEarly = window.isShown;
-    await DesktopApplicationTests.waitAsync(() => window.isShown, 2_000);
+    await Condition.waitAsync(() => window.isShown);
     const waited = Date.now() - started;
     arrive(connection);
-    await DesktopApplicationTests.waitAsync(() => window.calls.length > 1);
+    await Condition.waitAsync(() => window.calls.length > 1);
 
     Assert.isFalse(isShownEarly);
     Assert.isTrue(waited >= 1_900, `shown after ${waited} ms`);
@@ -696,12 +697,12 @@ export class DesktopApplicationTests {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const window = DesktopApplicationTests.firstWindow(electron);
-    await DesktopApplicationTests.waitAsync(() => connection.calls.length > 0);
+    await Condition.waitAsync(() => connection.calls.length > 0);
     window.bounds = { x: 300, y: 150, width: 1100, height: 750 };
 
     window.close();
     electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
-    await DesktopApplicationTests.waitAsync(() => window.isGone);
+    await Condition.waitAsync(() => window.isGone);
 
     Assert.areEqual(
       JSON.stringify({ x: 300, y: 150, width: 1100, height: 750, maximized: false }),
@@ -713,12 +714,12 @@ export class DesktopApplicationTests {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const window = DesktopApplicationTests.firstWindow(electron);
-    await DesktopApplicationTests.waitAsync(() => connection.calls.length > 0);
+    await Condition.waitAsync(() => connection.calls.length > 0);
     connection.onCall = () => window.destroy();
 
     window.close();
     electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
-    await DesktopApplicationTests.waitAsync(() => window.isGone);
+    await Condition.waitAsync(() => window.isGone);
     await setImmediate();
 
     Assert.areEqual(JSON.stringify(["close"]), JSON.stringify(window.calls));
@@ -730,12 +731,12 @@ export class DesktopApplicationTests {
     const process = new FakeDesktopProcess("linux");
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection), new FakeElectron(), new FakeDeviceIdentity(), process);
     const window = DesktopApplicationTests.firstWindow(electron);
-    await DesktopApplicationTests.waitAsync(() => connection.calls.length > 0);
+    await Condition.waitAsync(() => connection.calls.length > 0);
     connection.isFailing = true;
 
     window.close();
     electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
-    await DesktopApplicationTests.waitAsync(() => window.isGone);
+    await Condition.waitAsync(() => window.isGone);
 
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The window's bounds could not be saved: WindowStateException: The runtime refused shell.writeWindowBounds").length);
   }
@@ -749,7 +750,7 @@ export class DesktopApplicationTests {
     const window = DesktopApplicationTests.firstWindow(electron);
 
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
-    await DesktopApplicationTests.waitAsync(() => window.isShown);
+    await Condition.waitAsync(() => window.isShown);
 
     Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The window's saved bounds could not be restored, so it opens with its default bounds:").length);
@@ -765,7 +766,7 @@ export class DesktopApplicationTests {
     const window = DesktopApplicationTests.firstWindow(electron);
 
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
-    await DesktopApplicationTests.waitAsync(() => window.isShown);
+    await Condition.waitAsync(() => window.isShown);
 
     Assert.areEqual(0, connection.calls.length);
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "This device's identity could not be read, so window bounds are not kept:").length);
@@ -780,9 +781,9 @@ export class DesktopApplicationTests {
     const window = DesktopApplicationTests.firstWindow(electron);
 
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
-    await DesktopApplicationTests.waitAsync(() => window.isShown);
+    await Condition.waitAsync(() => window.isShown);
     await (electron.ipcMain.invoke("teamrun:startupAction", DesktopApplicationTests.trustedEvent("linux"), "moveAside") as Promise<boolean>);
-    await DesktopApplicationTests.waitAsync(() => window.calls.includes("maximize"));
+    await Condition.waitAsync(() => window.calls.includes("maximize"));
 
     Assert.areEqual(JSON.stringify(["show", "setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}", "maximize"]), JSON.stringify(window.calls));
   }
@@ -799,16 +800,16 @@ export class DesktopApplicationTests {
     const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
     const window = DesktopApplicationTests.firstWindow(electron);
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
-    await DesktopApplicationTests.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
+    await Condition.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
 
     launcher.listener?.onDisconnected();
     const readsBeforeTheMove = window.boundsReads;
     window.bounds = { x: 40, y: 60, width: 900, height: 640 };
     window.change("move");
-    await DesktopApplicationTests.waitAsync(() => window.boundsReads > readsBeforeTheMove, 2000);
+    await Condition.waitAsync(() => window.boundsReads > readsBeforeTheMove);
     const writesWhileGone = [...first.calls, ...second.calls].filter(t => t === "shell.writeWindowBounds").length;
     reconnect(second);
-    await DesktopApplicationTests.waitAsync(() => second.calls.includes("shell.writeWindowBounds"));
+    await Condition.waitAsync(() => second.calls.includes("shell.writeWindowBounds"));
 
     Assert.areEqual(0, writesWhileGone);
     Assert.areEqual(JSON.stringify({ x: 40, y: 60, width: 900, height: 640, maximized: false }), JSON.stringify(second.states.get(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`)));
@@ -828,14 +829,14 @@ export class DesktopApplicationTests {
     const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
     const window = DesktopApplicationTests.firstWindow(electron);
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
-    await DesktopApplicationTests.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
+    await Condition.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
 
     launcher.listener?.onDisconnected();
     const readsBeforeTheMove = window.boundsReads;
     window.change("move");
-    await DesktopApplicationTests.waitAsync(() => window.boundsReads > readsBeforeTheMove, 2000);
+    await Condition.waitAsync(() => window.boundsReads > readsBeforeTheMove);
     reconnect(second);
-    await DesktopApplicationTests.waitAsync(() => DesktopApplicationTests.readErrors(process, "The window's bounds").length > 0);
+    await Condition.waitAsync(() => DesktopApplicationTests.readErrors(process, "The window's bounds").length > 0);
 
     Assert.areEqual(JSON.stringify(["The window's bounds could not be saved: WindowStateException: The runtime refused shell.writeWindowBounds: The database is busy."]),
       JSON.stringify(DesktopApplicationTests.readErrors(process, "The window's bounds")));
@@ -907,7 +908,7 @@ export class DesktopApplicationTests {
 
       electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), { background: "red" });
       refusedElectron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), { background: "red" });
-      await DesktopApplicationTests.waitAsync(() => DesktopApplicationTests.firstWindow(refusedElectron).isShown);
+      await Condition.waitAsync(() => DesktopApplicationTests.firstWindow(refusedElectron).isShown);
 
       const lines = (await readFile(join(owned, "logs", "desktop.log"), "utf8")).trimEnd().split("\n");
       Assert.areEqual(1, lines.length);
@@ -933,9 +934,9 @@ export class DesktopApplicationTests {
 
       DesktopApplicationTests.firstWindow(quitting).webContents.goAway("crashed", 5);
       DesktopApplicationTests.firstWindow(looping).webContents.goAway("crashed", 5);
-      await DesktopApplicationTests.waitAsync(() => DesktopApplicationTests.firstWindow(looping).webContents.calls.includes("reload"));
+      await Condition.waitAsync(() => DesktopApplicationTests.firstWindow(looping).webContents.calls.includes("reload"));
       DesktopApplicationTests.firstWindow(looping).webContents.goAway("crashed", 5);
-      await DesktopApplicationTests.waitAsync(() => looping.shell.opened.length === 1);
+      await Condition.waitAsync(() => looping.shell.opened.length === 1);
 
       Assert.areEqual(1, quitting.app.calls.filter(t => t === "quit").length);
       Assert.areEqual(JSON.stringify([join(data, "logs")]), JSON.stringify(looping.shell.opened));
@@ -974,12 +975,6 @@ export class DesktopApplicationTests {
     finally {
       await rm(data, { recursive: true, force: true });
     }
-  }
-
-  private static async waitAsync(condition: () => boolean, attempts: number = 400): Promise<void> {
-    for (let attempt = 0; attempt < attempts && !condition(); attempt++)
-      await delay(5);
-    Assert.isTrue(condition());
   }
 
   private static readErrors(process: FakeDesktopProcess, prefix: string): string[] {

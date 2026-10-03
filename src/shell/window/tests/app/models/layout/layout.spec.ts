@@ -15,6 +15,7 @@ import { Bounds } from "../../../../src/app/models/layout/bounds";
 import { Dock } from "../../../../src/app/models/layout/dock";
 import { DocumentGroup } from "../../../../src/app/models/layout/document-group";
 import { Layout } from "../../../../src/app/models/layout/layout";
+import { LayoutReader } from "../../../../src/app/models/layout/layout.reader";
 import { SplitHandle } from "../../../../src/app/models/layout/split-handle";
 import type { SplitNode } from "../../../../src/app/models/layout/split.node";
 import { TabGroup } from "../../../../src/app/models/layout/tab-group";
@@ -90,6 +91,40 @@ describe("Layout", () => {
     expect(opened.documents).toEqual(new DocumentGroup([plan, todo], todo));
     expect(opened.openDocument(plan).documents).toEqual(new DocumentGroup([plan, todo], plan));
     expect(opened.middle).toBe(opened.documents);
+  });
+
+  it("opens document previews, each replacing the last, and keeps one opened again normally or asked to keep", () => {
+    const first = initial.openDocument(plan).openDocument(todo, true);
+    const second = first.openDocument(settings, true);
+
+    expect(first.documents).toEqual(new DocumentGroup([plan, todo], todo, todo));
+    expect(second.documents).toEqual(new DocumentGroup([plan, settings], settings, settings));
+    expect(second.openDocument(settings).documents).toEqual(new DocumentGroup([plan, settings], settings));
+    expect(second.openDocument(plan, true).documents).toEqual(new DocumentGroup([plan, settings], plan, settings));
+    expect(second.keep(settings).documents.preview).toBeNull();
+    expect(second.keep(new ViewTab("gone.view"))).toBe(second);
+  });
+
+  it("makes a moved, reordered, split or docked preview a normal tab, so a strip never holds two previews", () => {
+    const previews = LayoutReader.read({
+      version: 1,
+      docks: {
+        Left: { root: { tabs: [{ view: "files.tree" }, { view: "files.search" }], active: 0, preview: 1 }, size: null, collapsed: false },
+        Right: { root: { tabs: [{ view: "git.changes" }, { view: "terminal.shell", instance: "1" }], active: 0, preview: 1 }, size: null, collapsed: false },
+        Bottom: { root: null, size: null, collapsed: false }
+      },
+      middle: { tabs: [{ document: "notes.note", instance: "plan" }, { document: "notes.note", instance: "todo" }], active: 0, preview: 1, documents: true }
+    });
+    const right = previews.groupOf(changes)?.id ?? -1;
+
+    const moved = previews.moveTab(search, right, 0);
+
+    expect([moved.groupOf(search)?.tabs, moved.groupOf(search)?.preview]).toEqual([[search, changes, terminal], terminal]);
+    expect(moved.groupOf(files)?.preview).toBeNull();
+    expect(previews.moveTab(todo, 0, 0).documents.preview).toBeNull();
+    expect(previews.splitGroup(search, right, PanelEdge.Bottom).groupOf(search)?.preview).toBeNull();
+    expect(previews.dockOnSide(search, DockSide.Bottom).groupOf(search)?.preview).toBeNull();
+    expect(previews.reset(registry).documents.preview).toEqual(todo);
   });
 
   it("closes a tab, closing its group when it was the last and keeping the documents group", () => {

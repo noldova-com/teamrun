@@ -193,6 +193,7 @@ export class Resources {
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
   public static readonly menuPaneClass: string = "tr-menu-pane";
+  public static readonly previewDescription: string = "Preview";
   public static readonly submenuGlyph: string = "chevron_right";
   public static readonly contextMenuKey: string = "ContextMenu";
   public static readonly menuKey: string = "F10";

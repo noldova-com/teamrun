@@ -9,6 +9,9 @@ LICENSE file in the root directory of this source tree.
 <ng-template #tabMenu>
   <tr-menu class="tr-tab-menu">
     @if (group(); as group) {
+      @if (tab().equals(group.preview)) {
+        <button tr-menu-item class="tr-tab-menu-keep" [icon]="resources.keepGlyph" [label]="resources.keepLabel" (triggered)="keep()"></button>
+      }
       @if (tab().isMovable) {
         <button tr-menu-item class="tr-tab-menu-move" [icon]="resources.moveToGlyph" [label]="resources.moveToLabel" [disabled]="destinations().length === 0"
           [trMenuTriggerFor]="destinations().length === 0 ? null : moveMenu"></button>

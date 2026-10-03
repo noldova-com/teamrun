@@ -22,6 +22,7 @@ import { Resources } from "../../../resources";
     "[attr.aria-label]": "label()",
     "[attr.aria-selected]": "selected()",
     "[attr.aria-busy]": "working() || null",
+    "[attr.aria-description]": "preview() ? resources.previewDescription : null",
     "[attr.tabindex]": "selected() ? 0 : -1",
     "[class.tr-tab-selected]": "selected()",
     "[class.tr-tab-preview]": "preview()",

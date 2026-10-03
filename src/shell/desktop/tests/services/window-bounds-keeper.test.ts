@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { setTimeout as delay } from "node:timers/promises";
-
 import { JsonException, type JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { type IWindowStateStore, WindowBoundsKeeper, WindowStateException, WindowStateUnavailableException } from "@noldova/teamrun-shell-desktop";
@@ -128,7 +126,7 @@ export class WindowBoundsKeeperTests {
     window.change("maximize");
     window.isMaximizedNow = true;
     window.change("unmaximize");
-    await delay(40);
+    await Condition.waitAsync(() => store.writes.length === 1);
 
     Assert.areEqual(JSON.stringify([{ x: 100, y: 80, width: 1280, height: 800, maximized: true }]), JSON.stringify(store.writes));
   }
@@ -143,11 +141,13 @@ export class WindowBoundsKeeperTests {
     await keeper.restoreAsync(store);
     window.change("move");
     await keeper.saveAsync();
-    await delay(20);
+    window.bounds = { x: 1, y: 2, width: 700, height: 500 };
+    window.change("move");
+    await Condition.waitAsync(() => store.writes.at(-1)?.["x"] === 1);
     window.isGone = true;
     await keeper.saveAsync();
 
-    Assert.areEqual(1, store.writes.length);
+    Assert.areEqual(2, store.writes.length);
   }
 
   @TestMethod
@@ -160,7 +160,7 @@ export class WindowBoundsKeeperTests {
 
     await keeper.restoreAsync(store);
     window.change("resize");
-    await delay(20);
+    await Condition.waitAsync(() => log.lines.length === 1);
 
     Assert.areEqual(JSON.stringify(["The window's bounds could not be saved: Error: The runtime is gone."]), JSON.stringify(log.lines));
   }
