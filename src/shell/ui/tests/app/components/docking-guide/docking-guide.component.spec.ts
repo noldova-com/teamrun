@@ -75,9 +75,23 @@ describe("DockingGuideComponent", () => {
         fixture.detectChanges();
 
         expect(guide().classList.contains("tr-docking-guide-chosen")).toBe(true);
-        expect(style.backgroundColor).toBe(AppearanceFixture.readColor(theme, mode, "focusBorder"));
+        expect(style.backgroundColor).toBe(AppearanceFixture.readColor(theme, mode, "button.background"));
+        expect(style.borderTopColor).toBe(AppearanceFixture.readColor(theme, mode, "button.background"));
         expect(style.color).toBe(AppearanceFixture.readColor(theme, mode, "button.foreground"));
       });
+
+  for (const mode of AppearanceFixture.modes)
+    it(`keeps its glyph at least 3:1 against its surface, idle and chosen, in ${mode} mode`, () => {
+      AppearanceFixture.apply(DefaultTheme.theme, mode);
+      const style = getComputedStyle(guide());
+      const idle = AppearanceFixture.contrast(style.color, style.backgroundColor);
+
+      fixture.componentInstance.chosen.set(true);
+      fixture.detectChanges();
+
+      expect(idle).toBeGreaterThanOrEqual(3);
+      expect(AppearanceFixture.contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(3);
+    });
 
   for (const panelSize of AppearanceFixture.panelSizes)
     it(`scales with panel size ${panelSize}`, () => {
