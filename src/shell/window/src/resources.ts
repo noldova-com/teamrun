@@ -175,6 +175,33 @@ export class Resources {
   public static readonly resetLayoutCommand: string = "shell.resetLayout";
   public static readonly nextTabCommand: string = "shell.nextTab";
   public static readonly previousTabCommand: string = "shell.previousTab";
+  public static readonly openSettingsCommand: string = "shell.openSettings";
+  public static readonly openSettingsTitle: string = "Settings…";
+  public static readonly settingsDocument: string = "shell.settings";
+  public static readonly settingsTitle: string = "Settings";
+  public static readonly settingsGlyph: string = "settings";
+  public static readonly modifiedLabel: string = "Modified";
+  public static readonly modifiedGlyph: string = "circle";
+  public static readonly resetLabel: string = "Reset";
+  public static readonly appearancePage: string = "Appearance";
+  public static readonly themeSetting: string = "shell.theme";
+  public static readonly modeSetting: string = "shell.mode";
+  public static readonly interfaceFontSetting: string = "shell.interfaceFont";
+  public static readonly codeFontSetting: string = "shell.codeFont";
+  public static readonly panelSizeSetting: string = "shell.panelSize";
+  public static readonly messageSizeSetting: string = "shell.messageSize";
+  public static readonly codeSizeSetting: string = "shell.codeSize";
+  public static readonly appearanceUnreadable: string = "The appearance preferences could not be read.";
+  public static readonly notificationsPage: string = "Notifications";
+  public static readonly shortcutsPage: string = "Keyboard shortcuts";
+  public static readonly leadingSettingsPages: readonly string[] = [Resources.appearancePage, Resources.notificationsPage, Resources.shortcutsPage];
+  public static readonly searchSettingsLabel: string = "Search settings";
+  public static readonly settingsPagesLabel: string = "Settings pages";
+  public static readonly noSettingsFound: string = "No settings match your search.";
+  public static readonly commandColumn: string = "Command";
+  public static readonly keyColumn: string = "Key";
+  public static readonly noKey: string = "—";
+  public static readonly shortcutsExplanation: string = "The keys that run commands. Changing them comes later.";
   public static readonly showAllTabsCommand: string = "shell.showAllTabs";
   public static readonly splitTabCommands: Readonly<Record<PanelEdge, string>> = {
     [PanelEdge.Left]: "shell.splitTabLeft",
@@ -225,6 +252,7 @@ export class Resources {
   public static readonly showCommandsGlyph: string = "search";
   public static readonly shellKeys: readonly (readonly [string, readonly string[], readonly string[]])[] = [
     ["shell.showCommands", ["Mod+Shift+P"], ["Mod+Shift+P"]],
+    ["shell.openSettings", ["Mod+Comma"], ["Mod+Comma"]],
     ["shell.closeTab", ["Mod+W"], ["Mod+W"]],
     ["shell.nextTab", ["Ctrl+Tab", "Ctrl+PageDown"], ["Ctrl+Tab", "Mod+Alt+ArrowRight"]],
     ["shell.previousTab", ["Ctrl+Shift+Tab", "Ctrl+PageUp"], ["Ctrl+Shift+Tab", "Mod+Alt+ArrowLeft"]],
@@ -491,6 +519,18 @@ export class Resources {
 
   public static formatUnsupportedVersion(version: number): string {
     return `Layout format version ${version} is not supported; this build reads version ${Resources.layoutFormatVersion}.`;
+  }
+
+  public static formatResetLabel(title: string): string {
+    return `Reset ${title}`;
+  }
+
+  public static formatNumberRange(minimum: number | null, maximum: number | null, step: number | null): string {
+    return step === 1 ? `Enter a whole number from ${minimum} to ${maximum}.` : `Enter a number from ${minimum} to ${maximum} in steps of ${step}.`;
+  }
+
+  public static formatKeyTaken(key: string, keptBy: string): string {
+    return `${key} is taken by ${keptBy}`;
   }
 
   public static formatForeignDocument(moduleId: string, name: string): string {

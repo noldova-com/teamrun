@@ -198,6 +198,8 @@ A module defines each setting it contributes in `settings.json`, an object whose
 
 The shell keeps the values in its database and reports every change with the event `shell.settingsChanged`, whose payload is the changed key, the value now in effect and whether a value is stored for the key, false after a reset. A part reads the settings of its module, its dependencies and the shell, and changes only its own module's. A window reads them all with `shell.settings` and changes them with `shell.setSetting` and `shell.resetSetting`; the desktop adds its device to these requests and passes a device's change only to that device's windows. A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
 
+The shell shows Settings as a document of its own, `shell.settings`, which `shell.openSettings` opens or reveals. Its pages come from the settings' `page` and `group` fields: Appearance, Notifications and Keyboard shortcuts first, then the modules' pages in the order they first appear. Keyboard shortcuts lists each command's key, read-only until editing them is designed. The window applies the appearance settings as soon as they load and on every change. The desktop keeps the device's last appearance preferences outside the data directory and gives them to the window before its first frame, so a restart paints in the chosen theme and mode without a flash.
+
 ### Setting scopes
 
 The application scope belongs to the shell. A module that owns a kind of object, such as a project or a conversation, contributes a scope for it and tells the shell which object encloses each one, such as a conversation's project; an object with none falls under the application scope. A setting declares which scopes may override it. Its effective value comes from the most specific scope that sets it, then each enclosing scope, then the application scope, then the default. When an object is deleted, the scope's owner asks the shell to remove the values stored for it.
@@ -293,6 +295,7 @@ SQLite is the authority for durable records. The shell and each module that keep
 |---|---|
 | Migration history and change records | Each database's owner, in that database |
 | Shortcuts, settings and their values per scope | The shell, in its database |
+| The device's last appearance preferences | The desktop, in `appearance.json` beside the device's identity, outside the data directory; a copy of the settings in effect, replaced on each change, and read before the window opens |
 | Layout, window bounds and a window part's view state | The shell keeps layout and window bounds in its database, written through the runtime; the owning module keeps a part's view state in the data directory. State tied to a display or a window is kept for the device and window that recorded it. A device is identified by a random identity kept in the operating system's local application data, outside the data directory, so devices that share a data directory keep their own; the main window is `main`. Transient state stays in memory |
 | Drafts and other content the person wrote but did not send | The owning module's database, saved through its runtime part |
 | Credentials an external tool manages | That tool, accessed only through its supported interfaces |

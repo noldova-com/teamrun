@@ -1,0 +1,73 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  padding: var(--tr-settings-item-padding);
+  border-radius: var(--tr-radius-medium);
+}
+
+:host(:hover) {
+  background-color: var(--tr-hover);
+}
+
+.tr-setting-row-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tr-space-2);
+  min-height: var(--tr-field-height);
+}
+
+.tr-setting-row-marker {
+  flex: none;
+  color: var(--tr-accent);
+  font-size: var(--tr-setting-marker);
+}
+
+.tr-setting-row-title {
+  color: var(--tr-setting-title);
+  font-weight: 600;
+}
+
+.tr-setting-row-reset {
+  margin-inline-start: auto;
+}
+
+.tr-setting-row-name {
+  color: var(--tr-text-muted);
+  font-size: var(--tr-text-label);
+  line-height: var(--tr-line-label);
+}
+
+.tr-setting-row-description {
+  margin-top: var(--tr-settings-item-description-gap);
+  color: var(--tr-text);
+}
+
+.tr-setting-row-control {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-top: var(--tr-settings-item-control-gap);
+}
+
+.tr-setting-row-modules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-2);
+}
+
+.tr-setting-row-number {
+  width: var(--tr-number-field-width);
+}
+
+.tr-setting-row-error {
+  color: var(--tr-error);
+}

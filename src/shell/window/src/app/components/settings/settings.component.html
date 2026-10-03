@@ -1,0 +1,69 @@
+<div class="tr-settings-search">
+  <input tr-text-field type="search" class="tr-settings-search-field" [attr.aria-label]="resources.searchSettingsLabel" [placeholder]="resources.searchSettingsLabel"
+    [value]="query()" (input)="search($event)" />
+</div>
+<div class="tr-settings-body">
+  <nav class="tr-settings-pages" [attr.aria-label]="resources.settingsPagesLabel">
+    @for (page of pages(); track page.title) {
+      @let isCurrent = !isSearching() && page.title === currentPage()?.title;
+      <button type="button" class="tr-settings-page" [class.tr-settings-page-current]="isCurrent" [attr.aria-current]="isCurrent ? 'page' : null" (click)="select(page)">
+        {{ page.title }}
+      </button>
+    }
+  </nav>
+  <div class="tr-settings-content">
+    @if (isSearching()) {
+      @for (page of results(); track page.title) {
+        <section class="tr-settings-result" [attr.aria-label]="page.title">
+          <h2 class="tr-settings-result-title">{{ page.title }}</h2>
+          <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: true }" />
+        </section>
+      } @empty {
+        <p class="tr-settings-empty">{{ resources.noSettingsFound }}</p>
+      }
+    } @else if (currentPage(); as page) {
+      <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: false }" />
+    }
+  </div>
+</div>
+
+<ng-template #body let-page let-isResult="isResult">
+  @if (page.isShortcuts) {
+    @if (!isResult) {
+      <h2 class="tr-settings-group-title">{{ page.title }}</h2>
+    }
+    <p class="tr-settings-explanation">{{ resources.shortcutsExplanation }}</p>
+    <table class="tr-settings-shortcuts">
+      <thead>
+        <tr><th scope="col">{{ resources.commandColumn }}</th><th scope="col">{{ resources.keyColumn }}</th></tr>
+      </thead>
+      <tbody>
+        @for (row of matchingShortcuts(); track row.name) {
+          <tr [attr.data-command]="row.name">
+            <td><tr-highlighted-text [text]="row.title" [query]="query()" /></td>
+            <td>
+              <tr-highlighted-text [text]="row.key" [query]="query()" />
+              @if (row.collision; as collision) {
+                <span class="tr-settings-collision">{{ collision }}</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  } @else {
+    @for (group of page.groups; track group.title) {
+      <section class="tr-settings-group" [attr.aria-label]="group.title">
+        @if (isResult) {
+          <h3 class="tr-settings-result-group">{{ group.title }}</h3>
+        } @else {
+          <h2 class="tr-settings-group-title">{{ group.title }}</h2>
+        }
+        @for (definition of group.definitions; track definition.name.text) {
+          <tr-setting-row [definition]="definition" [value]="values().get(definition.name.text)" [isSet]="setFlags().get(definition.name.text)?.() ?? false"
+            [query]="query()" [modules]="modules" (changed)="change(definition, $event)" (reset)="reset(definition)" />
+        }
+      </section>
+    }
+  }
+</ng-template>

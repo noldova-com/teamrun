@@ -2227,10 +2227,13 @@ export declare class DesktopApplication {
    * @param createLauncher Creates the runtime launcher for the chosen settings.
    * @param readDeviceAsync Reads this device's identity from a folder: the one `--device-dir=` in the process's
    * arguments gives, otherwise the operating system's local application data. A failure leaves window bounds unkept.
+   * @param createAppearanceStore Creates the store of this device's last appearance preferences in the same folder. The
+   * desktop reads them before it opens a window, so the window's first frame already has them, and keeps those the
+   * window reports.
    * @example
    * ```ts
    * import { RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
-   * import { DesktopApplication, DeviceIdentity, type IDesktopProcess, type IElectron } from "@noldova/teamrun-shell-desktop";
+   * import { AppearanceStore, DesktopApplication, DeviceIdentity, type IDesktopProcess, type IElectron } from "@noldova/teamrun-shell-desktop";
    *
    * export function launch(electron: IElectron, process: IDesktopProcess): void {
    *   DesktopApplication.start(
@@ -2238,7 +2241,8 @@ export declare class DesktopApplication {
    *     process,
    *     "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js",
    *     t => new RuntimeLauncher(t, RuntimeBuild.identity),
-   *     t => DeviceIdentity.readOrCreateAsync(t));
+   *     t => DeviceIdentity.readOrCreateAsync(t),
+   *     t => new AppearanceStore(t));
    * }
    * ```
    */
@@ -2247,7 +2251,97 @@ export declare class DesktopApplication {
     process: IDesktopProcess,
     moduleUrl: string,
     createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
-    readDeviceAsync: (folder: string) => Promise<string>): void;
+    readDeviceAsync: (folder: string) => Promise<string>,
+    createAppearanceStore: (folder: string) => IAppearanceStore): void;
+}
+
+/**
+ * Where the desktop keeps this device's last appearance preferences, outside the data directory, so the next start
+ * paints its first frame with them.
+ */
+export interface IAppearanceStore {
+  /**
+   * Reads the preferences kept last.
+   *
+   * @returns A promise of the preferences, or `null` when none are kept; it rejects when the kept file cannot be read.
+   * @example
+   * ```ts
+   * import type { IAppearanceStore } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function hasAppearanceAsync(store: IAppearanceStore): Promise<boolean> {
+   *   return await store.readAsync() !== null;
+   * }
+   * ```
+   */
+  readAsync(): Promise<JsonObject | null>;
+
+  /**
+   * Keeps the preferences, replacing those kept before; writes happen one at a time, in order.
+   *
+   * @param preferences The appearance preferences the window reported.
+   * @returns A promise that settles once they are kept.
+   * @example
+   * ```ts
+   * import type { IAppearanceStore } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function keepDarkAsync(store: IAppearanceStore): Promise<void> {
+   *   return store.writeAsync({ "shell.mode": "Dark" });
+   * }
+   * ```
+   */
+  writeAsync(preferences: JsonObject): Promise<void>;
+}
+
+/**
+ * Keeps the appearance preferences in `appearance.json` in a device folder, writing a temporary file and renaming it so
+ * an interrupted write never leaves a partial file.
+ */
+export declare class AppearanceStore implements IAppearanceStore {
+  /**
+   * Creates the store.
+   *
+   * @param folder The device folder.
+   * @example
+   * ```ts
+   * import { AppearanceStore } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const store: AppearanceStore = new AppearanceStore("/home/person/.local/state/noldova/teamrun");
+   * ```
+   */
+  public constructor(folder: string);
+
+  /**
+   * Reads the preferences kept last.
+   *
+   * @returns A promise of the preferences, or `null` when the file does not exist.
+   * @throws {SyntaxError} Asynchronously when the file is not JSON.
+   * @throws {JsonException} Asynchronously when the file holds JSON that is not an object.
+   * @example
+   * ```ts
+   * import { AppearanceStore } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function readAsync(folder: string): Promise<unknown> {
+   *   return new AppearanceStore(folder).readAsync();
+   * }
+   * ```
+   */
+  public readAsync(): Promise<JsonObject | null>;
+
+  /**
+   * Keeps the preferences, after any write still in progress, creating the folder when needed.
+   *
+   * @param preferences The appearance preferences.
+   * @returns A promise that settles once they are kept, and rejects when they could not be written.
+   * @example
+   * ```ts
+   * import { AppearanceStore } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function keepAsync(folder: string): Promise<void> {
+   *   return new AppearanceStore(folder).writeAsync({ "shell.mode": "Light" });
+   * }
+   * ```
+   */
+  public writeAsync(preferences: JsonObject): Promise<void>;
 }
 
 /**

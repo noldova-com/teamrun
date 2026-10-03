@@ -27,6 +27,10 @@ export class DesktopBridgeService {
     return this.bridge.platform;
   }
 
+  public get initialAppearance(): unknown {
+    return this.bridge.appearance;
+  }
+
   public get isMac(): boolean {
     return this.bridge.platform === Resources.macPlatform;
   }
@@ -88,6 +92,10 @@ export class DesktopBridgeService {
     return this.bridge.openLogFolder();
   }
 
+  public keepAppearance(preferences: JsonObject): void {
+    this.bridge.keepAppearance(preferences);
+  }
+
   public onNotificationOpened(listener: (id: number) => void): () => void {
     return this.bridge.onNotificationOpened(t => {
       if (Number.isSafeInteger(t))
@@ -130,6 +138,7 @@ export class DesktopBridgeService {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readBuild))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.copyText))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.openLogFolder))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.keepAppearance))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onNotificationOpened)));
   }
 }

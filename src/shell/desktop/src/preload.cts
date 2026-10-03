@@ -11,8 +11,19 @@ import type { IpcRendererEvent } from "electron";
 
 const { contextBridge, ipcRenderer } = electron;
 
+function readAppearance(): unknown {
+  const argument = process.argv.find(t => t.startsWith("--teamrun-appearance="));
+  try {
+    return argument === undefined ? null : JSON.parse(argument.slice("--teamrun-appearance=".length));
+  }
+  catch {
+    return null;
+  }
+}
+
 contextBridge.exposeInMainWorld("teamrun", {
   platform: process.platform,
+  appearance: readAppearance(),
   notifyReady(appearance: unknown): void {
     ipcRenderer.send("teamrun:ready", appearance);
   },
@@ -60,6 +71,9 @@ contextBridge.exposeInMainWorld("teamrun", {
   },
   openLogFolder(): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:openLogFolder") as Promise<boolean>;
+  },
+  keepAppearance(preferences: unknown): void {
+    ipcRenderer.send("teamrun:keepAppearance", preferences);
   },
   onNotificationOpened(listener: (id: number) => void): () => void {
     const handler = (_event: IpcRendererEvent, id: number): void => listener(id);
