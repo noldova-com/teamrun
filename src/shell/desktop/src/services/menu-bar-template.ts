@@ -51,6 +51,7 @@ export class MenuBarTemplate {
       return { label: row.label, submenu: row.rows.map(t => MenuBarTemplate.itemOf(t, run)) };
     const id = String(row.id);
     return {
+      id,
       label: row.label,
       enabled: row.isEnabled,
       type: row.check === MenuCheck.Checkbox ? "checkbox" : row.check === MenuCheck.Radio ? "radio" : "normal",
