@@ -270,6 +270,8 @@ export class Resources {
   public static readonly textParameter: string = "text";
   public static readonly tooltipParameter: string = "tooltip";
   public static readonly commandParameter: string = "command";
+  public static readonly viewKind: string = "view";
+  public static readonly documentKind: string = "document";
   public static readonly statusBarItemKind: string = "status bar item";
   public static readonly topBarActionKind: string = "top bar action";
   public static readonly notificationKind: string = "notification kind";

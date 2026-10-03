@@ -76,7 +76,7 @@ describe("NotificationsComponent", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: NotificationService, useValue: service },
-        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] },
+        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
     });
