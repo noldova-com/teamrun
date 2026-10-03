@@ -157,6 +157,22 @@ describe("ContextMenuTriggerDirective", () => {
     expect(getComputedStyle(more, "::before").backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "list.hoverBackground"));
   });
 
+  it("opens no submenu for a resting pointer that the page last saw somewhere else", async () => {
+    key({ key: "ContextMenu" });
+    await settledAsync();
+    const measured = menu()?.querySelector(".more")?.getBoundingClientRect() as DOMRect;
+    await userEvent.keyboard("{Escape}");
+    await settledAsync();
+    await userEvent.hover(document.documentElement, { position: { x: measured.left + measured.width / 2, y: measured.top + measured.height / 2 } });
+    document.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, screenX: 3, screenY: 3, clientX: 3, clientY: 3 }));
+    key({ key: "ContextMenu" });
+    await settledAsync();
+    await vi.waitFor(() => expect(menu()?.querySelector(".more")?.matches(":hover")).toBe(true));
+    await settledAsync();
+
+    expect(menu("submenu")).toBeNull();
+  });
+
   it("leaves the row the pointer rested on alone when the pointer moves to another row", async () => {
     key({ key: "ContextMenu" });
     await settledAsync();

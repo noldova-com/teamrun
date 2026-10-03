@@ -49,7 +49,7 @@ The shell's default theme defines the values in this document: the colors below 
 
 Every color uses a theme token. The default theme's light and dark colors start from the table below; provide complete initial tokens before painting themed content. Section 9 governs module tokens.
 
-The application's icon follows the operating system's appearance, not the theme. Each window on Windows and Linux shows the light or dark icon and switches when the system's appearance changes; on Windows the taskbar's own appearance decides, and the taskbar shows the same icon. macOS shows one icon in the Dock.
+The application shows one icon in light and dark mode, whatever the theme or the operating system's appearance. On Windows and Linux it is the outlined icon, a white shape with a dark outline that stays readable on both backgrounds, on the window, the taskbar and the program file. macOS shows the Dock icon.
 
 The table specifies normal-state colors. Check actual composited foreground/background pairs in hover, selection and overlay states under section 7; correct the mapping or use a verified fallback when needed. Decorative borders may remain subtle; boundaries needed to identify controls must meet non-text contrast requirements.
 
@@ -167,7 +167,7 @@ This table assigns geometry and radius tokens under sections 1, 3 and 7, with th
 
 | Component | Default geometry | Text role | Surface and behavior |
 |---|---|---|---|
-| Window row | 2.1875rem high | Panel; title 600 | Shell; window controls, the active document's breadcrumb and the top bar's actions, with no divider beneath |
+| Window row | 2.1875rem high | Panel; title 600 | Shell; window controls, the active document's breadcrumb and the top bar's actions, with no divider beneath; the actions are icon buttons outside the drag region, named and labelled by their titles |
 | Status bar | 1.75rem high; 0.5rem side inset; items are 1.25rem high pills with 0.375rem side padding, 0.25rem apart; hover radius | Label | Shell; items on the left and right, with no divider above; an item with a command is a button with toolbar hover, meeting section 7's target size through its spacing; truncated text keeps its full text in the tooltip and accessible name |
 | Module failures item | Status-bar item; 1rem error icon 0.25rem from its text | Label | Shown at the status bar's right end only while a module is failed or blocked; the error icon with text such as "1 module didn't start", never color alone; opens the module failures popover |
 | Panel card | 1px border; large radius; 0.25rem gaps and outer side/bottom margin | Inherited | Shell for groups in a dock, panel for groups in the middle; meets the window row above |

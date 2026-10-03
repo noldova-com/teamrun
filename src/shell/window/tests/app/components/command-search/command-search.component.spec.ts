@@ -33,7 +33,7 @@ describe("CommandSearchComponent", () => {
     runs = [];
     DesktopBridgeFixture.install("win32");
     TestBed.configureTestingModule({
-      providers: [{ provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], ["notes.newNote"], () => Promise.reject(new Error("Not loaded.")))] }]
+      providers: [{ provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], ["notes.newNote"], [], [], () => Promise.reject(new Error("Not loaded.")))] }]
     });
     commands = TestBed.inject(CommandService);
     search = TestBed.inject(CommandSearchService);

@@ -18,7 +18,7 @@ export default class ModuleDeclaration {
   private static readonly ID_PATTERN: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   private static readonly MEMBER_PATTERN: RegExp = /^[a-z][a-zA-Z0-9]*$/;
   private static readonly RESERVED_ID: string = "shell";
-  private static readonly KINDS: readonly string[] = ["methods", "events", "commands", "views", "documents", "themes"];
+  private static readonly KINDS: readonly string[] = ["methods", "events", "commands", "views", "documents", "statusBarItems", "topBarActions", "themes"];
   private static readonly FIELDS: readonly string[] = ["id", "displayName", "parts", "dependencies", "contributes"];
   private static readonly RUNTIME_PART: string = "runtime";
   private static readonly WINDOW_PART: string = "window";
