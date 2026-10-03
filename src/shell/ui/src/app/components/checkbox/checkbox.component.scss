@@ -1,0 +1,67 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.tr-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tr-space-2);
+  min-width: 0;
+  cursor: pointer;
+}
+
+.tr-checkbox-control {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+}
+
+.tr-checkbox-box {
+  box-sizing: border-box;
+  width: var(--tr-checkbox-size);
+  height: var(--tr-checkbox-size);
+  margin: 0;
+  border: var(--tr-border-width) solid var(--tr-checkbox-border);
+  border-radius: var(--tr-radius-small);
+  background-color: var(--tr-checkbox);
+  appearance: none;
+  cursor: pointer;
+}
+
+.tr-checkbox-box:focus-visible {
+  outline: var(--tr-border-width) solid var(--tr-accent);
+  outline-offset: var(--tr-border-width);
+}
+
+.tr-checkbox-box:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tr-checkbox-mark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--tr-text);
+  font-size: var(--tr-icon);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.tr-checkbox-box:checked + .tr-checkbox-mark {
+  visibility: visible;
+}
+
+.tr-checkbox-text:empty {
+  display: none;
+}

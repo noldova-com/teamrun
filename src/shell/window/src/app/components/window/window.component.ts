@@ -10,6 +10,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ErrorHandler, inject } 
 
 import { AppearanceService } from "@noldova/teamrun-shell-ui";
 
+import { AppearanceSettingsService } from "../../services/appearance-settings.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { LayoutService } from "../../services/layout.service";
 import { StartupService } from "../../services/startup.service";
@@ -36,6 +37,7 @@ export class WindowComponent {
 
   public constructor() {
     inject(AppearanceService);
+    inject(AppearanceSettingsService);
     inject(WindowPartHostService);
     inject(DestroyRef).onDestroy(this.bridge.onCloseRequest(t => void this.closeAsync(t)));
   }

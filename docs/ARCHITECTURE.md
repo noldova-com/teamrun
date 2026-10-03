@@ -184,7 +184,7 @@ A module adds groups to the shell's places, its own and those of the modules it 
 
 A window part opens its own places and its dependencies' as context menus with the `trMenu` directive, giving a place and a context object. The context is merged into each item's arguments, the item's own fields winning, so one declared item acts on whatever the menu was opened on.
 
-The shell's own groups put Close the tab in File, and command search, showing or hiding each dock, the bottom dock across the window or between the side docks, and Reset the layout in View. On Windows and Linux, Edit holds Undo, Redo, Cut, Copy, Paste and Select all: each acts on the field that had focus before a menu took it, with the field's selection restored first, and is enabled only when that field allows it, such as Copy only with a selection and Paste only into a field that can be written. On macOS the window gives the desktop the main menu's rows whenever they change, and the desktop builds the native menu bar from them: a row shows its key without taking it from the window, so the window's key handling stays the only one, and choosing a row runs it in the window. The Edit and Window menus keep the system's own items, with their keys, before the shell's and modules' rows.
+The shell's own groups put Close the tab in File, and command search, showing or hiding each dock, the bottom dock across the window or between the side docks and Reset the layout in View, and Settings… in the macOS application menu after About. On Windows and Linux, Edit holds Undo, Redo, Cut, Copy, Paste and Select all: each acts on the field that had focus before a menu took it, with the field's selection restored first, and is enabled only when that field allows it, such as Copy only with a selection and Paste only into a field that can be written. On macOS the window gives the desktop the main menu's rows whenever they change, and the desktop builds the native menu bar from them: a row shows its key without taking it from the window, so the window's key handling stays the only one, and choosing a row runs it in the window. The Edit and Window menus keep the system's own items, with their keys, before the shell's and modules' rows.
 
 ### Settings
 
@@ -201,6 +201,8 @@ A module defines each setting it contributes in `settings.json`, an object whose
 | `page`, `group` | Where Settings shows it |
 
 The shell keeps the values in its database and reports every change with the event `shell.settingsChanged`, whose payload is the changed key, the value now in effect and whether a value is stored for the key, false after a reset. A part reads the settings of its module, its dependencies and the shell, and changes only its own module's. A window reads them all with `shell.settings` and changes them with `shell.setSetting` and `shell.resetSetting`; the desktop adds its device to these requests and passes a device's change only to that device's windows. A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
+
+The shell shows Settings as a document of its own, `shell.settings`, which `shell.openSettings` opens or reveals. Its pages come from the settings' `page` and `group` fields: Appearance, Notifications and Keyboard shortcuts first, then the modules' pages in the order they first appear. Keyboard shortcuts lists each command's key, read-only until editing them is designed. The window applies the appearance settings as soon as they load and on every change. The desktop keeps the device's last appearance preferences outside the data directory and gives them to the window before its first frame, so a restart paints in the chosen theme and mode without a flash.
 
 ### Setting scopes
 
@@ -297,6 +299,7 @@ SQLite is the authority for durable records. The shell and each module that keep
 |---|---|
 | Migration history and change records | Each database's owner, in that database |
 | Shortcuts, settings and their values per scope | The shell, in its database |
+| The device's last appearance preferences | The desktop, in `appearance.json` beside the device's identity, outside the data directory; a copy of the settings in effect, replaced on each change, and read before the window opens |
 | Layout, window bounds and a window part's view state | The shell keeps layout and window bounds in its database, written through the runtime; the owning module keeps a part's view state in the data directory. State tied to a display or a window is kept for the device and window that recorded it. A device is identified by a random identity kept in the operating system's local application data, outside the data directory, so devices that share a data directory keep their own; the main window is `main`. Transient state stays in memory |
 | Drafts and other content the person wrote but did not send | The owning module's database, saved through its runtime part |
 | Credentials an external tool manages | That tool, accessed only through its supported interfaces |

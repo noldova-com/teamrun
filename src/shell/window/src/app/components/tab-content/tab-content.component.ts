@@ -48,8 +48,11 @@ export class TabContentComponent {
       return Object.isNull(failure) ? null : new TabContent(ModuleFailureCardComponent, this.injector, { failure });
     }
 
+    const component = await match.loadComponent();
+    if (Object.isNull(match.context))
+      return new TabContent(component, this.injector, {});
     const injector = Injector.create({ providers: [{ provide: WindowPartTokens.context, useValue: match.context }], parent: this.injector });
     const inputs = tab instanceof DocumentTab ? { instance: tab.instance, title: this.labels.of(tab).title } : {};
-    return new TabContent(await match.loadComponent(), injector, inputs);
+    return new TabContent(component, injector, inputs);
   }
 }

@@ -151,6 +151,8 @@ describe("CommandService", () => {
     service.setCommands([command("notes.newNote", "Mod+Alt+N"), command("notes.sync", null)]);
 
     expect([service.keyLabel("notes.newNote"), service.keyLabel("notes.sync")]).toEqual(["⌥⌘N", null]);
+    expect(service.titleOf("notes.sync")).toBe("notes.sync");
+    expect(() => service.titleOf("notes.gone")).toThrowError(CommandNotFoundException);
   });
 
   it("runs a command by name and reports its failure", async () => {

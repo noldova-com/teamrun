@@ -1,0 +1,40 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  box-sizing: border-box;
+  width: var(--tr-text-field-width);
+  max-width: 100%;
+  min-width: 0;
+  min-height: var(--tr-field-height);
+  margin: 0;
+  padding: 0 var(--tr-field-padding);
+  border: var(--tr-border-width) solid var(--tr-input-border);
+  border-radius: var(--tr-radius-small);
+  background-color: var(--tr-input);
+  color: var(--tr-input-text);
+  font: inherit;
+  font-size: var(--tr-text-label);
+  line-height: var(--tr-line-label);
+  cursor: text;
+}
+
+:host::placeholder {
+  color: var(--tr-placeholder);
+  opacity: 1;
+}
+
+:host(:focus) {
+  border-color: var(--tr-accent);
+  outline: none;
+}
+
+:host(:disabled) {
+  opacity: 0.5;
+  cursor: default;
+}

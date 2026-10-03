@@ -15,6 +15,7 @@ import "@noldova/teamrun-foundation-core";
 import { ChildProcessStarter, RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "./resources.js";
+import { AppearanceStore } from "./services/appearance-store.js";
 import { DesktopApplication } from "./services/desktop-application.js";
 import { DeviceIdentity } from "./services/device-identity.js";
 import { UtilityProcessStarter } from "./services/utility-process-starter.js";
@@ -54,4 +55,5 @@ DesktopApplication.start(
   },
   import.meta.url,
   t => new RuntimeLauncher(t, RuntimeBuild.identity, starter),
-  t => DeviceIdentity.readOrCreateAsync(t));
+  t => DeviceIdentity.readOrCreateAsync(t),
+  t => new AppearanceStore(t));
