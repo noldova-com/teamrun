@@ -61,6 +61,14 @@ contextBridge.exposeInMainWorld("teamrun", {
   openLogFolder(): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:openLogFolder") as Promise<boolean>;
   },
+  setMenuBar(menuBar: unknown): void {
+    ipcRenderer.send("teamrun:menuBar", menuBar);
+  },
+  onMenuCommand(listener: (id: string) => void): () => void {
+    const handler = (_event: IpcRendererEvent, id: string): void => listener(id);
+    ipcRenderer.on("teamrun:menuCommand", handler);
+    return () => ipcRenderer.removeListener("teamrun:menuCommand", handler);
+  },
   onNotificationOpened(listener: (id: number) => void): () => void {
     const handler = (_event: IpcRendererEvent, id: number): void => listener(id);
     ipcRenderer.on("teamrun:notificationOpened", handler);

@@ -12,8 +12,10 @@ import type { IMenuHost } from "@noldova/teamrun-shell-desktop";
 
 export class FakeMenuHost implements IMenuHost {
   public menu: unknown = undefined;
+  public readonly templates: MenuItemConstructorOptions[][] = [];
 
   public buildFromTemplate(template: MenuItemConstructorOptions[]): unknown {
+    this.templates.push(template);
     return template;
   }
 

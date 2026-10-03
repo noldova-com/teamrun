@@ -1,3 +1,15 @@
+@if (!isMac && menuBar.shownPlaces().length > 0) {
+  <button type="button" tr-icon-button class="tr-window-row-menu" [icon]="resources.menuGlyph" [label]="resources.menuLabel" [trTooltip]="resources.menuLabel"
+    [trTooltipSide]="below" [trMenuTriggerFor]="barMenu"></button>
+  <ng-template #barMenu>
+    <tr-menu class="tr-window-row-menu-list">
+      @for (place of menuBar.shownPlaces(); track place.name) {
+        <tr-place-menu #nested [place]="place.name" />
+        <button tr-menu-item class="tr-window-row-menu-place" [attr.data-place]="place.name" [label]="place.title" [trMenuTriggerFor]="nested.menu()"></button>
+      }
+    </tr-menu>
+  </ng-template>
+}
 <div class="tr-window-row-breadcrumb"></div>
 <div class="tr-window-row-actions">
   @for (action of bars.topBarActions(); track action.name) {
