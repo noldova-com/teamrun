@@ -14,6 +14,7 @@ import { DockSide } from "../../../src/app/enums/dock-side";
 import type { CommandContribution } from "../../../src/app/models/command-contribution";
 import { Layout } from "../../../src/app/models/layout/layout";
 import type { LayoutService } from "../../../src/app/services/layout.service";
+import { CommandSearchService } from "../../../src/app/services/command-search.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
 import { TabStripService } from "../../../src/app/services/tab-strip.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
@@ -57,9 +58,10 @@ describe("ShellCommandsService", () => {
     expect(service.commands.map(t => t.name)).toEqual([
       "shell.closeTab", "shell.keepTab", "shell.closeOtherTabs", "shell.closeTabsToTheRight", "shell.closeAllTabs", "shell.moveTabLeft", "shell.moveTabRight",
       "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight", "shell.dockTabBottom",
-      "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.resetLayout", "shell.showAllTabs"
+      "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.showCommands", "shell.resetLayout", "shell.showAllTabs"
     ]);
-    expect(service.commands.every(t => t.title.length > 0 && t.icon !== null && t.defaultKey === null)).toBe(true);
+    expect(service.commands.every(t => t.title.length > 0 && t.icon !== null)).toBe(true);
+    expect(service.commands.filter(t => t.defaultKey !== null).map(t => [t.name, t.defaultKey?.text])).toEqual([["shell.showCommands", "Mod+Shift+P"]]);
     expect(command("shell.keepTab").title).toBe("Keep the tab open");
   });
 
@@ -122,6 +124,14 @@ describe("ShellCommandsService", () => {
     expect(layout.layout().groupOf(search)?.tabs).toEqual([search]);
     await runAsync("shell.dockTabBottom", tab(search.key));
     expect(layout.layout().sideOf(layout.layout().groupOf(search)?.id ?? -1)).toBe(DockSide.Bottom);
+  });
+
+  it("opens the command search", async () => {
+    const open = vi.spyOn(TestBed.inject(CommandSearchService), "open").mockImplementation(() => undefined);
+
+    await runAsync("shell.showCommands");
+
+    expect(open).toHaveBeenCalledOnce();
   });
 
   it("shows and hides each dock and resets the layout", async () => {
