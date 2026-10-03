@@ -22,6 +22,8 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
       <button tr-menu-item class="plain" [label]="label()" (triggered)="chosen.push('plain')"></button>
       <button tr-menu-item class="iconic" label="Close all" icon="clear_all" [disabled]="isDisabled()" (triggered)="chosen.push('iconic')"></button>
       <button tr-menu-item class="parent" label="Move to" [trMenuTriggerFor]="submenu"></button>
+      <button tr-menu-item class="on" label="Full width" [checked]="true"></button>
+      <button tr-menu-item class="off" label="Between the docks" [checked]="false"></button>
     </tr-menu>
     <ng-template #submenu>
       <tr-menu>
@@ -67,6 +69,13 @@ describe("MenuItemComponent", () => {
     expect(row("plain").querySelector(".tr-menu-item-label")?.hasAttribute("data-truncates")).toBe(true);
     expect(row("plain").getAttribute("role")).toBe("menuitem");
     expect(row("plain").type).toBe("button");
+  });
+
+  it("is a radio row with a check mark at its end while checked, and a plain item otherwise", () => {
+    expect([row("on").getAttribute("role"), row("on").getAttribute("aria-checked"), parts("on")]).toEqual(["menuitemradio", "true", ["tr-menu-item-label", "tr-menu-item-check"]]);
+    expect(row("on").querySelector(".tr-menu-item-check")?.textContent).toBe("check");
+    expect([row("off").getAttribute("role"), row("off").getAttribute("aria-checked"), parts("off")]).toEqual(["menuitemradio", "false", ["tr-menu-item-label"]]);
+    expect([row("plain").getAttribute("role"), row("plain").hasAttribute("aria-checked")]).toEqual(["menuitem", false]);
   });
 
   it("is found by type-ahead under its label as the label changes, not under its icon", () => {

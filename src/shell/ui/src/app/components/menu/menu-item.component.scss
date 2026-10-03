@@ -51,6 +51,7 @@
 }
 
 .tr-menu-item-icon,
+.tr-menu-item-check,
 .tr-menu-item-chevron {
   flex: none;
   font-size: var(--tr-icon);
@@ -63,6 +64,7 @@
   text-overflow: ellipsis;
 }
 
+.tr-menu-item-check,
 .tr-menu-item-chevron {
   margin-inline-start: var(--tr-space-4);
 }
