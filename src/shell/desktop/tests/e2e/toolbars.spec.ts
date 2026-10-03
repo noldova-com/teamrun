@@ -234,14 +234,14 @@ test.describe("toolbars", () => {
   });
 
   test("a toolbar too narrow for its sections keeps the rest in a More actions menu and its row never scrolls sideways", async ({ desktop }) => {
-    const window = desktop.window;
-    const main = toolbar(window, "notes.main");
-    await expect(main.locator(".tr-toolbar-overflow")).toHaveCount(0);
+    await expect(toolbar(desktop.window, "notes.main").locator(".tr-toolbar-overflow")).toHaveCount(0);
 
-    await setShownAsync(window, "Spare", true);
-
+    await setShownAsync(desktop.window, "Spare", true);
+    await desktop.reopenAsync();
     await desktop.useViewportAsync(400, 700);
 
+    const window = desktop.window;
+    const main = toolbar(window, "notes.main");
     await expect(main.locator(".tr-toolbar-overflow")).toBeVisible();
     expect(await window.evaluate(() => [document.documentElement.scrollWidth <= innerWidth, [...document.querySelectorAll(".tr-toolbar-row")].every(t => t.scrollWidth <= t.clientWidth)])).toEqual([true, true]);
     const shown = await labelsOf(main.locator(".tr-toolbar-item:not(.tr-toolbar-overflow)"));
