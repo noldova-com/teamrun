@@ -59,7 +59,7 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
 
 Assertions compare values according to a documented operation; truthiness or formatted strings must not replace the required value comparison. Structured assertion failures retain meaningful expected and actual values and their cause, subject to redaction.
 
-Results record stable identities, outcomes, durations and failure/skip details for every test and data row. Distinguish executed, skipped, unselected and unreached tests; reconcile totals with discovery and selection.
+Results record stable identities, outcomes, durations and failure/skip details for every test and data row. Distinguish executed, skipped, unselected and unreached tests; reconcile totals with discovery and selection. The Angular run reconciles the spec files in Vitest's JSON report with the files its test target's include patterns match under src/, and fails naming any it did not run.
 
 Console output groups package/file/class results and prints details as each class completes. Reduced-detail mode hides passing tests and entirely passing classes. Final totals and GitHub summaries cover the whole run.
 

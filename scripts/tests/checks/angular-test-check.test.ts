@@ -10,20 +10,78 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import AngularProject from "../../angular/angular-project.ts";
+import AngularTestRun from "../../angular/angular-test-run.ts";
 import AngularTestCheck from "../../checks/angular-test-check.ts";
+import ProcessException from "../../processes/process.exception.ts";
 import NpmCommand from "../../toolchain/npm-command.ts";
 import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
+import TextOutputFixture from "../fixtures/text-output.fixture.ts";
+
+class AngularProjectFixture extends AngularProject {
+  private readonly run: AngularTestRun | Error;
+  private readonly specFiles: readonly string[] | Error;
+
+  public constructor(run: AngularTestRun | Error, specFiles: readonly string[] | Error = []) {
+    const runner = new ProcessRunnerFixture();
+    super("root", runner, new NpmCommand(runner, {}));
+
+    this.run = run;
+    this.specFiles = specFiles;
+  }
+
+  public override async testAsync(): Promise<AngularTestRun> {
+    if (this.run instanceof Error)
+      throw this.run;
+    return this.run;
+  }
+
+  public override async specFilesAsync(): Promise<readonly string[]> {
+    if (this.specFiles instanceof Error)
+      throw this.specFiles;
+    return this.specFiles;
+  }
+}
 
 class AngularTestCheckTests {
   public static register(): void {
-    test("the check passes when the Angular tests and their coverage gate pass", async () => {
-      const runner = new ProcessRunnerFixture([0, 1]);
-      const check = new AngularTestCheck(new AngularProject("root", runner, new NpmCommand(runner, {})));
+    test("the check passes when the Angular tests and their coverage gate pass and every spec file ran", async () => {
+      const output = new TextOutputFixture();
+      const check = new AngularTestCheck(new AngularProjectFixture(new AngularTestRun(0, ["a.spec.ts", "b.spec.ts"]), ["a.spec.ts", "b.spec.ts"]));
 
       assert.equal(check.title, "Angular tests and coverage");
-      assert.equal(await check.runAsync(), true);
-      assert.equal(await check.runAsync(), false);
-      assert.equal(runner.runs.length, 2);
+      assert.equal(await check.runAsync(output), true);
+      assert.equal(output.text, "");
+    });
+
+    test("the check fails when the tests fail, without listing the spec files", async () => {
+      const output = new TextOutputFixture();
+
+      assert.equal(await new AngularTestCheck(new AngularProjectFixture(new AngularTestRun(1, null), new Error("not listed"))).runAsync(output), false);
+      assert.equal(output.text, "");
+    });
+
+    test("the check fails and names the spec files a passing run did not run", async () => {
+      const output = new TextOutputFixture();
+      const check = new AngularTestCheck(new AngularProjectFixture(new AngularTestRun(0, ["a.spec.ts"]), ["a.spec.ts", "shell/b.spec.ts", "shell/c.spec.ts"]));
+
+      assert.equal(await check.runAsync(output), false);
+      assert.equal(output.text, "The Angular tests did not run 2 of the spec files under src/:\n  shell/b.spec.ts\n  shell/c.spec.ts\n");
+    });
+
+    test("the check fails when a passing run wrote no report, or its report or workspace cannot be read", async () => {
+      const silent = new TextOutputFixture();
+      const unreadable = new TextOutputFixture();
+      const workspace = new TextOutputFixture();
+
+      assert.equal(await new AngularTestCheck(new AngularProjectFixture(new AngularTestRun(0, null))).runAsync(silent), false);
+      assert.equal(await new AngularTestCheck(new AngularProjectFixture(new ProcessException("The report is unreadable."))).runAsync(unreadable), false);
+      assert.equal(await new AngularTestCheck(new AngularProjectFixture(new AngularTestRun(0, []), new ProcessException("No include patterns."))).runAsync(workspace), false);
+      assert.deepEqual([silent.text, unreadable.text, workspace.text],
+        ["The Angular tests passed but wrote no report of the spec files they ran.\n", "The report is unreadable.\n", "No include patterns.\n"]);
+    });
+
+    test("the check lets an unexpected failure through", async () => {
+      await assert.rejects(new AngularTestCheck(new AngularProjectFixture(new Error("broken"))).runAsync(new TextOutputFixture()), new Error("broken"));
     });
   }
 }
