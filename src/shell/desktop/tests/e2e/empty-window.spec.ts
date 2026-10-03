@@ -37,7 +37,10 @@ test.describe("the empty window", () => {
       bridge: Object.keys(Reflect.get(globalThis, "teamrun") as object).sort()
     }));
 
-    expect(globals).toEqual({ require: "undefined", process: "undefined", module: "undefined", buffer: "undefined", bridge: ["actOnStartup", "answerClose", "copyText", "notifyAppearance", "notifyReady", "onCloseRequest", "onEvent", "onNotificationOpened", "onStartup", "openLogFolder", "platform", "readBuild", "readLayout", "readStartup", "request", "writeLayout"] });
+    expect(globals).toEqual({ require: "undefined", process: "undefined", module: "undefined", buffer: "undefined", bridge: [
+      "actOnStartup", "answerClose", "answerQuit", "copyText", "logModule", "notifyAppearance", "notifyReady", "onCloseRequest", "onEvent", "onNotificationOpened", "onQuitQuestion", "onStartup",
+      "openLogFolder", "platform", "readBuild", "readLayout", "readStartup", "request", "writeLayout"
+    ] });
   });
 
   test("the window row, status bar and panel card follow the default theme", async ({ desktop }) => {

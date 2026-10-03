@@ -282,7 +282,7 @@ SQLite is the authority for durable records. The shell and each module that keep
 - Each owner provides ordered migrations for its database. The shell runs its own first, then each module's in dependency order.
 - No transaction spans two databases. A module reaches another module's data only through that module's published API. It keeps references to another module's records as that module's stable identities and handles a record that no longer exists.
 - Modules keep all durable data in the data directory: records in their database and referenced files in their own folder. They add no storage files or folders to projects.
-- A working folder, where the person's and the agents' files live, is not module data. A project's folder is wherever the person keeps it. A folder TeamRun creates for work outside any project, such as a conversation without one, lives in the data directory's `work` folder beside the `modules` folder, under a name that carries its owner's id (section 3). The owner creates and removes it, and any module may work in it as in a project folder.
+- A working folder, where the person's and the agents' files live, is not module data. A project's folder is wherever the person keeps it. A folder TeamRun creates for work outside any project, such as a conversation without one, lives in the data directory's `work` folder beside the `modules` folder, inside its owner's `work/<id>`, which a runtime part's context creates when the part first asks for it (section 3). The owner creates and removes what it puts there, and any module may work in it as in a project folder.
 - Records reference filesystem locations by stable, owner-defined identities mapped to paths per device. Moving the data directory preserves records; owners report missing paths for reconnection, never treating them as empty.
 - Removing a module from a build preserves its database and files; deleting them requires a separate user request.
 - A module's database is `modules/<id>/<id>.sqlite`, so a module never names another file that way. Its migration history lives in it, as the shell's lives in the shell's database. The runtime opens it before the module's runtime part activates and closes it when the part deactivates, at shutdown and before an update. A module that fails, whether its migration failed or its schema is newer, keeps its database as it was: nothing is reset or deleted.
@@ -295,7 +295,7 @@ SQLite is the authority for durable records. The shell and each module that keep
 | Drafts and other content the person wrote but did not send | The owning module's database, saved through its runtime part |
 | Credentials an external tool manages | That tool, accessed only through its supported interfaces |
 | Caches | Bounded and transient; never the durable source of truth |
-| Logs | The shell writes bounded, rotated logs for each process to the data directory's `logs` folder; modules log through the shell under their id, without secrets or unnecessary personal or project data |
+| Logs | The shell writes bounded, rotated logs for each process to the data directory's `logs` folder; modules log through the shell under their id, a runtime part to the runtime's log and a window part to the desktop's, without secrets or unnecessary personal or project data |
 
 Related writes and their durable change records commit atomically within one database. A change feed is not a guarantee of complete event delivery or a finished synchronization protocol.
 
@@ -320,7 +320,9 @@ Persisted tabs and layout restore the person's saved workspace without opening u
 
 ## 9. Active work, closing and shutdown
 
-A part reports the work it has in progress, such as a running reply or command, to its host. Before TeamRun quits, restarts for an update or stops for a newer build (section 6) while work is in progress, it asks the person whether to wait for the work or to stop it, and never interrupts it without that choice.
+A runtime part reports the work it has in progress, such as a running reply or command, through its context, and ends it when the work is done; stopping the work aborts it, and the part's work ends when the part deactivates. Window parts report none yet. The runtime lists the work with `shell.work` and announces each change with the event of the same name, whose reports carry a sequence so a client keeps the newest. Before TeamRun quits, restarts for an update or stops for a newer build (section 6) while work is in progress, it asks the person whether to wait for the work or to stop it, and never interrupts it without that choice.
+
+When the person closes the last window, the desktop reads the runtime's work, waiting at most two seconds; when it cannot read it in that time, the window closes as it would without work. Otherwise the window asks, keeping the list current: waiting closes it once no work is left, even work that began while waiting; stopping the work asks the runtime to stop the work and itself once the window has saved; cancelling keeps TeamRun open. A window that can no longer ask, or a runtime that goes away, lets closing go ahead.
 
 Closing TeamRun waits for each window to save its unsaved state. A window part that reports a failed save keeps TeamRun open with the error, while a window that is gone or does not answer before the timeout does not block closing. The window's own layout is the exception: a failed save of the layout is logged and closing proceeds, because losing the last layout change is minor.
 

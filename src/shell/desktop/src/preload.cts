@@ -65,5 +65,16 @@ contextBridge.exposeInMainWorld("teamrun", {
     const handler = (_event: IpcRendererEvent, id: number): void => listener(id);
     ipcRenderer.on("teamrun:notificationOpened", handler);
     return () => ipcRenderer.removeListener("teamrun:notificationOpened", handler);
+  },
+  onQuitQuestion(listener: (question: unknown) => void): () => void {
+    const handler = (_event: IpcRendererEvent, question: unknown): void => listener(question);
+    ipcRenderer.on("teamrun:quitQuestion", handler);
+    return () => ipcRenderer.removeListener("teamrun:quitQuestion", handler);
+  },
+  answerQuit(choice: string): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:quitAnswer", choice) as Promise<boolean>;
+  },
+  logModule(moduleId: string, message: string): void {
+    ipcRenderer.send("teamrun:moduleLog", moduleId, message);
   }
 });

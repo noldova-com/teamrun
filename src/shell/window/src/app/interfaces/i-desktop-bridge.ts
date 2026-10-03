@@ -26,4 +26,7 @@ export interface IDesktopBridge {
   copyText(text: string): Promise<boolean>;
   openLogFolder(): Promise<boolean>;
   onNotificationOpened(listener: (id: number) => void): () => void;
+  onQuitQuestion(listener: (question: unknown) => void): () => void;
+  answerQuit(choice: string): Promise<boolean>;
+  logModule(moduleId: string, message: string): void;
 }

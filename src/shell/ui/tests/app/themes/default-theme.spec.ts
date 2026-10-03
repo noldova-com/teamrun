@@ -58,6 +58,10 @@ describe("DefaultTheme", () => {
       ["menu-item-height", "1.625rem"],
       ["tooltip-width", "43.75rem"],
       ["popover-width", "27.5rem"],
+      ["dialog-width", "27.5rem"],
+      ["dialog-title-padding", "1.375rem 2rem 0.75rem 1.25rem"],
+      ["dialog-body-padding", "0 2rem 0 1.25rem"],
+      ["dialog-actions-padding", "1.25rem 0.5rem 0.5rem"],
       ["checkbox-size", "1.125rem"],
       ["toast-width", "22.5rem"]
     ];

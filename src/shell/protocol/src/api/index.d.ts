@@ -945,21 +945,30 @@ export declare class WorkReport {
   public readonly descriptions: readonly string[];
 
   /**
+   * How many times the runtime's work has begun or ended before this report.
+   * A client that hears reports both as answers and as `shell.work` events
+   * keeps the one with the higher sequence, since an event may be handled
+   * before an answer that preceded it.
+   */
+  public readonly sequence: number;
+
+  /**
    * Creates the report.
    *
    * @param descriptions The descriptions, possibly none, none whitespace
    * only. The report keeps its own copy.
+   * @param sequence The report's sequence, a whole number from 0; 0 by default.
    * @throws ArgumentException synchronously when a description is null,
-   * empty or whitespace only.
+   * empty or whitespace only, or the sequence is not a whole number from 0.
    *
    * @example
    * ```ts
    * import { WorkReport } from "@noldova/teamrun-shell-protocol";
    *
-   * export const report: WorkReport = new WorkReport(["Indexing the project"]);
+   * export const report: WorkReport = new WorkReport(["Indexing the project"], 3);
    * ```
    */
-  public constructor(descriptions: readonly string[]);
+  public constructor(descriptions: readonly string[], sequence?: number);
 
   /**
    * Reads the report from its wire form. Unknown fields are ignored.
@@ -967,22 +976,39 @@ export declare class WorkReport {
    * @param value The untrusted value.
    * @param path The path a failure reports; `$` by default.
    * @returns The report.
-   * @throws JsonException synchronously when `descriptions` is missing or
-   * holds a blank description.
+   * @throws JsonException synchronously when `descriptions` or `sequence` is
+   * missing or invalid.
    *
    * @example
    * ```ts
    * import { WorkReport } from "@noldova/teamrun-shell-protocol";
    *
-   * export const report: WorkReport = WorkReport.fromJson({ descriptions: [] });
+   * export const report: WorkReport = WorkReport.fromJson({ descriptions: [], sequence: 0 });
    * ```
    */
   public static fromJson(value: unknown, path?: string): WorkReport;
 
   /**
+   * Whether this report is newer than another.
+   *
+   * @param other The other report, or `null` when there is none.
+   * @returns Whether there is no other report or this one's sequence is higher.
+   *
+   * @example
+   * ```ts
+   * import { WorkReport } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function newest(current: WorkReport | null, heard: WorkReport): WorkReport | null {
+   *   return heard.isNewerThan(current) ? heard : current;
+   * }
+   * ```
+   */
+  public isNewerThan(other: WorkReport | null): boolean;
+
+  /**
    * Returns the wire form.
    *
-   * @returns The `descriptions` field.
+   * @returns The `descriptions` and `sequence` fields.
    *
    * @example
    * ```ts
@@ -1203,6 +1229,12 @@ export declare class ShellEvents {
    * is a `SettingChange` with the value now in effect for its key.
    */
   public static readonly settingsChanged: QualifiedName;
+
+  /**
+   * `shell.work`: work began or ended in the runtime; its payload is a
+   * `WorkReport` of all the work now in progress.
+   */
+  public static readonly work: QualifiedName;
 }
 
 /**

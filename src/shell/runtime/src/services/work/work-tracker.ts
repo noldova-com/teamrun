@@ -6,11 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { WorkReport } from "@noldova/teamrun-shell-protocol";
+
 import { WorkItem } from "../../models/work-item.js";
 
 export class WorkTracker {
-  private readonly items: Set<WorkItem> = new Set();
+  private readonly items: Map<WorkItem, string> = new Map();
   private readonly changed: () => void;
+  private sequence: number = 0;
 
   public constructor(changed: () => void) {
     this.changed = changed;
@@ -21,23 +24,43 @@ export class WorkTracker {
   }
 
   public get descriptions(): readonly string[] {
-    return [...this.items].map(t => t.description);
+    return [...this.items.keys()].map(t => t.description);
   }
 
-  public begin(description: string): WorkItem {
+  public get report(): WorkReport {
+    return new WorkReport(this.descriptions, this.sequence);
+  }
+
+  public begin(description: string, owner: string = ""): WorkItem {
     const item = new WorkItem(description, t => this.end(t));
-    this.items.add(item);
-    this.changed();
+    this.items.set(item, owner);
+    this.notify();
     return item;
   }
 
   public cancelAll(): void {
-    for (const item of this.items)
+    for (const item of this.items.keys())
       item.cancel();
+  }
+
+  public endOwnedBy(owner: string): void {
+    const owned = [...this.items].filter(([, t]) => t === owner).map(([t]) => t);
+    if (owned.length === 0)
+      return;
+    for (const item of owned) {
+      item.cancel();
+      this.items.delete(item);
+    }
+    this.notify();
   }
 
   private end(item: WorkItem): void {
     if (this.items.delete(item))
-      this.changed();
+      this.notify();
+  }
+
+  private notify(): void {
+    this.sequence++;
+    this.changed();
   }
 }

@@ -27,6 +27,14 @@ export class Resources {
   public static readonly tickIcon: string = "timer";
   public static readonly tickKey: string = "Mod+Alt+T";
   public static readonly tickStepSetting: string = "clock.tickStep";
+  public static readonly beginWorkCommand: string = "clock.beginWork";
+  public static readonly beginWorkTitle: string = "Begin work";
+  public static readonly finishWorkCommand: string = "clock.finishWork";
+  public static readonly finishWorkTitle: string = "Finish the work";
+  public static readonly workDescription: string = "Counting the ticks";
+  public static readonly workBegan: string = "The clock began counting.";
+  public static readonly stoppedMarker: string = "stopped";
+  public static readonly abortEvent: string = "abort";
   public static readonly failureMarker: string = "fail-activation";
   public static readonly failureMessage: string = "The clock fixture was asked to fail its activation.";
 }

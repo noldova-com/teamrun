@@ -7,6 +7,7 @@
  */
 
 import { mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import { inspect } from "node:util";
 
@@ -18,6 +19,7 @@ import { WindowStateKind } from "../../enums/window-state-kind.js";
 import type { IIdleParticipant } from "../../interfaces/idle-participant.js";
 import { CapabilityToken } from "../../models/capability-token.js";
 import type { Endpoint } from "../../models/endpoint.js";
+import type { EventChannel } from "../../models/event-channel.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
 import { Refusal } from "../../models/refusal.js";
 import { RuntimeBuild } from "../../models/runtime-build.js";
@@ -26,6 +28,7 @@ import type { RuntimeOptions } from "../../models/runtime-options.js";
 import { Resources } from "../../resources.js";
 import { SystemCommand } from "../commands/system-command.js";
 import { DataDirectoryInspector } from "../data-directory/data-directory-inspector.js";
+import { DiagnosticRedactor } from "../diagnostics/diagnostic-redactor.js";
 import { ShellDatabase } from "../database/shell-database.js";
 import { ShellMigrations } from "../database/shell-migrations.js";
 import { DiscoveryPublisher } from "../discovery/discovery-publisher.js";
@@ -78,6 +81,7 @@ export class RuntimeHost implements IIdleParticipant {
   private movingAside: Promise<void> | null = null;
   private isStopping: boolean = false;
   private readonly quietDevices: Set<string> = new Set();
+  private readonly workEvent: EventChannel;
 
   public readonly identity: BuildIdentity;
   public readonly work: WorkTracker;
@@ -100,7 +104,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.log = log;
     this.database = database;
     this.identity = RuntimeBuild.identity;
-    this.work = new WorkTracker(() => this.idle.check());
+    this.work = new WorkTracker(() => this.workChanged());
     this.server = new RuntimeServer(
       this.identity,
       this.token,
@@ -111,10 +115,13 @@ export class RuntimeHost implements IIdleParticipant {
     this.events = new EventRegistry(this.server);
     this.publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(platform, new SystemCommand(), environment));
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
+    this.workEvent = this.events.declare(ShellEvents.work);
     const notificationsChanged = this.events.declare(ShellEvents.notifications);
     this.notifications = new NotificationCenter(
       t => notificationsChanged.publish(new NotificationBroadcast(t.notifications, [...this.quietDevices].sort(), this.notifications.sequence).toJson()), () => new Date());
-    this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics);
+    this.modules = new ModuleHost(
+      declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics,
+      this.work, new DiagnosticRedactor(homedir()));
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
     this.methods.register(ShellMethods.work, new WorkMethod(this.work));
@@ -173,6 +180,11 @@ export class RuntimeHost implements IIdleParticipant {
 
   public waitForStopAsync(): Promise<string> {
     return this.stopped.promise;
+  }
+
+  private workChanged(): void {
+    this.workEvent.publish(this.work.report.toJson());
+    this.idle.check();
   }
 
   private async openAsync(platform: string): Promise<void> {

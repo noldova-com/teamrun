@@ -15,7 +15,7 @@ import type {
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey } from "@noldova/teamrun-shell-protocol";
+import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
 import type { DataDirectory, DiagnosticRedactor, IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
 
 /**
@@ -56,6 +56,251 @@ export declare enum StartupStateKind {
    * The desktop is connected to the runtime.
    */
   Ready = "Ready"
+}
+
+/**
+ * The person's answer when quitting while work is in progress, as the window sends it.
+ */
+export declare enum QuitChoice {
+  /**
+   * Wait for the work to finish, then quit.
+   */
+  Wait = "Wait",
+
+  /**
+   * Stop the work and quit.
+   */
+  Stop = "Stop",
+
+  /**
+   * Keep TeamRun open.
+   */
+  Cancel = "Cancel"
+}
+
+/**
+ * Whether closing the last window may go ahead.
+ */
+export declare enum QuitOutcome {
+  /**
+   * Close; no work is in progress, it finished, or it could not be read.
+   */
+  Quit = "Quit",
+
+  /**
+   * Close, then stop the runtime's work.
+   */
+  StopWork = "StopWork",
+
+  /**
+   * Keep the window open.
+   */
+  Stay = "Stay"
+}
+
+/**
+ * A window that can show the question about work in progress.
+ */
+export interface IQuitPrompt {
+  /**
+   * Shows the question, or takes it away.
+   *
+   * @param question The question, or `null` to take it away.
+   * @returns Whether the window can show it.
+   * @example
+   * ```ts
+   * import type { IQuitPrompt } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function dismiss(prompt: IQuitPrompt): boolean {
+   *   return prompt.show(null);
+   * }
+   * ```
+   */
+  show(question: QuitQuestion | null): boolean;
+}
+
+/**
+ * Decides whether closing a window may go ahead while work is in progress.
+ */
+export interface ICloseGuard {
+  /**
+   * Decides whether the window may close, asking the person when it is the last window and the runtime has work in
+   * progress.
+   *
+   * @param prompt The closing window.
+   * @returns A promise of the outcome.
+   * @example
+   * ```ts
+   * import { type ICloseGuard, type IQuitPrompt, QuitOutcome } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function mayCloseAsync(guard: ICloseGuard, prompt: IQuitPrompt): Promise<boolean> {
+   *   return await guard.confirmAsync(prompt) !== QuitOutcome.Stay;
+   * }
+   * ```
+   */
+  confirmAsync(prompt: IQuitPrompt): Promise<QuitOutcome>;
+
+  /**
+   * Stops the runtime's work, once the windows have saved, when the person chose to.
+   *
+   * @returns A promise that settles once the runtime has answered or could not be reached.
+   * @example
+   * ```ts
+   * import type { ICloseGuard } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function stopAsync(guard: ICloseGuard): Promise<void> {
+   *   return guard.stopWorkAsync();
+   * }
+   * ```
+   */
+  stopWorkAsync(): Promise<void>;
+}
+
+/**
+ * The question a window shows about work in progress when the person quits.
+ */
+export declare class QuitQuestion {
+  /**
+   * The work in progress, as the person reads it.
+   */
+  public readonly descriptions: readonly string[];
+
+  /**
+   * Whether the person chose to wait and TeamRun quits when the work finishes.
+   */
+  public readonly isWaiting: boolean;
+
+  /**
+   * Creates the question.
+   *
+   * @param descriptions The work in progress.
+   * @param isWaiting Whether the person chose to wait.
+   * @example
+   * ```ts
+   * import { QuitQuestion } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const question: QuitQuestion = new QuitQuestion(["Indexing the project"], false);
+   * ```
+   */
+  public constructor(descriptions: readonly string[], isWaiting: boolean);
+
+  /**
+   * Returns the form the window receives.
+   *
+   * @returns The `descriptions` and `isWaiting` fields.
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { QuitQuestion } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const json: JsonObject = new QuitQuestion([], true).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * Asks the person before the last window closes while the runtime has work in progress, and decides from the answer
+ * and the runtime's reports of its work. Reading the work is bounded once; when it fails or times out, closing goes
+ * ahead as it would without work. Reports carry a sequence, so a report heard before an older answer is handled still
+ * wins.
+ */
+export declare class QuitCoordinator implements ICloseGuard {
+  /**
+   * Creates the coordinator.
+   *
+   * @param isLast Whether a window is the last one open, so closing it quits.
+   * @param readWorkAsync Reads the runtime's work within its time limit, or `null` when it cannot.
+   * @param stopAsync Stops the runtime's work.
+   * @example
+   * ```ts
+   * import { WorkReport } from "@noldova/teamrun-shell-protocol";
+   * import { QuitCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const coordinator: QuitCoordinator = new QuitCoordinator(() => true, async () => new WorkReport([], 0), async () => undefined);
+   * ```
+   */
+  public constructor(isLast: (prompt: IQuitPrompt) => boolean, readWorkAsync: () => Promise<WorkReport | null>, stopAsync: () => Promise<void>);
+
+  /**
+   * See {@link ICloseGuard.confirmAsync}. While a question is open, the window shows the newest work; closing goes
+   * ahead once no work is left, the window can no longer show the question, or the runtime is gone. A second request
+   * while one is open stays.
+   *
+   * @param prompt The closing window.
+   * @returns A promise of the outcome.
+   * @example
+   * ```ts
+   * import type { IQuitPrompt, QuitCoordinator, QuitOutcome } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function confirmAsync(coordinator: QuitCoordinator, prompt: IQuitPrompt): Promise<QuitOutcome> {
+   *   return coordinator.confirmAsync(prompt);
+   * }
+   * ```
+   */
+  public confirmAsync(prompt: IQuitPrompt): Promise<QuitOutcome>;
+
+  /**
+   * See {@link ICloseGuard.stopWorkAsync}.
+   *
+   * @returns A promise that settles once the work was asked to stop.
+   * @example
+   * ```ts
+   * import type { QuitCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function stopAsync(coordinator: QuitCoordinator): Promise<void> {
+   *   return coordinator.stopWorkAsync();
+   * }
+   * ```
+   */
+  public stopWorkAsync(): Promise<void>;
+
+  /**
+   * Takes a `shell.work` event into account while a question is being prepared or is open.
+   *
+   * @param report The runtime's report.
+   * @example
+   * ```ts
+   * import { WorkReport } from "@noldova/teamrun-shell-protocol";
+   * import type { QuitCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function heard(coordinator: QuitCoordinator): void {
+   *   coordinator.receive(new WorkReport([], 4));
+   * }
+   * ```
+   */
+  public receive(report: WorkReport): void;
+
+  /**
+   * Takes the person's answer from the window that shows the question.
+   *
+   * @param prompt The window that answered.
+   * @param choice The answer, one of {@link QuitChoice}.
+   * @returns Whether the answer was taken: false for another window, no open question or an unknown answer.
+   * @example
+   * ```ts
+   * import { type IQuitPrompt, QuitChoice, type QuitCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function wait(coordinator: QuitCoordinator, prompt: IQuitPrompt): boolean {
+   *   return coordinator.answer(prompt, QuitChoice.Wait);
+   * }
+   * ```
+   */
+  public answer(prompt: IQuitPrompt, choice: unknown): boolean;
+
+  /**
+   * Lets an open question close and closing go ahead, because the runtime is gone.
+   *
+   * @example
+   * ```ts
+   * import type { QuitCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function disconnected(coordinator: QuitCoordinator): void {
+   *   coordinator.release();
+   * }
+   * ```
+   */
+  public release(): void;
 }
 
 /**
@@ -149,7 +394,11 @@ export interface IRuntimeConnection {
    *
    * @param method The method's qualified name.
    * @param payload The request's payload.
+   * @param timeout How long to wait for the response, in milliseconds; the
+   * connection's own limit by default.
    * @returns A promise of the response, successful or failed.
+   * @throws {ConnectionException} Rejected when no response arrives in time
+   * or the connection ends.
    * @example
    * ```ts
    * import { ShellMethods, WindowStateKey, type Response } from "@noldova/teamrun-shell-protocol";
@@ -160,7 +409,7 @@ export interface IRuntimeConnection {
    * }
    * ```
    */
-  callAsync(method: QualifiedName, payload: JsonValue): Promise<Response>;
+  callAsync(method: QualifiedName, payload: JsonValue, timeout?: number): Promise<Response>;
 
   /**
    * Closes the connection.
@@ -2054,9 +2303,9 @@ export declare class CloseCoordinator {
 
 /**
  * One open window: it shows once its page has painted and its startup has settled, or unpainted after a limit; asks
- * its page to save before closing; and keeps its bounds.
+ * its guard whether it may close, then its page to save; and keeps its bounds.
  */
-export declare class OpenWindow {
+export declare class OpenWindow implements IQuitPrompt {
   /**
    * The native window.
    */
@@ -2078,16 +2327,34 @@ export declare class OpenWindow {
    * @param window The window, created hidden.
    * @param displays The displays, for placing restored bounds.
    * @param log Records why a window was shown unpainted and saves that failed.
+   * @param guard Decides whether closing the window may go ahead while work is in progress, and stops the work when
+   * the person chose to.
    * @example
    * ```ts
-   * import { type IDesktopLog, type IDesktopWindow, type IDisplayHost, OpenWindow } from "@noldova/teamrun-shell-desktop";
+   * import { type ICloseGuard, type IDesktopLog, type IDesktopWindow, type IDisplayHost, OpenWindow } from "@noldova/teamrun-shell-desktop";
    *
-   * export function track(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog): OpenWindow {
-   *   return new OpenWindow(window, displays, log);
+   * export function track(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog, guard: ICloseGuard): OpenWindow {
+   *   return new OpenWindow(window, displays, log, guard);
    * }
    * ```
    */
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog);
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog, guard: ICloseGuard);
+
+  /**
+   * Shows the page the question about work in progress, or takes it away.
+   *
+   * @param question The question, or `null` to take it away.
+   * @returns Whether the page can show it: false when the window is gone or its page has crashed.
+   * @example
+   * ```ts
+   * import { type OpenWindow, QuitQuestion } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function ask(open: OpenWindow): boolean {
+   *   return open.show(new QuitQuestion(["Indexing the project"], false));
+   * }
+   * ```
+   */
+  public show(question: QuitQuestion | null): boolean;
 
   /**
    * Notes that the page has painted, and shows the window if its startup has settled.
