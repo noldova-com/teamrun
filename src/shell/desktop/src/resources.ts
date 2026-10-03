@@ -145,6 +145,7 @@ export class Resources {
   public static readonly payloadField: string = "payload";
   public static readonly replyNeedsOneOutcome: string = "A start reply carries either a process id or a failure.";
   public static readonly starterEnded: string = "The runtime starter ended before it started the runtime.";
+  public static readonly starterAcknowledgement: string = "acknowledged";
   public static readonly starterServiceName: string = `${Resources.applicationName} runtime starter`;
   public static readonly utilityEntryRelativePath: string = "../utility-entry.js";
   public static readonly ignoredStdio: "ignore" = "ignore";
