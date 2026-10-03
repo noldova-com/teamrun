@@ -31,6 +31,8 @@ export default class DesktopApplicationFixture {
   private static readonly DEVICE_FOLDER: string = "device";
   private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
   private static readonly PROCESS_EXIT_TIMEOUT: number = 30_000;
+  private static readonly REMOVE_RETRIES: number = 3;
+  private static readonly LOCKED_CODES: readonly string[] = ["EBUSY", "EPERM", "ENOTEMPTY"];
   private static readonly TRACE_FILE: string = "trace.zip";
   private static readonly WINDOWS_FILE: string = "windows.json";
   private static readonly DIAGNOSTIC_TIMEOUT: number = 10_000;
@@ -187,8 +189,21 @@ export default class DesktopApplicationFixture {
     if (isRunning)
       await this.closeAsync();
     await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
-    await this.waitForProcessesAsync();
-    await rm(this.root, { recursive: true, force: true, maxRetries: 10 });
+    await this.removeFolderAsync();
+  }
+
+  private async removeFolderAsync(): Promise<void> {
+    await this.failIfRunningAsync(await ProcessListFixture.waitForSignalsAsync([...this.recorded], DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT));
+    try {
+      await rm(this.root, { recursive: true, force: true });
+      return;
+    }
+    catch (error) {
+      if (!DesktopApplicationFixture.LOCKED_CODES.includes((error as NodeJS.ErrnoException).code ?? ""))
+        throw error;
+    }
+    await this.failIfRunningAsync(await ProcessListFixture.waitForExitAsync([...this.recorded], DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT));
+    await rm(this.root, { recursive: true, force: true, maxRetries: DesktopApplicationFixture.REMOVE_RETRIES });
   }
 
   private async recordProcessesAsync(): Promise<void> {
@@ -198,8 +213,7 @@ export default class DesktopApplicationFixture {
       this.recorded.add(processId);
   }
 
-  private async waitForProcessesAsync(): Promise<void> {
-    const running = await ProcessListFixture.waitForExitAsync([...this.recorded], DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT);
+  private async failIfRunningAsync(running: readonly number[]): Promise<void> {
     if (running.length === 0)
       return;
     const described = await ProcessListFixture.describeAsync(running);

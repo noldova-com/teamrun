@@ -72,7 +72,7 @@ test.describe("the harness's teardown", () => {
     }
   });
 
-  test("records every process TeamRun runs, its Electron processes and its runtime, and removes its folder once they have all exited", async ({ desktop }) => {
+  test("records every process TeamRun runs, its Electron processes and its runtime, and removes its folder once they have all ended", async ({ desktop }) => {
     const electron = await desktop.application.evaluate(({ app }) => app.getAppMetrics().map(t => t.pid));
     const runtime = await desktop.readRuntimeProcessIdAsync();
 
@@ -80,7 +80,7 @@ test.describe("the harness's teardown", () => {
 
     expect(runtime).toBeDefined();
     expect(desktop.recordedProcessIds).toEqual(expect.arrayContaining([...electron, runtime ?? 0]));
-    expect(await ProcessListFixture.readRunningAsync(desktop.recordedProcessIds)).toEqual([]);
+    expect(await ProcessListFixture.waitForSignalsAsync(desktop.recordedProcessIds, 0)).toEqual([]);
     expect(existsSync(desktop.root)).toBe(false);
   });
 });

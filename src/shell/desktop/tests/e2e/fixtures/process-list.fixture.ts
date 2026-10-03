@@ -13,6 +13,7 @@ import { promisify } from "node:util";
 export default class ProcessListFixture {
   private static readonly TIMEOUT: number = 30_000;
   private static readonly EXIT_INTERVAL: number = 250;
+  private static readonly SIGNAL_INTERVAL: number = 50;
   private static readonly WINDOWS_ROW: RegExp = /^"([^"]*)","(\d+)"/;
   private static readonly POSIX_ROW: RegExp = /^\s*(\d+)\s+(.+)$/;
   private static readonly ID_ROW: RegExp = /^\s*(\d+)\s*$/;
@@ -58,6 +59,26 @@ export default class ProcessListFixture {
       running = await ProcessListFixture.readRunningAsync(running);
     }
     return running;
+  }
+
+  public static async waitForSignalsAsync(processIds: readonly number[], limit: number): Promise<number[]> {
+    const deadline = Date.now() + limit;
+    let answering = processIds.filter(t => ProcessListFixture.answersSignal(t));
+    while (answering.length > 0 && Date.now() < deadline) {
+      await delay(ProcessListFixture.SIGNAL_INTERVAL);
+      answering = answering.filter(t => ProcessListFixture.answersSignal(t));
+    }
+    return answering;
+  }
+
+  private static answersSignal(processId: number): boolean {
+    try {
+      process.kill(processId, 0);
+      return true;
+    }
+    catch (error) {
+      return (error as NodeJS.ErrnoException).code === "EPERM";
+    }
   }
 
   public static async describeAsync(processIds: readonly number[]): Promise<string> {
