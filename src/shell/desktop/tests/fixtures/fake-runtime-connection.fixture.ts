@@ -19,16 +19,26 @@ export class FakeRuntimeConnection implements IRuntimeConnection {
   public onCall?: () => void;
   public rejection?: Error;
   public readonly answers: Map<string, Response> = new Map();
+  public readonly deferred: Map<string, () => Promise<Response>> = new Map();
+  public readonly timeouts: (number | undefined)[] = [];
 
-  public callAsync(method: QualifiedName, payload: JsonValue): Promise<Response> {
+  public callAsync(method: QualifiedName, payload: JsonValue, timeout?: number): Promise<Response> {
     this.calls.push(method.text);
     this.payloads.push(payload);
+    this.timeouts.push(timeout);
     this.onCall?.();
     if (!Object.isUndefined(this.rejection))
       return Promise.reject(this.rejection);
+    const later = this.deferred.get(method.text);
+    if (!Object.isUndefined(later))
+      return later();
     const answer = this.answers.get(method.text);
     if (!Object.isUndefined(answer))
       return Promise.resolve(answer);
+    if (method.text === ShellMethods.work.text)
+      return Promise.resolve(Response.success("r", { descriptions: [], sequence: 0 }));
+    if (method.text === ShellMethods.stop.text)
+      return Promise.resolve(Response.success("r", null));
     if (this.isFailing)
       return Promise.resolve(Response.failure("r", new Failure(FailureCode.Internal, "The database is busy.")));
     if (method.text === ShellMethods.writeWindowBounds.text || method.text === ShellMethods.writeWindowLayout.text) {

@@ -6,17 +6,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
-import { type IRuntimePart, type IRuntimePartContext, Migration, RuntimeCommand } from "@noldova/teamrun-shell-runtime";
+import { type IRuntimePart, type IRuntimePartContext, Migration, RuntimeCommand, type WorkItem } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "./resources.js";
 
 export class RuntimePart implements IRuntimePart {
   public readonly migrations: readonly Migration[] = [new Migration(Resources.readingsMigration, [Resources.createReadingsStatement])];
   private ticks: number = 0;
+  private readonly work: WorkItem[] = [];
 
   public async activateAsync(context: IRuntimePartContext): Promise<void> {
     if (existsSync(path.join(context.moduleFolder, Resources.failureMarker)))
@@ -50,6 +51,26 @@ export class RuntimePart implements IRuntimePart {
     }, false);
     context.registerCommand(tick);
     context.registerCommand(pause);
+    context.registerCommand(new RuntimeCommand(Resources.beginWorkCommand, Resources.beginWorkTitle, null, null, {
+      handleAsync: async () => {
+        const folder = await context.getWorkFolderAsync();
+        const work = context.beginWork(Resources.workDescription);
+        context.log.write(Resources.workBegan);
+        work.signal.addEventListener(Resources.abortEvent, () => {
+          writeFileSync(path.join(folder, Resources.stoppedMarker), "");
+          work[Symbol.dispose]();
+        }, { once: true });
+        this.work.push(work);
+        return null;
+      }
+    }));
+    context.registerCommand(new RuntimeCommand(Resources.finishWorkCommand, Resources.finishWorkTitle, null, null, {
+      handleAsync: async () => {
+        for (const work of this.work.splice(0))
+          work[Symbol.dispose]();
+        return null;
+      }
+    }));
     context.postNotification(new NotificationPost(
       QualifiedName.parse(Resources.alarmKind), null, Resources.alarmTitle, Resources.alarmText, NotificationSeverity.Info, null, [], null));
     context.postNotification(new NotificationPost(

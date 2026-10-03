@@ -12,10 +12,12 @@ import { nameof } from "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 
 import type { EditAction } from "../enums/edit-action";
+import type { QuitChoice } from "../enums/quit-choice";
 import { DesktopBridgeException } from "../exceptions/desktop-bridge.exception";
 import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
 import type { IDesktopBridge } from "../interfaces/i-desktop-bridge";
 import { BuildInfo } from "../models/build-info";
+import { QuitQuestion } from "../models/quit-question";
 import { StartupState } from "../models/startup-state";
 import type { WindowAppearance } from "../models/window-appearance";
 import { Resources } from "../../resources";
@@ -117,6 +119,18 @@ export class DesktopBridgeService {
     });
   }
 
+  public onQuitQuestion(listener: (question: QuitQuestion | null) => void): () => void {
+    return this.bridge.onQuitQuestion(t => listener(Object.isNull(t) ? null : QuitQuestion.fromJson(t)));
+  }
+
+  public answerQuitAsync(choice: QuitChoice): Promise<boolean> {
+    return this.bridge.answerQuit(choice);
+  }
+
+  public logModule(moduleId: string, message: string): void {
+    this.bridge.logModule(moduleId, message);
+  }
+
   private static readAnswer(value: unknown): JsonValue {
     const answer = JsonReader.fromValue(value);
     if (!answer.hasField(Resources.failureField))
@@ -153,6 +167,9 @@ export class DesktopBridgeService {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.copyText))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.openLogFolder))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.keepAppearance))) &&
-      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onNotificationOpened)));
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onNotificationOpened))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onQuitQuestion))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerQuit))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.logModule)));
   }
 }

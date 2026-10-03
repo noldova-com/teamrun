@@ -6,11 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { setImmediate } from "node:timers/promises";
+
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
-import { type IWindowStateStore, OpenWindow, WindowStateException, WindowStateUnavailableException } from "@noldova/teamrun-shell-desktop";
+import { type IWindowStateStore, OpenWindow, QuitOutcome, QuitQuestion, WindowStateException, WindowStateUnavailableException } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
+import { FakeCloseGuard } from "../fixtures/fake-close-guard.fixture.js";
 import { FakeDesktopLog } from "../fixtures/fake-desktop-log.fixture.js";
 import { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
 import { FakeDisplayHost } from "../fixtures/fake-display-host.fixture.js";
@@ -41,7 +44,7 @@ export class OpenWindowTests {
 
     for (const [index, failure] of failures.entries()) {
       const window = new FakeDesktopWindow({}, index + 1);
-      const open = new OpenWindow(window, new FakeDisplayHost(), log);
+      const open = new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard());
       await open.bounds.restoreAsync(new RefusingStore(failure));
       window.close();
       const request = window.webContents.sent.find(t => t[0] === "teamrun:closeRequest");
@@ -58,6 +61,73 @@ export class OpenWindowTests {
   }
 
   @TestMethod
+  public async staysOpenWithoutAskingItsPageToSaveWhileTheGuardKeepsIt(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
+    const guard = new FakeCloseGuard();
+    guard.outcome = QuitOutcome.Stay;
+    const open = new OpenWindow(window, new FakeDisplayHost(), new FakeDesktopLog(), guard);
+
+    window.close();
+    await Condition.waitAsync(() => guard.prompts.length === 1);
+    await setImmediate();
+    window.close();
+    await Condition.waitAsync(() => guard.prompts.length === 2);
+    await setImmediate();
+
+    Assert.isFalse(window.isGone);
+    Assert.areEqual<unknown>(open, guard.prompts[0]);
+    Assert.areEqual(0, window.webContents.sent.filter(t => t[0] === "teamrun:closeRequest").length);
+  }
+
+  @TestMethod
+  public async stopsTheWorkOnlyOnceItsPageHasSavedWhenThePersonChoseTo(): Promise<void> {
+    const guard = new FakeCloseGuard();
+    guard.outcome = QuitOutcome.StopWork;
+    const refusing = new FakeDesktopWindow({}, 1);
+    const saving = new FakeDesktopWindow({}, 2);
+    const refused = new OpenWindow(refusing, new FakeDisplayHost(), new FakeDesktopLog(), guard);
+    const saved = new OpenWindow(saving, new FakeDisplayHost(), new FakeDesktopLog(), guard);
+    let isGoneWhenStopped: boolean | null = null;
+    guard.onStop = () => isGoneWhenStopped = saving.isGone;
+
+    refusing.close();
+    await Condition.waitAsync(() => refusing.webContents.sent.some(t => t[0] === "teamrun:closeRequest"));
+    refused.coordinator.answer(refusing.webContents.sent.find(t => t[0] === "teamrun:closeRequest")?.[1], false);
+    saving.close();
+    await Condition.waitAsync(() => saving.webContents.sent.some(t => t[0] === "teamrun:closeRequest"));
+    const stopsBeforeSaving = guard.stops;
+    saved.coordinator.answer(saving.webContents.sent.find(t => t[0] === "teamrun:closeRequest")?.[1], true);
+    await Condition.waitAsync(() => saving.isGone);
+
+    Assert.isFalse(refusing.isGone);
+    Assert.areEqual(0, stopsBeforeSaving);
+    Assert.areEqual(1, guard.stops);
+    Assert.areEqual(false, isGoneWhenStopped);
+  }
+
+  @TestMethod
+  public showsTheQuestionToItsPageUnlessTheWindowIsGoneOrItsPageHasCrashed(): void {
+    const window = new FakeDesktopWindow({}, 1);
+    const crashed = new FakeDesktopWindow({}, 2);
+    crashed.webContents.crashed = true;
+    const gone = new FakeDesktopWindow({}, 3);
+    gone.destroy();
+    const open = new OpenWindow(window, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard());
+
+    const shown = open.show(new QuitQuestion(["Indexing the project"], true));
+    const cleared = open.show(null);
+    const onCrashed = new OpenWindow(crashed, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard()).show(null);
+    const onGone = new OpenWindow(gone, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard()).show(null);
+
+    Assert.isTrue(shown && cleared);
+    Assert.isFalse(onCrashed || onGone);
+    Assert.areEqual(
+      JSON.stringify([["teamrun:quitQuestion", { descriptions: ["Indexing the project"], isWaiting: true }], ["teamrun:quitQuestion", null]]),
+      JSON.stringify(window.webContents.sent));
+    Assert.areEqual(0, crashed.webContents.sent.length);
+  }
+
+  @TestMethod
   public async showsAWindowWhosePageNeverReportsItsPaintAfterTheLimitAndRecordsWhy(): Promise<void> {
     const pages = [{ loading: false, crashed: false }, { loading: true, crashed: false }, { loading: true, crashed: true }];
     const windows = pages.map((t, i) => {
@@ -69,7 +139,7 @@ export class OpenWindowTests {
     const log = new FakeDesktopLog();
 
     for (const window of windows)
-      new OpenWindow(window, new FakeDisplayHost(), log).showUnpaintedWithin(20);
+      new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard()).showUnpaintedWithin(20);
     const isShownEarly = windows.some(t => t.isShown);
     await Condition.waitAsync(() => windows.every(t => t.isShown) && log.lines.length === 3);
 
@@ -86,7 +156,7 @@ export class OpenWindowTests {
   public async showsAPaintedWindowOnceSettledAndNeverRecordsItAsUnpainted(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const log = new FakeDesktopLog();
-    const open = new OpenWindow(window, new FakeDisplayHost(), log);
+    const open = new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard());
     open.settleWithin(10);
     open.showUnpaintedWithin(30);
 
@@ -104,7 +174,7 @@ export class OpenWindowTests {
   public async showsNothingForAWindowClosedBeforeTheLimit(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const log = new FakeDesktopLog();
-    const open = new OpenWindow(window, new FakeDisplayHost(), log);
+    const open = new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard());
     open.settleWithin(10);
     open.showUnpaintedWithin(20);
 
@@ -118,7 +188,7 @@ export class OpenWindowTests {
 
   private static startFence(milliseconds: number): FakeDesktopWindow {
     const fence = new FakeDesktopWindow({}, 99);
-    new OpenWindow(fence, new FakeDisplayHost(), new FakeDesktopLog()).showUnpaintedWithin(milliseconds);
+    new OpenWindow(fence, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard()).showUnpaintedWithin(milliseconds);
     return fence;
   }
 }

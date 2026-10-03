@@ -8,6 +8,7 @@
 
 export { ButtonComponent } from "../app/components/button/button.component";
 export { CheckboxComponent } from "../app/components/checkbox/checkbox.component";
+export { DialogComponent } from "../app/components/dialog/dialog.component";
 export { DockingGuideComponent } from "../app/components/docking-guide/docking-guide.component";
 export { DockingPlateComponent } from "../app/components/docking-plate/docking-plate.component";
 export { IconButtonComponent } from "../app/components/icon-button/icon-button.component";
@@ -37,6 +38,7 @@ export { ThemeMode } from "../app/enums/theme-mode";
 export { ToolbarOrientation } from "../app/enums/toolbar-orientation";
 export { ThemeException } from "../app/exceptions/theme.exception";
 export { ColorToken } from "../app/models/color-token";
+export { DialogTokens } from "../app/models/dialog-tokens";
 export { OverlayAnchoring } from "../app/models/overlay-anchoring";
 export { OverlayBounds } from "../app/models/overlay-bounds";
 export { OverlayPlacement } from "../app/models/overlay-placement";
@@ -48,6 +50,7 @@ export { TitleSegment } from "../app/models/title-segment";
 export { Typography } from "../app/models/typography";
 export { AnchoredOverlay } from "../app/services/anchored-overlay";
 export { AppearanceService } from "../app/services/appearance.service";
+export { DialogService } from "../app/services/dialog.service";
 export { OverlayBoundsService } from "../app/services/overlay-bounds.service";
 export { ThemePainter } from "../app/services/theme-painter";
 export { TypographyPainter } from "../app/services/typography-painter";
