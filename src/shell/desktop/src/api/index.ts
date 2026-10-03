@@ -34,6 +34,7 @@ export type { IWindowStateStore } from "../interfaces/i-window-state-store.js";
 export { StartupStateKind } from "../enums/startup-state-kind.js";
 export { DeviceIdentityException } from "../exceptions/device-identity.exception.js";
 export { WindowStateException } from "../exceptions/window-state.exception.js";
+export { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
 export { DesktopSettings } from "../models/desktop-settings.js";
 export { DetachedStartReply } from "../models/detached-start-reply.js";
 export { DetachedStartRequest } from "../models/detached-start-request.js";

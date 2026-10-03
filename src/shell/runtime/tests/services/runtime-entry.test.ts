@@ -10,7 +10,6 @@ import { spawn } from "node:child_process";
 import { EventEmitter, once } from "node:events";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { PassThrough } from "node:stream";
-import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, CoverageEnvironment, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
@@ -61,12 +60,11 @@ export class RuntimeEntryTests {
   @TestMethod
   public stopsOnASignal(): Promise<void> {
     return RuntimeEntryTests.runAsync(async (fixture, signals, error) => {
-      let endedWith: number | null = null;
-      const running = RuntimeEntry.runAsync(["--data-dir", fixture.dataDirectory.root, "--idle-grace", "60000"], process.platform, process.env, signals, error)
-        .then(code => endedWith = code);
-      while (endedWith === null && await DiscoveryReader.readAsync(fixture.dataDirectory) === null)
-        await delay(10);
-      Assert.isNull(endedWith, `the runtime ended before it published discovery: ${RuntimeEntryTests.read(error)}`);
+      const listening = RuntimeEntryTests.waitForListenerAsync(signals, "uncaughtExceptionMonitor");
+      const running = RuntimeEntry.runAsync(["--data-dir", fixture.dataDirectory.root, "--idle-grace", "60000"], process.platform, process.env, signals, error);
+      const endedWith = await Promise.race([listening.then(() => null), running]);
+      Assert.isNull(endedWith, `the runtime ended before it started: ${RuntimeEntryTests.read(error)}`);
+      Assert.isNotNull(await DiscoveryReader.readAsync(fixture.dataDirectory));
       Assert.areEqual(1, signals.listenerCount("SIGTERM"));
       Assert.areEqual(1, signals.listenerCount("SIGINT"));
 
@@ -82,9 +80,9 @@ export class RuntimeEntryTests {
   @TestMethod
   public writesAnUncaughtFailureToTheLog(): Promise<void> {
     return RuntimeEntryTests.runAsync(async (fixture, signals, error) => {
+      const listening = RuntimeEntryTests.waitForListenerAsync(signals, "uncaughtExceptionMonitor");
       const running = RuntimeEntry.runAsync(["--data-dir", fixture.dataDirectory.root, "--idle-grace", "60000"], process.platform, process.env, signals, error);
-      while (await DiscoveryReader.readAsync(fixture.dataDirectory) === null)
-        await delay(10);
+      await listening;
 
       signals.emit("uncaughtExceptionMonitor", new Error("The module notes threw."));
       signals.emit("SIGTERM");
@@ -137,6 +135,18 @@ export class RuntimeEntryTests {
 
   private static read(stream: PassThrough): string {
     return String(stream.read() ?? "");
+  }
+
+  private static waitForListenerAsync(emitter: EventEmitter, event: string): Promise<void> {
+    return new Promise<void>(resolve => {
+      const added = (name: string | symbol): void => {
+        if (name !== event)
+          return;
+        emitter.off("newListener", added);
+        resolve();
+      };
+      emitter.on("newListener", added);
+    });
   }
 
   private static async runAsync(test: (fixture: RuntimeHostFixture, signals: EventEmitter, error: PassThrough) => Promise<void>): Promise<void> {

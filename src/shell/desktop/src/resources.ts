@@ -145,6 +145,7 @@ export class Resources {
   public static readonly payloadField: string = "payload";
   public static readonly replyNeedsOneOutcome: string = "A start reply carries either a process id or a failure.";
   public static readonly starterEnded: string = "The runtime starter ended before it started the runtime.";
+  public static readonly starterAcknowledgement: string = "acknowledged";
   public static readonly starterServiceName: string = `${Resources.applicationName} runtime starter`;
   public static readonly utilityEntryRelativePath: string = "../utility-entry.js";
   public static readonly ignoredStdio: "ignore" = "ignore";
@@ -177,6 +178,10 @@ export class Resources {
 
   public static formatBoundsUnsaved(reason: string): string {
     return `The window's bounds could not be saved: ${reason}`;
+  }
+
+  public static formatBoundsLostAtClose(reason: string): string {
+    return `The window closed without saving its bounds, because the runtime could not be reached; the last position is lost: ${reason}`;
   }
 
   public static formatBoundsNotRestored(reason: string): string {

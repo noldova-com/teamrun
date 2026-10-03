@@ -8,4 +8,5 @@
 
 export interface IParentPort {
   postMessage(message: unknown): void;
+  once(event: "message", listener: () => void): unknown;
 }

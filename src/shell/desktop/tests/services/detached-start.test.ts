@@ -49,6 +49,25 @@ export class DetachedStartTests {
   }
 
   @TestMethod
+  public async settlesOnlyOnceTheDesktopAcknowledgesTheReply(): Promise<void> {
+    const port = new FakeParentPort(false);
+    const starter: IProcessStarter = { startAsync: () => Promise.resolve(4120) };
+    let isSettled = false;
+
+    const answering = DetachedStart.runAsync(new DetachedStartRequest("node", [], "start.log", {}).toJson(), port, starter).then(() => {
+      isSettled = true;
+    });
+    await DetachedStartTests.waitForAsync(() => Promise.resolve(port.messages.length === 1));
+    await new Promise(resolve => setImmediate(resolve));
+
+    Assert.isFalse(isSettled);
+    Assert.areEqual(4120, DetachedStartReply.fromJson(port.messages[0]).processId);
+    port.acknowledge();
+    await answering;
+    Assert.isTrue(isSettled);
+  }
+
+  @TestMethod
   public async repliesWithTheFailure(): Promise<void> {
     const port = new FakeParentPort();
     const starter: IProcessStarter = { startAsync: () => Promise.reject(new LaunchException("The runtime could not be started with node.")) };

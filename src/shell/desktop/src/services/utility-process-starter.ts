@@ -32,7 +32,10 @@ export class UtilityProcessStarter implements IProcessStarter {
     const request = new DetachedStartRequest(executable, launchArguments, errorFile, environment);
     const starter = this.host.fork(this.entryPath, [], { stdio: Resources.ignoredStdio, serviceName: Resources.starterServiceName });
     return new Promise<number>((resolve, reject) => {
-      starter.once(Resources.messageEvent, (message: unknown) => Promise.try(() => DetachedStartReply.fromJson(message).requireProcessId()).then(resolve, reject));
+      starter.once(Resources.messageEvent, (message: unknown) => {
+        starter.postMessage(Resources.starterAcknowledgement);
+        Promise.try(() => DetachedStartReply.fromJson(message).requireProcessId()).then(resolve, reject);
+      });
       starter.once(Resources.exitEvent, () => reject(new LaunchException(Resources.starterEnded)));
       starter.postMessage(request.toJson());
     });
