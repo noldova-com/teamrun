@@ -110,12 +110,12 @@ describe("DockComponent", () => {
     expect(strip?.classList.contains("tr-dock-strip-vertical")).toBe(true);
     expect(strip?.dataset["dropGroup"]).toBe("1");
     expect(buttons.map(t => t.getAttribute("aria-label"))).toEqual(["files.tree", "files.search"]);
+    const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === "files.search");
     buttons[1]?.dispatchEvent(new PointerEvent("pointerenter"));
-    await vi.waitFor(() => expect(document.querySelector(".cdk-overlay-container tr-tooltip")?.textContent?.trim()).toBe("files.search"));
-    const tip = document.querySelector(".cdk-overlay-container tr-tooltip")?.getBoundingClientRect();
-    expect(tip?.left).toBeGreaterThan(buttons[1]?.getBoundingClientRect().right ?? Infinity);
+    await vi.waitFor(() => expect(tooltip()).toBeDefined());
+    expect(tooltip()?.getBoundingClientRect().left).toBeGreaterThan(strip?.getBoundingClientRect().right ?? Infinity);
     buttons[1]?.dispatchEvent(new PointerEvent("pointerleave"));
-    await vi.waitFor(() => expect(document.querySelector(".cdk-overlay-container tr-tooltip")).toBeNull());
+    await vi.waitFor(() => expect(tooltip()).toBeUndefined());
 
     buttons[1]?.click();
     fixture.detectChanges();
