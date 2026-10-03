@@ -157,12 +157,12 @@ class BuildAndTestTests {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      doubles.respond("sudo", "mdutil -a -i off", "");
+      doubles.respond("sudo", "mdutil -i off /System/Volumes/Data", "");
 
       const result = await doubles.runAsync(workflow.readStepScript("Stop Spotlight indexing"));
 
       assert.equal(result.status, 0, result.stderr);
-      assert.deepEqual(await doubles.readCallsAsync(), ["sudo mdutil -a -i off"]);
+      assert.deepEqual(await doubles.readCallsAsync(), ["sudo mdutil -i off /System/Volumes/Data"]);
       assert.ok(workflow.text.indexOf("Stop Spotlight indexing\n        if: runner.os == 'macOS'") < workflow.text.indexOf("Check out the revision"));
     });
 
