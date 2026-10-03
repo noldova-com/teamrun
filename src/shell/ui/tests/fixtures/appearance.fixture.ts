@@ -75,4 +75,14 @@ export class AppearanceFixture {
     const blue = Number.parseInt(color.slice(5, 7), 16);
     return `rgb(${red}, ${green}, ${blue})`;
   }
+
+  public static contrast(foreground: string, background: string): number {
+    const luminance = (color: string): number => {
+      const [red = 0, green = 0, blue = 0] = (color.match(/\d+(\.\d+)?/gu) ?? []).slice(0, 3).map(t => Number(t) / 255)
+        .map(t => t <= 0.03928 ? t / 12.92 : ((t + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    };
+    const [lighter = 0, darker = 0] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+    return (lighter + 0.05) / (darker + 0.05);
+  }
 }
