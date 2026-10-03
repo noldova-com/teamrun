@@ -147,6 +147,7 @@ export class DesktopApplication {
     session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     session.setPermissionCheckHandler(() => false);
     this.electron.ipcMain.on(Resources.readyChannel, (event, appearance) => this.show(event, appearance));
+    this.electron.ipcMain.on(Resources.appearanceChannel, (event, appearance) => this.repaint(event, appearance));
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
     this.electron.ipcMain.handle(Resources.readStartupChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.startup.current.toJson());
     this.electron.ipcMain.handle(Resources.startupActionChannel, (event, action) => Object.isNull(this.findTrusted(event)) ? false : this.startup.actAsync(action));
@@ -325,16 +326,20 @@ export class DesktopApplication {
   }
 
   private show(event: IIpcEvent, appearance: unknown): void {
+    this.repaint(event, appearance)?.markPainted();
+  }
+
+  private repaint(event: IIpcEvent, appearance: unknown): OpenWindow | null {
     const open = this.findTrusted(event);
     if (Object.isNull(open))
-      return;
+      return null;
     try {
       this.factory.paint(open.window, WindowAppearance.fromJson(appearance));
     }
     catch (error) {
       this.log.write(Resources.formatAppearanceRejected(String(error)));
     }
-    open.markPainted();
+    return open;
   }
 
   private answerClose(event: IIpcEvent, requestId: unknown, isSaved: unknown): boolean {

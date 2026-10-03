@@ -12,6 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import { JsonException } from "@noldova/teamrun-foundation-json";
 
 import { Resources } from "../../resources";
+import type { BottomDockSpan } from "../enums/bottom-dock-span";
 import type { DockSide } from "../enums/dock-side";
 import { StartupStateKind } from "../enums/startup-state-kind";
 import type { ILayoutStore } from "../interfaces/i-layout-store";
@@ -118,6 +119,10 @@ export class LayoutService {
 
   public resizeDock(side: DockSide, size: number | null): void {
     this.update(this.layoutState().resizeDock(side, size));
+  }
+
+  public setBottomSpan(span: BottomDockSpan): void {
+    this.update(this.layoutState().withBottomSpan(span));
   }
 
   public resizeSplit(handle: SplitHandle, leadingLength: number): void {

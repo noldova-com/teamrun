@@ -9,6 +9,7 @@
 import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
+import { BottomDockSpan } from "../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { PanelEdge } from "../../../src/app/enums/panel-edge";
 import { Layout } from "../../../src/app/models/layout/layout";
@@ -146,6 +147,17 @@ describe("LayoutService", () => {
     service.resizeSplit(handle, handle.leadingLength + 4);
 
     expect(service.geometry().handles[0]?.leadingLength).toBeCloseTo(handle.leadingLength + 4);
+  });
+
+  it("spans the bottom dock across the window or keeps it between the side docks", async () => {
+    await loadAsync(prepared().openView(LayoutFixture.terminal, LayoutFixture.createRegistry()));
+    service.setViewport(160, 80);
+    const full = service.geometry().dock(DockSide.Bottom).width;
+
+    service.setBottomSpan(BottomDockSpan.Between);
+
+    expect(service.layout().bottomSpan).toBe(BottomDockSpan.Between);
+    expect(service.geometry().dock(DockSide.Bottom).width).toBeLessThan(full);
   });
 
   it("resets the layout to the default and keeps open documents", async () => {

@@ -16,6 +16,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
+import { BottomDockSpan } from "../../enums/bottom-dock-span";
 import { DockSide } from "../../enums/dock-side";
 import { PanelEdge } from "../../enums/panel-edge";
 import type { Tab } from "../../models/layout/tab";
@@ -41,6 +42,7 @@ export class TabMenuComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly edges: readonly PanelEdge[] = Object.values(PanelEdge);
   protected readonly sides: readonly DockSide[] = Object.values(DockSide);
+  protected readonly spans: readonly BottomDockSpan[] = Object.values(BottomDockSpan);
   protected readonly group: Signal<TabGroup | null> = computed(() => this.layout.layout().groupOf(this.tab()));
   protected readonly destinations: Signal<readonly TabGroup[]> = computed(() => this.layout.layout().groups.filter(t => t.accepts(this.tab()) && !t.has(this.tab())));
 
@@ -57,6 +59,14 @@ export class TabMenuComponent {
 
   protected run(command: string): void {
     this.commands.run(command, this.target());
+  }
+
+  protected isSpan(span: BottomDockSpan): boolean {
+    return this.layout.layout().bottomSpan === span;
+  }
+
+  protected setBottomSpan(span: BottomDockSpan): void {
+    this.layout.setBottomSpan(span);
   }
 
   protected canSplit(): boolean {
