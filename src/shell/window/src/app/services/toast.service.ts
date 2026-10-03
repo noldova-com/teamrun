@@ -89,14 +89,14 @@ export class ToastService {
         this.close(id);
     for (const notification of [...notifications].reverse())
       if (notification.sequence > highest)
-        this.offer(notification, state.isDoNotDisturb);
+        this.offer(notification, state);
     for (const notification of notifications)
       if (this.visibleIds().includes(notification.id) && !this.timers.has(notification.id) && ToastService.closesByItself(notification))
         this.startTimer(notification.id, Resources.toastDuration);
   }
 
-  private offer(notification: Notification, isQuiet: boolean): void {
-    if (isQuiet || notification.isRead || !this.document.hasFocus() || this.visibleIds().includes(notification.id) || this.queue.includes(notification.id))
+  private offer(notification: Notification, state: NotificationState): void {
+    if (state.isDoNotDisturb || state.mutedModules.includes(notification.post.kind.owner) || notification.isRead || !this.document.hasFocus() || this.visibleIds().includes(notification.id) || this.queue.includes(notification.id))
       return;
     const now = Date.now();
     const last = this.lastByKind.get(notification.post.kind.text);

@@ -60,6 +60,7 @@ export class RuntimeApiTests {
       "NotificationCenter",
       "NotificationHandle",
       "NotificationPolicy",
+      "NotificationSettings",
       "OwnershipLock",
       "OwnershipReleasedException",
       "PackageRuntimePartLoader",

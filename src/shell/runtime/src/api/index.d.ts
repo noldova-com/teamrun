@@ -4553,6 +4553,68 @@ export declare class NotificationCenter {
 }
 
 /**
+ * The notification settings in effect: which devices have Do not disturb on and which modules are muted. Before the
+ * shell's database is open there are no settings, and it reports none.
+ */
+export declare class NotificationSettings {
+  /**
+   * Creates it over the settings.
+   *
+   * @param settings The shell's settings, or `null` while the shell's database is not open.
+   * @example
+   * ```ts
+   * import { NotificationSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const none: NotificationSettings = new NotificationSettings(null);
+   * ```
+   */
+  public constructor(settings: SettingsService | null);
+
+  /**
+   * The devices with `shell.doNotDisturb` stored as on, sorted.
+   */
+  public get quietDevices(): readonly string[];
+
+  /**
+   * The modules `shell.mutedModules` names, which still post into the list but show no toast or operating system
+   * notification.
+   */
+  public get mutedModules(): readonly string[];
+
+  /**
+   * Tells whether Do not disturb is on for a device.
+   *
+   * @param device The device's id.
+   * @returns `true` when the device's `shell.doNotDisturb` is on.
+   * @example
+   * ```ts
+   * import type { NotificationSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function shouldShow(settings: NotificationSettings, device: string): boolean {
+   *   return !settings.isQuiet(device);
+   * }
+   * ```
+   */
+  public isQuiet(device: string): boolean;
+
+  /**
+   * Tells whether a setting changes the notification state, so the runtime republishes it.
+   *
+   * @param name The setting's name.
+   * @returns `true` for `shell.doNotDisturb` and `shell.mutedModules`.
+   * @example
+   * ```ts
+   * import type { NotificationSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function affectsNotifications(settings: NotificationSettings): boolean {
+   *   return settings.isNotificationSetting("shell.mutedModules");
+   * }
+   * ```
+   */
+  public isNotificationSetting(name: string): boolean;
+}
+
+/**
  * The rules a notification follows before the runtime holds it.
  */
 export declare class NotificationPolicy {

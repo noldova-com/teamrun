@@ -38,12 +38,11 @@ import { ModulesMethod } from "../modules/modules-method.js";
 import { RunCommandMethod } from "../modules/run-command-method.js";
 import { ClearNotificationsMethod } from "../notifications/clear-notifications-method.js";
 import { DismissNotificationMethod } from "../notifications/dismiss-notification-method.js";
-import { DoNotDisturbStore } from "../notifications/do-not-disturb-store.js";
 import { MarkNotificationsReadMethod } from "../notifications/mark-notifications-read-method.js";
 import { NotificationCenter } from "../notifications/notification-center.js";
+import { NotificationSettings } from "../notifications/notification-settings.js";
 import { NotificationsMethod } from "../notifications/notifications-method.js";
 import { PostNotificationMethod } from "../notifications/post-notification-method.js";
-import { SetDoNotDisturbMethod } from "../notifications/set-do-not-disturb-method.js";
 import { UpdateNotificationMethod } from "../notifications/update-notification-method.js";
 import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
@@ -77,7 +76,7 @@ export class RuntimeHost implements IIdleParticipant {
   private discovery: RuntimeDiscovery | null = null;
   private movingAside: Promise<void> | null = null;
   private isStopping: boolean = false;
-  private readonly quietDevices: Set<string> = new Set();
+  private notificationSettings: NotificationSettings = new NotificationSettings(null);
 
   public readonly identity: BuildIdentity;
   public readonly work: WorkTracker;
@@ -115,7 +114,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.commands = new CommandRegistry(t => commandsChanged.publish(t.toJson()));
     const notificationsChanged = this.events.declare(ShellEvents.notifications);
     this.notifications = new NotificationCenter(
-      t => notificationsChanged.publish(new NotificationBroadcast(t.notifications, [...this.quietDevices].sort(), this.notifications.sequence).toJson()), () => new Date());
+      t => notificationsChanged.publish(new NotificationBroadcast(t.notifications, this.notificationSettings.quietDevices, this.notificationSettings.mutedModules, this.notifications.sequence).toJson()), () => new Date());
     this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics);
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
@@ -210,7 +209,12 @@ export class RuntimeHost implements IIdleParticipant {
     const store = new WindowStateStore(database);
     const settings = new SettingsService(database, [...ShellSettings.all, ...this.modules.settingDefinitions], this.log.diagnostics);
     const changed = this.events.declare(ShellEvents.settingsChanged);
-    settings.onChanged(t => changed.publish(t.toJson()));
+    this.notificationSettings = new NotificationSettings(settings);
+    settings.onChanged(t => {
+      changed.publish(t.toJson());
+      if (this.notificationSettings.isNotificationSetting(t.key.name.text))
+        this.notifications.republish();
+    });
     this.methods.register(ShellMethods.settings, new SettingsReadMethod(settings));
     this.methods.register(ShellMethods.setSetting, new SettingWriteMethod(settings));
     this.methods.register(ShellMethods.resetSetting, new SettingResetMethod(settings));
@@ -219,14 +223,12 @@ export class RuntimeHost implements IIdleParticipant {
     this.methods.register(ShellMethods.writeWindowBounds, new WindowStateWriteMethod(store, WindowStateKind.Bounds));
     this.methods.register(ShellMethods.readWindowLayout, new WindowStateReadMethod(store, WindowStateKind.Layout));
     this.methods.register(ShellMethods.writeWindowLayout, new WindowStateWriteMethod(store, WindowStateKind.Layout));
-    const quietDevices = new DoNotDisturbStore(database, this.quietDevices);
-    this.methods.register(ShellMethods.notifications, new NotificationsMethod(this.notifications, quietDevices));
+    this.methods.register(ShellMethods.notifications, new NotificationsMethod(this.notifications, this.notificationSettings));
     this.methods.register(ShellMethods.postNotification, new PostNotificationMethod(this.notifications, this.modules.notificationPolicy));
     this.methods.register(ShellMethods.updateNotification, new UpdateNotificationMethod(this.notifications, this.modules.notificationPolicy));
     this.methods.register(ShellMethods.dismissNotification, new DismissNotificationMethod(this.notifications));
     this.methods.register(ShellMethods.markNotificationsRead, new MarkNotificationsReadMethod(this.notifications));
     this.methods.register(ShellMethods.clearNotifications, new ClearNotificationsMethod(this.notifications));
-    this.methods.register(ShellMethods.setDoNotDisturb, new SetDoNotDisturbMethod(quietDevices, () => this.notifications.republish()));
     return settings;
   }
 

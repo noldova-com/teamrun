@@ -44,49 +44,6 @@
   line-height: inherit;
 }
 
-.tr-notifications-quiet {
-  display: flex;
-  align-items: center;
-  gap: var(--tr-space-2);
-}
-
-.tr-notifications-quiet-control {
-  position: relative;
-  display: inline-grid;
-  flex: none;
-}
-
-.tr-notifications-quiet-box {
-  box-sizing: border-box;
-  width: var(--tr-checkbox-size);
-  height: var(--tr-checkbox-size);
-  margin: 0;
-  border: var(--tr-border-width) solid var(--tr-checkbox-border);
-  border-radius: var(--tr-radius-small);
-  background-color: var(--tr-checkbox);
-  appearance: none;
-}
-
-.tr-notifications-quiet-box:focus-visible {
-  outline: var(--tr-border-width) solid var(--tr-accent);
-  outline-offset: var(--tr-border-width);
-}
-
-.tr-notifications-quiet-mark {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: var(--tr-text);
-  font-size: var(--tr-icon);
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.tr-notifications-quiet-box:checked + .tr-notifications-quiet-mark {
-  visibility: visible;
-}
-
 .tr-notifications-empty {
   margin: 0;
   color: var(--tr-text-muted);

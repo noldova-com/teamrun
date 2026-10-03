@@ -21,9 +21,9 @@ import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.f
 
 class FakeNotificationService {
   public readonly calls: string[] = [];
-  public readonly stateValue: WritableSignal<NotificationState> = signal(new NotificationState([], false, 0));
+  public readonly stateValue: WritableSignal<NotificationState> = signal(new NotificationState([], false, [], 0));
   public readonly state = this.stateValue.asReadonly();
-  public readonly firstRead = signal(new NotificationState([], false, 0)).asReadonly();
+  public readonly firstRead = signal(new NotificationState([], false, [], 0)).asReadonly();
   public failure: Error | null = null;
 
   public isAvailable(command: CommandRun): boolean {
@@ -60,7 +60,7 @@ describe("ToastsComponent", () => {
   async function renderAsync(...list: Notification[]): Promise<ComponentFixture<ToastsComponent>> {
     const fixture = TestBed.createComponent(ToastsComponent);
     await fixture.whenStable();
-    notifications.stateValue.set(new NotificationState(list, false, Math.max(0, ...list.map(t => t.sequence))));
+    notifications.stateValue.set(new NotificationState(list, false, [], Math.max(0, ...list.map(t => t.sequence))));
     await fixture.whenStable();
     return fixture;
   }
