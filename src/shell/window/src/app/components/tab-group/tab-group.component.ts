@@ -74,8 +74,7 @@ export class TabGroupComponent {
   });
   protected readonly header: Signal<Tab | null> = computed(() => {
     const side = this.frame().side;
-    const tabs = this.group().tabs;
-    return !Object.isNull(side) && side !== DockSide.Bottom && tabs.length === 1 && this.layout.iconSides().has(side) ? this.group().active : null;
+    return !Object.isNull(side) && side !== DockSide.Bottom && this.layout.iconSides().has(side) ? this.group().active : null;
   });
   protected readonly hideSide: Signal<DockSide | null> = computed(() => {
     const side = this.frame().side;
