@@ -470,15 +470,19 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public handsAPackagedBuildOverToANewerBuildAndQuits(): Promise<void> {
+  public handsAPackagedBuildOverToANewerBuildWithItsDataArgumentsAndQuits(): Promise<void> {
     const handover = new RuntimeHandoverException(new RuntimeHandover(new BuildIdentity("2.0.0", 1, "newer"), "/opt/teamrun/teamrun"));
-    const process = new FakeDesktopProcess("linux");
+    const process = new FakeDesktopProcess("linux", [
+      "/opt/teamrun/teamrun-1", "--data-dir=/work/data", "--inspect=9229", "--user-data-dir=/work/profile", "--device-dir=/work/device", "--data-dir-extra"
+    ]);
     const electron = new FakeElectron(true, true);
     DesktopApplicationTests.start(electron, process, new FakeRuntimeLauncher(handover));
     return electron.app.becomeReadyAsync().then(async () => {
       await setImmediate();
 
-      Assert.areEqual(JSON.stringify(["/opt/teamrun/teamrun"]), JSON.stringify(process.started));
+      Assert.areEqual(
+        JSON.stringify([["/opt/teamrun/teamrun", "--data-dir=/work/data", "--user-data-dir=/work/profile", "--device-dir=/work/device"]]),
+        JSON.stringify(process.started));
       Assert.areEqual("quit", electron.app.calls.at(-1));
     });
   }
