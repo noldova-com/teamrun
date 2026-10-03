@@ -1,0 +1,48 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--tr-pointer-target);
+  margin: 0;
+  padding: 0 var(--tr-space-2);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  outline: none;
+}
+
+:host::before {
+  position: absolute;
+  z-index: -1;
+  inset-block: calc((var(--tr-pointer-target) - var(--tr-icon-button)) / 2);
+  inset-inline: 0;
+  border-radius: var(--tr-radius-small);
+  content: "";
+}
+
+:host(:not([aria-disabled="true"]):is(:hover, [aria-expanded="true"]))::before {
+  background-color: var(--tr-toolbar-hover);
+}
+
+:host(:focus-visible)::before {
+  outline: var(--tr-border-width) solid var(--tr-accent);
+  outline-offset: calc(var(--tr-border-width) * -1);
+}
+
+:host([aria-disabled="true"]) {
+  opacity: 0.5;
+  cursor: default;
+}

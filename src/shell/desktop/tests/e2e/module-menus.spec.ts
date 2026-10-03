@@ -30,24 +30,22 @@ async function openNoteMenuAsync(window: Page, week: number): Promise<Locator> {
 }
 
 async function openBarMenuAsync(window: Page, title: string): Promise<Locator> {
-  await window.locator(".tr-window-row-menu").click();
-  await window.locator("tr-menu.tr-window-row-menu-list").getByRole("menuitem", { name: title }).click();
+  await window.locator("tr-menu-bar").getByRole("menuitem", { name: title }).click();
   const menu = window.locator(".cdk-overlay-container tr-menu.tr-place-menu").last();
   await expect(menu).toBeVisible();
   return menu;
 }
 
-test.describe("the menu bar on Windows and Linux", () => {
+test.describe("the inline menu bar on Windows and Linux", () => {
   test.skip(process.platform === "darwin", "macOS shows the menus in its own menu bar.");
 
-  test("the menu button opens File, View and the modules' menus, and runs their rows with their checked state", async ({ desktop }) => {
+  test("the menu bar opens File, Edit, View and the modules' menus, and runs their rows with their checked state", async ({ desktop }) => {
     const window = desktop.window;
     const list = window.locator(".tr-notes-list-items");
-    const button = window.locator(".tr-window-row-menu");
-    await expect(button).toHaveAttribute("aria-label", "Menu");
-    await button.click();
-    await expect(window.locator("tr-menu.tr-window-row-menu-list button[tr-menu-item]")).toHaveText([/File/, /Edit/, /View/, /Notes/]);
-    await window.keyboard.press("Escape");
+    const bar = window.locator("tr-menu-bar");
+    await expect(bar).toHaveAttribute("aria-label", "Menus");
+    await expect(bar.getByRole("menuitem")).toHaveText([/File/, /Edit/, /View/, /Notes/]);
+    await expect(window.locator(".tr-window-row-menu")).toHaveCount(0);
 
     const file = await openBarMenuAsync(window, "File");
     await expect(file.locator("button[tr-menu-item]")).toHaveText([/Close the tab/, /New note/, /New from template/]);
@@ -70,7 +68,7 @@ test.describe("the menu bar on Windows and Linux", () => {
 
     await expect(window.locator(".cdk-overlay-container tr-menu")).toHaveCount(0);
     await expect(list).toHaveCount(0);
-    await expect(button).toBeFocused();
+    await expect(bar.getByRole("menuitem", { name: "View" })).toBeFocused();
   });
 
   test("the Edit menu copies from one field and pastes into another, acting on the field that had focus and its selection", async ({ desktop }) => {
@@ -96,7 +94,7 @@ test.describe("the menu bar on Windows and Linux", () => {
 });
 
 test.describe("the menu bar on macOS", () => {
-  test.skip(process.platform !== "darwin", "Windows and Linux show the menus from the menu button.");
+  test.skip(process.platform !== "darwin", "Windows and Linux show the menus in the window row.");
 
   test("the native menu bar holds the shell's and the modules' menus, shows checked state and runs a chosen row in the window", async ({ desktop }) => {
     const window = desktop.window;

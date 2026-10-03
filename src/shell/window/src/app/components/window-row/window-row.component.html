@@ -1,5 +1,14 @@
-@if (!isMac && menuBar.shownPlaces().length > 0) {
-  <button type="button" tr-icon-button class="tr-window-row-menu" [icon]="resources.menuGlyph" [label]="resources.menuLabel" [trTooltip]="resources.menuLabel"
+@if (isBarShown()) {
+  <tr-menu-bar #bar class="tr-window-row-menu-bar" [class.tr-window-row-menu-bar-folded]="isFolded()" [label]="resources.menuBarLabel"
+    [attr.inert]="isFolded() ? '' : null" [attr.aria-hidden]="isFolded() ? true : null">
+    @for (place of menuBar.shownPlaces(); track place.name) {
+      <tr-place-menu #inline [place]="place.name" />
+      <button type="button" tr-menu-bar-item class="tr-window-row-menu-bar-item" [attr.data-place]="place.name" [label]="place.title" [trMenuTriggerFor]="inline.menu()"></button>
+    }
+  </tr-menu-bar>
+}
+@if (isButtonShown()) {
+  <button #menuButton type="button" tr-icon-button class="tr-window-row-menu" [icon]="resources.menuGlyph" [label]="resources.menuLabel" [trTooltip]="resources.menuLabel"
     [trTooltipSide]="below" [trMenuTriggerFor]="barMenu"></button>
   <ng-template #barMenu>
     <tr-menu class="tr-window-row-menu-list">
@@ -10,15 +19,23 @@
     </tr-menu>
   </ng-template>
 }
+<div #start class="tr-window-row-start">
+  @for (action of bars.startActions(); track action.name) {
+    <ng-container [ngTemplateOutlet]="actionButton" [ngTemplateOutletContext]="{ $implicit: action }" />
+  }
+</div>
 <div class="tr-window-row-breadcrumb"></div>
-<div class="tr-window-row-actions">
-  @for (action of bars.topBarActions(); track action.name) {
-    @let state = action.state();
-    @if (!state.isHidden) {
-      <button type="button" tr-icon-button class="tr-window-row-action" [attr.data-tr-item]="action.name" [icon]="state.icon" [label]="state.title"
-        [disabled]="!isAvailable(state.command)" [trTooltip]="state.title" [trTooltipSide]="below" (click)="run(state.command, state.commandArguments)"></button>
-    }
+<div #end class="tr-window-row-actions">
+  @for (action of bars.endActions(); track action.name) {
+    <ng-container [ngTemplateOutlet]="actionButton" [ngTemplateOutletContext]="{ $implicit: action }" />
   }
   <button type="button" tr-icon-button class="tr-window-row-search" [icon]="resources.showCommandsGlyph" [label]="resources.commandSearchLabel"
     [trTooltip]="resources.commandSearchLabel" [trTooltipSide]="below" (click)="run(resources.showCommandsCommand, null)"></button>
 </div>
+<ng-template #actionButton let-action>
+  @let state = action.state();
+  @if (!state.isHidden) {
+    <button type="button" tr-icon-button class="tr-window-row-action" [attr.data-tr-item]="action.name" [icon]="state.icon" [label]="state.title"
+      [disabled]="!isAvailable(state.command)" [trTooltip]="state.title" [trTooltipSide]="below" (click)="run(state.command, state.commandArguments)"></button>
+  }
+</ng-template>
