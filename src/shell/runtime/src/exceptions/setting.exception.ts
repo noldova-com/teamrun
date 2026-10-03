@@ -6,15 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Exception } from "@noldova/teamrun-foundation-exceptions";
-import type { FailureCode } from "@noldova/teamrun-shell-protocol";
+import { Failure, type FailureCode } from "@noldova/teamrun-shell-protocol";
 
-export class SettingException extends Exception {
-  public readonly code: FailureCode;
+import { MethodFailureException } from "./method-failure.exception.js";
 
+export class SettingException extends MethodFailureException {
   public constructor(message: string, code: FailureCode) {
-    super(message);
-
-    this.code = code;
+    super(new Failure(code, message));
   }
 }

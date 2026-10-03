@@ -1404,6 +1404,8 @@ export declare class SettingType {
    */
   public readonly maxLength: number | null;
 
+  private constructor();
+
   /**
    * Creates the type of a setting that is on or off.
    *

@@ -66,7 +66,7 @@ export class SettingsServiceTests {
     Assert.areEqual("true,false,false,false", [quiet("d1"), quiet("d2"), quiet("d3"), quiet(null)].map(t => settings.service.read(t)).join(","));
     Assert.areEqual("d1=true,d2=false", [...settings.service.readDevices(SettingsServiceTests.QUIET)].map(([device, value]) => `${device}=${String(value)}`).join(","));
     Assert.areEqual("true,false", [settings.service.snapshot("d1"), settings.service.snapshot(null)].map(t => t.entries.find(u => u.name.text === SettingsServiceTests.QUIET.text)?.value).join(","));
-    Assert.areEqual(`${FailureCode.InvalidParams},${FailureCode.InvalidParams}`, [missing.code, scoped.code].join(","));
+    Assert.areEqual(`${FailureCode.InvalidParams},${FailureCode.InvalidParams}`, [missing.failure.code, scoped.failure.code].join(","));
   }
 
   @TestMethod
@@ -126,7 +126,7 @@ export class SettingsServiceTests {
       Assert.throws(() => settings.service.reset(new SettingKey(SettingsServiceTests.SEND, new SettingScope(QualifiedName.parse("chat.thread"), "t1"))), SettingException)
     ];
 
-    Assert.areEqual("NotFound,NotFound,InvalidParams,InvalidParams", failures.map(t => t.code).join(","));
+    Assert.areEqual("NotFound,NotFound,InvalidParams,InvalidParams", failures.map(t => t.failure.code).join(","));
     Assert.areEqual("No setting named chat.speed is declared.", failures[0]?.message);
   }
 

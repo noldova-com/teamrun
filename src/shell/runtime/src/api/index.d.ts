@@ -1536,20 +1536,16 @@ export declare class RegistrationException extends Exception {
 
 /**
  * The exception thrown when a setting is not declared, does not accept a
- * value or a scope, or is a device setting given no device.
+ * value or a scope, or is a device setting given no device. A method that
+ * lets it escape answers with its failure.
  */
-export declare class SettingException extends Exception {
-  /**
-   * The failure code a client receives for it: `NotFound` for an unknown
-   * setting, `InvalidParams` otherwise.
-   */
-  public readonly code: FailureCode;
-
+export declare class SettingException extends MethodFailureException {
   /**
    * Creates the exception.
    *
    * @param message What went wrong.
-   * @param code The failure code a client receives for it.
+   * @param code The failure code a client receives: `NotFound` for an
+   * unknown setting, `InvalidParams` otherwise.
    * @example
    * ```ts
    * import { FailureCode } from "@noldova/teamrun-shell-protocol";
@@ -4008,7 +4004,7 @@ export declare class ModuleHost {
    * blocked.
    * @example
    * ```ts
-   * import type { ModuleHost } from "@noldova/teamrun-shell-runtime";
+   * import type { ModuleHost, SettingsService } from "@noldova/teamrun-shell-runtime";
    *
    * export async function startAsync(host: ModuleHost, settings: SettingsService): Promise<number> {
    *   await host.activateAsync(settings);

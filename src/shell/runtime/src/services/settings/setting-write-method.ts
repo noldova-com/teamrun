@@ -11,7 +11,6 @@ import { SettingValue } from "@noldova/teamrun-shell-protocol";
 
 import type { IMethodHandler } from "../../interfaces/method-handler.js";
 import type { RequestContext } from "../../models/request-context.js";
-import { SettingFailures } from "./setting-failures.js";
 import type { SettingsService } from "./settings-service.js";
 
 export class SettingWriteMethod implements IMethodHandler {
@@ -23,7 +22,7 @@ export class SettingWriteMethod implements IMethodHandler {
 
   public handleAsync(context: RequestContext): Promise<JsonValue> {
     const write = SettingValue.fromJson(context.payload);
-    SettingFailures.translate(() => this.settings.write(write));
+    this.settings.write(write);
     return Promise.resolve(null);
   }
 }

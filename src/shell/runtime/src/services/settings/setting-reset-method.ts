@@ -11,7 +11,6 @@ import { SettingKey } from "@noldova/teamrun-shell-protocol";
 
 import type { IMethodHandler } from "../../interfaces/method-handler.js";
 import type { RequestContext } from "../../models/request-context.js";
-import { SettingFailures } from "./setting-failures.js";
 import type { SettingsService } from "./settings-service.js";
 
 export class SettingResetMethod implements IMethodHandler {
@@ -23,7 +22,7 @@ export class SettingResetMethod implements IMethodHandler {
 
   public handleAsync(context: RequestContext): Promise<JsonValue> {
     const key = SettingKey.fromJson(context.payload);
-    SettingFailures.translate(() => this.settings.reset(key));
+    this.settings.reset(key);
     return Promise.resolve(null);
   }
 }

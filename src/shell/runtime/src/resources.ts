@@ -192,7 +192,7 @@ export class Resources {
   public static readonly defaultThemeId: string = "shell.default";
   public static readonly defaultThemeTitle: string = "Default";
   public static readonly themeTitle: string = "Theme";
-  public static readonly themeDescription: string = "The colors and look of TeamRun.";
+  public static readonly themeDescription: string = `The colors and look of ${Resources.productName}.`;
   public static readonly modeTitle: string = "Mode";
   public static readonly modeDescription: string = "Light, dark, or following the operating system.";
   public static readonly modeOptions: readonly (readonly [string, string])[] = [["Light", "Light"], ["Dark", "Dark"], ["System", "System"]];
