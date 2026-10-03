@@ -135,8 +135,6 @@ export class Resources {
   public static readonly boundsSaveDelay: number = 500;
   public static readonly connectingShowLimit: number = 2_000;
   public static readonly paintShowLimit: number = 10_000;
-  public static readonly logLineSeparator: string = "\n";
-  public static readonly logFileMode: number = 0o600;
   public static readonly reloadCrashLimit: number = 10_000;
   public static readonly rendererEndLimit: number = 5_000;
   public static readonly renderProcessGoneEvent: "render-process-gone" = "render-process-gone";

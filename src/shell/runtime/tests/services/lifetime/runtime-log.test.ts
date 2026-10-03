@@ -6,7 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
@@ -19,12 +20,13 @@ import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.
 export class RuntimeLogTests {
   private static readonly OWN: string = "start-11111111-2222-4333-8444-555555555555.log";
   private static readonly STALE: string = "start-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.log";
+  private static readonly STAMP: string = "2026-10-02T23:40:01.250Z";
 
   @TestMethod
   public keepsExactlyThePreviousRun(): Promise<void> {
     return RuntimeLogTests.runAsync(async lock => {
       for (const run of ["first", "second", "third"]) {
-        const log = await RuntimeLog.openAsync(lock, null);
+        const log = await RuntimeLogTests.openAsync(lock, null);
         log.writeLine(`${run} run`);
         await new Promise<void>(resolve => log.diagnostics.write(`${run} diagnostics\n`, () => resolve()));
         await log.closeAsync();
@@ -32,8 +34,50 @@ export class RuntimeLogTests {
 
       const directory = lock.dataDirectory;
       Assert.areEqual("runtime.log,runtime.previous.log", (await readdir(directory.logsFolder)).sort().join(","));
-      Assert.areEqual("third run\nthird diagnostics\n", await readFile(directory.runtimeLog, "utf8"));
-      Assert.areEqual("second run\nsecond diagnostics\n", await readFile(directory.previousRuntimeLog, "utf8"));
+      Assert.areEqual(`${RuntimeLogTests.STAMP} third run\n${RuntimeLogTests.STAMP} third diagnostics\n`, await readFile(directory.runtimeLog, "utf8"));
+      Assert.areEqual(`${RuntimeLogTests.STAMP} second run\n${RuntimeLogTests.STAMP} second diagnostics\n`, await readFile(directory.previousRuntimeLog, "utf8"));
+    });
+  }
+
+  @TestMethod
+  public stampsAndRedactsEveryRecordFromBothWriters(): Promise<void> {
+    return RuntimeLogTests.runAsync(async lock => {
+      const token = "a1B2_c3D4-".repeat(4);
+      const log = await RuntimeLogTests.openAsync(lock, null);
+
+      log.writeLine(`Saved in ${path.join(homedir(), "notes")} with ${token}.`);
+      await new Promise<void>(resolve => log.diagnostics.write(`The module notes: failed.\nin ${homedir()}\n`, () => resolve()));
+      await log.closeAsync();
+
+      Assert.areEqual(
+        `${RuntimeLogTests.STAMP} Saved in ${path.join("~", "notes")} with [redacted].\n${RuntimeLogTests.STAMP} The module notes: failed.\nin ~\n`,
+        await readFile(lock.dataDirectory.runtimeLog, "utf8"));
+    });
+  }
+
+  @TestMethod
+  public takesADiagnosticWithoutALineEndingAsOneRecord(): Promise<void> {
+    return RuntimeLogTests.runAsync(async lock => {
+      const log = await RuntimeLogTests.openAsync(lock, null);
+
+      await new Promise<void>(resolve => log.diagnostics.write("No ending", () => resolve()));
+      await new Promise<void>(resolve => log.diagnostics.write(Buffer.from("As bytes\n"), () => resolve()));
+      await log.closeAsync();
+
+      Assert.areEqual(`${RuntimeLogTests.STAMP} No ending\n${RuntimeLogTests.STAMP} As bytes\n`, await readFile(lock.dataDirectory.runtimeLog, "utf8"));
+    });
+  }
+
+  @TestMethod
+  public failsTheDiagnosticsStreamWhenTheLogCannotBeWritten(): Promise<void> {
+    return RuntimeLogTests.runAsync(async lock => {
+      const log = await RuntimeLogTests.openAsync(lock, null);
+      await rm(lock.dataDirectory.logsFolder, { recursive: true });
+      const failure = new Promise<unknown>(resolve => log.diagnostics.once("error", resolve));
+
+      log.diagnostics.write("Lost");
+
+      Assert.isTrue(await failure instanceof Error);
     });
   }
 
@@ -46,7 +90,7 @@ export class RuntimeLogTests {
       for (const name of [RuntimeLogTests.OWN, RuntimeLogTests.STALE, "start-other.log", "notes.txt"])
         await writeFile(path.join(folder, name), name);
 
-      const log = await RuntimeLog.openAsync(lock, RuntimeLogTests.OWN);
+      const log = await RuntimeLogTests.openAsync(lock, RuntimeLogTests.OWN);
       await log.closeAsync();
 
       Assert.areEqual(
@@ -62,25 +106,25 @@ export class RuntimeLogTests {
       await mkdir(path.join(directory.previousRuntimeLog, "held"), { recursive: true });
       await writeFile(directory.runtimeLog, "older run\n");
 
-      const log = await RuntimeLog.openAsync(lock, null);
+      const log = await RuntimeLogTests.openAsync(lock, null);
       log.writeLine("new run");
       await log.closeAsync();
 
-      Assert.areEqual("new run\n", await readFile(directory.runtimeLog, "utf8"));
+      Assert.areEqual(`${RuntimeLogTests.STAMP} new run\n`, await readFile(directory.runtimeLog, "utf8"));
     });
   }
 
   @TestMethod
   public writesNothingOnceClosed(): Promise<void> {
     return RuntimeLogTests.runAsync(async lock => {
-      const log = await RuntimeLog.openAsync(lock, null);
+      const log = await RuntimeLogTests.openAsync(lock, null);
       log.writeLine("before");
       await log.closeAsync();
 
       log.writeLine("after");
       await log.closeAsync();
 
-      Assert.areEqual("before\n", await readFile(lock.dataDirectory.runtimeLog, "utf8"));
+      Assert.areEqual(`${RuntimeLogTests.STAMP} before\n`, await readFile(lock.dataDirectory.runtimeLog, "utf8"));
     });
   }
 
@@ -91,6 +135,10 @@ export class RuntimeLogTests {
 
       await Assert.throwsAsync(() => RuntimeLog.openAsync(lock, null), OwnershipReleasedException);
     });
+  }
+
+  private static openAsync(lock: OwnershipLock, ownStartLogName: string | null): Promise<RuntimeLog> {
+    return RuntimeLog.openAsync(lock, ownStartLogName, () => new Date(RuntimeLogTests.STAMP));
   }
 
   private static async runAsync(test: (lock: OwnershipLock) => Promise<void>): Promise<void> {
