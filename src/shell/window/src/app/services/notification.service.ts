@@ -33,7 +33,9 @@ export class NotificationService {
 
   public constructor() {
     const host = inject(WindowPartHostService);
-    inject(DestroyRef).onDestroy(this.bridge.onEvent((name, payload) => this.receive(name, payload)));
+    const destroyRef = inject(DestroyRef);
+    destroyRef.onDestroy(this.bridge.onEvent((name, payload) => this.receive(name, payload)));
+    destroyRef.onDestroy(this.bridge.onNotificationOpened(t => this.open(t)));
     effect(() => {
       const generation = host.generation();
       if (generation > this.generationRead) {
@@ -65,6 +67,12 @@ export class NotificationService {
 
   public setDoNotDisturb(isOn: boolean): void {
     this.send(ShellMethods.setDoNotDisturb.text, { [Resources.isOnField]: isOn });
+  }
+
+  private open(id: number): void {
+    const command = this.stateValue().notifications.find(t => t.id === id)?.post.open ?? null;
+    if (!Object.isNull(command) && this.isAvailable(command))
+      this.runAsync(command).catch((error: unknown) => this.errors.handleError(error));
   }
 
   private load(): void {

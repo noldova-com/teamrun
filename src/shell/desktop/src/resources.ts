@@ -34,6 +34,7 @@ export class Resources {
   public static readonly readBuildChannel: string = "teamrun:readBuild";
   public static readonly copyTextChannel: string = "teamrun:copyText";
   public static readonly openLogFolderChannel: string = "teamrun:openLogFolder";
+  public static readonly notificationOpenedChannel: string = "teamrun:notificationOpened";
   public static readonly copyTextLimit: number = 65536;
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
@@ -103,6 +104,8 @@ export class Resources {
   public static readonly willAttachWebviewEvent: "will-attach-webview" = "will-attach-webview";
   public static readonly closeEvent: "close" = "close";
   public static readonly closedEvent: "closed" = "closed";
+  public static readonly clickEvent: "click" = "click";
+  public static readonly failedEvent: "failed" = "failed";
   public static readonly secondInstanceEvent: "second-instance" = "second-instance";
   public static readonly windowAllClosedEvent: "window-all-closed" = "window-all-closed";
   public static readonly activateEvent: "activate" = "activate";
@@ -119,6 +122,7 @@ export class Resources {
   public static readonly reloadCrashLimit: number = 10_000;
   public static readonly rendererEndLimit: number = 5_000;
   public static readonly renderProcessGoneEvent: "render-process-gone" = "render-process-gone";
+  public static readonly didStartLoadingEvent: "did-start-loading" = "did-start-loading";
   public static readonly unresponsiveEvent: "unresponsive" = "unresponsive";
   public static readonly responsiveEvent: "responsive" = "responsive";
   public static readonly cleanExitReason: string = "clean-exit";
@@ -207,6 +211,14 @@ export class Resources {
 
   public static formatLogFolderNotOpened(reason: string): string {
     return `The log folder could not be opened: ${reason}`;
+  }
+
+  public static formatSystemNotificationFailed(reason: string): string {
+    return `The operating system did not show a notification: ${reason}`;
+  }
+
+  public static formatNotificationsNotRead(reason: string): string {
+    return `The notifications could not be read, so the operating system shows none until the window reads them again: ${reason}`;
   }
 
   public static formatDeviceUnavailable(reason: string): string {

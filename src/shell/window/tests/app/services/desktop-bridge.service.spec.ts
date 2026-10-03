@@ -33,7 +33,8 @@ describe("DesktopBridgeService", () => {
     onEvent: (): (() => void) => () => undefined,
     readBuild: (): Promise<unknown> => Promise.resolve(null),
     copyText: (): Promise<boolean> => Promise.resolve(true),
-    openLogFolder: (): Promise<boolean> => Promise.resolve(true)
+    openLogFolder: (): Promise<boolean> => Promise.resolve(true),
+    onNotificationOpened: (): (() => void) => () => undefined
   };
   const incomplete: readonly [string, unknown][] = [
     ["nothing", undefined],
@@ -51,7 +52,8 @@ describe("DesktopBridgeService", () => {
     ["no onEvent", { ...complete, onEvent: null }],
     ["no readBuild", { ...complete, readBuild: null }],
     ["no copyText", { ...complete, copyText: null }],
-    ["no openLogFolder", { ...complete, openLogFolder: null }]
+    ["no openLogFolder", { ...complete, openLogFolder: null }],
+    ["no onNotificationOpened", { ...complete, onNotificationOpened: null }]
   ];
 
   for (const [name, value] of incomplete)
@@ -190,6 +192,19 @@ describe("DesktopBridgeService", () => {
 
     expect([build.productVersion, build.fingerprint, isCopied, isOpened]).toEqual(["1.2.3", "abc123", true, true]);
     expect([bridge.copied, bridge.logFolderOpens]).toEqual([["clock: Failed"], 1]);
+  });
+
+  it("passes on the id of a notification opened from the operating system and ignores one that is not a whole number", () => {
+    const bridge = DesktopBridgeFixture.install();
+    const opened: number[] = [];
+
+    const stop = TestBed.inject(DesktopBridgeService).onNotificationOpened(t => opened.push(t));
+    bridge.publishNotificationOpened(2);
+    bridge.publishNotificationOpened(1.5);
+    stop();
+    bridge.publishNotificationOpened(3);
+
+    expect(opened).toEqual([2]);
   });
 
   it("refuses a kept layout that is not a JSON object", async () => {
