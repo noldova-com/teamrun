@@ -8,6 +8,7 @@
 
 import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
 
+import type { FakeDockHost } from "./fake-dock-host.fixture.js";
 import { ListenerRegistry } from "./listener-registry.fixture.js";
 
 export class FakeApplicationHost implements IApplicationHost {
@@ -17,6 +18,7 @@ export class FakeApplicationHost implements IApplicationHost {
 
   public readonly calls: string[] = [];
   public readonly isPackaged: boolean;
+  public dock: FakeDockHost | undefined = undefined;
 
   public constructor(hasLock: boolean, isPackaged: boolean) {
     this.hasLock = hasLock;
@@ -29,6 +31,10 @@ export class FakeApplicationHost implements IApplicationHost {
 
   public setAppUserModelId(id: string): void {
     this.calls.push(`setAppUserModelId ${id}`);
+  }
+
+  public setDesktopName(name: string): void {
+    this.calls.push(`setDesktopName ${name}`);
   }
 
   public setPath(name: string, path: string): void {

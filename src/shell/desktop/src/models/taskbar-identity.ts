@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 import type { AppDetailsOptions } from "electron";
@@ -33,9 +34,10 @@ export class TaskbarIdentity {
     const kept = argv.flatMap(t => Resources.relaunchArgumentPrefixes
       .filter(prefix => t.startsWith(prefix))
       .map(prefix => `${prefix}${path.resolve(workingDirectory, t.slice(prefix.length))}`));
-    const parts = isPackaged ? [executablePath, ...kept] : [executablePath, path.resolve(workingDirectory, mainScript), ...kept];
+    const script = path.resolve(workingDirectory, mainScript);
+    const parts = isPackaged ? [executablePath, ...kept] : [executablePath, script, ...kept];
     return new TaskbarIdentity(
-      isPackaged ? Resources.appUserModelId : Resources.developmentAppUserModelId,
+      isPackaged ? Resources.appUserModelId : TaskbarIdentity.identifyCheckout(path.resolve(path.dirname(script), ...Resources.repositoryRootSegments)),
       executablePath,
       parts.map(t => `"${t}"`).join(" "));
   }
@@ -48,5 +50,10 @@ export class TaskbarIdentity {
       relaunchCommand: this.relaunchCommand,
       relaunchDisplayName: Resources.applicationName
     };
+  }
+
+  private static identifyCheckout(checkout: string): string {
+    const hash = createHash(Resources.checkoutHashAlgorithm).update(checkout).digest(Resources.hexEncoding).slice(0, Resources.checkoutHashLength);
+    return `${Resources.developmentAppUserModelId}${Resources.idSeparator}${hash}`;
   }
 }

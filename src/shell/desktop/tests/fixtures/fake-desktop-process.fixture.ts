@@ -20,6 +20,7 @@ export class FakeDesktopProcess implements IDesktopProcess {
   public readonly execPath: string = "/electron/electron";
   public readonly homeFolder: string;
   public readonly workingDirectory: string = path.resolve("work");
+  public isDefaultApp: boolean = false;
   public readonly errorOutput: Writable = new Writable({
     write: (chunk: Buffer, _encoding, callback): void => {
       this.written += chunk.toString();

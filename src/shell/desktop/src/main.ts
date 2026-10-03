@@ -9,7 +9,7 @@
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 
-import { BrowserWindow, Menu, app, clipboard, dialog, ipcMain, screen, session, shell, utilityProcess } from "electron";
+import { BrowserWindow, Menu, app, clipboard, dialog, ipcMain, nativeTheme, screen, session, shell, utilityProcess } from "electron";
 
 import "@noldova/teamrun-foundation-core";
 import { ChildProcessStarter, RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
@@ -30,6 +30,7 @@ DesktopApplication.start(
     menu: Menu,
     clipboard,
     shell,
+    theme: nativeTheme,
     dialog: {
       showMessageBox: (windowId, options) => {
         const window = BrowserWindow.fromId(windowId);
@@ -45,6 +46,7 @@ DesktopApplication.start(
     execPath: process.execPath,
     homeFolder: homedir(),
     workingDirectory: process.cwd(),
+    isDefaultApp: process.defaultApp === true,
     errorOutput: process.stderr,
     startDetached: t => spawn(t, [], { detached: true, stdio: "ignore" }).unref(),
     endProcess: t => process.kill(t, "SIGKILL")

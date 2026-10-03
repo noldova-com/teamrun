@@ -12,7 +12,9 @@ import { rm } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
+import DesktopException from "../desktop/desktop.exception.ts";
 import UiWorkflows from "../ui-workflows.ts";
+import PreparedBinaryFixture from "./fixtures/prepared-binary.fixture.ts";
 import ProcessRunnerFixture from "./fixtures/process-runner.fixture.ts";
 import RepositoryFixture from "./fixtures/repository.fixture.ts";
 import SourceTreeFixture from "./fixtures/source-tree.fixture.ts";
@@ -26,12 +28,12 @@ class UiWorkflowsTests {
   ];
 
   public static register(): void {
-    test("the UI workflows build the no-modules, without-clock and full test builds in that order, then type-check and run", async t => {
+    test("the UI workflows build the no-modules, without-clock and full test builds in that order, prepare the development app, then type-check and run", async t => {
       const repository = await UiWorkflowsTests.createRepositoryAsync(t);
       const runner = new ProcessRunnerFixture();
       const output = new TextOutputFixture();
 
-      const exitCode = await new UiWorkflows(repository.directory, runner, output).runAsync(["docking.spec.ts"]);
+      const exitCode = await new UiWorkflows(repository.directory, runner, output, new PreparedBinaryFixture()).runAsync(["docking.spec.ts"]);
 
       assert.equal(exitCode, 0);
       assert.deepEqual(UiWorkflowsTests.describeRuns(runner, repository.directory), [
@@ -39,25 +41,25 @@ class UiWorkflowsTests {
         "node_modules/typescript/bin/tsc --project src/shell/desktop/tests/e2e",
         "node_modules/playwright/cli.js test --config src/shell/desktop/tests/e2e/playwright.config.ts docking.spec.ts"
       ]);
-      assert.equal(output.text, "Building the test build and its variants for the UI workflows...\n");
+      assert.equal(output.text, "Building the test build and its variants for the UI workflows...\nprepared\n");
     });
 
     test("unchanged inputs and outputs rebuild nothing", async t => {
       const repository = await UiWorkflowsTests.createRepositoryAsync(t);
-      await new UiWorkflows(repository.directory, new ProcessRunnerFixture(), new TextOutputFixture()).runAsync([]);
+      await new UiWorkflows(repository.directory, new ProcessRunnerFixture(), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
       const runner = new ProcessRunnerFixture();
       const output = new TextOutputFixture();
 
-      const exitCode = await new UiWorkflows(repository.directory, runner, output).runAsync([]);
+      const exitCode = await new UiWorkflows(repository.directory, runner, output, new PreparedBinaryFixture()).runAsync([]);
 
       assert.equal(exitCode, 0);
       assert.deepEqual(UiWorkflowsTests.describeRuns(runner, repository.directory).map(t => t.split(" ")[0]), ["node_modules/typescript/bin/tsc", "node_modules/playwright/cli.js"]);
-      assert.equal(output.text, "The builds of the UI workflows are current.\n");
+      assert.equal(output.text, "The builds of the UI workflows are current.\nprepared\n");
     });
 
     test("a changed source file or a missing or changed output rebuilds all three", async t => {
       const repository = await UiWorkflowsTests.createRepositoryAsync(t);
-      await new UiWorkflows(repository.directory, new ProcessRunnerFixture(), new TextOutputFixture()).runAsync([]);
+      await new UiWorkflows(repository.directory, new ProcessRunnerFixture(), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
       const changes: readonly [string, () => Promise<void>][] = [
         ["a source file", () => repository.writeAsync({ "src/shell/source.ts": "export const changed = 2;\n" })],
         ["a missing variant", () => rm(path.join(repository.directory, "_build", "variants", "without-clock"), { recursive: true })],
@@ -73,11 +75,11 @@ class UiWorkflowsTests {
           return run(...runArguments);
         };
 
-        await new UiWorkflows(repository.directory, runner, new TextOutputFixture()).runAsync([]);
+        await new UiWorkflows(repository.directory, runner, new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
 
         assert.equal(runner.runs.length, 5, reason);
         const unchanged = new ProcessRunnerFixture();
-        await new UiWorkflows(repository.directory, unchanged, new TextOutputFixture()).runAsync([]);
+        await new UiWorkflows(repository.directory, unchanged, new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
         assert.equal(unchanged.runs.length, 2, reason);
       }
     });
@@ -86,9 +88,9 @@ class UiWorkflowsTests {
       const repository = await UiWorkflowsTests.createRepositoryAsync(t);
       const runner = new ProcessRunnerFixture([0, 1]);
 
-      const exitCode = await new UiWorkflows(repository.directory, runner, new TextOutputFixture()).runAsync([]);
+      const exitCode = await new UiWorkflows(repository.directory, runner, new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
       const nextRunner = new ProcessRunnerFixture([null]);
-      const nextExitCode = await new UiWorkflows(repository.directory, nextRunner, new TextOutputFixture()).runAsync([]);
+      const nextExitCode = await new UiWorkflows(repository.directory, nextRunner, new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
 
       assert.equal(exitCode, 1);
       assert.equal(runner.runs.length, 2);
@@ -96,13 +98,22 @@ class UiWorkflowsTests {
       assert.equal(nextRunner.runs.length, 1);
     });
 
+    test("a development app that cannot be prepared stops the command before the type check", async t => {
+      const repository = await UiWorkflowsTests.createRepositoryAsync(t);
+      const runner = new ProcessRunnerFixture();
+      const failure = new DesktopException("The development binary is supported on Windows, macOS and Linux only.");
+
+      await assert.rejects(new UiWorkflows(repository.directory, runner, new TextOutputFixture(), new PreparedBinaryFixture(failure)).runAsync([]), failure);
+      assert.equal(runner.runs.length, 3);
+    });
+
     test("a failed type check or UI run fails the command with its exit code", async t => {
       const repository = await UiWorkflowsTests.createRepositoryAsync(t);
 
-      const typeCheck = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, 0, 0, 2]), new TextOutputFixture()).runAsync([]);
-      const unknown = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([null]), new TextOutputFixture()).runAsync([]);
-      const workflows = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, 0]), new TextOutputFixture()).runAsync([]);
-      const killed = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, null]), new TextOutputFixture()).runAsync([]);
+      const typeCheck = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, 0, 0, 2]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
+      const unknown = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([null]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
+      const workflows = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, 0]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
+      const killed = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, null]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
 
       assert.equal(typeCheck, 2);
       assert.equal(unknown, 1);

@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -19,6 +20,7 @@ import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShel
 import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
 
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
+import { FakeDockHost } from "../fixtures/fake-dock-host.fixture.js";
 import type { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
 import { FakeDeviceIdentity } from "../fixtures/fake-device-identity.fixture.js";
 import { FakeElectron } from "../fixtures/fake-electron.fixture.js";
@@ -28,6 +30,10 @@ import { FakeRuntimeLauncher } from "../fixtures/fake-runtime-launcher.fixture.j
 @TestClass
 export class DesktopApplicationTests {
   private static readonly MODULE_URL: string = pathToFileURL("/teamrun/node_modules/@noldova/teamrun-shell-desktop/main.js").href;
+  private static readonly DEVELOPMENT_APP_ID: string = `com.noldova.teamrun.development.${createHash("sha256")
+    .update(resolve(dirname(fileURLToPath(DesktopApplicationTests.MODULE_URL)), "..", "..", ".."))
+    .digest("hex")
+    .slice(0, 8)}`;
   private static readonly APPEARANCE: object = { background: "#181818", titleBar: "#181818", titleBarText: "#CCCCCC", titleBarHeight: 35 };
 
   @TestMethod
@@ -37,7 +43,7 @@ export class DesktopApplicationTests {
     DesktopApplicationTests.start(electron, new FakeDesktopProcess("win32"));
 
     Assert.areEqual(
-      JSON.stringify(["setName TeamRun", "setAppUserModelId com.noldova.teamrun.development", "requestSingleInstanceLock", "enableSandbox"]),
+      JSON.stringify(["setName TeamRun", `setAppUserModelId ${DesktopApplicationTests.DEVELOPMENT_APP_ID}`, "requestSingleInstanceLock", "enableSandbox"]),
       JSON.stringify(electron.app.calls.slice(1)));
     Assert.areEqual(0, electron.windows.length);
   }
@@ -49,7 +55,8 @@ export class DesktopApplicationTests {
     DesktopApplicationTests.start(electron, new FakeDesktopProcess("win32"));
     await electron.app.becomeReadyAsync();
 
-    Assert.areEqual(JSON.stringify(["setName TeamRun", "setAppUserModelId com.noldova.teamrun.development", "requestSingleInstanceLock", "quit"]), JSON.stringify(electron.app.calls.slice(1)));
+    Assert.areEqual(
+      JSON.stringify(["setName TeamRun", `setAppUserModelId ${DesktopApplicationTests.DEVELOPMENT_APP_ID}`, "requestSingleInstanceLock", "quit"]), JSON.stringify(electron.app.calls.slice(1)));
     Assert.areEqual(0, electron.app.count("window-all-closed"));
     Assert.areEqual(0, electron.windows.length);
   }
@@ -77,9 +84,65 @@ export class DesktopApplicationTests {
       Assert.areEqual(`"/electron/electron" "--data-dir=${data}"`, DesktopApplicationTests.firstWindow(packaged).appDetails?.relaunchCommand);
       Assert.areEqual("com.noldova.teamrun", DesktopApplicationTests.firstWindow(packaged).appDetails?.appId);
       Assert.areEqual(`"/electron/electron" "${mainScript}"`, DesktopApplicationTests.firstWindow(development).appDetails?.relaunchCommand);
-      Assert.areEqual("com.noldova.teamrun.development", DesktopApplicationTests.firstWindow(development).appDetails?.appId);
+      Assert.areEqual(DesktopApplicationTests.DEVELOPMENT_APP_ID, DesktopApplicationTests.firstWindow(development).appDetails?.appId);
       Assert.isNull(DesktopApplicationTests.firstWindow(linux).appDetails);
     });
+  }
+
+  @TestMethod
+  @TestData("win32", false, true, "icon-dark.ico", "icon-light.ico")
+  @TestData("win32", true, false, "icon-light.ico", "icon-dark.ico")
+  @TestData("linux", false, true, "icon-light-512.png", "icon-dark-512.png")
+  @TestData("linux", true, false, "icon-dark-512.png", "icon-light-512.png")
+  public async givesItsWindowTheIconForTheSystemsAppearanceAndFollowsItsChanges(
+    platform: string, isDark: boolean, isTaskbarDark: boolean, first: string, changed: string): Promise<void> {
+    const electron = new FakeElectron();
+    electron.theme.change(isDark, isTaskbarDark);
+    await DesktopApplicationTests.startReadyAsync(platform, undefined, electron);
+    const window = DesktopApplicationTests.firstWindow(electron);
+
+    electron.theme.change(!isDark, !isTaskbarDark);
+
+    Assert.areEqual(DesktopApplicationTests.icon(first), window.options.icon);
+    Assert.areEqual(JSON.stringify([DesktopApplicationTests.icon(changed)]), JSON.stringify(window.icons));
+    Assert.areEqual(platform === "win32" ? DesktopApplicationTests.icon(changed) : undefined, window.appDetails?.appIconPath);
+  }
+
+  @TestMethod
+  public async describesItsWindowToTheWindowsTaskbarWithTheIconForTheTaskbarsAppearance(): Promise<void> {
+    const electron = new FakeElectron();
+    electron.theme.change(false, true);
+
+    await DesktopApplicationTests.startReadyAsync("win32", undefined, electron);
+
+    Assert.areEqual(DesktopApplicationTests.icon("icon-dark.ico"), DesktopApplicationTests.firstWindow(electron).appDetails?.appIconPath);
+  }
+
+  @TestMethod
+  public async stopsFollowingTheAppearanceForAClosedWindow(): Promise<void> {
+    const electron = await DesktopApplicationTests.startReadyAsync("linux");
+    const window = DesktopApplicationTests.firstWindow(electron);
+
+    window.destroy();
+    electron.theme.change(true, true);
+
+    Assert.areEqual(0, electron.theme.count("updated"));
+    Assert.areEqual(0, window.icons.length);
+  }
+
+  @TestMethod
+  public async showsItsIconInTheDockOnMacOSAndLeavesTheWindowsIconToTheBundle(): Promise<void> {
+    const electron = new FakeElectron();
+    const dock = new FakeDockHost();
+    electron.app.dock = dock;
+
+    await DesktopApplicationTests.startReadyAsync("darwin", undefined, electron);
+    electron.theme.change(true, true);
+
+    Assert.areEqual(JSON.stringify([DesktopApplicationTests.icon("icon-dock-512.png")]), JSON.stringify(dock.icons));
+    Assert.isUndefined(DesktopApplicationTests.firstWindow(electron).options.icon);
+    Assert.areEqual(0, DesktopApplicationTests.firstWindow(electron).icons.length);
+    Assert.areEqual(0, electron.theme.count("updated"));
   }
 
   @TestMethod
@@ -285,7 +348,7 @@ export class DesktopApplicationTests {
         webSecurity: true,
         spellcheck: false
       }
-    }), JSON.stringify({ ...window.options, titleBarOverlay: undefined, trafficLightPosition: undefined }));
+    }), JSON.stringify({ ...window.options, titleBarOverlay: undefined, trafficLightPosition: undefined, icon: undefined }));
     Assert.areEqual(settings.windowIndexPath, window.loadedFile);
     Assert.isFalse(window.isShown);
     verifyTitleBar(window);
@@ -325,6 +388,38 @@ export class DesktopApplicationTests {
     const [settings] = DesktopApplicationTests.start(electron, process);
 
     Assert.areEqual(DataDirectoryLocator.locate(true, {}, process.homeFolder, "/unused").root, settings?.dataDirectory.root);
+  }
+
+  @TestMethod
+  public treatsAStartThroughElectronsDefaultAppAsDevelopmentWhateverItsProgramIsCalled(): Promise<void> {
+    const handover = new RuntimeHandoverException(new RuntimeHandover(new BuildIdentity("2.0.0", 1, "newer"), "/opt/teamrun/teamrun"));
+    const electron = new FakeElectron(true, true);
+    const process = new FakeDesktopProcess("win32");
+    process.isDefaultApp = true;
+
+    const [settings] = DesktopApplicationTests.start(electron, process, new FakeRuntimeLauncher(handover));
+    return electron.app.becomeReadyAsync().then(async () => {
+      await setImmediate();
+
+      Assert.areEqual(DataDirectoryLocator.locate(false, {}, process.homeFolder, DesktopApplicationTests.checkoutRoot()).root, settings?.dataDirectory.root);
+      Assert.areEqual(DesktopApplicationTests.DEVELOPMENT_APP_ID, DesktopApplicationTests.firstWindow(electron).appDetails?.appId);
+      Assert.areEqual(0, process.started.length);
+      Assert.areEqual(JSON.stringify({ kind: "NewerBuild", details: ["2.0.0"] }), JSON.stringify(electron.ipcMain.invoke("teamrun:readStartup", DesktopApplicationTests.trustedEvent("win32"))));
+    });
+  }
+
+  @TestMethod
+  @TestData("linux", true)
+  @TestData("linux", false)
+  @TestData("win32", true)
+  @TestData("darwin", false)
+  public namesItsDesktopFileOnLinuxAfterItsAppId(platform: string, isPackaged: boolean): void {
+    const electron = new FakeElectron(true, isPackaged);
+    const appId = isPackaged ? "com.noldova.teamrun" : DesktopApplicationTests.DEVELOPMENT_APP_ID;
+
+    DesktopApplicationTests.start(electron, new FakeDesktopProcess(platform));
+
+    Assert.areEqual(platform === "linux" ? `setDesktopName ${appId}.desktop` : "", electron.app.calls.filter(t => t.startsWith("setDesktopName")).join(","));
   }
 
   @TestMethod
@@ -872,6 +967,14 @@ export class DesktopApplicationTests {
 
   private static closeRequests(window: FakeDesktopWindow): unknown[][] {
     return window.webContents.sent.filter(t => t[0] === "teamrun:closeRequest");
+  }
+
+  private static checkoutRoot(): string {
+    return join(dirname(fileURLToPath(DesktopApplicationTests.MODULE_URL)), "..", "..", "..");
+  }
+
+  private static icon(name: string): string {
+    return join(DesktopApplicationTests.checkoutRoot(), "assets", "icons", name);
   }
 
   private static firstWindow(electron: FakeElectron): FakeDesktopWindow {

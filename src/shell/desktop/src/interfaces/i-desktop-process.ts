@@ -15,6 +15,7 @@ export interface IDesktopProcess {
   readonly execPath: string;
   readonly homeFolder: string;
   readonly workingDirectory: string;
+  readonly isDefaultApp: boolean;
   readonly errorOutput: Writable;
 
   startDetached(executablePath: string): void;

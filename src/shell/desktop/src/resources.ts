@@ -13,6 +13,10 @@ export class Resources {
   public static readonly applicationName: string = "__PRODUCT_NAME__";
   public static readonly appUserModelId: string = "__APPLICATION_ID__";
   public static readonly developmentAppUserModelId: string = "__DEVELOPMENT_APPLICATION_ID__";
+  public static readonly checkoutHashAlgorithm: string = "sha256";
+  public static readonly hexEncoding: "hex" = "hex";
+  public static readonly checkoutHashLength: number = 8;
+  public static readonly idSeparator: string = ".";
   public static readonly relaunchArgumentPrefixes: readonly string[] = ["--data-dir=", "--user-data-dir=", "--device-dir="];
   public static readonly appIdParameter: string = "appId";
   public static readonly iconPathParameter: string = "iconPath";
@@ -68,6 +72,15 @@ export class Resources {
   public static readonly hashPrefix: string = "#";
   public static readonly queryPrefix: string = "?";
   public static readonly macPlatform: string = "darwin";
+  public static readonly linuxPlatform: string = "linux";
+  public static readonly desktopFileSuffix: string = ".desktop";
+  public static readonly iconFolderSegments: readonly string[] = "__ICONS_FOLDER__".split(Resources.folderSeparator);
+  public static readonly windowsDarkIcon: string = "icon-dark.ico";
+  public static readonly windowsLightIcon: string = "icon-light.ico";
+  public static readonly darkIcon: string = "icon-dark-512.png";
+  public static readonly lightIcon: string = "icon-light-512.png";
+  public static readonly dockIcon: string = "icon-dock-512.png";
+  public static readonly themeUpdatedEvent: "updated" = "updated";
   public static readonly preloadFileName: string = "preload.cjs";
   public static readonly repositoryRootSegments: readonly string[] = ["..", "..", ".."];
   public static readonly windowIndexSegments: readonly string[] = ["_build", "window", "browser", "index.html"];
