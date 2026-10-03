@@ -6,34 +6,43 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal, computed, inject, signal } from "@angular/core";
+import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal, computed, effect, inject, signal, untracked } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { type CommandRun, NotificationReference, NotificationState, ShellEvents, ShellMethods } from "@noldova/teamrun-shell-protocol";
 
-import type { StartupState } from "../models/startup-state";
 import { Resources } from "../../resources";
 import { CommandService } from "./command.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
+import { WindowPartHostService } from "./window-part-host.service";
 
 @Injectable({ providedIn: "root" })
 export class NotificationService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly commands: CommandService = inject(CommandService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
-  private readonly stateValue: WritableSignal<NotificationState> = signal(new NotificationState([], false));
-  private isReady: boolean = false;
+  private readonly stateValue: WritableSignal<NotificationState> = signal(new NotificationState([], false, 0));
+  private readonly firstReadValue: WritableSignal<NotificationState | null> = signal(null);
   private eventsSeen: number = 0;
+  private generationRead: number = 0;
 
   public readonly state: Signal<NotificationState> = this.stateValue.asReadonly();
+  public readonly firstRead: Signal<NotificationState | null> = this.firstReadValue.asReadonly();
   public readonly unreadCount: Signal<number> = computed(() => this.stateValue().notifications.filter(t => !t.isRead).length);
 
   public constructor() {
+    const host = inject(WindowPartHostService);
     const destroyRef = inject(DestroyRef);
-    destroyRef.onDestroy(this.bridge.onStartup(t => this.follow(t)));
     destroyRef.onDestroy(this.bridge.onEvent((name, payload) => this.receive(name, payload)));
-    void this.bridge.readStartupAsync().then(t => this.follow(t));
+    destroyRef.onDestroy(this.bridge.onNotificationOpened(t => this.open(t)));
+    effect(() => {
+      const generation = host.generation();
+      if (generation > this.generationRead) {
+        this.generationRead = generation;
+        untracked(() => this.load());
+      }
+    });
   }
 
   public isAvailable(command: CommandRun): boolean {
@@ -60,17 +69,19 @@ export class NotificationService {
     this.send(ShellMethods.setDoNotDisturb.text, { [Resources.isOnField]: isOn });
   }
 
-  private follow(state: StartupState): void {
-    if (state.isReady && !this.isReady)
-      this.load();
-    this.isReady = state.isReady;
+  private open(id: number): void {
+    const command = this.stateValue().notifications.find(t => t.id === id)?.post.open ?? null;
+    if (!Object.isNull(command) && this.isAvailable(command))
+      this.runAsync(command).catch((error: unknown) => this.errors.handleError(error));
   }
 
   private load(): void {
     const seen = this.eventsSeen;
     this.bridge.requestAsync(ShellMethods.notifications.text, {}).then(t => {
+      const state = NotificationState.fromJson(t);
       if (this.eventsSeen === seen)
-        this.stateValue.set(NotificationState.fromJson(t));
+        this.stateValue.set(state);
+      this.firstReadValue.set(state);
     }).catch((error: unknown) => this.errors.handleError(error));
   }
 

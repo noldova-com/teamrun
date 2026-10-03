@@ -8,6 +8,7 @@
 
 import type { Locator, Page } from "@playwright/test";
 
+import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 const colors = {
@@ -22,6 +23,13 @@ function bell(window: Page): Locator {
 
 function list(window: Page): Locator {
   return window.locator(".tr-notifications-popover");
+}
+
+async function tickWithFocusAsync(desktop: DesktopApplicationFixture): Promise<void> {
+  await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.focus());
+  await expect.poll(() => desktop.window.evaluate(() => document.hasFocus())).toBe(true);
+  await desktop.window.locator("[data-fixture-content=notes-list]").click();
+  await desktop.window.keyboard.press("ControlOrMeta+Alt+KeyT");
 }
 
 test.describe("notifications", () => {
@@ -75,6 +83,58 @@ test.describe("notifications", () => {
     await expect(bell(desktop.window)).toHaveAttribute("aria-label", /, Do not disturb$/);
     await bell(desktop.window).click();
     await expect(list(desktop.window).getByRole("checkbox", { name: "Do not disturb" })).toBeChecked();
+  });
+
+  test("a notification posted after startup shows a toast that is announced and closes by itself, and Do not disturb holds the next one back", async ({ desktop }) => {
+    const window = desktop.window;
+    const toasts = window.locator(".tr-toast");
+    await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
+    await expect(toasts).toHaveCount(0);
+
+    await tickWithFocusAsync(desktop);
+    await expect(toasts.locator(".tr-toast-title")).toHaveText(["The clock ticked"]);
+    await expect(toasts.locator(".tr-toast-text")).toHaveText(["Ticks: 1"]);
+    await expect(window.locator(".tr-toasts-announcement[aria-live=polite]")).toHaveText("The clock ticked. Ticks: 1");
+    await expect(toasts).toHaveCount(0, { timeout: 15_000 });
+    await bell(window).click();
+    await list(window).getByRole("checkbox", { name: "Do not disturb" }).check();
+    await window.keyboard.press("Escape");
+    await tickWithFocusAsync(desktop);
+
+    await expect(bell(window).locator(".tr-notifications-count")).toHaveText("1");
+    await expect(toasts).toHaveCount(0);
+  });
+
+  test("a toast follows the component table, never takes focus and closes on Close", async ({ desktop }) => {
+    await desktop.useSuiteViewportAsync();
+    const window = desktop.window;
+    await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
+    await tickWithFocusAsync(desktop);
+    const toast = window.locator(".tr-toast");
+    await expect(toast).toHaveCount(1);
+    await toast.hover();
+
+    const look = await toast.evaluate(t => {
+      const style = getComputedStyle(t);
+      const bar = (document.querySelector("tr-status-bar") as Element).getBoundingClientRect();
+      const box = t.getBoundingClientRect();
+      return {
+        isDark: matchMedia("(prefers-color-scheme: dark)").matches,
+        width: style.width, padding: style.paddingTop, border: style.borderTopWidth, radius: style.borderTopLeftRadius, hasShadow: style.boxShadow !== "none",
+        background: style.backgroundColor, borderColor: style.borderTopColor,
+        right: Math.round(document.documentElement.clientWidth - box.right), gapAboveBar: Math.round(bar.top - box.bottom),
+        hasFocus: t.contains(document.activeElement)
+      };
+    });
+    const palette = look.isDark ? { background: "rgb(31, 31, 31)", border: "rgb(69, 69, 69)" } : { background: "rgb(255, 255, 255)", border: "rgb(229, 229, 229)" };
+
+    expect({ ...look, isDark: undefined }).toEqual({
+      isDark: undefined, width: "360px", padding: "12px", border: "1px", radius: "8px", hasShadow: true,
+      background: palette.background, borderColor: palette.border, right: 8, gapAboveBar: 8, hasFocus: false
+    });
+    await desktop.checkpointAsync("toast");
+    await toast.getByRole("button", { name: "Close" }).click();
+    await expect(toast).toHaveCount(0);
   });
 
   test("the bell and its list follow the component table", async ({ desktop }) => {

@@ -13,11 +13,13 @@ import path from "node:path";
 import DependencyOrder from "../ordering/dependency-order.ts";
 import ModuleDeclaration from "./module-declaration.ts";
 import ModuleInventory from "./module-inventory.ts";
+import ModuleMenus from "./module-menus.ts";
 import ModuleException from "./module.exception.ts";
 
 export default class ModuleCatalog {
   private static readonly MODULES_FOLDER: string = "src/modules";
   private static readonly ROOT_MANIFEST: string = "package.json";
+  private static readonly COMMANDS_KIND: string = "commands";
   private static readonly LIST_REQUIRED: string = "The root package.json must list the build's modules once each in teamrun.modules.";
 
   private readonly root: string;
@@ -63,8 +65,21 @@ export default class ModuleCatalog {
       if (missing.length > 0)
         throw new ModuleException(`${declaration.id} depends on ${missing.join(", ")}, which the build does not include.`);
     }
-    return new DependencyOrder(included, t => t.id, t => t.dependencies)
+    const ordered = new DependencyOrder(included, t => t.id, t => t.dependencies)
       .sort(t => new ModuleException(`The dependencies of ${t.join(", ")} form a cycle.`));
+    ModuleCatalog.checkMenus(ordered);
+    return ordered;
+  }
+
+  private static checkMenus(declarations: readonly ModuleDeclaration[]): void {
+    const byId = new Map(declarations.map(t => [t.id, t]));
+    for (const declaration of declarations) {
+      const reachable = [declaration, ...declaration.dependencies.map(t => byId.get(t)).filter(t => t !== undefined)];
+      declaration.menus.checkReferences(
+        declaration.id,
+        new Set([...ModuleMenus.SHELL_PLACES, ...reachable.flatMap(t => t.menus.places.map(u => u.name))]),
+        new Set(reachable.flatMap(t => t.contributions.get(ModuleCatalog.COMMANDS_KIND) ?? [])));
+    }
   }
 
   private async readListAsync(): Promise<readonly string[]> {

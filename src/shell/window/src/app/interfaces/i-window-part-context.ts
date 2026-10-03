@@ -25,6 +25,7 @@ export interface IWindowPartContext {
   registerCommand(command: CommandContribution): void;
   registerStatusBarItem(item: StatusBarItemContribution): StatusBarItem;
   registerTopBarAction(action: TopBarActionContribution): TopBarAction;
+  isAllowed(name: string): boolean;
   runCommandAsync(name: string, commandArguments?: JsonValue): Promise<JsonValue>;
   postNotificationAsync(post: NotificationPost): Promise<NotificationHandle>;
   openDocument(name: string, instance: string, title: string, options?: IDocumentOptions): void;

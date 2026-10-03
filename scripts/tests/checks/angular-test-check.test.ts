@@ -43,6 +43,8 @@ class AngularProjectFixture extends AngularProject {
 }
 
 class AngularTestCheckTests {
+  private static readonly LOG_HINT: string = "The Angular tests' full output is in _build/angular-tests.log.\n";
+
   public static register(): void {
     test("the check passes when the Angular tests and their coverage gate pass and every spec file ran", async () => {
       const output = new TextOutputFixture();
@@ -53,11 +55,11 @@ class AngularTestCheckTests {
       assert.equal(output.text, "");
     });
 
-    test("the check fails when the tests fail, without listing the spec files", async () => {
+    test("the check fails when the tests fail, without listing the spec files, and names the log of their output", async () => {
       const output = new TextOutputFixture();
 
       assert.equal(await new AngularTestCheck(new AngularProjectFixture(new AngularTestRun(1, null), new Error("not listed"))).runAsync(output), false);
-      assert.equal(output.text, "");
+      assert.equal(output.text, AngularTestCheckTests.LOG_HINT);
     });
 
     test("the check fails and names the spec files a passing run did not run", async () => {
@@ -65,7 +67,7 @@ class AngularTestCheckTests {
       const check = new AngularTestCheck(new AngularProjectFixture(new AngularTestRun(0, ["a.spec.ts"]), ["a.spec.ts", "shell/b.spec.ts", "shell/c.spec.ts"]));
 
       assert.equal(await check.runAsync(output), false);
-      assert.equal(output.text, "The Angular tests did not run 2 of the spec files under src/:\n  shell/b.spec.ts\n  shell/c.spec.ts\n");
+      assert.equal(output.text, `The Angular tests did not run 2 of the spec files under src/:\n  shell/b.spec.ts\n  shell/c.spec.ts\n${AngularTestCheckTests.LOG_HINT}`);
     });
 
     test("the check fails when a passing run wrote no report, or its report or workspace cannot be read", async () => {
@@ -77,7 +79,7 @@ class AngularTestCheckTests {
       assert.equal(await new AngularTestCheck(new AngularProjectFixture(new ProcessException("The report is unreadable."))).runAsync(unreadable), false);
       assert.equal(await new AngularTestCheck(new AngularProjectFixture(new AngularTestRun(0, []), new ProcessException("No include patterns."))).runAsync(workspace), false);
       assert.deepEqual([silent.text, unreadable.text, workspace.text],
-        ["The Angular tests passed but wrote no report of the spec files they ran.\n", "The report is unreadable.\n", "No include patterns.\n"]);
+        ["The Angular tests passed but wrote no report of the spec files they ran.\n", "The report is unreadable.\n", "No include patterns.\n"].map(t => `${t}${AngularTestCheckTests.LOG_HINT}`));
     });
 
     test("the check lets an unexpected failure through", async () => {

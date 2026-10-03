@@ -156,6 +156,10 @@ export class WindowPartContext implements IWindowPartContext {
     this.host.refresh();
   }
 
+  public isAllowed(name: string): boolean {
+    return this.owners.includes(name.substring(0, name.indexOf(Resources.contributionSeparator)));
+  }
+
   private async updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
     this.requireNotification(post);
     await this.host.updateNotificationAsync(id, post);
@@ -188,7 +192,7 @@ export class WindowPartContext implements IWindowPartContext {
   }
 
   private requireAllowed(name: string): void {
-    if (!this.owners.includes(name.substring(0, name.indexOf(Resources.contributionSeparator))))
+    if (!this.isAllowed(name))
       throw new WindowPartAccessException(Resources.formatForeignName(this.moduleId, name));
   }
 }

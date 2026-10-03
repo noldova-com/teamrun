@@ -8,11 +8,15 @@
 
 import assert from "node:assert/strict";
 import { realpathSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 
 import ProcessRunner from "../../processes/process-runner.ts";
 import ProcessException from "../../processes/process.exception.ts";
+import RepositoryFixture from "../fixtures/repository.fixture.ts";
+import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
 class ProcessRunnerTests {
   private static readonly TIMEOUT: number = 10_000;
@@ -52,11 +56,28 @@ class ProcessRunnerTests {
 
       await assert.rejects(new ProcessRunner().captureAsync("teamrun-missing-command", [], tmpdir(), ProcessRunnerTests.TIMEOUT), isStartFailure);
       await assert.rejects(new ProcessRunner().runAsync("teamrun-missing-command", [], tmpdir()), isStartFailure);
+      await assert.rejects(
+        new ProcessRunner().runLoggedAsync("teamrun-missing-command", [], tmpdir(), path.join(tmpdir(), "teamrun-missing-command.log"), new TextOutputFixture(), new TextOutputFixture()),
+        isStartFailure);
     });
 
     test("running shares the output streams and returns the exit code", async () => {
       assert.equal(await new ProcessRunner().runAsync(process.execPath, ["-e", "process.exitCode = 4"], tmpdir()), 4);
       assert.equal(await new ProcessRunner().runAsync(process.execPath, ["-e", ""], tmpdir()), 0);
+    });
+
+    test("running with a log passes both output streams on, keeps them both in the log and returns the exit code", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const log = path.join(repository.directory, "run.log");
+      const output = new TextOutputFixture();
+      const errorOutput = new TextOutputFixture();
+      const script = "process.stdout.write('passed'); process.stderr.write('failed'); process.exitCode = 5";
+
+      const exitCode = await new ProcessRunner().runLoggedAsync(process.execPath, ["-e", script], tmpdir(), log, output, errorOutput);
+
+      assert.deepEqual([exitCode, output.text, errorOutput.text], [5, "passed", "failed"]);
+      assert.ok(["passedfailed", "failedpassed"].includes(await readFile(log, "utf8")));
     });
 
     test("running passes the given environment instead of the process's own", async () => {

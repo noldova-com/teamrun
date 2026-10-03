@@ -14,6 +14,7 @@ import { dirname, join, resolve } from "node:path";
 import { setImmediate } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeBuild, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
@@ -684,7 +685,7 @@ export class DesktopApplicationTests {
   @TestMethod
   public async addsItsOwnDeviceToItsWindowsNotificationRequestsAndRefusesAnInvalidSwitch(): Promise<void> {
     const connection = new FakeRuntimeConnection();
-    connection.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: true }));
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: true, sequence: 2 }));
     connection.answers.set("shell.setDoNotDisturb", Response.success("r", null));
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopApplicationTests.trustedEvent("linux");
@@ -701,7 +702,7 @@ export class DesktopApplicationTests {
     Assert.areEqual(
       JSON.stringify([`shell.notifications {"device":"${FakeDeviceIdentity.ID}"}`, `shell.setDoNotDisturb {"device":"${FakeDeviceIdentity.ID}","isOn":true}`]),
       JSON.stringify(sent));
-    Assert.areEqual("{\"notifications\":[],\"isDoNotDisturb\":true}|null", `${JSON.stringify(state.payload)}|${JSON.stringify(quiet.payload)}`);
+    Assert.areEqual("{\"notifications\":[],\"isDoNotDisturb\":true,\"sequence\":2}|null", `${JSON.stringify(state.payload)}|${JSON.stringify(quiet.payload)}`);
     Assert.areEqual(FailureCode.InvalidParams, invalid.failure?.code);
     Assert.areEqual(FailureCode.Unavailable, noDevice.failure?.code);
   }
@@ -718,7 +719,7 @@ export class DesktopApplicationTests {
     const lostLauncher = new FakeRuntimeLauncher();
     const lost = await DesktopApplicationTests.startReadyAsync("linux", lostLauncher, new FakeElectron(), unidentified);
     await DesktopApplicationTests.invokeAsync(lost, "teamrun:readLayout", DesktopApplicationTests.trustedEvent("linux"));
-    const broadcast = (devices: readonly string[]): Event => new Event(ShellEvents.notifications, new NotificationBroadcast([], devices).toJson());
+    const broadcast = (devices: readonly string[]): Event => new Event(ShellEvents.notifications, new NotificationBroadcast([], devices, 4).toJson());
 
     launcher.listener?.onEvent(broadcast([FakeDeviceIdentity.ID, "desk"]));
     launcher.listener?.onEvent(broadcast(["desk"]));
@@ -727,14 +728,97 @@ export class DesktopApplicationTests {
 
     Assert.areEqual(
       JSON.stringify([
-        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: true }],
-        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false }]
+        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: true, sequence: 4 }],
+        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false, sequence: 4 }]
       ]),
       JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
     Assert.areEqual(
-      JSON.stringify([["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false }]]),
+      JSON.stringify([["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false, sequence: 4 }]]),
       JSON.stringify(DesktopApplicationTests.firstWindow(lost).webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.notifications could not be passed to the window").length);
+  }
+
+  @TestMethod
+  public async showsTheOperatingSystemANotificationPostedAfterItsWindowsReadWhileNoWindowIsFocusedAndOpensItInTheWindow(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const early = DesktopApplicationTests.wireNotification(1, "Early");
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [early], isDoNotDisturb: false, sequence: 1 }));
+    const launcher = new FakeRuntimeLauncher(connection);
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    const later = DesktopApplicationTests.wireNotification(2, "Later");
+
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [early], quietDevices: [], sequence: 1 }));
+    await DesktopApplicationTests.requestAsync(electron, DesktopApplicationTests.trustedEvent("linux"), "shell.notifications", {});
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [later, early], quietDevices: [], sequence: 2 }));
+    window.isFocusedNow = true;
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(3, "Focused"), later, early], quietDevices: [], sequence: 3 }));
+    window.isMinimizedNow = true;
+    electron.notifications.created[0]?.click();
+
+    Assert.areEqual("Later", electron.notifications.created.map(t => t.title).join(","));
+    Assert.isTrue(String(electron.notifications.created[0]?.options.icon).endsWith("icon-dark-512.png"));
+    Assert.areEqual("restore,focus", window.calls.filter(t => t === "restore" || t === "focus").join(","));
+    Assert.areEqual(JSON.stringify([["teamrun:notificationOpened", 2]]), JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:notificationOpened")));
+  }
+
+  @TestMethod
+  public async holdsTheOperatingSystemsNotificationsWhileItsWindowReloadsUntilTheWindowReadsAgain(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const alarm = DesktopApplicationTests.wireNotification(1, "Alarm");
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [alarm], isDoNotDisturb: false, sequence: 1 }));
+    const launcher = new FakeRuntimeLauncher(connection);
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+    await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
+    const reposted = DesktopApplicationTests.wireNotification(2, "Re-posted by the window");
+
+    window.webContents.startLoading();
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [reposted, alarm], quietDevices: [], sequence: 2 }));
+    const whileLoading = electron.notifications.created.length;
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [reposted, alarm], isDoNotDisturb: false, sequence: 2 }));
+    await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(3, "Posted after"), reposted, alarm], quietDevices: [], sequence: 3 }));
+
+    Assert.areEqual(0, whileLoading);
+    Assert.areEqual("Posted after", electron.notifications.created.map(t => t.title).join(","));
+  }
+
+  @TestMethod
+  public async showsTheOperatingSystemNothingWithoutAWindowReadForAKnownDeviceOrAfterTheRuntimeLeaves(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    first.answers.set("shell.notifications", Response.failure("r", new Failure(FailureCode.Internal, "The database is busy.")));
+    const second = new FakeRuntimeConnection();
+    let reconnect: (connection: FakeRuntimeConnection) => void = () => undefined;
+    const launcher = new FakeRuntimeLauncher(first, new Promise<FakeRuntimeConnection>(resolve => {
+      reconnect = resolve;
+    }));
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const unidentified = new FakeDeviceIdentity();
+    unidentified.failure = new Error("The identity file is not JSON.");
+    const lostLauncher = new FakeRuntimeLauncher(new FakeRuntimeConnection());
+    const lost = await DesktopApplicationTests.startReadyAsync("linux", lostLauncher, new FakeElectron(), unidentified);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+    const posted = new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(1, "Alarm")], quietDevices: [], sequence: 1 });
+
+    await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
+    await DesktopApplicationTests.requestAsync(lost, event, "shell.notifications", {});
+    launcher.listener?.onEvent(posted);
+    lostLauncher.listener?.onEvent(posted);
+    first.answers.set("shell.notifications", Response.success("r", { notifications: [] }));
+    await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
+    first.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: false, sequence: 1 }));
+    await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
+    launcher.listener?.onDisconnected();
+    reconnect(second);
+    await Condition.waitAsync(() => launcher.connections.length === 2);
+    await setImmediate();
+    launcher.listener?.onEvent(posted);
+
+    Assert.areEqual("0,0", [electron.notifications.created.length, lost.notifications.created.length].join(","));
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The notifications could not be read, so the operating system shows none until the window reads them again: ").length);
   }
 
   @TestMethod
@@ -1108,6 +1192,10 @@ export class DesktopApplicationTests {
 
   private static icon(name: string): string {
     return join(DesktopApplicationTests.checkoutRoot(), "assets", "icons", name);
+  }
+
+  private static wireNotification(id: number, title: string): JsonObject {
+    return { id, sequence: id, post: { kind: "clock.alarm", title, severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false };
   }
 
   private static firstWindow(electron: FakeElectron): FakeDesktopWindow {
