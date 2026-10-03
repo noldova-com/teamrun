@@ -15,7 +15,9 @@ import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import {
-  BuildIdentity, CommandList, CommandRun, FailureCode, ModuleStatusList, DoNotDisturbChange, NotificationBroadcast, NotificationPost, NotificationReference, NotificationSeverity, NotificationState, NotificationUpdate, NotificationsQuery, QualifiedName, Request, type Response, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateWrite
+  BuildIdentity, CommandList, CommandRun, DoNotDisturbChange, Event, FailureCode, ModuleStatusList, NotificationBroadcast, NotificationPost, NotificationReference, NotificationSeverity,
+  NotificationState, NotificationUpdate, NotificationsQuery, QualifiedName, Request, Response, SettingKey, SettingValue, SettingsQuery, SettingsSnapshot, ShellMethods, StopPolicy, StopRequest,
+  WindowStateKey, WindowStateWrite, WireDecoder
 } from "@noldova/teamrun-shell-protocol";
 import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
 
@@ -439,6 +441,54 @@ export class RuntimeHostTests {
 
       Assert.isFalse(existsSync(fixture.dataDirectory.root));
     });
+  }
+
+  @TestMethod
+  public answersSettingsAndPublishesTheirChanges(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      await fixture.startAsync(30_000, await fixture.writeModulesAsync([]));
+      const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      const mode = new SettingKey(QualifiedName.parse("shell.mode"));
+      const quiet = new SettingKey(QualifiedName.parse("shell.doNotDisturb"), null, "d1");
+
+      connection.sendMessages(
+        new Request("desktop:1", ShellMethods.setSetting, new SettingValue(mode, "Dark").toJson()),
+        new Request("desktop:2", ShellMethods.setSetting, new SettingValue(quiet, true).toJson()),
+        new Request("desktop:3", ShellMethods.settings, new SettingsQuery("d1").toJson()),
+        new Request("desktop:4", ShellMethods.resetSetting, mode.toJson()),
+        new Request("desktop:5", ShellMethods.setSetting, new SettingValue(mode, "Blue").toJson()),
+        new Request("desktop:6", ShellMethods.setSetting, new SettingValue(new SettingKey(QualifiedName.parse("shell.speed")), 1).toJson()),
+        new Request("desktop:7", ShellMethods.resetSetting, new SettingKey(QualifiedName.parse("shell.doNotDisturb")).toJson()));
+      const [responses, events] = await RuntimeHostTests.readMessagesAsync(connection, 10);
+      const snapshot = SettingsSnapshot.fromJson(responses.get("desktop:3")?.payload);
+      const entry = (name: string): string => JSON.stringify(snapshot.entries.find(t => t.name.text === name)?.toJson());
+
+      Assert.isTrue(["desktop:1", "desktop:2", "desktop:4"].every(t => responses.get(t)?.hasFailed === false));
+      Assert.areEqual("{\"name\":\"shell.mode\",\"value\":\"Dark\",\"isSet\":true}", entry("shell.mode"));
+      Assert.areEqual("{\"name\":\"shell.doNotDisturb\",\"value\":true,\"isSet\":true}", entry("shell.doNotDisturb"));
+      Assert.areEqual("shell.theme,shell.mode,shell.interfaceFont,shell.codeFont,shell.panelSize,shell.messageSize,shell.codeSize,shell.doNotDisturb,shell.mutedModules",
+        snapshot.definitions.map(t => t.name.text).join(","));
+      Assert.areEqual("InvalidParams,NotFound,InvalidParams", ["desktop:5", "desktop:6", "desktop:7"].map(t => responses.get(t)?.failure?.code).join(","));
+      Assert.areEqual(JSON.stringify([
+        "{\"name\":\"shell.mode\",\"value\":\"Dark\"}",
+        "{\"name\":\"shell.doNotDisturb\",\"device\":\"d1\",\"value\":true}",
+        "{\"name\":\"shell.mode\",\"value\":\"System\"}"
+      ]), JSON.stringify(events.map(t => JSON.stringify(t.payload))));
+      Assert.isTrue(events.every(t => t.name.text === "shell.settingsChanged"));
+    });
+  }
+
+  private static async readMessagesAsync(connection: RawConnectionFixture, count: number): Promise<[Map<string, Response>, Event[]]> {
+    const responses = new Map<string, Response>();
+    const events: Event[] = [];
+    for (let index = 0; index < count; index++) {
+      const message = new WireDecoder().decode(await connection.readTextAsync());
+      if (message instanceof Response)
+        responses.set(String(message.id), message);
+      else if (message instanceof Event)
+        events.push(message);
+    }
+    return [responses, events];
   }
 
   private static async readResponsesAsync(connection: RawConnectionFixture, count: number): Promise<Map<string, Response>> {

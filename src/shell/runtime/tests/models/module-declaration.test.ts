@@ -89,6 +89,20 @@ export class ModuleDeclarationTests {
       Assert.areEqual(message, Assert.throws(() => ModuleDeclaration.fromJson(value), DeclarationsFormatException).message);
   }
 
+  @TestMethod
+  public readsTheSettingsItDeclaresAndRefusesAnotherOwnersOrAnInvalidOne(): void {
+    const setting = { name: "notes.sortBy", title: "Sort by", description: "Orders the list.", type: { kind: "Text", maxLength: 20 }, default: "title", locality: "Shared", scopes: [], page: "Notes", group: "List" };
+
+    const declaration = ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [setting] });
+
+    Assert.areEqual("notes.sortBy", declaration.settings.map(t => t.name.text).join(","));
+    Assert.areEqual(0, ModuleDeclaration.fromJson(ModuleDeclarationTests.VALID).settings.length);
+    Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: {} }), DeclarationsFormatException);
+    Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, default: 1 }] }), DeclarationsFormatException);
+    Assert.areEqual("The module notes declares the setting tasks.size, which it does not own. (Parameter 'settings')",
+      Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, name: "tasks.size" }] }), ArgumentException).message);
+  }
+
   private static without(field: string): Readonly<Record<string, unknown>> {
     return Object.fromEntries(Object.entries(ModuleDeclarationTests.VALID).filter(([name]) => name !== field));
   }

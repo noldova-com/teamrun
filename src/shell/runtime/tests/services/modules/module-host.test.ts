@@ -16,6 +16,7 @@ import { CommandRegistry, DataDirectory, EventRegistry, type IRuntimePart, Metho
 
 import { RuntimePartFixture } from "../../fixtures/runtime-part.fixture.js";
 import { RuntimePartLoaderFixture } from "../../fixtures/runtime-part-loader.fixture.js";
+import { SettingsFixture } from "../../fixtures/settings.fixture.js";
 import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
 import { TextOutputFixture } from "../../fixtures/text-output.fixture.js";
 
@@ -23,6 +24,7 @@ import { TextOutputFixture } from "../../fixtures/text-output.fixture.js";
 export class ModuleHostTests {
   @TestMethod
   public async activatesEachModuleAfterItsDependenciesAndReportsThemInThatOrder(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     const log: string[] = [];
     const store = new Map<string, string>([["first", "Write the plan"]]);
     let found: Map<unknown, unknown> | null = null;
@@ -39,7 +41,7 @@ export class ModuleHostTests {
     ], parts);
 
     const before = host.report.modules.length;
-    await host.activateAsync();
+    await host.activateAsync(settings.service);
 
     Assert.areEqual(0, before);
     Assert.areEqual("activate tasks,activate notes", log.join(","));
@@ -51,6 +53,7 @@ export class ModuleHostTests {
 
   @TestMethod
   public async recordsFailuresWithSafeCausesAndBlocksTheirDependents(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     const methods = new MethodRegistry();
     const diagnostics = new TextOutputFixture();
     const log: string[] = [];
@@ -70,7 +73,7 @@ export class ModuleHostTests {
       ModuleHostTests.declare("second", ["first"], null)
     ], parts, methods, diagnostics);
 
-    await host.activateAsync();
+    await host.activateAsync(settings.service);
     await host.deactivateAsync();
     const written = diagnostics.text;
 
@@ -92,6 +95,7 @@ export class ModuleHostTests {
 
   @TestMethod
   public async deactivatesInReverseOrderAndWithdrawsEvenWhenAPartFails(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     const methods = new MethodRegistry();
     const log: string[] = [];
     const failure = new Error("The notes cannot be saved.");
@@ -104,7 +108,7 @@ export class ModuleHostTests {
       ModuleHostTests.declare("tasks", [], "tasks-runtime", ["tasks.list"]),
       ModuleHostTests.declare("notes", ["tasks"], "notes-runtime", ["notes.list"])
     ], parts, methods, diagnostics);
-    await host.activateAsync();
+    await host.activateAsync(settings.service);
 
     const exception = await Assert.throwsAsync(() => host.deactivateAsync(), AggregateError);
     await host.deactivateAsync();
@@ -119,6 +123,7 @@ export class ModuleHostTests {
 
   @TestMethod
   public async migratesAModulesDatabaseBeforeActivatingItAndClosesItAtDeactivation(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     await using folder = await TemporaryFolderFixture.createAsync();
     const log: string[] = [];
     const migrations = [new Migration("create-notes", ["CREATE TABLE notes (title TEXT NOT NULL) STRICT"])];
@@ -129,7 +134,7 @@ export class ModuleHostTests {
       ModuleHostTests.declare("tasks", [], "tasks-runtime")
     ], new Map<string, IRuntimePart>([["notes-runtime", notes], ["tasks-runtime", tasks]]), new MethodRegistry(), new TextOutputFixture(), folder.path);
 
-    await host.activateAsync();
+    await host.activateAsync(settings.service);
     const database = notes.context?.database;
     const missing = Assert.throws(() => tasks.context?.database, ModuleDatabaseException);
     await host.deactivateAsync();
@@ -144,6 +149,7 @@ export class ModuleHostTests {
 
   @TestMethod
   public async failsAModuleWhoseDatabaseCannotBeMigratedOrIsNewerWithoutActivatingIt(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     await using folder = await TemporaryFolderFixture.createAsync();
     const directory = new DataDirectory(folder.path);
     (await ModuleDatabase.openAsync(directory, "newer", [
@@ -161,7 +167,7 @@ export class ModuleHostTests {
       ModuleHostTests.declare("newer", [], "newer-runtime")
     ], parts, new MethodRegistry(), diagnostics, folder.path);
 
-    await host.activateAsync();
+    await host.activateAsync(settings.service);
 
     Assert.areEqual("", log.join(","));
     Assert.areEqual(
@@ -178,6 +184,7 @@ export class ModuleHostTests {
 
   @TestMethod
   public async closesTheDatabaseOfAPartThatFailsToActivate(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     await using folder = await TemporaryFolderFixture.createAsync();
     const migrations = [new Migration("create-notes", ["CREATE TABLE notes (title TEXT NOT NULL) STRICT"])];
     const part = new RuntimePartFixture("notes", [], t => {
@@ -187,7 +194,7 @@ export class ModuleHostTests {
     const host = ModuleHostTests.create([ModuleHostTests.declare("notes", [], "notes-runtime")], new Map<string, IRuntimePart>([["notes-runtime", part]]),
       new MethodRegistry(), new TextOutputFixture(), folder.path);
 
-    await host.activateAsync();
+    await host.activateAsync(settings.service);
     const database = part.context?.database;
 
     Assert.areEqual("Failed", host.report.modules[0]?.state);

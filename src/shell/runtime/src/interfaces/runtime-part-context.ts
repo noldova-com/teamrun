@@ -13,11 +13,14 @@ import type { NotificationHandle } from "../models/notification-handle.js";
 import type { RuntimeCommand } from "../models/runtime-command.js";
 import type { IMethodHandler } from "./method-handler.js";
 import type { IModuleDatabase } from "./module-database.js";
+import type { IModuleSettings } from "./module-settings.js";
 
 export interface IRuntimePartContext {
   readonly moduleId: string;
   readonly moduleFolder: string;
   readonly database: IModuleDatabase;
+
+  readonly settings: IModuleSettings;
 
   registerMethod(name: string, handler: IMethodHandler): void;
 

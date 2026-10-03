@@ -12,7 +12,10 @@ import type { Writable } from "node:stream";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import type { BuildIdentity, CommandInfo, CommandList, Event, Failure, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, QualifiedName, Response, RunningWork, RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
+import type {
+  BuildIdentity, CommandInfo, CommandList, Event, Failure, FailureCode, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, QualifiedName, Response,
+  RunningWork, RuntimeHandover, SettingDefinition, SettingKey, SettingScope, SettingValue, SettingsSnapshot, StopPolicy
+} from "@noldova/teamrun-shell-protocol";
 
 /**
  * What a data directory holds, judged from its top-level entries other than the
@@ -914,6 +917,26 @@ export declare class MigratedDatabase implements Disposable {
 }
 
 /**
+ * The shell database's migrations, in the order they apply: its window
+ * states, then its settings.
+ */
+export declare class ShellMigrations {
+  /**
+   * Every migration of the shell's database.
+   *
+   * @example
+   * ```ts
+   * import { type OwnershipLock, ShellDatabase, ShellMigrations } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function openAsync(lock: OwnershipLock): Promise<ShellDatabase> {
+   *   return ShellDatabase.openAsync(lock, ShellMigrations.all);
+   * }
+   * ```
+   */
+  public static readonly all: readonly Migration[];
+}
+
+/**
  * The shell's own database, `shell.sqlite`, which serves the shell's facilities.
  */
 export declare class ShellDatabase extends MigratedDatabase {
@@ -1512,6 +1535,35 @@ export declare class RegistrationException extends Exception {
 }
 
 /**
+ * The exception thrown when a setting is not declared, does not accept a
+ * value or a scope, or is a device setting given no device.
+ */
+export declare class SettingException extends Exception {
+  /**
+   * The failure code a client receives for it: `NotFound` for an unknown
+   * setting, `InvalidParams` otherwise.
+   */
+  public readonly code: FailureCode;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @param code The failure code a client receives for it.
+   * @example
+   * ```ts
+   * import { FailureCode } from "@noldova/teamrun-shell-protocol";
+   * import { SettingException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new SettingException("No setting named clock.speed is declared.", FailureCode.NotFound);
+   * }
+   * ```
+   */
+  public constructor(message: string, code: FailureCode);
+}
+
+/**
  * The exception thrown when a newer build's runtime owns the data directory, so this older build hands the person over to it.
  */
 export declare class RuntimeHandoverException extends Exception {
@@ -1784,6 +1836,141 @@ export interface IModuleDatabase {
 }
 
 /**
+ * A runtime part's access to settings: it reads its own settings, its
+ * dependencies' and the shell's, changes only its own, and describes the
+ * setting scopes its declaration lists. Calls are synchronous; values live
+ * in the shell's database.
+ */
+export interface IModuleSettings {
+  /**
+   * Reads a setting's value in effect: the value set for the scope object,
+   * else for each enclosing scope, else for the application, else the
+   * default. A device setting reads the given device's value.
+   *
+   * @param name The setting's name.
+   * @param scope The scope object; `null` by default, the application.
+   * @param device The device, for a device setting; `null` by default.
+   * @returns The value in effect.
+   * @throws {RegistrationException} When the setting is another module's that
+   * is not a dependency.
+   * @throws {SettingException} When no such setting is declared.
+   * @example
+   * ```ts
+   * import type { JsonValue } from "@noldova/teamrun-foundation-json";
+   * import type { IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readStep(context: IRuntimePartContext): JsonValue {
+   *   return context.settings.read("clock.tickStep");
+   * }
+   * ```
+   */
+  read(name: string, scope?: SettingScope | null, device?: string | null): JsonValue;
+
+  /**
+   * Sets one of the module's own settings for the application, a scope
+   * object or, for a device setting, a device.
+   *
+   * @param name The setting's name.
+   * @param value The value; one the setting accepts.
+   * @param scope The scope object; `null` by default, the application.
+   * @param device The device, for a device setting; `null` by default.
+   * @throws {RegistrationException} When the setting is not the module's own.
+   * @throws {SettingException} When the setting is unknown, does not accept
+   * the value or the scope, or is a device setting given no device.
+   * @example
+   * ```ts
+   * import type { IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function slowDown(context: IRuntimePartContext): void {
+   *   context.settings.write("clock.tickStep", 1);
+   * }
+   * ```
+   */
+  write(name: string, value: JsonValue, scope?: SettingScope | null, device?: string | null): void;
+
+  /**
+   * Removes one of the module's own setting values, so the enclosing value
+   * or the default takes effect.
+   *
+   * @param name The setting's name.
+   * @param scope The scope object; `null` by default, the application.
+   * @param device The device, for a device setting; `null` by default.
+   * @throws {RegistrationException} When the setting is not the module's own.
+   * @throws {SettingException} As `write` does.
+   * @example
+   * ```ts
+   * import type { IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function restore(context: IRuntimePartContext): void {
+   *   context.settings.reset("clock.tickStep");
+   * }
+   * ```
+   */
+  reset(name: string, scope?: SettingScope | null, device?: string | null): void;
+
+  /**
+   * Follows a readable setting: the listener receives each change, a value
+   * set or reset for any scope or device, with the value then in effect for
+   * that key. It stops when the part deactivates.
+   *
+   * @param name The setting's name.
+   * @param listener Called after each change commits.
+   * @throws {RegistrationException} As `read` does.
+   * @throws {SettingException} When no such setting is declared.
+   * @example
+   * ```ts
+   * import type { IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function follow(context: IRuntimePartContext, apply: (step: number) => void): void {
+   *   context.settings.onChanged("clock.tickStep", t => apply(Number(t.value)));
+   * }
+   * ```
+   */
+  onChanged(name: string, listener: (change: SettingValue) => void): void;
+
+  /**
+   * Records which scope object encloses one of the module's scope objects,
+   * such as a conversation's project, or that none does.
+   *
+   * @param scope One of the module's scope objects.
+   * @param parent The enclosing object, of the module's own scopes or a
+   * dependency's; `null` when the application encloses it.
+   * @throws {RegistrationException} When the scope is not the module's or the
+   * parent's scope is neither its own nor a dependency's.
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingScope } from "@noldova/teamrun-shell-protocol";
+   * import type { IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function place(context: IRuntimePartContext, conversation: string, project: string): void {
+   *   context.settings.setScopeParent(
+   *     new SettingScope(QualifiedName.parse("chat.conversation"), conversation),
+   *     new SettingScope(QualifiedName.parse("projects.project"), project));
+   * }
+   * ```
+   */
+  setScopeParent(scope: SettingScope, parent: SettingScope | null): void;
+
+  /**
+   * Removes the values set for one of the module's scope objects and its
+   * enclosure, when the object is deleted.
+   *
+   * @param scope One of the module's scope objects.
+   * @throws {RegistrationException} When the scope is not the module's.
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingScope } from "@noldova/teamrun-shell-protocol";
+   * import type { IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function forget(context: IRuntimePartContext, conversation: string): void {
+   *   context.settings.removeScope(new SettingScope(QualifiedName.parse("chat.conversation"), conversation));
+   * }
+   * ```
+   */
+  removeScope(scope: SettingScope): void;
+}
+
+/**
  * What a module's runtime part may register and use. The runtime withdraws
  * everything registered through it when the part deactivates or fails to
  * activate.
@@ -1809,6 +1996,12 @@ export interface IRuntimePartContext {
    * @throws {ModuleDatabaseException} When the part declares no migrations.
    */
   readonly database: IModuleDatabase;
+
+  /**
+   * The module's access to settings: its own, its dependencies' and the
+   * shell's.
+   */
+  readonly settings: IModuleSettings;
 
   /**
    * Registers a handler for one of the methods the module's declaration
@@ -2482,6 +2675,11 @@ export declare class ModuleDeclaration {
   public readonly contributions: ReadonlyMap<string, readonly string[]>;
 
   /**
+   * The definitions of the settings it declares.
+   */
+  public readonly settings: readonly SettingDefinition[];
+
+  /**
    * Creates the declaration.
    *
    * @param id The module's id: lowercase kebab-case and not `shell`.
@@ -2489,7 +2687,10 @@ export declare class ModuleDeclaration {
    * @param dependencies The ids of the modules it depends on.
    * @param runtimePackage Its runtime package, or `null`.
    * @param contributions The names it contributes, by kind.
-   * @throws {ArgumentException} When the id or the display name is not valid.
+   * @param settings The definitions of its settings, each its own; none by
+   * default.
+   * @throws {ArgumentException} When the id or the display name is not valid,
+   * or a setting belongs to another owner.
    * @example
    * ```ts
    * import { ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
@@ -2497,7 +2698,13 @@ export declare class ModuleDeclaration {
    * export const notes: ModuleDeclaration = new ModuleDeclaration("notes", "Notes", [], "@noldova/teamrun-modules-notes-runtime", new Map([["methods", ["notes.list"]]]));
    * ```
    */
-  public constructor(id: string, displayName: string, dependencies: readonly string[], runtimePackage: string | null, contributions: ReadonlyMap<string, readonly string[]>);
+  public constructor(
+    id: string,
+    displayName: string,
+    dependencies: readonly string[],
+    runtimePackage: string | null,
+    contributions: ReadonlyMap<string, readonly string[]>,
+    settings?: readonly SettingDefinition[]);
 
   /**
    * Reads a declaration from its form in `declarations.json`.
@@ -2505,7 +2712,7 @@ export declare class ModuleDeclaration {
    * @param value The value read from the file.
    * @returns The declaration.
    * @throws {DeclarationsFormatException} When the value is no object or a
-   * field is missing or invalid.
+   * field is missing or invalid, including a setting's definition.
    * @example
    * ```ts
    * import { ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
@@ -3347,18 +3554,20 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * @param notifications The runtime's notifications, which its posts join.
    * @param notificationPolicy The rules its posts follow.
    * @param services The registry its services join.
+   * @param settings The shell's settings, which the module reads and writes
+   * within its rights.
    * @param database The module's open database, when its runtime part declares migrations.
    * @example
    * ```ts
    * import {
-   *   CommandRegistry, DataDirectory, EventRegistry, MethodRegistry, ModuleContext, ModuleDeclaration, NotificationCenter, NotificationPolicy, ServiceRegistry
+   *   CommandRegistry, DataDirectory, EventRegistry, MethodRegistry, ModuleContext, ModuleDeclaration, NotificationCenter, NotificationPolicy, ServiceRegistry, type SettingsService
    * } from "@noldova/teamrun-shell-runtime";
    *
-   * export function createContext(events: EventRegistry): ModuleContext {
+   * export function createContext(events: EventRegistry, settings: SettingsService): ModuleContext {
    *   const notes = new ModuleDeclaration("notes", "Notes", [], null, new Map());
    *   return new ModuleContext(
    *     notes, new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(),
-   *     new NotificationCenter(() => undefined, () => new Date()), new NotificationPolicy([notes], () => true), new ServiceRegistry());
+   *     new NotificationCenter(() => undefined, () => new Date()), new NotificationPolicy([notes], () => true), new ServiceRegistry(), settings);
    * }
    * ```
    */
@@ -3371,6 +3580,7 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
     notifications: NotificationCenter,
     notificationPolicy: NotificationPolicy,
     services: ServiceRegistry,
+    settings: SettingsService,
     database?: IModuleDatabase);
 
   /**
@@ -3384,6 +3594,11 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * @throws {ModuleDatabaseException} When the module's runtime part declares no migrations.
    */
   public get database(): IModuleDatabase;
+
+  /**
+   * The module's access to settings.
+   */
+  public readonly settings: IModuleSettings;
 
   /**
    * See {@link IRuntimePartContext.registerMethod}.
@@ -3534,6 +3749,199 @@ export declare class ModuleDeclarationReader {
 }
 
 /**
+ * The shell's settings: the definitions the shell and the modules declare,
+ * and their values in the shell's database, per scope object and, for a
+ * device setting, per device. A stored value that no longer fits its
+ * definition is kept, ignored and reported once to the diagnostics.
+ */
+export declare class SettingsService {
+  /**
+   * Creates the service over an open shell database.
+   *
+   * @param database The shell's database, migrated with the shell's
+   * migrations.
+   * @param definitions Every setting's definition.
+   * @param diagnostics Where an ignored stored value is reported.
+   * @example
+   * ```ts
+   * import type { ShellDatabase } from "@noldova/teamrun-shell-runtime";
+   * import { SettingsService } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createSettings(database: ShellDatabase): SettingsService {
+   *   return new SettingsService(database, [], process.stderr);
+   * }
+   * ```
+   */
+  public constructor(database: ShellDatabase, definitions: readonly SettingDefinition[], diagnostics: Writable);
+
+  /**
+   * Finds a setting's definition.
+   *
+   * @param name The setting's name.
+   * @returns The definition.
+   * @throws {SettingException} When no such setting is declared.
+   * @example
+   * ```ts
+   * import { QualifiedName, type SettingDefinition } from "@noldova/teamrun-shell-protocol";
+   * import type { SettingsService } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function defineMode(settings: SettingsService): SettingDefinition {
+   *   return settings.define(QualifiedName.parse("shell.mode"));
+   * }
+   * ```
+   */
+  public define(name: QualifiedName): SettingDefinition;
+
+  /**
+   * Reads the value in effect for a key: the value set for its scope
+   * object, else each enclosing scope's, else the application's, else the
+   * default. A device setting reads the key's device, and its default when
+   * the key names none.
+   *
+   * @param key Which value.
+   * @returns The value in effect.
+   * @throws {SettingException} When no such setting is declared.
+   * @example
+   * ```ts
+   * import type { JsonValue } from "@noldova/teamrun-foundation-json";
+   * import { QualifiedName, SettingKey } from "@noldova/teamrun-shell-protocol";
+   * import type { SettingsService } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readMode(settings: SettingsService): JsonValue {
+   *   return settings.read(new SettingKey(QualifiedName.parse("shell.mode")));
+   * }
+   * ```
+   */
+  public read(key: SettingKey): JsonValue;
+
+  /**
+   * Reads a device setting's application values on every device that set
+   * one; a device without one is at the default.
+   *
+   * @param name The setting's name.
+   * @returns The values by device.
+   * @throws {SettingException} When no such setting is declared.
+   * @example
+   * ```ts
+   * import type { JsonValue } from "@noldova/teamrun-foundation-json";
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   * import type { SettingsService } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readQuiet(settings: SettingsService): ReadonlyMap<string, JsonValue> {
+   *   return settings.readDevices(QualifiedName.parse("shell.doNotDisturb"));
+   * }
+   * ```
+   */
+  public readDevices(name: QualifiedName): ReadonlyMap<string, JsonValue>;
+
+  /**
+   * Describes every setting and its value for the application on a device.
+   *
+   * @param device The device whose device settings it gives, or `null` for
+   * their defaults.
+   * @returns The snapshot.
+   * @example
+   * ```ts
+   * import type { SettingsSnapshot } from "@noldova/teamrun-shell-protocol";
+   * import type { SettingsService } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function describe(settings: SettingsService): SettingsSnapshot {
+   *   return settings.snapshot(null);
+   * }
+   * ```
+   */
+  public snapshot(device: string | null): SettingsSnapshot;
+
+  /**
+   * Sets a value and tells the listeners. A shared setting ignores the
+   * key's device.
+   *
+   * @param write The key and the value.
+   * @throws {SettingException} When the setting is unknown, does not accept
+   * the value or the scope, or is a device setting given no device or a
+   * scope.
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingKey, SettingValue } from "@noldova/teamrun-shell-protocol";
+   * import type { SettingsService } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function darken(settings: SettingsService): void {
+   *   settings.write(new SettingValue(new SettingKey(QualifiedName.parse("shell.mode")), "Dark"));
+   * }
+   * ```
+   */
+  public write(write: SettingValue): void;
+
+  /**
+   * Removes a value, so the enclosing value or the default takes effect,
+   * and tells the listeners the value now in effect.
+   *
+   * @param key Which value.
+   * @throws {SettingException} As `write` does.
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingKey } from "@noldova/teamrun-shell-protocol";
+   * import type { SettingsService } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function restore(settings: SettingsService): void {
+   *   settings.reset(new SettingKey(QualifiedName.parse("shell.mode")));
+   * }
+   * ```
+   */
+  public reset(key: SettingKey): void;
+
+  /**
+   * Records which scope object encloses another, or that none does.
+   *
+   * @param scope The enclosed object.
+   * @param parent The enclosing object, or `null` for the application.
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingScope } from "@noldova/teamrun-shell-protocol";
+   * import type { SettingsService } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function release(settings: SettingsService): void {
+   *   settings.setScopeParent(new SettingScope(QualifiedName.parse("chat.conversation"), "c42"), null);
+   * }
+   * ```
+   */
+  public setScopeParent(scope: SettingScope, parent: SettingScope | null): void;
+
+  /**
+   * Removes a scope object's values and its enclosure, in one transaction.
+   *
+   * @param scope The object.
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingScope } from "@noldova/teamrun-shell-protocol";
+   * import type { SettingsService } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function forget(settings: SettingsService): void {
+   *   settings.removeScope(new SettingScope(QualifiedName.parse("chat.conversation"), "c42"));
+   * }
+   * ```
+   */
+  public removeScope(scope: SettingScope): void;
+
+  /**
+   * Follows every change: each value set or reset, with the value then in
+   * effect for its key, after the change commits.
+   *
+   * @param listener Called for each change.
+   * @returns What stops the listener when disposed.
+   * @example
+   * ```ts
+   * import type { SettingsService } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function watch(settings: SettingsService, report: (name: string) => void): Disposable {
+   *   return settings.onChanged(t => report(t.key.name.text));
+   * }
+   * ```
+   */
+  public onChanged(listener: (change: SettingValue) => void): Disposable;
+}
+
+/**
  * Runs the build's modules in the runtime: it activates them after their
  * dependencies, records where each stands and deactivates them in reverse.
  */
@@ -3602,13 +4010,29 @@ export declare class ModuleHost {
    * ```ts
    * import type { ModuleHost } from "@noldova/teamrun-shell-runtime";
    *
-   * export async function startAsync(host: ModuleHost): Promise<number> {
-   *   await host.activateAsync();
+   * export async function startAsync(host: ModuleHost, settings: SettingsService): Promise<number> {
+   *   await host.activateAsync(settings);
    *   return host.report.modules.length;
    * }
    * ```
    */
-  public activateAsync(): Promise<void>;
+  public activateAsync(settings: SettingsService): Promise<void>;
+
+  /**
+   * The definitions of the settings every declared module declares, in
+   * module order.
+   *
+   * @example
+   * ```ts
+   * import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
+   * import type { ModuleHost } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function listSettings(host: ModuleHost): readonly SettingDefinition[] {
+   *   return host.settingDefinitions;
+   * }
+   * ```
+   */
+  public get settingDefinitions(): readonly SettingDefinition[];
 
   /**
    * Deactivates the active runtime parts in reverse order, withdrawing what

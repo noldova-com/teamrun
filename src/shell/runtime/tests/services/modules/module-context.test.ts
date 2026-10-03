@@ -10,7 +10,9 @@ import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { CommandRun, type Event, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+import {
+  CommandRun, type Event, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName, SettingDefinition, SettingKey, SettingLocality, SettingScope, SettingType, SettingValue
+} from "@noldova/teamrun-shell-protocol";
 import {
   CommandRegistry,
   DataDirectory,
@@ -23,8 +25,12 @@ import {
   RegistrationException,
   RuntimeCommand,
   ServiceAccessException,
-  ServiceRegistry
+  ServiceRegistry,
+  SettingException,
+  type SettingsService
 } from "@noldova/teamrun-shell-runtime";
+
+import { SettingsFixture } from "../../fixtures/settings.fixture.js";
 
 @TestClass
 export class ModuleContextTests {
@@ -34,21 +40,28 @@ export class ModuleContextTests {
     "Notes",
     ["tasks"],
     "@noldova/teamrun-modules-notes-runtime",
-    new Map([["methods", ["notes.list"]], ["events", ["notes.changed"]], ["commands", ["notes.newNote"]], ["notifications", ["notes.saved"]]]));
+    new Map([
+      ["methods", ["notes.list"]], ["events", ["notes.changed"]], ["commands", ["notes.newNote"]], ["notifications", ["notes.saved"]], ["settings", ["notes.sortBy"]],
+      ["settingScopes", ["notes.folder"]]
+    ]));
+  private static readonly SETTINGS: readonly SettingDefinition[] = ["notes.sortBy", "tasks.size", "clock.speed", "shell.mode"].map(t => new SettingDefinition(
+    QualifiedName.parse(t), t, "A setting.", SettingType.text(20), "a", SettingLocality.Shared, t === "notes.sortBy" ? [QualifiedName.parse("notes.folder")] : [], "Page", "Group"));
 
   @TestMethod
-  public namesTheModuleAndItsFolder(): void {
-    const context = ModuleContextTests.create(new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry());
+  public async namesTheModuleAndItsFolder(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
+    const context = ModuleContextTests.create(settings.service, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry());
 
     Assert.areEqual("notes", context.moduleId);
     Assert.areEqual(path.join(ModuleContextTests.ROOT, "modules", "notes"), context.moduleFolder);
   }
 
   @TestMethod
-  public registersOnlyTheMethodsAndEventsItsDeclarationContributes(): void {
+  public async registersOnlyTheMethodsAndEventsItsDeclarationContributes(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     const methods = new MethodRegistry();
     const events: Event[] = [];
-    const context = ModuleContextTests.create(methods, new EventRegistry({ broadcast: t => events.push(t) }), new ServiceRegistry());
+    const context = ModuleContextTests.create(settings.service, methods, new EventRegistry({ broadcast: t => events.push(t) }), new ServiceRegistry());
 
     context.registerMethod("notes.list", { handleAsync: async () => [] });
     context.declareEvent("notes.changed").publish(1);
@@ -62,9 +75,10 @@ export class ModuleContextTests {
   }
 
   @TestMethod
-  public registersOnlyTheCommandsItsDeclarationContributes(): void {
+  public async registersOnlyTheCommandsItsDeclarationContributes(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     const commands = new CommandRegistry();
-    const context = ModuleContextTests.create(new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), commands);
+    const context = ModuleContextTests.create(settings.service, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), commands);
 
     context.registerCommand(new RuntimeCommand("notes.newNote", "New note", "note_add", "Mod+Alt+N", { handleAsync: async () => null }));
     const undeclared = Assert.throws(() => context.registerCommand(new RuntimeCommand("notes.delete", "Delete note", null, null, { handleAsync: async () => null })), RegistrationException);
@@ -76,9 +90,10 @@ export class ModuleContextTests {
   }
 
   @TestMethod
-  public publishesServicesOnlyUnderItsOwnId(): void {
+  public async publishesServicesOnlyUnderItsOwnId(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     const services = new ServiceRegistry();
-    const context = ModuleContextTests.create(new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), services);
+    const context = ModuleContextTests.create(settings.service, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), services);
     const store = new Map<string, string>();
 
     context.publishService("notes.store", store);
@@ -91,14 +106,15 @@ export class ModuleContextTests {
   }
 
   @TestMethod
-  public findsTheServicesOfTheShellAndItsDependenciesByType(): void {
+  public async findsTheServicesOfTheShellAndItsDependenciesByType(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     const services = new ServiceRegistry();
     const tasks = new Map<string, string>([["first", "Write the plan"]]);
     const clock = new Set<string>();
     services.publish(new QualifiedName("tasks", "store"), tasks);
     services.publish(new QualifiedName("shell", "clock"), clock);
     services.publish(new QualifiedName("calendar", "store"), new Map());
-    const context = ModuleContextTests.create(new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), services);
+    const context = ModuleContextTests.create(settings.service, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), services);
 
     const found = context.getService("tasks.store", Map);
     const shell = context.getService("shell.clock", Set);
@@ -114,13 +130,14 @@ export class ModuleContextTests {
   }
 
   @TestMethod
-  public withdrawsEverythingItRegisteredWhenDisposed(): void {
+  public async withdrawsEverythingItRegisteredWhenDisposed(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     const methods = new MethodRegistry();
     const events: Event[] = [];
     const eventRegistry = new EventRegistry({ broadcast: t => events.push(t) });
     const services = new ServiceRegistry();
     const commands = new CommandRegistry();
-    const context = ModuleContextTests.create(methods, eventRegistry, services, commands);
+    const context = ModuleContextTests.create(settings.service, methods, eventRegistry, services, commands);
     context.registerMethod("notes.list", { handleAsync: async () => [] });
     context.registerCommand(new RuntimeCommand("notes.newNote", "New note", null, null, { handleAsync: async () => null }));
     const channel = context.declareEvent("notes.changed");
@@ -138,9 +155,10 @@ export class ModuleContextTests {
   }
 
   @TestMethod
-  public postsUpdatesAndDismissesItsNotificationsAndDismissesThemAllWhenDisposed(): void {
+  public async postsUpdatesAndDismissesItsNotificationsAndDismissesThemAllWhenDisposed(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     const notifications = new NotificationCenter(() => undefined, () => new Date());
-    const context = ModuleContextTests.create(new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), new CommandRegistry(), notifications);
+    const context = ModuleContextTests.create(settings.service, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), new CommandRegistry(), notifications);
     notifications.post(ModuleContextTests.post("tasks.due", "Due", "tasks.show"));
 
     const saved = context.postNotification(ModuleContextTests.post("notes.saved", "Saved", "tasks.show"));
@@ -158,9 +176,10 @@ export class ModuleContextTests {
   }
 
   @TestMethod
-  public refusesAnUndeclaredKindOrAnotherModulesCommandOnPostAndOnUpdate(): void {
+  public async refusesAnUndeclaredKindOrAnotherModulesCommandOnPostAndOnUpdate(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
     const notifications = new NotificationCenter(() => undefined, () => new Date());
-    const context = ModuleContextTests.create(new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), new CommandRegistry(), notifications);
+    const context = ModuleContextTests.create(settings.service, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), new CommandRegistry(), notifications);
     const saved = context.postNotification(ModuleContextTests.post("notes.saved", "Saved", null));
 
     const undeclared = Assert.throws(() => context.postNotification(ModuleContextTests.post("notes.deleted", "Deleted", null)), RegistrationException);
@@ -171,12 +190,57 @@ export class ModuleContextTests {
     Assert.areEqual("Saved", notifications.list.notifications.map(t => t.post.title).join(","));
   }
 
+  @TestMethod
+  public async readsItsOwnItsDependenciesAndTheShellsSettingsAndChangesOnlyItsOwn(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(ModuleContextTests.SETTINGS);
+    const context = ModuleContextTests.create(settings.service, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry());
+    const folder = new SettingScope(QualifiedName.parse("notes.folder"), "f1");
+    const tasks = new SettingScope(QualifiedName.parse("tasks.list"), "l1");
+
+    context.settings.write("notes.sortBy", "title");
+    context.settings.write("notes.sortBy", "date", folder);
+    const read = ["notes.sortBy", "tasks.size", "shell.mode"].map(t => context.settings.read(t));
+    const scoped = context.settings.read("notes.sortBy", folder);
+    context.settings.reset("notes.sortBy", folder);
+    context.settings.setScopeParent(folder, tasks);
+    context.settings.setScopeParent(folder, null);
+    context.settings.removeScope(folder);
+
+    Assert.areEqual("title,a,a,date,title", [...read, scoped, context.settings.read("notes.sortBy", folder)].join(","));
+    Assert.areEqual("The module notes may only read its own settings, its dependencies' and the shell's, not clock.speed.",
+      Assert.throws(() => context.settings.read("clock.speed"), RegistrationException).message);
+    Assert.throws(() => context.settings.read("notes.missing"), SettingException);
+    Assert.areEqual("The module notes may only change its own settings, not tasks.size.",
+      Assert.throws(() => context.settings.write("tasks.size", "b"), RegistrationException).message);
+    Assert.throws(() => context.settings.reset("shell.mode"), RegistrationException);
+    Assert.throws(() => context.settings.setScopeParent(tasks, null), RegistrationException);
+    Assert.throws(() => context.settings.setScopeParent(folder, new SettingScope(QualifiedName.parse("clock.dial"), "d1")), RegistrationException);
+    Assert.throws(() => context.settings.removeScope(tasks), RegistrationException);
+  }
+
+  @TestMethod
+  public async followsAReadableSettingUntilWithdrawn(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(ModuleContextTests.SETTINGS);
+    const context = ModuleContextTests.create(settings.service, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry());
+    const seen: string[] = [];
+    context.settings.onChanged("tasks.size", t => seen.push(String(t.value)));
+
+    settings.service.write(new SettingValue(new SettingKey(QualifiedName.parse("shell.mode")), "b"));
+    settings.service.write(new SettingValue(new SettingKey(QualifiedName.parse("tasks.size")), "c"));
+    context[Symbol.dispose]();
+    settings.service.write(new SettingValue(new SettingKey(QualifiedName.parse("tasks.size")), "d"));
+
+    Assert.areEqual("c", seen.join(","));
+    Assert.throws(() => context.settings.onChanged("clock.speed", () => undefined), RegistrationException);
+  }
+
   private static post(kind: string, title: string, action: string | null): NotificationPost {
     const actions = action === null ? [] : [new NotificationAction("Show", new CommandRun(QualifiedName.parse(action), null))];
     return new NotificationPost(QualifiedName.parse(kind), null, title, null, NotificationSeverity.Info, null, actions, null);
   }
 
   private static create(
+    settings: SettingsService,
     methods: MethodRegistry,
     events: EventRegistry,
     services: ServiceRegistry,
@@ -184,6 +248,6 @@ export class ModuleContextTests {
     notifications: NotificationCenter = new NotificationCenter(() => undefined, () => new Date())): ModuleContext {
     return new ModuleContext(
       ModuleContextTests.NOTES, new DataDirectory(ModuleContextTests.ROOT), methods, events, commands,
-      notifications, new NotificationPolicy([ModuleContextTests.NOTES], () => true), services);
+      notifications, new NotificationPolicy([ModuleContextTests.NOTES], () => true), services, settings);
   }
 }
