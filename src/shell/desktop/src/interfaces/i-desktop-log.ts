@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export interface IParentPort {
-  postMessage(message: unknown): void;
-  once(event: "message", listener: () => void): unknown;
+export interface IDesktopLog {
+  write(text: string): void;
 }

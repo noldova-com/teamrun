@@ -45,6 +45,16 @@ Scoped mock clocks may exercise long deadlines without changing production defau
 
 Angular tests install a throwing `ErrorHandler` through the unit-test builder's provider configuration. Unexpected framework errors must fail the run; a test of an expected error asserts it explicitly. Specs that depend on styles, storage, preferences or document focus establish their own initial state and restore it after pending effects and fixtures are destroyed. A passing assertion alongside an unhandled framework error is not a pass.
 
+### Flakiness and races
+
+A test that sometimes fails is a bug in the test or in the code, and no test is flaky by nature.
+
+- **Deterministic tests.** A test waits on an event or a condition, never a fixed sleep. A limit only bounds a hang: it is generous and is never what the test checks. A test is never retried, and a flaky test is never skipped or quarantined as the fix.
+- **No races in the code.** Code never relies on the order of independent events, such as a process's exit against its message, or a window closing against a save. The order is made explicit, for example with a reply or an acknowledgement. Each such fix comes with a test that forces the bad order and fails on the old code.
+- **Flakiness is a bug.** A flaky or racy failure seen anywhere, locally or in CI, gets its own bug issue and a small fix PR right away, never folded into other work.
+- **Stop the line.** While `main` has a known flaky or failing test, no other pull request enters the merge queue until it is fixed.
+- **Repeated native runs.** A change to startup, shutdown, processes, windows or inter-process messages passes its affected tests ten times in a row natively on Windows, Linux and macOS before review.
+
 ## 4. Results and reporting
 
 Assertions compare values according to a documented operation; truthiness or formatted strings must not replace the required value comparison. Structured assertion failures retain meaningful expected and actual values and their cause, subject to redaction.
@@ -93,7 +103,7 @@ Build, pack and install the selected source before testing its package API; depe
 Before pushing for review:
 
 - Merge the current `main` into the branch and run the gate on the result.
-- Run a new or changed test of processes, timing or platform behavior 10 times in a row on Windows and Linux; one pass does not show it is stable.
+- Repeat the tests as [Flakiness and races](#flakiness-and-races) requires: ten times in a row for a new or changed test of processes, timing or platform behavior, and for a change to startup, shutdown, processes, windows or inter-process messages. One pass does not show it is stable.
 - Check a configuration change, such as a workflow, with the tool that reads it.
 - Run the UI workflows a change affects natively on Windows, Linux and macOS, and name each machine's OS and CPU in the report. A change that does not touch the UI skips this step.
 
@@ -126,7 +136,7 @@ Verify normal closure, interruption and failure cleanup, including child process
 
 ### UI screenshots and reports
 
-Each workflow captures named screenshot checkpoints on every target and attaches relevant page/component captures to their test/step, including passing runs, keeping them with the run. On failure, retain a trace and capture any usable window. Report capture failure without replacing the original failure.
+Each workflow captures named screenshot checkpoints on every target and attaches relevant page/component captures to their test/step, including passing runs, keeping them with the run. On failure, retain a trace and capture any usable window. A failure while starting the application keeps the same evidence: the trace, each window's page and screenshot, each window's visibility, address, loading and crash state from the main process, and the data directory's logs, before the harness closes the application, removes its folders and reports the original failure. Each capture has a deadline. Report capture failure without replacing the original failure. Playwright starts Electron with its hang monitor disabled, so the workflows cannot see a page stop responding; package tests cover that path, and a workflow that stops a page ends its renderer process itself rather than asking Electron to crash it, which some targets do not do reliably.
 
 Capture established UI state using declared animation policy and framework stabilization; generic waits must not misread animation cancellation as failure. Test animations explicitly when relevant. Record platform, viewport, scale, theme, mode and font settings.
 

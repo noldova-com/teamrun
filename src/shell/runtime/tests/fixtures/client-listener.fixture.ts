@@ -11,6 +11,7 @@ import type { IRuntimeClientListener } from "@noldova/teamrun-shell-runtime";
 
 export class ClientListenerFixture implements IRuntimeClientListener {
   private readonly disconnected: PromiseWithResolvers<void> = Promise.withResolvers<void>();
+  private readonly waiters: [number, () => void][] = [];
 
   public readonly events: Event[] = [];
   public disconnections: number = 0;
@@ -19,8 +20,18 @@ export class ClientListenerFixture implements IRuntimeClientListener {
     return this.disconnected.promise;
   }
 
+  public waitForEventsAsync(count: number): Promise<void> {
+    if (this.events.length >= count)
+      return Promise.resolve();
+    return new Promise<void>(resolve => this.waiters.push([count, resolve]));
+  }
+
   public onEvent(event: Event): void {
     this.events.push(event);
+    for (const waiter of this.waiters.filter(t => this.events.length >= t[0])) {
+      this.waiters.splice(this.waiters.indexOf(waiter), 1);
+      waiter[1]();
+    }
   }
 
   public onDisconnected(): void {

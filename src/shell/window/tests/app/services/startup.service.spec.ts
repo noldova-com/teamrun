@@ -20,8 +20,7 @@ describe("StartupService", () => {
     const service = TestBed.inject(StartupService);
 
     expect(service.state().kind).toBe("Connecting");
-    await new Promise(t => setTimeout(t));
-    expect(service.state().kind).toBe("Failed");
+    await vi.waitFor(() => expect(service.state().kind).toBe("Failed"));
     bridge.publishStartup({ kind: "Ready", details: [] });
     expect(service.state().isReady).toBe(true);
   });

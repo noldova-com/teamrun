@@ -12,6 +12,7 @@ import type { IPreventableEvent } from "./i-preventable-event.js";
 import type { IWindowContents } from "./i-window-contents.js";
 
 export interface IDesktopWindow {
+  readonly id: number;
   readonly webContents: IWindowContents;
 
   loadFile(filePath: string): Promise<void>;
@@ -36,5 +37,7 @@ export interface IDesktopWindow {
   on(event: "move", listener: () => void): unknown;
   on(event: "maximize", listener: () => void): unknown;
   on(event: "unmaximize", listener: () => void): unknown;
+  on(event: "unresponsive", listener: () => void): unknown;
+  on(event: "responsive", listener: () => void): unknown;
   once(event: "closed", listener: () => void): unknown;
 }
