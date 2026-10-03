@@ -178,7 +178,7 @@ The shell owns notifications. A module decides when something deserves one; muti
 A module declares its notification kinds in `contributes.notifications`. A part posts a notification of one of them through its context and gets a handle that updates or dismisses it:
 
 - Its commands, the one opening it runs and those of its actions, are the module's own or a dependency's. A post with an undeclared kind or another module's command is refused.
-- Posting the same kind and key again replaces the earlier notification: it keeps its id and returns to the top, unread. An update keeps its place, time and whether it was read, and never changes its kind.
+- Posting the same kind and key again replaces the earlier notification: it keeps its id and returns to the top, unread, because a new post is a new occurrence that deserves attention. An update through the handle is the same occurrence changing, such as progress moving on, so it keeps its place, time and whether it was read, and never changes its kind.
 - The runtime holds the list, newest first, for its own life. It keeps at most 100, dropping the oldest that report no work in progress.
 - Windows read the list with `shell.notifications` and follow the event of the same name, which carries the whole list after every change. A window part posts with `shell.postNotification` and changes or removes its notifications with `shell.updateNotification` and `shell.dismissNotification`; a post for a module that is not active is refused.
 - When a module's runtime part deactivates, all of its notifications are dismissed. When a window part is withdrawn, the notifications it posted are dismissed.
