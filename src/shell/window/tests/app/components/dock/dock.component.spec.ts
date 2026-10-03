@@ -208,10 +208,10 @@ describe("DockComponent", () => {
     const search = query(".tr-dock-strip-view[data-view=\"view/files.search\"]");
     const tree = query(".tr-dock-strip-view[data-view=\"view/files.tree\"]");
 
-    expect([search?.getAttribute("aria-label"), search?.querySelector("tr-badge")?.textContent?.trim()]).toEqual(["files.search, 120 results", "99+"]);
-    expect([tree?.getAttribute("aria-label"), tree?.querySelector("tr-badge")]).toEqual(["files.tree", null]);
+    expect([search?.getAttribute("aria-label"), search?.querySelector("tr-view-badge")?.textContent?.trim()]).toEqual(["files.search, 120 results", "99+"]);
+    expect([tree?.getAttribute("aria-label"), tree?.querySelector("tr-view-badge")]).toEqual(["files.tree", null]);
     const icon = search?.getBoundingClientRect();
-    const badge = search?.querySelector("tr-badge")?.getBoundingClientRect();
+    const badge = search?.querySelector("tr-view-badge")?.getBoundingClientRect();
     expect([badge?.top, badge?.right]).toEqual([icon?.top, icon?.right]);
   });
 

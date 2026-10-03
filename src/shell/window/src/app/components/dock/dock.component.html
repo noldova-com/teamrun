@@ -27,7 +27,7 @@ LICENSE file in the root directory of this source tree.
               [label]="badge ? resources.formatBadged(label.title, badge.description) : label.title"
               [pressed]="isShowing(icon.group, tab)" [trTooltip]="label.title" [trTooltipSide]="tooltipSide()" [trTooltipBeside]="resources.dockStripSelector" (click)="toggle(icon.group, tab)">
               @if (badge) {
-                <tr-badge class="tr-dock-strip-badge" [count]="badge.count" />
+                <tr-view-badge class="tr-dock-strip-badge" [count]="badge.count" />
               }
             </button>
           }

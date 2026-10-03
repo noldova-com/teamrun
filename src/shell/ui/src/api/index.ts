@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export { BadgeComponent } from "../app/components/badge/badge.component";
+export { ViewBadgeComponent } from "../app/components/view-badge/view-badge.component";
 export { ButtonComponent } from "../app/components/button/button.component";
 export { CheckboxComponent } from "../app/components/checkbox/checkbox.component";
 export { DialogComponent } from "../app/components/dialog/dialog.component";
