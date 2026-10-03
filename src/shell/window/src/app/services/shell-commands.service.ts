@@ -13,6 +13,7 @@ import "@noldova/teamrun-foundation-core";
 import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import { KeyChord } from "@noldova/teamrun-shell-protocol";
 
+import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
 import { PanelEdge } from "../enums/panel-edge";
 import { CommandContribution } from "../models/command-contribution";
@@ -57,6 +58,8 @@ export class ShellCommandsService {
     new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, null,
       () => this.done(() => this.search.open())),
     new CommandContribution(Resources.resetLayoutCommand, Resources.resetLayoutLabel, Resources.resetLayoutGlyph, null, () => this.done(() => this.layout.reset())),
+    ...Object.values(BottomDockSpan).map(span => new CommandContribution(Resources.bottomSpanCommands[span], Resources.bottomSpanLabels[span], Resources.bottomSpanGlyphs[span], null,
+      () => this.done(() => this.layout.setBottomSpan(span)))),
     new CommandContribution(Resources.showAllTabsCommand, Resources.overflowLabel, Resources.overflowGlyph, null,
       commandArguments => this.done(() => {
         const group = this.groupOf(commandArguments);

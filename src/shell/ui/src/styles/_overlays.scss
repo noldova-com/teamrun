@@ -12,3 +12,7 @@ tr-menu .tr-menu-label {
   font-size: var(--tr-text-panel);
   line-height: var(--tr-line-panel);
 }
+
+tr-menu:has(.tr-menu-item-icon) [tr-menu-item]:not(:has(.tr-menu-item-icon)) {
+  padding-inline-start: calc(var(--tr-menu-item-inset) + var(--tr-menu-item-padding) * 2 + var(--tr-icon));
+}
