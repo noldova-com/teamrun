@@ -86,6 +86,7 @@ test.describe("notifications", () => {
     await list(window).getByRole("checkbox", { name: "Do not disturb" }).check();
     await expect(bell(window).locator(".tr-notifications-icon")).toHaveText("notifications_off");
     await desktop.restartAsync();
+    await desktop.useSuiteViewportAsync();
 
     await expect(bell(desktop.window).locator(".tr-notifications-icon")).toHaveText("notifications_off");
     await expect(bell(desktop.window)).toHaveAttribute("aria-label", /, Do not disturb$/);
