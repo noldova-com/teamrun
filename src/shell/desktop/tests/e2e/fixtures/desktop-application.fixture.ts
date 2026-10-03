@@ -11,12 +11,14 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 
 import { type ElectronApplication, type Page, type TestInfo, _electron, expect } from "@playwright/test";
 
 import { DataDirectory, DiscoveryReader, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
 import ErrorOutputClassifier from "./error-output.classifier.ts";
+import ProcessListFixture from "./process-list.fixture.ts";
 
 export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
@@ -29,6 +31,8 @@ export default class DesktopApplicationFixture {
   private static readonly DATA_FOLDER: string = "data";
   private static readonly DEVICE_FOLDER: string = "device";
   private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
+  private static readonly PROCESS_EXIT_TIMEOUT: number = 30_000;
+  private static readonly PROCESS_EXIT_INTERVAL: number = 50;
   private static readonly TRACE_FILE: string = "trace.zip";
   private static readonly WINDOWS_FILE: string = "windows.json";
   private static readonly DIAGNOSTIC_TIMEOUT: number = 10_000;
@@ -41,9 +45,11 @@ export default class DesktopApplicationFixture {
   private electronApplication: ElectronApplication | null = null;
   private page: Page | null = null;
   private childProcess: ChildProcess | null = null;
+  private readonly processIds: Set<number> = new Set();
 
   public readonly failures: string[] = [];
   public closeMilliseconds: number | null = null;
+  public awaitedProcessIds: readonly number[] = [];
   public readonly root: string;
   public readonly dataDirectory: string;
 
@@ -157,6 +163,7 @@ export default class DesktopApplicationFixture {
   public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
     const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
+    await this.recordProcessesAsync(child);
     const started = Date.now();
     await this.application.close();
     this.closeMilliseconds = Date.now() - started;
@@ -179,7 +186,35 @@ export default class DesktopApplicationFixture {
     if (isRunning)
       await this.closeAsync();
     await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
+    await this.waitForProcessesAsync();
     await rm(this.root, { recursive: true, force: true, maxRetries: 10 });
+  }
+
+  private async recordProcessesAsync(child: ChildProcess): Promise<void> {
+    for (const processId of [...this.processIds].filter(t => !DesktopApplicationFixture.isAlive(t)))
+      this.processIds.delete(processId);
+    if (child.pid === undefined)
+      return;
+    for (const processId of [child.pid, ...await ProcessListFixture.readDescendantsAsync(child.pid)])
+      this.processIds.add(processId);
+  }
+
+  private async waitForProcessesAsync(): Promise<void> {
+    if (this.childProcess?.pid !== undefined)
+      this.processIds.add(this.childProcess.pid);
+    const deadline = Date.now() + DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT;
+    let running = [...this.processIds].filter(t => DesktopApplicationFixture.isAlive(t));
+    this.awaitedProcessIds = running;
+    while (running.length > 0 && Date.now() < deadline) {
+      await delay(DesktopApplicationFixture.PROCESS_EXIT_INTERVAL);
+      running = running.filter(t => DesktopApplicationFixture.isAlive(t));
+    }
+    this.awaitedProcessIds = [];
+    if (running.length === 0)
+      return;
+    const names = ProcessListFixture.readNames(running);
+    const described = running.map(t => `${names.get(t) ?? "unknown"} (${t})`).join(", ");
+    throw new Error(`TeamRun's processes ${described} still run ${DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT / 1000} s after it closed, so its folder ${this.root} is kept.`);
   }
 
   private async keepDiagnosticsAsync(isRunning: boolean): Promise<void> {
