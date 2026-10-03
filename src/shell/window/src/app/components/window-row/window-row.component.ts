@@ -11,8 +11,8 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandle
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { AppearanceService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OverlaySide, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
-import { WindowAppearance } from "../../models/window-appearance";
 import { Resources } from "../../../resources";
+import { WindowAppearance } from "../../models/window-appearance";
 import { BarItemsService } from "../../services/bar-items.service";
 import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
@@ -35,10 +35,10 @@ export class WindowRowComponent {
   private readonly commands: CommandService = inject(CommandService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
 
+  protected readonly resources: typeof Resources = Resources;
   protected readonly isMac: boolean = this.bridge.isMac;
   protected readonly bars: BarItemsService = inject(BarItemsService);
   protected readonly menuBar: MenuBarService = inject(MenuBarService);
-  protected readonly resources: typeof Resources = Resources;
   protected readonly below: OverlaySide = OverlaySide.below;
 
   public constructor() {

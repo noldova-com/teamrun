@@ -130,6 +130,14 @@ export class Resources {
   public static readonly moveEarlierLabel: string = "Move left";
   public static readonly moveLaterLabel: string = "Move right";
   public static readonly resetLayoutLabel: string = "Reset the layout";
+  public static readonly bottomSpanCommands: Readonly<Record<BottomDockSpan, string>> = {
+    [BottomDockSpan.Full]: "shell.spanBottomDock",
+    [BottomDockSpan.Between]: "shell.fitBottomDockBetween"
+  };
+  public static readonly bottomSpanGlyphs: Readonly<Record<BottomDockSpan, string>> = {
+    [BottomDockSpan.Full]: "width_full",
+    [BottomDockSpan.Between]: "width_normal"
+  };
   public static readonly bottomSpanLabels: Readonly<Record<BottomDockSpan, string>> = {
     [BottomDockSpan.Full]: "Bottom dock across the window",
     [BottomDockSpan.Between]: "Bottom dock between the side docks"
@@ -207,6 +215,14 @@ export class Resources {
     [DockSide.Bottom]: "Show or hide the bottom dock"
   };
   public static readonly tabArgument: string = "tab";
+  public static readonly showCommandsCommand: string = "shell.showCommands";
+  public static readonly showCommandsTitle: string = "Show all commands";
+  public static readonly showCommandsGlyph: string = "search";
+  public static readonly showCommandsKey: string = "Mod+Shift+P";
+  public static readonly commandSearchLabel: string = "Search commands";
+  public static readonly commandSearchPaneClass: string = "tr-command-search-pane";
+  public static readonly windowRowSelector: string = "tr-window-row";
+  public static readonly wordSeparatorPattern: RegExp = /[\s\-_./:,]/u;
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly hideDockLabels: Readonly<Record<DockSide, string>> = {
     [DockSide.Left]: "Hide the left dock",
@@ -248,6 +264,7 @@ export class Resources {
   public static readonly documentField: string = "document";
   public static readonly instanceField: string = "instance";
   public static readonly keySeparator: string = "/";
+  public static readonly shellOwner: string = "shell";
   public static readonly contributionSeparator: string = ".";
   public static readonly nameParameter: string = "name";
   public static readonly titleParameter: string = "title";
@@ -320,7 +337,6 @@ export class Resources {
     [EditAction.SelectAll]: "select_all"
   };
   public static readonly menuLabel: string = "Menu";
-  public static readonly shellOwner: string = "shell";
   public static readonly fileMenu: string = "shell.file";
   public static readonly editMenu: string = "shell.edit";
   public static readonly viewMenu: string = "shell.view";
@@ -334,7 +350,9 @@ export class Resources {
   public static readonly helpMenuTitle: string = "Help";
   public static readonly tabMenuTitle: string = "Tab";
   public static readonly closeGroup: string = "shell.close";
+  public static readonly searchGroup: string = "shell.search";
   public static readonly docksGroup: string = "shell.docks";
+  public static readonly bottomDockGroup: string = "shell.bottomDock";
   public static readonly layoutGroup: string = "shell.layout";
   public static readonly windowPartMenusToken: string = "The build's module menus";
   public static readonly placeInput: string = "place";

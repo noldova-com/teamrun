@@ -9,6 +9,7 @@
     "commands": ["clock.tick"],
     "notifications": ["clock.alarm", "clock.sync"],
     "views": ["clock.face"],
-    "statusBarItems": ["clock.ticks"]
+    "statusBarItems": ["clock.ticks"],
+    "settings": ["clock.tickStep"]
   }
 }

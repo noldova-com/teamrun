@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
 import { EditAction } from "../enums/edit-action";
 import { MenuDeclarations } from "./menu-declarations";
@@ -28,7 +29,9 @@ export class ShellMenus {
     Object.values(EditAction).map(t => MenuItem.ofCommand(Resources.editCommands[t])));
   private static readonly GROUPS: readonly MenuGroup[] = [
     new MenuGroup(Resources.closeGroup, Resources.fileMenu, false, [MenuItem.ofCommand(Resources.closeTabCommand)]),
+    new MenuGroup(Resources.searchGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.showCommandsCommand)]),
     new MenuGroup(Resources.docksGroup, Resources.viewMenu, false, Object.values(DockSide).map(t => MenuItem.ofCommand(Resources.toggleDockCommands[t]))),
+    new MenuGroup(Resources.bottomDockGroup, Resources.viewMenu, true, Object.values(BottomDockSpan).map(t => MenuItem.ofCommand(Resources.bottomSpanCommands[t]))),
     new MenuGroup(Resources.layoutGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.resetLayoutCommand)])
   ];
 

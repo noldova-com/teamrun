@@ -17,6 +17,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly startupListeners: Set<(state: unknown) => void> = new Set();
   private readonly eventListeners: Set<(name: string, payload: unknown) => void> = new Set();
   private readonly menuListeners: Set<(id: string) => void> = new Set();
+  private readonly openedListeners: Set<(id: number) => void> = new Set();
 
   public readonly platform: string;
   public readonly appearances: JsonObject[] = [];
@@ -30,7 +31,8 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public readonly responses: Map<string, unknown> = new Map<string, unknown>([
     ["shell.modules", { payload: { modules: [] } }],
     ["shell.commands", { payload: { commands: [] } }],
-    ["shell.notifications", { payload: { notifications: [], isDoNotDisturb: false, sequence: 0 } }]
+    ["shell.notifications", { payload: { notifications: [], isDoNotDisturb: false, sequence: 0 } }],
+    ["shell.settings", { payload: { definitions: [], entries: [] } }]
   ]);
   public build: unknown = { productVersion: "1.2.3", fingerprint: "abc123" };
   public readonly copied: string[] = [];
@@ -59,7 +61,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   }
 
   public get listenerCount(): number {
-    return this.listeners.size + this.startupListeners.size + this.eventListeners.size + this.menuListeners.size;
+    return this.listeners.size + this.startupListeners.size + this.eventListeners.size + this.menuListeners.size + this.openedListeners.size;
   }
 
   public get closeListenerCount(): number {
@@ -148,6 +150,16 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public chooseMenuCommand(id: string): void {
     for (const listener of this.menuListeners)
+      listener(id);
+  }
+
+  public onNotificationOpened(listener: (id: number) => void): () => void {
+    this.openedListeners.add(listener);
+    return () => this.openedListeners.delete(listener);
+  }
+
+  public publishNotificationOpened(id: number): void {
+    for (const listener of this.openedListeners)
       listener(id);
   }
 

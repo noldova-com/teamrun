@@ -17,6 +17,7 @@ import { type ElectronApplication, type Page, type TestInfo, _electron, expect }
 import { DataDirectory, DiscoveryReader, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
 import ErrorOutputClassifier from "./error-output.classifier.ts";
+import ProcessListFixture from "./process-list.fixture.ts";
 
 export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
@@ -29,6 +30,9 @@ export default class DesktopApplicationFixture {
   private static readonly DATA_FOLDER: string = "data";
   private static readonly DEVICE_FOLDER: string = "device";
   private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
+  private static readonly PROCESS_EXIT_TIMEOUT: number = 30_000;
+  private static readonly REMOVE_RETRIES: number = 3;
+  private static readonly LOCKED_CODES: readonly string[] = ["EBUSY", "EPERM", "ENOTEMPTY"];
   private static readonly TRACE_FILE: string = "trace.zip";
   private static readonly WINDOWS_FILE: string = "windows.json";
   private static readonly DIAGNOSTIC_TIMEOUT: number = 10_000;
@@ -41,6 +45,8 @@ export default class DesktopApplicationFixture {
   private electronApplication: ElectronApplication | null = null;
   private page: Page | null = null;
   private childProcess: ChildProcess | null = null;
+  private isKeptOffCursor: boolean = false;
+  private readonly recorded: Set<number> = new Set();
 
   public readonly failures: string[] = [];
   public closeMilliseconds: number | null = null;
@@ -97,6 +103,10 @@ export default class DesktopApplicationFixture {
     }
   }
 
+  public get recordedProcessIds(): readonly number[] {
+    return [...this.recorded];
+  }
+
   public get application(): ElectronApplication {
     if (this.electronApplication === null)
       throw new Error("TeamRun is not running.");
@@ -136,6 +146,8 @@ export default class DesktopApplicationFixture {
   }
 
   public async useViewportAsync(width: number, height: number): Promise<void> {
+    this.isKeptOffCursor = true;
+    await this.moveOffCursorAsync();
     const session = await this.window.context().newCDPSession(this.window);
     await session.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
     await expect.poll(() => this.window.evaluate(() => [innerWidth, innerHeight, devicePixelRatio])).toEqual([width, height, 1]);
@@ -157,6 +169,7 @@ export default class DesktopApplicationFixture {
   public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
     const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
+    await this.recordProcessesAsync();
     const started = Date.now();
     await this.application.close();
     this.closeMilliseconds = Date.now() - started;
@@ -174,12 +187,42 @@ export default class DesktopApplicationFixture {
 
   public async disposeAsync(hasFailed: boolean = this.testInfo.status !== this.testInfo.expectedStatus): Promise<void> {
     const isRunning = this.electronApplication !== null && Object.is(this.requireProcess().exitCode, null);
+    if (isRunning && this.isKeptOffCursor && await this.isCursorInsideAsync())
+      this.failures.push("The real cursor came back inside the window, so its position could reach the test's pointer events.");
     if (hasFailed)
       await this.keepDiagnosticsAsync(isRunning);
     if (isRunning)
       await this.closeAsync();
     await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
-    await rm(this.root, { recursive: true, force: true, maxRetries: 10 });
+    await this.removeFolderAsync();
+  }
+
+  private async removeFolderAsync(): Promise<void> {
+    await this.failIfRunningAsync(await ProcessListFixture.waitForSignalsAsync([...this.recorded], DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT));
+    try {
+      await rm(this.root, { recursive: true, force: true });
+      return;
+    }
+    catch (error) {
+      if (!DesktopApplicationFixture.LOCKED_CODES.includes((error as NodeJS.ErrnoException).code ?? ""))
+        throw error;
+    }
+    await this.failIfRunningAsync(await ProcessListFixture.waitForExitAsync([...this.recorded], DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT));
+    await rm(this.root, { recursive: true, force: true, maxRetries: DesktopApplicationFixture.REMOVE_RETRIES });
+  }
+
+  private async recordProcessesAsync(): Promise<void> {
+    const electron = await this.application.evaluate(({ app }) => app.getAppMetrics().map(t => t.pid));
+    const runtime = await this.readRuntimeProcessIdAsync();
+    for (const processId of [...electron, ...runtime === undefined ? [] : [runtime]])
+      this.recorded.add(processId);
+  }
+
+  private async failIfRunningAsync(running: readonly number[]): Promise<void> {
+    if (running.length === 0)
+      return;
+    const described = await ProcessListFixture.describeAsync(running);
+    throw new Error(`TeamRun's processes ${described} still run ${DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT / 1000} s after it closed, so its folder ${this.root} is kept.`);
   }
 
   private async keepDiagnosticsAsync(isRunning: boolean): Promise<void> {
@@ -258,6 +301,40 @@ export default class DesktopApplicationFixture {
     await expect.poll(() => this.isVisibleAsync()).toBe(true);
     await expect.poll(async () => (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.productVersion)
       .toBe(RuntimeBuild.identity.productVersion);
+    await this.recordProcessesAsync();
+    if (this.isKeptOffCursor)
+      await this.moveOffCursorAsync();
+  }
+
+  private async moveOffCursorAsync(): Promise<void> {
+    await this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.unmaximize());
+    await expect.poll(() => this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isMaximized())).toBe(false);
+    await this.application.evaluate(({ BrowserWindow, screen }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (window === undefined)
+        return;
+      const cursor = screen.getCursorScreenPoint();
+      const bounds = window.getBounds();
+      if (cursor.x < bounds.x || cursor.y < bounds.y || cursor.x >= bounds.x + bounds.width || cursor.y >= bounds.y + bounds.height)
+        return;
+      const [shift] = [
+        { x: cursor.x + 1 - bounds.x, y: 0 },
+        { x: cursor.x - bounds.x - bounds.width, y: 0 },
+        { x: 0, y: cursor.y + 1 - bounds.y },
+        { x: 0, y: cursor.y - bounds.y - bounds.height }
+      ].sort((a, b) => Math.abs(a.x) + Math.abs(a.y) - Math.abs(b.x) - Math.abs(b.y));
+      window.setBounds({ ...bounds, x: bounds.x + (shift?.x ?? 0), y: bounds.y + (shift?.y ?? 0) });
+    });
+    await expect.poll(() => this.isCursorInsideAsync()).toBe(false);
+    await expect.poll(() => this.window.evaluate(() => document.querySelector(":hover") === null)).toBe(true);
+  }
+
+  private async isCursorInsideAsync(): Promise<boolean> {
+    return await this.application.evaluate(({ BrowserWindow, screen }) => {
+      const cursor = screen.getCursorScreenPoint();
+      const bounds = BrowserWindow.getAllWindows()[0]?.getBounds();
+      return bounds !== undefined && cursor.x >= bounds.x && cursor.y >= bounds.y && cursor.x < bounds.x + bounds.width && cursor.y < bounds.y + bounds.height;
+    });
   }
 
   private requireProcess(): ChildProcess {

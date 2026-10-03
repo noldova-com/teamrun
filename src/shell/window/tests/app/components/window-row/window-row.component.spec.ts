@@ -20,6 +20,7 @@ import { TopBarActionContribution } from "../../../../src/app/models/top-bar-act
 import { TopBarActionState } from "../../../../src/app/models/top-bar-action-state";
 import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { BarItemsService } from "../../../../src/app/services/bar-items.service";
+import { CommandSearchService } from "../../../../src/app/services/command-search.service";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { MenuService } from "../../../../src/app/services/menu.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
@@ -93,6 +94,23 @@ describe("WindowRowComponent", () => {
     expect(getComputedStyle(buttons[0] ?? fixture.nativeElement).getPropertyValue("app-region")).toBe("no-drag");
     expect(runs).toEqual([{ title: "Plan" }]);
     expect(errors.map(t => String(t))).toEqual(["Error: The note was not created."]);
+  });
+
+  it("ends the top bar with the shell's command search, outside the drag region", async () => {
+    DesktopBridgeFixture.install("win32");
+    apply();
+    const open = vi.spyOn(TestBed.inject(CommandSearchService), "open").mockImplementation(() => undefined);
+    TestBed.inject(BarItemsService).set([], [new TopBarAction(new TopBarActionContribution("notes.print", new TopBarActionState("print", "Print", "notes.print")), () => undefined)]);
+
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    fixture.detectChanges();
+    const buttons: HTMLButtonElement[] = [...fixture.nativeElement.querySelectorAll(".tr-window-row-actions button")];
+    buttons.at(-1)?.click();
+    await fixture.whenStable();
+
+    expect(buttons.map(t => t.getAttribute("aria-label"))).toEqual(["Print", "Search commands"]);
+    expect(getComputedStyle(buttons.at(-1) ?? fixture.nativeElement).getPropertyValue("app-region")).toBe("no-drag");
+    expect(open).toHaveBeenCalledTimes(1);
   });
 
   it("is a drag region that leaves the native controls' space free on Windows and Linux", () => {

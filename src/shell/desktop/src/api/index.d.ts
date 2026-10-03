@@ -8,11 +8,14 @@
 
 import type { Writable } from "node:stream";
 
-import type { AppDetailsOptions, BrowserWindowConstructorOptions, MenuItemConstructorOptions, MessageBoxOptions, MessageBoxReturnValue, Rectangle, RenderProcessGoneDetails, TitleBarOverlayOptions, WindowOpenHandlerResponse } from "electron";
+import type {
+  AppDetailsOptions, BrowserWindowConstructorOptions, MenuItemConstructorOptions, MessageBoxOptions, MessageBoxReturnValue, NotificationConstructorOptions, Rectangle, RenderProcessGoneDetails,
+  TitleBarOverlayOptions, WindowOpenHandlerResponse
+} from "electron";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { Event, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey } from "@noldova/teamrun-shell-protocol";
+import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey } from "@noldova/teamrun-shell-protocol";
 import type { DataDirectory, DiagnosticRedactor, IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
 
 /**
@@ -709,6 +712,23 @@ export interface IWindowContents {
   on(event: "render-process-gone", listener: (event: unknown, details: RenderProcessGoneDetails) => void): unknown;
 
   /**
+   * Listens for the page starting to load, on the first load and on every reload, before any of its scripts run.
+   *
+   * @param event The event's name.
+   * @param listener Called each time the page starts loading.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function count(contents: IWindowContents, loads: { count: number }): void {
+   *   contents.on("did-start-loading", () => loads.count++);
+   * }
+   * ```
+   */
+  on(event: "did-start-loading", listener: () => void): unknown;
+
+  /**
    * Decides what happens when the page asks to open a window.
    *
    * @param handler Returns the decision.
@@ -896,6 +916,126 @@ export interface IWindowContents {
    * ```
    */
   getOSProcessId(): number;
+}
+
+/**
+ * One notification shown through the operating system, as Electron's `Notification` provides it.
+ */
+export interface ISystemNotification {
+  /**
+   * Shows the notification without taking focus.
+   *
+   * @example
+   * ```ts
+   * import type { INotificationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function announce(host: INotificationHost): void {
+   *   host.create({ title: "Saved" }).show();
+   * }
+   * ```
+   */
+  show(): void;
+
+  /**
+   * Removes the notification from the screen and the operating system's list.
+   *
+   * @example
+   * ```ts
+   * import type { ISystemNotification } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function withdraw(notification: ISystemNotification): void {
+   *   notification.close();
+   * }
+   * ```
+   */
+  close(): void;
+
+  /**
+   * Listens for the person clicking the notification.
+   *
+   * @param event `"click"`.
+   * @param listener Called on each click.
+   * @returns Electron's notification, for chaining.
+   * @example
+   * ```ts
+   * import type { ISystemNotification } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function follow(notification: ISystemNotification, open: () => void): void {
+   *   notification.on("click", open);
+   * }
+   * ```
+   */
+  on(event: "click", listener: () => void): unknown;
+
+  /**
+   * Listens for the notification closing, by the person or from code.
+   *
+   * @param event `"close"`.
+   * @param listener Called once it closes.
+   * @returns Electron's notification, for chaining.
+   * @example
+   * ```ts
+   * import type { ISystemNotification } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function forget(notification: ISystemNotification, shown: Set<ISystemNotification>): void {
+   *   notification.on("close", () => shown.delete(notification));
+   * }
+   * ```
+   */
+  on(event: "close", listener: () => void): unknown;
+
+  /**
+   * Listens for the operating system failing to show the notification; Windows reports it.
+   *
+   * @param event `"failed"`.
+   * @param listener Called with the operating system's reason.
+   * @returns Electron's notification, for chaining.
+   * @example
+   * ```ts
+   * import type { ISystemNotification } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function report(notification: ISystemNotification, write: (text: string) => void): void {
+   *   notification.on("failed", (_event, error) => write(error));
+   * }
+   * ```
+   */
+  on(event: "failed", listener: (event: unknown, error: string) => void): unknown;
+}
+
+/**
+ * The operating system's notification service, as Electron's `Notification` class provides it.
+ */
+export interface INotificationHost {
+  /**
+   * Whether the operating system has a notification service.
+   *
+   * @returns `true` when notifications can show.
+   * @example
+   * ```ts
+   * import type { INotificationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function canNotify(host: INotificationHost): boolean {
+   *   return host.isSupported();
+   * }
+   * ```
+   */
+  isSupported(): boolean;
+
+  /**
+   * Creates a notification without showing it.
+   *
+   * @param options Its title, text and icon.
+   * @returns The notification.
+   * @example
+   * ```ts
+   * import type { INotificationHost, ISystemNotification } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function prepare(host: INotificationHost): ISystemNotification {
+   *   return host.create({ title: "Saved", body: "Plan.md" });
+   * }
+   * ```
+   */
+  create(options: NotificationConstructorOptions): ISystemNotification;
 }
 
 /**
@@ -1139,6 +1279,21 @@ export interface IDesktopWindow {
   isMinimized(): boolean;
 
   /**
+   * Whether the window has the keyboard focus.
+   *
+   * @returns `true` when the window is focused.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function isInUse(windows: readonly IDesktopWindow[]): boolean {
+   *   return windows.some(t => t.isFocused());
+   * }
+   * ```
+   */
+  isFocused(): boolean;
+
+  /**
    * Shows the window.
    *
    * @example
@@ -1372,6 +1527,11 @@ export interface IElectron {
    * Native message boxes, for a window whose page cannot draw.
    */
   readonly dialog: IDialogHost;
+
+  /**
+   * The operating system's notifications, for notifications posted while no window is focused.
+   */
+  readonly notifications: INotificationHost;
 
   /**
    * The displays, for placing a window on one that shows it.
@@ -2308,6 +2468,102 @@ export declare class SenderPolicy {
    * ```
    */
   public isWindowUrl(url: string): boolean;
+}
+
+/**
+ * Shows new notifications through the operating system while no TeamRun window is focused. A notification is new when
+ * its sequence is above every one seen since the window last read the notifications, so it counts from the same point
+ * as the window's toasts; while a window loads, broadcasts wait for its read. Updates, work in progress and
+ * notifications posted while Do not disturb is on for the device never show. An operating system notification closes
+ * when its notification is dismissed or replaced, and a failure to show one is logged once.
+ */
+export declare class SystemNotifier {
+  /**
+   * Creates the notifier.
+   *
+   * @param host The operating system's notification service.
+   * @param log Where the first failure to show a notification is written.
+   * @param readIcon Gives the application icon's path for each notification.
+   * @param isAnyWindowFocused Tells whether a TeamRun window has the focus.
+   * @param open Brings TeamRun forward and opens a clicked notification, by its id.
+   * @example
+   * ```ts
+   * import type { IDesktopLog, INotificationHost } from "@noldova/teamrun-shell-desktop";
+   * import { SystemNotifier } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function create(host: INotificationHost, log: IDesktopLog): SystemNotifier {
+   *   return new SystemNotifier(host, log, () => "/teamrun/icon.png", () => false, t => console.log(t));
+   * }
+   * ```
+   */
+  public constructor(host: INotificationHost, log: IDesktopLog, readIcon: () => string, isAnyWindowFocused: () => boolean, open: (id: number) => void);
+
+  /**
+   * The number to pass to {@link begin} for a read starting now; a reset or a hold changes it, so a read started before
+   * them is ignored.
+   */
+  public get epoch(): number;
+
+  /**
+   * Forgets the runtime's notifications and closes those shown, when the runtime connection ends or starts again.
+   *
+   * @example
+   * ```ts
+   * import type { SystemNotifier } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function disconnect(notifier: SystemNotifier): void {
+   *   notifier.reset();
+   * }
+   * ```
+   */
+  public reset(): void;
+
+  /**
+   * Holds broadcasts while a window loads, until its read of the notifications answers.
+   *
+   * @example
+   * ```ts
+   * import type { SystemNotifier } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function reload(notifier: SystemNotifier): void {
+   *   notifier.hold();
+   * }
+   * ```
+   */
+  public hold(): void;
+
+  /**
+   * Shows notifications above the sequence a window's read returned, including any in a broadcast held since.
+   *
+   * @param epoch The {@link epoch} when the read started.
+   * @param device This device's id, to know when its Do not disturb is on.
+   * @param sequence The sequence the read returned.
+   * @example
+   * ```ts
+   * import type { SystemNotifier } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function connect(notifier: SystemNotifier, device: string): void {
+   *   notifier.begin(notifier.epoch, device, 0);
+   * }
+   * ```
+   */
+  public begin(epoch: number, device: string, sequence: number): void;
+
+  /**
+   * Follows a broadcast of the runtime's notifications.
+   *
+   * @param broadcast The notifications, the quiet devices and the latest sequence.
+   * @example
+   * ```ts
+   * import type { SystemNotifier } from "@noldova/teamrun-shell-desktop";
+   * import { NotificationBroadcast } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function clear(notifier: SystemNotifier): void {
+   *   notifier.receive(new NotificationBroadcast([], [], 0));
+   * }
+   * ```
+   */
+  public receive(broadcast: NotificationBroadcast): void;
 }
 
 /**

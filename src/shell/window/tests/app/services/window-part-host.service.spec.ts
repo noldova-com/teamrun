@@ -34,6 +34,7 @@ import { CommandService } from "../../../src/app/services/command.service";
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../src/app/services/layout.service";
 import { TabLabelService } from "../../../src/app/services/tab-label.service";
+import { SettingsService } from "../../../src/app/services/settings.service";
 import { WindowPartHostService } from "../../../src/app/services/window-part-host.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 
@@ -120,11 +121,30 @@ describe("WindowPartHostService", () => {
 
     await vi.waitFor(() => expect(loads).toEqual([""]));
 
-    expect(bridge.requests).toEqual([["shell.modules", null], ["shell.commands", null]]);
+    expect(bridge.requests).toEqual([["shell.settings", {}], ["shell.modules", null], ["shell.commands", null]]);
     expect(host.failures()).toEqual([]);
     expect(host.generation()).toBe(1);
     expect(layout.layout().documents.tabs).toEqual([]);
     expect(errors).toEqual([]);
+  });
+
+  it("reads, sets, resets and follows settings through the settings service", async () => {
+    bridge.responses.set("shell.settings", { payload: { definitions: [], entries: [] } });
+    const { host, loads } = start([], []);
+    const settings = TestBed.inject(SettingsService);
+    const heard: string[] = [];
+    await vi.waitFor(() => expect(loads).toEqual([""]));
+    const stop = host.onSettingChanged(t => heard.push(t.key.name.text));
+
+    await host.writeSettingAsync("shell.mode", "Dark", null);
+    await host.resetSettingAsync("shell.mode", null);
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.mode", value: "Dark", isSet: true });
+    stop();
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.mode", value: "Light", isSet: true });
+
+    expect([host.readSetting("shell.mode"), settings.read("shell.mode")]).toEqual(["Light", "Light"]);
+    expect(heard).toEqual(["shell.mode"]);
+    expect(bridge.requests.slice(-2)).toEqual([["shell.setSetting", { name: "shell.mode", value: "Dark" }], ["shell.resetSetting", { name: "shell.mode" }]]);
   });
 
   it("activates the active modules' window parts before loading the layout and finds their contributions", async () => {

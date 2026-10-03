@@ -10,7 +10,7 @@ import { Component, type Type } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName, SettingChange, SettingKey, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { WindowPartAccessException } from "../../../src/app/exceptions/window-part-access.exception";
@@ -35,6 +35,7 @@ class FakeWindowPartHost implements IWindowPartHost {
   public readonly calls: string[] = [];
   public readonly listeners: Set<(name: string, payload: JsonValue) => void> = new Set();
   public readonly registered: Set<string> = new Set(["notes.taken"]);
+  public readonly settingListeners: Set<(change: SettingChange) => void> = new Set();
 
   public requestAsync(method: string, payload: JsonValue): Promise<JsonValue> {
     this.calls.push(`request ${method}`);
@@ -75,6 +76,30 @@ class FakeWindowPartHost implements IWindowPartHost {
 
   public dismissNotification(id: number): void {
     this.calls.push(`dismiss ${id}`);
+  }
+
+  public readSetting(name: string): JsonValue | undefined {
+    return name === "notes.missing" ? undefined : `${name} value`;
+  }
+
+  public writeSettingAsync(name: string, value: JsonValue, scope: SettingScope | null): Promise<void> {
+    this.calls.push(`write ${name} ${JSON.stringify(value)} ${scope?.id ?? "app"}`);
+    return Promise.resolve();
+  }
+
+  public resetSettingAsync(name: string, scope: SettingScope | null): Promise<void> {
+    this.calls.push(`reset ${name} ${scope?.id ?? "app"}`);
+    return Promise.resolve();
+  }
+
+  public onSettingChanged(listener: (change: SettingChange) => void): () => void {
+    this.settingListeners.add(listener);
+    return () => this.settingListeners.delete(listener);
+  }
+
+  public changeSetting(change: SettingChange): void {
+    for (const listener of this.settingListeners)
+      listener(change);
   }
 
   public refresh(): void {
@@ -126,6 +151,30 @@ describe("WindowPartContext", () => {
     await expect(posted.updateAsync(new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Info,
       new CommandRun(QualifiedName.parse("clock.open"), null), [], null))).rejects.toThrowError(WindowPartAccessException);
     expect(host.calls).toEqual(["post Saved"]);
+  });
+
+  it("reads its own, its dependencies' and the shell's settings, changes only its own, and hears their changes until withdrawn", async () => {
+    const folder = new SettingScope(QualifiedName.parse("notes.folder"), "f1");
+    const heard: string[] = [];
+    context.onSettingChanged("tasks.size", (value, scope) => heard.push(`${String(value)} ${scope?.id ?? "app"}`));
+
+    const read = ["notes.sortBy", "tasks.size", "shell.mode", "notes.missing"].map(t => context.readSetting(t));
+    await context.writeSettingAsync("notes.sortBy", "date");
+    await context.writeSettingAsync("notes.sortBy", "title", folder);
+    await context.resetSettingAsync("notes.sortBy");
+    await context.resetSettingAsync("notes.sortBy", folder);
+    host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("shell.mode")), "Dark", true));
+    host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("tasks.size"), folder), 2, true));
+    context.withdraw();
+    host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("tasks.size")), 3, true));
+
+    expect(read).toEqual(["notes.sortBy value", "tasks.size value", "shell.mode value", undefined]);
+    expect(host.calls).toEqual(["write notes.sortBy \"date\" app", "write notes.sortBy \"title\" f1", "reset notes.sortBy app", "reset notes.sortBy f1", "refresh"]);
+    expect(heard).toEqual(["2 f1"]);
+    expect(() => context.readSetting("clock.speed")).toThrowError(WindowPartAccessException);
+    expect(() => context.onSettingChanged("clock.speed", () => undefined)).toThrowError(WindowPartAccessException);
+    await expect(context.writeSettingAsync("tasks.size", 1)).rejects.toThrowError(WindowPartAccessException);
+    await expect(context.resetSettingAsync("shell.mode")).rejects.toThrowError(WindowPartAccessException);
   });
 
   it("registers its module's own views and documents and has the host refresh after each", () => {

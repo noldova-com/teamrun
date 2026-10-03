@@ -1,0 +1,68 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import { QualifiedName, SettingDefinition, SettingLocality, SettingOption, SettingType } from "@noldova/teamrun-shell-protocol";
+
+import { Resources } from "../../resources.js";
+
+export class ShellSettings {
+  public static readonly theme: QualifiedName = ShellSettings.named(Resources.themeSetting);
+  public static readonly mode: QualifiedName = ShellSettings.named(Resources.modeSetting);
+  public static readonly interfaceFont: QualifiedName = ShellSettings.named(Resources.interfaceFontSetting);
+  public static readonly codeFont: QualifiedName = ShellSettings.named(Resources.codeFontSetting);
+  public static readonly panelSize: QualifiedName = ShellSettings.named(Resources.panelSizeSetting);
+  public static readonly messageSize: QualifiedName = ShellSettings.named(Resources.messageSizeSetting);
+  public static readonly codeSize: QualifiedName = ShellSettings.named(Resources.codeSizeSetting);
+  public static readonly doNotDisturb: QualifiedName = ShellSettings.named(Resources.doNotDisturbSetting);
+  public static readonly mutedModules: QualifiedName = ShellSettings.named(Resources.mutedModulesSetting);
+
+  public static readonly all: readonly SettingDefinition[] = [
+    ShellSettings.appearance(ShellSettings.theme, Resources.themeTitle, Resources.themeDescription,
+      SettingType.choice([new SettingOption(Resources.defaultThemeId, Resources.defaultThemeTitle)]), Resources.defaultThemeId, SettingLocality.Shared, Resources.themeGroup),
+    ShellSettings.appearance(ShellSettings.mode, Resources.modeTitle, Resources.modeDescription,
+      ShellSettings.choiceOf(Resources.modeOptions), Resources.defaultMode, SettingLocality.Shared, Resources.themeGroup),
+    ShellSettings.appearance(ShellSettings.interfaceFont, Resources.interfaceFontTitle, Resources.interfaceFontDescription,
+      ShellSettings.choiceOf(Resources.fontOptions), Resources.defaultFont, SettingLocality.Device, Resources.textGroup),
+    ShellSettings.appearance(ShellSettings.codeFont, Resources.codeFontTitle, Resources.codeFontDescription,
+      ShellSettings.choiceOf(Resources.fontOptions), Resources.defaultFont, SettingLocality.Device, Resources.textGroup),
+    ShellSettings.appearance(ShellSettings.panelSize, Resources.panelSizeTitle, Resources.panelSizeDescription,
+      ShellSettings.textSize(), Resources.defaultPanelSize, SettingLocality.Device, Resources.textGroup),
+    ShellSettings.appearance(ShellSettings.messageSize, Resources.messageSizeTitle, Resources.messageSizeDescription,
+      ShellSettings.textSize(), Resources.defaultMessageSize, SettingLocality.Device, Resources.textGroup),
+    ShellSettings.appearance(ShellSettings.codeSize, Resources.codeSizeTitle, Resources.codeSizeDescription,
+      ShellSettings.textSize(), Resources.defaultCodeSize, SettingLocality.Device, Resources.textGroup),
+    new SettingDefinition(ShellSettings.doNotDisturb, Resources.doNotDisturbTitle, Resources.doNotDisturbDescription,
+      SettingType.boolean(), false, SettingLocality.Device, [], Resources.notificationsPage, Resources.notificationsGroup),
+    new SettingDefinition(ShellSettings.mutedModules, Resources.mutedModulesTitle, Resources.mutedModulesDescription,
+      SettingType.modules(), [], SettingLocality.Shared, [], Resources.notificationsPage, Resources.notificationsGroup)
+  ];
+
+  private static named(member: string): QualifiedName {
+    return new QualifiedName(Resources.reservedModuleId, member);
+  }
+
+  private static choiceOf(options: readonly (readonly [string, string])[]): SettingType {
+    return SettingType.choice(options.map(([value, title]) => new SettingOption(value, title)));
+  }
+
+  private static textSize(): SettingType {
+    return SettingType.number(Resources.minimumTextSize, Resources.maximumTextSize, Resources.textSizeStep);
+  }
+
+  private static appearance(
+    name: QualifiedName,
+    title: string,
+    description: string,
+    type: SettingType,
+    defaultValue: string | number,
+    locality: SettingLocality,
+    group: string
+  ): SettingDefinition {
+    return new SettingDefinition(name, title, description, type, defaultValue, locality, [], Resources.appearancePage, group);
+  }
+}

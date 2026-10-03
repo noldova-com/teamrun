@@ -16,6 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import type { MenuItemConstructorOptions } from "electron";
 
+import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeBuild, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
@@ -747,6 +748,52 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async addsThisDeviceToItsWindowsSettingsRequests(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    for (const name of ["shell.settings", "shell.setSetting", "shell.resetSetting"])
+      connection.answers.set(name, Response.success("r", name));
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    const answers = [
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", {}),
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", { name: "shell.panelSize", value: 15 }),
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.resetSetting", { name: "shell.panelSize", device: "another" })
+    ];
+    const sent = connection.calls.flatMap((t, index) => t.includes("Setting") || t === "shell.settings" ? [connection.payloads[index]] : []);
+
+    Assert.areEqual("shell.settings,shell.setSetting,shell.resetSetting", answers.map(t => t.payload).join(","));
+    Assert.areEqual(JSON.stringify([
+      { device: FakeDeviceIdentity.ID },
+      { name: "shell.panelSize", value: 15, device: FakeDeviceIdentity.ID },
+      { name: "shell.panelSize", device: FakeDeviceIdentity.ID }
+    ]), JSON.stringify(sent));
+  }
+
+  @TestMethod
+  public async refusesASettingsRequestWithoutAnObjectOrADevice(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const device = new FakeDeviceIdentity();
+    device.failure = new Error("The identity file is not JSON.");
+    const anonymous = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new FakeRuntimeConnection()), new FakeElectron(), device);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    const failures = [
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", null),
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", [1]),
+      await DesktopApplicationTests.requestAsync(anonymous, event, "shell.settings", {})
+    ].map(t => t.failure?.toJson());
+
+    Assert.areEqual(JSON.stringify([
+      { code: "InvalidMessage", message: "A settings request's payload must be a JSON object." },
+      { code: "InvalidMessage", message: "A settings request's payload must be a JSON object." },
+      { code: "Unavailable", message: "This device has no identity, so its settings cannot be read or changed." }
+    ]), JSON.stringify(failures));
+    Assert.isFalse(connection.calls.some(t => t.includes("etting")));
+  }
+
+  @TestMethod
   public async refusesRequestsItsWindowMayNotMake(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
@@ -843,6 +890,89 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async showsTheOperatingSystemANotificationPostedAfterItsWindowsReadWhileNoWindowIsFocusedAndOpensItInTheWindow(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const early = DesktopApplicationTests.wireNotification(1, "Early");
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [early], isDoNotDisturb: false, sequence: 1 }));
+    const launcher = new FakeRuntimeLauncher(connection);
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    const later = DesktopApplicationTests.wireNotification(2, "Later");
+
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [early], quietDevices: [], sequence: 1 }));
+    await DesktopApplicationTests.requestAsync(electron, DesktopApplicationTests.trustedEvent("linux"), "shell.notifications", {});
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [later, early], quietDevices: [], sequence: 2 }));
+    window.isFocusedNow = true;
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(3, "Focused"), later, early], quietDevices: [], sequence: 3 }));
+    window.isMinimizedNow = true;
+    electron.notifications.created[0]?.click();
+
+    Assert.areEqual("Later", electron.notifications.created.map(t => t.title).join(","));
+    Assert.isTrue(String(electron.notifications.created[0]?.options.icon).endsWith("icon-dark-512.png"));
+    Assert.areEqual("restore,focus", window.calls.filter(t => t === "restore" || t === "focus").join(","));
+    Assert.areEqual(JSON.stringify([["teamrun:notificationOpened", 2]]), JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:notificationOpened")));
+  }
+
+  @TestMethod
+  public async holdsTheOperatingSystemsNotificationsWhileItsWindowReloadsUntilTheWindowReadsAgain(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const alarm = DesktopApplicationTests.wireNotification(1, "Alarm");
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [alarm], isDoNotDisturb: false, sequence: 1 }));
+    const launcher = new FakeRuntimeLauncher(connection);
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+    await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
+    const reposted = DesktopApplicationTests.wireNotification(2, "Re-posted by the window");
+
+    window.webContents.startLoading();
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [reposted, alarm], quietDevices: [], sequence: 2 }));
+    const whileLoading = electron.notifications.created.length;
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [reposted, alarm], isDoNotDisturb: false, sequence: 2 }));
+    await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(3, "Posted after"), reposted, alarm], quietDevices: [], sequence: 3 }));
+
+    Assert.areEqual(0, whileLoading);
+    Assert.areEqual("Posted after", electron.notifications.created.map(t => t.title).join(","));
+  }
+
+  @TestMethod
+  public async showsTheOperatingSystemNothingWithoutAWindowReadForAKnownDeviceOrAfterTheRuntimeLeaves(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    first.answers.set("shell.notifications", Response.failure("r", new Failure(FailureCode.Internal, "The database is busy.")));
+    const second = new FakeRuntimeConnection();
+    let reconnect: (connection: FakeRuntimeConnection) => void = () => undefined;
+    const launcher = new FakeRuntimeLauncher(first, new Promise<FakeRuntimeConnection>(resolve => {
+      reconnect = resolve;
+    }));
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const unidentified = new FakeDeviceIdentity();
+    unidentified.failure = new Error("The identity file is not JSON.");
+    const lostLauncher = new FakeRuntimeLauncher(new FakeRuntimeConnection());
+    const lost = await DesktopApplicationTests.startReadyAsync("linux", lostLauncher, new FakeElectron(), unidentified);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+    const posted = new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(1, "Alarm")], quietDevices: [], sequence: 1 });
+
+    await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
+    await DesktopApplicationTests.requestAsync(lost, event, "shell.notifications", {});
+    launcher.listener?.onEvent(posted);
+    lostLauncher.listener?.onEvent(posted);
+    first.answers.set("shell.notifications", Response.success("r", { notifications: [] }));
+    await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
+    first.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: false, sequence: 1 }));
+    await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
+    launcher.listener?.onDisconnected();
+    reconnect(second);
+    await Condition.waitAsync(() => launcher.connections.length === 2);
+    await setImmediate();
+    launcher.listener?.onEvent(posted);
+
+    Assert.areEqual("0,0", [electron.notifications.created.length, lost.notifications.created.length].join(","));
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The notifications could not be read, so the operating system shows none until the window reads them again: ").length);
+  }
+
+  @TestMethod
   public async passesTheRuntimesEventsToItsWindowsThatRemain(): Promise<void> {
     const launcher = new FakeRuntimeLauncher();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher);
@@ -855,6 +985,28 @@ export class DesktopApplicationTests {
     Assert.areEqual(
       JSON.stringify([["teamrun:runtimeEvent", "notes.changed", { path: "/notes/a.md" }]]),
       JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
+  }
+
+  @TestMethod
+  public async passesASettingChangeOnlyToTheDeviceItConcernsWithoutItsDevice(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher();
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    const changed = new QualifiedName("shell", "settingsChanged");
+
+    launcher.listener?.onEvent(new Event(changed, { name: "shell.mode", value: "Dark", isSet: true }));
+    launcher.listener?.onEvent(new Event(changed, { name: "shell.panelSize", device: FakeDeviceIdentity.ID, value: 13, isSet: false }));
+    launcher.listener?.onEvent(new Event(changed, { name: "shell.panelSize", device: "another", value: 16, isSet: true }));
+    launcher.listener?.onEvent(new Event(changed, { value: 17 }));
+
+    Assert.areEqual(
+      JSON.stringify([
+        ["teamrun:runtimeEvent", "shell.settingsChanged", { name: "shell.mode", value: "Dark", isSet: true }],
+        ["teamrun:runtimeEvent", "shell.settingsChanged", { name: "shell.panelSize", value: 13, isSet: false }]
+      ]),
+      JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.settingsChanged could not be passed to the window").length);
   }
 
   @TestMethod
@@ -1232,6 +1384,10 @@ export class DesktopApplicationTests {
   private static click(item: MenuItemConstructorOptions | undefined): void {
     const click: ((...values: never[]) => void) | undefined = item?.click;
     click?.();
+  }
+
+  private static wireNotification(id: number, title: string): JsonObject {
+    return { id, sequence: id, post: { kind: "clock.alarm", title, severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false };
   }
 
   private static firstWindow(electron: FakeElectron): FakeDesktopWindow {

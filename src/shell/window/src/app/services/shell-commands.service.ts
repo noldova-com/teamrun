@@ -12,6 +12,7 @@ import { EnvironmentInjector, Injectable, afterNextRender, inject } from "@angul
 import "@noldova/teamrun-foundation-core";
 import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 
+import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
 import { EditAction } from "../enums/edit-action";
 import { PanelEdge } from "../enums/panel-edge";
@@ -22,6 +23,7 @@ import type { Tab } from "../models/layout/tab";
 import { TabDropTarget } from "../models/layout/tab-drop-target";
 import { TabTarget } from "../models/tab-target";
 import { Resources } from "../../resources";
+import { CommandSearchService } from "./command-search.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { EditTargetService } from "./edit-target.service";
 import { LayoutService } from "./layout.service";
@@ -31,6 +33,7 @@ import { TabStripService } from "./tab-strip.service";
 export class ShellCommandsService {
   private readonly layout: LayoutService = inject(LayoutService);
   private readonly strips: TabStripService = inject(TabStripService);
+  private readonly search: CommandSearchService = inject(CommandSearchService);
   private readonly edits: EditTargetService = inject(EditTargetService);
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly document: Document = inject(DOCUMENT);
@@ -56,7 +59,11 @@ export class ShellCommandsService {
       () => this.done(() => this.layout.toggleDock(side)), () => true, () => this.layout.layout().dock(side).isExpanded)),
     ...Object.values(EditAction).map(action => new CommandContribution(Resources.editCommands[action], Resources.editTitles[action], Resources.editGlyphs[action], null,
       () => this.editAsync(action), () => this.edits.canRun(action))),
+    new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, Resources.showCommandsKey,
+      () => this.done(() => this.search.open())),
     new CommandContribution(Resources.resetLayoutCommand, Resources.resetLayoutLabel, Resources.resetLayoutGlyph, null, () => this.done(() => this.layout.reset())),
+    ...Object.values(BottomDockSpan).map(span => new CommandContribution(Resources.bottomSpanCommands[span], Resources.bottomSpanLabels[span], Resources.bottomSpanGlyphs[span], null,
+      () => this.done(() => this.layout.setBottomSpan(span)), () => true, () => this.layout.layout().bottomSpan === span)),
     new CommandContribution(Resources.showAllTabsCommand, Resources.overflowLabel, Resources.overflowGlyph, null,
       commandArguments => this.done(() => {
         const group = this.groupOf(commandArguments);

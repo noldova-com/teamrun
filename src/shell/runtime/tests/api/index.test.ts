@@ -14,8 +14,10 @@ export class RuntimeApiTests {
   @TestMethod
   public exportsTheCompleteCatalog(): void {
     const exportNames = [
+      "AttachOptions",
       "BackupVerificationException",
       "BuildComparer",
+      "BuildMismatchException",
       "BuildRelation",
       "CapabilityToken",
       "ChildProcessStarter",
@@ -54,6 +56,7 @@ export class RuntimeApiTests {
       "ModuleDeclarationReader",
       "ModuleHost",
       "ModuleLoadException",
+      "NoRuntimeException",
       "NotificationCenter",
       "NotificationHandle",
       "NotificationPolicy",
@@ -82,7 +85,10 @@ export class RuntimeApiTests {
       "ServerSettings",
       "ServiceAccessException",
       "ServiceRegistry",
+      "SettingException",
+      "SettingsService",
       "ShellDatabase",
+      "ShellMigrations",
       "SystemCommand",
       "SystemCommandException",
       "UnknownSchemaException",

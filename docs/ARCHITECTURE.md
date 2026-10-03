@@ -96,9 +96,9 @@ Each module declares itself in `module.json` at its folder's root, with exactly 
 | `displayName` | The name people see |
 | `parts` | Its parts, each once: `runtime`, `window` or `cli`, each with a folder of that name |
 | `dependencies` | The ids of the modules it depends on |
-| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `notifications`, `views`, `documents`, `statusBarItems`, `topBarActions`, `menus` and `themes`, each of the form `<id>.<name>` with a camelCase name |
+| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `notifications`, `views`, `documents`, `statusBarItems`, `topBarActions`, `menus`, `themes`, `settings` and `settingScopes`, each of the form `<id>.<name>` with a camelCase name |
 
-A module without parts may leave the file out until it gains one. Dependencies form no cycle, and a build includes every module a listed module depends on. The build validates the declarations, orders them after their dependencies and writes them for the runtime, which reads them from `_build/modules/declarations.json` in the repository it is installed in, as the desktop finds the window's build there; the packaged layout is decided with packaging. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
+A module that contributes settings defines them in `settings.json`, and one that contributes menus in `menus.json`, each beside `module.json`, as section 5 describes. A module without parts may leave `module.json` out until it gains one, but a module the build lists must have it. An id is lowercase kebab-case and never `shell`. Dependencies form no cycle, and a build refuses a module whose dependency it does not include. The build validates the declarations, orders them after their dependencies and writes the runtime's view of them: each module's id, display name, dependencies, runtime package, contributions and settings, without its parts. The runtime reads that from `_build/modules/declarations.json` in the repository it is installed in, as the desktop finds the window's build there; the packaged layout is decided with packaging. The window's parts and menus reach the window through source the build generates. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
 
 ### Lifecycle
 
@@ -138,7 +138,7 @@ The shell owns registration, collisions, user overrides, persistence and removal
 |---|---|---|
 | Views | Content for a panel, in a dock or in the middle, with its title and icon | Docks, splits, hides and restores it |
 | Documents | Content for a tab in the middle, with its title and the breadcrumb the top bar shows for it | Opens, arranges, previews and restores tabs |
-| Commands | Named actions, each with a title, an optional icon and an optional default key, from its window part or its runtime part | Runs them by name, with optional JSON arguments, from shortcuts, the top bar, the status bar and menus and, later, search |
+| Commands | Named actions, each with a title, an optional icon and an optional default key, from its window part or its runtime part | Runs them by name, with optional JSON arguments, from shortcuts, the top bar, the status bar, menus and command search |
 | Shortcuts | A default key for a command | Dispatches keys to commands, reports collisions and applies the person's bindings |
 | Top bar | Actions for the window's top row, from its window part: an icon, a title and a command to run, which it may update or hide | Shows them as icon buttons beside the window controls and the active document's breadcrumb, in module order and then declared order; an action whose command is not registered is disabled. The shell's own top bar actions are shell components, not registrations |
 | Status bar | Items for its left or right side, from its window part: text, an icon or both, a tooltip and optionally a command to run, which it may update or hide | Shows them along the bottom of the window by side, in module order and then declared order, with the shell's own items, which are shell components rather than registrations, at the right end; an item with a command is a button, disabled while the command is not registered. An item runs a command and opens no popover of its own; a module that needs one waits for the shell to offer it |
@@ -165,7 +165,7 @@ A key is written as any of `Mod`, `Ctrl`, `Alt` and `Shift` joined by `+` to one
 
 Menus show a key by the platform's convention: macOS symbols in the order ⌃⌥⇧⌘ before the key, and elsewhere names such as `Ctrl+Alt+Shift+K`.
 
-The shell's own actions are commands too, named `shell.*`: closing, keeping and moving tabs, splitting and docking them, showing and hiding docks, resetting the layout and showing all of a group's tabs. A tab command acts on the tab its `tab` argument names, or else on the current tab, the active tab of the group that last held focus or had a tab activated; the shell's menus run the same commands. A command may say whether it is enabled for given arguments.
+The shell's own actions are commands too, named `shell.*`: closing, keeping and moving tabs, splitting and docking them, showing and hiding docks, spanning the bottom dock across the window or keeping it between the side docks, resetting the layout, showing all of a group's tabs and showing all commands, whose search lists every enabled command and runs the chosen one. Its default key, Mod+Shift+P, is the shell's only one. A tab command acts on the tab its `tab` argument names, or else on the current tab, the active tab of the group that last held focus or had a tab activated; the shell's menus run the same commands. A command may say whether it is enabled for given arguments.
 
 The window keeps one keyboard listener on the document, after every element's own. A key an input, editor or terminal handled, a key during text composition, a repeated key and the key of a command that is not enabled are left alone; a key bound to an enabled command runs it and goes no further. Keys go to commands in this order: the person's bindings first, then the shell's default keys, then default keys in module order, as `shell.modules` reports it, with a module's runtime commands before its window commands. The first holder keeps a key and each refused command is recorded as a collision. The person's bindings are applied as described, but until Settings exists none are stored and the collisions are not shown.
 
@@ -180,7 +180,23 @@ A module adds groups to the shell's places, its own and those of the modules it 
 
 A window part opens its own places and its dependencies' as context menus with the `trMenu` directive, giving a place and a context object. The context is merged into each item's arguments, the item's own fields winning, so one declared item acts on whatever the menu was opened on.
 
-The shell's own groups put Close the tab in File, and showing or hiding each dock and Reset the layout in View. On Windows and Linux, Edit holds Undo, Redo, Cut, Copy, Paste and Select all: each acts on the field that had focus before a menu took it, with the field's selection restored first, and is enabled only when that field allows it, such as Copy only with a selection and Paste only into a field that can be written. On macOS the window gives the desktop the main menu's rows whenever they change, and the desktop builds the native menu bar from them: a row shows its key without taking it from the window, so the window's key handling stays the only one, and choosing a row runs it in the window. The Edit and Window menus keep the system's own items, with their keys, before the shell's and modules' rows.
+The shell's own groups put Close the tab in File, and command search, showing or hiding each dock, the bottom dock across the window or between the side docks, and Reset the layout in View. On Windows and Linux, Edit holds Undo, Redo, Cut, Copy, Paste and Select all: each acts on the field that had focus before a menu took it, with the field's selection restored first, and is enabled only when that field allows it, such as Copy only with a selection and Paste only into a field that can be written. On macOS the window gives the desktop the main menu's rows whenever they change, and the desktop builds the native menu bar from them: a row shows its key without taking it from the window, so the window's key handling stays the only one, and choosing a row runs it in the window. The Edit and Window menus keep the system's own items, with their keys, before the shell's and modules' rows.
+
+### Settings
+
+A module defines each setting it contributes in `settings.json`, an object whose only field, `settings`, lists them. A setting has exactly these fields, and the build refuses a file whose settings differ from those `module.json` declares:
+
+| Field | Holds |
+|---|---|
+| `name` | The setting's name, `<id>.<name>` |
+| `title`, `description` | What Settings shows for it |
+| `type` | Its `kind` and that kind's limits: `Boolean`; `Choice` with `options`, each a `value` and a `title`; `Number` with `minimum`, `maximum` and `step`; `Text` with `maxLength`; or `Modules`, a list of distinct module ids |
+| `default` | A value its type accepts |
+| `locality` | `Shared`, one value for every device that shares the data directory, or `Device`, a value per device |
+| `scopes` | The setting scopes that may override it, its module's own or a dependency's; a device setting has none |
+| `page`, `group` | Where Settings shows it |
+
+The shell keeps the values in its database and reports every change with the event `shell.settingsChanged`, whose payload is the changed key, the value now in effect and whether a value is stored for the key, false after a reset. A part reads the settings of its module, its dependencies and the shell, and changes only its own module's. A window reads them all with `shell.settings` and changes them with `shell.setSetting` and `shell.resetSetting`; the desktop adds its device to these requests and passes a device's change only to that device's windows. A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
 
 ### Setting scopes
 
@@ -188,7 +204,7 @@ The application scope belongs to the shell. A module that owns a kind of object,
 
 ### Notifications
 
-The shell owns notifications. A module decides when something deserves one; muting, for example for one conversation, is a setting at that object's scope, applied by the module. The shell shows a notification without taking focus. Opening it brings TeamRun's window forward and runs the notification's command. The person can turn notifications off entirely or for one module in Settings.
+The shell owns notifications. A module decides when something deserves one; muting, for example for one conversation, is a setting at that object's scope, applied by the module. The shell shows a notification without taking focus. Opening it brings TeamRun's window forward and runs the notification's command. The person can turn notifications off entirely or for one module in Settings: that stops the window's toasts and the operating system's notifications and leaves each notification in the list. Do not disturb, below, does the same for one device.
 
 A module declares its notification kinds in `contributes.notifications`. A part posts a notification of one of them through its context and gets a handle that updates or dismisses it:
 
@@ -199,7 +215,8 @@ A module declares its notification kinds in `contributes.notifications`. A part 
 - When a module's runtime part deactivates, all of its notifications are dismissed. When a window part is withdrawn, the notifications it posted are dismissed.
 - The list marks every notification read when the person opens it, and Clear all removes every notification that reports no work in progress; those still in progress stay, because their modules update them.
 - The runtime gives each post and re-post the next sequence number, which an update keeps, and the list and its event carry the latest. A window reads the list once its window parts have activated, and toasts only notifications with a higher sequence than that read, so nothing posted before it toasts after a reload or reconnection. Activation does not await a part's posts, and the desktop resolves its device before passing the read on, so the posts and the read have no shared order: the window waits until every post its parts made while activating is answered before it reads.
-- While its window is focused and Do not disturb is off, the window shows those toasts, at most one of a kind every 5 s; the rest wait in the list. Without a focused window, the operating system shows it instead.
+- While its window is focused and Do not disturb is off, the window shows those toasts, at most one of a kind every 5 s; the rest wait in the list.
+- While no window is focused, the desktop shows each new notification through the operating system instead, with its title, text and the application's icon, never for an update or work in progress, while Do not disturb is on, or when the device's identity is unknown. It counts from the window's own read of the list, holding broadcasts while the window loads until that read answers, so it counts from the same point as the toasts. Clicking one brings the window forward, and the window runs the notification's command, because that command may be a window part's. The operating system's notification closes when the notification is dismissed, cleared or replaced. TeamRun never asks for permission upfront; a refusal leaves the notification in the list, and the first failure is logged.
 - Do not disturb is notification state kept per device in the runtime's database, not a general preference. The desktop adds its own device to its window's `shell.notifications` and `shell.setDoNotDisturb` requests and forwards the event as the state for that device, so the device's identity never reaches the window.
 
 ## 6. Runtime ownership and local protocol
@@ -229,7 +246,7 @@ A module declares its notification kinds in `contributes.notifications`. A part 
 ### Builds and lifetime
 
 - The first client may start a runtime; later clients attach only to their own build, carrying the same modules without separate module-protocol negotiation.
-- A newer build takes over a directory an older build's runtime owns by itself. It asks the older runtime to stop; if work is in progress, the person makes section 9's choice to wait for it or stop it; then the older runtime exits and the newer one starts. An older build that finds a newer runtime hands the person over to the newer build instead of starting. The person is never asked to find and quit another TeamRun.
+- A newer build takes over a directory an older build's runtime owns by itself. It asks the older runtime to stop; if work is in progress, the person makes section 9's choice to wait for it or stop it; then the older runtime exits and the newer one starts. An older build that finds a newer runtime hands the person over to the newer build instead of starting; a development build says that a newer one is running instead. A second desktop on a data directory, of any build, focuses the first and exits: the single-instance lock allows one desktop per data directory, and the handover is between a desktop and a runtime. The person is never asked to find and quit another TeamRun.
 - A build is newer when its product version is higher. Between two builds of the same product version, such as successive development builds, the build that is starting takes over.
 - Every build keeps this exchange from protocol version 1, so any build can stop any earlier one:
   - A handshake from another build, of any protocol version, is answered with a `BuildMismatch` failure whose details are the runtime's build identity and the program it runs from.
@@ -283,7 +300,7 @@ Migrations are ordered, explicit and transactional:
 - Refuse unknown or newer schemas rather than resetting them.
 - Destructive rollback, backup retention and cleanup of owned files require explicit policies; no automatic deletion is assumed.
 
-TeamRun does not open data written by a release that predates the shell. The runtime refuses such a data directory, as it refuses an unknown schema, and neither migrates nor resets it. The shell's own entries never count as such data, even before the shell's database exists: the ownership database and the `discovery`, `backups`, `desktop` (Electron's profile), `modules`, `work` and `logs` folders. The window explains the refusal and offers to move that data aside: at the person's request, the runtime renames its folder, deletes nothing, and starts with an empty data directory.
+TeamRun does not open data written by a release that predates the shell. The runtime refuses such a data directory, as it refuses an unknown schema, and neither migrates nor resets it. The shell's own entries never count as such data, even before the shell's database exists: the ownership database and the `discovery`, `backups`, `desktop` (Electron's profile), `modules`, `work` and `logs` folders. The window explains the refusal and offers to move that data aside. At the person's request, the runtime moves everything in the data directory that is not one of its own entries into a new folder beside it, named `<data directory>-before-shell-<time>`, deletes nothing, and carries on with an empty data directory.
 
 ## 8. Window
 

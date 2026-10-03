@@ -85,6 +85,10 @@ export class FakeWindowContents implements IWindowContents {
     return this.osProcessId;
   }
 
+  public startLoading(): void {
+    this.listeners.emit("did-start-loading");
+  }
+
   public goAway(reason: string, exitCode: number = 0): void {
     this.listeners.emit("render-process-gone", {}, { reason, exitCode });
   }

@@ -7,7 +7,7 @@
  */
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
+import type { NotificationPost, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import type { CommandContribution } from "../models/command-contribution";
 import type { DocumentContribution } from "../models/document-contribution";
@@ -32,4 +32,8 @@ export interface IWindowPartContext {
   keepDocument(name: string, instance: string): void;
   requestAsync(method: string, parameters: JsonValue): Promise<JsonValue>;
   onEvent(event: string, listener: (payload: JsonValue) => void): () => void;
+  readSetting(name: string): JsonValue | undefined;
+  writeSettingAsync(name: string, value: JsonValue, scope?: SettingScope | null): Promise<void>;
+  resetSettingAsync(name: string, scope?: SettingScope | null): Promise<void>;
+  onSettingChanged(name: string, listener: (value: JsonValue, scope: SettingScope | null) => void): () => void;
 }

@@ -247,7 +247,7 @@ test.describe("docking", () => {
     await expect(tab(window, secondNote)).toHaveAttribute("aria-selected", "true");
   });
 
-  test("the bottom dock spans the window under the side docks, or stays between them when chosen, and keeps that choice", async ({ desktop }) => {
+  test("the bottom dock spans the window under the side docks, or stays between them when chosen through its commands, and keeps that choice", async ({ desktop }) => {
     await desktop.useSuiteViewportAsync();
     const sideRects = (): Promise<Readonly<Record<string, { left: number; right: number; top: number; bottom: number }>>> => desktop.window.locator("tr-tab-group[data-side]")
       .evaluateAll(groups => Object.fromEntries(groups.map(group => {
@@ -263,11 +263,12 @@ test.describe("docking", () => {
       const rects = await sideRects();
       return (rects["Bottom"]?.left ?? 0) >= (rects["Left"]?.right ?? Infinity) && (rects["Left"]?.bottom ?? 0) > (rects["Bottom"]?.top ?? Infinity);
     };
-    const chooseAsync = async (name: string): Promise<void> => {
-      await tab(desktop.window, notes).focus();
-      await desktop.window.keyboard.press("Shift+F10");
-      await desktop.window.getByRole("menuitemradio", { name }).click();
-      await closeMenusAsync(desktop.window);
+    const chooseAsync = async (command: string): Promise<void> => {
+      await desktop.window.keyboard.press("ControlOrMeta+Shift+KeyP");
+      await expect(desktop.window.getByRole("combobox", { name: "Search commands" })).toBeFocused();
+      await desktop.window.keyboard.type("bottom dock");
+      await desktop.window.locator(`.tr-command-search-pane [data-item="${command}"]`).click();
+      await expect(desktop.window.locator(".tr-command-search-pane")).toHaveCount(0);
     };
     await tab(desktop.window, notes).focus();
     await desktop.window.keyboard.press("Shift+F10");
@@ -277,11 +278,9 @@ test.describe("docking", () => {
 
     await expect.poll(spansWindow).toBe(true);
     await desktop.checkpointAsync("bottom-dock-across-the-window");
-    await desktop.window.keyboard.press("Shift+F10");
-    await expect(desktop.window.getByRole("menuitemradio", { name: "Bottom dock across the window" })).toHaveAttribute("aria-checked", "true");
-    await desktop.window.keyboard.press("Escape");
-    await closeMenusAsync(desktop.window);
-    await chooseAsync("Bottom dock between the side docks");
+    await chooseAsync("shell.spanBottomDock");
+    await expect.poll(spansWindow).toBe(true);
+    await chooseAsync("shell.fitBottomDockBetween");
     await expect.poll(staysBetween).toBe(true);
     await desktop.checkpointAsync("bottom-dock-between-the-side-docks");
 
@@ -290,7 +289,7 @@ test.describe("docking", () => {
 
     await expect(tab(desktop.window, notes)).toBeVisible();
     await expect.poll(staysBetween).toBe(true);
-    await chooseAsync("Bottom dock across the window");
+    await chooseAsync("shell.spanBottomDock");
     await expect.poll(spansWindow).toBe(true);
   });
 

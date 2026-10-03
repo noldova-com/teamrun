@@ -50,9 +50,15 @@ import { OwnershipLock } from "../ownership/ownership-lock.js";
 import { CommandRegistry } from "../registry/command-registry.js";
 import { EventRegistry } from "../registry/event-registry.js";
 import { MethodRegistry } from "../registry/method-registry.js";
+import { SettingResetMethod } from "../settings/setting-reset-method.js";
+import { SettingWriteMethod } from "../settings/setting-write-method.js";
+import { SettingsReadMethod } from "../settings/settings-read-method.js";
+import { SettingsService } from "../settings/settings-service.js";
+import { ShellSettings } from "../settings/shell-settings.js";
 import { WindowStateReadMethod } from "../window-state/window-state-read-method.js";
 import { WindowStateStore } from "../window-state/window-state-store.js";
 import { WindowStateWriteMethod } from "../window-state/window-state-write-method.js";
+import { WorkMethod } from "../work/work-method.js";
 import { WorkTracker } from "../work/work-tracker.js";
 import { IdleMonitor } from "./idle-monitor.js";
 import { MoveAsideMethod } from "./move-aside-method.js";
@@ -67,6 +73,7 @@ export class RuntimeHost implements IIdleParticipant {
   private readonly idle: IdleMonitor;
   private readonly stopped: PromiseWithResolvers<string> = Promise.withResolvers<string>();
   private database: ShellDatabase | null;
+  private settings: SettingsService | null = null;
   private discovery: RuntimeDiscovery | null = null;
   private movingAside: Promise<void> | null = null;
   private isStopping: boolean = false;
@@ -110,6 +117,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics);
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
+    this.methods.register(ShellMethods.work, new WorkMethod(this.work));
     this.methods.register(ShellMethods.commands, new CommandsMethod(this.commands));
     this.methods.register(ShellMethods.runCommand, new RunCommandMethod(this.commands));
     if (!Object.isNull(database))
@@ -168,8 +176,8 @@ export class RuntimeHost implements IIdleParticipant {
   }
 
   private async openAsync(platform: string): Promise<void> {
-    if (!Object.isNull(this.database))
-      await this.modules.activateAsync();
+    if (!Object.isNull(this.settings))
+      await this.modules.activateAsync(this.settings);
     const endpoint = await this.listenAsync(platform);
     const discovery = new RuntimeDiscovery(
       endpoint.toString(),
@@ -192,13 +200,19 @@ export class RuntimeHost implements IIdleParticipant {
   private async performMoveAsideAsync(): Promise<void> {
     await DataDirectoryInspector.moveAsideAsync(this.lock);
     this.database = await ShellDatabase.openAsync(this.lock, ShellMigrations.all);
-    this.registerShellFacilities(this.database);
-    await this.modules.activateAsync();
+    await this.modules.activateAsync(this.registerShellFacilities(this.database));
     setImmediate(() => this.server.admit());
   }
 
-  private registerShellFacilities(database: ShellDatabase): void {
+  private registerShellFacilities(database: ShellDatabase): SettingsService {
     const store = new WindowStateStore(database);
+    const settings = new SettingsService(database, [...ShellSettings.all, ...this.modules.settingDefinitions], this.log.diagnostics);
+    const changed = this.events.declare(ShellEvents.settingsChanged);
+    settings.onChanged(t => changed.publish(t.toJson()));
+    this.methods.register(ShellMethods.settings, new SettingsReadMethod(settings));
+    this.methods.register(ShellMethods.setSetting, new SettingWriteMethod(settings));
+    this.methods.register(ShellMethods.resetSetting, new SettingResetMethod(settings));
+    this.settings = settings;
     this.methods.register(ShellMethods.readWindowBounds, new WindowStateReadMethod(store, WindowStateKind.Bounds));
     this.methods.register(ShellMethods.writeWindowBounds, new WindowStateWriteMethod(store, WindowStateKind.Bounds));
     this.methods.register(ShellMethods.readWindowLayout, new WindowStateReadMethod(store, WindowStateKind.Layout));
@@ -211,6 +225,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.methods.register(ShellMethods.markNotificationsRead, new MarkNotificationsReadMethod(this.notifications));
     this.methods.register(ShellMethods.clearNotifications, new ClearNotificationsMethod(this.notifications));
     this.methods.register(ShellMethods.setDoNotDisturb, new SetDoNotDisturbMethod(quietDevices, () => this.notifications.republish()));
+    return settings;
   }
 
   private async listenAsync(platform: string): Promise<Endpoint> {

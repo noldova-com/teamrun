@@ -17,6 +17,7 @@ export interface IWindowContents {
   on(event: "will-redirect", listener: (event: IPreventableEvent, url: string) => void): unknown;
   on(event: "will-attach-webview", listener: (event: IPreventableEvent) => void): unknown;
   on(event: "render-process-gone", listener: (event: unknown, details: RenderProcessGoneDetails) => void): unknown;
+  on(event: "did-start-loading", listener: () => void): unknown;
   setWindowOpenHandler(handler: () => WindowOpenHandlerResponse): void;
   send(channel: string, ...values: unknown[]): void;
   isLoading(): boolean;

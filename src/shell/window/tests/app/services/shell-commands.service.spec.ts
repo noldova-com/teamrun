@@ -10,10 +10,12 @@ import { TestBed } from "@angular/core/testing";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 
+import { BottomDockSpan } from "../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import type { CommandContribution } from "../../../src/app/models/command-contribution";
 import { Layout } from "../../../src/app/models/layout/layout";
 import type { LayoutService } from "../../../src/app/services/layout.service";
+import { CommandSearchService } from "../../../src/app/services/command-search.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
 import { TabStripService } from "../../../src/app/services/tab-strip.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
@@ -59,9 +61,10 @@ describe("ShellCommandsService", () => {
       "shell.closeTab", "shell.keepTab", "shell.closeOtherTabs", "shell.closeTabsToTheRight", "shell.closeAllTabs", "shell.moveTabLeft", "shell.moveTabRight",
       "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight", "shell.dockTabBottom",
       "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut", "shell.copy", "shell.paste", "shell.selectAll",
-      "shell.resetLayout", "shell.showAllTabs"
+      "shell.showCommands", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
-    expect(service.commands.every(t => t.title.length > 0 && t.icon !== null && t.defaultKey === null)).toBe(true);
+    expect(service.commands.every(t => t.title.length > 0 && t.icon !== null)).toBe(true);
+    expect(service.commands.filter(t => t.defaultKey !== null).map(t => [t.name, t.defaultKey?.text])).toEqual([["shell.showCommands", "Mod+Shift+P"]]);
     expect(command("shell.keepTab").title).toBe("Keep the tab open");
   });
 
@@ -151,6 +154,14 @@ describe("ShellCommandsService", () => {
     expect(layout.layout().sideOf(layout.layout().groupOf(search)?.id ?? -1)).toBe(DockSide.Bottom);
   });
 
+  it("opens the command search", async () => {
+    const open = vi.spyOn(TestBed.inject(CommandSearchService), "open").mockImplementation(() => undefined);
+
+    await runAsync("shell.showCommands");
+
+    expect(open).toHaveBeenCalledOnce();
+  });
+
   it("shows and hides each dock and resets the layout", async () => {
     await runAsync("shell.toggleLeftDock");
     expect(layout.layout().dock(DockSide.Left).isCollapsed).toBe(true);
@@ -160,6 +171,19 @@ describe("ShellCommandsService", () => {
 
     await runAsync("shell.resetLayout");
     expect(layout.layout().dock(DockSide.Left).isCollapsed).toBe(false);
+  });
+
+  it("keeps the bottom dock between the side docks or spans it across the window, both always enabled and the current one changing nothing", async () => {
+    const enabled = (): boolean[] => ["shell.spanBottomDock", "shell.fitBottomDockBetween"].map(t => command(t).isEnabled(null));
+    const initial = layout.layout();
+
+    await runAsync("shell.spanBottomDock");
+    expect(layout.layout()).toBe(initial);
+    await runAsync("shell.fitBottomDockBetween");
+    expect([layout.layout().bottomSpan, ...enabled()]).toEqual([BottomDockSpan.Between, true, true]);
+    await runAsync("shell.spanBottomDock");
+
+    expect(layout.layout().bottomSpan).toBe(BottomDockSpan.Full);
   });
 
   it("shows all tabs of a group whose tabs overflow, the current group by default", async () => {

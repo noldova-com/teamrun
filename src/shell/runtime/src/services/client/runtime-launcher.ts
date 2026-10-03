@@ -16,13 +16,16 @@ import "@noldova/teamrun-foundation-core";
 import { type BuildIdentity, FailureCode, type RuntimeHandover, RunningWork, StopPolicy } from "@noldova/teamrun-shell-protocol";
 
 import { BuildRelation } from "../../enums/build-relation.js";
+import { BuildMismatchException } from "../../exceptions/build-mismatch.exception.js";
 import { ConnectionException } from "../../exceptions/connection.exception.js";
 import { LaunchException } from "../../exceptions/launch.exception.js";
+import { NoRuntimeException } from "../../exceptions/no-runtime.exception.js";
 import { PreShellDataFoundException } from "../../exceptions/pre-shell-data-found.exception.js";
 import { RuntimeHandoverException } from "../../exceptions/runtime-handover.exception.js";
 import { WorkInProgressException } from "../../exceptions/work-in-progress.exception.js";
 import type { IProcessStarter } from "../../interfaces/process-starter.js";
 import type { IRuntimeClientListener } from "../../interfaces/runtime-client-listener.js";
+import { AttachOptions } from "../../models/attach-options.js";
 import { Endpoint } from "../../models/endpoint.js";
 import type { LaunchSettings } from "../../models/launch-settings.js";
 import { ProcessLaunchCommand } from "../../models/process-launch-command.js";
@@ -47,12 +50,12 @@ export class RuntimeLauncher {
     this.starter = starter;
   }
 
-  public async attachAsync(clientName: string, listener: IRuntimeClientListener, policy: StopPolicy = StopPolicy.IfIdle): Promise<RuntimeClient> {
-    return RuntimeLauncher.requireCurrentData(await this.connectAsync(clientName, listener, policy));
+  public async attachAsync(clientName: string, listener: IRuntimeClientListener, policy: StopPolicy = StopPolicy.IfIdle, options: AttachOptions = new AttachOptions()): Promise<RuntimeClient> {
+    return RuntimeLauncher.requireCurrentData(await this.connectAsync(clientName, listener, policy, options));
   }
 
   public async moveAsideAsync(clientName: string, listener: IRuntimeClientListener, policy: StopPolicy = StopPolicy.IfIdle): Promise<RuntimeClient> {
-    const client = await this.connectAsync(clientName, listener, policy);
+    const client = await this.connectAsync(clientName, listener, policy, new AttachOptions());
     if (Object.isNull(client.preShellData))
       return client;
 
@@ -71,7 +74,7 @@ export class RuntimeLauncher {
     throw new PreShellDataFoundException(data);
   }
 
-  private async connectAsync(clientName: string, listener: IRuntimeClientListener, policy: StopPolicy): Promise<RuntimeClient> {
+  private async connectAsync(clientName: string, listener: IRuntimeClientListener, policy: StopPolicy, options: AttachOptions): Promise<RuntimeClient> {
     const deadline = Date.now() + this.settings.launchTimeout;
     let started: StartedRuntime | null = null;
     while (Date.now() < deadline) {
@@ -84,12 +87,15 @@ export class RuntimeLauncher {
           const handover = client.handover;
           if (Object.isNull(handover))
             return client;
-          await this.resolveOtherBuildAsync(client, handover, policy, deadline);
+          await this.resolveOtherBuildAsync(client, handover, policy, deadline, options.takeOver);
           continue;
         }
       }
-      else if (Object.isNull(started))
+      else if (Object.isNull(started)) {
+        if (!options.start)
+          throw new NoRuntimeException(this.settings.dataDirectory.root);
         started = await this.startAsync();
+      }
       else if (!started.isRunning && !OwnershipLock.isOwned(this.settings.dataDirectory))
         throw await RuntimeLauncher.describeExitAsync(started);
       await delay(this.settings.pollInterval);
@@ -121,10 +127,14 @@ export class RuntimeLauncher {
     }
   }
 
-  private async resolveOtherBuildAsync(client: RuntimeClient, handover: RuntimeHandover, policy: StopPolicy, deadline: number): Promise<void> {
+  private async resolveOtherBuildAsync(client: RuntimeClient, handover: RuntimeHandover, policy: StopPolicy, deadline: number, takeOver: boolean): Promise<void> {
     if (BuildComparer.compare(this.identity, handover.identity) === BuildRelation.Older) {
       client.close();
       throw new RuntimeHandoverException(handover);
+    }
+    if (!takeOver) {
+      client.close();
+      throw new BuildMismatchException(handover);
     }
 
     const response = await client.stopAsync(policy).finally(() => client.close());

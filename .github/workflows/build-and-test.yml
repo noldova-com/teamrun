@@ -124,7 +124,33 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Set up Node.js
+      - name: Set up Node.js to classify
+        id: node
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to classify again
+        if: steps.node.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to classify again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to classify a last time
+        if: steps.node-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to classify a last time
+        if: steps.node-again.outcome == 'failure'
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '26.7.0'
@@ -198,6 +224,34 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js
+        id: node
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          architecture: ${{ matrix.architecture }}
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js again
+        if: steps.node.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          architecture: ${{ matrix.architecture }}
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js a last time
+        if: steps.node-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js a last time
+        if: steps.node-again.outcome == 'failure'
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '26.7.0'
@@ -500,6 +554,34 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js to install
+        id: node
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          architecture: ${{ matrix.architecture }}
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to install again
+        if: steps.node.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to install again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          architecture: ${{ matrix.architecture }}
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to install a last time
+        if: steps.node-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to install a last time
+        if: steps.node-again.outcome == 'failure'
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '26.7.0'

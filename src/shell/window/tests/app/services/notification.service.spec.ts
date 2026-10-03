@@ -60,7 +60,9 @@ describe("NotificationService", () => {
     expect(unread).toBe(1);
     expect(first?.sequence).toBe(2);
     expect([service.state().isDoNotDisturb, service.firstRead()?.sequence]).toEqual([false, 0]);
-    expect(bridge.requests.map(t => t[0])).toEqual(["shell.modules", "shell.commands", "shell.notifications", "shell.modules", "shell.commands", "shell.notifications"]);
+    expect(bridge.requests.map(t => t[0])).toEqual([
+      "shell.settings", "shell.modules", "shell.commands", "shell.notifications", "shell.settings", "shell.modules", "shell.commands", "shell.notifications"
+    ]);
   });
 
   it("reports a first read that fails", async () => {
@@ -118,6 +120,26 @@ describe("NotificationService", () => {
       ["shell.dismissNotification", { id: 7 }],
       ["shell.setDoNotDisturb", { isOn: true }]
     ]);
+  });
+
+  it("runs the open command of a notification opened from the operating system when it can run, and reports one that fails", async () => {
+    const runs: string[] = [];
+    const withOpen = (id: number, command: string): object =>
+      ({ id, sequence: id, post: { kind: "clock.alarm", title: `Alarm ${id}`, severity: "Info", open: { name: command, arguments: null }, actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false });
+    bridge.responses.set("shell.notifications", { payload: state(false, withOpen(4, "notes.fail"), withOpen(3, "clock.tick"), withOpen(2, "notes.newNote"), notification(1, "Plain", false)) });
+    const service = start();
+    await settleAsync(() => service.state().notifications.length === 4);
+    TestBed.inject(CommandService).setCommands([
+      new CommandContribution("notes.newNote", "New note", null, null, async () => runs.push("notes.newNote")),
+      new CommandContribution("notes.fail", "Fail", null, null, () => Promise.reject(new Error("The note is locked.")))
+    ]);
+
+    for (const id of [2, 1, 3, 9, 4])
+      bridge.publishNotificationOpened(id);
+    await vi.waitFor(() => expect(errors.length).toBe(1));
+
+    expect(runs).toEqual(["notes.newNote"]);
+    expect((errors[0] as Error).message).toBe("The note is locked.");
   });
 
   it("knows which actions can run and runs them through the commands", async () => {

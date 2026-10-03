@@ -20,6 +20,12 @@ export class ShellMethodsTests {
   }
 
   @TestMethod
+  public namesTheWorkMethod(): void {
+    Assert.areEqual("shell.work", ShellMethods.work.text);
+    Assert.isTrue(ShellMethods.work.isShell);
+  }
+
+  @TestMethod
   public namesTheCommandMethods(): void {
     Assert.areEqual("shell.commands", ShellMethods.commands.text);
     Assert.areEqual("shell.runCommand", ShellMethods.runCommand.text);
@@ -40,5 +46,10 @@ export class ShellMethodsTests {
     Assert.areEqual(
       JSON.stringify(["shell.readWindowBounds", "shell.writeWindowBounds", "shell.readWindowLayout", "shell.writeWindowLayout"]),
       JSON.stringify([ShellMethods.readWindowBounds, ShellMethods.writeWindowBounds, ShellMethods.readWindowLayout, ShellMethods.writeWindowLayout].map(t => t.text)));
+  }
+
+  @TestMethod
+  public namesTheSettingsMethods(): void {
+    Assert.areEqual("shell.settings,shell.setSetting,shell.resetSetting", [ShellMethods.settings, ShellMethods.setSetting, ShellMethods.resetSetting].map(t => t.text).join(","));
   }
 }

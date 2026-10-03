@@ -19,4 +19,6 @@
         [disabled]="!isAvailable(state.command)" [trTooltip]="state.title" [trTooltipSide]="below" (click)="run(state.command, state.commandArguments)"></button>
     }
   }
+  <button type="button" tr-icon-button class="tr-window-row-search" [icon]="resources.showCommandsGlyph" [label]="resources.commandSearchLabel"
+    [trTooltip]="resources.commandSearchLabel" [trTooltipSide]="below" (click)="run(resources.showCommandsCommand, null)"></button>
 </div>
