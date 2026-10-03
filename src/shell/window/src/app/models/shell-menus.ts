@@ -21,7 +21,8 @@ export class ShellMenus {
     new MenuPlace(Resources.viewMenu, Resources.viewMenuTitle, true),
     new MenuPlace(Resources.windowMenu, Resources.windowMenuTitle, true),
     new MenuPlace(Resources.helpMenu, Resources.helpMenuTitle, true),
-    new MenuPlace(Resources.tabMenu, Resources.tabMenuTitle, false)
+    new MenuPlace(Resources.tabMenu, Resources.tabMenuTitle, false),
+    new MenuPlace(Resources.appMenu, Resources.appMenuTitle, false)
   ];
   private static readonly EDITING: MenuGroup = new MenuGroup(Resources.editingGroup, Resources.editMenu, false,
     Object.values(EditAction).map(t => MenuItem.ofCommand(Resources.editCommands[t])));

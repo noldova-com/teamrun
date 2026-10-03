@@ -361,6 +361,8 @@ export class Resources {
   public static readonly invalidLayoutPart: string = "The value does not describe a valid part of a layout.";
   public static readonly unknownNode: string = "A node is a split, with children, or a group, with tabs.";
   public static readonly productName: string = productName;
+  public static readonly appMenu: string = "shell.app";
+  public static readonly appMenuTitle: string = Resources.productName;
   public static readonly noModules: string = "No modules";
   public static readonly moduleFailuresTitle: string = "Modules that didn't start";
   public static readonly copyDetailsLabel: string = "Copy details";

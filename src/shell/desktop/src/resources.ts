@@ -189,6 +189,7 @@ export class Resources {
   public static readonly enabledField: string = "enabled";
   public static readonly checkField: string = "check";
   public static readonly checkedField: string = "checked";
+  public static readonly appMenu: string = "shell.app";
   public static readonly editMenu: string = "shell.edit";
   public static readonly windowMenu: string = "shell.window";
   public static readonly helpMenu: string = "shell.help";
@@ -240,6 +241,10 @@ export class Resources {
 
   public static formatStarterFailed(failure: string): string {
     return `The runtime starter could not start the runtime: ${failure}`;
+  }
+
+  public static formatMenuBarRejected(reason: string): string {
+    return `The window sent a menu bar that is not valid, so the menu bar is unchanged: ${reason}`;
   }
 
   public static formatAppearanceRejected(reason: string): string {

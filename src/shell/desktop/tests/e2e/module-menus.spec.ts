@@ -42,7 +42,7 @@ test.describe("the menu bar on Windows and Linux", () => {
     const button = window.locator(".tr-window-row-menu");
     await expect(button).toHaveAttribute("aria-label", "Menu");
     await button.click();
-    await expect(window.locator("tr-menu.tr-window-row-menu-list button[tr-menu-item]")).toHaveText([/File/, /View/, /Notes/]);
+    await expect(window.locator("tr-menu.tr-window-row-menu-list button[tr-menu-item]")).toHaveText([/File/, /Edit/, /View/, /Notes/]);
     await window.keyboard.press("Escape");
 
     const file = await openBarMenuAsync(window, "File");
@@ -82,6 +82,29 @@ test.describe("the menu bar on Windows and Linux", () => {
 
     await expect(summary).toHaveValue("");
     await expect(summary).toBeFocused();
+  });
+});
+
+test.describe("the menu bar on macOS", () => {
+  test.skip(process.platform !== "darwin", "Windows and Linux show the menus from the menu button.");
+
+  test("the native menu bar holds the shell's and the modules' menus, shows checked state and runs a chosen row in the window", async ({ desktop }) => {
+    const window = desktop.window;
+    const read = (id: string): Promise<readonly [boolean, boolean] | null> => desktop.application.evaluate(({ Menu }, itemId) => {
+      const item = Menu.getApplicationMenu()?.getMenuItemById(itemId);
+      return item ? [item.enabled, item.checked] as const : null;
+    }, id);
+
+    await expect.poll(() => desktop.application.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map(t => t.label) ?? []))
+      .toEqual([expect.any(String), "File", "Edit", "View", "Notes", "Window"]);
+    await expect.poll(() => read("notes.tools/notes.toolsSorting/1")).toEqual([true, true]);
+    await desktop.application.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("shell.file/notes.create/0")?.click());
+    await desktop.application.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("notes.tools/notes.toolsSorting/0")?.click());
+
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"] .tr-tab-label")).toHaveText("Note 3");
+    await expect(window.locator(".tr-notes-list-items")).toHaveAttribute("data-sort", "title");
+    await expect.poll(() => read("notes.tools/notes.toolsSorting/0")).toEqual([true, true]);
+    await expect.poll(() => read("notes.tools/notes.toolsSorting/1")).toEqual([true, false]);
   });
 });
 

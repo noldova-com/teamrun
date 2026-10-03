@@ -16,6 +16,7 @@ import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../src/app/services/command.service";
 import { MenuBarService } from "../../../src/app/services/menu-bar.service";
 import { MenuService } from "../../../src/app/services/menu.service";
+import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 
 describe("MenuBarService", () => {
@@ -65,8 +66,9 @@ describe("MenuBarService", () => {
     const tree = start().tree();
     const menus = JsonReader.fromValue(tree).readObjectArray("menus").map(t => t.toJson());
 
-    expect(menus.map(t => t["place"])).toEqual(["shell.file", "shell.edit", "shell.view", "notes.tools", "shell.window", "shell.help"]);
-    expect(menus[3]).toEqual({
+    expect(menus.map(t => t["place"])).toEqual(["shell.app", "shell.file", "shell.edit", "shell.view", "notes.tools", "shell.window", "shell.help"]);
+    expect(menus[0]).toEqual({ place: "shell.app", title: Resources.productName, rows: [] });
+    expect(menus[4]).toEqual({
       place: "notes.tools", title: "Notes", rows: [
         { type: "command", id: "notes.tools/notes.sorting/0", label: "Sort by", key: null, enabled: true, check: "Radio", checked: false },
         { type: "command", id: "notes.tools/notes.sorting/1", label: "Sort by", key: null, enabled: true, check: "Radio", checked: true },
@@ -79,7 +81,7 @@ describe("MenuBarService", () => {
         { type: "command", id: "notes.tools/notes.more/1", label: "Locked", key: null, enabled: false, check: "None", checked: false }
       ]
     });
-    expect(menus[1]).toEqual({
+    expect(menus[2]).toEqual({
       place: "shell.edit", title: "Edit", rows: ["Undo", "Redo", "Cut", "Copy", "Paste", "Select all"]
         .map((t, i) => ({ type: "command", id: `shell.edit/shell.editing/${i}`, label: t, key: null, enabled: false, check: "None", checked: false }))
     });
@@ -108,7 +110,7 @@ describe("MenuBarService", () => {
 
   it("describes the rows again when the commands change", () => {
     const bar = start();
-    const checked = (): readonly boolean[] | undefined => JsonReader.fromValue(bar.tree()).readObjectArray("menus")[3]?.readObjectArray("rows").slice(0, 2)
+    const checked = (): readonly boolean[] | undefined => JsonReader.fromValue(bar.tree()).readObjectArray("menus")[4]?.readObjectArray("rows").slice(0, 2)
       .map(t => t.readBoolean("checked"));
     const before = checked();
 

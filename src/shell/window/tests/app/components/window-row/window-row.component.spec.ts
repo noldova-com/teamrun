@@ -207,7 +207,7 @@ describe("WindowRowComponent", () => {
 
     expect(fixture.nativeElement.querySelector(".tr-window-row-menu")).toBeNull();
     expect(JsonReader.fromValue(bridge.menuBars.at(-1) ?? {}).readObjectArray("menus").map(t => t.readString("place")))
-      .toEqual(["shell.file", "shell.edit", "shell.view", "shell.window", "shell.help"]);
+      .toEqual(["shell.app", "shell.file", "shell.edit", "shell.view", "shell.window", "shell.help"]);
     expect(runs).toEqual([{ template: "plan" }]);
     expect(bridge.listenerCount).toBe(listeners);
   });

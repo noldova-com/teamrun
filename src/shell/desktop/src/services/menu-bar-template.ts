@@ -23,10 +23,17 @@ export class MenuBarTemplate {
     { role: "undo" }, { role: "redo" }, MenuBarTemplate.SEPARATOR, { role: "cut" }, { role: "copy" }, { role: "paste" }, { role: "pasteAndMatchStyle" },
     { role: "delete" }, { role: "selectAll" }, MenuBarTemplate.SEPARATOR, { label: Resources.speechLabel, submenu: [{ role: "startSpeaking" }, { role: "stopSpeaking" }] }
   ];
+  private static readonly APP_ITEMS: readonly MenuItemConstructorOptions[] = [
+    { role: "services" }, MenuBarTemplate.SEPARATOR, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, MenuBarTemplate.SEPARATOR, { role: "quit" }
+  ];
   private static readonly WINDOW_ITEMS: readonly MenuItemConstructorOptions[] = [{ role: "minimize" }, { role: "zoom" }, MenuBarTemplate.SEPARATOR, { role: "front" }];
 
   public static build(bar: MenuBar, run: (id: string) => void): MenuItemConstructorOptions[] {
-    return [{ role: "appMenu" }, ...bar.menus.flatMap(t => MenuBarTemplate.menuOf(t, run))];
+    const app = bar.menus.find(t => t.place === Resources.appMenu)?.rows.map(t => MenuBarTemplate.itemOf(t, run)) ?? [];
+    return [
+      { label: Resources.applicationName, submenu: [{ role: "about" }, MenuBarTemplate.SEPARATOR, ...MenuBarTemplate.before(app, MenuBarTemplate.APP_ITEMS)] },
+      ...bar.menus.filter(t => t.place !== Resources.appMenu).flatMap(t => MenuBarTemplate.menuOf(t, run))
+    ];
   }
 
   private static menuOf(menu: MenuBarMenu, run: (id: string) => void): MenuItemConstructorOptions[] {
@@ -38,6 +45,10 @@ export class MenuBarTemplate {
     if (rows.length === 0)
       return [];
     return [{ label: menu.title, submenu: rows, ...menu.place === Resources.helpMenu ? { role: "help" } : {} }];
+  }
+
+  private static before(rows: readonly MenuItemConstructorOptions[], native: readonly MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
+    return rows.length === 0 ? [...native] : [...rows, MenuBarTemplate.SEPARATOR, ...native];
   }
 
   private static after(native: readonly MenuItemConstructorOptions[], rows: readonly MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
