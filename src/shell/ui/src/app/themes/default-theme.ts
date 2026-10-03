@@ -166,6 +166,7 @@ export class DefaultTheme {
       ["menu-item-height", "1.625rem"],
       ["menu-item-inset", "0.25rem"],
       ["menu-item-padding", "0.5rem"],
+      ["menu-trail-gap", "2rem"],
       ["menu-separator-spacing", "0.3125rem"],
       ["tooltip-width", "43.75rem"],
       ["tooltip-padding", "0.125rem 0.5rem"],
