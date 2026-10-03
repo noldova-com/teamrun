@@ -18,4 +18,5 @@ export interface IDesktopProcess {
   readonly errorOutput: Writable;
 
   startDetached(executablePath: string): void;
+  endProcess(processId: number): void;
 }

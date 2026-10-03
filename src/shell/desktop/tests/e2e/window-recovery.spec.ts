@@ -27,7 +27,9 @@ test("a window whose page stops asks with a native box, comes back when the pers
     }) as typeof dialog.showMessageBox;
   });
 
-  await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.forcefullyCrashRenderer());
+  const renderer = await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.getOSProcessId() ?? 0);
+  expect(renderer).toBeGreaterThan(0);
+  process.kill(renderer, "SIGKILL");
 
   await expect.poll(() => desktop.application.evaluate(() => Reflect.get(globalThis, "teamrunAskedBoxes") as string[]))
     .toEqual(["TeamRun's window stopped unexpectedly. Reload/Quit"]);

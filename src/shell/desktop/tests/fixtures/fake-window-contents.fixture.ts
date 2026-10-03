@@ -56,6 +56,10 @@ export class FakeWindowContents implements IWindowContents {
     this.calls.push("crash");
   }
 
+  public getOSProcessId(): number {
+    return 4242;
+  }
+
   public goAway(reason: string, exitCode: number = 0): void {
     this.listeners.emit("render-process-gone", {}, { reason, exitCode });
   }

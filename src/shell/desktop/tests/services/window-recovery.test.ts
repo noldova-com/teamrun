@@ -12,6 +12,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import { OpenWindow, WindowRecovery } from "@noldova/teamrun-shell-desktop";
 
 import { FakeDesktopLog } from "../fixtures/fake-desktop-log.fixture.js";
+import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
 import { FakeDialogHost } from "../fixtures/fake-dialog-host.fixture.js";
 import { FakeDisplayHost } from "../fixtures/fake-display-host.fixture.js";
@@ -20,15 +21,16 @@ class Recovered {
   public readonly window: FakeDesktopWindow = new FakeDesktopWindow({}, 7);
   public readonly log: FakeDesktopLog = new FakeDesktopLog();
   public readonly dialog: FakeDialogHost;
+  public readonly process: FakeDesktopProcess = new FakeDesktopProcess("linux");
   public quits: number = 0;
   public logFolders: number = 0;
 
-  public constructor(answers: readonly number[], reloadCrashLimit: number = 10_000) {
+  public constructor(answers: readonly number[], reloadCrashLimit: number = 10_000, rendererEndLimit: number = 1_000) {
     this.dialog = new FakeDialogHost(answers);
-    new WindowRecovery(new OpenWindow(this.window, new FakeDisplayHost(), this.log), this.dialog, this.log, () => this.quits++, () => {
+    new WindowRecovery(new OpenWindow(this.window, new FakeDisplayHost(), this.log), this.dialog, this.log, this.process, () => this.quits++, () => {
       this.logFolders++;
       return Promise.resolve(true);
-    }, reloadCrashLimit);
+    }, reloadCrashLimit, rendererEndLimit);
   }
 
   public get boxes(): string[] {
@@ -180,6 +182,59 @@ export class WindowRecoveryTests {
       "The window's page stopped: killed, exit code 1.",
       "The window's page stopped responding."
     ]), JSON.stringify(recovered.log.lines));
+  }
+
+  @TestMethod
+  public async endsThePageProcessThatDoesNotStopWhenAskedAndReloadsOnceItHasGone(): Promise<void> {
+    const recovered = new Recovered([1], 10_000, 20);
+
+    recovered.window.change("unresponsive");
+    await Recovered.settleAsync();
+    const callsBeforeItWent = [...recovered.window.webContents.calls];
+    await delay(40);
+    recovered.window.webContents.goAway("killed", 9);
+    await Recovered.settleAsync();
+
+    Assert.areEqual(JSON.stringify(["crash"]), JSON.stringify(callsBeforeItWent));
+    Assert.areEqual(JSON.stringify([4242]), JSON.stringify(recovered.process.ended));
+    Assert.areEqual(JSON.stringify(["crash", "reload"]), JSON.stringify(recovered.window.webContents.calls));
+    Assert.areEqual(JSON.stringify([
+      "The window's page stopped responding.",
+      "The person chose Reload.",
+      "The window's page did not stop when asked, so the desktop ended its process 4242.",
+      "The window's page stopped: killed, exit code 9."
+    ]), JSON.stringify(recovered.log.lines));
+  }
+
+  @TestMethod
+  public async recordsAPageProcessItCannotEndAndLeavesAClosedWindowsProcessAlone(): Promise<void> {
+    const failing = new Recovered([1], 10_000, 20);
+    failing.process.endFailure = new Error("No such process.");
+    const closed = new Recovered([1], 10_000, 20);
+
+    failing.window.change("unresponsive");
+    closed.window.change("unresponsive");
+    await Recovered.settleAsync();
+    closed.window.destroy();
+    await delay(40);
+
+    Assert.areEqual("The window's page did not stop when asked, and its process could not be ended: Error: No such process.", failing.log.lines.at(-1));
+    Assert.areEqual(0, closed.process.ended.length);
+    Assert.areEqual(JSON.stringify(["The window's page stopped responding.", "The person chose Reload."]), JSON.stringify(closed.log.lines));
+  }
+
+  @TestMethod
+  public async reloadsAPageAskedToStopEvenWhenItExitsCleanly(): Promise<void> {
+    const recovered = new Recovered([1]);
+
+    recovered.window.change("unresponsive");
+    await Recovered.settleAsync();
+    recovered.window.webContents.goAway("clean-exit");
+    await Recovered.settleAsync();
+
+    Assert.areEqual(JSON.stringify(["crash", "reload"]), JSON.stringify(recovered.window.webContents.calls));
+    Assert.areEqual("The window's page stopped: clean-exit, exit code 0.", recovered.log.lines.at(-1));
+    Assert.areEqual(0, recovered.process.ended.length);
   }
 
   @TestMethod

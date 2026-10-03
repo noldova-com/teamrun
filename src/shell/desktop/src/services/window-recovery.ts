@@ -11,6 +11,7 @@ import type { MessageBoxOptions, RenderProcessGoneDetails } from "electron";
 import "@noldova/teamrun-foundation-core";
 
 import type { IDesktopLog } from "../interfaces/i-desktop-log.js";
+import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import type { IDialogHost } from "../interfaces/i-dialog-host.js";
 import { Resources } from "../resources.js";
 import type { OpenWindow } from "./open-window.js";
@@ -19,40 +20,49 @@ export class WindowRecovery {
   private readonly open: OpenWindow;
   private readonly dialog: IDialogHost;
   private readonly log: IDesktopLog;
+  private readonly process: IDesktopProcess;
   private readonly quit: () => void;
   private readonly openLogFolderAsync: () => Promise<boolean>;
   private readonly reloadCrashLimit: number;
+  private readonly rendererEndLimit: number;
   private reloadedAt: number | null = null;
   private isCrashingToReload: boolean = false;
   private isUnresponsive: boolean = false;
   private unresponsiveBox: AbortController | null = null;
+  private endTimer: NodeJS.Timeout | null = null;
 
   public constructor(
     open: OpenWindow,
     dialog: IDialogHost,
     log: IDesktopLog,
+    process: IDesktopProcess,
     quit: () => void,
     openLogFolderAsync: () => Promise<boolean>,
-    reloadCrashLimit: number) {
+    reloadCrashLimit: number,
+    rendererEndLimit: number) {
     this.open = open;
     this.dialog = dialog;
     this.log = log;
+    this.process = process;
     this.quit = quit;
     this.openLogFolderAsync = openLogFolderAsync;
     this.reloadCrashLimit = reloadCrashLimit;
+    this.rendererEndLimit = rendererEndLimit;
     open.window.webContents.on(Resources.renderProcessGoneEvent, (_event, details) => void this.recoverFromGoneAsync(details));
     open.window.on(Resources.unresponsiveEvent, () => void this.recoverFromUnresponsiveAsync());
     open.window.on(Resources.responsiveEvent, () => this.noteResponsive());
   }
 
   private async recoverFromGoneAsync(details: RenderProcessGoneDetails): Promise<void> {
-    if (details.reason === Resources.cleanExitReason || this.open.window.isDestroyed())
+    if (this.open.window.isDestroyed() || (details.reason === Resources.cleanExitReason && !this.isCrashingToReload))
       return;
     this.log.write(Resources.formatRendererGone(details.reason, details.exitCode));
     this.isUnresponsive = false;
     this.unresponsiveBox?.abort();
     if (this.isCrashingToReload) {
       this.isCrashingToReload = false;
+      this.stopEndTimer();
+      this.reload();
       return;
     }
     this.open.showNow();
@@ -86,7 +96,27 @@ export class WindowRecovery {
     this.isUnresponsive = false;
     this.isCrashingToReload = true;
     this.open.window.webContents.forcefullyCrashRenderer();
-    this.reload();
+    this.endTimer = setTimeout(() => this.endRenderer(), this.rendererEndLimit);
+  }
+
+  private endRenderer(): void {
+    this.endTimer = null;
+    if (this.open.window.isDestroyed())
+      return;
+    const processId = this.open.window.webContents.getOSProcessId();
+    try {
+      this.process.endProcess(processId);
+      this.log.write(Resources.formatRendererEnded(processId));
+    }
+    catch (failure) {
+      this.log.write(Resources.formatRendererNotEnded(String(failure)));
+    }
+  }
+
+  private stopEndTimer(): void {
+    if (!Object.isNull(this.endTimer))
+      clearTimeout(this.endTimer);
+    this.endTimer = null;
   }
 
   private noteResponsive(): void {

@@ -108,6 +108,22 @@ export interface IDesktopProcess {
    * ```
    */
   startDetached(executablePath: string): void;
+
+  /**
+   * Ends another process at once, for a window's page that did not stop when asked.
+   *
+   * @param processId The process.
+   * @throws Error synchronously when the process cannot be ended, for example because it is gone.
+   * @example
+   * ```ts
+   * import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function end(process: IDesktopProcess, processId: number): void {
+   *   process.endProcess(processId);
+   * }
+   * ```
+   */
+  endProcess(processId: number): void;
 }
 
 /**
@@ -729,6 +745,21 @@ export interface IWindowContents {
    * ```
    */
   forcefullyCrashRenderer(): void;
+
+  /**
+   * Returns the operating system's id of the page's renderer process.
+   *
+   * @returns The process id.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function rendererOf(contents: IWindowContents): number {
+   *   return contents.getOSProcessId();
+   * }
+   * ```
+   */
+  getOSProcessId(): number;
 }
 
 /**
@@ -1908,7 +1939,8 @@ export declare class OpenWindow {
  * outcome and the person's choice in the desktop log, and asks with a native message box, because the page cannot draw:
  * a gone page offers Reload or Quit, or the log folder and Quit when it went again soon after a reload, so a page that
  * fails while loading never becomes a loop; a page that stops responding offers Wait or Reload once per episode, and the
- * box closes when the page responds again.
+ * box closes when the page responds again. Reload ends the page's renderer and reloads once it has gone; a renderer that
+ * has not gone within a limit has its process ended.
  */
 export declare class WindowRecovery {
   /**
@@ -1917,16 +1949,18 @@ export declare class WindowRecovery {
    * @param open The window.
    * @param dialog Shows the message boxes.
    * @param log Records each episode, its outcome and the person's choice.
+   * @param process Ends a renderer process that did not stop when asked.
    * @param quit Quits the application.
    * @param openLogFolderAsync Opens the log folder; its promise tells whether it opened.
    * @param reloadCrashLimit How soon after a reload a page that goes again is offered the log folder instead, in
    * milliseconds.
+   * @param rendererEndLimit How long a renderer asked to stop may take before its process is ended, in milliseconds.
    * @example
    * ```ts
-   * import { type IDesktopLog, type IDialogHost, type OpenWindow, WindowRecovery } from "@noldova/teamrun-shell-desktop";
+   * import { type IDesktopLog, type IDesktopProcess, type IDialogHost, type OpenWindow, WindowRecovery } from "@noldova/teamrun-shell-desktop";
    *
-   * export function recover(open: OpenWindow, dialog: IDialogHost, log: IDesktopLog): WindowRecovery {
-   *   return new WindowRecovery(open, dialog, log, () => process.exit(0), () => Promise.resolve(true), 10_000);
+   * export function recover(open: OpenWindow, dialog: IDialogHost, log: IDesktopLog, desktop: IDesktopProcess): WindowRecovery {
+   *   return new WindowRecovery(open, dialog, log, desktop, () => process.exit(0), () => Promise.resolve(true), 10_000, 5_000);
    * }
    * ```
    */
@@ -1934,9 +1968,11 @@ export declare class WindowRecovery {
     open: OpenWindow,
     dialog: IDialogHost,
     log: IDesktopLog,
+    process: IDesktopProcess,
     quit: () => void,
     openLogFolderAsync: () => Promise<boolean>,
-    reloadCrashLimit: number);
+    reloadCrashLimit: number,
+    rendererEndLimit: number);
 }
 
 /**

@@ -27,6 +27,8 @@ export class FakeDesktopProcess implements IDesktopProcess {
     }
   });
   public readonly started: string[] = [];
+  public readonly ended: number[] = [];
+  public endFailure: Error | null = null;
 
   public constructor(platform: string, argv: readonly string[] = [], env: NodeJS.ProcessEnv = {}, homeFolder: string = "/home/person") {
     this.platform = platform;
@@ -41,5 +43,11 @@ export class FakeDesktopProcess implements IDesktopProcess {
 
   public startDetached(executablePath: string): void {
     this.started.push(executablePath);
+  }
+
+  public endProcess(processId: number): void {
+    if (this.endFailure !== null)
+      throw this.endFailure;
+    this.ended.push(processId);
   }
 }

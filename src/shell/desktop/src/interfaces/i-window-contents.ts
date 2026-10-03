@@ -23,4 +23,5 @@ export interface IWindowContents {
   isCrashed(): boolean;
   reload(): void;
   forcefullyCrashRenderer(): void;
+  getOSProcessId(): number;
 }

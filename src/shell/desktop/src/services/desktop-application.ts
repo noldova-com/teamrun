@@ -149,7 +149,7 @@ export class DesktopApplication {
     const window = this.factory.create(WindowState.createDefault());
     const contentsId = window.webContents.id;
     const open = new OpenWindow(window, this.electron.screen, this.log);
-    new WindowRecovery(open, this.electron.dialog, this.log, () => this.electron.app.quit(), () => this.openLogFolderAsync(), Resources.reloadCrashLimit);
+    new WindowRecovery(open, this.electron.dialog, this.log, this.process, () => this.electron.app.quit(), () => this.openLogFolderAsync(), Resources.reloadCrashLimit, Resources.rendererEndLimit);
     this.windows.set(contentsId, open);
     window.once(Resources.closedEvent, () => this.windows.delete(contentsId));
     open.settleWithin(Resources.connectingShowLimit);

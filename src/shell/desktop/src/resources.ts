@@ -96,6 +96,7 @@ export class Resources {
   public static readonly logLineSeparator: string = "\n";
   public static readonly logFileMode: number = 0o600;
   public static readonly reloadCrashLimit: number = 10_000;
+  public static readonly rendererEndLimit: number = 5_000;
   public static readonly renderProcessGoneEvent: "render-process-gone" = "render-process-gone";
   public static readonly unresponsiveEvent: "unresponsive" = "unresponsive";
   public static readonly responsiveEvent: "responsive" = "responsive";
@@ -200,6 +201,14 @@ export class Resources {
 
   public static formatRendererGone(reason: string, exitCode: number): string {
     return `The window's page stopped: ${reason}, exit code ${exitCode}.`;
+  }
+
+  public static formatRendererEnded(processId: number): string {
+    return `The window's page did not stop when asked, so the desktop ended its process ${processId}.`;
+  }
+
+  public static formatRendererNotEnded(reason: string): string {
+    return `The window's page did not stop when asked, and its process could not be ended: ${reason}`;
   }
 
   public static formatRecoveryChoice(choice: string): string {

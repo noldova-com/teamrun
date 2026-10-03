@@ -46,7 +46,8 @@ DesktopApplication.start(
     homeFolder: homedir(),
     workingDirectory: process.cwd(),
     errorOutput: process.stderr,
-    startDetached: t => spawn(t, [], { detached: true, stdio: "ignore" }).unref()
+    startDetached: t => spawn(t, [], { detached: true, stdio: "ignore" }).unref(),
+    endProcess: t => process.kill(t, "SIGKILL")
   },
   import.meta.url,
   t => new RuntimeLauncher(t, RuntimeBuild.identity, starter),
