@@ -18,12 +18,15 @@ import type NpmCommand from "../toolchain/npm-command.ts";
 import AngularTestRun from "./angular-test-run.ts";
 
 export default class AngularProject {
+  public static readonly LOG_FILE: string = "_build/angular-tests.log";
+
   private static readonly FOLDER: string = "src";
   private static readonly WORKSPACE_FILE: string = "angular.json";
   private static readonly LOCKFILE: string = "package-lock.json";
   private static readonly INSTALL_RECORD: string = "node_modules/.teamrun-install";
   private static readonly RECORD_ENCODING: BufferEncoding = "utf8";
   private static readonly OWN_SCOPE: string = "node_modules/@noldova";
+  private static readonly DEPENDENCY_CACHE: string = "node_modules/.vite";
   private static readonly CLI: string = "node_modules/@angular/cli/bin/ng.js";
   private static readonly PLAYWRIGHT_CLI: string = "node_modules/playwright/cli.js";
   private static readonly INSTALL_ARGUMENTS: readonly string[] = ["ci", "--no-audit", "--no-fund"];
@@ -59,6 +62,7 @@ export default class AngularProject {
     }
 
     await rm(path.join(this.directory, AngularProject.OWN_SCOPE), { recursive: true, force: true });
+    await rm(path.join(this.directory, AngularProject.DEPENDENCY_CACHE), { recursive: true, force: true });
     if (await this.needsInstallAsync()) {
       output.write(AngularProject.INSTALLING);
       const result = await this.npm.runAsync(AngularProject.INSTALL_ARGUMENTS, this.directory);
@@ -90,11 +94,15 @@ export default class AngularProject {
   public async testAsync(): Promise<AngularTestRun> {
     const report = path.join(this.root, ...AngularProject.REPORT_SEGMENTS);
     await rm(report, { force: true });
+    await rm(path.join(this.directory, AngularProject.DEPENDENCY_CACHE), { recursive: true, force: true });
     await mkdir(path.dirname(report), { recursive: true });
-    const exitCode = await this.runner.runAsync(
+    const exitCode = await this.runner.runLoggedAsync(
       process.execPath,
       [path.join(this.directory, AngularProject.CLI), ...AngularProject.TEST_ARGUMENTS, AngularProject.OUTPUT_FILE_OPTION, report],
-      this.directory);
+      this.directory,
+      path.join(this.root, AngularProject.LOG_FILE),
+      process.stdout,
+      process.stderr);
     return new AngularTestRun(exitCode, existsSync(report) ? await this.readCollectedAsync(report) : null);
   }
 

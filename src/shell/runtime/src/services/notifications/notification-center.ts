@@ -17,6 +17,7 @@ export class NotificationCenter {
   private readonly now: () => Date;
   private entries: readonly Notification[] = [];
   private nextId: number = 1;
+  private lastSequence: number = 0;
 
   public constructor(publish: (list: NotificationList) => void, now: () => Date) {
     this.publish = publish;
@@ -27,6 +28,10 @@ export class NotificationCenter {
     return new NotificationList(this.entries);
   }
 
+  public get sequence(): number {
+    return this.lastSequence;
+  }
+
   public find(id: number): Notification | undefined {
     return this.entries.find(t => t.id === id);
   }
@@ -34,7 +39,7 @@ export class NotificationCenter {
   public post(post: NotificationPost): number {
     const replaced = Object.isNull(post.key) ? undefined : this.entries.find(t => t.post.kind.text === post.kind.text && t.post.key === post.key);
     const id = replaced?.id ?? this.nextId++;
-    const posted = new Notification(id, post, this.now().toISOString(), false);
+    const posted = new Notification(id, ++this.lastSequence, post, this.now().toISOString(), false);
     this.entries = NotificationCenter.trim([posted, ...this.entries.filter(t => t.id !== id)]);
     this.publish(this.list);
     return id;
@@ -47,7 +52,7 @@ export class NotificationCenter {
     if (current.post.kind.text !== post.kind.text)
       throw new RegistrationException(Resources.formatNotificationKindChanged(id, current.post.kind.text));
 
-    this.entries = this.entries.map(t => t.id === id ? new Notification(id, post, t.postedAt, t.isRead) : t);
+    this.entries = this.entries.map(t => t.id === id ? new Notification(id, t.sequence, post, t.postedAt, t.isRead) : t);
     this.publish(this.list);
     return true;
   }
@@ -59,7 +64,7 @@ export class NotificationCenter {
   public markAllRead(): void {
     if (this.entries.every(t => t.isRead))
       return;
-    this.entries = this.entries.map(t => t.isRead ? t : new Notification(t.id, t.post, t.postedAt, true));
+    this.entries = this.entries.map(t => t.isRead ? t : new Notification(t.id, t.sequence, t.post, t.postedAt, true));
     this.publish(this.list);
   }
 

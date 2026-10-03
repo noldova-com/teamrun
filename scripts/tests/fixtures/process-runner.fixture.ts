@@ -16,6 +16,7 @@ export default class ProcessRunnerFixture extends ProcessRunner {
   public readonly runs: (readonly string[])[] = [];
   public readonly environments: (NodeJS.ProcessEnv | undefined)[] = [];
   public readonly captured: (readonly string[])[] = [];
+  public readonly logs: string[] = [];
 
   public constructor(exitCodes: readonly (number | null)[] = [], captures: readonly ProcessResult[] = []) {
     super();
@@ -36,5 +37,10 @@ export default class ProcessRunnerFixture extends ProcessRunner {
     this.runs.push([command, directory, ...commandArguments]);
     this.environments.push(environment);
     return this.exitCodes.length === 0 ? 0 : this.exitCodes.shift() ?? null;
+  }
+
+  public override runLoggedAsync(command: string, commandArguments: readonly string[], directory: string, log: string): Promise<number | null> {
+    this.logs.push(log);
+    return this.runAsync(command, commandArguments, directory);
   }
 }

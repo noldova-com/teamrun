@@ -30,7 +30,7 @@ describe("WindowComponent", () => {
     await fixture.whenStable();
     const root: HTMLElement = fixture.nativeElement;
 
-    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-workspace", "tr-status-bar"]);
+    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-workspace", "tr-status-bar", "tr-toasts"]);
     expect(root.getBoundingClientRect().height).toBe(innerHeight);
     expect(root.querySelector("tr-empty-window")).not.toBeNull();
   });
@@ -58,7 +58,7 @@ describe("WindowComponent", () => {
     await fixture.whenStable();
     const root: HTMLElement = fixture.nativeElement;
 
-    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-startup", "tr-status-bar"]);
+    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-startup", "tr-status-bar", "tr-toasts"]);
     bridge.publishStartup({ kind: "Ready", details: [] });
     await fixture.whenStable();
 

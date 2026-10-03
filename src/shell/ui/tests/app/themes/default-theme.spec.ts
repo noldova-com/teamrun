@@ -58,7 +58,8 @@ describe("DefaultTheme", () => {
       ["menu-item-height", "1.625rem"],
       ["tooltip-width", "43.75rem"],
       ["popover-width", "27.5rem"],
-      ["checkbox-size", "1.125rem"]
+      ["checkbox-size", "1.125rem"],
+      ["toast-width", "22.5rem"]
     ];
 
     for (const [name, value] of expected)

@@ -1,0 +1,116 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: fixed;
+  right: var(--tr-space-2);
+  bottom: calc(var(--tr-status-bar-height) + var(--tr-space-2));
+  z-index: 1;
+  display: block;
+  pointer-events: none;
+}
+
+.tr-toasts-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-2);
+}
+
+.tr-toast {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--tr-space-2);
+  box-sizing: border-box;
+  width: min(var(--tr-toast-width), calc(100vw - var(--tr-space-4)));
+  padding: var(--tr-space-3);
+  border: var(--tr-border-width) solid var(--tr-notification-border);
+  border-radius: var(--tr-radius-large);
+  background-color: var(--tr-notification);
+  box-shadow: var(--tr-shadow-large);
+  color: var(--tr-text);
+  font-size: var(--tr-text-panel);
+  line-height: var(--tr-line-panel);
+  pointer-events: auto;
+}
+
+.tr-toast-severity {
+  color: var(--tr-icon-color);
+  font-size: var(--tr-icon);
+  line-height: var(--tr-line-panel);
+}
+
+.tr-toast[data-severity="Error"] .tr-toast-severity {
+  color: var(--tr-error);
+}
+
+.tr-toast[data-severity="Success"] .tr-toast-severity {
+  color: var(--tr-added);
+}
+
+.tr-toast-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-1);
+  min-width: 0;
+}
+
+.tr-toast-title {
+  font-weight: var(--tr-weight-emphasis);
+  overflow-wrap: anywhere;
+}
+
+.tr-toast-open {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tr-link);
+  font: inherit;
+  font-weight: var(--tr-weight-emphasis);
+  text-align: start;
+  cursor: pointer;
+}
+
+.tr-toast-open:disabled {
+  color: inherit;
+  cursor: default;
+}
+
+.tr-toast-open:focus-visible {
+  outline: var(--tr-border-width) solid var(--tr-accent);
+}
+
+.tr-toast-text {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.tr-toast-progress {
+  width: 100%;
+  height: var(--tr-space-1);
+  accent-color: var(--tr-progress);
+}
+
+.tr-toast-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tr-space-2);
+}
+
+.tr-toasts-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

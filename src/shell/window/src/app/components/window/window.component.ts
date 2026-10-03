@@ -16,12 +16,13 @@ import { StartupService } from "../../services/startup.service";
 import { WindowPartHostService } from "../../services/window-part-host.service";
 import { StartupComponent } from "../startup/startup.component";
 import { StatusBarComponent } from "../status-bar/status-bar.component";
+import { ToastsComponent } from "../toasts/toasts.component";
 import { WindowRowComponent } from "../window-row/window-row.component";
 import { WorkspaceComponent } from "../workspace/workspace.component";
 
 @Component({
   selector: "tr-window",
-  imports: [StartupComponent, StatusBarComponent, WindowRowComponent, WorkspaceComponent],
+  imports: [StartupComponent, StatusBarComponent, ToastsComponent, WindowRowComponent, WorkspaceComponent],
   templateUrl: "./window.component.html",
   styleUrl: "./window.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush

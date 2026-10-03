@@ -339,8 +339,11 @@ export class RuntimeHostTests {
       await host.waitForStopAsync();
 
       const titles = (payload: unknown): string => NotificationBroadcast.fromJson(payload).notifications.map(t => `${t.id}:${t.post.title}`).join(",");
-      Assert.areEqual("1:Synced|false", `${NotificationState.fromJson(listed.payload).notifications.map(t => `${t.id}:${t.post.title}`).join(",")}|${String(NotificationState.fromJson(listed.payload).isDoNotDisturb)}`);
-      Assert.areEqual("shell.notifications|2:Posted,1:Synced|{\"id\":2}", `${posted[0].name.text}|${titles(posted[0].payload)}|${JSON.stringify(posted[1].payload)}`);
+      const state = NotificationState.fromJson(listed.payload);
+      Assert.areEqual("1:Synced|false|1", `${state.notifications.map(t => `${t.id}:${t.post.title}`).join(",")}|${String(state.isDoNotDisturb)}|${state.sequence}`);
+      Assert.areEqual(
+        "shell.notifications|2:Posted,1:Synced|2|{\"id\":2}",
+        `${posted[0].name.text}|${titles(posted[0].payload)}|${NotificationBroadcast.fromJson(posted[0].payload).sequence}|${JSON.stringify(posted[1].payload)}`);
       Assert.areEqual("2:Updated,1:Synced|null", `${titles(updated[0].payload)}|${JSON.stringify(updated[1].payload)}`);
       Assert.areEqual(`${FailureCode.NotFound}|Notification 9 is gone; it was dismissed or its module stopped.`, `${missing.failure?.code}|${missing.failure?.message}`);
       Assert.areEqual(`${FailureCode.InvalidParams}|Notification 1 is of the kind clock.alarm, which an update keeps.`, `${otherKind.failure?.code}|${otherKind.failure?.message}`);

@@ -20,6 +20,8 @@ export class Resources {
   public static readonly alarmText: string = "Its runtime part is running.";
   public static readonly syncKind: string = "clock.sync";
   public static readonly syncTitle: string = "Syncing the clock";
+  public static readonly tickedKey: string = "ticked";
+  public static readonly tickedTitle: string = "The clock ticked";
   public static readonly tickCommand: string = "clock.tick";
   public static readonly tickTitle: string = "Tick";
   public static readonly tickIcon: string = "timer";

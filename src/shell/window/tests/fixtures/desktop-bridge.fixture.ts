@@ -30,7 +30,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public readonly responses: Map<string, unknown> = new Map<string, unknown>([
     ["shell.modules", { payload: { modules: [] } }],
     ["shell.commands", { payload: { commands: [] } }],
-    ["shell.notifications", { payload: { notifications: [], isDoNotDisturb: false } }]
+    ["shell.notifications", { payload: { notifications: [], isDoNotDisturb: false, sequence: 0 } }]
   ]);
   public build: unknown = { productVersion: "1.2.3", fingerprint: "abc123" };
   public readonly copied: string[] = [];
