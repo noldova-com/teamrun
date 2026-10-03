@@ -12,7 +12,9 @@ Issue: #
 ## Testing
 
 <!-- List the checks you ran and their results.
-If a relevant check was not run or does not apply, explain why. -->
+If a relevant check was not run or does not apply, explain why.
+If the change touches startup, shutdown, processes, windows or inter-process messages,
+list the ten repeated native runs of the affected tests on Windows, Linux and macOS. -->
 
 ## Notes
 
