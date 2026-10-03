@@ -16,6 +16,7 @@ import { SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
 import { SettingsPage } from "../../models/settings/settings-page";
 import { ShortcutRow } from "../../models/settings/shortcut-row";
 import { TextMatch } from "../../models/settings/text-match";
+import type { WindowPartSource } from "../../models/window-part-source";
 import { WindowPartTokens } from "../../models/window-part-tokens";
 import { Resources } from "../../../resources";
 import { CommandService } from "../../services/command.service";
@@ -43,7 +44,12 @@ export class SettingsComponent {
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly query: WritableSignal<string> = signal("");
-  protected readonly modules: readonly SelectOption[] = inject(WindowPartTokens.sources).map(t => new SelectOption(t.moduleId, t.displayName));
+  private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
+
+  protected readonly modules: readonly SelectOption[] = this.sources.map(t => new SelectOption(t.moduleId, t.displayName));
+  protected readonly notifyingModules: readonly SelectOption[] = this.sources
+    .filter(t => t.notificationKinds.length > 0)
+    .map(t => new SelectOption(t.moduleId, Resources.formatModuleNotifications(t.displayName)));
   protected readonly values: Signal<ReadonlyMap<string, JsonValue>> = this.settings.values;
   protected readonly setFlags: Signal<ReadonlyMap<string, Signal<boolean>>> = computed(() =>
     new Map(this.settings.definitions().map(t => [t.name.text, this.settings.isSet(t.name.text)])));
@@ -76,6 +82,10 @@ export class SettingsComponent {
   protected select(page: SettingsPage): void {
     this.query.set("");
     this.selected.set(page.title);
+  }
+
+  protected isMutedModules(definition: SettingDefinition): boolean {
+    return definition.name.text === Resources.mutedModulesSetting;
   }
 
   protected change(definition: SettingDefinition, value: JsonValue): void {

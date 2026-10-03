@@ -15,6 +15,7 @@ import { type CommandRun, NotificationReference, NotificationState, ShellEvents,
 import { Resources } from "../../resources";
 import { CommandService } from "./command.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
+import { SettingsService } from "./settings.service";
 import { WindowPartHostService } from "./window-part-host.service";
 
 @Injectable({ providedIn: "root" })
@@ -22,14 +23,18 @@ export class NotificationService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly commands: CommandService = inject(CommandService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
-  private readonly stateValue: WritableSignal<NotificationState> = signal(new NotificationState([], false, 0));
+  private readonly settings: SettingsService = inject(SettingsService);
+  private readonly stateValue: WritableSignal<NotificationState> = signal(new NotificationState([], false, [], 0));
   private readonly firstReadValue: WritableSignal<NotificationState | null> = signal(null);
   private eventsSeen: number = 0;
   private generationRead: number = 0;
 
   public readonly state: Signal<NotificationState> = this.stateValue.asReadonly();
   public readonly firstRead: Signal<NotificationState | null> = this.firstReadValue.asReadonly();
-  public readonly unreadCount: Signal<number> = computed(() => this.stateValue().notifications.filter(t => !t.isRead).length);
+  public readonly unreadCount: Signal<number> = computed(() => {
+    const state = this.stateValue();
+    return state.notifications.filter(t => !t.isRead && !state.mutedModules.includes(t.post.kind.owner)).length;
+  });
 
   public constructor() {
     const host = inject(WindowPartHostService);
@@ -66,7 +71,7 @@ export class NotificationService {
   }
 
   public setDoNotDisturb(isOn: boolean): void {
-    this.send(ShellMethods.setDoNotDisturb.text, { [Resources.isOnField]: isOn });
+    this.settings.setAsync(Resources.doNotDisturbSetting, isOn).catch((error: unknown) => this.errors.handleError(error));
   }
 
   private open(id: number): void {

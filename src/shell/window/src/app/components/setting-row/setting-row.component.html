@@ -33,7 +33,7 @@
     @case (kinds.Modules) {
       <div class="tr-setting-row-modules" role="group" [attr.aria-label]="definition().title">
         @for (module of modules(); track module.value) {
-          <tr-checkbox [checked]="chosenModules().has(module.value)" (checkedChange)="toggleModule(module.value, $event)">{{ module.title }}</tr-checkbox>
+          <tr-checkbox [checked]="chosenModules().has(module.value) !== isInverse()" (checkedChange)="toggleModule(module.value, $event)">{{ module.title }}</tr-checkbox>
         }
       </div>
     }

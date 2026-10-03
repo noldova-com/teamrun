@@ -79,7 +79,7 @@ export class SystemNotifier {
     start.highestSequence = Math.max(highest, ...broadcast.notifications.map(t => t.sequence));
     if (broadcast.quietDevices.includes(start.device) || this.isAnyWindowFocused() || !this.host.isSupported())
       return;
-    for (const notification of [...broadcast.notifications].reverse())
+    for (const notification of [...broadcast.notifications].reverse().filter(t => !broadcast.mutedModules.includes(t.post.kind.owner)))
       if (notification.sequence > highest && !SystemNotifier.isInProgress(notification))
         this.show(notification);
   }

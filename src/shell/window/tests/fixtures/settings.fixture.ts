@@ -16,7 +16,7 @@ export class SettingsFixture {
     SettingType.number(12, 18, 1), 13, "Appearance", "Text");
   public static readonly doNotDisturb: SettingDefinition = SettingsFixture.define("shell.doNotDisturb", "Do not disturb", "Holds back notifications on this device.",
     SettingType.boolean(), false, "Notifications", "Notifications");
-  public static readonly mutedModules: SettingDefinition = SettingsFixture.define("shell.mutedModules", "Muted modules", "Modules whose notifications are not shown.",
+  public static readonly mutedModules: SettingDefinition = SettingsFixture.define("shell.mutedModules", "Notifications from modules", "Modules whose notifications are not shown.",
     SettingType.modules(), [], "Notifications", "Notifications");
   public static readonly greeting: SettingDefinition = SettingsFixture.define("clock.greeting", "Greeting", "What the clock says at noon.",
     SettingType.text(20), "Noon", "Clock", "Words");
