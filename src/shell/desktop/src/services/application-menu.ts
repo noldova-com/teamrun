@@ -8,9 +8,10 @@
 
 import type { IMenuHost } from "../interfaces/i-menu-host.js";
 import type { DesktopSettings } from "../models/desktop-settings.js";
+import { Resources } from "../resources.js";
 
 export class ApplicationMenu {
   public static install(menu: IMenuHost, settings: DesktopSettings): void {
-    menu.setApplicationMenu(settings.isMac ? menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }]) : null);
+    menu.setApplicationMenu(settings.isMac ? menu.buildFromTemplate(Resources.macMenu) : null);
   }
 }
