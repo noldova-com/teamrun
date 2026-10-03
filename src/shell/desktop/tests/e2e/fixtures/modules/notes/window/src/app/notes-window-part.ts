@@ -70,7 +70,7 @@ export class NotesWindowPart implements IWindowPart {
       const note = JsonReader.fromValue(commandArguments);
       context.openDocument("notes.note", `week-${note.readInteger("week")}`, note.readString("title"));
       return null;
-    }, commandArguments => JsonReader.fromValue(commandArguments).hasField("week")));
+    }, commandArguments => commandArguments !== null && JsonReader.fromValue(commandArguments).hasField("week")));
     for (const [name, title, by] of NotesWindowPart.SORTINGS)
       context.registerCommand(new CommandContribution(name, title, null, null, async () => {
         NotesState.sortBy.set(by);

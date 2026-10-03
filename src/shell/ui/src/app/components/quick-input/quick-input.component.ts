@@ -1,0 +1,105 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import {
+  ChangeDetectionStrategy, Component, ElementRef, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, input, model,
+  output, signal
+} from "@angular/core";
+
+import "@noldova/teamrun-foundation-core";
+
+import type { QuickInputItem } from "../../models/quick-input-item";
+import { Resources } from "../../../resources";
+
+@Component({
+  selector: "tr-quick-input",
+  templateUrl: "./quick-input.component.html",
+  styleUrl: "./quick-input.component.scss",
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class QuickInputComponent {
+  private static count: number = 0;
+
+  private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly activeValue: WritableSignal<number> = signal(0);
+
+  protected readonly listId: string = `${Resources.quickInputIdPrefix}${QuickInputComponent.count++}`;
+  protected readonly active: Signal<number> = this.activeValue.asReadonly();
+  protected readonly activeId: Signal<string | null> = computed(() => this.items().length === 0 ? null : this.optionId(this.active()));
+  protected readonly status: Signal<string> = computed(() => Resources.formatResultCount(this.items().length));
+
+  public readonly items = input.required<readonly QuickInputItem[]>();
+  public readonly label = input.required<string>();
+  public readonly query = model<string>(String.empty);
+  public readonly chosen = output<QuickInputItem>();
+  public readonly dismissed = output<void>();
+
+  public constructor() {
+    effect(() => {
+      this.items();
+      this.activeValue.set(0);
+    });
+    afterRenderEffect(() => {
+      this.host.querySelector(`#${this.optionId(this.active())}`)?.scrollIntoView(Resources.revealOptions);
+    });
+    afterNextRender(() => this.host.querySelector<HTMLInputElement>(Resources.quickInputFieldSelector)?.focus());
+  }
+
+  protected optionId(index: number): string {
+    return `${this.listId}${Resources.quickInputOptionSeparator}${index}`;
+  }
+
+  protected onKey(event: KeyboardEvent): void {
+    const next = this.indexFor(event.key);
+    if (!Object.isNull(next)) {
+      event.preventDefault();
+      this.activeValue.set(Math.max(0, Math.min(next, this.items().length - 1)));
+      return;
+    }
+    if (event.key === Resources.enterKey) {
+      event.preventDefault();
+      this.choose(this.active());
+    }
+    else if (event.key === Resources.escapeKey) {
+      event.preventDefault();
+      this.dismissed.emit();
+    }
+  }
+
+  protected choose(index: number): void {
+    const item = this.items()[index];
+    if (!Object.isUndefined(item))
+      this.chosen.emit(item);
+  }
+
+  private indexFor(key: string): number | null {
+    const active = this.active();
+    switch (key) {
+      case Resources.arrowDownKey:
+        return active + 1;
+      case Resources.arrowUpKey:
+        return active - 1;
+      case Resources.homeKey:
+        return 0;
+      case Resources.endKey:
+        return this.items().length - 1;
+      case Resources.pageDownKey:
+        return active + this.pageSize();
+      case Resources.pageUpKey:
+        return active - this.pageSize();
+      default:
+        return null;
+    }
+  }
+
+  private pageSize(): number {
+    const list = this.host.querySelector<HTMLElement>(Resources.quickInputListSelector);
+    const row = list?.querySelector<HTMLElement>(Resources.quickInputOptionSelector);
+    return Object.isNullOrUndefined(list) || Object.isNullOrUndefined(row) ? 1 : Math.max(1, Math.floor(list.clientHeight / row.offsetHeight));
+  }
+}

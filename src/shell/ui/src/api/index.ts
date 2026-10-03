@@ -16,6 +16,7 @@ export { MenuSeparatorComponent } from "../app/components/menu/menu-separator.co
 export { MenuTriggerDirective } from "../app/components/menu/menu-trigger.directive";
 export { MenuComponent } from "../app/components/menu/menu.component";
 export { PanelCardComponent } from "../app/components/panel-card/panel-card.component";
+export { QuickInputComponent } from "../app/components/quick-input/quick-input.component";
 export { SashComponent } from "../app/components/sash/sash.component";
 export { TabComponent } from "../app/components/tab/tab.component";
 export { TooltipComponent } from "../app/components/tooltip/tooltip.component";
@@ -34,7 +35,9 @@ export { OverlayAnchoring } from "../app/models/overlay-anchoring";
 export { OverlayBounds } from "../app/models/overlay-bounds";
 export { OverlayPlacement } from "../app/models/overlay-placement";
 export { OverlaySide } from "../app/models/overlay-side";
+export { QuickInputItem } from "../app/models/quick-input-item";
 export { Theme } from "../app/models/theme";
+export { TitleSegment } from "../app/models/title-segment";
 export { Typography } from "../app/models/typography";
 export { AnchoredOverlay } from "../app/services/anchored-overlay";
 export { AppearanceService } from "../app/services/appearance.service";

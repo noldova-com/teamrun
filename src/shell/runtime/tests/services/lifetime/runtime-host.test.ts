@@ -100,6 +100,27 @@ export class RuntimeHostTests {
   }
 
   @TestMethod
+  public listsTheWorkInProgressWithoutStopping(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const host = await fixture.startAsync();
+      const [connection] = await fixture.handshakeAsync("cli", RuntimeBuild.identity);
+
+      connection.sendMessages(new Request("cli:1", ShellMethods.work, null));
+      const idle = await connection.readTextAsync();
+      const work = host.work.begin("Indexing the project");
+      connection.sendMessages(new Request("cli:2", ShellMethods.work, null));
+      const busy = await connection.readTextAsync();
+      work[Symbol.dispose]();
+      connection.sendMessages(new Request("cli:3", ShellMethods.stop, new StopRequest(StopPolicy.IfIdle).toJson()));
+
+      Assert.areEqual("{\"kind\":\"Response\",\"id\":\"cli:1\",\"payload\":{\"descriptions\":[]}}", idle);
+      Assert.areEqual("{\"kind\":\"Response\",\"id\":\"cli:2\",\"payload\":{\"descriptions\":[\"Indexing the project\"]}}", busy);
+      Assert.isFalse(work.signal.aborted);
+      Assert.areEqual("request", await host.waitForStopAsync());
+    });
+  }
+
+  @TestMethod
   public stopsWhenIdle(): Promise<void> {
     return RuntimeHostTests.runAsync(async fixture => {
       const host = await fixture.startAsync(50);

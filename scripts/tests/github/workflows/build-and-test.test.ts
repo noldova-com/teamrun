@@ -35,6 +35,8 @@ class BuildAndTestTests {
     ["Keep the main window screenshot", "Keep the main window screenshot again", "Keep the main window screenshot a last time",
       ["path: _build/ui/main-window-*.png", "archive: false", "retention-days: 14", "if-no-files-found: warn"]]
   ];
+  private static readonly NODE_SETUPS: readonly string[] = ["Set up Node.js to classify", "Set up Node.js", "Set up Node.js to install"];
+  private static readonly NODE_ACTION: string = "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0";
   private static readonly TEST_STEP: string = "Test";
   private static readonly ANGULAR_UPLOADS: readonly string[] = ["Keep the Angular test output", "Keep the Angular test output again", "Keep the Angular test output a last time"];
   private static readonly ANGULAR_WARNING: string = "Warn that the Angular test output was not kept";
@@ -86,7 +88,7 @@ class BuildAndTestTests {
       assert.ok(typeof manifest === "object" && manifest !== null && "engines" in manifest && "packageManager" in manifest);
       assert.deepEqual(manifest.engines, { node: ">=26.7.0 <27", npm: "11.19.0" });
       assert.equal(manifest.packageManager, "npm@11.19.0");
-      assert.equal(workflow.text.match(/node-version: '26\.7\.0'/g)?.length, 3);
+      assert.equal(workflow.text.match(/node-version: '26\.7\.0'/g)?.length, 3 * BuildAndTestTests.NODE_SETUPS.length);
       assert.doesNotMatch(workflow.text, /node-version: '(?!26\.7\.0')/);
       const script = workflow.readStepScript(BuildAndTestTests.TOOLCHAIN_STEP);
       assert.ok(script.includes("test \"$(node --version)\" = v26.7.0\n"));
@@ -599,6 +601,29 @@ class BuildAndTestTests {
         assert.deepEqual(attempts[2]?.settings, [...settings, "overwrite: true"]);
         assert.equal(workflow.readStepScript(`${pause} again`), "sleep 15\n");
         assert.equal(workflow.readStepScript(`${pause} a last time`), "sleep 15\n");
+      }
+    });
+
+    test("each Node.js setup is tried three times with a pause and the same settings, and fails its job only when the last attempt fails", async () => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+
+      for (const first of BuildAndTestTests.NODE_SETUPS) {
+        const [again, last] = [`${first} again`, `${first} a last time`];
+        const pause = `Wait before setting up ${first.slice("Set up ".length)}`;
+        const simulation = new WorkflowSimulation(workflow.text, first, last);
+        const attempts = [first, again, last].map(t => simulation.find(t));
+
+        const passed = simulation.run(BuildAndTestTests.WHOLE_LEG, {});
+        const retried = simulation.run(BuildAndTestTests.WHOLE_LEG, { [first]: "failure" });
+        const failed = simulation.run(BuildAndTestTests.WHOLE_LEG, { [first]: "failure", [again]: "failure", [last]: "failure" });
+
+        assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[BuildAndTestTests.NODE_ACTION, true], [BuildAndTestTests.NODE_ACTION, true], [BuildAndTestTests.NODE_ACTION, false]], first);
+        assert.deepEqual([attempts[1]?.settings, attempts[2]?.settings], [attempts[0]?.settings, attempts[0]?.settings], first);
+        assert.ok(attempts[0]?.settings.includes("node-version: '26.7.0'"), first);
+        assert.deepEqual([workflow.readStepScript(`${pause} again`), workflow.readStepScript(`${pause} a last time`)], ["sleep 30\n", "sleep 30\n"], first);
+        assert.deepEqual([passed.ran, passed.isJobFailed], [[first], false], first);
+        assert.deepEqual([retried.ran, retried.isJobFailed], [[first, `${pause} again`, again], false], first);
+        assert.deepEqual([failed.ran, failed.isJobFailed], [[first, `${pause} again`, again, `${pause} a last time`, last], true], first);
       }
     });
 

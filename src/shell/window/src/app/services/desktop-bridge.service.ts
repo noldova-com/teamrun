@@ -97,6 +97,13 @@ export class DesktopBridgeService {
     return this.bridge.openLogFolder();
   }
 
+  public onNotificationOpened(listener: (id: number) => void): () => void {
+    return this.bridge.onNotificationOpened(t => {
+      if (Number.isSafeInteger(t))
+        listener(t);
+    });
+  }
+
   private static readAnswer(value: unknown): JsonValue {
     const answer = JsonReader.fromValue(value);
     if (!answer.hasField(Resources.failureField))
@@ -131,6 +138,7 @@ export class DesktopBridgeService {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onEvent))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readBuild))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.copyText))) &&
-      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.openLogFolder)));
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.openLogFolder))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onNotificationOpened)));
   }
 }

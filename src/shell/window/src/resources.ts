@@ -206,6 +206,14 @@ export class Resources {
     [DockSide.Bottom]: "Show or hide the bottom dock"
   };
   public static readonly tabArgument: string = "tab";
+  public static readonly showCommandsCommand: string = "shell.showCommands";
+  public static readonly showCommandsTitle: string = "Show all commands";
+  public static readonly showCommandsGlyph: string = "search";
+  public static readonly showCommandsKey: string = "Mod+Shift+P";
+  public static readonly commandSearchLabel: string = "Search commands";
+  public static readonly commandSearchPaneClass: string = "tr-command-search-pane";
+  public static readonly windowRowSelector: string = "tr-window-row";
+  public static readonly wordSeparatorPattern: RegExp = /[\s\-_./:,]/u;
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly hideDockLabels: Readonly<Record<DockSide, string>> = {
     [DockSide.Left]: "Hide the left dock",
@@ -304,6 +312,7 @@ export class Resources {
   public static readonly helpMenuTitle: string = "Help";
   public static readonly tabMenuTitle: string = "Tab";
   public static readonly closeGroup: string = "shell.close";
+  public static readonly searchGroup: string = "shell.search";
   public static readonly docksGroup: string = "shell.docks";
   public static readonly layoutGroup: string = "shell.layout";
   public static readonly windowPartMenusToken: string = "The build's module menus";
