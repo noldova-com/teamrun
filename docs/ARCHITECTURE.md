@@ -184,6 +184,8 @@ A module declares its notification kinds in `contributes.notifications`. A part 
 - The runtime holds the list, newest first, for its own life. It keeps at most 100, dropping the oldest that report no work in progress.
 - Windows read the list with `shell.notifications` and follow the event of the same name, which carries the whole list after every change. A window part posts with `shell.postNotification` and changes or removes its notifications with `shell.updateNotification` and `shell.dismissNotification`; a post for a module that is not active is refused.
 - When a module's runtime part deactivates, all of its notifications are dismissed. When a window part is withdrawn, the notifications it posted are dismissed.
+- The list marks every notification read when the person opens it, and Clear all removes every notification that reports no work in progress; those still in progress stay, because their modules update them.
+- Do not disturb is notification state kept per device in the runtime's database, not a general preference. The desktop adds its own device to its window's `shell.notifications` and `shell.setDoNotDisturb` requests and forwards the event as the state for that device, so the device's identity never reaches the window.
 
 ## 6. Runtime ownership and local protocol
 

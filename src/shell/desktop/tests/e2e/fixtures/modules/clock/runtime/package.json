@@ -7,6 +7,7 @@
   "types": "api/index.d.ts",
   "license": "MIT",
   "dependencies": {
+    "@noldova/teamrun-shell-protocol": "__VERSION__",
     "@noldova/teamrun-shell-runtime": "__VERSION__"
   }
 }

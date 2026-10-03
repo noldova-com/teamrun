@@ -9,6 +9,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 
+import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 import { type IRuntimePart, type IRuntimePartContext, Migration, RuntimeCommand } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "./resources.js";
@@ -37,6 +38,10 @@ export class RuntimePart implements IRuntimePart {
         return { ticks: this.ticks };
       }
     }));
+    context.postNotification(new NotificationPost(
+      QualifiedName.parse(Resources.alarmKind), null, Resources.alarmTitle, Resources.alarmText, NotificationSeverity.Info, null, [], null));
+    context.postNotification(new NotificationPost(
+      QualifiedName.parse(Resources.syncKind), null, Resources.syncTitle, null, NotificationSeverity.Info, null, [], NotificationPost.indeterminate));
   }
 
   public async deactivateAsync(): Promise<void> {

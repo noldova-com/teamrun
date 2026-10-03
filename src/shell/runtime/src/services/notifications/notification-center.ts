@@ -52,6 +52,21 @@ export class NotificationCenter {
     return true;
   }
 
+  public republish(): void {
+    this.publish(this.list);
+  }
+
+  public markAllRead(): void {
+    if (this.entries.every(t => t.isRead))
+      return;
+    this.entries = this.entries.map(t => t.isRead ? t : new Notification(t.id, t.post, t.postedAt, true));
+    this.publish(this.list);
+  }
+
+  public clearFinished(): void {
+    this.remove(t => !NotificationCenter.isInProgress(t));
+  }
+
   public dismiss(id: number): void {
     this.remove(t => t.id === id);
   }
