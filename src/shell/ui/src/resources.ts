@@ -195,6 +195,9 @@ export class Resources {
   public static readonly menuPaneClass: string = "tr-menu-pane";
   public static readonly previewDescription: string = "Preview";
   public static readonly submenuGlyph: string = "chevron_right";
+  public static readonly checkedGlyph: string = "check";
+  public static readonly menuItemRole: string = "menuitem";
+  public static readonly menuItemRadioRole: string = "menuitemradio";
   public static readonly contextMenuKey: string = "ContextMenu";
   public static readonly menuKey: string = "F10";
   public static readonly clickEvent: string = "click";

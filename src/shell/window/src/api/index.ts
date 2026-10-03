@@ -15,6 +15,7 @@ export type { ITopBarActionOptions } from "../app/interfaces/i-top-bar-action-op
 export type { IWindowPart } from "../app/interfaces/i-window-part";
 export type { IWindowPartContext } from "../app/interfaces/i-window-part-context";
 export { CommandContribution } from "../app/models/command-contribution";
+export { NotificationHandle } from "../app/models/notification-handle";
 export { DocumentContribution } from "../app/models/document-contribution";
 export { MenuDeclarations } from "../app/models/menu-declarations";
 export { StatusBarItem } from "../app/models/status-bar-item";

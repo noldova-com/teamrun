@@ -28,6 +28,7 @@ export default class ModuleArtifacts {
   private static readonly SOURCE_PREFIX: string = "src/";
   private static readonly VIEWS_KIND: string = "views";
   private static readonly COMMANDS_KIND: string = "commands";
+  private static readonly NOTIFICATIONS_KIND: string = "notifications";
   private static readonly STATUS_BAR_ITEMS_KIND: string = "statusBarItems";
   private static readonly TOP_BAR_ACTIONS_KIND: string = "topBarActions";
   private static readonly SOURCE_IMPORT: string = "import { MenuDeclarations, WindowPartSource } from \"@noldova/teamrun-shell-window\";\n";
@@ -62,6 +63,7 @@ export default class ModuleArtifacts {
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.COMMANDS_KIND) ?? [])}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.STATUS_BAR_ITEMS_KIND) ?? [])}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.TOP_BAR_ACTIONS_KIND) ?? [])}, `
+        + `${JSON.stringify(t.contributions.get(ModuleArtifacts.NOTIFICATIONS_KIND) ?? [])}, `
         + `() => import("../${String(t.windowEntry).slice(ModuleArtifacts.SOURCE_PREFIX.length)}").then(t => t.windowPart))`);
     const menus = declarations
       .filter(t => t.menus.places.length > 0 || t.menus.groups.length > 0)

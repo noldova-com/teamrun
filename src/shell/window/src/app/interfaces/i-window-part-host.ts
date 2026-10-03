@@ -7,6 +7,7 @@
  */
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
 
 export interface IWindowPartHost {
   requestAsync(method: string, payload: JsonValue): Promise<JsonValue>;
@@ -20,6 +21,12 @@ export interface IWindowPartHost {
   isCommandRegistered(name: string): boolean;
 
   runCommandAsync(name: string, commandArguments: JsonValue): Promise<JsonValue>;
+
+  postNotificationAsync(post: NotificationPost): Promise<number>;
+
+  updateNotificationAsync(id: number, post: NotificationPost): Promise<void>;
+
+  dismissNotification(id: number): void;
 
   refresh(): void;
 }
