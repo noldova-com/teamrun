@@ -48,6 +48,19 @@ class TestDocumentComponent {
   public readonly title: InputSignal<string> = input.required<string>();
 }
 
+@Component({
+  selector: "tr-test-shell-document",
+  template: "<p class=\"shell-document\">settings</p>",
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+class TestShellDocumentComponent {
+  public static contexts: (IWindowPartContext | null)[] = [];
+
+  public constructor() {
+    TestShellDocumentComponent.contexts.push(inject(WindowPartTokens.context, { optional: true }));
+  }
+}
+
 class StubWindowPartHost {
   public readonly generation: WritableSignal<number> = signal(0);
   public readonly contributions: Map<string, ContributionMatch> = new Map();
@@ -112,6 +125,17 @@ describe("TabContentComponent", () => {
     const element = await renderAsync(tab);
 
     expect(element.querySelector(".document")?.textContent).toBe("1: Note 1");
+  });
+
+  it("shows a shell document without a part's context or inputs", async () => {
+    const tab = new DocumentTab("shell.settings");
+    TestShellDocumentComponent.contexts = [];
+    host.contributions.set(tab.key, new ContributionMatch(() => Promise.resolve(TestShellDocumentComponent), null));
+
+    const element = await renderAsync(tab);
+
+    expect(element.querySelector(".shell-document")?.textContent).toBe("settings");
+    expect(TestShellDocumentComponent.contexts).toEqual([null]);
   });
 
   it("shows why a failed module's view is empty", async () => {

@@ -1,0 +1,44 @@
+<div class="tr-setting-row-heading">
+  @if (isSet()) {
+    <span class="tr-setting-row-marker material-symbols-rounded" role="img" [attr.aria-label]="resources.modifiedLabel" [trTooltip]="resources.modifiedLabel">{{ resources.modifiedGlyph }}</span>
+  }
+  <span class="tr-setting-row-title"><tr-highlighted-text [text]="definition().title" [query]="query()" /></span>
+  @if (isSet()) {
+    <button type="button" class="tr-setting-row-reset" tr-button [variant]="secondary" [attr.aria-label]="resources.formatResetLabel(definition().title)" (click)="reset.emit()">
+      {{ resources.resetLabel }}
+    </button>
+  }
+</div>
+<div class="tr-setting-row-name"><tr-highlighted-text [text]="definition().name.text" [query]="query()" /></div>
+@if (definition().type.kind !== kinds.Boolean) {
+  <div class="tr-setting-row-description"><tr-highlighted-text [text]="definition().description" [query]="query()" /></div>
+}
+<div class="tr-setting-row-control">
+  @switch (definition().type.kind) {
+    @case (kinds.Boolean) {
+      <tr-checkbox [checked]="current() === true" (checkedChange)="choose($event)">
+        <tr-highlighted-text [text]="definition().description" [query]="query()" />
+      </tr-checkbox>
+    }
+    @case (kinds.Choice) {
+      <tr-select [label]="definition().title" [options]="options()" [value]="asString(current())" (valueChange)="choose($event)" />
+    }
+    @case (kinds.Number) {
+      <input tr-text-field type="number" class="tr-setting-row-number" [attr.aria-label]="definition().title" [min]="definition().type.minimum" [max]="definition().type.maximum"
+        [step]="definition().type.step" [value]="current()" (change)="commitNumber($event)" />
+    }
+    @case (kinds.Text) {
+      <input tr-text-field type="text" [attr.aria-label]="definition().title" [attr.maxlength]="definition().type.maxLength" [value]="asString(current())" (change)="commitText($event)" />
+    }
+    @case (kinds.Modules) {
+      <div class="tr-setting-row-modules" role="group" [attr.aria-label]="definition().title">
+        @for (module of modules(); track module.value) {
+          <tr-checkbox [checked]="chosenModules().has(module.value)" (checkedChange)="toggleModule(module.value, $event)">{{ module.title }}</tr-checkbox>
+        }
+      </div>
+    }
+  }
+</div>
+@if (error(); as message) {
+  <div class="tr-setting-row-error" role="alert">{{ message }}</div>
+}

@@ -20,6 +20,8 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly openedListeners: Set<(id: number) => void> = new Set();
 
   public readonly platform: string;
+  public appearance: unknown = null;
+  public readonly keptAppearances: JsonObject[] = [];
   public readonly appearances: JsonObject[] = [];
   public readonly changes: JsonObject[] = [];
   public readonly answers: string[] = [];
@@ -127,6 +129,10 @@ export class DesktopBridgeFixture implements IDesktopBridge {
     if (this.isCopyAccepted)
       this.copied.push(text);
     return Promise.resolve(this.isCopyAccepted);
+  }
+
+  public keepAppearance(preferences: JsonObject): void {
+    this.keptAppearances.push(preferences);
   }
 
   public openLogFolder(): Promise<boolean> {

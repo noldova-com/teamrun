@@ -35,6 +35,7 @@ describe("DesktopBridgeService", () => {
     readBuild: (): Promise<unknown> => Promise.resolve(null),
     copyText: (): Promise<boolean> => Promise.resolve(true),
     openLogFolder: (): Promise<boolean> => Promise.resolve(true),
+    keepAppearance: (): void => undefined,
     onNotificationOpened: (): (() => void) => () => undefined
   };
   const incomplete: readonly [string, unknown][] = [
@@ -55,6 +56,7 @@ describe("DesktopBridgeService", () => {
     ["no readBuild", { ...complete, readBuild: null }],
     ["no copyText", { ...complete, copyText: null }],
     ["no openLogFolder", { ...complete, openLogFolder: null }],
+    ["no keepAppearance", { ...complete, keepAppearance: null }],
     ["no onNotificationOpened", { ...complete, onNotificationOpened: null }]
   ];
 
@@ -216,6 +218,17 @@ describe("DesktopBridgeService", () => {
     bridge.publishNotificationOpened(3);
 
     expect(opened).toEqual([2]);
+  });
+
+  it("passes on the device's last appearance and keeps the window's", () => {
+    const bridge = DesktopBridgeFixture.install();
+    bridge.appearance = { "shell.mode": "Dark" };
+    const service = TestBed.inject(DesktopBridgeService);
+
+    service.keepAppearance({ "shell.mode": "Light" });
+
+    expect(service.initialAppearance).toEqual({ "shell.mode": "Dark" });
+    expect(bridge.keptAppearances).toEqual([{ "shell.mode": "Light" }]);
   });
 
   it("refuses a kept layout that is not a JSON object", async () => {

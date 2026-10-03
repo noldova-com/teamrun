@@ -11,6 +11,7 @@ import { TestBed } from "@angular/core/testing";
 
 import { ModuleState, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
+import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
@@ -129,6 +130,17 @@ describe("WindowPartHostService", () => {
     expect(errors).toEqual([]);
   });
 
+  it("registers the shell's Settings document before any module's, finds it without a part's context and labels it", async () => {
+    const { host, layout, loads } = start([], []);
+    await vi.waitFor(() => expect(loads).toEqual([""]));
+
+    const match = host.findContribution(new DocumentTab("shell.settings"));
+
+    expect(layout.registry().hasDocument("shell.settings")).toBe(true);
+    expect([match?.context, await match?.loadComponent()]).toEqual([null, SettingsComponent]);
+    expect(TestBed.inject(TabLabelService).of(new DocumentTab("shell.settings")).title).toBe("Settings");
+  });
+
   it("reads, sets, resets and follows settings through the settings service", async () => {
     bridge.responses.set("shell.settings", { payload: { definitions: [], entries: [] } });
     const { host, loads } = start([], []);
@@ -161,7 +173,7 @@ describe("WindowPartHostService", () => {
     expect(layout.registry().hasDocument("notes.note")).toBe(true);
     expect(labels.of(new ViewTab("notes.list")).title).toBe("Notes");
     expect(labels.of(new DocumentTab("notes.note", "1")).title).toBe("Note 1");
-    expect(host.findContribution(new ViewTab("notes.list"))?.context.moduleId).toBe("notes");
+    expect(host.findContribution(new ViewTab("notes.list"))?.context?.moduleId).toBe("notes");
     expect(await host.findContribution(new DocumentTab("notes.note", "2"))?.loadComponent()).toBe(ContentComponent);
     expect(host.findContribution(new ViewTab("notes.outline"))).toBeNull();
     expect(host.findFailure(new ViewTab("notes.list"))).toBeNull();
@@ -463,7 +475,7 @@ describe("WindowPartHostService", () => {
     expect(log).toEqual(["activate tasks", "activate notes", "deactivate notes", "deactivate tasks", "activate tasks", "activate notes"]);
     expect(loads.length).toBe(1);
     expect(errors.map(t => (t as Error).message)).toEqual(["tasks did not stop"]);
-    expect(host.findContribution(new ViewTab("notes.list"))?.context.moduleId).toBe("notes");
+    expect(host.findContribution(new ViewTab("notes.list"))?.context?.moduleId).toBe("notes");
   });
 
   it("passes requests and events to and from the runtime", async () => {

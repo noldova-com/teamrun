@@ -81,6 +81,7 @@ The table specifies normal-state colors. Check actual composited foreground/back
 | `--tr-button-secondary`, `--tr-button-secondary-text`, `--tr-button-secondary-hover` | `button.secondary*` | #E5E5E5, #3B3B3B, #CCCCCC | transparent, #CCCCCC, #2B2B2B | Secondary button |
 | `--tr-dropdown`, `--tr-dropdown-border`, `--tr-dropdown-list` | `dropdown.*`, fallback `input.*` | #FFFFFF, #858585, #FFFFFF | #313131, #858585, #1F1F1F | Select and options list |
 | `--tr-list-active`, `--tr-list-active-text` | `list.activeSelection*` | #E8E8E8, #000000 | #04395E, #FFFFFF | Chosen or keyboard-active option |
+| `--tr-list-highlight` | `list.highlightForeground` | #0066BF | #2AAAFF | Search matches, underlined so color is not their only cue |
 | `--tr-button-border` | `button.border` | #0000001A | #FFFFFF1A | Decorative edge where the button fill already identifies the control |
 | `--tr-setting-title` | `settings.headerForeground`, fallback `foreground` | #1F1F1F | #FFFFFF | Settings titles |
 | `--tr-hover-widget`, `--tr-hover-widget-border` | `editorHoverWidget.*`, fallback `editorWidget.background` / `widget.border` | #F8F8F8, #3B3B3B33 | #202020, #CCCCCC33 | Tooltip surface |
@@ -160,6 +161,7 @@ Use spacing tokens of 0.25, 0.5, 0.75, 1 and 1.5rem with section 8's component m
   | Command | Windows and Linux | macOS |
   |---|---|---|
   | Show all commands | Ctrl+Shift+P | ⇧⌘P |
+  | Open Settings | Ctrl+, | ⌘, |
   | Close the tab | Ctrl+W | ⌘W |
   | Show the next tab | Ctrl+Tab, Ctrl+PageDown | ⌃⇥, ⌥⌘→ |
   | Show the previous tab | Ctrl+Shift+Tab, Ctrl+PageUp | ⌃⇧⇥, ⌥⌘← |
@@ -169,6 +171,7 @@ Use spacing tokens of 0.25, 0.5, 0.75, 1 and 1.5rem with section 8's component m
 
   The next and previous tab move through the current group's tabs and wrap at either end. Other shell commands have no default key.
 - All operations are usable by keyboard with a predictable focus order. Tabs, lists, menus and completion use their established keyboard patterns; activation and dismissal cannot depend on middle-click, double-click, drag or a context menu alone.
+- Toolbars and icon strips follow the [toolbar pattern](https://www.w3.org/WAI/ARIA/apg/patterns/toolbar/). Each strip is one tab stop that returns to the item last focused, or the first. The arrow keys along its axis move between items, past separators and onto disabled items, which stay focusable and mark themselves disabled. Home and End go to the first and last item, and a strip wraps at its ends only where its component says so. Enter, Space and the other axis's arrows stay with the item, so a dropdown opens with Down.
 - Modal dialogs receive appropriate initial focus, contain focus while open, make the background inert and return focus to the opener or a sensible surviving control when closed. Escape dismisses a dismissible overlay; forms with unsaved work use an explicit discard policy. Non-modal search and popovers do not accidentally trap focus. See the [modal-dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
 - Dialogs are the shell's own, drawn in the window. The one exception is a window whose page has stopped or no longer responds: the page cannot draw then, so the desktop asks with the operating system's message box, in the product's voice, with the safe choice as default.
 - Pointer targets are at least 24 by 24 CSS pixels or meet a documented spacing/equivalent-control exception. A target sized in rem keeps this minimum when the root is small. Visual glyphs, hover pads and hit regions can differ, but hit regions must not overlap adjacent controls. A narrow resize sash needs adequate hit spacing or an equivalent adequately sized pointer control, plus keyboard operation. Do not restore large framework hit regions that obscure neighboring controls. See [target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html).
@@ -212,7 +215,12 @@ This table assigns geometry and radius tokens under sections 1, 3 and 7, with th
 | Choice pills (toggle group) | 1.375rem minimum visual height; 0.5rem side padding; 0.25rem gaps; small radius | Panel, 600 | Selected or hover fill, no decorative border/check; separate semantic selected state |
 | Settings item | Padding 0.75rem 0.875rem 1.125rem; description gap 0.1875rem; control gap 0.5625rem; medium radius | Panel; title 600 | Subtle hover surface; text and controls wrap |
 | Settings heading | Automatic height; 0.625rem surrounding space, 0.9375rem start inset | Settings group heading, 600 | Heading foreground; grows with its proportional line height |
+| Settings document | Search field above, preferred width 37.5rem; page list 12.5rem wide beside content at most 50rem wide; 1rem top and 1.5rem side padding | Panel | A document in the middle group; the page list and the content scroll separately |
+| Settings page list | Tree-row geometry, rows 0.25rem apart | Panel | Hover surface; the current page uses the selected fill and is marked as the current page; while searching, no page is current and choosing one ends the search |
+| Settings search | Text-field geometry | Panel | Filters every page by title, description and name as the person types; matches use the list highlight, underlined; results are grouped under their pages' headings, then their groups; with no match a sentence says so |
+| Modified marker | 0.625rem filled dot before the setting's title | — | Accent foreground; named "Modified" with the same tooltip, so its shape and name carry it, not its color; shown with the row's Reset while a value is stored, even one equal to the default |
 | Icon button | 1.375rem visual pad around a 1rem glyph; small radius | Accessible name | Toolbar hover; pointer hit region at least 24px unless a documented exception applies |
+| Toolbar | A horizontal or vertical strip; its items keep their own geometry | Accessible name | No surface of its own; one tab stop with the keyboard of section 7; items added or removed while it shows join or leave it; dragging belongs to the strip's owner |
 | Docking guide | 2.5rem square around a 1.5rem glyph; small radius; a group's center target and split arrows share a medium-radius plate with 0.125rem gaps, moved clear of the side guides | Accessible action name | Raised surface; shown while a view's tab is dragged; primary-button fill and text for the chosen target, whose landing area is previewed with the docking-preview fill, a 1px docking-preview border and the large radius |
 | Progress | 2px bar; 1rem spinner; reveal after 300ms where delay avoids flicker | Accessible status | Progress token; empty track; completion/error remain understandable without animation |
 | Word wrap | Icon-button geometry; 1rem wrap glyph | Accessible name | Initially off; precedes Copy or diff collapse; pressed state exposed; Enter/Space activate |
