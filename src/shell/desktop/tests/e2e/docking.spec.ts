@@ -6,9 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { writeFile } from "node:fs/promises";
-import path from "node:path";
-
 import type { Locator, Page } from "@playwright/test";
 
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
@@ -227,8 +224,7 @@ test.describe("docking", () => {
     await expect(sash).toHaveAttribute("aria-valuenow", String(Math.round(width + 72)));
   });
 
-  test("a sash in use shows a bar as wide as its gap and as long as itself in the sash color, in light and in dark, and shows none otherwise", async ({ desktop }, testInfo) => {
-    await desktop.useSuiteViewportAsync();
+  test("a sash in use shows a bar as wide as its gap and as long as itself in the sash color, in light and in dark, and shows none otherwise", async ({ desktop }) => {
     const window = desktop.window;
     const sash = window.getByRole("separator", { name: "Resize the left dock" });
     const bar = sash.locator(".tr-sash-bar");
@@ -258,8 +254,7 @@ test.describe("docking", () => {
       expect(inner?.width).toBe(4);
       await expect(bar).toHaveCSS("background-color", await colorOf("--tr-sash-active"));
       expect(await colorOf("--tr-sash-active")).toBe(await colorOf("--tr-accent"));
-      const image = await desktop.checkpointAsync(`sash-in-use-${scheme}`);
-      await writeFile(path.join(testInfo.project.outputDir, "..", `sash-in-use-${scheme}-${process.platform}-${process.arch}.png`), image);
+      await desktop.checkpointAsync(`sash-in-use-${scheme}`);
       await window.mouse.up();
       await window.mouse.move(grip.x + 600, grip.y + 300);
       await expect(bar).toHaveCSS("opacity", "0");
