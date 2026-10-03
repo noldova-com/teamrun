@@ -77,7 +77,7 @@ describe("SettingsComponent", () => {
       providers: [
         { provide: SettingsService, useValue: settings },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } },
-        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("clock", "Clock", [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] }
+        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("clock", "Clock", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] }
       ]
     });
     TestBed.inject(CommandService).setCommands([
