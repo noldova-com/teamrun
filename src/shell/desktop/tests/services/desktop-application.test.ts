@@ -129,8 +129,8 @@ export class DesktopApplicationTests {
 
   @TestMethod
   @TestData("win32", "null")
-  @TestData("darwin", "[\"appMenu\",\"editMenu\",\"windowMenu\"]")
-  public async setsTheStandardMenuOnlyOnMacOS(platform: string, menu: string): Promise<void> {
+  @TestData("darwin", "[{\"role\":\"appMenu\"},{\"role\":\"editMenu\"},{\"role\":\"window\",\"submenu\":[{\"role\":\"minimize\"},{\"role\":\"zoom\"},{\"type\":\"separator\"},{\"role\":\"close\",\"label\":\"Close Window\",\"accelerator\":\"Command+Shift+W\"},{\"type\":\"separator\"},{\"role\":\"front\"}]}]")
+  public async setsTheStandardMenuOnlyOnMacOSLeavingCommandWToTheWindow(platform: string, menu: string): Promise<void> {
     const electron = await DesktopApplicationTests.startReadyAsync(platform);
 
     Assert.areEqual(menu, JSON.stringify(electron.menu.menu));
