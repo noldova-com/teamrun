@@ -7,57 +7,16 @@
  */
 
 import { execFile, spawnSync } from "node:child_process";
+import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 
 export default class ProcessListFixture {
   private static readonly TIMEOUT: number = 30_000;
+  private static readonly EXIT_INTERVAL: number = 250;
   private static readonly WINDOWS_ROW: RegExp = /^"([^"]*)","(\d+)"/;
   private static readonly POSIX_ROW: RegExp = /^\s*(\d+)\s+(.+)$/;
-  private static readonly LISTED_ROW: RegExp = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.*?)\s*$/;
-  private static readonly POSIX_LISTED_ROW: RegExp = /^\s*(\d+)\s+(\d+)\s+(.*?)\s*$/;
-  private static readonly WINDOWS_PROCESSES: string = "CimCmdlets\\Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate, Name, CommandLine | " +
-    "Microsoft.PowerShell.Core\\ForEach-Object { \"$($_.ProcessId) $($_.ParentProcessId) $($_.CreationDate.ToFileTimeUtc()) $($_.Name) $($_.CommandLine)\" }";
-
-  public static async readProcessesAsync(): Promise<ListedProcess[]> {
-    const { stdout } = process.platform === "win32"
-      ? await promisify(execFile)("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", ProcessListFixture.WINDOWS_PROCESSES],
-        { encoding: "utf8", windowsHide: true, timeout: ProcessListFixture.TIMEOUT, maxBuffer: 16 * 1024 * 1024 })
-      : await promisify(execFile)("ps", ["-A", "-ww", "-o", "pid=,ppid=,args="], { encoding: "utf8", timeout: ProcessListFixture.TIMEOUT, maxBuffer: 16 * 1024 * 1024 });
-    const processes: ListedProcess[] = [];
-    for (const line of stdout.split(/\r?\n/)) {
-      if (process.platform === "win32") {
-        const match = ProcessListFixture.LISTED_ROW.exec(line);
-        if (match !== null)
-          processes.push({ processId: Number(match[1]), parentId: Number(match[2]), started: BigInt(match[3] ?? 0), command: match[4] ?? "" });
-        continue;
-      }
-      const match = ProcessListFixture.POSIX_LISTED_ROW.exec(line);
-      if (match !== null)
-        processes.push({ processId: Number(match[1]), parentId: Number(match[2]), started: 0n, command: match[3] ?? "" });
-    }
-    return processes;
-  }
-
-  public static descendants(processes: readonly ListedProcess[], processId: number): ListedProcess[] {
-    const started = new Map(processes.map(t => [t.processId, t.started]));
-    const children = new Map<number, ListedProcess[]>();
-    for (const listed of processes)
-      if (listed.processId !== listed.parentId && listed.started >= (started.get(listed.parentId) ?? 0n))
-        children.set(listed.parentId, [...children.get(listed.parentId) ?? [], listed]);
-    const descendants: ListedProcess[] = [];
-    const pending = [processId];
-    for (let next = pending.pop(); next !== undefined; next = pending.pop())
-      for (const child of children.get(next) ?? [])
-        if (child.processId !== processId && !descendants.some(t => t.processId === child.processId)) {
-          descendants.push(child);
-          pending.push(child.processId);
-        }
-    return descendants;
-  }
-
-  public static isListed(processes: readonly ListedProcess[], expected: ListedProcess): boolean {
-    return processes.some(t => t.processId === expected.processId && t.started === expected.started);
-  }
+  private static readonly ID_ROW: RegExp = /^\s*(\d+)\s*$/;
+  private static readonly DESCRIBED_ROW: RegExp = /^\s*(\d+)\s+(.*?)\s*$/;
 
   public static readNames(processIds: readonly number[]): ReadonlyMap<number, string> {
     const isWindows = process.platform === "win32";
@@ -78,11 +37,47 @@ export default class ProcessListFixture {
     }
     return names;
   }
-}
 
-export interface ListedProcess {
-  readonly processId: number;
-  readonly parentId: number;
-  readonly started: bigint;
-  readonly command: string;
+  public static async readRunningAsync(processIds: readonly number[]): Promise<number[]> {
+    if (processIds.length === 0)
+      return [];
+    const output = process.platform === "win32"
+      ? await ProcessListFixture.runAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+        `Microsoft.PowerShell.Management\\Get-Process -Id ${processIds.join(",")} -ErrorAction SilentlyContinue | Microsoft.PowerShell.Core\\ForEach-Object { $_.Id }`])
+      : await ProcessListFixture.runAsync("ps", ["-o", "pid=", "-p", processIds.join(",")]);
+    const listed = output.split(/\r?\n/).map(t => ProcessListFixture.ID_ROW.exec(t)).filter(t => t !== null).map(t => Number(t[1]));
+    return processIds.filter(t => listed.includes(t));
+  }
+
+  public static async waitForExitAsync(processIds: readonly number[], limit: number, onWaiting: (running: readonly number[]) => void = () => undefined): Promise<number[]> {
+    const deadline = Date.now() + limit;
+    let running = await ProcessListFixture.readRunningAsync(processIds);
+    while (running.length > 0 && Date.now() < deadline) {
+      onWaiting(running);
+      await delay(ProcessListFixture.EXIT_INTERVAL);
+      running = await ProcessListFixture.readRunningAsync(running);
+    }
+    return running;
+  }
+
+  public static async describeAsync(processIds: readonly number[]): Promise<string> {
+    const output = process.platform === "win32"
+      ? await ProcessListFixture.runAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+        `CimCmdlets\\Get-CimInstance Win32_Process -Filter "${processIds.map(t => `ProcessId = ${t}`).join(" OR ")}" | Microsoft.PowerShell.Core\\ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" }`])
+      : await ProcessListFixture.runAsync("ps", ["-ww", "-o", "pid=,args=", "-p", processIds.join(",")]);
+    const described = new Map(output.split(/\r?\n/).map(t => ProcessListFixture.DESCRIBED_ROW.exec(t)).filter(t => t !== null).map(t => [Number(t[1]), t[2] ?? ""]));
+    return processIds.map(t => `${t} ${described.get(t) ?? "(gone)"}`).join("; ");
+  }
+
+  private static async runAsync(file: string, commandArguments: readonly string[]): Promise<string> {
+    try {
+      return (await promisify(execFile)(file, [...commandArguments], { encoding: "utf8", windowsHide: true, timeout: ProcessListFixture.TIMEOUT, maxBuffer: 16 * 1024 * 1024 })).stdout;
+    }
+    catch (error) {
+      const failed = error as { code?: unknown; stdout?: string };
+      if (typeof failed.code === "number" && typeof failed.stdout === "string")
+        return failed.stdout;
+      throw error;
+    }
+  }
 }

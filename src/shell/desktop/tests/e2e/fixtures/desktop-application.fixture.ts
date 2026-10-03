@@ -11,14 +11,13 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 
 import { type ElectronApplication, type Page, type TestInfo, _electron, expect } from "@playwright/test";
 
 import { DataDirectory, DiscoveryReader, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
 import ErrorOutputClassifier from "./error-output.classifier.ts";
-import ProcessListFixture, { type ListedProcess } from "./process-list.fixture.ts";
+import ProcessListFixture from "./process-list.fixture.ts";
 
 export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
@@ -32,7 +31,6 @@ export default class DesktopApplicationFixture {
   private static readonly DEVICE_FOLDER: string = "device";
   private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
   private static readonly PROCESS_EXIT_TIMEOUT: number = 30_000;
-  private static readonly PROCESS_EXIT_INTERVAL: number = 250;
   private static readonly TRACE_FILE: string = "trace.zip";
   private static readonly WINDOWS_FILE: string = "windows.json";
   private static readonly DIAGNOSTIC_TIMEOUT: number = 10_000;
@@ -45,11 +43,10 @@ export default class DesktopApplicationFixture {
   private electronApplication: ElectronApplication | null = null;
   private page: Page | null = null;
   private childProcess: ChildProcess | null = null;
-  private processes: ListedProcess[] = [];
+  private readonly recorded: Set<number> = new Set();
 
   public readonly failures: string[] = [];
   public closeMilliseconds: number | null = null;
-  public awaitedProcessIds: readonly number[] = [];
   public readonly root: string;
   public readonly dataDirectory: string;
 
@@ -101,6 +98,10 @@ export default class DesktopApplicationFixture {
     catch {
       return false;
     }
+  }
+
+  public get recordedProcessIds(): readonly number[] {
+    return [...this.recorded];
   }
 
   public get application(): ElectronApplication {
@@ -163,7 +164,7 @@ export default class DesktopApplicationFixture {
   public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
     const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
-    await this.recordProcessesAsync(child);
+    await this.recordProcessesAsync();
     const started = Date.now();
     await this.application.close();
     this.closeMilliseconds = Date.now() - started;
@@ -190,31 +191,18 @@ export default class DesktopApplicationFixture {
     await rm(this.root, { recursive: true, force: true, maxRetries: 10 });
   }
 
-  private async recordProcessesAsync(child: ChildProcess): Promise<void> {
-    const listed = await ProcessListFixture.readProcessesAsync();
-    this.processes = this.processes.filter(t => ProcessListFixture.isListed(listed, t));
-    const main = listed.find(t => t.processId === child.pid);
-    if (main === undefined)
-      return;
-    for (const recorded of [main, ...ProcessListFixture.descendants(listed, main.processId)])
-      if (!this.processes.some(t => t.processId === recorded.processId && t.started === recorded.started))
-        this.processes.push(recorded);
+  private async recordProcessesAsync(): Promise<void> {
+    const electron = await this.application.evaluate(({ app }) => app.getAppMetrics().map(t => t.pid));
+    const runtime = await this.readRuntimeProcessIdAsync();
+    for (const processId of [...electron, ...runtime === undefined ? [] : [runtime]])
+      this.recorded.add(processId);
   }
 
   private async waitForProcessesAsync(): Promise<void> {
-    const deadline = Date.now() + DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT;
-    let listed = await ProcessListFixture.readProcessesAsync();
-    let running = this.processes.filter(t => ProcessListFixture.isListed(listed, t));
-    while (running.length > 0 && Date.now() < deadline) {
-      this.awaitedProcessIds = running.map(t => t.processId);
-      await delay(DesktopApplicationFixture.PROCESS_EXIT_INTERVAL);
-      listed = await ProcessListFixture.readProcessesAsync();
-      running = running.filter(t => ProcessListFixture.isListed(listed, t));
-    }
-    this.awaitedProcessIds = [];
+    const running = await ProcessListFixture.waitForExitAsync([...this.recorded], DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT);
     if (running.length === 0)
       return;
-    const described = running.map(t => `${t.processId} ${t.command}`).join("; ");
+    const described = await ProcessListFixture.describeAsync(running);
     throw new Error(`TeamRun's processes ${described} still run ${DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT / 1000} s after it closed, so its folder ${this.root} is kept.`);
   }
 
@@ -294,7 +282,7 @@ export default class DesktopApplicationFixture {
     await expect.poll(() => this.isVisibleAsync()).toBe(true);
     await expect.poll(async () => (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.productVersion)
       .toBe(RuntimeBuild.identity.productVersion);
-    await this.recordProcessesAsync(application.process());
+    await this.recordProcessesAsync();
   }
 
   private requireProcess(): ChildProcess {
