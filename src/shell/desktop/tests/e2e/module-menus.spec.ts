@@ -25,6 +25,74 @@ async function openNoteMenuAsync(window: Page, week: number): Promise<Locator> {
   return menu;
 }
 
+async function openBarMenuAsync(window: Page, title: string): Promise<Locator> {
+  await window.locator(".tr-window-row-menu").click();
+  await window.locator("tr-menu.tr-window-row-menu-list").getByRole("menuitem", { name: title }).click();
+  const menu = window.locator(".cdk-overlay-container tr-menu.tr-place-menu").last();
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
+test.describe("the menu bar on Windows and Linux", () => {
+  test.skip(process.platform === "darwin", "macOS shows the menus in its own menu bar.");
+
+  test("the menu button opens File, View and the modules' menus, and runs their rows with their checked state", async ({ desktop }) => {
+    const window = desktop.window;
+    const list = window.locator(".tr-notes-list-items");
+    const button = window.locator(".tr-window-row-menu");
+    await expect(button).toHaveAttribute("aria-label", "Menu");
+    await button.click();
+    await expect(window.locator("tr-menu.tr-window-row-menu-list button[tr-menu-item]")).toHaveText([/File/, /View/, /Notes/]);
+    await window.keyboard.press("Escape");
+
+    const file = await openBarMenuAsync(window, "File");
+    await expect(file.locator("button[tr-menu-item]")).toHaveText([/Close the tab/, /New note/, /New from template/]);
+    await file.getByRole("menuitem", { name: "New note" }).click();
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"] .tr-tab-label")).toHaveText("Note 3");
+    await (await openBarMenuAsync(window, "Notes")).getByRole("menuitemradio", { name: "Sort by title" }).click();
+    await expect(list).toHaveAttribute("data-sort", "title");
+    const spans = await openBarMenuAsync(window, "View");
+    await expect(spans.getByRole("menuitemradio", { name: "Bottom dock across the window" })).toHaveAttribute("aria-checked", "true");
+    await spans.getByRole("menuitemradio", { name: "Bottom dock between the side docks" }).click();
+    await expect((await openBarMenuAsync(window, "View")).getByRole("menuitemradio", { name: "Bottom dock between the side docks" })).toHaveAttribute("aria-checked", "true");
+    await window.keyboard.press("Escape");
+    await window.keyboard.press("Escape");
+    const view = await openBarMenuAsync(window, "View");
+    await expect(view.getByRole("menuitemcheckbox", { name: "Show or hide the left dock" })).toHaveAttribute("aria-checked", "true");
+    await view.getByRole("menuitemcheckbox", { name: "Show or hide the left dock" }).click();
+    await expect((await openBarMenuAsync(window, "View")).getByRole("menuitemcheckbox", { name: "Show or hide the left dock" })).toHaveAttribute("aria-checked", "false");
+    await window.keyboard.press("Escape");
+    await window.keyboard.press("Escape");
+
+    await expect(window.locator(".cdk-overlay-container tr-menu")).toHaveCount(0);
+    await expect(list).toHaveCount(0);
+    await expect(button).toBeFocused();
+  });
+});
+
+test.describe("the menu bar on macOS", () => {
+  test.skip(process.platform !== "darwin", "Windows and Linux show the menus from the menu button.");
+
+  test("the native menu bar holds the shell's and the modules' menus, shows checked state and runs a chosen row in the window", async ({ desktop }) => {
+    const window = desktop.window;
+    const read = (id: string): Promise<readonly [boolean, boolean] | null> => desktop.application.evaluate(({ Menu }, itemId) => {
+      const item = Menu.getApplicationMenu()?.getMenuItemById(itemId);
+      return item ? [item.enabled, item.checked] as const : null;
+    }, id);
+
+    await expect.poll(() => desktop.application.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map(t => t.label) ?? []))
+      .toEqual([expect.any(String), "File", "Edit", "View", "Notes", "Window"]);
+    await expect.poll(() => read("notes.tools/notes.toolsSorting/1")).toEqual([true, true]);
+    await desktop.application.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("shell.file/notes.create/0")?.click());
+    await desktop.application.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("notes.tools/notes.toolsSorting/0")?.click());
+
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"] .tr-tab-label")).toHaveText("Note 3");
+    await expect(window.locator(".tr-notes-list-items")).toHaveAttribute("data-sort", "title");
+    await expect.poll(() => read("notes.tools/notes.toolsSorting/0")).toEqual([true, true]);
+    await expect.poll(() => read("notes.tools/notes.toolsSorting/1")).toEqual([true, false]);
+  });
+});
+
 test.describe("module menus", () => {
   test("a note's context menu shows the module's groups apart and runs its items with the note it was opened on", async ({ desktop }) => {
     const window = desktop.window;

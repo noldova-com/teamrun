@@ -124,7 +124,7 @@ describe("MenuService", () => {
     })]);
     menus.setActiveModules(["notes"]);
 
-    expect(describeSections(menus.resolve("shell.file"))).toEqual([["New note (disabled)"]]);
+    expect(describeSections(menus.resolve("shell.file"))).toEqual([["Close the tab (disabled) Ctrl+W"], ["New note (disabled)"]]);
     expect(reported).toHaveBeenCalledOnce();
   });
 });

@@ -36,6 +36,11 @@
 }
 
 .tr-window-row-action,
+.tr-window-row-menu,
 .tr-window-row-search {
   app-region: no-drag;
+}
+
+.tr-window-row-menu {
+  margin-inline: var(--tr-space-1);
 }

@@ -55,7 +55,7 @@ export class ShellCommandsService {
     ...Object.values(DockSide).map(side => this.tabCommand(Resources.dockTabCommands[side], Resources.dockTabTitles[side], Resources.dockGlyphs[side],
       t => this.place(t.tab, new SideDropTarget(side)), t => t.tab.isMovable)),
     ...Object.values(DockSide).map(side => new CommandContribution(Resources.toggleDockCommands[side], Resources.toggleDockTitles[side], Resources.hideDockGlyphs[side], null,
-      () => this.done(() => this.layout.toggleDock(side)))),
+      () => this.done(() => this.layout.toggleDock(side)), () => true, () => this.layout.layout().dock(side).isExpanded)),
     new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, null,
       () => this.done(() => this.search.open())),
     new CommandContribution(Resources.openSettingsCommand, Resources.openSettingsTitle, Resources.settingsGlyph, null,
@@ -63,7 +63,7 @@ export class ShellCommandsService {
       () => this.layout.registry().hasDocument(ShellDocuments.settings.name)),
     new CommandContribution(Resources.resetLayoutCommand, Resources.resetLayoutLabel, Resources.resetLayoutGlyph, null, () => this.done(() => this.layout.reset())),
     ...Object.values(BottomDockSpan).map(span => new CommandContribution(Resources.bottomSpanCommands[span], Resources.bottomSpanLabels[span], Resources.bottomSpanGlyphs[span], null,
-      () => this.done(() => this.layout.setBottomSpan(span)))),
+      () => this.done(() => this.layout.setBottomSpan(span)), () => true, () => this.layout.layout().bottomSpan === span)),
     new CommandContribution(Resources.showAllTabsCommand, Resources.overflowLabel, Resources.overflowGlyph, null,
       commandArguments => this.done(() => {
         const group = this.groupOf(commandArguments);
