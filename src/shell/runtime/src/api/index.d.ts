@@ -2786,7 +2786,7 @@ export declare class ProcessLaunchCommand {
 }
 
 /**
- * What a refusing runtime answers every handshake with, and the one method a refused connection may call.
+ * What a refusing runtime answers every handshake with, and the one method a refused connection may call besides `shell.stop`.
  */
 export declare class Refusal {
   /**
@@ -2795,7 +2795,7 @@ export declare class Refusal {
   public readonly failure: Failure;
 
   /**
-   * The only method a refused connection may call.
+   * The only method a refused connection may call besides `shell.stop`, which every connection may call.
    */
   public readonly method: QualifiedName;
 
@@ -2803,7 +2803,7 @@ export declare class Refusal {
    * Creates the refusal.
    *
    * @param failure The handshake's failure.
-   * @param method The method a refused connection may call.
+   * @param method The method a refused connection may call besides `shell.stop`.
    * @example
    * ```ts
    * import { Failure, FailureCode, PreShellData, ShellMethods } from "@noldova/teamrun-shell-protocol";
@@ -3009,6 +3009,11 @@ export declare class RuntimeOptions {
   public readonly startLogName: string | null;
 
   /**
+   * How long a starting runtime keeps trying to take the data directory over from an owner that publishes no discovery file, because it is starting or stopping, in milliseconds.
+   */
+  public readonly takeoverMilliseconds: number;
+
+  /**
    * Creates the options.
    *
    * @param dataDirectory The data directory.
@@ -3016,6 +3021,7 @@ export declare class RuntimeOptions {
    * @param serverSettings The server's limits. Defaults to {@link ServerSettings}' defaults.
    * @param declarationsFile The build's module declarations. Defaults to the build's file beside the installed runtime.
    * @param startLogName The start log's file name, `start-<UUID>.log`, or `null`. Defaults to `null`.
+   * @param takeoverMilliseconds How long to keep trying to take over from an owner without a discovery file, in milliseconds. Defaults to 5 seconds.
    * @throws {ArgumentException} When the start log's name is not of that form.
    * @example
    * ```ts
@@ -3024,7 +3030,7 @@ export declare class RuntimeOptions {
    * export const options = new RuntimeOptions(new DataDirectory("/home/person/.noldova/teamrun"), 60_000, new ServerSettings());
    * ```
    */
-  public constructor(dataDirectory: DataDirectory, idleGraceMilliseconds?: number, serverSettings?: ServerSettings, declarationsFile?: string, startLogName?: string | null);
+  public constructor(dataDirectory: DataDirectory, idleGraceMilliseconds?: number, serverSettings?: ServerSettings, declarationsFile?: string, startLogName?: string | null, takeoverMilliseconds?: number);
 
   /**
    * Reads the options from entry arguments.
@@ -3238,7 +3244,7 @@ export declare class RuntimeClient {
   public callAsync(method: QualifiedName, payload: JsonValue, timeoutMilliseconds?: number, signal?: AbortSignal): Promise<Response>;
 
   /**
-   * Asks the runtime to stop; the only request another build may send.
+   * Asks the runtime to stop; the only request another build may send, and one a refused connection may send.
    *
    * @param policy Whether to stop only when no work is in progress, or to stop the work.
    * @returns A promise of the response: success, or a conflict whose details list the work in progress.
@@ -3256,7 +3262,7 @@ export declare class RuntimeClient {
   public stopAsync(policy: StopPolicy): Promise<Response>;
 
   /**
-   * Asks a refusing runtime to move the data from before the shell aside; the only request a refused connection may send.
+   * Asks a refusing runtime to move the data from before the shell aside; with {@link stopAsync}, the only request a refused connection may send.
    *
    * @returns A promise of the response: success, after which the runtime serves new connections normally, or a failure.
    * @throws {ConnectionException} Rejected as for {@link callAsync}.
@@ -3526,7 +3532,7 @@ export declare class RuntimeServer implements IEventSink {
   public listenSocketAsync(socketPath: string): Promise<Endpoint>;
 
   /**
-   * Starts refusing: every later handshake is answered with the refusal's failure, and the connection may call only the refusal's method.
+   * Starts refusing: every later handshake is answered with the refusal's failure, and the connection may call only the refusal's method and `shell.stop`.
    *
    * @param refusal The failure and the method allowed.
    * @example
@@ -3712,14 +3718,14 @@ export declare class RuntimeHost implements IIdleParticipant {
   public get isIdle(): boolean;
 
   /**
-   * Takes ownership, opens the shell's database, listens and publishes discovery. When the directory holds data from before the shell, the runtime refuses instead: every handshake is answered with a {@link FailureCode.PreShellData} failure whose details give the location, and only `shell.moveAside` is served until it has moved the data aside and opened the database. Concurrent `shell.moveAside` requests share one move, and a request after the move succeeds without moving anything.
+   * Takes ownership, opens the shell's database, listens and publishes discovery. When the directory holds data from before the shell, the runtime refuses instead: every handshake is answered with a {@link FailureCode.PreShellData} failure whose details give the location, and only `shell.moveAside` and `shell.stop` are served until it has moved the data aside and opened the database. Concurrent `shell.moveAside` requests share one move, and a request after the move succeeds without moving anything.
    *
    * @param options How the runtime runs.
    * @param platform The platform, as in `process.platform`; Windows listens on loopback TCP, others on a socket in the discovery folder.
    * @param environment The environment the discovery folder's protection uses.
    * @returns A promise of the running host.
    * @throws {DeclarationsFormatException} Rejected, before taking ownership, when the build's module declarations cannot be read.
-   * @throws {DataDirectoryOwnedException} Rejected when another runtime owns the directory.
+   * @throws {DataDirectoryOwnedException} Rejected when another runtime owns the directory and has published its discovery file, or still owns it once the options' takeover time has passed.
    * @example
    * ```ts
    * import { RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
