@@ -17,6 +17,16 @@ const colors = {
 };
 const titles = ["Note 2 couldn't be saved", "Syncing the clock", "The clock started"];
 
+function contrast(foreground: string, background: string): number {
+  const luminance = (color: string): number => {
+    const [red = 0, green = 0, blue = 0] = (color.match(/\d+/gu) ?? []).slice(0, 3).map(t => Number(t) / 255)
+      .map(t => t <= 0.03928 ? t / 12.92 : ((t + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  };
+  const [lighter = 0, darker = 0] = [luminance(foreground), luminance(background)].sort((x, y) => y - x);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 function bell(window: Page): Locator {
   return window.locator("button.tr-notifications-item");
 }
@@ -240,6 +250,9 @@ test.describe("notifications", () => {
 
       expect(look.fill).toBe(await colorOf("--tr-progress"));
       expect(look.fill).not.toBe(look.surface);
+      expect(look.fill.startsWith("rgb(")).toBe(true);
+      expect(look.surface.startsWith("rgb(")).toBe(true);
+      expect(contrast(look.fill, look.surface)).toBeGreaterThanOrEqual(3);
       expect(look.fill).not.toBe(look.track);
       expect(look.fill).not.toMatch(/^rgba\(.*, 0\)$/);
       expect(look.width).toBeGreaterThan(0);

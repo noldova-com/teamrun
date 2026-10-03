@@ -14,7 +14,11 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({
   imports: [ProgressComponent],
-  template: `<div class="frame" [style.width]="'200px'"><tr-progress label="Syncing the clock" [value]="value()" /></div>`
+  template: `
+    <div class="frame" [style.width]="'200px'"><tr-progress label="Syncing the clock" [value]="value()" /></div>
+    <div class="popover" [style.background]="'var(--tr-menu)'"><tr-progress label="Syncing the clock" [value]="0.5" /></div>
+    <div class="toast" [style.background]="'var(--tr-notification)'"><tr-progress label="Syncing the clock" [value]="0.5" /></div>
+  `
 })
 class ProgressHostComponent {
   public readonly value = signal<number | null>(null);
@@ -86,4 +90,17 @@ describe("ProgressComponent", () => {
         expect(fill).not.toBe(track);
         expect(bar().getBoundingClientRect().height).toBe(2);
       });
+
+  for (const mode of AppearanceFixture.modes)
+    for (const theme of AppearanceFixture.themes)
+      for (const surface of ["popover", "toast"])
+        it(`keeps its bar at least 3:1 against the ${surface} it sits on in the ${theme.id} theme in ${mode} mode`, () => {
+          AppearanceFixture.apply(theme, mode);
+          const fill = getComputedStyle(fixture.nativeElement.querySelector(`.${surface} .tr-progress-bar`)).backgroundColor;
+          const ground = getComputedStyle(fixture.nativeElement.querySelector(`.${surface}`)).backgroundColor;
+
+          expect(fill.startsWith("rgb(")).toBe(true);
+          expect(ground.startsWith("rgb(")).toBe(true);
+          expect(AppearanceFixture.contrast(fill, ground)).toBeGreaterThanOrEqual(3);
+        });
 });
