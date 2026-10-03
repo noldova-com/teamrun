@@ -11,6 +11,7 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import { DockComponent } from "../../../../src/app/components/dock/dock.component";
 import { DockSide } from "../../../../src/app/enums/dock-side";
+import { PanelEdge } from "../../../../src/app/enums/panel-edge";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { ViewTab } from "../../../../src/app/models/layout/view-tab";
 import type { LayoutService } from "../../../../src/app/services/layout.service";
@@ -28,8 +29,10 @@ class DockHostComponent {
 }
 
 describe("DockComponent", () => {
+  let bridge: DesktopBridgeFixture;
+
   beforeEach(() => {
-    DesktopBridgeFixture.install();
+    bridge = DesktopBridgeFixture.install();
   });
 
   afterEach(() => {
@@ -125,9 +128,54 @@ describe("DockComponent", () => {
     expect(query("tr-sash")).not.toBeNull();
   });
 
+  it("shows a side set to icons as a toolbar of its views on the window's edge, group by group, beside the open dock", async () => {
+    await renderAsync(DockSide.Left, Layout.createDefault(registry).splitGroup(LayoutFixture.search, 1, PanelEdge.Bottom));
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
+    fixture.detectChanges();
+    const strip = query("tr-panel-card");
+    const rail = layout.geometry().rail(DockSide.Left);
+    const host: HTMLElement = fixture.nativeElement;
+
+    expect([strip?.getAttribute("role"), strip?.getAttribute("aria-orientation"), strip?.getAttribute("aria-label")]).toEqual(["toolbar", "vertical", "Left dock views"]);
+    expect(strip?.classList.contains("tr-dock-strip-rail")).toBe(true);
+    expect([strip?.style.left, strip?.style.width]).toEqual([`${rail?.x}rem`, `${rail?.width}rem`]);
+    expect([...host.querySelectorAll(".tr-dock-strip-view")].map(t => [t.getAttribute("data-view"), t.getAttribute("aria-pressed")])).toEqual([
+      ["view/files.tree", "true"],
+      ["view/files.search", "true"]
+    ]);
+    expect([...host.querySelectorAll(".tr-dock-strip-separator")].map(t => t.getAttribute("aria-orientation"))).toEqual(["horizontal"]);
+    expect(query("tr-sash")).not.toBeNull();
+  });
+
+  it("closes the dock from the icon of a view it shows, and opens it at the chosen view from any other", async () => {
+    await renderAsync(DockSide.Left, Layout.createDefault(registry).openView(LayoutFixture.search, registry));
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
+    fixture.detectChanges();
+    const button = (key: string): HTMLButtonElement | null => query(`.tr-dock-strip-view[data-view="${key}"]`) as HTMLButtonElement | null;
+    const pressed = (): readonly (string | null | undefined)[] => [button("view/files.tree"), button("view/files.search")].map(t => t?.getAttribute("aria-pressed"));
+    const first = pressed();
+
+    button("view/files.search")?.click();
+    fixture.detectChanges();
+    const closed = [layout.layout().dock(DockSide.Left).isCollapsed, query("tr-sash"), pressed()];
+    button("view/files.tree")?.click();
+    fixture.detectChanges();
+
+    expect(first).toEqual(["false", "true"]);
+    expect(closed).toEqual([true, null, ["false", "false"]]);
+    expect([layout.layout().dock(DockSide.Left).isCollapsed, layout.layout().group(1)?.active, pressed()]).toEqual([false, LayoutFixture.files, ["true", "false"]]);
+    button("view/files.search")?.click();
+    fixture.detectChanges();
+    expect([layout.layout().dock(DockSide.Left).isCollapsed, pressed()]).toEqual([false, ["false", "true"]]);
+  });
+
   it("lays the bottom strip out in a row", async () => {
-    await renderAsync(DockSide.Bottom, Layout.createDefault(registry).openView(LayoutFixture.terminal, registry).toggleDock(DockSide.Bottom));
+    const terminals = Layout.createDefault(registry).openView(LayoutFixture.terminal, registry).openView(LayoutFixture.secondTerminal, registry);
+    const split = terminals.splitGroup(LayoutFixture.secondTerminal, terminals.groupOf(LayoutFixture.terminal)?.id ?? -1, PanelEdge.Right);
+    await renderAsync(DockSide.Bottom, split.toggleDock(DockSide.Bottom));
 
     expect(query("tr-panel-card")?.classList.contains("tr-dock-strip-vertical")).toBe(false);
+    expect(query(".tr-dock-strip-separator")?.getAttribute("aria-orientation")).toBe("vertical");
+    expect(query("tr-panel-card")?.getAttribute("aria-orientation")).toBe("horizontal");
   });
 });

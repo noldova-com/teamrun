@@ -9,7 +9,10 @@
 import { ChangeDetectionStrategy, Component, type Signal, computed, inject, input } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import { AppearanceService, IconButtonComponent, OverlaySide, PanelCardComponent, PanelSurface, SashComponent, SashOrientation, TooltipDirective } from "@noldova/teamrun-shell-ui";
+import {
+  AppearanceService, IconButtonComponent, OverlaySide, PanelCardComponent, PanelSurface, SashComponent, SashOrientation, ToolbarDirective, ToolbarItemDirective, ToolbarOrientation,
+  TooltipDirective
+} from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
 import { DockSide } from "../../enums/dock-side";
@@ -17,12 +20,13 @@ import { Bounds } from "../../models/layout/bounds";
 import type { Dock } from "../../models/layout/dock";
 import type { LayoutNode } from "../../models/layout/layout.node";
 import type { Tab } from "../../models/layout/tab";
+import type { TabGroup } from "../../models/layout/tab-group";
 import { LayoutService } from "../../services/layout.service";
 import { TabLabelService } from "../../services/tab-label.service";
 
 @Component({
   selector: "tr-dock",
-  imports: [IconButtonComponent, PanelCardComponent, SashComponent, TooltipDirective],
+  imports: [IconButtonComponent, PanelCardComponent, SashComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective],
   templateUrl: "./dock.component.html",
   styleUrl: "./dock.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -46,6 +50,10 @@ export class DockComponent {
   protected readonly size: Signal<number> = computed(() => this.dock().size ?? this.bounds().length(this.dock().axis));
   protected readonly isVertical: Signal<boolean> = computed(() => this.side() !== DockSide.Bottom);
   protected readonly tooltipSide: Signal<OverlaySide> = computed(() => Resources.dockStripTooltipSides[this.side()]);
+  protected readonly isRail: Signal<boolean> = computed(() => !Object.isNull(this.layout.geometry().rail(this.side())));
+  protected readonly stripBounds: Signal<Bounds | null> = computed(() => this.layout.geometry().rail(this.side()) ?? (this.isCollapsed() ? this.bounds() : null));
+  protected readonly stripOrientation: Signal<ToolbarOrientation> = computed(() => this.isVertical() ? ToolbarOrientation.Vertical : ToolbarOrientation.Horizontal);
+  protected readonly separatorOrientation: Signal<string> = computed(() => this.isVertical() ? Resources.horizontalOrientation : Resources.verticalOrientation);
   protected readonly sash: Signal<Bounds> = computed(() => {
     const bounds = this.bounds();
     const gap = Resources.panelGap;
@@ -61,8 +69,19 @@ export class DockComponent {
 
   public readonly side = input.required<DockSide>();
 
-  protected tabsOf(root: LayoutNode): readonly Tab[] {
-    return root.groups.flatMap(t => t.tabs).filter(t => t.isAvailable(this.layout.registry()));
+  protected groupsOf(root: LayoutNode): readonly (readonly [TabGroup, readonly Tab[]])[] {
+    return root.groups.map(t => [t, t.tabs.filter(u => u.isAvailable(this.layout.registry()))] as const).filter(([, tabs]) => tabs.length > 0);
+  }
+
+  protected isShowing(group: TabGroup, tab: Tab): boolean {
+    return !this.isCollapsed() && tab.equals(group.active);
+  }
+
+  protected toggle(group: TabGroup, tab: Tab): void {
+    if (this.isShowing(group, tab))
+      this.layout.toggleDock(this.side());
+    else
+      this.layout.activate(tab);
   }
 
   protected pixels(rem: number): number {

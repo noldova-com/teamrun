@@ -23,14 +23,15 @@ export class LayoutFit {
     this.middle = middle;
   }
 
-  public static of(length: number, chrome: number, docks: readonly Dock[], middleMinimum: number): LayoutFit {
-    const strip = Resources.dockStripSize + Resources.panelGap;
+  public static of(length: number, chrome: number, docks: readonly Dock[], middleMinimum: number, railed: ReadonlySet<DockSide> = new Set()): LayoutFit {
+    const strip = (dock: Dock): number => railed.has(dock.side) ? 0 : Resources.dockStripSize + Resources.panelGap;
+    const preferred = (dock: Dock): number => dock.isCollapsed && railed.has(dock.side) ? 0 : dock.preferredTrack;
     const collapsed = new Set<DockSide>();
-    const floor = (dock: Dock): number => collapsed.has(dock.side) ? strip : dock.isExpanded ? dock.minimumSize + Resources.panelGap : dock.preferredTrack;
+    const floor = (dock: Dock): number => collapsed.has(dock.side) ? strip(dock) : dock.isExpanded ? dock.minimumSize + Resources.panelGap : preferred(dock);
     for (const dock of docks.filter(t => t.isExpanded))
       if (length - chrome - docks.reduce((sum, t) => sum + floor(t), 0) < middleMinimum)
         collapsed.add(dock.side);
-    const tracks = new Map(docks.map(t => [t.side, collapsed.has(t.side) ? strip : t.preferredTrack]));
+    const tracks = new Map(docks.map(t => [t.side, collapsed.has(t.side) ? strip(t) : preferred(t)]));
     const room = (): number => length - chrome - [...tracks.values()].reduce((sum, t) => sum + t, 0);
     for (const dock of docks.filter(t => t.isExpanded && !collapsed.has(t.side)))
       tracks.set(dock.side, Math.max(floor(dock), dock.preferredTrack - Math.max(0, middleMinimum - room())));
