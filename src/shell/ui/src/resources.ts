@@ -116,6 +116,12 @@ export class Resources {
     "tooltip-width",
     "tooltip-padding",
     "popover-width",
+    "quick-input-width",
+    "quick-input-margin",
+    "quick-input-padding",
+    "quick-input-gap",
+    "field-height",
+    "field-padding",
     "window-row-height",
     "status-bar-height",
     "status-bar-inset",
@@ -197,6 +203,20 @@ export class Resources {
   public static readonly menuPaneClass: string = "tr-menu-pane";
   public static readonly previewDescription: string = "Preview";
   public static readonly submenuGlyph: string = "chevron_right";
+  public static readonly quickInputIdPrefix: string = "tr-quick-input-";
+  public static readonly quickInputOptionSeparator: string = "-option-";
+  public static readonly quickInputFieldSelector: string = ".tr-quick-input-field";
+  public static readonly quickInputListSelector: string = ".tr-quick-input-list";
+  public static readonly quickInputOptionSelector: string = "[role=option]";
+  public static readonly revealOptions: ScrollIntoViewOptions = { block: "nearest" };
+  public static readonly arrowDownKey: string = "ArrowDown";
+  public static readonly arrowUpKey: string = "ArrowUp";
+  public static readonly homeKey: string = "Home";
+  public static readonly endKey: string = "End";
+  public static readonly pageDownKey: string = "PageDown";
+  public static readonly pageUpKey: string = "PageUp";
+  public static readonly enterKey: string = "Enter";
+  public static readonly escapeKey: string = "Escape";
   public static readonly checkedGlyph: string = "check";
   public static readonly menuItemRole: string = "menuitem";
   public static readonly menuItemRadioRole: string = "menuitemradio";
@@ -238,5 +258,11 @@ export class Resources {
 
   public static formatCloseTab(label: string): string {
     return `Close ${label}`;
+  }
+
+  public static formatResultCount(count: number): string {
+    if (count === 0)
+      return "No results";
+    return count === 1 ? "1 result" : `${count} results`;
   }
 }
