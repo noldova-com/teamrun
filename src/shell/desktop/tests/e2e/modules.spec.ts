@@ -36,7 +36,6 @@ const failClockAsync = async (desktop: DesktopApplicationFixture): Promise<void>
 
 test.describe("modules", () => {
   test("the fixture modules' views and documents take their places and show their content", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
 
     await expect(window.locator("tr-tab-group[data-side=Left] .tr-tab-label")).toHaveText(["Notes", "Outline"]);
@@ -61,7 +60,6 @@ test.describe("modules", () => {
   });
 
   test("a module that didn't start keeps its view's place, says why in the status bar and its view, and offers its details", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     await expect(desktop.window.locator("[data-fixture-content=clock-face]")).toBeVisible();
 
     await tab(desktop, "view/notes.outline").click();

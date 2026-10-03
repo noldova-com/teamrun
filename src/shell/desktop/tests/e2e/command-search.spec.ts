@@ -24,7 +24,6 @@ function options(window: Page): Locator {
 
 test.describe("command search", () => {
   test("opens from its key centred under the window row, runs a module's command from the keyboard and lists it first next time", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     const tab = window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]");
     await expect(tab).toBeVisible();
@@ -52,6 +51,7 @@ test.describe("command search", () => {
 
     await window.keyboard.press("ControlOrMeta+Shift+KeyP");
     await expect(options(window).first()).toHaveAttribute("data-item", "notes.newNote");
+    await desktop.checkpointAsync("command-search-open");
   });
 
   test("opens from the top bar, runs a runtime part's command chosen with the pointer, leaves out a disabled command, and returns focus when dismissed", async ({ desktop }) => {

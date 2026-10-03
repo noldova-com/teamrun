@@ -46,7 +46,6 @@ test.describe("quitting while a module works", () => {
   };
 
   test("asks before quitting, stays open when the person cancels and quits once the work they waited for finishes", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]")).toBeVisible();
     await beginWorkAsync(window);

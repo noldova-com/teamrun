@@ -40,5 +40,6 @@ test.describe("the window controls", () => {
     await expect.poll(lastOverlay).toMatchObject(dark);
     await window.emulateMedia({ colorScheme: "light" });
     await expect.poll(lastOverlay).toMatchObject(light);
+    await desktop.checkpointAsync("window-controls");
   });
 });

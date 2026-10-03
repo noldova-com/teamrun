@@ -46,7 +46,7 @@ export default class DesktopApplicationFixture {
   private electronApplication: ElectronApplication | null = null;
   private page: Page | null = null;
   private childProcess: ChildProcess | null = null;
-  private isKeptOffCursor: boolean = false;
+  private viewport: { width: number; height: number } | null;
   private readonly recorded: Set<number> = new Set();
 
   public readonly failures: string[] = [];
@@ -54,9 +54,10 @@ export default class DesktopApplicationFixture {
   public readonly root: string;
   public readonly dataDirectory: string;
 
-  private constructor(testInfo: TestInfo, root: string, environment: Readonly<Record<string, string>>, extraArguments: readonly string[]) {
+  private constructor(testInfo: TestInfo, root: string, environment: Readonly<Record<string, string>>, extraArguments: readonly string[], placesWindow: boolean) {
     this.testInfo = testInfo;
     this.extraArguments = extraArguments;
+    this.viewport = placesWindow ? null : { width: DesktopApplicationFixture.VIEWPORT_WIDTH, height: DesktopApplicationFixture.VIEWPORT_HEIGHT };
     this.root = root;
     this.dataDirectory = path.join(root, DesktopApplicationFixture.DATA_FOLDER);
     this.environment = environment;
@@ -66,9 +67,10 @@ export default class DesktopApplicationFixture {
     testInfo: TestInfo,
     environment: Readonly<Record<string, string>> = {},
     dataFiles: Readonly<Record<string, string>> = {},
-    extraArguments: readonly string[] = []): Promise<DesktopApplicationFixture> {
+    extraArguments: readonly string[] = [],
+    placesWindow: boolean = false): Promise<DesktopApplicationFixture> {
     const root = await mkdtemp(path.join(os.tmpdir(), DesktopApplicationFixture.ROOT_PREFIX));
-    const fixture = new DesktopApplicationFixture(testInfo, root, environment, extraArguments);
+    const fixture = new DesktopApplicationFixture(testInfo, root, environment, extraArguments, placesWindow);
     await mkdir(fixture.dataDirectory);
     for (const [name, text] of Object.entries(dataFiles)) {
       const file = path.join(fixture.dataDirectory, name);
@@ -142,21 +144,15 @@ export default class DesktopApplicationFixture {
     return await this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some(t => t.isVisible()));
   }
 
-  public async useSuiteViewportAsync(): Promise<void> {
-    await this.useViewportAsync(DesktopApplicationFixture.VIEWPORT_WIDTH, DesktopApplicationFixture.VIEWPORT_HEIGHT);
-  }
-
   public async useViewportAsync(width: number, height: number): Promise<void> {
-    this.isKeptOffCursor = true;
-    await this.moveOffCursorAsync();
-    const session = await this.window.context().newCDPSession(this.window);
-    await session.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
-    await expect.poll(() => this.window.evaluate(() => [innerWidth, innerHeight, devicePixelRatio])).toEqual([width, height, 1]);
+    this.viewport = { width, height };
+    await this.applyViewportAsync(this.viewport);
   }
 
   public async checkpointAsync(name: string): Promise<Buffer> {
     const image = await this.window.screenshot({ scale: "css" });
-    expect([image.readUInt32BE(16), image.readUInt32BE(20)]).toEqual([DesktopApplicationFixture.VIEWPORT_WIDTH, DesktopApplicationFixture.VIEWPORT_HEIGHT]);
+    if (this.viewport !== null)
+      expect([image.readUInt32BE(16), image.readUInt32BE(20)]).toEqual([this.viewport.width, this.viewport.height]);
     await this.testInfo.attach(name, { body: image, contentType: "image/png" });
     return image;
   }
@@ -188,8 +184,8 @@ export default class DesktopApplicationFixture {
 
   public async disposeAsync(hasFailed: boolean = this.testInfo.status !== this.testInfo.expectedStatus): Promise<void> {
     const isRunning = this.electronApplication !== null && Object.is(this.requireProcess().exitCode, null);
-    if (isRunning && this.isKeptOffCursor && await this.isCursorInsideAsync())
-      this.failures.push("The real cursor came back inside the window, so its position could reach the test's pointer events.");
+    if (isRunning && this.viewport !== null)
+      await this.checkGuardAsync(this.viewport);
     if (hasFailed)
       await this.keepDiagnosticsAsync(isRunning);
     if (isRunning)
@@ -303,8 +299,23 @@ export default class DesktopApplicationFixture {
     await expect.poll(async () => (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.productVersion)
       .toBe(RuntimeBuild.identity.productVersion);
     await this.recordProcessesAsync();
-    if (this.isKeptOffCursor)
-      await this.moveOffCursorAsync();
+    if (this.viewport !== null)
+      await this.applyViewportAsync(this.viewport);
+  }
+
+  private async applyViewportAsync(viewport: { width: number; height: number }): Promise<void> {
+    await this.moveOffCursorAsync();
+    const session = await this.window.context().newCDPSession(this.window);
+    await session.send("Emulation.setDeviceMetricsOverride", { width: viewport.width, height: viewport.height, deviceScaleFactor: 1, mobile: false });
+    await expect.poll(() => this.window.evaluate(() => [innerWidth, innerHeight, devicePixelRatio])).toEqual([viewport.width, viewport.height, 1]);
+  }
+
+  private async checkGuardAsync(viewport: { width: number; height: number }): Promise<void> {
+    const shown = await this.window.evaluate(() => [Math.round(innerWidth * devicePixelRatio), Math.round(innerHeight * devicePixelRatio)]).catch(() => null);
+    if (shown !== null && (shown[0] !== viewport.width || shown[1] !== viewport.height))
+      this.failures.push(`The workflow ended at a ${shown.join(" × ")} viewport instead of ${viewport.width} × ${viewport.height}, so its viewport was lost.`);
+    if (await this.isCursorInsideAsync())
+      this.failures.push("The real cursor came back inside the window, so its position could reach the test's pointer events.");
   }
 
   private async moveOffCursorAsync(): Promise<void> {
