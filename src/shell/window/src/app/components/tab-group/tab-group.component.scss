@@ -24,6 +24,22 @@
   padding-inline: var(--tr-radius-large);
 }
 
+.tr-tab-group-header {
+  align-items: center;
+}
+
+.tr-tab-group-title {
+  flex: 1;
+  min-width: 0;
+  padding-inline-start: calc(var(--tr-tab-inset) + var(--tr-tab-label-inset));
+  overflow: hidden;
+  font-size: var(--tr-text-panel);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--tr-text);
+}
+
 .tr-tab-group-scroller {
   display: flex;
   flex: 1;
