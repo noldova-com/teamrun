@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 
 import "@noldova/teamrun-foundation-core";
@@ -20,10 +19,15 @@ import type { DataDirectory } from "../data-directory/data-directory.js";
 export class DiscoveryReader {
   public static async readAsync(dataDirectory: DataDirectory): Promise<RuntimeDiscovery | null> {
     const file = dataDirectory.discoveryFile;
-    if (!existsSync(file))
-      return null;
-
-    const text = await readFile(file, Resources.utf8Encoding);
+    let text: string;
+    try {
+      text = await readFile(file, Resources.utf8Encoding);
+    }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === Resources.missingFileCode)
+        return null;
+      throw error;
+    }
     try {
       return RuntimeDiscovery.fromJson(JSON.parse(text));
     }

@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -173,6 +173,31 @@ export class RuntimeHostTests {
   }
 
   @TestMethod
+  public stopsWhileItHoldsDataFromBeforeTheShellAndLetsGoOfItsFiles(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const root = fixture.dataDirectory.root;
+      await mkdir(root, { recursive: true });
+      await writeFile(path.join(root, "teamrun.db"), "old data");
+      const host = await fixture.startAsync();
+
+      const [refused, answer] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      refused.sendMessages(new Request("desktop:1", ShellMethods.stop, new StopRequest(StopPolicy.StopWork).toJson()));
+      const stopped = await refused.readResponseAsync();
+      const reason = await host.waitForStopAsync();
+
+      Assert.areEqual(FailureCode.PreShellData, answer.failure?.code);
+      Assert.isFalse(stopped.hasFailed);
+      Assert.areEqual("request", reason);
+      Assert.isFalse(OwnershipLock.isOwned(fixture.dataDirectory));
+      Assert.isFalse(existsSync(fixture.dataDirectory.discoveryFile));
+      Assert.isFalse(existsSync(path.join(root, "shell.sqlite")));
+      Assert.areEqual("old data", await readFile(path.join(root, "teamrun.db"), "utf8"));
+      await rm(root, { recursive: true });
+      Assert.isFalse(existsSync(root));
+    });
+  }
+
+  @TestMethod
   public keepsEachWindowsBoundsAndLayoutForItsDevice(): Promise<void> {
     return RuntimeHostTests.runAsync(async fixture => {
       await fixture.startAsync();
@@ -220,12 +245,68 @@ export class RuntimeHostTests {
   }
 
   @TestMethod
-  public refusesADirectoryAnotherRuntimeOwns(): Promise<void> {
+  public refusesAtOnceADirectoryARuntimeOwnsAndServes(): Promise<void> {
     return RuntimeHostTests.runAsync(async fixture => {
       using lock = OwnershipLock.acquire(fixture.dataDirectory);
+      await mkdir(fixture.dataDirectory.discoveryFolder, { recursive: true });
+      await writeFile(fixture.dataDirectory.discoveryFile, "{}");
+      const started = Date.now();
 
       await Assert.throwsAsync(() => fixture.startAsync(), DataDirectoryOwnedException);
 
+      Assert.isTrue(Date.now() - started < 2_000);
+      Assert.isTrue(lock.isHeld);
+    });
+  }
+
+  @TestMethod
+  public takesOverADirectoryOnceARuntimeStoppingWithoutDiscoveryLetsGo(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const lock = OwnershipLock.acquire(fixture.dataDirectory);
+      const release = setTimeout(() => lock.release(), 200);
+
+      try {
+        await fixture.startAsync();
+      }
+      finally {
+        clearTimeout(release);
+        lock.release();
+      }
+
+      Assert.isTrue(OwnershipLock.isOwned(fixture.dataDirectory));
+      Assert.isTrue(existsSync(fixture.dataDirectory.discoveryFile));
+    });
+  }
+
+  @TestMethod
+  public leavesADirectoryToAStartingRuntimeOnceItPublishesDiscovery(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      using lock = OwnershipLock.acquire(fixture.dataDirectory);
+      await mkdir(fixture.dataDirectory.discoveryFolder, { recursive: true });
+      const publish = setTimeout(() => writeFileSync(fixture.dataDirectory.discoveryFile, "{}"), 200);
+      const started = Date.now();
+
+      try {
+        await Assert.throwsAsync(() => fixture.startAsync(), DataDirectoryOwnedException);
+      }
+      finally {
+        clearTimeout(publish);
+      }
+
+      Assert.isTrue(Date.now() - started < 2_000);
+      Assert.isTrue(lock.isHeld);
+    });
+  }
+
+  @TestMethod
+  public refusesADirectoryWhoseOwnerWithoutDiscoveryHoldsItPastTheTakeoverTime(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      using lock = OwnershipLock.acquire(fixture.dataDirectory);
+      const started = Date.now();
+
+      await Assert.throwsAsync(() => fixture.startAsync(30_000, undefined, 400), DataDirectoryOwnedException);
+
+      Assert.isTrue(Date.now() - started >= 400);
       Assert.isTrue(lock.isHeld);
     });
   }
@@ -534,7 +615,7 @@ export class RuntimeHostTests {
       Assert.isTrue(["desktop:1", "desktop:2", "desktop:4"].every(t => responses.get(t)?.hasFailed === false));
       Assert.areEqual("{\"name\":\"shell.mode\",\"value\":\"Dark\",\"isSet\":true}", entry("shell.mode"));
       Assert.areEqual("{\"name\":\"shell.doNotDisturb\",\"value\":true,\"isSet\":true}", entry("shell.doNotDisturb"));
-      Assert.areEqual("shell.theme,shell.mode,shell.interfaceFont,shell.codeFont,shell.panelSize,shell.messageSize,shell.codeSize,shell.doNotDisturb,shell.mutedModules",
+      Assert.areEqual("shell.theme,shell.mode,shell.interfaceFont,shell.codeFont,shell.panelSize,shell.messageSize,shell.codeSize,shell.leftDockStyle,shell.rightDockStyle,shell.menuBar,shell.doNotDisturb,shell.mutedModules",
         snapshot.definitions.map(t => t.name.text).join(","));
       Assert.areEqual("InvalidParams,NotFound,InvalidParams", ["desktop:5", "desktop:6", "desktop:7"].map(t => responses.get(t)?.failure?.code).join(","));
       Assert.areEqual(JSON.stringify([

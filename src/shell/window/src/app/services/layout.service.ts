@@ -14,6 +14,7 @@ import { JsonException } from "@noldova/teamrun-foundation-json";
 import { Resources } from "../../resources";
 import type { BottomDockSpan } from "../enums/bottom-dock-span";
 import type { DockSide } from "../enums/dock-side";
+import { DockStyle } from "../enums/dock-style";
 import { StartupStateKind } from "../enums/startup-state-kind";
 import type { ILayoutStore } from "../interfaces/i-layout-store";
 import type { DocumentTab } from "../models/layout/document-tab";
@@ -27,6 +28,7 @@ import type { Tab } from "../models/layout/tab";
 import type { TabGroup } from "../models/layout/tab-group";
 import { ViewRegistry } from "../models/layout/view-registry";
 import { LayoutStoreService } from "./layout-store.service";
+import { SettingsService } from "./settings.service";
 import { StartupService } from "./startup.service";
 
 @Injectable({ providedIn: "root" })
@@ -34,6 +36,7 @@ export class LayoutService {
   private readonly store: ILayoutStore = inject(LayoutStoreService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly startup: StartupService = inject(StartupService);
+  private readonly settings: SettingsService = inject(SettingsService);
   private readonly registryState: WritableSignal<ViewRegistry> = signal(ViewRegistry.createEmpty());
   private readonly layoutState: WritableSignal<Layout> = signal(Layout.createDefault(this.registryState()));
   private readonly width: WritableSignal<number> = signal(0);
@@ -45,7 +48,9 @@ export class LayoutService {
 
   public readonly layout: Signal<Layout> = this.layoutState.asReadonly();
   public readonly registry: Signal<ViewRegistry> = this.registryState.asReadonly();
-  public readonly geometry: Signal<LayoutGeometry> = computed(() => new LayoutGeometry(this.width(), this.height(), this.layoutState(), this.registryState()));
+  public readonly iconSides: Signal<ReadonlySet<DockSide>> = computed(() =>
+    new Set([...Resources.dockStyleSettings].filter(([, name]) => this.settings.values().get(name) === DockStyle.Icons).map(([side]) => side)));
+  public readonly geometry: Signal<LayoutGeometry> = computed(() => new LayoutGeometry(this.width(), this.height(), this.layoutState(), this.registryState(), this.iconSides()));
   public readonly currentGroup: Signal<TabGroup> = computed(() => {
     const id = this.currentGroupId();
     return (Object.isNull(id) ? null : this.layoutState().group(id)) ?? this.layoutState().documents;

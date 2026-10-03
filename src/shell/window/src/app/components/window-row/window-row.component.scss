@@ -7,6 +7,7 @@
  */
 
 :host {
+  position: relative;
   display: flex;
   align-items: center;
   box-sizing: border-box;
@@ -30,6 +31,7 @@
   min-width: 0;
 }
 
+.tr-window-row-start,
 .tr-window-row-actions {
   display: flex;
   align-items: center;
@@ -37,8 +39,20 @@
 
 .tr-window-row-action,
 .tr-window-row-menu,
+.tr-window-row-menu-bar,
 .tr-window-row-search {
   app-region: no-drag;
+}
+
+.tr-window-row-menu-bar {
+  flex: none;
+  margin-inline: var(--tr-space-1);
+}
+
+.tr-window-row-menu-bar-folded {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .tr-window-row-menu {

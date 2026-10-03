@@ -22,6 +22,18 @@
   flex-direction: column;
 }
 
+.tr-dock-strip-separator {
+  flex: none;
+  align-self: stretch;
+  width: var(--tr-border-width);
+  background-color: var(--tr-border);
+}
+
+.tr-dock-strip-vertical .tr-dock-strip-separator {
+  width: auto;
+  height: var(--tr-border-width);
+}
+
 .tr-dock-sash {
   position: absolute;
 }

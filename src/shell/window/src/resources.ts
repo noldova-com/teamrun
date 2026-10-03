@@ -279,6 +279,16 @@ export class Resources {
     [DockSide.Bottom]: "Hide the bottom dock"
   };
   public static readonly dockStripSelector: string = ".tr-dock-strip";
+  public static readonly horizontalOrientation: string = "horizontal";
+  public static readonly regionRole: string = "region";
+  public static readonly tabPanelRole: string = "tabpanel";
+  public static readonly verticalOrientation: string = "vertical";
+  public static readonly dockStyleSettings: ReadonlyMap<DockSide, string> = new Map([[DockSide.Left, "shell.leftDockStyle"], [DockSide.Right, "shell.rightDockStyle"]]);
+  public static readonly dockStripLabels: Readonly<Record<DockSide, string>> = {
+    [DockSide.Left]: "Left dock views",
+    [DockSide.Right]: "Right dock views",
+    [DockSide.Bottom]: "Bottom dock views"
+  };
   public static readonly dockStripTooltipSides: Readonly<Record<DockSide, OverlaySide>> = {
     [DockSide.Left]: OverlaySide.end,
     [DockSide.Right]: OverlaySide.start,
@@ -412,6 +422,14 @@ export class Resources {
     [EditAction.SelectAll]: "select_all"
   };
   public static readonly menuLabel: string = "Menu";
+  public static readonly menuBarLabel: string = "Menus";
+  public static readonly menuBarSetting: string = "shell.menuBar";
+  public static readonly menuBarItemSelector: string = "[tr-menu-bar-item]";
+  public static readonly windowRowMinimumDragWidth: number = 96;
+  public static readonly altKey: string = "Alt";
+  public static readonly functionKey: string = "F10";
+  public static readonly ariaExpandedAttribute: string = "aria-expanded";
+  public static readonly trueValue: string = "true";
   public static readonly fileMenu: string = "shell.file";
   public static readonly editMenu: string = "shell.edit";
   public static readonly viewMenu: string = "shell.view";

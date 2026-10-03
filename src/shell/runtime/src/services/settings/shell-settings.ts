@@ -18,6 +18,9 @@ export class ShellSettings {
   public static readonly panelSize: QualifiedName = ShellSettings.named(Resources.panelSizeSetting);
   public static readonly messageSize: QualifiedName = ShellSettings.named(Resources.messageSizeSetting);
   public static readonly codeSize: QualifiedName = ShellSettings.named(Resources.codeSizeSetting);
+  public static readonly leftDockStyle: QualifiedName = ShellSettings.named(Resources.leftDockStyleSetting);
+  public static readonly rightDockStyle: QualifiedName = ShellSettings.named(Resources.rightDockStyleSetting);
+  public static readonly menuBar: QualifiedName = ShellSettings.named(Resources.menuBarSetting);
   public static readonly doNotDisturb: QualifiedName = ShellSettings.named(Resources.doNotDisturbSetting);
   public static readonly mutedModules: QualifiedName = ShellSettings.named(Resources.mutedModulesSetting);
 
@@ -36,6 +39,12 @@ export class ShellSettings {
       ShellSettings.textSize(), Resources.defaultMessageSize, SettingLocality.Device, Resources.textGroup),
     ShellSettings.appearance(ShellSettings.codeSize, Resources.codeSizeTitle, Resources.codeSizeDescription,
       ShellSettings.textSize(), Resources.defaultCodeSize, SettingLocality.Device, Resources.textGroup),
+    ShellSettings.appearance(ShellSettings.leftDockStyle, Resources.leftDockStyleTitle, Resources.leftDockStyleDescription,
+      ShellSettings.choiceOf(Resources.dockStyleOptions), Resources.defaultDockStyle, SettingLocality.Shared, Resources.layoutGroup),
+    ShellSettings.appearance(ShellSettings.rightDockStyle, Resources.rightDockStyleTitle, Resources.rightDockStyleDescription,
+      ShellSettings.choiceOf(Resources.dockStyleOptions), Resources.defaultDockStyle, SettingLocality.Shared, Resources.layoutGroup),
+    ShellSettings.appearance(ShellSettings.menuBar, Resources.menuBarTitle, Resources.menuBarDescription,
+      ShellSettings.choiceOf(Resources.menuBarOptions), Resources.defaultMenuBar, SettingLocality.Shared, Resources.layoutGroup),
     new SettingDefinition(ShellSettings.doNotDisturb, Resources.doNotDisturbTitle, Resources.doNotDisturbDescription,
       SettingType.boolean(), false, SettingLocality.Device, [], Resources.notificationsPage, Resources.notificationsGroup),
     new SettingDefinition(ShellSettings.mutedModules, Resources.mutedModulesTitle, Resources.mutedModulesDescription,

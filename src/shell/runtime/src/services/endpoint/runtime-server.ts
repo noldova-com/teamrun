@@ -230,7 +230,7 @@ export class RuntimeServer implements IEventSink {
       return;
     }
     const refusal = this.refusals.get(session);
-    if (!Object.isUndefined(refusal) && !request.method.equals(refusal.method)) {
+    if (!Object.isUndefined(refusal) && !request.method.equals(refusal.method) && !request.method.equals(ShellMethods.stop)) {
       session.send(Response.failure(request.id, refusal.failure));
       return;
     }

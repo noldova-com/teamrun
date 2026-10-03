@@ -17,6 +17,7 @@ import { PanelEdge } from "../../../../src/app/enums/panel-edge";
 import { DocumentTab } from "../../../../src/app/models/layout/document-tab";
 import type { GroupFrame } from "../../../../src/app/models/layout/group-frame";
 import { Layout } from "../../../../src/app/models/layout/layout";
+import { TabDropTarget } from "../../../../src/app/models/layout/tab-drop-target";
 import { LayoutService } from "../../../../src/app/services/layout.service";
 import { TabDragService } from "../../../../src/app/services/tab-drag.service";
 import { TabStripService } from "../../../../src/app/services/tab-strip.service";
@@ -53,8 +54,10 @@ async function expectTooltipAsync(button: HTMLElement | null | undefined, text: 
 }
 
 describe("TabGroupComponent", () => {
+  let bridge: DesktopBridgeFixture;
+
   beforeEach(() => {
-    DesktopBridgeFixture.install();
+    bridge = DesktopBridgeFixture.install();
   });
 
   afterEach(() => {
@@ -239,6 +242,38 @@ describe("TabGroupComponent", () => {
     update();
 
     expect(layout.layout().dock(DockSide.Left).isCollapsed).toBe(true);
+  });
+
+  it("shows a header with the active view's title and the group's actions instead of a tab bar, whatever its number of views, on a side set to icons", async () => {
+    await renderAsync(prepared.splitGroup(LayoutFixture.search, 1, PanelEdge.Bottom));
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
+    update();
+    const begin = vi.spyOn(TestBed.inject(TabDragService), "begin").mockImplementation(() => undefined);
+    const corner = layout.layout().dock(DockSide.Left).root?.cornerGroup.id ?? -1;
+    const title = group(corner).querySelector<HTMLElement>(".tr-tab-group-title");
+    const body = group(corner).querySelector<HTMLElement>(".tr-tab-group-body");
+
+    expect(group(corner).querySelector("[role=tablist]")).toBeNull();
+    expect(title?.textContent?.trim()).toBe("files.tree");
+    expect([body?.getAttribute("role"), body?.getAttribute("aria-labelledby")]).toEqual(["region", title?.id]);
+    expect([group(corner).querySelector(".tr-tab-group-menu"), group(corner).querySelector(".tr-tab-group-hide")].every(t => !Object.isNull(t))).toBe(true);
+    expect(group(layout.layout().dock(DockSide.Right).root?.cornerGroup.id ?? -1).querySelector("[role=tablist]")).not.toBeNull();
+    title?.dispatchEvent(new PointerEvent("pointerdown", { button: 0 }));
+    expect(begin).not.toHaveBeenCalled();
+
+    layout.place(LayoutFixture.search, new TabDropTarget(corner, 1));
+    update();
+    const shared = group(corner).querySelector<HTMLElement>(".tr-tab-group-title");
+    const sharedBody = group(corner).querySelector<HTMLElement>(".tr-tab-group-body");
+    expect(layout.layout().group(corner)?.tabs.length).toBe(2);
+    expect([group(corner).querySelector("[role=tablist]"), group(corner).querySelectorAll("tr-tab").length]).toEqual([null, 0]);
+    expect(shared?.textContent?.trim()).toBe("files.search");
+    expect([sharedBody?.getAttribute("role"), sharedBody?.getAttribute("aria-labelledby")]).toEqual(["region", shared?.id]);
+    expect([group(corner).querySelector(".tr-tab-group-menu"), group(corner).querySelector(".tr-tab-group-hide")].every(t => !Object.isNull(t))).toBe(true);
+
+    layout.activate(LayoutFixture.files);
+    update();
+    expect(group(corner).querySelector(".tr-tab-group-title")?.textContent?.trim()).toBe("files.tree");
   });
 
   it("opens the active tab's menu from the panel actions and a tab's menu from the keyboard", async () => {
