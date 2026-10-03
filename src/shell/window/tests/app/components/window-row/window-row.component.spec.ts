@@ -340,9 +340,11 @@ describe("WindowRowComponent", () => {
     press(field, "x", "keydown", { altKey: true });
     press(field, "Alt", "keyup");
     press(field, "Alt");
-    document.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    const pointerdown = new PointerEvent("pointerdown", { bubbles: true, cancelable: true });
+    document.dispatchEvent(pointerdown);
     press(field, "Alt", "keyup");
     focused.push(document.activeElement);
+    expect(pointerdown.defaultPrevented).toBe(false);
     press(field, "F10");
     focused.push(document.activeElement);
     press(first, "F10");

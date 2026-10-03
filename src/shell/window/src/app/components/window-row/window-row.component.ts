@@ -33,7 +33,7 @@ import { PlaceMenuComponent } from "../place-menu/place-menu.component";
     "[class.tr-window-row-mac]": "isMac",
     "(document:keydown)": "pressed($event)",
     "(document:keyup)": "released($event)",
-    "(document:pointerdown)": "isAltAlone = false"
+    "(document:pointerdown)": "pointed()"
   }
 })
 export class WindowRowComponent {
@@ -63,7 +63,7 @@ export class WindowRowComponent {
   protected readonly isButtonShown: Signal<boolean> = computed(() =>
     !this.isMac && this.menuBar.shownPlaces().length > 0 && (this.style() === MenuBarStyle.Button || (this.style() === MenuBarStyle.Inline && this.isFolded())));
 
-  protected isAltAlone: boolean = false;
+  private isAltAlone: boolean = false;
 
   public constructor() {
     const host = this.host;
@@ -97,6 +97,10 @@ export class WindowRowComponent {
       this.focusMenu(event);
     else if (event.key === Resources.escapeKey && this.isReturnable(event.target))
       this.giveFocusBack(event);
+  }
+
+  protected pointed(): void {
+    this.isAltAlone = false;
   }
 
   protected released(event: KeyboardEvent): void {

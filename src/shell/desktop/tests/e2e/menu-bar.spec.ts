@@ -66,7 +66,12 @@ test.describe("the window row's menus on Windows and Linux", () => {
     await desktop.checkpointAsync("menu-bar-open");
     await window.keyboard.press("Escape");
     await expect(window.locator(".cdk-overlay-container tr-menu")).toHaveCount(0);
-    await expect(menuItem(window, "Notes")).toBeFocused();
+
+    await menuItem(window, "Edit").click();
+    await expect(window.locator(".cdk-overlay-container tr-menu[data-place=\"shell.edit\"]")).toBeVisible();
+    await window.keyboard.press("Escape");
+    await expect(window.locator(".cdk-overlay-container tr-menu")).toHaveCount(0);
+    await expect(menuItem(window, "Edit")).toBeFocused();
   });
 
   test("F10 or a lone Alt focuses the menus, and Escape returns to the field that had the focus", async ({ desktop }) => {
