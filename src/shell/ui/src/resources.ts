@@ -215,6 +215,9 @@ export class Resources {
   public static readonly pageUpKey: string = "PageUp";
   public static readonly enterKey: string = "Enter";
   public static readonly escapeKey: string = "Escape";
+  public static readonly checkedGlyph: string = "check";
+  public static readonly menuItemRole: string = "menuitem";
+  public static readonly menuItemRadioRole: string = "menuitemradio";
   public static readonly contextMenuKey: string = "ContextMenu";
   public static readonly menuKey: string = "F10";
   public static readonly clickEvent: string = "click";

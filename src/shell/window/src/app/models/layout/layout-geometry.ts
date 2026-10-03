@@ -9,9 +9,11 @@
 import "@noldova/teamrun-foundation-core";
 
 import { Resources } from "../../../resources";
+import { BottomDockSpan } from "../../enums/bottom-dock-span";
 import { DockSide } from "../../enums/dock-side";
 import { SplitAxis } from "../../enums/split-axis";
 import { Bounds } from "./bounds";
+import type { Dock } from "./dock";
 import type { GroupFrame } from "./group-frame";
 import type { Layout } from "./layout";
 import { LayoutFit } from "./layout-fit";
@@ -19,11 +21,14 @@ import type { SplitHandle } from "./split-handle";
 import type { ViewRegistry } from "./view-registry";
 
 export class LayoutGeometry {
+  private readonly width: number;
+  private readonly height: number;
+  private readonly registry: ViewRegistry;
   private readonly layout: Layout;
   private readonly across: LayoutFit;
   private readonly down: LayoutFit;
-  private readonly area: Bounds;
   private readonly dockBounds: Readonly<Record<DockSide, Bounds>>;
+  public readonly area: Bounds;
   public readonly middle: Bounds;
   public readonly frames: readonly GroupFrame[];
   public readonly handles: readonly SplitHandle[];
@@ -33,22 +38,30 @@ export class LayoutGeometry {
     const margin = Resources.panelMargin;
     const gap = Resources.panelGap;
     const sides = [visible.dock(DockSide.Left), visible.dock(DockSide.Right)];
+    const isFull = visible.bottomSpan === BottomDockSpan.Full;
     const across = LayoutFit.of(width, 2 * margin, sides, visible.middle.minimumLength(SplitAxis.Horizontal));
-    const down = LayoutFit.of(height, margin, [visible.dock(DockSide.Bottom)], visible.middle.minimumLength(SplitAxis.Vertical));
+    const upright = Math.max(visible.middle.minimumLength(SplitAxis.Vertical), ...(isFull ? this.uprightMinimums(sides, across) : []));
+    const down = LayoutFit.of(height, margin, [visible.dock(DockSide.Bottom)], upright);
     const inner = Math.max(0, height - margin);
+    const sideHeight = isFull ? down.middle : inner;
     const left = Math.max(0, across.track(DockSide.Left) - gap);
     const right = Math.max(0, across.track(DockSide.Right) - gap);
     const middle = new Bounds(margin + across.track(DockSide.Left), 0, across.middle, down.middle);
+    const area = new Bounds(margin, 0, Math.max(0, width - 2 * margin), inner);
+    const bottomSpan = isFull ? area : middle;
     const frames: GroupFrame[] = [];
     const handles: SplitHandle[] = [];
+    this.width = width;
+    this.height = height;
+    this.registry = registry;
     this.layout = visible;
     this.across = across;
     this.down = down;
-    this.area = new Bounds(margin, 0, Math.max(0, width - 2 * margin), inner);
+    this.area = area;
     this.dockBounds = {
-      [DockSide.Left]: new Bounds(margin, 0, left, inner),
-      [DockSide.Right]: new Bounds(width - margin - right, 0, right, inner),
-      [DockSide.Bottom]: new Bounds(middle.x, middle.bottom + gap, middle.width, Math.max(0, down.track(DockSide.Bottom) - gap))
+      [DockSide.Left]: new Bounds(margin, 0, left, sideHeight),
+      [DockSide.Right]: new Bounds(width - margin - right, 0, right, sideHeight),
+      [DockSide.Bottom]: new Bounds(bottomSpan.x, middle.bottom + gap, bottomSpan.width, Math.max(0, down.track(DockSide.Bottom) - gap))
     };
     for (const dock of visible.docks.filter(t => !this.isCollapsed(t.side)))
       dock.root?.arrange(this.dockBounds[dock.side], dock.side, frames, handles);
@@ -60,6 +73,10 @@ export class LayoutGeometry {
 
   public dock(side: DockSide): Bounds {
     return this.dockBounds[side];
+  }
+
+  public withBottomSpan(span: BottomDockSpan): LayoutGeometry {
+    return span === this.layout.bottomSpan ? this : new LayoutGeometry(this.width, this.height, this.layout.withBottomSpan(span), this.registry);
   }
 
   public isShown(side: DockSide): boolean {
@@ -83,8 +100,19 @@ export class LayoutGeometry {
     const edge = Resources.dockEdges[side];
     if (this.isShown(side) && !this.isCollapsed(side))
       return this.dock(side).edgeHalf(edge);
-    const span = side === DockSide.Bottom ? new Bounds(this.middle.x, 0, this.middle.width, this.area.height) : this.area;
+    const span = this.spanOf(side);
     return span.edgeStrip(edge, Math.min(span.length(dock.axis), dock.size ?? Resources.defaultDockSizes[side]));
+  }
+
+  private uprightMinimums(sides: readonly Dock[], across: LayoutFit): readonly number[] {
+    return sides.flatMap(t => Object.isNull(t.root) || t.isCollapsed || across.isCollapsed(t.side) ? [] : [t.root.minimumLength(SplitAxis.Vertical)]);
+  }
+
+  private spanOf(side: DockSide): Bounds {
+    const isFull = this.layout.bottomSpan === BottomDockSpan.Full;
+    if (side === DockSide.Bottom)
+      return isFull ? this.area : new Bounds(this.middle.x, 0, this.middle.width, this.area.height);
+    return isFull ? new Bounds(this.area.x, 0, this.area.width, this.down.middle) : this.area;
   }
 
   private fitOf(side: DockSide): LayoutFit {

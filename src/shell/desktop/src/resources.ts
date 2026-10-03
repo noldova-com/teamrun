@@ -22,6 +22,7 @@ export class Resources {
   public static readonly iconPathParameter: string = "iconPath";
   public static readonly relaunchCommandParameter: string = "relaunchCommand";
   public static readonly readyChannel: string = "teamrun:ready";
+  public static readonly appearanceChannel: string = "teamrun:appearance";
   public static readonly closeRequestChannel: string = "teamrun:closeRequest";
   public static readonly closeAnswerChannel: string = "teamrun:closeAnswer";
   public static readonly startupStateChannel: string = "teamrun:startupState";
@@ -37,7 +38,15 @@ export class Resources {
   public static readonly copyTextLimit: number = 65536;
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
-  public static readonly windowShellMethods: readonly string[] = [ShellMethods.modules.text, ShellMethods.commands.text, ShellMethods.runCommand.text];
+  public static readonly windowShellMethods: readonly string[] = [
+    ShellMethods.modules.text,
+    ShellMethods.commands.text,
+    ShellMethods.runCommand.text,
+    ShellMethods.notifications.text,
+    ShellMethods.postNotification.text,
+    ShellMethods.updateNotification.text,
+    ShellMethods.dismissNotification.text
+  ];
   public static readonly untrustedRequest: string = `Only ${Resources.applicationName}'s own window may call the runtime.`;
   public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
   public static readonly payloadNotJson: string = "The payload must be a JSON value.";

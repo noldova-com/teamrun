@@ -185,6 +185,48 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  @TestData("linux", "{\"color\":\"#FFFFFF\",\"symbolColor\":\"#111111\",\"height\":35}")
+  @TestData("win32", "{\"color\":\"#FFFFFF\",\"symbolColor\":\"#111111\",\"height\":35}")
+  @TestData("darwin", "null")
+  public async paintsTheWindowAgainWhenItsPageReportsAChangedAppearanceWithoutShowingItAgain(platform: string, overlay: string): Promise<void> {
+    const electron = await DesktopApplicationTests.startReadyAsync(platform);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent(platform), DesktopApplicationTests.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown);
+
+    electron.ipcMain.send("teamrun:appearance", DesktopApplicationTests.trustedEvent(platform),
+      { background: "#FFFFFF", titleBar: "#FFFFFF", titleBarText: "#111111", titleBarHeight: 35 });
+
+    Assert.areEqual("#FFFFFF", window.backgroundColor);
+    Assert.areEqual(overlay, JSON.stringify(window.overlay));
+    Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
+  }
+
+  @TestMethod
+  public async keepsTheWindowHiddenWhenAChangedAppearanceComesBeforeTheFirstOne(): Promise<void> {
+    const electron = await DesktopApplicationTests.startReadyAsync("linux");
+    const window = DesktopApplicationTests.firstWindow(electron);
+
+    electron.ipcMain.send("teamrun:appearance", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+
+    Assert.areEqual("#181818", window.backgroundColor);
+    Assert.isFalse(window.isShown);
+  }
+
+  @TestMethod
+  public async keepsTheWindowsColorsWhenAChangedAppearanceCannotBeUsed(): Promise<void> {
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+
+    electron.ipcMain.send("teamrun:appearance", DesktopApplicationTests.trustedEvent("linux"), { background: "red" });
+
+    Assert.areEqual("#181818", window.backgroundColor);
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The window reported").length);
+  }
+
+  @TestMethod
   public async ignoresMessagesFromFramesItDoesNotTrust(): Promise<void> {
     const electron = await DesktopApplicationTests.startReadyAsync("linux");
     const window = DesktopApplicationTests.firstWindow(electron);
@@ -198,10 +240,12 @@ export class DesktopApplicationTests {
 
     for (const event of untrusted) {
       electron.ipcMain.send("teamrun:ready", event, DesktopApplicationTests.APPEARANCE);
+      electron.ipcMain.send("teamrun:appearance", event, DesktopApplicationTests.APPEARANCE);
       Assert.isFalse(electron.ipcMain.invoke("teamrun:closeAnswer", event, "request", true) === true);
     }
 
     Assert.areEqual("[]", JSON.stringify(window.calls));
+    Assert.isNull(window.backgroundColor);
   }
 
   @TestMethod
@@ -570,6 +614,8 @@ export class DesktopApplicationTests {
     connection.answers.set("shell.modules", Response.success("r", { modules: [] }));
     connection.answers.set("shell.commands", Response.success("r", { commands: [] }));
     connection.answers.set("shell.runCommand", Response.success("r", 3));
+    for (const name of ["shell.notifications", "shell.postNotification", "shell.updateNotification", "shell.dismissNotification"])
+      connection.answers.set(name, Response.success("r", name));
     connection.answers.set("notes.missing", Response.failure("r", new Failure(FailureCode.NotFound, "There is no such note.")));
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopApplicationTests.trustedEvent("linux");
@@ -578,12 +624,16 @@ export class DesktopApplicationTests {
     const modules = await DesktopApplicationTests.requestAsync(electron, event, "shell.modules", null);
     const commands = await DesktopApplicationTests.requestAsync(electron, event, "shell.commands", null);
     const ran = await DesktopApplicationTests.requestAsync(electron, event, "shell.runCommand", { name: "clock.tick", arguments: null });
+    const notifications = [];
+    for (const name of ["shell.notifications", "shell.postNotification", "shell.updateNotification", "shell.dismissNotification"])
+      notifications.push((await DesktopApplicationTests.requestAsync(electron, event, name, null)).payload);
     const missing = await DesktopApplicationTests.requestAsync(electron, event, "notes.missing", null);
 
     Assert.areEqual(JSON.stringify({ title: "Notes" }), JSON.stringify(opened.payload));
     Assert.areEqual(JSON.stringify({ modules: [] }), JSON.stringify(modules.payload));
     Assert.areEqual(JSON.stringify({ commands: [] }), JSON.stringify(commands.payload));
     Assert.areEqual("3", JSON.stringify(ran.payload));
+    Assert.areEqual("shell.notifications,shell.postNotification,shell.updateNotification,shell.dismissNotification", notifications.join(","));
     Assert.areEqual(JSON.stringify({ code: "NotFound", message: "There is no such note." }), JSON.stringify(missing.failure?.toJson()));
   }
 

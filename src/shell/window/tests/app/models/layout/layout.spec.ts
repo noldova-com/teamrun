@@ -8,6 +8,7 @@
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 
+import { BottomDockSpan } from "../../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../../src/app/enums/dock-side";
 import { PanelEdge } from "../../../../src/app/enums/panel-edge";
 import { SplitAxis } from "../../../../src/app/enums/split-axis";
@@ -228,6 +229,16 @@ describe("Layout", () => {
     expect(initial.resizeDock(DockSide.Left, null)).toBe(initial);
   });
 
+  it("spans the bottom dock across the window unless kept between the side docks, through every change until a reset", () => {
+    const between = initial.withBottomSpan(BottomDockSpan.Between);
+
+    expect(initial.bottomSpan).toBe(BottomDockSpan.Full);
+    expect(initial.withBottomSpan(BottomDockSpan.Full)).toBe(initial);
+    expect(between.openView(terminal, registry).toggleDock(DockSide.Bottom).openDocument(plan).bottomSpan).toBe(BottomDockSpan.Between);
+    expect(between.reset(registry).bottomSpan).toBe(BottomDockSpan.Full);
+    expect(between.withBottomSpan(BottomDockSpan.Full).bottomSpan).toBe(BottomDockSpan.Full);
+  });
+
   it("resizes a split through its handle", () => {
     const split = initial.splitGroup(changes, 1, PanelEdge.Right);
     const root = split.dock(DockSide.Left).root as SplitNode;
@@ -273,7 +284,8 @@ describe("Layout", () => {
         Right: { root: { tabs: [{ view: "git.changes" }], active: 0 }, size: null, collapsed: true },
         Bottom: { root: null, size: null, collapsed: false }
       },
-      middle: { tabs: [{ document: "notes.note", instance: "plan" }], active: 0, documents: true }
+      middle: { tabs: [{ document: "notes.note", instance: "plan" }], active: 0, documents: true },
+      bottomSpan: "Full"
     });
   });
 });

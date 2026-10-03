@@ -145,6 +145,8 @@ export class Resources {
   public static readonly methodsKind: string = "methods";
   public static readonly eventsKind: string = "events";
   public static readonly commandsKind: string = "commands";
+  public static readonly notificationsKind: string = "notifications";
+  public static readonly notificationLimit: number = 100;
   public static readonly nameParameterName: string = "name";
   public static readonly defaultKeyParameterName: string = "defaultKey";
   public static readonly dataDirectoryVariable: string = "__DATA_DIRECTORY_VARIABLE__";
@@ -361,6 +363,22 @@ export class Resources {
 
   public static formatCommandRegistered(name: string): string {
     return `The command ${name} is already registered.`;
+  }
+
+  public static formatNotificationKindChanged(id: number, kind: string): string {
+    return `Notification ${id} is of the kind ${kind}, which an update keeps.`;
+  }
+
+  public static formatNotificationModuleInactive(moduleId: string, kind: string): string {
+    return `The notification kind ${kind} belongs to ${moduleId}, which is not an active module.`;
+  }
+
+  public static formatNotificationCommandNotAllowed(moduleId: string, command: string): string {
+    return `The module ${moduleId} may not offer the command ${command} in a notification; it must be its own or a dependency's.`;
+  }
+
+  public static formatNotificationNotFound(id: number): string {
+    return `Notification ${id} is gone; it was dismissed or its module stopped.`;
   }
 
   public static formatCommandNotFound(name: string): string {

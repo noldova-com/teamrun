@@ -122,6 +122,31 @@ export declare enum FailureCode {
 }
 
 /**
+ * How serious a notification is; each severity has its own icon.
+ */
+export declare enum NotificationSeverity {
+  /**
+   * Something the person may want to know.
+   */
+  Info = "Info",
+
+  /**
+   * Something that finished well.
+   */
+  Success = "Success",
+
+  /**
+   * Something the person should look at.
+   */
+  Warning = "Warning",
+
+  /**
+   * Something that failed.
+   */
+  Error = "Error"
+}
+
+/**
  * Where a module stands in the runtime, as `shell.modules` reports it.
  */
 export declare enum ModuleState {
@@ -1056,6 +1081,16 @@ export declare class PreShellData {
 }
 
 /**
+ * The names of the events the shell publishes.
+ */
+export declare class ShellEvents {
+  /**
+   * `shell.notifications`: the runtime's notifications changed; its payload is the whole `NotificationList`.
+   */
+  public static readonly notifications: QualifiedName;
+}
+
+/**
  * The names of the shell's methods that every build understands. They never
  * change after protocol version 1.
  */
@@ -1090,6 +1125,29 @@ export declare class ShellMethods {
    * is not registered fails with `NotFound`.
    */
   public static readonly runCommand: QualifiedName;
+
+  /**
+   * `shell.notifications`: asks the runtime for its notifications; it answers with a `NotificationList`.
+   */
+  public static readonly notifications: QualifiedName;
+
+  /**
+   * `shell.postNotification`: posts a notification for a window part; its payload is a `NotificationPost` whose kind its
+   * module declares, and its answer the `NotificationReference` of the notification it created or replaced.
+   */
+  public static readonly postNotification: QualifiedName;
+
+  /**
+   * `shell.updateNotification`: replaces a posted notification's post; its payload is a `NotificationUpdate`. A
+   * notification that is gone fails with `NotFound`.
+   */
+  public static readonly updateNotification: QualifiedName;
+
+  /**
+   * `shell.dismissNotification`: removes a notification; its payload is a `NotificationReference`. One that is already gone
+   * is ignored.
+   */
+  public static readonly dismissNotification: QualifiedName;
 
   /**
    * `shell.readWindowBounds`: reads the bounds the desktop kept for a
@@ -1563,6 +1621,448 @@ export declare class CommandRun {
    * import { CommandRun, QualifiedName } from "@noldova/teamrun-shell-protocol";
    *
    * export const json: JsonObject = new CommandRun(QualifiedName.parse("clock.tick"), null).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * An action a notification offers: a button that runs a command.
+ */
+export declare class NotificationAction {
+  /**
+   * The button's text.
+   */
+  public readonly title: string;
+
+  /**
+   * The command the button runs, with its arguments.
+   */
+  public readonly command: CommandRun;
+
+  /**
+   * Creates the action.
+   *
+   * @param title The button's text.
+   * @param command The command and its arguments.
+   * @throws ArgumentException synchronously when `title` is blank.
+   *
+   * @example
+   * ```ts
+   * import { CommandRun, NotificationAction, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const action: NotificationAction = new NotificationAction("Show", new CommandRun(QualifiedName.parse("clock.tick"), null));
+   * ```
+   */
+  public constructor(title: string, command: CommandRun);
+
+  /**
+   * Reads the action from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The action.
+   * @throws JsonException synchronously when `title` or `command` is missing or invalid, or a field is unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { NotificationAction } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const action: NotificationAction = NotificationAction.fromJson({ title: "Show", command: { name: "clock.tick", arguments: null } });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): NotificationAction;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `title` and `command` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { CommandRun, NotificationAction, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new NotificationAction("Show", new CommandRun(QualifiedName.parse("clock.tick"), null)).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * What a module posts as a notification: the payload of `shell.postNotification`, and of an update.
+ */
+export declare class NotificationPost {
+  /**
+   * The most actions a notification offers: 2.
+   */
+  public static readonly maximumActions: number;
+
+  /**
+   * The progress of work whose share done is unknown.
+   */
+  public static readonly indeterminate: "indeterminate";
+
+  /**
+   * The notification's kind, one its module declares in `contributes.notifications`.
+   */
+  public readonly kind: QualifiedName;
+
+  /**
+   * The key that identifies it within its kind; posting the same kind and key again replaces it. `null` when it has none.
+   */
+  public readonly key: string | null;
+
+  /**
+   * The title.
+   */
+  public readonly title: string;
+
+  /**
+   * The text below the title; `null` when it has none.
+   */
+  public readonly text: string | null;
+
+  /**
+   * How serious it is.
+   */
+  public readonly severity: NotificationSeverity;
+
+  /**
+   * The command that opening the notification runs; `null` when opening it does nothing.
+   */
+  public readonly open: CommandRun | null;
+
+  /**
+   * Its actions, at most {@link NotificationPost.maximumActions}.
+   */
+  public readonly actions: readonly NotificationAction[];
+
+  /**
+   * The progress of the work it reports: a share from 0 to 1, {@link NotificationPost.indeterminate}, or `null` when it reports none.
+   */
+  public readonly progress: number | typeof NotificationPost.indeterminate | null;
+
+  /**
+   * Creates the post.
+   *
+   * @param kind The kind.
+   * @param key The key within the kind, or `null`.
+   * @param title The title.
+   * @param text The text, or `null`.
+   * @param severity The severity.
+   * @param open The command opening it runs, or `null`.
+   * @param actions The actions.
+   * @param progress The progress, or `null`.
+   * @throws ArgumentException synchronously when the key, the title or the text is blank, there are more than two actions, or the progress is a number outside 0 to 1.
+   *
+   * @example
+   * ```ts
+   * import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const post: NotificationPost = new NotificationPost(
+   *   QualifiedName.parse("clock.alarm"), null, "Alarm", "It is time.", NotificationSeverity.Info, null, [], null);
+   * ```
+   */
+  public constructor(
+    kind: QualifiedName,
+    key: string | null,
+    title: string,
+    text: string | null,
+    severity: NotificationSeverity,
+    open: CommandRun | null,
+    actions: readonly NotificationAction[],
+    progress: number | typeof NotificationPost.indeterminate | null);
+
+  /**
+   * Reads the post from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The post.
+   * @throws JsonException synchronously when a field is missing, invalid or unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { NotificationPost } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const post: NotificationPost = NotificationPost.fromJson({ kind: "clock.alarm", title: "Alarm", severity: "Info", actions: [], progress: 0.5 });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): NotificationPost;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `kind`, `title`, `severity` and `actions` fields, and `key`, `text`, `open` and `progress` when set.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A notification the runtime holds: what its module posted, with its id, time and whether it was read.
+ */
+export declare class Notification {
+  /**
+   * The id the runtime gave it, from 1.
+   */
+  public readonly id: number;
+
+  /**
+   * What its module posted, as last updated.
+   */
+  public readonly post: NotificationPost;
+
+  /**
+   * When it was first posted, as an ISO 8601 date and time.
+   */
+  public readonly postedAt: string;
+
+  /**
+   * Whether the person has seen it in the notifications list.
+   */
+  public readonly isRead: boolean;
+
+  /**
+   * Creates the notification.
+   *
+   * @param id The id.
+   * @param post What was posted.
+   * @param postedAt When it was posted.
+   * @param isRead Whether it was read.
+   * @throws ArgumentException synchronously when the id is not a whole number from 1 or the time is not a date and time.
+   *
+   * @example
+   * ```ts
+   * import { Notification, NotificationPost } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function hold(post: NotificationPost): Notification {
+   *   return new Notification(1, post, new Date().toISOString(), false);
+   * }
+   * ```
+   */
+  public constructor(id: number, post: NotificationPost, postedAt: string, isRead: boolean);
+
+  /**
+   * Reads the notification from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The notification.
+   * @throws JsonException synchronously when a field is missing, invalid or unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { Notification } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const notification: Notification = Notification.fromJson({
+   *   id: 1, post: { kind: "clock.alarm", title: "Alarm", severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false
+   * });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): Notification;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `id`, `post`, `postedAt` and `isRead` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import type { Notification } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function write(notification: Notification): JsonObject {
+   *   return notification.toJson();
+   * }
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The runtime's notifications, newest first: the answer of `shell.notifications` and the payload of its event.
+ */
+export declare class NotificationList {
+  /**
+   * The notifications, newest first.
+   */
+  public readonly notifications: readonly Notification[];
+
+  /**
+   * Creates the list.
+   *
+   * @param notifications The notifications, newest first.
+   *
+   * @example
+   * ```ts
+   * import { NotificationList } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const list: NotificationList = new NotificationList([]);
+   * ```
+   */
+  public constructor(notifications: readonly Notification[]);
+
+  /**
+   * Reads the list from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The list.
+   * @throws JsonException synchronously when `notifications` is missing or invalid, or a field is unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { NotificationList } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const list: NotificationList = NotificationList.fromJson({ notifications: [] });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): NotificationList;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `notifications` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { NotificationList } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new NotificationList([]).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A change to a posted notification: the payload of `shell.updateNotification`.
+ */
+export declare class NotificationUpdate {
+  /**
+   * The notification's id.
+   */
+  public readonly id: number;
+
+  /**
+   * What replaces its post; its kind stays the notification's own.
+   */
+  public readonly post: NotificationPost;
+
+  /**
+   * Creates the update.
+   *
+   * @param id The notification's id.
+   * @param post The new post.
+   * @throws ArgumentException synchronously when the id is not a whole number from 1.
+   *
+   * @example
+   * ```ts
+   * import { NotificationPost, NotificationUpdate } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function change(id: number, post: NotificationPost): NotificationUpdate {
+   *   return new NotificationUpdate(id, post);
+   * }
+   * ```
+   */
+  public constructor(id: number, post: NotificationPost);
+
+  /**
+   * Reads the update from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The update.
+   * @throws JsonException synchronously when `id` or `post` is missing or invalid, or a field is unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { NotificationUpdate } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const update: NotificationUpdate = NotificationUpdate.fromJson({ id: 1, post: { kind: "clock.alarm", title: "Alarm", severity: "Info", actions: [] } });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): NotificationUpdate;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `id` and `post` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import type { NotificationUpdate } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function write(update: NotificationUpdate): JsonObject {
+   *   return update.toJson();
+   * }
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A notification named by its id: the answer of `shell.postNotification` and the payload of `shell.dismissNotification`.
+ */
+export declare class NotificationReference {
+  /**
+   * The notification's id.
+   */
+  public readonly id: number;
+
+  /**
+   * Creates the reference.
+   *
+   * @param id The notification's id.
+   * @throws ArgumentException synchronously when the id is not a whole number from 1.
+   *
+   * @example
+   * ```ts
+   * import { NotificationReference } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const reference: NotificationReference = new NotificationReference(1);
+   * ```
+   */
+  public constructor(id: number);
+
+  /**
+   * Reads the reference from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The reference.
+   * @throws JsonException synchronously when `id` is missing or invalid, or a field is unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { NotificationReference } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const reference: NotificationReference = NotificationReference.fromJson({ id: 1 });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): NotificationReference;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `id` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { NotificationReference } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new NotificationReference(1).toJson();
    * ```
    */
   public toJson(): JsonObject;

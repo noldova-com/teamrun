@@ -11,12 +11,19 @@ import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 
 import ExecutableLocator from "../../processes/executable-locator.ts";
 
 export default class RepositoryFixture {
   private static readonly PREFIX: string = "teamrun-fixture-";
   private static readonly TIMEOUT: number = 10_000;
+  private static readonly REMOVE_LIMIT: number = 10_000;
+  private static readonly REMOVE_INTERVAL: number = 250;
+  private static readonly LOCKED_CODES: readonly string[] = ["EBUSY", "EPERM", "ENOTEMPTY"];
+  private static readonly WINDOWS_USERS: string = "CimCmdlets\\Get-CimInstance Win32_Process | " +
+    "Microsoft.PowerShell.Core\\Where-Object { $_.ProcessId -ne $PID -and ($_.ExecutablePath -like 'FOLDER*' -or $_.CommandLine -like '*FOLDER*') } | " +
+    "Microsoft.PowerShell.Core\\ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }";
   private static readonly IDENTITY: readonly string[] = ["-c", "user.name=TeamRun Fixture", "-c", "user.email=fixture@example.invalid"];
 
   private readonly root: string;
@@ -62,6 +69,29 @@ export default class RepositoryFixture {
   }
 
   public async disposeAsync(): Promise<void> {
-    await rm(this.root, { recursive: true, force: true });
+    const deadline = Date.now() + RepositoryFixture.REMOVE_LIMIT;
+    for (;;)
+      try {
+        await rm(this.root, { recursive: true, force: true });
+        return;
+      }
+      catch (error) {
+        if (!RepositoryFixture.LOCKED_CODES.includes((error as NodeJS.ErrnoException).code ?? ""))
+          throw error;
+        if (Date.now() >= deadline)
+          throw new Error(`${this.root} stayed locked for ${RepositoryFixture.REMOVE_LIMIT / 1000} s. Processes started from it or naming it: ${RepositoryFixture.describeUsers(this.root)}`, { cause: error });
+        await delay(RepositoryFixture.REMOVE_INTERVAL);
+      }
+  }
+
+  private static describeUsers(folder: string): string {
+    const result = process.platform === "win32"
+      ? spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", RepositoryFixture.WINDOWS_USERS.replaceAll("FOLDER", folder.replaceAll("'", "''"))],
+        { encoding: "utf8", windowsHide: true, timeout: RepositoryFixture.TIMEOUT })
+      : spawnSync("ps", ["-A", "-ww", "-o", "pid=,args="], { encoding: "utf8", timeout: RepositoryFixture.TIMEOUT });
+    if (result.status !== 0)
+      return `unknown (${result.error?.message ?? result.stderr.trim()})`;
+    const users = result.stdout.split(/\r?\n/).filter(t => t.trim().length > 0 && (process.platform === "win32" || t.includes(folder)));
+    return users.length === 0 ? "none listed" : users.join("; ");
   }
 }

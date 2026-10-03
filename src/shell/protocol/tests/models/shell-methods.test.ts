@@ -26,6 +26,13 @@ export class ShellMethodsTests {
   }
 
   @TestMethod
+  public namesTheNotificationMethods(): void {
+    Assert.areEqual(
+      JSON.stringify(["shell.notifications", "shell.postNotification", "shell.updateNotification", "shell.dismissNotification"]),
+      JSON.stringify([ShellMethods.notifications, ShellMethods.postNotification, ShellMethods.updateNotification, ShellMethods.dismissNotification].map(t => t.text)));
+  }
+
+  @TestMethod
   public namesTheWindowStateMethods(): void {
     Assert.areEqual(
       JSON.stringify(["shell.readWindowBounds", "shell.writeWindowBounds", "shell.readWindowLayout", "shell.writeWindowLayout"]),
