@@ -10,6 +10,7 @@ import { TestBed } from "@angular/core/testing";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 
+import { BottomDockSpan } from "../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import type { CommandContribution } from "../../../src/app/models/command-contribution";
 import { Layout } from "../../../src/app/models/layout/layout";
@@ -58,7 +59,8 @@ describe("ShellCommandsService", () => {
     expect(service.commands.map(t => t.name)).toEqual([
       "shell.closeTab", "shell.keepTab", "shell.closeOtherTabs", "shell.closeTabsToTheRight", "shell.closeAllTabs", "shell.moveTabLeft", "shell.moveTabRight",
       "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight", "shell.dockTabBottom",
-      "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.showCommands", "shell.resetLayout", "shell.showAllTabs"
+      "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.showCommands", "shell.resetLayout", "shell.spanBottomDock",
+      "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
     expect(service.commands.every(t => t.title.length > 0 && t.icon !== null)).toBe(true);
     expect(service.commands.filter(t => t.defaultKey !== null).map(t => [t.name, t.defaultKey?.text])).toEqual([["shell.showCommands", "Mod+Shift+P"]]);
@@ -143,6 +145,19 @@ describe("ShellCommandsService", () => {
 
     await runAsync("shell.resetLayout");
     expect(layout.layout().dock(DockSide.Left).isCollapsed).toBe(false);
+  });
+
+  it("keeps the bottom dock between the side docks or spans it across the window, both always enabled and the current one changing nothing", async () => {
+    const enabled = (): boolean[] => ["shell.spanBottomDock", "shell.fitBottomDockBetween"].map(t => command(t).isEnabled(null));
+    const initial = layout.layout();
+
+    await runAsync("shell.spanBottomDock");
+    expect(layout.layout()).toBe(initial);
+    await runAsync("shell.fitBottomDockBetween");
+    expect([layout.layout().bottomSpan, ...enabled()]).toEqual([BottomDockSpan.Between, true, true]);
+    await runAsync("shell.spanBottomDock");
+
+    expect(layout.layout().bottomSpan).toBe(BottomDockSpan.Full);
   });
 
   it("shows all tabs of a group whose tabs overflow, the current group by default", async () => {
