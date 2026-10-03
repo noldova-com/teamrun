@@ -8,6 +8,7 @@
 
 import { ErrorHandler, type WritableSignal, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { userEvent } from "vitest/browser";
 
 import { ModuleState } from "@noldova/teamrun-shell-protocol";
 
@@ -269,6 +270,10 @@ describe("ModuleFailuresComponent", () => {
       it(`takes its colors and geometry from the ${theme.id} theme in ${mode} mode`, async () => {
         AppearanceFixture.apply(theme, mode);
         const fixture = await renderAsync();
+        const away = document.body.appendChild(document.createElement("div"));
+        Object.assign(away.style, { position: "fixed", right: "0", bottom: "0", width: "40px", height: "40px" });
+        await userEvent.hover(away);
+        away.remove();
 
         const itemStyle = getComputedStyle(item(fixture));
         const icon = getComputedStyle(item(fixture).querySelector(".tr-module-failures-icon") as Element);
