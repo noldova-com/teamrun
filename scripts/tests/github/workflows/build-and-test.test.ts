@@ -26,6 +26,7 @@ class BuildAndTestTests {
   private static readonly PLAN_STEP: string = "List the targets without a current cache";
   private static readonly UI_STEP: string = "Test the UI workflows";
   private static readonly SUMMARY_STEP: string = "Summarize the UI workflows";
+  private static readonly WHOLE_LEG: Readonly<Record<string, string>> = { part: "all" };
   private static readonly UPLOAD_ACTION: string = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1";
   private static readonly UPLOADS: readonly (readonly [string, string, string, readonly string[]])[] = [
     ["Keep the UI workflow results", "Keep the UI workflow results again", "Keep the UI workflow results a last time",
@@ -546,7 +547,7 @@ class BuildAndTestTests {
     test("an upload that fails and then succeeds is tried again once and keeps the job green", async () => {
       const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
 
-      const result = simulation.run({ "Keep the UI workflow results": "failure", "Keep the main window screenshot": "failure", "Keep the main window screenshot again": "failure" });
+      const result = simulation.run(BuildAndTestTests.WHOLE_LEG, { "Keep the UI workflow results": "failure", "Keep the main window screenshot": "failure", "Keep the main window screenshot again": "failure" });
 
       assert.equal(result.isJobFailed, false);
       assert.deepEqual(result.ran, [
@@ -565,7 +566,7 @@ class BuildAndTestTests {
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
 
-      const result = simulation.run(failures);
+      const result = simulation.run(BuildAndTestTests.WHOLE_LEG, failures);
       const results = await doubles.runAsync(workflow.readStepScript("Warn that the UI workflow results were not kept"));
       const screenshot = await doubles.runAsync(workflow.readStepScript("Warn that the main window screenshot was not kept"));
 
@@ -581,8 +582,8 @@ class BuildAndTestTests {
     test("uploads that succeed run no retry and no warning, and failed tests still fail the job", async () => {
       const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
 
-      const passed = simulation.run({});
-      const failed = simulation.run({ [BuildAndTestTests.UI_STEP]: "failure" });
+      const passed = simulation.run(BuildAndTestTests.WHOLE_LEG, {});
+      const failed = simulation.run(BuildAndTestTests.WHOLE_LEG, { [BuildAndTestTests.UI_STEP]: "failure" });
 
       assert.deepEqual(passed.ran, [BuildAndTestTests.UI_STEP, "Keep the UI workflow results", "Keep the main window screenshot", BuildAndTestTests.SUMMARY_STEP]);
       assert.equal(passed.isJobFailed, false);
@@ -590,6 +591,18 @@ class BuildAndTestTests {
       assert.deepEqual(failed.ran, passed.ran);
       assert.equal(simulation.find(BuildAndTestTests.UI_STEP).continueOnError, false);
       assert.equal(simulation.find(BuildAndTestTests.SUMMARY_STEP).continueOnError, false);
+    });
+
+    test("a tests leg runs no UI workflow, upload or summary, and a UI workflows leg runs them as a whole leg does", async () => {
+      const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
+      const failures = { "Keep the UI workflow results": "failure", "Keep the main window screenshot": "failure" };
+
+      const tests = simulation.run({ part: "tests" }, failures);
+      const workflows = simulation.run({ part: "workflows" }, failures);
+
+      assert.deepEqual(tests.ran, []);
+      assert.equal(tests.isJobFailed, false);
+      assert.deepEqual(workflows, simulation.run(BuildAndTestTests.WHOLE_LEG, failures));
     });
 
     test("the UI workflows build their own test builds, so the workflow builds none", async () => {
