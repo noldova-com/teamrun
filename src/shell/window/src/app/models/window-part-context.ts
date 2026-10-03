@@ -7,7 +7,7 @@
  */
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
+import type { NotificationPost, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import { WindowPartAccessException } from "../exceptions/window-part-access.exception";
 import type { IWindowPartContext } from "../interfaces/i-window-part-context";
@@ -143,6 +143,31 @@ export class WindowPartContext implements IWindowPartContext {
     return unsubscribe;
   }
 
+  public readSetting(name: string): JsonValue | undefined {
+    this.requireReadable(name);
+    return this.host.readSetting(name);
+  }
+
+  public async writeSettingAsync(name: string, value: JsonValue, scope: SettingScope | null = null): Promise<void> {
+    this.requireOwn(name);
+    await this.host.writeSettingAsync(name, value, scope);
+  }
+
+  public async resetSettingAsync(name: string, scope: SettingScope | null = null): Promise<void> {
+    this.requireOwn(name);
+    await this.host.resetSettingAsync(name, scope);
+  }
+
+  public onSettingChanged(name: string, listener: (value: JsonValue, scope: SettingScope | null) => void): () => void {
+    this.requireReadable(name);
+    const unsubscribe = this.host.onSettingChanged(t => {
+      if (t.key.name.text === name)
+        listener(t.value, t.key.scope);
+    });
+    this.subscriptions.push(unsubscribe);
+    return unsubscribe;
+  }
+
   public withdraw(): void {
     for (const unsubscribe of this.subscriptions.splice(0))
       unsubscribe();
@@ -185,6 +210,11 @@ export class WindowPartContext implements IWindowPartContext {
       throw new WindowPartAccessException(Resources.formatUndeclaredContribution(this.moduleId, kind, name));
     if (registered.some(t => t.name === name))
       throw new WindowPartAccessException(Resources.formatContributionRegistered(kind, name));
+  }
+
+  private requireReadable(name: string): void {
+    if (!name.startsWith(`${Resources.shellOwner}${Resources.contributionSeparator}`))
+      this.requireAllowed(name);
   }
 
   private requireAllowed(name: string): void {

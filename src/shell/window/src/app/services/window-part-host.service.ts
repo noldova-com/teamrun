@@ -11,7 +11,8 @@ import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal,
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import {
-  type CommandInfo, CommandList, CommandRun, ModuleState, ModuleStatus, ModuleStatusList, type NotificationPost, NotificationReference, NotificationUpdate, ShellMethods
+  type CommandInfo, CommandList, CommandRun, ModuleState, ModuleStatus, ModuleStatusList, type NotificationPost, NotificationReference, NotificationUpdate, type SettingScope,
+  type SettingValue, ShellMethods
 } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../enums/dock-side";
@@ -38,6 +39,7 @@ import { CommandService } from "./command.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { DocumentOpenerService } from "./document-opener.service";
 import { LayoutService } from "./layout.service";
+import { SettingsService } from "./settings.service";
 import { TabLabelService } from "./tab-label.service";
 
 @Injectable({ providedIn: "root" })
@@ -48,6 +50,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly labels: TabLabelService = inject(TabLabelService);
   private readonly commands: CommandService = inject(CommandService);
   private readonly bars: BarItemsService = inject(BarItemsService);
+  private readonly settings: SettingsService = inject(SettingsService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
   private readonly activations: WindowPartActivation[] = [];
@@ -88,6 +91,22 @@ export class WindowPartHostService implements IWindowPartHost {
 
   public onEvent(listener: (name: string, payload: JsonValue) => void): () => void {
     return this.bridge.onEvent(listener);
+  }
+
+  public readSetting(name: string): JsonValue | undefined {
+    return this.settings.read(name);
+  }
+
+  public writeSettingAsync(name: string, value: JsonValue, scope: SettingScope | null): Promise<void> {
+    return this.settings.setAsync(name, value, scope);
+  }
+
+  public resetSettingAsync(name: string, scope: SettingScope | null): Promise<void> {
+    return this.settings.resetAsync(name, scope);
+  }
+
+  public onSettingChanged(listener: (change: SettingValue) => void): () => void {
+    return this.settings.onChanged(listener);
   }
 
   public openDocument(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
@@ -166,6 +185,7 @@ export class WindowPartHostService implements IWindowPartHost {
   }
 
   private async activateReportedAsync(): Promise<void> {
+    await this.settings.loadAsync();
     const report = ModuleStatusList.fromJson(await this.bridge.requestAsync(ShellMethods.modules.text, null));
     this.moduleOrder = report.modules.map(t => t.id);
     this.runtimeCommands = CommandList.fromJson(await this.bridge.requestAsync(ShellMethods.commands.text, null)).commands.map(t => this.describeRuntimeCommand(t));

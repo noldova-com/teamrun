@@ -247,6 +247,7 @@ export class Resources {
   public static readonly documentField: string = "document";
   public static readonly instanceField: string = "instance";
   public static readonly keySeparator: string = "/";
+  public static readonly shellOwner: string = "shell";
   public static readonly contributionSeparator: string = ".";
   public static readonly nameParameter: string = "name";
   public static readonly titleParameter: string = "title";
