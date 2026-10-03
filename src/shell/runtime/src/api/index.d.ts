@@ -1041,6 +1041,78 @@ export declare class DiagnosticRedactor {
 }
 
 /**
+ * A log file whose size is bounded. Each record is stamped with its time and redacted, and the file becomes the
+ * previous file, replacing it, when a record would take it over its size limit.
+ */
+export declare class LogFile {
+  /**
+   * Creates the log file, which is not opened yet.
+   *
+   * @param file The file to write.
+   * @param previousFile The file the log becomes when it is opened again or reaches its size limit.
+   * @param redactor Redacts every record.
+   * @param now Returns the time to stamp a record with; the current time by default.
+   * @param limit The most bytes the file holds, 1 MiB by default. A record is cut to a quarter of it.
+   * @example
+   * ```ts
+   * import { homedir } from "node:os";
+   *
+   * import { DiagnosticRedactor, LogFile } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const log: LogFile = new LogFile("/data/logs/app.log", "/data/logs/app.previous.log", new DiagnosticRedactor(homedir()));
+   * ```
+   */
+  public constructor(file: string, previousFile: string, redactor: DiagnosticRedactor, now?: () => Date, limit?: number);
+
+  /**
+   * Stamps and redacts a record.
+   *
+   * @param text The record, possibly of several lines, without its line ending.
+   * @returns The line to write: the time, the redacted record, cut to its size limit, and a line ending.
+   * @example
+   * ```ts
+   * import type { LogFile } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function line(log: LogFile): string {
+   *   return log.format("The runtime started.");
+   * }
+   * ```
+   */
+  public format(text: string): string;
+
+  /**
+   * Starts an empty file. The existing file becomes the previous file, replacing it; when that fails the new file starts anyway.
+   *
+   * @throws {Error} Thrown when the file cannot be written.
+   * @example
+   * ```ts
+   * import type { LogFile } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function start(log: LogFile): void {
+   *   log.open();
+   * }
+   * ```
+   */
+  public open(): void;
+
+  /**
+   * Appends a line. When it would take the file over its size limit, the file first becomes the previous file.
+   *
+   * @param line The line from {@link LogFile.format}.
+   * @throws {Error} Thrown when the file cannot be written.
+   * @example
+   * ```ts
+   * import type { LogFile } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function note(log: LogFile): void {
+   *   log.append(log.format("The runtime started."));
+   * }
+   * ```
+   */
+  public append(line: string): void;
+}
+
+/**
  * Publishes and withdraws a runtime's discovery metadata.
  */
 export declare class DiscoveryPublisher {
@@ -3153,11 +3225,11 @@ export declare class ChildProcessStarter implements IProcessStarter {
 }
 
 /**
- * The running runtime's log, `logs/runtime.log`. Opening it under ownership keeps the previous run's log as `logs/runtime.previous.log` and removes the start logs that launchers left behind.
+ * The running runtime's log, `logs/runtime.log`. Every line is stamped with its time and redacted, and the log is a {@link LogFile}: it stays within its size limit by becoming `logs/runtime.previous.log` when it fills. Opening it under ownership keeps the previous run's log as `logs/runtime.previous.log` and removes the start logs that launchers left behind.
  */
 export declare class RuntimeLog {
   /**
-   * The stream the runtime writes its diagnostics to; it writes to the log until the log closes.
+   * The stream the runtime writes its diagnostics to; each write is one record, stamped and redacted like a line, without its trailing line ending. It writes to the log until the log closes.
    */
   public readonly diagnostics: Writable;
 
@@ -3168,6 +3240,7 @@ export declare class RuntimeLog {
    *
    * @param lock The held ownership of the data directory.
    * @param ownStartLogName The start log of the launcher that started this runtime, which is kept, or `null`.
+   * @param now Returns the time to stamp a line with; the current time by default.
    * @returns A promise of the open log.
    * @throws {OwnershipReleasedException} Rejected when the ownership was released.
    * @example
@@ -3181,10 +3254,10 @@ export declare class RuntimeLog {
    * }
    * ```
    */
-  public static openAsync(lock: OwnershipLock, ownStartLogName: string | null): Promise<RuntimeLog>;
+  public static openAsync(lock: OwnershipLock, ownStartLogName: string | null, now?: () => Date): Promise<RuntimeLog>;
 
   /**
-   * Writes one line at once, as when the process is about to end; nothing is written after the log closes.
+   * Writes one line at once, as when the process is about to end; nothing is written after the log closes. A line that cannot be written is thrown.
    *
    * @param text The line, without its line ending.
    * @example

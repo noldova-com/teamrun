@@ -89,7 +89,7 @@ export class RuntimeEntryTests {
 
       Assert.areEqual(0, await running);
       Assert.areEqual(0, signals.listenerCount("uncaughtExceptionMonitor"));
-      Assert.isTrue((await readFile(fixture.dataDirectory.runtimeLog, "utf8")).startsWith("Error: The module notes threw.\n    at "));
+      Assert.isTrue((await readFile(fixture.dataDirectory.runtimeLog, "utf8")).includes(" Error: The module notes threw.\n    at "));
     });
   }
 

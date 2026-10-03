@@ -117,6 +117,8 @@ export class Resources {
   public static readonly ownershipWaitMilliseconds: number = 250;
   public static readonly backupWakeMilliseconds: number = 25;
   public static readonly privateFileMode: number = 0o600;
+  public static readonly logSizeLimit: number = 1048576;
+  public static readonly logRecordShare: number = 4;
   public static readonly privateFolderMode: number = 0o700;
   public static readonly exclusiveWriteFlag: string = "wx";
   public static readonly temporarySuffix: string = ".tmp";
