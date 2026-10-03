@@ -31,7 +31,6 @@ test.describe("the window row's menus on Windows and Linux", () => {
   test.skip(process.platform === "darwin", "macOS shows the menus in its own menu bar.");
 
   test.beforeEach(async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     await expect(desktop.window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]")).toBeVisible();
   });
 
