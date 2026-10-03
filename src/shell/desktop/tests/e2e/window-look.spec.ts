@@ -123,7 +123,7 @@ test.describe("the window's look", () => {
     await desktop.useViewportAsync(900, 700);
     const window = desktop.window;
     await window.locator(`${documentsGroup} tr-tab[aria-label="${architectureTitle}"]`).click();
-    const heading = window.locator(`${documentsGroup} h1`);
+    const heading = window.locator(`${documentsGroup} h1`, { hasText: architectureTitle });
     await expect(heading).toHaveText(architectureTitle);
 
     const lines = await heading.evaluate(t => {

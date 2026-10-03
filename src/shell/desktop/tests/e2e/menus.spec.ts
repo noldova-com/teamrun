@@ -60,7 +60,7 @@ test.describe("menus", () => {
     await expect(menus(window)).toHaveCount(1);
     await expect.poll(() => focusedLabel(window)).toBe("Move to");
     await window.keyboard.press("End");
-    await expect.poll(() => focusedLabel(window)).toBe("Reset the layout");
+    await expect.poll(() => focusedLabel(window)).toBe("Close all");
     await window.keyboard.press("Home");
     await expect.poll(() => focusedLabel(window)).toBe("Move to");
     await window.keyboard.press("ArrowDown");

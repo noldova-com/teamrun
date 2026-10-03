@@ -56,7 +56,7 @@ test.describe("the shell's keys", () => {
     await note(window, 2).click();
 
     await window.keyboard.press("Shift+F10");
-    await expect(window.locator(".cdk-overlay-container .tr-tab-menu-close .tr-menu-item-shortcut")).toHaveText(isMac ? "⌘W" : "Ctrl+W");
+    await expect(window.locator(".cdk-overlay-container button[data-command='shell.closeTab'] .tr-menu-item-shortcut")).toHaveText(isMac ? "⌘W" : "Ctrl+W");
     await window.keyboard.press("Escape");
     await expect(window.locator(".cdk-overlay-container tr-menu")).toHaveCount(0);
 
