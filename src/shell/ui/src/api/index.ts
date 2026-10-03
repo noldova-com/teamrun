@@ -14,6 +14,8 @@ export { DockingGuideComponent } from "../app/components/docking-guide/docking-g
 export { DockingPlateComponent } from "../app/components/docking-plate/docking-plate.component";
 export { IconButtonComponent } from "../app/components/icon-button/icon-button.component";
 export { ContextMenuTriggerDirective } from "../app/components/menu/context-menu-trigger.directive";
+export { MenuBarItemComponent } from "../app/components/menu-bar/menu-bar-item.component";
+export { MenuBarComponent } from "../app/components/menu-bar/menu-bar.component";
 export { MenuItemComponent } from "../app/components/menu/menu-item.component";
 export { MenuSeparatorComponent } from "../app/components/menu/menu-separator.component";
 export { MenuTriggerDirective } from "../app/components/menu/menu-trigger.directive";

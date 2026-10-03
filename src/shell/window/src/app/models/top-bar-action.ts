@@ -8,6 +8,7 @@
 
 import { type Signal, type WritableSignal, signal } from "@angular/core";
 
+import type { TopBarSide } from "../enums/top-bar-side";
 import type { TopBarActionContribution } from "./top-bar-action-contribution";
 import type { TopBarActionState } from "./top-bar-action-state";
 
@@ -16,6 +17,7 @@ export class TopBarAction {
   private readonly check: (state: TopBarActionState) => void;
 
   public readonly name: string;
+  public readonly side: TopBarSide;
   public readonly state: Signal<TopBarActionState>;
 
   public constructor(contribution: TopBarActionContribution, check: (state: TopBarActionState) => void) {
@@ -23,6 +25,7 @@ export class TopBarAction {
 
     this.check = check;
     this.name = contribution.name;
+    this.side = contribution.side;
     this.stateValue = signal(contribution.state);
     this.state = this.stateValue.asReadonly();
   }

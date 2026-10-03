@@ -409,6 +409,14 @@ export class Resources {
     [EditAction.SelectAll]: "select_all"
   };
   public static readonly menuLabel: string = "Menu";
+  public static readonly menuBarLabel: string = "Menus";
+  public static readonly menuBarSetting: string = "shell.menuBar";
+  public static readonly menuBarItemSelector: string = "[tr-menu-bar-item]";
+  public static readonly windowRowMinimumDragWidth: number = 96;
+  public static readonly altKey: string = "Alt";
+  public static readonly functionKey: string = "F10";
+  public static readonly ariaExpandedAttribute: string = "aria-expanded";
+  public static readonly trueValue: string = "true";
   public static readonly fileMenu: string = "shell.file";
   public static readonly editMenu: string = "shell.edit";
   public static readonly viewMenu: string = "shell.view";

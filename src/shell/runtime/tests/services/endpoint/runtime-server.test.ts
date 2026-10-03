@@ -321,6 +321,27 @@ export class RuntimeServerTests {
   }
 
   @TestMethod
+  public servesStopButNoOtherMethodToARefusedConnection(): Promise<void> {
+    return RuntimeServerTests.runAsync(undefined, async fixture => {
+      const failure = new Failure(FailureCode.PreShellData, "Move the old data aside.", { location: "/data" });
+      fixture.methods.register(ShellMethods.stop, RuntimeServerTests.ECHO_HANDLER);
+      fixture.methods.register(ShellMethods.settings, RuntimeServerTests.ECHO_HANDLER);
+      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
+      fixture.server.refuse(new Refusal(failure, RuntimeServerTests.MOVE));
+
+      const [refused] = await fixture.handshakeAsync("desktop");
+      refused.sendMessages(
+        new Request("desktop:1", ShellMethods.settings, null),
+        new Request("desktop:2", RuntimeServerTests.ECHO, null),
+        new Request("desktop:3", ShellMethods.stop, { policy: "StopWork" }));
+
+      Assert.areEqual(JSON.stringify(Response.failure("desktop:1", failure).toJson()), JSON.stringify((await refused.readResponseAsync()).toJson()));
+      Assert.areEqual(JSON.stringify(Response.failure("desktop:2", failure).toJson()), JSON.stringify((await refused.readResponseAsync()).toJson()));
+      Assert.areEqual("{\"client\":\"desktop\",\"payload\":{\"policy\":\"StopWork\"}}", JSON.stringify((await refused.readResponseAsync()).payload));
+    });
+  }
+
+  @TestMethod
   public listensOnALocalSocketAndRemovesItWhenClosed(): Promise<void> {
     return RuntimeServerTests.runInFolderAsync(async folder => {
       const socketPath = process.platform === "win32" ? `\\\\.\\pipe\\teamrun-test-${path.basename(folder)}` : path.join(folder, "runtime.sock");
