@@ -18,16 +18,18 @@ import type { ShortcutBinding } from "../models/shortcut-binding";
 import { ShortcutMap } from "../models/shortcut-map";
 import { Resources } from "../../resources";
 import { DesktopBridgeService } from "./desktop-bridge.service";
+import { ShellCommandsService } from "./shell-commands.service";
 
 @Injectable({ providedIn: "root" })
 export class CommandService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
-  private readonly commandsValue: WritableSignal<readonly CommandContribution[]> = signal([]);
+  private readonly shellCommands: readonly CommandContribution[] = inject(ShellCommandsService).commands;
+  private readonly moduleCommands: WritableSignal<readonly CommandContribution[]> = signal([]);
   private readonly bindingsValue: WritableSignal<readonly ShortcutBinding[]> = signal([]);
 
-  public readonly commands: Signal<readonly CommandContribution[]> = this.commandsValue.asReadonly();
-  public readonly shortcuts: Signal<ShortcutMap> = computed(() => new ShortcutMap(this.commandsValue(), this.bindingsValue(), this.bridge.platform));
+  public readonly commands: Signal<readonly CommandContribution[]> = computed(() => [...this.shellCommands, ...this.moduleCommands()]);
+  public readonly shortcuts: Signal<ShortcutMap> = computed(() => new ShortcutMap(this.commands(), this.bindingsValue(), this.bridge.platform));
 
   public constructor() {
     const document = inject(DOCUMENT);
@@ -39,7 +41,7 @@ export class CommandService {
   }
 
   public setCommands(commands: readonly CommandContribution[]): void {
-    this.commandsValue.set([...commands]);
+    this.moduleCommands.set([...commands]);
   }
 
   public setBindings(bindings: readonly ShortcutBinding[]): void {
@@ -47,21 +49,42 @@ export class CommandService {
   }
 
   public async runAsync(name: string, commandArguments: JsonValue = null): Promise<JsonValue> {
-    const command = this.commandsValue().find(t => t.name === name);
-    if (Object.isUndefined(command))
-      throw new CommandNotFoundException(Resources.formatCommandNotFound(name));
-    return command.runAsync(commandArguments);
+    return this.find(name).runAsync(commandArguments);
+  }
+
+  public run(name: string, commandArguments: JsonValue = null): void {
+    this.report(this.runAsync(name, commandArguments));
+  }
+
+  public isEnabled(name: string, commandArguments: JsonValue = null): boolean {
+    return this.find(name).isEnabled(commandArguments);
+  }
+
+  public keyLabel(name: string): string | null {
+    return this.shortcuts().keyOf(this.find(name).name)?.label(this.bridge.platform) ?? null;
   }
 
   public dispatch(event: KeyboardEvent): boolean {
     if (event.defaultPrevented || event.isComposing || event.repeat)
       return false;
     const name = this.shortcuts().find(event);
-    if (Object.isUndefined(name))
+    const command = this.commands().find(t => t.name === name);
+    if (Object.isUndefined(command) || !command.isEnabled(null))
       return false;
 
     event.preventDefault();
-    this.runAsync(name).catch((error: unknown) => this.errors.handleError(error));
+    this.report(command.runAsync(null));
     return true;
+  }
+
+  private report(running: Promise<JsonValue>): void {
+    running.catch((error: unknown) => this.errors.handleError(error));
+  }
+
+  private find(name: string): CommandContribution {
+    const command = this.commands().find(t => t.name === name);
+    if (Object.isUndefined(command))
+      throw new CommandNotFoundException(Resources.formatCommandNotFound(name));
+    return command;
   }
 }

@@ -12,6 +12,10 @@ import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
 import type { CommandContribution } from "../models/command-contribution";
 import type { DocumentContribution } from "../models/document-contribution";
 import type { NotificationHandle } from "../models/notification-handle";
+import type { StatusBarItem } from "../models/status-bar-item";
+import type { StatusBarItemContribution } from "../models/status-bar-item-contribution";
+import type { TopBarAction } from "../models/top-bar-action";
+import type { TopBarActionContribution } from "../models/top-bar-action-contribution";
 import type { ViewContribution } from "../models/view-contribution";
 import type { IDocumentOptions } from "./i-document-options";
 
@@ -19,6 +23,8 @@ export interface IWindowPartContext {
   registerView(view: ViewContribution): void;
   registerDocument(document: DocumentContribution): void;
   registerCommand(command: CommandContribution): void;
+  registerStatusBarItem(item: StatusBarItemContribution): StatusBarItem;
+  registerTopBarAction(action: TopBarActionContribution): TopBarAction;
   runCommandAsync(name: string, commandArguments?: JsonValue): Promise<JsonValue>;
   postNotificationAsync(post: NotificationPost): Promise<NotificationHandle>;
   openDocument(name: string, instance: string, title: string, options?: IDocumentOptions): void;

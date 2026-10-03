@@ -27,6 +27,7 @@ export class MenuItemComponent {
 
   public readonly label = input.required<string>();
   public readonly icon = input<string | null>(null);
+  public readonly shortcut = input<string | null>(null);
 
   public constructor() {
     const item = inject(CdkMenuItem, { self: true });

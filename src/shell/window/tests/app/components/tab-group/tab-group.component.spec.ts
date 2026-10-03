@@ -19,6 +19,7 @@ import type { GroupFrame } from "../../../../src/app/models/layout/group-frame";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { LayoutService } from "../../../../src/app/services/layout.service";
 import { TabDragService } from "../../../../src/app/services/tab-drag.service";
+import { TabStripService } from "../../../../src/app/services/tab-strip.service";
 import { Resources } from "../../../../src/resources";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
@@ -310,6 +311,26 @@ describe("TabGroupComponent", () => {
 
     expect(layout.layout().documents.tabs).toEqual([]);
     expect(document.querySelector(".cdk-overlay-container tr-menu")).toBeNull();
+  });
+
+  it("reports that its tabs overflow, opens its overflow list on request with the first row focused, and stops reporting once gone", async () => {
+    const strips = TestBed.inject(TabStripService);
+    const many = Array.from({ length: 12 }, (_, index) => new DocumentTab("notes.note", `note ${index}`));
+    await renderAsync(many.reduce((current, t) => current.openDocument(t), Layout.createDefault(registry)), 60);
+    update();
+    await fixture.whenStable();
+    update();
+    expect([strips.isOverflowing(0), strips.isOverflowing(1)]).toEqual([true, false]);
+
+    strips.showList(0);
+    update();
+    await fixture.whenStable();
+
+    expect(document.querySelector(".cdk-overlay-container .tr-tab-group-overflow-menu")).not.toBeNull();
+    expect(document.activeElement?.classList.contains("tr-tab-group-overflow-close-all")).toBe(true);
+    expect(strips.listRequest()).toBeNull();
+    fixture.destroy();
+    expect(strips.isOverflowing(0)).toBe(false);
   });
 
   it("drops the overflow list once the group is wide enough", async () => {

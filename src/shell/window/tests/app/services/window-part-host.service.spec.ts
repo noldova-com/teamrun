@@ -12,6 +12,7 @@ import { TestBed } from "@angular/core/testing";
 import { ModuleState, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../../../src/app/enums/dock-side";
+import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
 import type { IWindowPartContext } from "../../../src/app/interfaces/i-window-part-context";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
@@ -21,9 +22,14 @@ import { Layout } from "../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../src/app/models/layout/view-registry";
 import { ViewTab } from "../../../src/app/models/layout/view-tab";
 import { ViewType } from "../../../src/app/models/layout/view-type";
+import { StatusBarItemContribution } from "../../../src/app/models/status-bar-item-contribution";
+import { StatusBarItemState } from "../../../src/app/models/status-bar-item-state";
+import { TopBarActionContribution } from "../../../src/app/models/top-bar-action-contribution";
+import { TopBarActionState } from "../../../src/app/models/top-bar-action-state";
 import { ViewContribution } from "../../../src/app/models/view-contribution";
 import { WindowPartSource } from "../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
+import { BarItemsService } from "../../../src/app/services/bar-items.service";
 import { CommandService } from "../../../src/app/services/command.service";
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../src/app/services/layout.service";
@@ -69,9 +75,10 @@ describe("WindowPartHostService", () => {
     dependencies: readonly string[] = [],
     views: readonly string[] = [],
     commands: readonly string[] = [],
+    statusBarItems: readonly string[] = [],
+    topBarActions: readonly string[] = [],
     notifications: readonly string[] = []): WindowPartSource =>
-    new WindowPartSource(
-      moduleId, `${moduleId[0]?.toUpperCase()}${moduleId.slice(1)}`, dependencies, views, commands, notifications,
+    new WindowPartSource(moduleId, `${moduleId[0]?.toUpperCase()}${moduleId.slice(1)}`, dependencies, views, commands, statusBarItems, topBarActions, notifications,
       () => part instanceof Error ? Promise.reject(part) : Promise.resolve(part));
   const notesPart = (log: string[]): FakeWindowPart => new FakeWindowPart("notes", log, t => {
     t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load));
@@ -225,7 +232,7 @@ describe("WindowPartHostService", () => {
 
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
-    expect(commands.commands().map(t => [t.name, t.title, t.icon, t.defaultKey?.text ?? null])).toEqual([
+    expect(commands.commands().filter(t => !t.name.startsWith("shell.")).map(t => [t.name, t.title, t.icon, t.defaultKey?.text ?? null])).toEqual([
       ["clock.tick", "Tick", "timer", "Mod+Alt+T"],
       ["notes.sync", "Sync", null, null],
       ["notes.newNote", "New note", "note_add", "Mod+Alt+N"]
@@ -235,6 +242,34 @@ describe("WindowPartHostService", () => {
     expect(bridge.requests.at(-1)).toEqual(["shell.runCommand", { name: "clock.tick", arguments: { by: 2 } }]);
     expect(runs).toEqual(["notes.newNote {\"folder\":\"inbox\"}"]);
     expect([host.isCommandRegistered("clock.tick"), host.isCommandRegistered("notes.newNote"), host.isCommandRegistered("notes.open")]).toEqual([true, true, false]);
+  });
+
+  it("shows the window parts' bar items in module order and withdraws a module's items when it no longer activates", async () => {
+    const notes = new FakeWindowPart("notes", log, t => {
+      t.registerStatusBarItem(new StatusBarItemContribution("notes.count", StatusBarSide.Left, new StatusBarItemState("2 notes")));
+      t.registerTopBarAction(new TopBarActionContribution("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote")));
+    });
+    const clock = new FakeWindowPart("clock", log, t => {
+      t.registerStatusBarItem(new StatusBarItemContribution("clock.ticks", StatusBarSide.Right, new StatusBarItemState("No ticks")));
+      t.registerStatusBarItem(new StatusBarItemContribution("clock.zone", StatusBarSide.Left, new StatusBarItemState("UTC")));
+      t.registerTopBarAction(new TopBarActionContribution("clock.reset", new TopBarActionState("restart_alt", "Reset", "clock.tick")));
+    });
+    const { host } = start([
+      source("notes", notes, [], [], [], ["notes.count"], ["notes.compose"]),
+      source("clock", clock, [], [], [], ["clock.ticks", "clock.zone"], ["clock.reset"])
+    ], [status("clock"), status("notes")]);
+    const bars = TestBed.inject(BarItemsService);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const shown = [bars.leftItems().map(t => t.name), bars.rightItems().map(t => t.name), bars.topBarActions().map(t => t.name)];
+
+    bridge.responses.set("shell.modules", { payload: { modules: [status("clock", ModuleState.Failed, "It broke."), status("notes")] } });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(shown).toEqual([["clock.zone", "notes.count"], ["clock.ticks"], ["clock.reset", "notes.compose"]]);
+    expect([bars.leftItems().map(t => t.name), bars.rightItems(), bars.topBarActions().map(t => t.name)]).toEqual([["notes.count"], [], ["notes.compose"]]);
+    expect(errors).toEqual([]);
   });
 
   it("fails a window part that registers a command the runtime part registered, and replaces the commands when the runtime returns", async () => {
@@ -250,7 +285,7 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(host.generation()).toBe(2));
 
     expect(errors.map(t => (t as Error).message)).toEqual(["The command notes.sync is already registered."]);
-    expect(commands.commands().map(t => t.title)).toEqual(["Sync"]);
+    expect(commands.commands().filter(t => !t.name.startsWith("shell.")).map(t => t.title)).toEqual(["Sync"]);
     expect(host.isCommandRegistered("notes.sync")).toBe(true);
     expect(host.failures().length).toBe(0);
   });

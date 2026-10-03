@@ -86,7 +86,7 @@ class BuildTests {
       assert.equal(unknown.text, "The build has no module weather to leave out.\n");
       assert.equal(await readFile(artifacts.declarationsFile, "utf8"), testedDeclarations);
       assert.doesNotMatch(await readFile(artifacts.locateDeclarations(variant), "utf8"), /"id": "clock"/);
-      assert.match(regularParts, /\[\n {2}new WindowPartSource\("notes", "Notes", \[\], \["notes\.list"\], \[\], \[\], \(\) => import\("\.\.\/modules\/notes\/window\/src\/api\/index"\)\.then\(t => t\.windowPart\)\)\n\];\n$/);
+      assert.match(regularParts, /\[\n {2}new WindowPartSource\("notes", "Notes", \[\], \["notes\.list"\], \[\], \[\], \[\], \[\], \(\) => import\("\.\.\/modules\/notes\/window\/src\/api\/index"\)\.then\(t => t\.windowPart\)\)\n\];\n$/);
       assert.match(testedParts, /import\("\.\.\/shell\/desktop\/tests\/e2e\/fixtures\/modules\/clock\/window\/src\/api\/index"\)/);
       assert.match(testedDeclarations, /"id": "notes"[\s\S]*"id": "clock"/);
     });

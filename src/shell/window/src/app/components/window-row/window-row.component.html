@@ -1,2 +1,10 @@
 <div class="tr-window-row-breadcrumb"></div>
-<div class="tr-window-row-actions"></div>
+<div class="tr-window-row-actions">
+  @for (action of bars.topBarActions(); track action.name) {
+    @let state = action.state();
+    @if (!state.isHidden) {
+      <button type="button" tr-icon-button class="tr-window-row-action" [attr.data-tr-item]="action.name" [icon]="state.icon" [label]="state.title"
+        [disabled]="!isAvailable(state.command)" [trTooltip]="state.title" [trTooltipSide]="below" (click)="run(state.command, state.commandArguments)"></button>
+    }
+  }
+</div>

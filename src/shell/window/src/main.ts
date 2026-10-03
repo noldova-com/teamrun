@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { ApplicationRef } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
 
 import { windowPartSources } from "../../../generated/window-parts";
@@ -14,4 +15,4 @@ import { WindowPartTokens } from "./app/models/window-part-tokens";
 import { Resources } from "./resources";
 
 document.title = Resources.productName;
-await bootstrapApplication(WindowComponent, { providers: [{ provide: WindowPartTokens.sources, useValue: windowPartSources }] });
+export const application: ApplicationRef = await bootstrapApplication(WindowComponent, { providers: [{ provide: WindowPartTokens.sources, useValue: windowPartSources }] });

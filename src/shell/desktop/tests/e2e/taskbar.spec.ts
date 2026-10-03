@@ -40,4 +40,20 @@ test.describe("the Windows taskbar", () => {
     await expect.poll(() => desktop.application.evaluate(() => Reflect.get(globalThis, "teamrunSecondInstance") as boolean)).toBe(true);
     expect(await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
   });
+
+  test("the program's icon, which the taskbar shows, is the outlined icon in light and in dark mode", async ({ desktop }) => {
+    await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
+    const read = (mode: "light" | "dark"): Promise<{ icon: string; isEmpty: boolean; isDark: boolean }> => desktop.application.evaluate(async ({ app, nativeTheme }, themeSource) => {
+      nativeTheme.themeSource = themeSource;
+      const icon = await app.getFileIcon(process.execPath, { size: "large" });
+      return { icon: icon.toDataURL(), isEmpty: icon.isEmpty(), isDark: nativeTheme.shouldUseDarkColors };
+    }, mode);
+
+    const light = await read("light");
+    const dark = await read("dark");
+
+    expect([light.isDark, dark.isDark]).toEqual([false, true]);
+    expect([light.isEmpty, dark.isEmpty]).toEqual([false, false]);
+    expect(dark.icon).toBe(light.icon);
+  });
 });

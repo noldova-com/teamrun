@@ -25,7 +25,6 @@ export class FakeDesktopWindow implements IDesktopWindow {
   public backgroundColor: string | null = null;
   public overlay: TitleBarOverlayOptions | null = null;
   public appDetails: AppDetailsOptions | null = null;
-  public readonly icons: string[] = [];
   public isShown: boolean = false;
   public isGone: boolean = false;
   public isMinimizedNow: boolean = false;
@@ -50,10 +49,6 @@ export class FakeDesktopWindow implements IDesktopWindow {
 
   public setAppDetails(options: AppDetailsOptions): void {
     this.appDetails = options;
-  }
-
-  public setIcon(iconPath: string): void {
-    this.icons.push(iconPath);
   }
 
   public setTitleBarOverlay(options: TitleBarOverlayOptions): void {
