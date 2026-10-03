@@ -8,7 +8,7 @@
 
 import { ChangeDetectionStrategy, Component, ErrorHandler, type Signal, computed, inject, input } from "@angular/core";
 
-import "@noldova/teamrun-foundation-core";
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import type { StatusBarItem } from "../../models/status-bar-item";
@@ -33,15 +33,11 @@ export class StatusBarItemComponent {
   public readonly item = input.required<StatusBarItem>();
 
   protected readonly state: Signal<StatusBarItemState> = computed(() => this.item().state());
-  protected readonly isAvailable: Signal<boolean> = computed(() => {
-    const command = this.state().command;
-    return !Object.isNull(command) && this.commands.commands().some(t => t.name === command);
-  });
+  protected isAvailable(command: string): boolean {
+    return this.commands.commands().some(t => t.name === command);
+  }
 
-  protected run(): void {
-    const state = this.state();
-    if (Object.isNull(state.command))
-      return;
-    this.commands.runAsync(state.command, state.commandArguments).catch((error: unknown) => this.errors.handleError(error));
+  protected run(command: string, commandArguments: JsonValue): void {
+    this.commands.runAsync(command, commandArguments).catch((error: unknown) => this.errors.handleError(error));
   }
 }
