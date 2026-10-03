@@ -30,7 +30,7 @@
   },
   "scripts": {
     "build": "node scripts/build.ts",
-    "start": "electron node_modules/@noldova/teamrun-shell-desktop/main.js",
+    "start": "node scripts/desktop/start.ts",
     "test": "node scripts/test.ts",
     "test:ui": "node scripts/ui-workflows.ts"
   },
@@ -38,6 +38,7 @@
     "@playwright/test": "1.63.0",
     "@types/node": "26.2.0",
     "electron": "44.5.1",
+    "resedit": "3.1.0",
     "typescript": "7.0.2"
   }
 }

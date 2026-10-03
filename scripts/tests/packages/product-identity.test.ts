@@ -7,6 +7,8 @@
  */
 
 import assert from "node:assert/strict";
+import { symlink } from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 
 import PackageException from "../../packages/package.exception.ts";
@@ -32,12 +34,28 @@ class ProductIdentityTests {
           "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons"]);
       assert.deepEqual([...product.placeholders.keys()], [
         "__PRODUCT_NAME__", "__PRODUCT_SLUG__", "__APPLICATION_ID__", "__DEVELOPMENT_APPLICATION_ID__", "__DATA_FOLDER__",
-        "__WINDOWS_DEVICE_FOLDER__", "__MACOS_DEVICE_FOLDER__", "__LINUX_DEVICE_FOLDER__", "__DATA_DIRECTORY_VARIABLE__"
+        "__WINDOWS_DEVICE_FOLDER__", "__MACOS_DEVICE_FOLDER__", "__LINUX_DEVICE_FOLDER__", "__DATA_DIRECTORY_VARIABLE__", "__ICONS_FOLDER__"
       ]);
       assert.deepEqual(product.literals, [
         "Fixture Studio", "org.fixtureworks.studio", "org.fixtureworks.studio.development", ".fixtureworks/studio",
-        "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR"
+        "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons"
       ]);
+    });
+
+    test("each checkout gets its own stable development application ID, the same when reached through a link", async t => {
+      const first = await RepositoryFixture.createAsync();
+      const second = await RepositoryFixture.createAsync();
+      t.after(() => Promise.all([first.disposeAsync(), second.disposeAsync()]));
+      const link = path.join(path.dirname(first.directory), "link");
+      await symlink(first.directory, link, "junction");
+      const product = ProductIdentity.fromManifest(ProductIdentityFixture.manifest());
+
+      const id = product.formatDevelopmentApplicationId(first.directory);
+
+      assert.match(id, /^org\.fixtureworks\.studio\.development\.[0-9a-f]{8}$/);
+      assert.equal(product.formatDevelopmentApplicationId(path.join(first.directory, "..", "repository")), id);
+      assert.equal(product.formatDevelopmentApplicationId(link), id);
+      assert.notEqual(product.formatDevelopmentApplicationId(second.directory), id);
     });
 
     test("the same device folder on several systems is one literal", () => {

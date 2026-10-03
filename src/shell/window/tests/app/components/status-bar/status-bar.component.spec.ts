@@ -35,6 +35,7 @@ describe("StatusBarComponent", () => {
 
     expect([...bar.children].map(t => t.className)).toEqual(["tr-status-bar-side tr-status-bar-left", "tr-status-bar-side tr-status-bar-right"]);
     expect(bar.textContent).toBe("");
+    expect(bar.getAttribute("data-tr-chrome")).toBe("bottom");
   });
 
   for (const mode of AppearanceFixture.modes)

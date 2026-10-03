@@ -8,7 +8,8 @@
 
 :host {
   display: flex;
-  align-self: stretch;
+  align-self: center;
+  height: var(--tr-status-bar-item-height);
 }
 
 .tr-module-failures-item {

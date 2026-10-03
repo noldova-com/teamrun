@@ -27,6 +27,7 @@ import type { StartupState } from "../models/startup-state.js";
 import { WindowAppearance } from "../models/window-appearance.js";
 import { WindowState } from "../models/window-state.js";
 import { Resources } from "../resources.js";
+import { AppIcons } from "./app-icons.js";
 import { ApplicationMenu } from "./application-menu.js";
 import { DeviceIdentity } from "./device-identity.js";
 import { OpenWindow } from "./open-window.js";
@@ -40,6 +41,8 @@ export class DesktopApplication {
   private readonly process: IDesktopProcess;
   private readonly settings: DesktopSettings;
   private readonly taskbar: TaskbarIdentity;
+  private readonly isPackaged: boolean;
+  private readonly icons: AppIcons;
   private readonly dataDirectory: DataDirectory;
   private readonly policy: SenderPolicy;
   private readonly factory: WindowFactory;
@@ -56,15 +59,18 @@ export class DesktopApplication {
     taskbar: TaskbarIdentity,
     dataDirectory: DataDirectory,
     launcher: IRuntimeLauncher,
-    readDeviceAsync: (folder: string) => Promise<string>) {
+    readDeviceAsync: (folder: string) => Promise<string>,
+    icons: AppIcons) {
     this.electron = electron;
     this.readDeviceAsync = readDeviceAsync;
     this.process = process;
     this.settings = settings;
     this.taskbar = taskbar;
+    this.isPackaged = DesktopApplication.isPackagedBuild(electron, process);
+    this.icons = icons;
     this.dataDirectory = dataDirectory;
     this.policy = new SenderPolicy(settings.windowUrl);
-    this.factory = new WindowFactory(settings, this.policy, electron, taskbar);
+    this.factory = new WindowFactory(settings, this.policy, electron, taskbar, icons);
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t));
   }
 
@@ -75,8 +81,9 @@ export class DesktopApplication {
     createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>): void {
     const moduleDirectory = dirname(fileURLToPath(moduleUrl));
+    const isPackaged = DesktopApplication.isPackagedBuild(electron, process);
     const dataDirectory = DataDirectoryLocator.locate(
-      electron.app.isPackaged,
+      isPackaged,
       process.env,
       process.homeFolder,
       join(moduleDirectory, ...Resources.repositoryRootSegments),
@@ -89,14 +96,18 @@ export class DesktopApplication {
       RuntimeEntry.entryPath,
       { ...process.env, [Resources.runAsNodeVariable]: Resources.runAsNodeValue },
       process.platform);
-    const taskbar = TaskbarIdentity.create(electron.app.isPackaged, process.execPath, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
-    new DesktopApplication(electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, createLauncher(launchSettings), readDeviceAsync).run();
+    const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
+    const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform, electron.theme);
+    new DesktopApplication(
+      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, createLauncher(launchSettings), readDeviceAsync, icons).run();
   }
 
   private run(): void {
     const app = this.electron.app;
     app.setName(Resources.applicationName);
     app.setAppUserModelId(this.taskbar.appId);
+    if (this.settings.platform === Resources.linuxPlatform)
+      app.setDesktopName(`${this.taskbar.appId}${Resources.desktopFileSuffix}`);
     if (!app.requestSingleInstanceLock()) {
       app.quit();
       return;
@@ -111,6 +122,7 @@ export class DesktopApplication {
   private ready(): void {
     const session = this.electron.session.defaultSession;
     ApplicationMenu.install(this.electron.menu, this.settings);
+    this.electron.app.dock?.setIcon(this.icons.dock);
     const deviceFolder = DesktopApplication.readArgument(this.process.argv, Resources.deviceDirectoryArgument)
       ?? DeviceIdentity.locateFolder(this.process.platform, this.process.env, this.process.homeFolder);
     this.device = this.readDeviceAsync(deviceFolder).catch((error: unknown) => {
@@ -252,7 +264,7 @@ export class DesktopApplication {
   }
 
   private handOver(handover: RuntimeHandover): boolean {
-    if (!this.electron.app.isPackaged)
+    if (!this.isPackaged)
       return false;
     this.process.startDetached(handover.executablePath);
     this.electron.app.quit();
@@ -323,6 +335,10 @@ export class DesktopApplication {
     catch {
       return undefined;
     }
+  }
+
+  private static isPackagedBuild(electron: IElectron, process: IDesktopProcess): boolean {
+    return electron.app.isPackaged && !process.isDefaultApp;
   }
 
   private static readArgument(argv: readonly string[], prefix: string): string | undefined {

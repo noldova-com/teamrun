@@ -8,12 +8,10 @@
 
 import { bootstrapApplication } from "@angular/platform-browser";
 
-import { KitProviders } from "@noldova/teamrun-shell-ui";
-
 import { windowPartSources } from "../../../generated/window-parts";
 import { WindowComponent } from "./app/components/window/window.component";
 import { WindowPartTokens } from "./app/models/window-part-tokens";
 import { Resources } from "./resources";
 
 document.title = Resources.productName;
-await bootstrapApplication(WindowComponent, { providers: [...KitProviders.providers, { provide: WindowPartTokens.sources, useValue: windowPartSources }] });
+await bootstrapApplication(WindowComponent, { providers: [{ provide: WindowPartTokens.sources, useValue: windowPartSources }] });

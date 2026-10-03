@@ -34,7 +34,7 @@ import { Resources } from "../../../resources";
   styleUrl: "./module-failures-popover.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    "class": "tr-module-failures-popover",
+    "class": "tr-module-failures-popover tr-scroll-reveal",
     "role": "dialog",
     "tabindex": "-1",
     "[attr.aria-label]": "resources.moduleFailuresTitle"

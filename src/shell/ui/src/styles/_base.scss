@@ -35,6 +35,15 @@ body {
   line-height: var(--tr-line-panel);
 }
 
+:where(h1, h2, h3, h4, h5, h6) {
+  line-height: 1.25;
+}
+
+:where(h1) {
+  font-size: var(--tr-text-heading);
+  line-height: var(--tr-line-heading);
+}
+
 .material-symbols-rounded {
   width: 1em;
   height: 1em;

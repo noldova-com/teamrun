@@ -7,7 +7,7 @@
  */
 
 import { type ChildProcess, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -19,6 +19,7 @@ import ErrorOutputClassifier from "./error-output.classifier.ts";
 
 export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
+  private static readonly EXECUTABLE_RECORD: string = path.resolve("_build", "development-app", "path.txt");
   private static readonly VIEWPORT_WIDTH: number = 1920;
   private static readonly VIEWPORT_HEIGHT: number = 1080;
   private static readonly LAUNCH_ARGUMENTS: readonly string[] = ["--disable-gpu", "--disable-software-rasterizer"];
@@ -116,15 +117,13 @@ export default class DesktopApplicationFixture {
   }
 
   public async useSuiteViewportAsync(): Promise<void> {
+    await this.useViewportAsync(DesktopApplicationFixture.VIEWPORT_WIDTH, DesktopApplicationFixture.VIEWPORT_HEIGHT);
+  }
+
+  public async useViewportAsync(width: number, height: number): Promise<void> {
     const session = await this.window.context().newCDPSession(this.window);
-    await session.send("Emulation.setDeviceMetricsOverride", {
-      width: DesktopApplicationFixture.VIEWPORT_WIDTH,
-      height: DesktopApplicationFixture.VIEWPORT_HEIGHT,
-      deviceScaleFactor: 1,
-      mobile: false
-    });
-    await expect.poll(() => this.window.evaluate(() => [innerWidth, innerHeight, devicePixelRatio]))
-      .toEqual([DesktopApplicationFixture.VIEWPORT_WIDTH, DesktopApplicationFixture.VIEWPORT_HEIGHT, 1]);
+    await session.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+    await expect.poll(() => this.window.evaluate(() => [innerWidth, innerHeight, devicePixelRatio])).toEqual([width, height, 1]);
   }
 
   public async checkpointAsync(name: string): Promise<Buffer> {
@@ -173,6 +172,7 @@ export default class DesktopApplicationFixture {
 
   private async startAsync(): Promise<void> {
     const application = await _electron.launch({
+      executablePath: await readFile(DesktopApplicationFixture.EXECUTABLE_RECORD, "utf8"),
       args: [
         DesktopApplicationFixture.MAIN,
         `--data-dir=${this.dataDirectory}`,

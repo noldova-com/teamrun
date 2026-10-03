@@ -64,7 +64,7 @@ async function describePlacesAsync(window: Page): Promise<readonly unknown[]> {
 }
 
 async function closeMenusAsync(window: Page): Promise<void> {
-  await expect(window.locator(".mat-mdc-menu-panel")).toHaveCount(0);
+  await expect(window.locator(".cdk-overlay-container tr-menu")).toHaveCount(0);
 }
 
 async function describeGroupsAsync(window: Page): Promise<readonly (readonly [string | null, readonly string[]])[]> {

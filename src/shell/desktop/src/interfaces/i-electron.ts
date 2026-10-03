@@ -16,6 +16,7 @@ import type { IIpcHost } from "./i-ipc-host.js";
 import type { IMenuHost } from "./i-menu-host.js";
 import type { ISessionHost } from "./i-session-host.js";
 import type { IShellHost } from "./i-shell-host.js";
+import type { IThemeHost } from "./i-theme-host.js";
 
 export interface IElectron {
   readonly app: IApplicationHost;
@@ -25,6 +26,7 @@ export interface IElectron {
   readonly menu: IMenuHost;
   readonly clipboard: IClipboardHost;
   readonly shell: IShellHost;
+  readonly theme: IThemeHost;
 
   createWindow(options: BrowserWindowConstructorOptions): IDesktopWindow;
 }

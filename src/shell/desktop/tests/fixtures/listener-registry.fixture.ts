@@ -13,6 +13,10 @@ export class ListenerRegistry {
     this.listeners.set(name, [...this.listeners.get(name) ?? [], listener as (...values: unknown[]) => unknown]);
   }
 
+  public remove(name: string, listener: (...values: never[]) => unknown): void {
+    this.listeners.set(name, (this.listeners.get(name) ?? []).filter(t => t !== listener));
+  }
+
   public count(name: string): number {
     return this.listeners.get(name)?.length ?? 0;
   }

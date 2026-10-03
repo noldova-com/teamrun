@@ -1,0 +1,7 @@
+@if (icon(); as glyph) {
+  <span class="tr-menu-item-icon material-symbols-rounded" aria-hidden="true">{{ glyph }}</span>
+}
+<span class="tr-menu-item-label" data-truncates>{{ label() }}</span>
+@if (hasSubmenu) {
+  <span class="tr-menu-item-chevron material-symbols-rounded" aria-hidden="true">{{ resources.submenuGlyph }}</span>
+}

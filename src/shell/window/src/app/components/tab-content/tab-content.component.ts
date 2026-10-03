@@ -24,7 +24,10 @@ import { ModuleFailureCardComponent } from "../module-failure-card/module-failur
   imports: [NgComponentOutlet],
   templateUrl: "./tab-content.component.html",
   styleUrl: "./tab-content.component.scss",
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    "class": "tr-scroll-reveal"
+  }
 })
 export class TabContentComponent {
   private readonly host: WindowPartHostService = inject(WindowPartHostService);

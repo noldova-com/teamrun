@@ -82,7 +82,7 @@ test.describe("modules", () => {
       const card = style(".tr-module-failure-card");
       return {
         isDark: matchMedia("(prefers-color-scheme: dark)").matches,
-        item: { padding: [item.paddingLeft, item.paddingRight], radius: item.borderTopLeftRadius, background: item.backgroundColor, color: item.color, isRight: (document.querySelector("tr-module-failures") as Element).closest(".tr-status-bar-right") !== null },
+        item: { height: item.height, padding: [item.paddingLeft, item.paddingRight], radius: item.borderTopLeftRadius, background: item.backgroundColor, color: item.color, isRight: (document.querySelector("tr-module-failures") as Element).closest(".tr-status-bar-right") !== null },
         icon: { color: style(".tr-module-failures-icon").color, size: style(".tr-module-failures-icon").fontSize },
         card: { border: card.borderTopWidth, borderColor: card.borderTopColor, radius: card.borderTopLeftRadius, background: card.backgroundColor, padding: card.paddingTop },
         cardIcon: style(".tr-module-failure-card-icon").color,
@@ -90,7 +90,7 @@ test.describe("modules", () => {
       };
     });
     const palette = look.isDark ? colors.dark : colors.light;
-    expect(look.item).toEqual({ padding: ["6px", "6px"], radius: "3px", background: "rgba(0, 0, 0, 0)", color: look.barColor, isRight: true });
+    expect(look.item).toEqual({ height: "20px", padding: ["6px", "6px"], radius: "3px", background: "rgba(0, 0, 0, 0)", color: look.barColor, isRight: true });
     expect(look.icon).toEqual({ color: palette.error, size: "16px" });
     expect(look.card).toEqual({ border: "1px", borderColor: palette.cardBorder, radius: "6px", background: palette.raised, padding: "12px" });
     expect(look.cardIcon).toBe(palette.error);
@@ -106,6 +106,9 @@ test.describe("modules", () => {
       return { width: style.width, border: style.borderTopWidth, borderColor: style.borderTopColor, radius: style.borderTopLeftRadius, background: style.backgroundColor, hasShadow: style.boxShadow !== "none" };
     });
     expect(surface).toEqual({ width: "440px", border: "1px", borderColor: palette.menuBorder, radius: "8px", background: palette.menu, hasShadow: true });
+    const [placed, anchor] = await Promise.all([popover, item].map(t => t.evaluate(u => u.getBoundingClientRect().toJSON() as Record<string, number>)));
+    expect(Math.round((anchor?.["top"] ?? 0) - (placed?.["bottom"] ?? 0))).toBe(8);
+    expect(Math.abs((anchor?.["right"] ?? 0) - (placed?.["right"] ?? 0))).toBeLessThan(1);
     await desktop.checkpointAsync("module-failures");
 
     await popover.getByRole("button", { name: "Copy details" }).click();

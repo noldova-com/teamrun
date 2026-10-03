@@ -106,7 +106,7 @@ class PackageBuilderTests {
       assert.deepEqual(
         [...stamped.matchAll(/value\d+ = "([^"]*)";/g)].map(t => t[1]),
         ["Fixture Studio", "fixture-studio", "org.fixtureworks.studio", "org.fixtureworks.studio.development", ".fixtureworks/studio",
-          "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR"]);
+          "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons"]);
       assert.doesNotMatch(stamped, /__[A-Z_]+__/);
     });
 

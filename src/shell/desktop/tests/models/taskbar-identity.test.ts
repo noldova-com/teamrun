@@ -5,6 +5,7 @@
  * This source code is licensed under the license found in the
  * LICENSE file in the root directory of this source tree.
  */
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
@@ -41,16 +42,31 @@ export class TaskbarIdentityTests {
   public relaunchesADevelopmentBuildWithItsMainScriptMadeAbsoluteUnderItsOwnAppId(): void {
     const identity = TaskbarIdentity.create(false, TaskbarIdentityTests.PROGRAM, "main.js", [], TaskbarIdentityTests.WORK);
     const command = `"${TaskbarIdentityTests.PROGRAM}" "${path.join(TaskbarIdentityTests.WORK, "main.js")}"`;
+    const checkout = path.resolve(TaskbarIdentityTests.WORK, "..", "..", "..");
+    const appId = `com.noldova.teamrun.development.${createHash("sha256").update(checkout).digest("hex").slice(0, 8)}`;
 
-    Assert.areEqual("com.noldova.teamrun.development", identity.appId);
+    Assert.areEqual(appId, identity.appId);
     Assert.areEqual(command, identity.relaunchCommand);
     Assert.areEqual(JSON.stringify({
-      appId: "com.noldova.teamrun.development",
+      appId,
       appIconPath: TaskbarIdentityTests.PROGRAM,
       appIconIndex: 0,
       relaunchCommand: command,
       relaunchDisplayName: "TeamRun"
     }), JSON.stringify(identity.toAppDetails()));
+  }
+
+  @TestMethod
+  public givesEachCheckoutItsOwnDevelopmentAppIdAndAPackagedBuildThePlainOne(): void {
+    const appId = (checkout: string, isPackaged: boolean = false): string =>
+      TaskbarIdentity.create(isPackaged, TaskbarIdentityTests.PROGRAM, path.join(checkout, "node_modules", "@noldova", "teamrun-shell-desktop", "main.js"), [], TaskbarIdentityTests.WORK).appId;
+    const first = path.resolve("lanes", "first");
+
+    Assert.isTrue(/^com\.noldova\.teamrun\.development\.[0-9a-f]{8}$/.test(appId(first)));
+    Assert.areEqual(appId(first), appId(path.join(first, "..", "first")));
+    Assert.areNotEqual(appId(first), appId(path.resolve("lanes", "second")));
+    Assert.areEqual("com.noldova.teamrun", appId(first, true));
+    Assert.areEqual("com.noldova.teamrun", appId(path.resolve("lanes", "second"), true));
   }
 
   @TestMethod
