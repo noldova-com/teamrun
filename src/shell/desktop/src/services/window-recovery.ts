@@ -104,13 +104,24 @@ export class WindowRecovery {
     if (this.open.window.isDestroyed())
       return;
     const processId = this.open.window.webContents.getOSProcessId();
+    if (processId <= 0 || processId === this.process.processId) {
+      this.log.write(Resources.formatNoRendererToEnd(processId));
+      this.reloadWithoutStop();
+      return;
+    }
     try {
       this.process.endProcess(processId);
       this.log.write(Resources.formatRendererEnded(processId));
     }
     catch (failure) {
       this.log.write(Resources.formatRendererNotEnded(String(failure)));
+      this.reloadWithoutStop();
     }
+  }
+
+  private reloadWithoutStop(): void {
+    this.isCrashingToReload = false;
+    this.reload();
   }
 
   private stopEndTimer(): void {

@@ -101,6 +101,11 @@ export interface IDesktopProcess {
   readonly errorOutput: Writable;
 
   /**
+   * The desktop's own process id, which it never ends.
+   */
+  readonly processId: number;
+
+  /**
    * Starts another program, detached, for the hand-over to a newer build.
    *
    * @param executablePath The program.
@@ -2060,7 +2065,8 @@ export declare class OpenWindow {
  * a gone page offers Reload or Quit, or the log folder and Quit when it went again soon after a reload, so a page that
  * fails while loading never becomes a loop; a page that stops responding offers Wait or Reload once per episode, and the
  * box closes when the page responds again. Reload ends the page's renderer and reloads once it has gone; a renderer that
- * has not gone within a limit has its process ended.
+ * has not gone within a limit has its process ended, and a page with no renderer process of its own to end, or whose
+ * process cannot be ended, is reloaded at once.
  */
 export declare class WindowRecovery {
   /**

@@ -21,6 +21,7 @@ export class FakeWindowContents implements IWindowContents {
   public readonly sent: unknown[][] = [];
   public loading: boolean = false;
   public crashed: boolean = false;
+  public osProcessId: number = 4242;
   public readonly calls: string[] = [];
 
   public constructor(id: number) {
@@ -57,7 +58,7 @@ export class FakeWindowContents implements IWindowContents {
   }
 
   public getOSProcessId(): number {
-    return 4242;
+    return this.osProcessId;
   }
 
   public goAway(reason: string, exitCode: number = 0): void {

@@ -29,6 +29,7 @@ export class FakeDesktopProcess implements IDesktopProcess {
   });
   public readonly started: string[] = [];
   public readonly ended: number[] = [];
+  public readonly processId: number = 1000;
   public endFailure: Error | null = null;
 
   public constructor(platform: string, argv: readonly string[] = [], env: NodeJS.ProcessEnv = {}, homeFolder: string = "/home/person") {

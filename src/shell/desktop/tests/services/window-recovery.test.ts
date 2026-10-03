@@ -218,9 +218,33 @@ export class WindowRecoveryTests {
     closed.window.destroy();
     await delay(40);
 
-    Assert.areEqual("The window's page did not stop when asked, and its process could not be ended: Error: No such process.", failing.log.lines.at(-1));
+    Assert.areEqual("The window's page did not stop when asked, and its process could not be ended, so the desktop reloads it: Error: No such process.", failing.log.lines.at(-1));
+    Assert.areEqual(JSON.stringify(["crash", "reload"]), JSON.stringify(failing.window.webContents.calls));
     Assert.areEqual(0, closed.process.ended.length);
+    Assert.areEqual(JSON.stringify(["crash"]), JSON.stringify(closed.window.webContents.calls));
     Assert.areEqual(JSON.stringify(["The window's page stopped responding.", "The person chose Reload."]), JSON.stringify(closed.log.lines));
+  }
+
+  @TestMethod
+  public async neverEndsProcessZeroOrTheDesktopItselfAndReloadsInstead(): Promise<void> {
+    const none = new Recovered([1], 10_000, 20);
+    none.window.webContents.osProcessId = 0;
+    const own = new Recovered([1], 10_000, 20);
+    own.window.webContents.osProcessId = own.process.processId;
+
+    none.window.change("unresponsive");
+    own.window.change("unresponsive");
+    await Recovered.settleAsync();
+    await delay(40);
+    none.window.webContents.goAway("crashed", 5);
+    await Recovered.settleAsync();
+
+    Assert.areEqual(0, none.process.ended.length + own.process.ended.length);
+    Assert.areEqual("The window's page did not stop when asked and has no renderer process of its own to end (0), so the desktop reloads it.", none.log.lines[2]);
+    Assert.areEqual("The window's page did not stop when asked and has no renderer process of its own to end (1000), so the desktop reloads it.", own.log.lines.at(-1));
+    Assert.areEqual(JSON.stringify(["crash", "reload"]), JSON.stringify(none.window.webContents.calls));
+    Assert.areEqual(JSON.stringify([WindowRecoveryTests.NOT_RESPONDING, WindowRecoveryTests.STOPPED_AGAIN]), JSON.stringify(none.boxes));
+    Assert.areEqual(JSON.stringify(["crash", "reload"]), JSON.stringify(own.window.webContents.calls));
   }
 
   @TestMethod

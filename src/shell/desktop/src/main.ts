@@ -48,6 +48,7 @@ DesktopApplication.start(
     workingDirectory: process.cwd(),
     isDefaultApp: process.defaultApp === true,
     errorOutput: process.stderr,
+    processId: process.pid,
     startDetached: t => spawn(t, [], { detached: true, stdio: "ignore" }).unref(),
     endProcess: t => process.kill(t, "SIGKILL")
   },

@@ -220,8 +220,12 @@ export class Resources {
     return `The window's page did not stop when asked, so the desktop ended its process ${processId}.`;
   }
 
+  public static formatNoRendererToEnd(processId: number): string {
+    return `The window's page did not stop when asked and has no renderer process of its own to end (${processId}), so the desktop reloads it.`;
+  }
+
   public static formatRendererNotEnded(reason: string): string {
-    return `The window's page did not stop when asked, and its process could not be ended: ${reason}`;
+    return `The window's page did not stop when asked, and its process could not be ended, so the desktop reloads it: ${reason}`;
   }
 
   public static formatRecoveryChoice(choice: string): string {
