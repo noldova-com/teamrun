@@ -47,7 +47,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
   private readonly activations: WindowPartActivation[] = [];
-  private readonly pendingOpens: PendingDocument[] = [];
+  private pendingOpens: PendingDocument[] = [];
   private moduleOrder: readonly string[] = [];
   private runtimeCommands: readonly CommandContribution[] = [];
   private readonly failuresValue: WritableSignal<readonly ModuleFailure[]> = signal([]);
@@ -86,11 +86,18 @@ export class WindowPartHostService implements IWindowPartHost {
     return this.bridge.onEvent(listener);
   }
 
-  public openDocument(moduleId: string, name: string, instance: string, title: string): void {
+  public openDocument(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
     if (this.isLayoutLoaded)
-      this.opener.open(moduleId, name, instance, title);
+      this.opener.open(moduleId, name, instance, title, isPreview);
     else
-      this.pendingOpens.push(new PendingDocument(moduleId, name, instance, title));
+      this.pendingOpens.push(new PendingDocument(moduleId, name, instance, title, isPreview));
+  }
+
+  public keepDocument(moduleId: string, name: string, instance: string): void {
+    if (this.isLayoutLoaded)
+      this.opener.keep(moduleId, name, instance);
+    else
+      this.pendingOpens = this.pendingOpens.map(t => t.kept(moduleId, name, instance));
   }
 
   public isCommandRegistered(name: string): boolean {
@@ -168,7 +175,7 @@ export class WindowPartHostService implements IWindowPartHost {
 
   private openPending(pending: PendingDocument): void {
     try {
-      this.opener.open(pending.moduleId, pending.name, pending.instance, pending.title);
+      this.opener.open(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
     }
     catch (error) {
       this.errors.handleError(error);

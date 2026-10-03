@@ -171,12 +171,14 @@ describe("TabComponent", () => {
     expect(getComputedStyle(part(".tr-tab-close") ?? tab()).visibility).toBe("visible");
   });
 
-  it("shows a preview in italic", () => {
+  it("shows a preview in italic and describes it as a preview", () => {
     expect(getComputedStyle(part(".tr-tab-label") ?? tab()).fontStyle).toBe("normal");
+    expect(tab().hasAttribute("aria-description")).toBe(false);
 
     update(() => host.preview.set(true));
 
     expect(getComputedStyle(part(".tr-tab-label") ?? tab()).fontStyle).toBe("italic");
+    expect(tab().getAttribute("aria-description")).toBe("Preview");
   });
 
   it("keeps a visible focus outline after keyboard focus", async () => {

@@ -10,6 +10,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 
 import { WindowPartAccessException } from "../exceptions/window-part-access.exception";
 import type { IWindowPartContext } from "../interfaces/i-window-part-context";
+import type { IDocumentOptions } from "../interfaces/i-document-options";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
 import type { CommandContribution } from "./command-contribution";
 import type { DocumentContribution } from "./document-contribution";
@@ -73,9 +74,14 @@ export class WindowPartContext implements IWindowPartContext {
     return this.host.runCommandAsync(name, commandArguments);
   }
 
-  public openDocument(name: string, instance: string, title: string): void {
+  public openDocument(name: string, instance: string, title: string, options: IDocumentOptions = {}): void {
     this.requireOwn(name);
-    this.host.openDocument(this.moduleId, name, instance, title);
+    this.host.openDocument(this.moduleId, name, instance, title, options.preview === true);
+  }
+
+  public keepDocument(name: string, instance: string): void {
+    this.requireOwn(name);
+    this.host.keepDocument(this.moduleId, name, instance);
   }
 
   public async requestAsync(method: string, parameters: JsonValue): Promise<JsonValue> {

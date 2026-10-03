@@ -14,8 +14,8 @@ import type { Tab } from "./tab";
 import { TabGroup } from "./tab-group";
 
 export class DocumentGroup extends TabGroup {
-  public constructor(tabs: readonly Tab[], active: Tab | null) {
-    super(Resources.documentsGroupId, tabs, active);
+  public constructor(tabs: readonly Tab[], active: Tab | null, preview: Tab | null = null) {
+    super(Resources.documentsGroupId, tabs, active, preview);
   }
 
   public static createEmpty(): DocumentGroup {
@@ -38,8 +38,8 @@ export class DocumentGroup extends TabGroup {
     return { ...super.toJson(), [Resources.documentsField]: true };
   }
 
-  protected override copy(tabs: readonly Tab[], active: Tab | null): TabGroup {
-    return new DocumentGroup(tabs, active);
+  protected override copy(tabs: readonly Tab[], active: Tab | null, preview: Tab | null): TabGroup {
+    return new DocumentGroup(tabs, active, preview);
   }
 
   protected override emptied(): TabGroup {

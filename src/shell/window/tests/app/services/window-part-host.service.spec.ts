@@ -247,9 +247,27 @@ describe("WindowPartHostService", () => {
     const { host, layout } = start([source("notes", part)], [status("notes")]);
 
     await vi.waitFor(() => expect(errors.length).toBe(1));
-    host.openDocument("notes", "notes.note", "3", "Note 3");
+    host.openDocument("notes", "notes.note", "3", "Note 3", false);
 
     expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1"), new DocumentTab("notes.note", "3")]);
+  });
+
+  it("keeps a preview asked to be kept before the layout loads, and keeps one at once afterwards", async () => {
+    const part = new FakeWindowPart("notes", log, t => {
+      t.registerDocument(new DocumentContribution("notes.note", load));
+      t.openDocument("notes.note", "0", "Note 0");
+      t.openDocument("notes.note", "1", "Note 1", { preview: true });
+      t.keepDocument("notes.note", "1");
+      t.openDocument("notes.note", "2", "Note 2", { preview: true });
+    });
+    const { host, layout } = start([source("notes", part)], [status("notes")]);
+    await vi.waitFor(() => expect(layout.layout().documents.tabs.length).toBe(3));
+    const preview = layout.layout().documents.preview;
+
+    host.keepDocument("notes", "notes.note", "2");
+
+    expect(preview).toEqual(new DocumentTab("notes.note", "2"));
+    expect(layout.layout().documents.preview).toBeNull();
   });
 
   it("reports a layout that cannot load and still opens the documents asked for", async () => {

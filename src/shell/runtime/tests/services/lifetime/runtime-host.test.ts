@@ -23,6 +23,7 @@ import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 @TestClass
 export class RuntimeHostTests {
   private static readonly OTHER: BuildIdentity = new BuildIdentity(RuntimeBuild.identity.productVersion, BuildIdentity.supportedProtocolVersion, "other-build");
+  private static readonly MOVE_ASIDE_LIMIT: number = 15_000;
   private static readonly PART: string = [
     "import { mkdir, writeFile } from \"node:fs/promises\";",
     "import path from \"node:path\";",
@@ -121,11 +122,15 @@ export class RuntimeHostTests {
         new Request("desktop:1", new QualifiedName("notes", "open"), null),
         new Request("desktop:2", ShellMethods.moveAside, null),
         new Request("desktop:3", ShellMethods.moveAside, null));
-      const responses = [await refused.readResponseAsync(), await refused.readResponseAsync(), await refused.readResponseAsync()];
+      const responses = [
+        await refused.readResponseAsync(),
+        await refused.readResponseAsync(RuntimeHostTests.MOVE_ASIDE_LIMIT),
+        await refused.readResponseAsync(RuntimeHostTests.MOVE_ASIDE_LIMIT)
+      ];
       await refused.waitForCloseAsync();
       const [admitted, admission] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
       admitted.sendMessages(new Request("desktop:4", ShellMethods.moveAside, null));
-      const again = await admitted.readResponseAsync();
+      const again = await admitted.readResponseAsync(RuntimeHostTests.MOVE_ASIDE_LIMIT);
 
       Assert.areEqual(expected, JSON.stringify(answer.failure?.toJson()));
       Assert.areEqual(expected, JSON.stringify(responses[0]?.failure?.toJson()));
@@ -339,7 +344,7 @@ export class RuntimeHostTests {
 
       const [refused] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
       refused.sendMessages(new Request("desktop:1", ShellMethods.moveAside, null));
-      await refused.readResponseAsync();
+      await refused.readResponseAsync(RuntimeHostTests.MOVE_ASIDE_LIMIT);
       await refused.waitForCloseAsync();
       const [admitted] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
       admitted.sendMessages(new Request("desktop:2", new QualifiedName("notes", "echo"), "after"));
@@ -347,6 +352,24 @@ export class RuntimeHostTests {
 
       Assert.areEqual(0, before);
       Assert.areEqual("\"after\"", JSON.stringify(echoed.payload));
+    });
+  }
+
+  @TestMethod
+  public answersTheMoveAsideOfASlowRuntimeAfterTheOrdinaryReadDeadline(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const slow = RuntimeHostTests.PART.replace("async activateAsync(context) {", "async activateAsync(context) {\n    await new Promise(resolve => setTimeout(resolve, 3500));");
+      const declarations = await fixture.writeModulesAsync([["notes", slow]]);
+      await mkdir(fixture.dataDirectory.root, { recursive: true });
+      await writeFile(path.join(fixture.dataDirectory.root, "teamrun.db"), "old data");
+      await fixture.startAsync(30_000, declarations);
+
+      const [refused] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      refused.sendMessages(new Request("desktop:1", ShellMethods.moveAside, null));
+      await Assert.throwsAsync(() => refused.readResponseAsync(), Error);
+      const answered = await refused.readResponseAsync(RuntimeHostTests.MOVE_ASIDE_LIMIT);
+
+      Assert.isFalse(answered.hasFailed);
     });
   }
 
