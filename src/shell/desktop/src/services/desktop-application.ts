@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
-  DoNotDisturbChange, type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, Response, type RuntimeHandover, SettingChange, SettingKey,
+  type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, Response, type RuntimeHandover, SettingChange, SettingKey,
   ShellEvents, ShellMethods, WindowStateKey, WindowStateValue, WindowStateWrite
 } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
@@ -287,8 +287,8 @@ export class DesktopApplication {
       return DesktopApplication.fail(FailureCode.InvalidMessage, Resources.payloadNotJson);
     if (name.owner === Resources.shellOwner && !Resources.windowShellMethods.includes(name.text))
       return DesktopApplication.fail(FailureCode.Unauthorized, Resources.formatMethodRefused(name.text));
-    if (name.text === ShellMethods.notifications.text || name.text === ShellMethods.setDoNotDisturb.text)
-      return await this.requestForDeviceAsync(name, value);
+    if (name.text === ShellMethods.notifications.text)
+      return await this.readNotificationsAsync(name);
     if (Resources.deviceMethods.includes(name.text))
       return await this.requestSettingsForDeviceAsync(name, value);
     return (await this.callAsync(name, value)).toJson();
@@ -320,7 +320,7 @@ export class DesktopApplication {
     try {
       const broadcast = NotificationBroadcast.fromJson(event.payload);
       this.notifier.receive(broadcast);
-      return (Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.sequence) : broadcast.stateFor(this.knownDevice)).toJson();
+      return (Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.mutedModules, broadcast.sequence) : broadcast.stateFor(this.knownDevice)).toJson();
     }
     catch (error) {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
@@ -328,24 +328,14 @@ export class DesktopApplication {
     }
   }
 
-  private async requestForDeviceAsync(name: QualifiedName, value: JsonValue): Promise<JsonObject> {
+  private async readNotificationsAsync(name: QualifiedName): Promise<JsonObject> {
     const epoch = this.notifier.epoch;
     const device = await this.device;
     if (Object.isNull(device))
       return DesktopApplication.fail(FailureCode.Unavailable, Resources.deviceNotIdentified);
-    if (name.text === ShellMethods.notifications.text) {
-      const response = await this.callAsync(name, new NotificationsQuery(device).toJson());
-      this.beginNotifier(epoch, device, response);
-      return response.toJson();
-    }
-    let isOn: boolean;
-    try {
-      isOn = JsonReader.fromValue(value).readBoolean(Resources.isOnField);
-    }
-    catch (error) {
-      return DesktopApplication.fail(FailureCode.InvalidParams, String(error));
-    }
-    return (await this.callAsync(name, new DoNotDisturbChange(device, isOn).toJson())).toJson();
+    const response = await this.callAsync(name, new NotificationsQuery(device).toJson());
+    this.beginNotifier(epoch, device, response);
+    return response.toJson();
   }
 
   private async callAsync(method: QualifiedName, payload: JsonValue): Promise<Response> {

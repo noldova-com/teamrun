@@ -90,6 +90,7 @@ export { ModuleContext } from "../services/modules/module-context.js";
 export { ModuleDeclarationReader } from "../services/modules/module-declaration.reader.js";
 export { ModuleHost } from "../services/modules/module-host.js";
 export { NotificationCenter } from "../services/notifications/notification-center.js";
+export { NotificationSettings } from "../services/notifications/notification-settings.js";
 export { NotificationPolicy } from "../services/notifications/notification-policy.js";
 export { PackageRuntimePartLoader } from "../services/modules/package-runtime-part-loader.js";
 export { OwnershipLock } from "../services/ownership/ownership-lock.js";

@@ -20,7 +20,7 @@ import { ToastService } from "../../../src/app/services/toast.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 
 class FakeNotificationService {
-  public readonly stateValue: WritableSignal<NotificationState> = signal(new NotificationState([], false, 0));
+  public readonly stateValue: WritableSignal<NotificationState> = signal(new NotificationState([], false, [], 0));
   public readonly firstReadValue: WritableSignal<NotificationState | null> = signal(null);
   public readonly state = this.stateValue.asReadonly();
   public readonly firstRead = this.firstReadValue.asReadonly();
@@ -40,7 +40,7 @@ describe("ToastService", () => {
   const latest = (list: readonly Notification[]): number => Math.max(0, ...list.map(t => t.sequence));
 
   function start(...existing: Notification[]): ToastService {
-    const state = new NotificationState(existing, false, latest(existing));
+    const state = new NotificationState(existing, false, [], latest(existing));
     notifications.stateValue.set(state);
     notifications.firstReadValue.set(state);
     const service = TestBed.inject(ToastService);
@@ -49,7 +49,7 @@ describe("ToastService", () => {
   }
 
   function post(isQuiet: boolean, ...list: Notification[]): void {
-    notifications.stateValue.set(new NotificationState(list, isQuiet, latest(list)));
+    notifications.stateValue.set(new NotificationState(list, isQuiet, [], latest(list)));
     TestBed.tick();
   }
 
@@ -85,7 +85,7 @@ describe("ToastService", () => {
     post(false, notification(2, "notes.saved"), notification(1, "clock.alarm"));
     post(false, notification(3, "notes.moved"), notification(2, "notes.saved"), notification(1, "clock.alarm"));
 
-    notifications.firstReadValue.set(new NotificationState([notification(2, "notes.saved"), notification(1, "clock.alarm")], false, 2));
+    notifications.firstReadValue.set(new NotificationState([notification(2, "notes.saved"), notification(1, "clock.alarm")], false, [], 2));
     TestBed.tick();
 
     expect(shown(service)).toEqual([3]);
@@ -94,7 +94,7 @@ describe("ToastService", () => {
   it("counts from a new first read after the runtime restarts its sequence", () => {
     const service = start(notification(4, "clock.alarm", { severity: NotificationSeverity.Warning }));
 
-    notifications.firstReadValue.set(new NotificationState([], false, 0));
+    notifications.firstReadValue.set(new NotificationState([], false, [], 0));
     post(false);
     post(false, notification(1, "notes.saved", { severity: NotificationSeverity.Warning }));
 
@@ -111,6 +111,15 @@ describe("ToastService", () => {
     post(false, notification(3, "notes.read", { isRead: true }), notification(2, "notes.saved"), notification(1, "clock.alarm"));
 
     expect(shown(service)).toEqual([]);
+  });
+
+  it("toasts nothing from a muted module and still toasts the others", () => {
+    const service = start();
+
+    notifications.stateValue.set(new NotificationState([notification(2, "notes.saved"), notification(1, "clock.alarm")], false, ["clock"], 2));
+    TestBed.tick();
+
+    expect(shown(service)).toEqual([2]);
   });
 
   it("toasts at most one notification of a kind every five seconds", () => {
@@ -133,7 +142,7 @@ describe("ToastService", () => {
 
     post(false, ...list);
     const firstThree = shown(service);
-    notifications.stateValue.set(new NotificationState(list.filter(t => t.id !== 4), false, 5));
+    notifications.stateValue.set(new NotificationState(list.filter(t => t.id !== 4), false, [], 5));
     service.close(1);
     TestBed.tick();
 
@@ -231,15 +240,15 @@ describe("ToastService with the window parts", () => {
     TestBed.tick();
     await vi.waitFor(() => expect(isActivated).toBe(true));
 
-    bridge.responses.set("shell.notifications", { payload: { notifications: [wire(1, "Early")], isDoNotDisturb: false, sequence: 1 } });
-    bridge.publishEvent("shell.notifications", { notifications: [wire(1, "Early")], isDoNotDisturb: false, sequence: 1 });
+    bridge.responses.set("shell.notifications", { payload: { notifications: [wire(1, "Early")], isDoNotDisturb: false, mutedModules: [], sequence: 1 } });
+    bridge.publishEvent("shell.notifications", { notifications: [wire(1, "Early")], isDoNotDisturb: false, mutedModules: [], sequence: 1 });
     const readsBeforeAnswer = bridge.requests.filter(t => t[0] === "shell.notifications").length;
     answerPost({ payload: { id: 1 } });
     await vi.waitFor(() => {
       TestBed.tick();
       expect(TestBed.inject(NotificationService).firstRead()?.sequence).toBe(1);
     });
-    bridge.publishEvent("shell.notifications", { notifications: [wire(2, "Later"), wire(1, "Early")], isDoNotDisturb: false, sequence: 2 });
+    bridge.publishEvent("shell.notifications", { notifications: [wire(2, "Later"), wire(1, "Early")], isDoNotDisturb: false, mutedModules: [], sequence: 2 });
     TestBed.tick();
 
     expect(readsBeforeAnswer).toBe(0);

@@ -77,7 +77,12 @@ describe("SettingsComponent", () => {
       providers: [
         { provide: SettingsService, useValue: settings },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } },
-        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("clock", "Clock", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] }
+        {
+          provide: WindowPartTokens.sources, useValue: [
+            new WindowPartSource("clock", "Clock", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused"))),
+            new WindowPartSource("notes", "Notes", [], [], [], [], [], [], ["notes.saved"], () => Promise.reject(new Error("unused")))
+          ]
+        }
       ]
     });
     TestBed.inject(CommandService).setCommands([
@@ -105,6 +110,19 @@ describe("SettingsComponent", () => {
     });
     expect([texts("[aria-current=page]"), texts(".tr-settings-group-title"), texts(".tr-setting-row-title")]).toEqual([["Clock"], ["Words", "Ticks"], ["Greeting", "Tick step"]]);
     expect(markers).toEqual([true, false]);
+  });
+
+  it("lists only the modules that post notifications on Notifications, each checked while its notifications are on", async () => {
+    render();
+    await page.getByRole("button", { name: "Notifications", exact: true }).click();
+    fixture.detectChanges();
+    const row = element().querySelector("[data-setting='shell.mutedModules']") as HTMLElement;
+    const boxes = [...row.querySelectorAll<HTMLInputElement>("input[type=checkbox]")].map(t => [t.closest("tr-checkbox")?.querySelector(".tr-checkbox-text")?.textContent?.trim(), t.checked]);
+
+    await page.getByRole("checkbox", { name: "Notes notifications" }).click();
+
+    expect(boxes).toEqual([["Notes notifications", true]]);
+    expect(settings.calls).toEqual(["set shell.mutedModules [\"notes\"]"]);
   });
 
   it("returns to the first page when the chosen page goes away with its module", async () => {

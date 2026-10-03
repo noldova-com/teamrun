@@ -20,9 +20,9 @@ describe("NotificationService", () => {
   let errors: unknown[];
   let bridge: DesktopBridgeFixture;
 
-  const notification = (id: number, title: string, isRead: boolean): object =>
-    ({ id, sequence: id, post: { kind: "clock.alarm", title, severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead });
-  const state = (isDoNotDisturb: boolean, ...notifications: object[]): object => ({ notifications, isDoNotDisturb, sequence: notifications.length });
+  const notification = (id: number, title: string, isRead: boolean, kind: string = "clock.alarm"): object =>
+    ({ id, sequence: id, post: { kind, title, severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead });
+  const state = (isDoNotDisturb: boolean, ...notifications: object[]): object => ({ notifications, isDoNotDisturb, mutedModules: [], sequence: notifications.length });
 
   function start(): NotificationService {
     TestBed.configureTestingModule({ providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }] });
@@ -103,23 +103,35 @@ describe("NotificationService", () => {
     expect(service.firstRead()?.sequence).toBe(1);
   });
 
-  it("asks the runtime to mark read, clear, dismiss and switch Do not disturb, and reports a request that fails", async () => {
+  it("asks the runtime to mark read, clear and dismiss, sets Do not disturb, and reports the requests that fail", async () => {
     const service = start();
     await settleAsync(() => !Object.is(service.firstRead(), null));
     bridge.responses.set("shell.clearNotifications", { failure: { code: "Unavailable", message: "Not connected." } });
+    bridge.responses.set("shell.setSetting", { failure: { code: "Unavailable", message: "Not connected." } });
 
     service.markAllRead();
     service.clear();
     service.dismiss(7);
     service.setDoNotDisturb(true);
-    await vi.waitFor(() => expect(errors.length).toBe(1));
+    await vi.waitFor(() => expect(errors.length).toBe(2));
 
     expect(bridge.requests.slice(-4)).toEqual([
       ["shell.markNotificationsRead", null],
       ["shell.clearNotifications", null],
       ["shell.dismissNotification", { id: 7 }],
-      ["shell.setDoNotDisturb", { isOn: true }]
+      ["shell.setSetting", { name: "shell.doNotDisturb", value: true }]
     ]);
+  });
+
+  it("leaves a muted module's unread notifications out of the unread count while keeping them in the list", async () => {
+    bridge.responses.set("shell.notifications", {
+      payload: { ...state(false, notification(3, "Saved", false, "notes.saved"), notification(2, "Alarm", false), notification(1, "Read", true)), mutedModules: ["clock"] }
+    });
+    const service = start();
+
+    await settleAsync(() => service.state().notifications.length === 3);
+
+    expect(service.unreadCount()).toBe(1);
   });
 
   it("runs the open command of a notification opened from the operating system when it can run, and reports one that fails", async () => {
