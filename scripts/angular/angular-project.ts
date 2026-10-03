@@ -26,6 +26,7 @@ export default class AngularProject {
   private static readonly INSTALL_RECORD: string = "node_modules/.teamrun-install";
   private static readonly RECORD_ENCODING: BufferEncoding = "utf8";
   private static readonly OWN_SCOPE: string = "node_modules/@noldova";
+  private static readonly DEPENDENCY_CACHE: string = "node_modules/.vite";
   private static readonly CLI: string = "node_modules/@angular/cli/bin/ng.js";
   private static readonly PLAYWRIGHT_CLI: string = "node_modules/playwright/cli.js";
   private static readonly INSTALL_ARGUMENTS: readonly string[] = ["ci", "--no-audit", "--no-fund"];
@@ -61,6 +62,7 @@ export default class AngularProject {
     }
 
     await rm(path.join(this.directory, AngularProject.OWN_SCOPE), { recursive: true, force: true });
+    await rm(path.join(this.directory, AngularProject.DEPENDENCY_CACHE), { recursive: true, force: true });
     if (await this.needsInstallAsync()) {
       output.write(AngularProject.INSTALLING);
       const result = await this.npm.runAsync(AngularProject.INSTALL_ARGUMENTS, this.directory);
@@ -92,6 +94,7 @@ export default class AngularProject {
   public async testAsync(): Promise<AngularTestRun> {
     const report = path.join(this.root, ...AngularProject.REPORT_SEGMENTS);
     await rm(report, { force: true });
+    await rm(path.join(this.directory, AngularProject.DEPENDENCY_CACHE), { recursive: true, force: true });
     await mkdir(path.dirname(report), { recursive: true });
     const exitCode = await this.runner.runLoggedAsync(
       process.execPath,

@@ -75,6 +75,23 @@ class AngularProjectTests {
       assert.equal(otherCpu.captured.length, 1);
     });
 
+    test("preparing an installed project removes the test runner's pre-bundled dependencies, so no copy of an earlier build of TeamRun's packages survives", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      const stale = "src/node_modules/.vite/vitest/0123abcd/deps/@noldova_teamrun-shell-protocol.js";
+      await repository.writeAsync({
+        "src/node_modules/.teamrun-install": AngularProjectTests.formatRecord("{}\n"),
+        "src/node_modules/@angular/cli/bin/ng.js": "",
+        [stale]: "export class EarlierBuild {}\n"
+      });
+      const runner = new ProcessRunnerFixture();
+
+      await AngularProjectTests.create(repository, runner).prepareAsync(new TextOutputFixture());
+
+      assert.equal(runner.captured.length, 0);
+      assert.equal(existsSync(path.join(repository.directory, "src", "node_modules", ".vite")), false);
+      assert.equal(existsSync(path.join(repository.directory, "src", "node_modules", "@angular", "cli", "bin", "ng.js")), true);
+    });
+
     test("a project without its CLI is reinstalled", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
       await repository.writeAsync({ "src/node_modules/.teamrun-install": AngularProjectTests.formatRecord("{}\n") });
@@ -112,6 +129,22 @@ class AngularProjectTests {
       assert.deepEqual(reporting.runs, [[process.execPath, directory, path.join(directory, "node_modules", "@angular", "cli", "bin", "ng.js"), "test", "--reporters=default", "--reporters=json", "--output-file", report]]);
       assert.deepEqual(reporting.logs, [path.join(repository.directory, "_build", "angular-tests.log")]);
       assert.equal(AngularProject.LOG_FILE, "_build/angular-tests.log");
+    });
+
+    test("the tests start without the runner's pre-bundled dependencies, since the package check may have reinstalled TeamRun's packages since the build", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      await repository.writeAsync({ "src/node_modules/.vite/vitest/0123abcd/deps/@noldova_teamrun-shell-protocol.js": "export class EarlierBuild {}\n" });
+      let isCachePresent: boolean | null = null;
+      const runner = new class extends ProcessRunnerFixture {
+        public override runLoggedAsync(command: string, commandArguments: readonly string[], directory: string, log: string): Promise<number | null> {
+          isCachePresent = existsSync(path.join(directory, "node_modules", ".vite"));
+          return super.runLoggedAsync(command, commandArguments, directory, log);
+        }
+      }();
+
+      await AngularProjectTests.create(repository, runner).testAsync();
+
+      assert.equal(isCachePresent, false);
     });
 
     test("a report that is not JSON or lists no test files is refused", async t => {
