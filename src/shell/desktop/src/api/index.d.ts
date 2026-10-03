@@ -2302,6 +2302,26 @@ export declare class WindowStateException extends Exception {
 }
 
 /**
+ * The exception thrown when a window's state cannot be read or kept because the runtime cannot be reached: the desktop
+ * has no connection, or the connection failed. A refusal from the runtime is a {@link WindowStateException} instead.
+ */
+export declare class WindowStateUnavailableException extends WindowStateException {
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @param options The connection's failure, if any.
+   * @example
+   * ```ts
+   * import { WindowStateUnavailableException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: WindowStateUnavailableException = new WindowStateUnavailableException("TeamRun is not connected to its runtime.");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
  * Keeps one window's state, its bounds or its layout, in the shell's database through the runtime.
  */
 export declare class RuntimeWindowStateStore implements IWindowStateStore {
@@ -2328,7 +2348,8 @@ export declare class RuntimeWindowStateStore implements IWindowStateStore {
    * Reads the kept state.
    *
    * @returns A promise of the state, or `null` when none is kept.
-   * @throws WindowStateException as a rejection when there is no connection or the runtime refuses.
+   * @throws WindowStateUnavailableException as a rejection when the runtime cannot be reached.
+   * @throws WindowStateException as a rejection when the runtime refuses.
    * @throws JsonException as a rejection when the runtime's answer is not a window state.
    * @example
    * ```ts
@@ -2347,7 +2368,8 @@ export declare class RuntimeWindowStateStore implements IWindowStateStore {
    *
    * @param value The state.
    * @returns A promise that settles once the runtime kept it.
-   * @throws WindowStateException as a rejection when there is no connection or the runtime refuses.
+   * @throws WindowStateUnavailableException as a rejection when the runtime cannot be reached.
+   * @throws WindowStateException as a rejection when the runtime refuses.
    * @example
    * ```ts
    * import type { RuntimeWindowStateStore } from "@noldova/teamrun-shell-desktop";
@@ -2462,7 +2484,8 @@ export declare class WindowBoundsKeeper {
 
   /**
    * Saves the window's current bounds at once, cancelling a pending save; does nothing before a store is set or
-   * after the window is gone.
+   * after the window is gone. Bounds that could not be kept stay unsaved for {@link WindowBoundsKeeper.saveUnsavedAsync}.
+   * A save after a move or resize that finds the runtime unreachable keeps the bounds unsaved without reporting it.
    *
    * @returns A promise that settles once the bounds are kept.
    * @throws The store's failure as a rejection.
@@ -2476,6 +2499,23 @@ export declare class WindowBoundsKeeper {
    * ```
    */
   public saveAsync(): Promise<void>;
+
+  /**
+   * Saves the window's newest bounds when an earlier save could not keep them, for example while the runtime was
+   * unreachable; does nothing otherwise.
+   *
+   * @returns A promise that settles once the bounds are kept, or at once when nothing is unsaved.
+   * @throws The store's failure as a rejection.
+   * @example
+   * ```ts
+   * import type { WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function catchUpAsync(keeper: WindowBoundsKeeper): Promise<void> {
+   *   return keeper.saveUnsavedAsync();
+   * }
+   * ```
+   */
+  public saveUnsavedAsync(): Promise<void>;
 
   /**
    * Cancels a pending save.
