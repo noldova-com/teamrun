@@ -31,7 +31,7 @@ export class RuntimePart implements IRuntimePart {
       }
     });
     const ticked = context.declareEvent(Resources.tickedEvent);
-    context.registerCommand(new RuntimeCommand(Resources.tickCommand, Resources.tickTitle, Resources.tickIcon, Resources.tickKey, {
+    const tick = new RuntimeCommand(Resources.tickCommand, Resources.tickTitle, Resources.tickIcon, Resources.tickKey, {
       handleAsync: async () => {
         this.ticks += Number(context.settings.read(Resources.tickStepSetting));
         ticked.publish({ ticks: this.ticks });
@@ -39,7 +39,17 @@ export class RuntimePart implements IRuntimePart {
           QualifiedName.parse(Resources.alarmKind), Resources.tickedKey, Resources.tickedTitle, `Ticks: ${this.ticks}`, NotificationSeverity.Success, null, [], null));
         return { ticks: this.ticks };
       }
-    }));
+    });
+    const pause: RuntimeCommand = new RuntimeCommand(Resources.pauseCommand, Resources.pauseTitle, null, null, {
+      handleAsync: async () => {
+        const isPaused = pause.info.isChecked !== true;
+        pause.setChecked(isPaused);
+        tick.setEnabled(!isPaused);
+        return { isPaused };
+      }
+    }, false);
+    context.registerCommand(tick);
+    context.registerCommand(pause);
     context.postNotification(new NotificationPost(
       QualifiedName.parse(Resources.alarmKind), null, Resources.alarmTitle, Resources.alarmText, NotificationSeverity.Info, null, [], null));
     context.postNotification(new NotificationPost(

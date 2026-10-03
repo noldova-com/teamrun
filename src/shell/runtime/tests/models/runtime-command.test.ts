@@ -25,6 +25,43 @@ export class RuntimeCommandTests {
   }
 
   @TestMethod
+  public startsEnabledAndReportsEachChangeOfItsState(): void {
+    const command = new RuntimeCommand("clock.pause", "Pause", null, null, RuntimeCommandTests.HANDLER, false);
+    const seen: string[] = [];
+    const first = command.onChanged(() => seen.push(`first ${JSON.stringify(command.info.toJson())}`));
+    command.onChanged(() => seen.push("second"));
+    const initial = JSON.stringify(command.info.toJson());
+
+    command.setEnabled(false);
+    command.setEnabled(false);
+    command.setChecked(true);
+    command.setChecked(true);
+    first[Symbol.dispose]();
+    command.setEnabled(true);
+
+    Assert.areEqual("{\"name\":\"clock.pause\",\"title\":\"Pause\",\"isChecked\":false}", initial);
+    Assert.areEqual([
+      "first {\"name\":\"clock.pause\",\"title\":\"Pause\",\"isEnabled\":false,\"isChecked\":false}",
+      "second",
+      "first {\"name\":\"clock.pause\",\"title\":\"Pause\",\"isEnabled\":false,\"isChecked\":true}",
+      "second",
+      "second"
+    ].join("|"), seen.join("|"));
+    Assert.isTrue(command.info.isEnabled);
+  }
+
+  @TestMethod
+  public refusesACheckedStateForACommandCreatedWithoutOne(): void {
+    const command = new RuntimeCommand("clock.tick", "Tick", null, null, RuntimeCommandTests.HANDLER);
+
+    const exception = Assert.throws(() => command.setChecked(true), ArgumentException);
+
+    Assert.areEqual("isChecked", exception.parameterName);
+    Assert.areEqual("The command clock.tick is not checkable; give it a checked state when it is created.", exception.message.split(" (Parameter")[0]);
+    Assert.isNull(command.info.isChecked);
+  }
+
+  @TestMethod
   public namesTheInvalidPart(): void {
     Assert.areEqual("name", Assert.throws(() => new RuntimeCommand("tick", "Tick", null, null, RuntimeCommandTests.HANDLER), ArgumentException).parameterName);
     Assert.areEqual("title", Assert.throws(() => new RuntimeCommand("clock.tick", " ", null, null, RuntimeCommandTests.HANDLER), ArgumentException).parameterName);

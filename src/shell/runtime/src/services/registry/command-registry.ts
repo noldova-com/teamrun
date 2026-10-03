@@ -15,9 +15,16 @@ import { Resources } from "../../resources.js";
 
 export class CommandRegistry {
   private readonly commands: Map<string, RuntimeCommand> = new Map();
+  private readonly watches: Map<RuntimeCommand, Registration> = new Map();
+  private readonly changed: (list: CommandList) => void;
+  private sequence: number = 0;
+
+  public constructor(changed: (list: CommandList) => void = () => undefined) {
+    this.changed = changed;
+  }
 
   public get list(): CommandList {
-    return new CommandList([...this.commands.values()].map(t => t.info));
+    return new CommandList([...this.commands.values()].map(t => t.info), this.sequence);
   }
 
   public register(command: RuntimeCommand): Registration {
@@ -26,6 +33,8 @@ export class CommandRegistry {
       throw new RegistrationException(Resources.formatCommandRegistered(name));
 
     this.commands.set(name, command);
+    this.watches.set(command, command.onChanged(() => this.publish()));
+    this.publish();
     return new Registration(() => this.unregister(command));
   }
 
@@ -35,7 +44,16 @@ export class CommandRegistry {
 
   private unregister(command: RuntimeCommand): void {
     const name = command.info.name.text;
-    if (this.commands.get(name) === command)
-      this.commands.delete(name);
+    if (this.commands.get(name) !== command)
+      return;
+    this.commands.delete(name);
+    this.watches.get(command)?.[Symbol.dispose]();
+    this.watches.delete(command);
+    this.publish();
+  }
+
+  private publish(): void {
+    this.sequence++;
+    this.changed(this.list);
   }
 }
