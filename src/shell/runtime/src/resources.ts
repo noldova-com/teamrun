@@ -133,6 +133,7 @@ export class Resources {
   public static readonly declarationsFileSegments: readonly string[] = ["_build", "modules", "declarations.json"];
   public static readonly installRootSegments: readonly string[] = ["..", "..", "..", ".."];
   public static readonly utf8Encoding: BufferEncoding = "utf8";
+  public static readonly missingFileCode: string = "ENOENT";
   public static readonly lineSeparator: string = "\n";
   public static readonly lineBreakPattern: RegExp = /\r?\n/;
   public static readonly windowsPlatform: string = "win32";
@@ -189,12 +190,15 @@ export class Resources {
   public static readonly panelSizeSetting: string = "panelSize";
   public static readonly messageSizeSetting: string = "messageSize";
   public static readonly codeSizeSetting: string = "codeSize";
+  public static readonly leftDockStyleSetting: string = "leftDockStyle";
+  public static readonly rightDockStyleSetting: string = "rightDockStyle";
   public static readonly doNotDisturbSetting: string = "doNotDisturb";
   public static readonly mutedModulesSetting: string = "mutedModules";
   public static readonly appearancePage: string = "Appearance";
   public static readonly notificationsPage: string = "Notifications";
   public static readonly themeGroup: string = "Theme";
   public static readonly textGroup: string = "Text";
+  public static readonly layoutGroup: string = "Layout";
   public static readonly notificationsGroup: string = "Notifications";
   public static readonly defaultThemeId: string = "shell.default";
   public static readonly defaultThemeTitle: string = "Default";
@@ -204,6 +208,12 @@ export class Resources {
   public static readonly modeDescription: string = "Light, dark, or following the operating system.";
   public static readonly modeOptions: readonly (readonly [string, string])[] = [["Light", "Light"], ["Dark", "Dark"], ["System", "System"]];
   public static readonly defaultMode: string = "System";
+  public static readonly leftDockStyleTitle: string = "Left dock";
+  public static readonly leftDockStyleDescription: string = "Show the left dock's views as tabs, or as icons along the window's left edge.";
+  public static readonly rightDockStyleTitle: string = "Right dock";
+  public static readonly rightDockStyleDescription: string = "Show the right dock's views as tabs, or as icons along the window's right edge.";
+  public static readonly dockStyleOptions: readonly (readonly [string, string])[] = [["Tabs", "Tabs"], ["Icons", "Icons"]];
+  public static readonly defaultDockStyle: string = "Tabs";
   public static readonly interfaceFontTitle: string = "Interface font";
   public static readonly interfaceFontDescription: string = "The font of menus, panels and prose.";
   public static readonly codeFontTitle: string = "Code font";
