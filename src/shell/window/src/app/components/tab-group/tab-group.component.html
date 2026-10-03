@@ -16,7 +16,7 @@ LICENSE file in the root directory of this source tree.
           <tr-tab [label]="label.title" [icon]="label.icon" [selected]="tab.equals(group().active)" [preview]="tab.equals(group().preview)" [attr.data-tab-index]="index"
             [attr.data-tab-key]="tab.key" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, index)" [class.tr-tab-dragged]="tab.equals(drag.dragging())"
             [trTooltip]="label.title" [trTooltipSide]="below" [trTooltipTruncated]="true"
-            [trContextMenuTriggerFor]="menu.menu()" (activate)="layout.activate(tab)" (close)="layout.close(tab)" (pointerdown)="drag.begin(tab, $event)" (dblclick)="keep(tab)" />
+            [trContextMenuTriggerFor]="menu.menu()" (activate)="layout.activate(tab)" (close)="close(tab)" (pointerdown)="drag.begin(tab, $event)" (dblclick)="keep(tab)" />
         }
         <span class="tr-tab-group-end" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, group().tabs.length)"></span>
       </div>

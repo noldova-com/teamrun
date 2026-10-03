@@ -94,6 +94,19 @@ export class TabGroupComponent {
     }, { injector: this.environment });
   }
 
+  protected close(tab: Tab): void {
+    const hadFocus = this.host.contains(this.host.ownerDocument.activeElement);
+    this.layout.close(tab);
+    const next = this.layout.layout().group(this.group().id)?.active ?? this.layout.currentGroup().active;
+    if (!hadFocus || Object.isNull(next))
+      return;
+    afterNextRender(() => {
+      for (const element of this.host.ownerDocument.querySelectorAll<HTMLElement>(Resources.tabKeySelector))
+        if (element.dataset[Resources.tabKeyData] === next.key)
+          element.focus();
+    }, { injector: this.environment });
+  }
+
   protected keep(tab: Tab): void {
     this.commands.run(Resources.keepTabCommand, { [Resources.tabArgument]: tab.key });
   }
