@@ -38,6 +38,7 @@ import { CommandService } from "./command.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { DocumentOpenerService } from "./document-opener.service";
 import { LayoutService } from "./layout.service";
+import { MenuService } from "./menu.service";
 import { TabLabelService } from "./tab-label.service";
 
 @Injectable({ providedIn: "root" })
@@ -48,9 +49,11 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly labels: TabLabelService = inject(TabLabelService);
   private readonly commands: CommandService = inject(CommandService);
   private readonly bars: BarItemsService = inject(BarItemsService);
+  private readonly menus: MenuService = inject(MenuService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
   private readonly activations: WindowPartActivation[] = [];
+  private readonly posting: Set<Promise<JsonValue>> = new Set();
   private pendingOpens: PendingDocument[] = [];
   private moduleOrder: readonly string[] = [];
   private runtimeCommands: readonly CommandContribution[] = [];
@@ -113,7 +116,14 @@ export class WindowPartHostService implements IWindowPartHost {
   }
 
   public async postNotificationAsync(post: NotificationPost): Promise<number> {
-    return NotificationReference.fromJson(await this.bridge.requestAsync(ShellMethods.postNotification.text, post.toJson())).id;
+    const request = this.bridge.requestAsync(ShellMethods.postNotification.text, post.toJson());
+    this.posting.add(request);
+    try {
+      return NotificationReference.fromJson(await request).id;
+    }
+    finally {
+      this.posting.delete(request);
+    }
   }
 
   public async updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
@@ -131,6 +141,8 @@ export class WindowPartHostService implements IWindowPartHost {
     ]));
     const ordered = this.moduleOrder.flatMap(t => this.activations.filter(u => u.context.moduleId === t));
     this.bars.set(ordered.flatMap(t => t.context.statusBarItems), ordered.flatMap(t => t.context.topBarActions));
+    const notStarted = new Set(this.failuresValue().map(t => t.moduleId));
+    this.menus.setActiveModules(this.moduleOrder.filter(t => !notStarted.has(t)));
     const views = this.activations.flatMap(t => t.context.views);
     for (const view of views)
       this.labels.register(view.name, new TabLabel(view.title, view.icon));
@@ -159,6 +171,7 @@ export class WindowPartHostService implements IWindowPartHost {
     catch (error) {
       this.errors.handleError(error);
     }
+    await Promise.allSettled(this.posting);
     this.refresh();
     this.generationValue.update(t => t + 1);
     if (!this.isLayoutLoaded)

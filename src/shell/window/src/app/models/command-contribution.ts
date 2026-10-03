@@ -20,6 +20,7 @@ export class CommandContribution {
   public readonly defaultKey: KeyChord | null;
   public readonly runAsync: (commandArguments: JsonValue) => Promise<JsonValue>;
   public readonly isEnabled: (commandArguments: JsonValue) => boolean;
+  public readonly isChecked: ((commandArguments: JsonValue) => boolean) | null;
 
   public constructor(
     name: string,
@@ -27,7 +28,8 @@ export class CommandContribution {
     icon: string | null,
     defaultKey: string | null,
     runAsync: (commandArguments: JsonValue) => Promise<JsonValue>,
-    isEnabled: (commandArguments: JsonValue) => boolean = CommandContribution.isAlwaysEnabled
+    isEnabled: (commandArguments: JsonValue) => boolean = CommandContribution.isAlwaysEnabled,
+    isChecked: ((commandArguments: JsonValue) => boolean) | null = null
   ) {
     ArgumentException.throwIfNullOrWhitespace(title, Resources.titleParameter);
     if (!Object.isNull(icon))
@@ -39,6 +41,7 @@ export class CommandContribution {
     this.defaultKey = Object.isNull(defaultKey) ? null : KeyChord.parseDefault(defaultKey, Resources.defaultKeyParameter);
     this.runAsync = runAsync;
     this.isEnabled = isEnabled;
+    this.isChecked = isChecked;
   }
 
   private static isAlwaysEnabled(): boolean {

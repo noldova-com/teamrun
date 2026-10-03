@@ -26,7 +26,14 @@ class ModuleArtifactsTests {
     " */",
     ""
   ].join("\n");
-  private static readonly SOURCE_IMPORT: string = "import { WindowPartSource } from \"@noldova/teamrun-shell-window\";\n";
+  private static readonly SOURCE_IMPORT: string = "import { MenuDeclarations, WindowPartSource } from \"@noldova/teamrun-shell-window\";\n";
+  private static readonly MENUS: Readonly<Record<string, unknown>> = {
+    places: [{ name: "notes.templates", title: "New from template" }],
+    groups: [
+      { name: "notes.create", place: "shell.file", items: [{ command: "notes.newNote" }, { submenu: "notes.templates" }] },
+      { name: "notes.sorting", place: "notes.templates", exclusive: true, items: [{ command: "notes.newNote", arguments: { template: "plan" } }] }
+    ]
+  };
 
   public static register(): void {
     test("the declarations and the window parts' loaders are written in build order, or empty without modules", async t => {
@@ -35,9 +42,11 @@ class ModuleArtifactsTests {
       await repository.writeAsync({
         "package.json": JSON.stringify({ teamrun: { modules: ["notes", "tasks"] } }),
         "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", parts: ["window"], dependencies: ["tasks"], contributes: {
-          views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"]
+          views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"],
+          menus: ["notes.templates"]
         }
       }),
+        "src/modules/notes/menus.json": JSON.stringify(ModuleArtifactsTests.MENUS),
         "src/modules/notes/window/src/api/index.ts": "export {};\n",
         "src/modules/tasks/module.json": JSON.stringify({ id: "tasks", displayName: "Tasks", parts: ["runtime"], dependencies: [], contributes: {} }),
         "src/modules/tasks/runtime/package.json": "{}\n",
@@ -60,14 +69,16 @@ class ModuleArtifactsTests {
       assert.deepEqual(JSON.parse(emptyDeclarations), { formatVersion: 1, modules: [] });
       assert.equal(
         emptyParts,
-        `${ModuleArtifactsTests.LICENSE_HEADER}\n${ModuleArtifactsTests.SOURCE_IMPORT}\nexport const windowPartSources: readonly WindowPartSource[] = [];\n`);
+        `${ModuleArtifactsTests.LICENSE_HEADER}\n${ModuleArtifactsTests.SOURCE_IMPORT}\nexport const windowPartSources: readonly WindowPartSource[] = [];\n\n`
+          + "export const moduleMenus: readonly MenuDeclarations[] = [];\n");
       assert.deepEqual(JSON.parse(await readFile(artifacts.declarationsFile, "utf8")), {
         formatVersion: 1,
         modules: [
           { id: "tasks", displayName: "Tasks", dependencies: [], runtimePackage: "@noldova/teamrun-modules-tasks-runtime", contributes: {} },
           { id: "clock", displayName: "Clock", dependencies: [], runtimePackage: null, contributes: {} },
           { id: "notes", displayName: "Notes", dependencies: ["tasks"], runtimePackage: null, contributes: {
-            views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"]
+            views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"],
+            menus: ["notes.templates"]
           }
         }
         ]
@@ -78,6 +89,16 @@ class ModuleArtifactsTests {
         "export const windowPartSources: readonly WindowPartSource[] = [",
         "  new WindowPartSource(\"clock\", \"Clock\", [], [], [], [], [], [], () => import(\"../shell/desktop/tests/e2e/fixtures/modules/clock/window/src/api/index\").then(t => t.windowPart)),",
         "  new WindowPartSource(\"notes\", \"Notes\", [\"tasks\"], [\"notes.list\",\"notes.outline\"], [\"notes.newNote\"], [\"notes.count\"], [\"notes.compose\"], [], () => import(\"../modules/notes/window/src/api/index\").then(t => t.windowPart))",
+        "];",
+        "",
+        "export const moduleMenus: readonly MenuDeclarations[] = [",
+        `  MenuDeclarations.fromJson("notes", ${JSON.stringify({
+          places: [{ name: "notes.templates", title: "New from template", menuBar: false }],
+          groups: [
+            { name: "notes.create", place: "shell.file", exclusive: false, items: [{ command: "notes.newNote", arguments: {} }, { submenu: "notes.templates" }] },
+            { name: "notes.sorting", place: "notes.templates", exclusive: true, items: [{ command: "notes.newNote", arguments: { template: "plan" } }] }
+          ]
+        })})`,
         "];",
         ""
       ].join("\n"));

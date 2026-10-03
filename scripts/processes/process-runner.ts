@@ -7,6 +7,8 @@
  */
 
 import { spawn } from "node:child_process";
+import { createWriteStream } from "node:fs";
+import type { Writable } from "node:stream";
 
 import ProcessResult from "./process-result.ts";
 import ProcessException from "./process.exception.ts";
@@ -51,6 +53,22 @@ export default class ProcessRunner {
       const child = spawn(command, [...commandArguments], { cwd: directory, shell: false, stdio: "inherit", env: environment ?? process.env });
       child.on("error", t => reject(new ProcessException(`"${command}" could not start.`, { cause: t })));
       child.on("close", t => resolve(t));
+    });
+  }
+
+  public runLoggedAsync(command: string, commandArguments: readonly string[], directory: string, log: string, output: Writable, errorOutput: Writable): Promise<number | null> {
+    return new Promise<number | null>((resolve, reject) => {
+      const file = createWriteStream(log);
+      const child = spawn(command, [...commandArguments], { cwd: directory, shell: false, stdio: ["inherit", "pipe", "pipe"] });
+      let failure: ProcessException | null = null;
+      const forward = (target: Writable, chunk: Buffer): void => {
+        target.write(chunk);
+        file.write(chunk);
+      };
+      child.stdout.on("data", (t: Buffer) => forward(output, t));
+      child.stderr.on("data", (t: Buffer) => forward(errorOutput, t));
+      child.on("error", t => failure = new ProcessException(`"${command}" could not start.`, { cause: t }));
+      child.on("close", t => file.end(() => failure === null ? resolve(t) : reject(failure)));
     });
   }
 }

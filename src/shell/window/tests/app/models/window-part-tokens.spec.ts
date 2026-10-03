@@ -13,6 +13,7 @@ import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 describe("WindowPartTokens", () => {
   it("provides no window parts unless the build gives them", () => {
     expect(TestBed.inject(WindowPartTokens.sources)).toEqual([]);
+    expect(TestBed.inject(WindowPartTokens.menus)).toEqual([]);
     expect(WindowPartTokens.context.toString()).toContain("The window part's context");
   });
 });

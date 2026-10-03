@@ -31,7 +31,7 @@ export default class ModuleArtifacts {
   private static readonly NOTIFICATIONS_KIND: string = "notifications";
   private static readonly STATUS_BAR_ITEMS_KIND: string = "statusBarItems";
   private static readonly TOP_BAR_ACTIONS_KIND: string = "topBarActions";
-  private static readonly SOURCE_IMPORT: string = "import { WindowPartSource } from \"@noldova/teamrun-shell-window\";\n";
+  private static readonly SOURCE_IMPORT: string = "import { MenuDeclarations, WindowPartSource } from \"@noldova/teamrun-shell-window\";\n";
   private static readonly OUTPUT_DECLARATIONS_SEGMENTS: readonly string[] = ["modules", "declarations.json"];
 
   private readonly root: string;
@@ -65,10 +65,18 @@ export default class ModuleArtifacts {
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.TOP_BAR_ACTIONS_KIND) ?? [])}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.NOTIFICATIONS_KIND) ?? [])}, `
         + `() => import("../${String(t.windowEntry).slice(ModuleArtifacts.SOURCE_PREFIX.length)}").then(t => t.windowPart))`);
-    const list = sources.length === 0 ? "[]" : `[\n${sources.join(",\n")}\n]`;
+    const menus = declarations
+      .filter(t => t.menus.places.length > 0 || t.menus.groups.length > 0)
+      .map(t => `  MenuDeclarations.fromJson(${JSON.stringify(t.id)}, ${JSON.stringify(t.menus.toJson())})`);
     await ModuleArtifacts.writeFileAsync(
       this.windowPartsFile,
-      `${ModuleArtifacts.LICENSE_HEADER}\n${ModuleArtifacts.SOURCE_IMPORT}\nexport const windowPartSources: readonly WindowPartSource[] = ${list};\n`);
+      `${ModuleArtifacts.LICENSE_HEADER}\n${ModuleArtifacts.SOURCE_IMPORT}\n`
+        + `export const windowPartSources: readonly WindowPartSource[] = ${ModuleArtifacts.formatList(sources)};\n\n`
+        + `export const moduleMenus: readonly MenuDeclarations[] = ${ModuleArtifacts.formatList(menus)};\n`);
+  }
+
+  private static formatList(lines: readonly string[]): string {
+    return lines.length === 0 ? "[]" : `[\n${lines.join(",\n")}\n]`;
   }
 
   private static async writeFileAsync(file: string, text: string): Promise<void> {

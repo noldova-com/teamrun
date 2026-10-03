@@ -1,0 +1,27 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<ng-template #placeMenu>
+  <tr-menu class="tr-place-menu" [attr.data-place]="place()">
+    @for (section of sections(); track section.group; let first = $first) {
+      @if (!first) {
+        <tr-menu-separator />
+      }
+      @for (row of section.rows; track $index) {
+        @if (row.isSubmenu) {
+          <tr-place-menu #nested [place]="row.place" [context]="context()" />
+          <button tr-menu-item class="tr-place-menu-submenu" [attr.data-submenu]="row.place" [label]="row.title" [trMenuTriggerFor]="nested.menu()"></button>
+        } @else {
+          <button tr-menu-item class="tr-place-menu-item" [attr.data-command]="row.command" [label]="row.title" [icon]="row.icon"
+            [shortcut]="row.key" [checked]="row.check === menuCheck.None ? null : row.isChecked" [checkbox]="row.check === menuCheck.Checkbox"
+            [disabled]="!row.isEnabled" (triggered)="run(row)"></button>
+        }
+      }
+    }
+  </tr-menu>
+</ng-template>

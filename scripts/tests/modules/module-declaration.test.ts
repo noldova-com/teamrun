@@ -103,7 +103,7 @@ class ModuleDeclarationTests {
 
       for (const contributes of [undefined, null, [], "views"])
         await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...valid, contributes }), "must list its contributions as an object");
-      await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...valid, contributes: { menus: [] } }), "contributes an unknown kind: menus");
+      await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...valid, contributes: { toolbars: [] } }), "contributes an unknown kind: toolbars");
       for (const views of ["notes.list", [1], ["tasks.list"], ["notes."], ["notes.List"], ["notes.list-view"], ["notes"]])
         await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...valid, contributes: { views } }), "must list its views as \"notes.<name>\", with a camelCase name");
     });

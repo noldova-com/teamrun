@@ -13,7 +13,10 @@ import {
   TopBarActionState, ViewContribution
 } from "@noldova/teamrun-shell-window";
 
+import { NotesState } from "./notes-state";
+
 export class NotesWindowPart implements IWindowPart {
+  private static readonly SORTINGS: readonly [string, string, string][] = [["notes.sortByTitle", "Sort by title", "title"], ["notes.sortByWeek", "Sort by week", "week"]];
   private static readonly MANY_VIEWS: readonly [string, string, string, DockSide][] = [
     ["notes.search", "Search", "search", DockSide.Left],
     ["notes.changes", "Source control", "account_tree", DockSide.Left],
@@ -63,6 +66,20 @@ export class NotesWindowPart implements IWindowPart {
       counter.update(new StatusBarItemState(`${count} notes`));
       return count;
     }));
+    context.registerCommand(new CommandContribution("notes.openNote", "Open note", "open_in_new", null, async commandArguments => {
+      const note = JsonReader.fromValue(commandArguments);
+      context.openDocument("notes.note", `week-${note.readInteger("week")}`, note.readString("title"));
+      return null;
+    }, commandArguments => JsonReader.fromValue(commandArguments).hasField("week")));
+    for (const [name, title, by] of NotesWindowPart.SORTINGS)
+      context.registerCommand(new CommandContribution(name, title, null, null, async () => {
+        NotesState.sortBy.set(by);
+        return null;
+      }, () => true, () => NotesState.sortBy() === by));
+    context.registerCommand(new CommandContribution("notes.wrapLines", "Wrap lines", "wrap_text", null, async () => {
+      NotesState.wrapsLines.update(t => !t);
+      return null;
+    }, () => true, () => NotesState.wrapsLines()));
     context.registerTopBarAction(new TopBarActionContribution("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote")));
     await context.postNotificationAsync(new NotificationPost(
       QualifiedName.parse("notes.saveFailed"), null, "Note 2 couldn't be saved", "The disk is full.", NotificationSeverity.Error, null,

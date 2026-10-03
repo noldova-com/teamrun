@@ -1,0 +1,32 @@
+<div class="tr-toasts-stack">
+  @for (toast of toasts(); track toast.id) {
+    <section class="tr-toast" [attr.data-notification]="toast.id" [attr.data-severity]="toast.post.severity" [attr.aria-label]="toast.post.title"
+      (mouseenter)="pause(toast)" (mouseleave)="resume(toast, $event)" (focusin)="pause(toast)" (focusout)="resume(toast, $event)">
+      <span class="material-symbols-rounded tr-toast-severity" role="img" [attr.aria-label]="severityName(toast.post.severity)">{{ glyph(toast.post.severity) }}</span>
+      <div class="tr-toast-body">
+        @if (toast.post.open !== null) {
+          <button type="button" class="tr-toast-title tr-toast-open" [disabled]="!isAvailable(toast.post.open)" (click)="run(toast, toast.post.open)">{{ toast.post.title }}</button>
+        }
+        @else {
+          <span class="tr-toast-title">{{ toast.post.title }}</span>
+        }
+        @if (toast.post.text !== null) {
+          <span class="tr-toast-text">{{ toast.post.text }}</span>
+        }
+        @if (isIndeterminate(toast) || progressOf(toast) !== null) {
+          <progress class="tr-toast-progress" max="1" [attr.value]="progressOf(toast)" [attr.aria-label]="toast.post.title"></progress>
+        }
+        @if (toast.post.actions.length > 0) {
+          <div class="tr-toast-actions">
+            @for (action of toast.post.actions; track $index) {
+              <button type="button" tr-button class="tr-toast-action" [variant]="secondary" [disabled]="!isAvailable(action.command)" (click)="run(toast, action.command)">{{ action.title }}</button>
+            }
+          </div>
+        }
+      </div>
+      <button type="button" tr-icon-button class="tr-toast-close" [icon]="resources.closeGlyph" [label]="resources.closeToastLabel" [attr.title]="resources.closeToastLabel" (click)="close(toast)"></button>
+    </section>
+  }
+</div>
+<div class="tr-toasts-announcement" role="status" aria-live="polite">{{ polite() }}</div>
+<div class="tr-toasts-announcement" role="alert" aria-live="assertive">{{ assertive() }}</div>
