@@ -8,19 +8,18 @@
 
 import { once } from "node:events";
 import { type Socket, connect } from "node:net";
-import { setTimeout as delay } from "node:timers/promises";
 
 import { Event, Response, type WireMessage, WireDecoder } from "@noldova/teamrun-shell-protocol";
 import type { Endpoint } from "@noldova/teamrun-shell-runtime";
 
 export class RawConnectionFixture implements Disposable {
   private static readonly ANSWER_TIMEOUT: number = 3_000;
-  private static readonly POLL_INTERVAL: number = 10;
 
   private readonly socket: Socket;
   private readonly frames: string[] = [];
   private readonly closed: Promise<unknown>;
   private pending: string = "";
+  private arrival: PromiseWithResolvers<void> | null = null;
 
   private constructor(socket: Socket) {
     this.socket = socket;
@@ -28,6 +27,7 @@ export class RawConnectionFixture implements Disposable {
     socket.on("data", (chunk: string) => this.receive(chunk));
     socket.on("error", () => socket.destroy());
     this.closed = once(socket, "close");
+    socket.once("close", () => this.arrival?.resolve());
   }
 
   public static async connectAsync(endpoint: Endpoint, allowHalfOpen: boolean = false): Promise<RawConnectionFixture> {
@@ -55,13 +55,18 @@ export class RawConnectionFixture implements Disposable {
   }
 
   public async readTextAsync(timeoutMilliseconds: number = RawConnectionFixture.ANSWER_TIMEOUT): Promise<string> {
-    const deadline = Date.now() + timeoutMilliseconds;
-    while (this.frames.length === 0) {
-      if (this.socket.closed || Date.now() >= deadline)
-        throw new Error("No frame arrived.");
-      await delay(RawConnectionFixture.POLL_INTERVAL);
+    if (this.frames.length === 0 && !this.socket.closed) {
+      const arrival = Promise.withResolvers<void>();
+      this.arrival = arrival;
+      const limit = setTimeout(() => arrival.resolve(), timeoutMilliseconds);
+      await arrival.promise;
+      clearTimeout(limit);
+      this.arrival = null;
     }
-    return String(this.frames.shift());
+    const frame = this.frames.shift();
+    if (frame === undefined)
+      throw new Error("No frame arrived.");
+    return frame;
   }
 
   public async readResponseAsync(timeoutMilliseconds: number = RawConnectionFixture.ANSWER_TIMEOUT): Promise<Response> {
@@ -98,5 +103,7 @@ export class RawConnectionFixture implements Disposable {
       this.pending = this.pending.slice(index + 1);
       index = this.pending.indexOf("\n");
     }
+    if (this.frames.length > 0)
+      this.arrival?.resolve();
   }
 }
