@@ -7,7 +7,7 @@
  */
 
 import { type ChildProcess, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -19,6 +19,7 @@ import ErrorOutputClassifier from "./error-output.classifier.ts";
 
 export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
+  private static readonly EXECUTABLE_RECORD: string = path.resolve("_build", "development-app", "path.txt");
   private static readonly VIEWPORT_WIDTH: number = 1920;
   private static readonly VIEWPORT_HEIGHT: number = 1080;
   private static readonly LAUNCH_ARGUMENTS: readonly string[] = ["--disable-gpu", "--disable-software-rasterizer"];
@@ -173,6 +174,7 @@ export default class DesktopApplicationFixture {
 
   private async startAsync(): Promise<void> {
     const application = await _electron.launch({
+      executablePath: await readFile(DesktopApplicationFixture.EXECUTABLE_RECORD, "utf8"),
       args: [
         DesktopApplicationFixture.MAIN,
         `--data-dir=${this.dataDirectory}`,

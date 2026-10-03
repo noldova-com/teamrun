@@ -88,6 +88,12 @@ export interface IDesktopProcess {
   readonly workingDirectory: string;
 
   /**
+   * Whether Electron's default app runs the desktop's main script, as in every development start. A packaged build never
+   * does, so this, not the program's name, tells a development start from a packaged build.
+   */
+  readonly isDefaultApp: boolean;
+
+  /**
    * Starts another program, detached, for the hand-over to a newer build.
    *
    * @param executablePath The program.
@@ -338,6 +344,11 @@ export interface IApplicationHost {
   readonly isPackaged: boolean;
 
   /**
+   * The macOS Dock's entry for the application, absent on other systems.
+   */
+  readonly dock: IDockHost | undefined;
+
+  /**
    * Sets the application's name.
    *
    * @param name The name.
@@ -366,6 +377,22 @@ export interface IApplicationHost {
    * ```
    */
   setAppUserModelId(id: string): void;
+
+  /**
+   * Sets the name of the `.desktop` file the application belongs to on Linux. Electron derives its windows' `WM_CLASS`
+   * from it, and desktop portals identify the application by it, so it is set before the application is ready.
+   *
+   * @param name The file's name, the application's id followed by `.desktop`.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function identify(app: IApplicationHost): void {
+   *   app.setDesktopName("org.example.app.desktop");
+   * }
+   * ```
+   */
+  setDesktopName(name: string): void;
 
   /**
    * Sets where Electron keeps the application's own data, its caches and Chromium storage.
@@ -461,6 +488,79 @@ export interface IApplicationHost {
   on(event: "window-all-closed", listener: () => void): unknown;
   on(event: "activate", listener: () => void): unknown;
   on(event: "will-quit", listener: () => void): unknown;
+}
+
+/**
+ * The macOS Dock's entry for the application, as Electron's `app.dock` provides it.
+ */
+export interface IDockHost {
+  /**
+   * Shows an image as the application's icon in the Dock.
+   *
+   * @param iconPath The image's absolute path.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function showIcon(app: IApplicationHost, iconPath: string): void {
+   *   app.dock?.setIcon(iconPath);
+   * }
+   * ```
+   */
+  setIcon(iconPath: string): void;
+}
+
+/**
+ * The system's light or dark appearance, as Electron's `nativeTheme` provides it.
+ */
+export interface IThemeHost {
+  /**
+   * Whether the system asks applications for dark colors.
+   */
+  readonly shouldUseDarkColors: boolean;
+
+  /**
+   * Whether the system's own surfaces, such as the Windows taskbar, are dark.
+   */
+  readonly shouldUseDarkColorsForSystemIntegratedUI: boolean;
+
+  /**
+   * Listens for a change of the system's appearance.
+   *
+   * @param event The event's name.
+   * @param listener Called after each change.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IThemeHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function follow(theme: IThemeHost, changes: boolean[]): void {
+   *   theme.on("updated", () => changes.push(theme.shouldUseDarkColors));
+   * }
+   * ```
+   */
+  on(event: "updated", listener: () => void): unknown;
+
+  /**
+   * Stops a listener that `on` added.
+   *
+   * @param event The event's name.
+   * @param listener The listener `on` received.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IThemeHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function followOnce(theme: IThemeHost, listener: () => void): void {
+   *   const once = (): void => {
+   *     theme.removeListener("updated", once);
+   *     listener();
+   *   };
+   *   theme.on("updated", once);
+   * }
+   * ```
+   */
+  removeListener(event: "updated", listener: () => void): unknown;
 }
 
 /**
@@ -717,6 +817,21 @@ export interface IDesktopWindow {
    * ```
    */
   setAppDetails(options: AppDetailsOptions): void;
+
+  /**
+   * Shows an image as the window's icon in its frame and in the taskbar, on Windows and Linux.
+   *
+   * @param iconPath The image's absolute path: an `.ico` file on Windows, a PNG image on Linux.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function showIcon(window: IDesktopWindow, iconPath: string): void {
+   *   window.setIcon(iconPath);
+   * }
+   * ```
+   */
+  setIcon(iconPath: string): void;
 
   /**
    * The window's bounds when it is neither maximized nor minimized.
@@ -1049,6 +1164,11 @@ export interface IElectron {
    * The system's file manager, for opening the log folder.
    */
   readonly shell: IShellHost;
+
+  /**
+   * The system's light or dark appearance, for the application's icons.
+   */
+  readonly theme: IThemeHost;
 
   /**
    * The displays, for placing a window on one that shows it.
@@ -2024,6 +2144,9 @@ export declare class TaskbarIdentity {
    * Describes the running build. A packaged build starts again by its program; a development build by Electron with
    * its main script. Both keep the given `--data-dir=`, `--user-data-dir=` and `--device-dir=` arguments, resolved to
    * absolute paths, so the relaunch reaches the running instance's single-instance lock from any working directory.
+   * A packaged build takes the application ID. A development build takes the development application ID followed by
+   * the first eight hexadecimal digits of the SHA-256 of its checkout's path, the folder three levels above the main
+   * script's, so each checkout has its own taskbar entry and relaunches itself.
    *
    * @param isPackaged Whether the build is packaged.
    * @param executablePath The running program.

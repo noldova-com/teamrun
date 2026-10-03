@@ -6,10 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import DevelopmentBinary from "./desktop/development-binary.ts";
 import BuildRecord from "./packages/build-record.ts";
 import ContentHash from "./packages/content-hash.ts";
 import ProcessRunner from "./processes/process-runner.ts";
@@ -41,12 +42,14 @@ export default class UiWorkflows {
   private readonly runner: ProcessRunner;
   private readonly files: RepositoryFiles;
   private readonly output: Writable;
+  private readonly binary: DevelopmentBinary;
 
-  public constructor(root: string, runner: ProcessRunner, output: Writable) {
+  public constructor(root: string, runner: ProcessRunner, output: Writable, binary: DevelopmentBinary) {
     this.root = root;
     this.runner = runner;
     this.files = new RepositoryFiles(root, new Git(root, runner));
     this.output = output;
+    this.binary = binary;
   }
 
   public async runAsync(playwrightArguments: readonly string[]): Promise<number> {
@@ -63,6 +66,7 @@ export default class UiWorkflows {
       }
       await (await this.hashOutputsAsync(inputs)).writeAsync(recordFile);
     }
+    await this.binary.prepareAsync(this.output);
 
     const typeScript = await this.runner.runAsync(process.execPath, [path.join(this.root, ...UiWorkflows.TYPESCRIPT_CLI), "--project", UiWorkflows.E2E_PROJECT], this.root);
     if (typeScript !== 0)
@@ -93,5 +97,8 @@ export default class UiWorkflows {
   }
 }
 
-if (import.meta.main)
-  process.exitCode = await new UiWorkflows(process.cwd(), new ProcessRunner(), process.stdout).runAsync(process.argv.slice(2));
+if (import.meta.main) {
+  const root = realpathSync(process.cwd());
+  const runner = new ProcessRunner();
+  process.exitCode = await new UiWorkflows(root, runner, process.stdout, new DevelopmentBinary(root, runner)).runAsync(process.argv.slice(2));
+}

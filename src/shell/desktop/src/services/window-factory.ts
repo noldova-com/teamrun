@@ -6,15 +6,16 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { BrowserWindowConstructorOptions } from "electron";
+import type { AppDetailsOptions, BrowserWindowConstructorOptions } from "electron";
 
 import type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
 import type { IElectron } from "../interfaces/i-electron.js";
 import type { DesktopSettings } from "../models/desktop-settings.js";
-import type { TaskbarIdentity } from "../models/taskbar-identity.js";
+import { TaskbarIdentity } from "../models/taskbar-identity.js";
 import type { WindowAppearance } from "../models/window-appearance.js";
 import type { WindowState } from "../models/window-state.js";
 import { Resources } from "../resources.js";
+import type { AppIcons } from "./app-icons.js";
 import type { SenderPolicy } from "./sender-policy.js";
 
 export class WindowFactory {
@@ -22,12 +23,14 @@ export class WindowFactory {
   private readonly policy: SenderPolicy;
   private readonly electron: IElectron;
   private readonly taskbar: TaskbarIdentity;
+  private readonly icons: AppIcons;
 
-  public constructor(settings: DesktopSettings, policy: SenderPolicy, electron: IElectron, taskbar: TaskbarIdentity) {
+  public constructor(settings: DesktopSettings, policy: SenderPolicy, electron: IElectron, taskbar: TaskbarIdentity, icons: AppIcons) {
     this.settings = settings;
     this.policy = policy;
     this.electron = electron;
     this.taskbar = taskbar;
+    this.icons = icons;
   }
 
   public create(state: WindowState): IDesktopWindow {
@@ -51,11 +54,15 @@ export class WindowFactory {
     };
     if (this.settings.isMac)
       options.trafficLightPosition = { ...Resources.trafficLightPosition };
-    else
+    else {
       options.titleBarOverlay = true;
+      options.icon = this.icons.window;
+    }
     const window = this.electron.createWindow(options);
     if (this.settings.platform === Resources.windowsPlatform)
-      window.setAppDetails(this.taskbar.toAppDetails());
+      window.setAppDetails(this.describe());
+    if (!this.settings.isMac)
+      this.followTheme(window);
     const contents = window.webContents;
     contents.on(Resources.willNavigateEvent, (event, url) => {
       if (!this.policy.isWindowUrl(url))
@@ -75,5 +82,19 @@ export class WindowFactory {
     window.setBackgroundColor(appearance.background);
     if (!this.settings.isMac)
       window.setTitleBarOverlay({ color: appearance.titleBar, symbolColor: appearance.titleBarText, height: appearance.titleBarHeight });
+  }
+
+  private followTheme(window: IDesktopWindow): void {
+    const update = (): void => {
+      window.setIcon(this.icons.window);
+      if (this.settings.platform === Resources.windowsPlatform)
+        window.setAppDetails(this.describe());
+    };
+    this.electron.theme.on(Resources.themeUpdatedEvent, update);
+    window.once(Resources.closedEvent, () => this.electron.theme.removeListener(Resources.themeUpdatedEvent, update));
+  }
+
+  private describe(): AppDetailsOptions {
+    return new TaskbarIdentity(this.taskbar.appId, this.icons.window, this.taskbar.relaunchCommand).toAppDetails();
   }
 }

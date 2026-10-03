@@ -9,7 +9,7 @@
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 
-import { BrowserWindow, Menu, app, clipboard, ipcMain, screen, session, shell, utilityProcess } from "electron";
+import { BrowserWindow, Menu, app, clipboard, ipcMain, nativeTheme, screen, session, shell, utilityProcess } from "electron";
 
 import { ChildProcessStarter, RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
 
@@ -21,7 +21,7 @@ import { UtilityProcessStarter } from "./services/utility-process-starter.js";
 const starter = process.platform === Resources.windowsPlatform ? new UtilityProcessStarter(utilityProcess) : new ChildProcessStarter();
 
 DesktopApplication.start(
-  { app, ipcMain, session, screen, menu: Menu, clipboard, shell, createWindow: t => new BrowserWindow(t) },
+  { app, ipcMain, session, screen, menu: Menu, clipboard, shell, theme: nativeTheme, createWindow: t => new BrowserWindow(t) },
   {
     argv: process.argv,
     env: process.env,
@@ -29,6 +29,7 @@ DesktopApplication.start(
     execPath: process.execPath,
     homeFolder: homedir(),
     workingDirectory: process.cwd(),
+    isDefaultApp: process.defaultApp === true,
     startDetached: t => spawn(t, [], { detached: true, stdio: "ignore" }).unref()
   },
   import.meta.url,

@@ -21,13 +21,15 @@ test.describe("the harness's reading of the main process's error output", () => 
 
     expect(together).toEqual([{ kind: "platform-log", text: warning }, { kind: "platform-log", text: continuation }]);
     expect(apart).toEqual(together);
+    expect(new ErrorOutputClassifier().classify(`${warning.replace("electron", "fixture-studio")}\n${continuation}\n`).map(t => t.kind)).toEqual(["platform-log", "platform-log"]);
   });
 
-  test("a macOS service line is a platform log and Chromium's own lines are expected", () => {
+  test("a macOS service line is a platform log, whatever the application's name, and Chromium's own lines are expected", () => {
     const service = "2026-10-02 03:20:40.123 Electron Helper (Renderer)[1234:5678] XPC connection interrupted";
+    const named = "2026-10-02 03:20:41.456 Fixture Studio Helper (GPU)[1234:5679] XPC connection interrupted";
 
-    expect(new ErrorOutputClassifier().classify(`[1:0102/030405.678:ERROR:thing] x\nDebugger listening on ws://127.0.0.1:1/x\nFor help, see: y\n${service}\n`))
-      .toEqual([{ kind: "platform-log", text: service }]);
+    expect(new ErrorOutputClassifier().classify(`[1:0102/030405.678:ERROR:thing] x\nDebugger listening on ws://127.0.0.1:1/x\nFor help, see: y\n${service}\n${named}\n`))
+      .toEqual([{ kind: "platform-log", text: service }, { kind: "platform-log", text: named }]);
   });
 
   test("Node's debugger lines are expected, including the wait for the debugger to disconnect as the process exits", () => {

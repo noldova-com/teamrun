@@ -23,7 +23,7 @@ test.describe("the Windows taskbar", () => {
     const launch = await desktop.application.evaluate(({ app }) => {
       Reflect.set(globalThis, "teamrunSecondInstance", false);
       app.once("second-instance", () => Reflect.set(globalThis, "teamrunSecondInstance", true));
-      return { isPackaged: app.isPackaged, executablePath: process.execPath, argv: process.argv, workingDirectory: process.cwd(), profile: app.getPath("userData") };
+      return { isPackaged: app.isPackaged && process.defaultApp !== true, executablePath: process.execPath, argv: process.argv, workingDirectory: process.cwd(), profile: app.getPath("userData") };
     });
     const command = TaskbarIdentity.create(
       launch.isPackaged,

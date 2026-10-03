@@ -31,6 +31,14 @@ npm test
 
 `npm ci` installs the exact tool versions the repository pins and warns when your Node.js or npm version differs from the required one. `npm run build` builds the packages under `src/`, writes the declarations of the modules the build lists, installs the Angular project in `src/` from its own lockfile and downloads the headless Chromium its tests run in. `npm test` runs the complete set of checks: the documents' format and links, the folder structure, the architecture's dependency and naming rules, the type check and tests of the repository's scripts, and the Angular tests, each with full coverage. `npm test -- documents` runs only the document checks.
 
+To run TeamRun from your build, run `npm start`. It starts a copy of Electron's program that carries TeamRun's name and icon, in `_build/development-app`, and prepares the copy again when Electron, the version or the icons change.
+
+Some Linux systems restrict unprivileged user namespaces, as Ubuntu does since 23.10. There, Chromium's sandbox needs its helper owned by root with the setuid bit, and `npm start` stops and prints the commands instead of starting. Run them once, and again after the copy is prepared again:
+
+```bash
+sudo chown root:root _build/development-app/chrome-sandbox && sudo chmod 4755 _build/development-app/chrome-sandbox
+```
+
 ## Questions, ideas and contributions
 
 Have a question, found a bug or want to suggest a feature? Search [GitHub Issues](https://github.com/noldova-com/teamrun/issues), then open an issue describing what you need. For security concerns, follow the [private reporting guidance](.github/SECURITY.md).

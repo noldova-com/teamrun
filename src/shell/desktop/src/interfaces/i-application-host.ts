@@ -6,11 +6,15 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { IDockHost } from "./i-dock-host.js";
+
 export interface IApplicationHost {
   readonly isPackaged: boolean;
+  readonly dock: IDockHost | undefined;
 
   setName(name: string): void;
   setAppUserModelId(id: string): void;
+  setDesktopName(name: string): void;
   setPath(name: "userData", path: string): void;
   requestSingleInstanceLock(): boolean;
   enableSandbox(): void;
