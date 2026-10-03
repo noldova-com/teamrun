@@ -12,6 +12,8 @@ import "@noldova/teamrun-foundation-core";
 import { type CommandRun, type Notification, NotificationPost, type NotificationSeverity } from "@noldova/teamrun-shell-protocol";
 import { ButtonComponent, ButtonVariant, IconButtonComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
+import type { WindowPartSource } from "../../models/window-part-source";
+import { WindowPartTokens } from "../../models/window-part-tokens";
 import { NotificationService } from "../../services/notification.service";
 import { ToastService } from "../../services/toast.service";
 import { Resources } from "../../../resources";
@@ -27,6 +29,8 @@ export class ToastsComponent {
   private readonly notifications: NotificationService = inject(NotificationService);
   private readonly service: ToastService = inject(ToastService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
+  private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
+  private readonly time: Intl.DateTimeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
@@ -40,6 +44,15 @@ export class ToastsComponent {
 
   protected severityName(severity: NotificationSeverity): string {
     return Resources.severityNames[severity];
+  }
+
+  protected moduleName(notification: Notification): string {
+    const owner = notification.post.kind.owner;
+    return this.sources.find(t => t.moduleId === owner)?.displayName ?? owner;
+  }
+
+  protected timeOf(notification: Notification): string {
+    return this.time.format(new Date(notification.postedAt));
   }
 
   protected progressOf(notification: Notification): number | null {

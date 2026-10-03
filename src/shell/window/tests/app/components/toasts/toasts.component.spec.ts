@@ -13,6 +13,8 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { CommandRun, Notification, NotificationAction, NotificationPost, NotificationSeverity, NotificationState, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { ToastsComponent } from "../../../../src/app/components/toasts/toasts.component";
+import { WindowPartSource } from "../../../../src/app/models/window-part-source";
+import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { NotificationService } from "../../../../src/app/services/notification.service";
 import { ToastService } from "../../../../src/app/services/toast.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
@@ -74,6 +76,7 @@ describe("ToastsComponent", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: NotificationService, useValue: notifications },
+        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
     });
@@ -101,6 +104,15 @@ describe("ToastsComponent", () => {
     expect(second?.querySelector(".tr-toast-close")?.getAttribute("aria-label")).toBe("Close");
     await expectTooltipAsync(second?.querySelector<HTMLElement>(".tr-toast-close"), "Close");
     expect(regions).toEqual([["polite", "Title 1"], ["assertive", "Title 2. The disk is full."]]);
+  });
+
+  it("names each toast's module, by its display name when it has a window part, and the time it was posted", async () => {
+    const clock = new Notification(2, 2, new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null),
+      "2026-10-03T08:05:00.000Z", false);
+    const fixture = await renderAsync(clock, toast(1));
+
+    expect(toasts(fixture).map(t => t.querySelector(".tr-toast-meta")?.textContent?.split(" · ")[0])).toEqual(["Notes", "clock"]);
+    expect(toasts(fixture)[1]?.querySelector(".tr-toast-meta")?.textContent).toMatch(/ · \d{1,2}:05/);
   });
 
   it("runs an action or the open command and closes the toast, closes one on Close and reports an action that fails", async () => {
