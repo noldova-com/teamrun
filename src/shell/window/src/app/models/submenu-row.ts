@@ -12,8 +12,8 @@ export class SubmenuRow extends MenuRow {
   public readonly isSubmenu: true = true;
   public readonly place: string;
 
-  public constructor(place: string, title: string) {
-    super(title, null);
+  public constructor(place: string, title: string, icon: string | null = null) {
+    super(title, icon);
 
     this.place = place;
   }
