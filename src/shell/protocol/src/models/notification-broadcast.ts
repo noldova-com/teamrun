@@ -16,17 +16,21 @@ import { Notification } from "./notification.js";
 import { NotificationState } from "./notification-state.js";
 
 export class NotificationBroadcast {
-  private static readonly FIELDS: readonly string[] = [Resources.notificationsField, Resources.quietDevicesField];
+  private static readonly FIELDS: readonly string[] = [Resources.notificationsField, Resources.quietDevicesField, Resources.sequenceField];
 
   public readonly notifications: readonly Notification[];
   public readonly quietDevices: readonly string[];
+  public readonly sequence: number;
 
-  public constructor(notifications: readonly Notification[], quietDevices: readonly string[]) {
+  public constructor(notifications: readonly Notification[], quietDevices: readonly string[], sequence: number) {
     if (quietDevices.some(t => String.isNullOrWhitespace(t)))
       throw new ArgumentException(Resources.quietDeviceInvalid, Resources.quietDevicesField);
+    if (!Number.isSafeInteger(sequence) || sequence < 0)
+      throw new ArgumentException(Resources.currentSequenceInvalid, Resources.sequenceField);
 
     this.notifications = [...notifications];
     this.quietDevices = [...quietDevices];
+    this.sequence = sequence;
   }
 
   public static fromJson(value: unknown, path?: string): NotificationBroadcast {
@@ -34,14 +38,19 @@ export class NotificationBroadcast {
     WireContract.requireKnownFields(reader, NotificationBroadcast.FIELDS);
     return WireContract.create(reader, () => new NotificationBroadcast(
       reader.readObjectArray(Resources.notificationsField).map(t => Notification.fromJson(t.toJson(), t.path)),
-      reader.readStringArray(Resources.quietDevicesField)));
+      reader.readStringArray(Resources.quietDevicesField),
+      reader.readInteger(Resources.sequenceField)));
   }
 
   public stateFor(device: string): NotificationState {
-    return new NotificationState(this.notifications, this.quietDevices.includes(device));
+    return new NotificationState(this.notifications, this.quietDevices.includes(device), this.sequence);
   }
 
   public toJson(): JsonObject {
-    return { [Resources.notificationsField]: this.notifications.map(t => t.toJson()), [Resources.quietDevicesField]: [...this.quietDevices] };
+    return {
+      [Resources.notificationsField]: this.notifications.map(t => t.toJson()),
+      [Resources.quietDevicesField]: [...this.quietDevices],
+      [Resources.sequenceField]: this.sequence
+    };
   }
 }

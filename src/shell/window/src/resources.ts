@@ -261,6 +261,36 @@ export class Resources {
   public static readonly statusBarItemEmpty: string = "A status bar item shows text, an icon or both.";
   public static readonly statusBarItemUnnamed: string = "A status bar item that shows only an icon needs a tooltip, which is also its accessible name.";
   public static readonly defaultKeyParameter: string = "defaultKey";
+  public static readonly submenuParameter: string = "submenu";
+  public static readonly placeParameter: string = "place";
+  public static readonly itemsParameter: string = "items";
+  public static readonly emptyMenuGroup: string = "A menu group has at least one item.";
+  public static readonly placesField: string = "places";
+  public static readonly groupsField: string = "groups";
+  public static readonly nameField: string = "name";
+  public static readonly titleField: string = "title";
+  public static readonly menuBarField: string = "menuBar";
+  public static readonly placeField: string = "place";
+  public static readonly exclusiveField: string = "exclusive";
+  public static readonly itemsField: string = "items";
+  public static readonly submenuField: string = "submenu";
+  public static readonly commandField: string = "command";
+  public static readonly argumentsField: string = "arguments";
+  public static readonly fileMenu: string = "shell.file";
+  public static readonly editMenu: string = "shell.edit";
+  public static readonly viewMenu: string = "shell.view";
+  public static readonly windowMenu: string = "shell.window";
+  public static readonly helpMenu: string = "shell.help";
+  public static readonly tabMenu: string = "shell.tab";
+  public static readonly fileMenuTitle: string = "File";
+  public static readonly editMenuTitle: string = "Edit";
+  public static readonly viewMenuTitle: string = "View";
+  public static readonly windowMenuTitle: string = "Window";
+  public static readonly helpMenuTitle: string = "Help";
+  public static readonly tabMenuTitle: string = "Tab";
+  public static readonly windowPartMenusToken: string = "The build's module menus";
+  public static readonly placeInput: string = "place";
+  public static readonly contextInput: string = "context";
   public static readonly invalidContributionName: string = "A contribution name has the form <module id>.<name>.";
   public static readonly invalidModuleId: string = "A module id is lowercase kebab-case.";
   public static readonly windowPartLoadFailed: string = "Its window part could not be loaded.";
@@ -374,6 +404,11 @@ export class Resources {
   public static readonly dismissLabel: string = "Dismiss";
   public static readonly checkGlyph: string = "check";
   public static readonly unreadLimit: number = 9;
+  public static readonly toastLimit: number = 3;
+  public static readonly hoverSelector: string = ":hover";
+  public static readonly toastDuration: number = 8000;
+  public static readonly toastKindInterval: number = 5000;
+  public static readonly closeToastLabel: string = "Close";
   public static readonly severityGlyphs: Readonly<Record<NotificationSeverity, string>> = {
     [NotificationSeverity.Info]: "info",
     [NotificationSeverity.Success]: "check_circle",
@@ -406,6 +441,10 @@ export class Resources {
 
   public static formatCommandRegistered(name: string): string {
     return `The command ${name} is already registered.`;
+  }
+
+  public static formatForeignMenu(place: string): string {
+    return `A module may open only its own menus and those of the modules it depends on, not ${place}.`;
   }
 
   public static formatForeignName(moduleId: string, name: string): string {

@@ -11,6 +11,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import type IModuleDeclarationJson from "./interfaces/module-declaration-json.ts";
+import ModuleMenus from "./module-menus.ts";
 import ModuleException from "./module.exception.ts";
 import ModuleSettings from "./module-settings.ts";
 
@@ -20,12 +21,13 @@ export default class ModuleDeclaration {
   private static readonly MEMBER_PATTERN: RegExp = /^[a-z][a-zA-Z0-9]*$/;
   private static readonly RESERVED_ID: string = "shell";
   private static readonly KINDS: readonly string[] = [
-    "methods", "events", "commands", "notifications", "views", "documents", "statusBarItems", "topBarActions", "themes", ModuleSettings.SETTINGS_KIND, ModuleSettings.SCOPES_KIND
+    "methods", "events", "commands", "notifications", "views", "documents", "statusBarItems", "topBarActions", "menus", "themes", ModuleSettings.SETTINGS_KIND, ModuleSettings.SCOPES_KIND
   ];
   private static readonly FIELDS: readonly string[] = ["id", "displayName", "parts", "dependencies", "contributes"];
   private static readonly RUNTIME_PART: string = "runtime";
   private static readonly WINDOW_PART: string = "window";
   private static readonly WINDOW_ENTRY: string = "window/src/api/index";
+  private static readonly MENUS_KIND: string = "menus";
 
   public static readonly PARTS: readonly string[] = ["runtime", "window", "cli"];
 
@@ -35,6 +37,7 @@ export default class ModuleDeclaration {
   public readonly parts: readonly string[];
   public readonly dependencies: readonly string[];
   public readonly contributions: ReadonlyMap<string, readonly string[]>;
+  public readonly menus: ModuleMenus;
   public readonly settings: readonly Readonly<Record<string, unknown>>[];
   public readonly isFixture: boolean;
 
@@ -45,6 +48,7 @@ export default class ModuleDeclaration {
     parts: readonly string[],
     dependencies: readonly string[],
     contributions: ReadonlyMap<string, readonly string[]>,
+    menus: ModuleMenus,
     settings: readonly Readonly<Record<string, unknown>>[],
     isFixture: boolean) {
     this.folder = folder;
@@ -53,6 +57,7 @@ export default class ModuleDeclaration {
     this.parts = parts;
     this.dependencies = dependencies;
     this.contributions = contributions;
+    this.menus = menus;
     this.settings = settings;
     this.isFixture = isFixture;
   }
@@ -99,8 +104,9 @@ export default class ModuleDeclaration {
         throw fail(`contributes an unknown kind: ${kind}`);
       contributions.set(kind, ModuleDeclaration.readNames(names, id, fail, kind));
     }
+    const menus = await ModuleMenus.readAsync(root, folder, id, contributions.get(ModuleDeclaration.MENUS_KIND) ?? []);
     const settings = await ModuleSettings.readAsync(root, folder, dependencies, contributions);
-    return new ModuleDeclaration(folder, id, displayName, parts, dependencies, contributions, settings, isFixture);
+    return new ModuleDeclaration(folder, id, displayName, parts, dependencies, contributions, menus, settings, isFixture);
   }
 
   public get file(): string {

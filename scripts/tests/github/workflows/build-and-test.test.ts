@@ -35,7 +35,14 @@ class BuildAndTestTests {
     ["Keep the main window screenshot", "Keep the main window screenshot again", "Keep the main window screenshot a last time",
       ["path: _build/ui/main-window-*.png", "archive: false", "retention-days: 14", "if-no-files-found: warn"]]
   ];
-  private static readonly SHA: string = "0123456789abcdef0123456789abcdef01234567";
+  private static readonly TEST_STEP: string = "Test";
+  private static readonly ANGULAR_UPLOADS: readonly string[] = ["Keep the Angular test output", "Keep the Angular test output again", "Keep the Angular test output a last time"];
+  private static readonly ANGULAR_WARNING: string = "Warn that the Angular test output was not kept";
+  private static readonly ANGULAR_SETTINGS: readonly string[] = [
+    "name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}", "path: |", "  _build/angular-tests.log", "  _build/angular-tests.json", "retention-days: 14",
+    "if-no-files-found: ignore"
+  ];
+  private static readonly SHA: string ="0123456789abcdef0123456789abcdef01234567";
   private static readonly RUNS_QUERY: string = "api repos/noldova-com/teamrun/actions/workflows/build-and-test.yml/runs?event=merge_group" +
     "&head_sha=0123456789abcdef0123456789abcdef01234567&status=success&per_page=100 --jq .workflow_runs[] | select(.event == \"merge_group\" and " +
     ".head_sha == env.GITHUB_SHA and .conclusion == \"success\" and .path == \".github/workflows/build-and-test.yml\") | \"\\(.html_url)/attempts/\\(.run_attempt)\"";
@@ -442,8 +449,8 @@ class BuildAndTestTests {
       assert.ok(text.includes("    name: Build and test (${{ matrix.label }})\n    needs: changes\n"));
       assert.ok(text.includes("      matrix:\n        include: ${{ fromJSON(needs.changes.outputs.legs) }}\n    runs-on: ${{ matrix.runner }}\n"));
       assert.ok(text.includes("      legs: ${{ steps.legs.outputs.legs }}\n      deferred: ${{ steps.legs.outputs.deferred }}\n      complete: ${{ steps.legs.outputs.complete }}\n"));
-      for (const step of ["Build", "Test"])
-        assert.ok(text.includes(`      - name: ${step}\n        if: matrix.part != 'workflows'\n`), step);
+      assert.ok(text.includes("      - name: Build\n        if: matrix.part != 'workflows'\n"));
+      assert.ok(text.includes("      - name: Test\n        id: test\n        if: matrix.part != 'workflows'\n"));
       assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n        if: matrix.part != 'tests'\n"));
       for (const step of ["Check out the revision", "Set up Node.js", "Restore the installed dependencies", "Restore the Angular project's installed dependencies", "Install Electron"])
         assert.ok(!new RegExp(`      - name: ${step}\\n        if: [^\\n]*matrix\\.part`).test(text), step);
@@ -593,6 +600,37 @@ class BuildAndTestTests {
         assert.equal(workflow.readStepScript(`${pause} again`), "sleep 15\n");
         assert.equal(workflow.readStepScript(`${pause} a last time`), "sleep 15\n");
       }
+    });
+
+    test("failed tests keep the Angular tests' output and report, tried three times with a pause, and a passing or skipped test step keeps nothing", async t => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const simulation = new WorkflowSimulation(workflow.text, BuildAndTestTests.TEST_STEP, BuildAndTestTests.ANGULAR_WARNING);
+      const [first, again, last] = BuildAndTestTests.ANGULAR_UPLOADS.map(t => simulation.find(t));
+      const doubles = await CommandDoublesFixture.createAsync();
+      t.after(() => doubles.disposeAsync());
+
+      const passed = simulation.run(BuildAndTestTests.WHOLE_LEG, {});
+      const skipped = simulation.run({ part: "workflows" }, {});
+      const failed = simulation.run(BuildAndTestTests.WHOLE_LEG, { [BuildAndTestTests.TEST_STEP]: "failure" });
+      const unkept = simulation.run(BuildAndTestTests.WHOLE_LEG,
+        Object.fromEntries([BuildAndTestTests.TEST_STEP, ...BuildAndTestTests.ANGULAR_UPLOADS].map(t => [t, "failure"])));
+      const warning = await doubles.runAsync(workflow.readStepScript(BuildAndTestTests.ANGULAR_WARNING));
+
+      assert.deepEqual([passed.ran, passed.isJobFailed], [[BuildAndTestTests.TEST_STEP], false]);
+      assert.deepEqual([skipped.ran, skipped.isJobFailed], [[], false]);
+      assert.deepEqual([failed.ran, failed.isJobFailed], [[BuildAndTestTests.TEST_STEP, "Keep the Angular test output"], true]);
+      assert.deepEqual(unkept.ran, [
+        BuildAndTestTests.TEST_STEP,
+        "Keep the Angular test output", "Wait before keeping the Angular test output again", "Keep the Angular test output again",
+        "Wait before keeping the Angular test output a last time", "Keep the Angular test output a last time",
+        BuildAndTestTests.ANGULAR_WARNING
+      ]);
+      assert.deepEqual([first, again, last].map(t => [t?.uses, t?.continueOnError]), [first, again, last].map(() => [BuildAndTestTests.UPLOAD_ACTION, true]));
+      assert.deepEqual(first?.settings, BuildAndTestTests.ANGULAR_SETTINGS);
+      assert.deepEqual([again?.settings, last?.settings], [[...BuildAndTestTests.ANGULAR_SETTINGS, "overwrite: true"], [...BuildAndTestTests.ANGULAR_SETTINGS, "overwrite: true"]]);
+      assert.equal(workflow.readStepScript("Wait before keeping the Angular test output again"), "sleep 15\n");
+      assert.equal(workflow.readStepScript("Wait before keeping the Angular test output a last time"), "sleep 15\n");
+      assert.deepEqual([warning.status, warning.stdout], [0, "::warning title=The Angular test output was not kept::The upload failed three times, so it is not attached.\n"]);
     });
 
     test("an upload that fails and then succeeds is tried again once and keeps the job green", async () => {

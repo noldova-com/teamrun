@@ -21,12 +21,21 @@ describe("NotificationService", () => {
   let bridge: DesktopBridgeFixture;
 
   const notification = (id: number, title: string, isRead: boolean): object =>
-    ({ id, post: { kind: "clock.alarm", title, severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead });
-  const state = (isDoNotDisturb: boolean, ...notifications: object[]): object => ({ notifications, isDoNotDisturb });
+    ({ id, sequence: id, post: { kind: "clock.alarm", title, severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead });
+  const state = (isDoNotDisturb: boolean, ...notifications: object[]): object => ({ notifications, isDoNotDisturb, sequence: notifications.length });
 
   function start(): NotificationService {
     TestBed.configureTestingModule({ providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }] });
-    return TestBed.inject(NotificationService);
+    const service = TestBed.inject(NotificationService);
+    TestBed.tick();
+    return service;
+  }
+
+  async function settleAsync(isDone: () => boolean): Promise<void> {
+    await vi.waitFor(() => {
+      TestBed.tick();
+      expect(isDone()).toBe(true);
+    });
   }
 
   beforeEach(() => {
@@ -36,34 +45,38 @@ describe("NotificationService", () => {
 
   afterEach(() => DesktopBridgeFixture.remove());
 
-  it("reads the state once the runtime is ready, counts what is unread and reads it again after a reconnection", async () => {
+  it("reads the state once the window parts activate, counts what is unread and reads it again after a reconnection", async () => {
     bridge.responses.set("shell.notifications", { payload: state(true, notification(2, "Second", false), notification(1, "First", true)) });
     const service = start();
 
-    await vi.waitFor(() => expect(service.state().notifications.length).toBe(2));
+    await settleAsync(() => service.state().notifications.length === 2);
     const unread = service.unreadCount();
+    const first = service.firstRead();
     bridge.responses.set("shell.notifications", { payload: state(false) });
     bridge.publishStartup({ kind: "Connecting", details: [] });
     bridge.publishStartup({ kind: "Ready", details: [] });
-    await vi.waitFor(() => expect(service.state().notifications.length).toBe(0));
+    await settleAsync(() => service.state().notifications.length === 0);
 
     expect(unread).toBe(1);
-    expect(service.state().isDoNotDisturb).toBe(false);
-    expect(bridge.requests.filter(t => t[0] === "shell.notifications")).toEqual([["shell.notifications", {}], ["shell.notifications", {}]]);
+    expect(first?.sequence).toBe(2);
+    expect([service.state().isDoNotDisturb, service.firstRead()?.sequence]).toEqual([false, 0]);
+    expect(bridge.requests.map(t => t[0])).toEqual([
+      "shell.settings", "shell.modules", "shell.commands", "shell.notifications", "shell.settings", "shell.modules", "shell.commands", "shell.notifications"
+    ]);
   });
 
   it("reports a first read that fails", async () => {
     bridge.responses.set("shell.notifications", { failure: { code: "Unavailable", message: "Not connected." } });
 
     start();
-    await vi.waitFor(() => expect(errors.length).toBe(1));
+    await settleAsync(() => errors.length === 1);
 
     expect((errors[0] as Error).message).toContain("Not connected.");
   });
 
   it("follows the notifications event, ignores other events and reports one it cannot read", async () => {
     const service = start();
-    await vi.waitFor(() => expect(bridge.requests.length).toBeGreaterThan(0));
+    await settleAsync(() => !Object.is(service.firstRead(), null));
 
     bridge.publishEvent("shell.notifications", state(true, notification(3, "Third", false)));
     bridge.publishEvent("clock.ticked", { ticks: 1 });
@@ -74,25 +87,25 @@ describe("NotificationService", () => {
     expect(errors.length).toBe(1);
   });
 
-  it("keeps an event that arrives while its first read is pending over the older answer", async () => {
+  it("keeps an event that arrives while its first read is pending over the older answer, but counts from the answer", async () => {
     let answer: (value: unknown) => void = () => undefined;
     bridge.responses.set("shell.notifications", new Promise(resolve => {
       answer = resolve;
     }));
     const service = start();
-    await vi.waitFor(() => expect(bridge.requests.some(t => t[0] === "shell.notifications")).toBe(true));
+    await settleAsync(() => bridge.requests.some(t => t[0] === "shell.notifications"));
 
-    bridge.publishEvent("shell.notifications", state(false, notification(5, "Newer", false)));
+    bridge.publishEvent("shell.notifications", state(false, notification(5, "Newer", false), notification(4, "Older", false)));
     answer({ payload: state(false, notification(4, "Older", false)) });
-    await vi.waitFor(() => expect(bridge.requests.length).toBeGreaterThan(0));
-    await Promise.resolve();
+    await settleAsync(() => !Object.is(service.firstRead(), null));
 
-    expect(service.state().notifications.map(t => t.post.title)).toEqual(["Newer"]);
+    expect(service.state().notifications.map(t => t.post.title)).toEqual(["Newer", "Older"]);
+    expect(service.firstRead()?.sequence).toBe(1);
   });
 
   it("asks the runtime to mark read, clear, dismiss and switch Do not disturb, and reports a request that fails", async () => {
     const service = start();
-    await vi.waitFor(() => expect(bridge.requests.length).toBeGreaterThan(0));
+    await settleAsync(() => !Object.is(service.firstRead(), null));
     bridge.responses.set("shell.clearNotifications", { failure: { code: "Unavailable", message: "Not connected." } });
 
     service.markAllRead();

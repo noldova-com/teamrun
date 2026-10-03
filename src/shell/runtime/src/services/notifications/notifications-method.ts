@@ -25,6 +25,6 @@ export class NotificationsMethod implements IMethodHandler {
 
   public async handleAsync(context: RequestContext): Promise<JsonValue> {
     const query = NotificationsQuery.fromJson(context.payload);
-    return new NotificationState(this.notifications.list.notifications, this.store.isQuiet(query.device)).toJson();
+    return new NotificationState(this.notifications.list.notifications, this.store.isQuiet(query.device), this.notifications.sequence).toJson();
   }
 }

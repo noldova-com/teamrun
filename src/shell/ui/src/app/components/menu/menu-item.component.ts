@@ -21,7 +21,7 @@ import { MenuTriggerDirective } from "./menu-trigger.directive";
   changeDetection: ChangeDetectionStrategy.OnPush,
   hostDirectives: [{ directive: CdkMenuItem, inputs: ["cdkMenuItemDisabled: disabled"], outputs: ["cdkMenuItemTriggered: triggered"] }],
   host: {
-    "[attr.role]": "checked() === null ? resources.menuItemRole : resources.menuItemRadioRole",
+    "[attr.role]": "checked() === null ? resources.menuItemRole : checkbox() ? resources.menuItemCheckboxRole : resources.menuItemRadioRole",
     "[attr.aria-checked]": "checked()"
   }
 })
@@ -32,6 +32,7 @@ export class MenuItemComponent {
   public readonly label = input.required<string>();
   public readonly icon = input<string | null>(null);
   public readonly checked = input<boolean | null>(null);
+  public readonly checkbox = input<boolean>(false);
   public readonly shortcut = input<string | null>(null);
 
   public constructor() {

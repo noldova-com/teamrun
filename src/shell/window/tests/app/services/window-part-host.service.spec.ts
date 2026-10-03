@@ -237,6 +237,29 @@ describe("WindowPartHostService", () => {
     expect((errors[0] as Error).message).toContain("Not connected.");
   });
 
+  it("advances its generation only once every post its parts made while activating is answered, even one not awaited or refused", async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    bridge.responses.set("shell.postNotification", new Promise(resolve => {
+      answer = resolve;
+    }));
+    const refusals: unknown[] = [];
+    const post = new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Success, null, [], null);
+    const notes = new FakeWindowPart("notes", log, t => {
+      t.postNotificationAsync(post).catch((error: unknown) => refusals.push(error));
+    });
+    const { host, loads } = start([source("notes", notes, [], [], [], [], [], ["notes.saved"])], [status("notes")]);
+    await vi.waitFor(() => expect(bridge.requests.some(t => t[0] === "shell.postNotification")).toBe(true));
+    await Promise.resolve();
+    const waiting = [host.generation(), loads.length];
+
+    answer({ failure: { code: "Refused", message: "The kind is not declared." } });
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    expect(waiting).toEqual([0, 0]);
+    expect((refusals[0] as Error).message).toContain("The kind is not declared.");
+    expect(errors).toEqual([]);
+  });
+
   it("lists the runtime's and the window parts' commands in module order and runs both", async () => {
     const runs: string[] = [];
     const notes = new FakeWindowPart("notes", log, t => {
