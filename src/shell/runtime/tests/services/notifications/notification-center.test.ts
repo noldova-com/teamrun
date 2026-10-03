@@ -42,6 +42,20 @@ export class NotificationCenterTests {
   }
 
   @TestMethod
+  public givesEachPostAndRePostTheNextSequenceWhichAnUpdateKeeps(): void {
+    const { center } = NotificationCenterTests.create();
+    const before = center.sequence;
+    const alarm = center.post(NotificationCenterTests.post("clock.alarm", "morning", "Wake up"));
+    center.post(NotificationCenterTests.post("notes.saved", null, "Saved"));
+    center.post(NotificationCenterTests.post("clock.alarm", "morning", "Wake up now"));
+    center.update(alarm, NotificationCenterTests.post("clock.alarm", "morning", "Awake"));
+    center.markAllRead();
+
+    Assert.areEqual(0, before);
+    Assert.areEqual("1:3,2:2|3", `${center.list.notifications.map(t => `${t.id}:${t.sequence}`).join(",")}|${center.sequence}`);
+  }
+
+  @TestMethod
   public updatesInPlaceKeepingItsTimeButRefusesAnotherKindAndReportsAMissingOne(): void {
     const { center, published } = NotificationCenterTests.create();
     const id = center.post(NotificationCenterTests.post("clock.sync", null, "Syncing", 0.25));

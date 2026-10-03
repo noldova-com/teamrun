@@ -3855,6 +3855,11 @@ export declare class NotificationCenter {
   public get list(): NotificationList;
 
   /**
+   * The sequence of the latest post, or 0 before any. Each post and re-post takes the next number; an update keeps it.
+   */
+  public get sequence(): number;
+
+  /**
    * Finds a notification by its id.
    *
    * @param id The notification's id.
@@ -3871,7 +3876,8 @@ export declare class NotificationCenter {
   public find(id: number): Notification | undefined;
 
   /**
-   * Adds a notification at the top, unread. One with the same kind and key is replaced and keeps its id.
+   * Adds a notification at the top, unread, with the next sequence. One with the same kind and key is replaced and keeps its
+   * id.
    *
    * @param post What was posted, already allowed.
    * @returns The notification's id.
@@ -3888,7 +3894,7 @@ export declare class NotificationCenter {
   public post(post: NotificationPost): number;
 
   /**
-   * Replaces a notification's post, keeping its place, time and whether it was read.
+   * Replaces a notification's post, keeping its place, sequence, time and whether it was read.
    *
    * @param id The notification's id.
    * @param post The new post, already allowed.

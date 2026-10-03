@@ -106,7 +106,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
     const notificationsChanged = this.events.declare(ShellEvents.notifications);
     this.notifications = new NotificationCenter(
-      t => notificationsChanged.publish(new NotificationBroadcast(t.notifications, [...this.quietDevices].sort()).toJson()), () => new Date());
+      t => notificationsChanged.publish(new NotificationBroadcast(t.notifications, [...this.quietDevices].sort(), this.notifications.sequence).toJson()), () => new Date());
     this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics);
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));

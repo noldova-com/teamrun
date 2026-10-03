@@ -24,7 +24,7 @@ import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 
 class FakeNotificationService {
   public readonly calls: string[] = [];
-  public readonly stateValue: WritableSignal<NotificationState> = signal(new NotificationState([], false));
+  public readonly stateValue: WritableSignal<NotificationState> = signal(new NotificationState([], false, 0));
   public readonly state = this.stateValue.asReadonly();
   public readonly unreadCount = computed(() => this.stateValue().notifications.filter(t => !t.isRead).length);
   public failure: Error | null = null;
@@ -62,7 +62,7 @@ describe("NotificationsComponent", () => {
     kind: string,
     title: string,
     options: Partial<{ text: string; severity: NotificationSeverity; open: string; actions: readonly string[]; progress: number | typeof NotificationPost.indeterminate; isRead: boolean }> = {}): Notification =>
-    new Notification(id, new NotificationPost(
+    new Notification(id, id, new NotificationPost(
       QualifiedName.parse(kind), null, title, options.text ?? null, options.severity ?? NotificationSeverity.Info,
       options.open === undefined ? null : run(options.open), (options.actions ?? []).map(t => new NotificationAction(`Run ${t}`, run(t))),
       options.progress ?? null), "2026-10-03T08:05:00.000Z", options.isRead ?? false);
@@ -109,7 +109,7 @@ describe("NotificationsComponent", () => {
     const quietLabel = (): string | null => item(fixture).getAttribute("aria-label");
     const empty = [item(fixture).textContent?.trim(), quietLabel()];
 
-    service.stateValue.set(new NotificationState(Array.from({ length: 12 }, (_, index) => notification(index + 1, "clock.alarm", `Alarm ${index}`)), true));
+    service.stateValue.set(new NotificationState(Array.from({ length: 12 }, (_, index) => notification(index + 1, "clock.alarm", `Alarm ${index}`)), true, 0));
     await fixture.whenStable();
 
     expect(empty).toEqual(["notifications", "Notifications"]);
@@ -118,7 +118,7 @@ describe("NotificationsComponent", () => {
   });
 
   it("opens its list, marking everything read only when something is unread, and closes on a second click, Escape and a click outside", async () => {
-    service.stateValue.set(new NotificationState([notification(1, "clock.alarm", "Alarm")], false));
+    service.stateValue.set(new NotificationState([notification(1, "clock.alarm", "Alarm")], false, 0));
     const fixture = await renderAsync();
 
     const opened = await openAsync(fixture);
@@ -126,7 +126,7 @@ describe("NotificationsComponent", () => {
     item(fixture).click();
     await fixture.whenStable();
     const afterSecondClick = popover();
-    service.stateValue.set(new NotificationState([notification(1, "clock.alarm", "Alarm", { isRead: true })], false));
+    service.stateValue.set(new NotificationState([notification(1, "clock.alarm", "Alarm", { isRead: true })], false, 0));
     await openAsync(fixture);
     await userEvent.keyboard("{Escape}");
     await fixture.whenStable();
@@ -166,7 +166,7 @@ describe("NotificationsComponent", () => {
       notification(3, "notes.saved", "Saved", { severity: NotificationSeverity.Success, text: "Plan.md", open: "notes.open", actions: ["notes.undo", "clock.reset"], isRead: true }),
       notification(2, "clock.sync", "Syncing", { severity: NotificationSeverity.Warning, progress: NotificationPost.indeterminate, isRead: true }),
       notification(1, "clock.sync", "Copying", { severity: NotificationSeverity.Error, progress: 0.25, isRead: true })
-    ], false));
+    ], false, 0));
     await fixture.whenStable();
     const rows = [...(popover() as HTMLElement).querySelectorAll<HTMLElement>(".tr-notifications-row")];
 
@@ -188,7 +188,7 @@ describe("NotificationsComponent", () => {
     service.stateValue.set(new NotificationState([
       notification(2, "notes.saved", "Saved", { open: "notes.open", actions: ["notes.undo"], isRead: true }),
       notification(1, "clock.sync", "Syncing", { progress: 0.5, isRead: true })
-    ], false));
+    ], false, 0));
     const fixture = await renderAsync();
 
     (await openAsync(fixture)).querySelector<HTMLButtonElement>(".tr-notifications-action")?.click();
@@ -208,14 +208,14 @@ describe("NotificationsComponent", () => {
   for (const theme of AppearanceFixture.themes)
     it(`draws its Do not disturb checkbox at the ${theme.id} theme's size and shows its mark only while checked`, async () => {
       AppearanceFixture.apply(theme);
-      service.stateValue.set(new NotificationState([], false));
+      service.stateValue.set(new NotificationState([], false, 0));
       const fixture = await renderAsync();
 
       const list = await openAsync(fixture);
       const box = list.querySelector(".tr-notifications-quiet-box") as HTMLElement;
       const mark = (): string => getComputedStyle(list.querySelector(".tr-notifications-quiet-mark") as Element).visibility;
       const unchecked = mark();
-      service.stateValue.set(new NotificationState([], true));
+      service.stateValue.set(new NotificationState([], true, 0));
       await fixture.whenStable();
 
       AppearanceFixture.expectLook(getComputedStyle(box).width, theme, "checkbox-size", "width");
@@ -225,7 +225,7 @@ describe("NotificationsComponent", () => {
     });
 
   it("disables Clear all while every notification is in progress and reports an action that fails", async () => {
-    service.stateValue.set(new NotificationState([notification(1, "clock.sync", "Syncing", { progress: 0.5, actions: ["clock.cancel"], isRead: true })], false));
+    service.stateValue.set(new NotificationState([notification(1, "clock.sync", "Syncing", { progress: 0.5, actions: ["clock.cancel"], isRead: true })], false, 0));
     service.failure = new Error("The clock stopped.");
     const fixture = await renderAsync();
 

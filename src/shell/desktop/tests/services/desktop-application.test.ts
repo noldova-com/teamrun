@@ -640,7 +640,7 @@ export class DesktopApplicationTests {
   @TestMethod
   public async addsItsOwnDeviceToItsWindowsNotificationRequestsAndRefusesAnInvalidSwitch(): Promise<void> {
     const connection = new FakeRuntimeConnection();
-    connection.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: true }));
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: true, sequence: 2 }));
     connection.answers.set("shell.setDoNotDisturb", Response.success("r", null));
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopApplicationTests.trustedEvent("linux");
@@ -657,7 +657,7 @@ export class DesktopApplicationTests {
     Assert.areEqual(
       JSON.stringify([`shell.notifications {"device":"${FakeDeviceIdentity.ID}"}`, `shell.setDoNotDisturb {"device":"${FakeDeviceIdentity.ID}","isOn":true}`]),
       JSON.stringify(sent));
-    Assert.areEqual("{\"notifications\":[],\"isDoNotDisturb\":true}|null", `${JSON.stringify(state.payload)}|${JSON.stringify(quiet.payload)}`);
+    Assert.areEqual("{\"notifications\":[],\"isDoNotDisturb\":true,\"sequence\":2}|null", `${JSON.stringify(state.payload)}|${JSON.stringify(quiet.payload)}`);
     Assert.areEqual(FailureCode.InvalidParams, invalid.failure?.code);
     Assert.areEqual(FailureCode.Unavailable, noDevice.failure?.code);
   }
@@ -674,7 +674,7 @@ export class DesktopApplicationTests {
     const lostLauncher = new FakeRuntimeLauncher();
     const lost = await DesktopApplicationTests.startReadyAsync("linux", lostLauncher, new FakeElectron(), unidentified);
     await DesktopApplicationTests.invokeAsync(lost, "teamrun:readLayout", DesktopApplicationTests.trustedEvent("linux"));
-    const broadcast = (devices: readonly string[]): Event => new Event(ShellEvents.notifications, new NotificationBroadcast([], devices).toJson());
+    const broadcast = (devices: readonly string[]): Event => new Event(ShellEvents.notifications, new NotificationBroadcast([], devices, 4).toJson());
 
     launcher.listener?.onEvent(broadcast([FakeDeviceIdentity.ID, "desk"]));
     launcher.listener?.onEvent(broadcast(["desk"]));
@@ -683,12 +683,12 @@ export class DesktopApplicationTests {
 
     Assert.areEqual(
       JSON.stringify([
-        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: true }],
-        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false }]
+        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: true, sequence: 4 }],
+        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false, sequence: 4 }]
       ]),
       JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
     Assert.areEqual(
-      JSON.stringify([["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false }]]),
+      JSON.stringify([["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false, sequence: 4 }]]),
       JSON.stringify(DesktopApplicationTests.firstWindow(lost).webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.notifications could not be passed to the window").length);
   }
