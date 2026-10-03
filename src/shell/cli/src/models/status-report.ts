@@ -26,7 +26,7 @@ export class StatusReport {
     return {
       build: this.identity.toJson(),
       dataDirectory: this.dataDirectory,
-      modules: this.modules.toJson()["modules"] ?? [],
+      modules: this.modules.modules.map(t => t.toJson()),
       work: [...this.work.descriptions]
     };
   }

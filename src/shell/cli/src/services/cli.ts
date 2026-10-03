@@ -38,7 +38,8 @@ import { Resources } from "../resources.js";
 import { CliOutput } from "./cli-output.js";
 
 export class Cli {
-  private static readonly LISTENER: IRuntimeClientListener = { onEvent: () => undefined, onDisconnected: () => undefined };
+  private static readonly IGNORE: () => void = () => undefined;
+  private static readonly LISTENER: IRuntimeClientListener = { onEvent: Cli.IGNORE, onDisconnected: Cli.IGNORE };
 
   private readonly context: CliContext;
 
@@ -110,7 +111,7 @@ export class Cli {
   }
 
   private async runCommandAsync(commandLine: CommandLine): Promise<JsonValue> {
-    const run = new CommandRun(Cli.parseName(commandLine.commandName ?? ""), await this.readArgumentsAsync(commandLine));
+    const run = new CommandRun(Cli.parseName(commandLine.commandName), await this.readArgumentsAsync(commandLine));
     const client = await this.attachAsync(this.locate(commandLine), new AttachOptions(commandLine.start, commandLine.takeOver));
     const controller = new AbortController();
     const interrupt = (): void => controller.abort();
@@ -126,9 +127,9 @@ export class Cli {
 
   private async openAsync(commandLine: CommandLine): Promise<string> {
     const directory = this.locate(commandLine);
-    const checkout = this.context.environment[Resources.checkoutVariable];
+    const checkout = this.context.environment[Resources.checkoutVariable] ?? "";
     const desktopArguments = [
-      ...String.isNullOrWhitespace(checkout) ? [] : [path.join(checkout ?? "", ...Resources.desktopMainSegments)],
+      ...String.isNullOrWhitespace(checkout) ? [] : [path.join(checkout, ...Resources.desktopMainSegments)],
       `${Resources.dataDirectoryFlag}${Resources.valueSeparator}${directory.root}`
     ];
     const environment = { ...this.context.environment };
@@ -143,9 +144,9 @@ export class Cli {
   }
 
   private locate(commandLine: CommandLine): DataDirectory {
-    const checkout = this.context.environment[Resources.checkoutVariable];
+    const checkout = this.context.environment[Resources.checkoutVariable] ?? "";
     const explicit = Object.isNull(commandLine.dataDirectory) ? undefined : path.resolve(commandLine.dataDirectory);
-    return DataDirectoryLocator.locate(String.isNullOrWhitespace(checkout), this.context.environment, this.context.homeFolder, checkout ?? "", explicit);
+    return DataDirectoryLocator.locate(String.isNullOrWhitespace(checkout), this.context.environment, this.context.homeFolder, checkout, explicit);
   }
 
   private attachAsync(directory: DataDirectory, options: AttachOptions): Promise<RuntimeClient> {
@@ -160,10 +161,10 @@ export class Cli {
       case ArgumentsSource.None:
         return null;
       case ArgumentsSource.Inline:
-        source = commandLine.argumentsText ?? "";
+        source = commandLine.argumentsText;
         break;
       case ArgumentsSource.File:
-        source = await Cli.readArgumentsFileAsync(commandLine.argumentsText ?? "");
+        source = await Cli.readArgumentsFileAsync(commandLine.argumentsText);
         break;
       case ArgumentsSource.Input:
         source = await text(this.context.input);

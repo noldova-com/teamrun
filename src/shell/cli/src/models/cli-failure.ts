@@ -37,6 +37,8 @@ export class CliFailure {
   }
 
   public static fromFailure(failure: Failure): CliFailure {
+    if (failure.code === FailureCode.Unauthorized)
+      return new CliFailure(ExitCode.DataDirectoryUnusable, failure.code, Resources.formatDataDirectoryUnusable(failure.message));
     const isStopped = failure.code === FailureCode.Cancelled || failure.code === FailureCode.DeadlineExceeded;
     return new CliFailure(isStopped ? ExitCode.Stopped : ExitCode.Failed, failure.code, failure.message, failure.details ?? null);
   }
@@ -63,11 +65,7 @@ export class CliFailure {
 
   private static fromConnection(error: ConnectionException): CliFailure {
     const failure = error.failure;
-    if (Object.isNull(failure))
-      return new CliFailure(ExitCode.Failed, Resources.unavailableCode, error.message);
-    if (failure.code === FailureCode.Unauthorized)
-      return new CliFailure(ExitCode.DataDirectoryUnusable, failure.code, Resources.formatDataDirectoryUnusable(failure.message));
-    return CliFailure.fromFailure(failure);
+    return Object.isNull(failure) ? new CliFailure(ExitCode.Failed, Resources.unavailableCode, error.message) : CliFailure.fromFailure(failure);
   }
 
   private static isUnusableDirectory(error: unknown): boolean {

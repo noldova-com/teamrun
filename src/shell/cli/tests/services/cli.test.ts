@@ -347,6 +347,16 @@ export class CliTests {
   }
 
   @TestMethod
+  public async letsAnUnexpectedErrorReachItsCaller(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    const starter = { startAsync: (): Promise<number> => Promise.reject(new RangeError("The starter broke.")) };
+
+    const run = fixture.runAsync(fixture.withDataDirectory(["commands"]), null, fixture.environment, "", starter);
+
+    Assert.areEqual("The starter broke.", (await Assert.throwsAsync(() => run, RangeError)).message);
+  }
+
+  @TestMethod
   public async opensTheDesktopWithTheSameDataDirectory(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     const development = { ...fixture.environment, [CliFixture.CHECKOUT_VARIABLE]: fixture.root, ELECTRON_RUN_AS_NODE: "1" };

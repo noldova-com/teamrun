@@ -65,6 +65,14 @@ export interface IDesktopOpener {
    * @param environment Its environment.
    * @returns A promise that settles once the program has started.
    * @throws {Error} Rejected when the program cannot be started.
+   * @example
+   * ```ts
+   * import type { IDesktopOpener } from "@noldova/teamrun-shell-cli";
+   *
+   * export function openAsync(opener: IDesktopOpener, executable: string): Promise<void> {
+   *   return opener.openAsync(executable, ["--data-dir=/data"], process.env);
+   * }
+   * ```
    */
   openAsync(executable: string, launchArguments: readonly string[], environment: NodeJS.ProcessEnv): Promise<void>;
 }

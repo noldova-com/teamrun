@@ -24,9 +24,9 @@ export class CommandLine {
   public readonly start: boolean;
   public readonly takeOver: boolean;
   public readonly timeoutMilliseconds: number | null;
-  public readonly commandName: string | null;
+  public readonly commandName: string;
   public readonly argumentsSource: ArgumentsSource;
-  public readonly argumentsText: string | null;
+  public readonly argumentsText: string;
 
   public constructor(
     command: CliCommand,
@@ -35,9 +35,9 @@ export class CommandLine {
     start: boolean = true,
     takeOver: boolean = false,
     timeoutMilliseconds: number | null = null,
-    commandName: string | null = null,
+    commandName: string = "",
     argumentsSource: ArgumentsSource = ArgumentsSource.None,
-    argumentsText: string | null = null) {
+    argumentsText: string = "") {
     this.command = command;
     this.dataDirectory = dataDirectory;
     this.isJson = isJson;
@@ -52,8 +52,8 @@ export class CommandLine {
   public static parse(commandLineArguments: readonly string[]): CommandLine {
     const options = new Map<string, string>();
     const positional: string[] = [];
-    for (let index = 0; index < commandLineArguments.length; index++) {
-      const argument = commandLineArguments[index] ?? "";
+    const queue = [...commandLineArguments];
+    for (let argument = queue.shift(); !Object.isUndefined(argument); argument = queue.shift()) {
       if (argument === Resources.inputArgument || !argument.startsWith(Resources.flagPrefix)) {
         positional.push(argument);
         continue;
@@ -63,7 +63,7 @@ export class CommandLine {
       if (CommandLine.SWITCHES.includes(name) && separator < 0)
         options.set(name, "");
       else if (CommandLine.VALUE_OPTIONS.includes(name)) {
-        const value = separator < 0 ? commandLineArguments[++index] : argument.slice(separator + 1);
+        const value = separator < 0 ? queue.shift() : argument.slice(separator + 1);
         if (Object.isUndefined(value) || value.length === 0)
           throw new UsageException(Resources.formatOptionNeedsValue(name));
         options.set(name, value);
@@ -109,9 +109,9 @@ export class CommandLine {
       !options.has(Resources.noStartFlag),
       options.has(Resources.takeOverFlag),
       CommandLine.parseTimeout(options.get(Resources.timeoutFlag)),
-      commandName ?? null,
+      commandName,
       source,
-      file ?? (source === ArgumentsSource.Inline ? argumentsValue ?? null : null));
+      file ?? (source === ArgumentsSource.Inline ? argumentsValue : undefined));
   }
 
   private static parseTimeout(value: string | undefined): number | null {

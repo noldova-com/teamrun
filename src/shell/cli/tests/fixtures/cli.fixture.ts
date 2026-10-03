@@ -14,7 +14,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import "@noldova/teamrun-foundation-core";
 import { Cli, CliContext } from "@noldova/teamrun-shell-cli";
 import type { BuildIdentity } from "@noldova/teamrun-shell-protocol";
-import { DataDirectory, DiscoveryReader, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions, ServerSettings } from "@noldova/teamrun-shell-runtime";
+import { DataDirectory, DiscoveryReader, type IProcessStarter, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions, ServerSettings } from "@noldova/teamrun-shell-runtime";
 
 import { FakeDesktopOpenerFixture } from "./fake-desktop-opener.fixture.js";
 import type { ProbeBuildFixture } from "./probe-build.fixture.js";
@@ -57,14 +57,15 @@ export class CliFixture implements AsyncDisposable {
     commandLineArguments: readonly string[],
     build: ProbeBuildFixture | null = null,
     environment: NodeJS.ProcessEnv = this.environment,
-    input: string = ""): Promise<{ code: number; output: string; error: string }> {
+    input: string = "",
+    starter?: IProcessStarter): Promise<{ code: number; output: string; error: string }> {
     const output = new PassThrough({ encoding: "utf8" });
     const error = new PassThrough({ encoding: "utf8" });
     const inputStream = new PassThrough({ encoding: "utf8" });
     inputStream.end(input);
     const identity: BuildIdentity = build?.identity ?? RuntimeBuild.identity;
     const context = new CliContext(environment, process.platform, this.homeFolder, process.execPath, build?.entryPath ?? RuntimeEntry.entryPath, identity,
-      output, error, inputStream, this.signals, undefined, this.opener);
+      output, error, inputStream, this.signals, starter, this.opener);
     const code = await new Cli(context).runAsync(commandLineArguments);
     return { code, output: String(output.read() ?? ""), error: String(error.read() ?? "") };
   }
