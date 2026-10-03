@@ -36,6 +36,29 @@ describe("LayoutGeometry", () => {
     expect(geometry.handles).toEqual([]);
   });
 
+  it("keeps a strip on the outer edge of each side shown as icons, beside its dock or alone while it is collapsed", () => {
+    const icons = new Set([DockSide.Left, DockSide.Right, DockSide.Bottom]);
+    const open = new LayoutGeometry(120, 60, initial, registry, icons);
+    const collapsed = new LayoutGeometry(120, 60, initial.toggleDock(DockSide.Left), registry, icons);
+    const empty = new LayoutGeometry(120, 60, initial.close(LayoutFixture.changes), registry, icons);
+
+    expect(sides.map(t => open.rail(t))).toEqual([new Bounds(0.25, 0, 2.75, 59.75), new Bounds(117, 0, 2.75, 59.75), null]);
+    expect([open.dock(DockSide.Left), open.dock(DockSide.Right), open.middle]).toEqual([new Bounds(3.25, 0, 26, 59.75), new Bounds(91.75, 0, 25, 59.75), new Bounds(29.5, 0, 62, 59.75)]);
+    expect([collapsed.isCollapsed(DockSide.Left), collapsed.rail(DockSide.Left), collapsed.middle]).toEqual([true, new Bounds(0.25, 0, 2.75, 59.75), new Bounds(3.25, 0, 88.25, 59.75)]);
+    expect(collapsed.frames.map(t => t.group.id)).toEqual([2, 0]);
+    expect([empty.rail(DockSide.Right), empty.middle]).toEqual([null, new Bounds(29.5, 0, 90.25, 59.75)]);
+    expect(new LayoutGeometry(120, 60, initial, registry).rail(DockSide.Left)).toBeNull();
+  });
+
+  it("collapses a side shown as icons to its strip alone when the window is too narrow, and keeps its strip across a change of the bottom span", () => {
+    const narrow = new LayoutGeometry(30, 60, initial, registry, new Set([DockSide.Left]));
+    const spanned = new LayoutGeometry(120, 60, initial.openView(LayoutFixture.terminal, registry), registry, new Set([DockSide.Left])).withBottomSpan(BottomDockSpan.Between);
+
+    expect([narrow.isCollapsed(DockSide.Left), narrow.middle.x]).toEqual([true, 3.25]);
+    expect([spanned.rail(DockSide.Left), spanned.dock(DockSide.Bottom).x]).toEqual([new Bounds(0.25, 0, 2.75, 59.75), 29.5]);
+    expect(new LayoutGeometry(120, 60, initial.toggleDock(DockSide.Left), registry, new Set([DockSide.Left])).sidePreview(DockSide.Left)).toEqual(new Bounds(3.25, 0, 26, 59.75));
+  });
+
   it("spans the bottom dock across the window, under the side docks and the middle", () => {
     const geometry = new LayoutGeometry(120, 60, initial.openView(LayoutFixture.terminal, registry), registry);
 
