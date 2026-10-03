@@ -156,6 +156,7 @@ test.describe("docking", () => {
     expect(preview.right - preview.left).toBeGreaterThan(workspace.right - workspace.left - 20);
     expect(Math.abs((guide.left + guide.right) / 2 - (workspace.left + workspace.right) / 2)).toBeLessThan(1);
     expect(innerGuide.bottom).toBeLessThan(guide.top);
+    await desktop.checkpointAsync("outer-bottom-guide-preview");
     await window.mouse.up();
 
     await expect.poll(() => rectOf("tr-tab-group[data-side=Bottom]").then(t => t.right - t.left)).toBeGreaterThan(workspace.right - workspace.left - 20);
@@ -164,6 +165,7 @@ test.describe("docking", () => {
     await startDragAsync(window, clock);
     await moveOverAsync(window, inner);
     await expect(inner).toHaveClass(/tr-docking-guide-chosen/);
+    await desktop.checkpointAsync("inner-bottom-guide-preview");
     await window.mouse.up();
 
     await expect.poll(async () => (await rectOf("tr-tab-group[data-side=Bottom]")).left).toBeGreaterThanOrEqual((await rectOf("tr-tab-group[data-side=Left]")).right);
@@ -270,12 +272,14 @@ test.describe("docking", () => {
     await closeMenusAsync(desktop.window);
 
     await expect.poll(spansWindow).toBe(true);
+    await desktop.checkpointAsync("bottom-dock-across-the-window");
     await desktop.window.keyboard.press("Shift+F10");
     await expect(desktop.window.getByRole("menuitemradio", { name: "Bottom dock across the window" })).toHaveAttribute("aria-checked", "true");
     await desktop.window.keyboard.press("Escape");
     await closeMenusAsync(desktop.window);
     await chooseAsync("Bottom dock between the side docks");
     await expect.poll(staysBetween).toBe(true);
+    await desktop.checkpointAsync("bottom-dock-between-the-side-docks");
 
     await desktop.reopenAsync();
     await desktop.useSuiteViewportAsync();
