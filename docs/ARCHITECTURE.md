@@ -98,7 +98,7 @@ Each module declares itself in `module.json` at its folder's root, with exactly 
 | `dependencies` | The ids of the modules it depends on |
 | `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `notifications`, `views`, `documents`, `statusBarItems`, `topBarActions`, `menus`, `themes`, `settings` and `settingScopes`, each of the form `<id>.<name>` with a camelCase name |
 
-A module that contributes settings defines them in `settings.json` beside `module.json`, as section 5 describes. A module without parts may leave the file out until it gains one. Dependencies form no cycle, and a build includes every module a listed module depends on. The build validates the declarations, orders them after their dependencies and writes them for the runtime, which reads them from `_build/modules/declarations.json` in the repository it is installed in, as the desktop finds the window's build there; the packaged layout is decided with packaging. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
+A module that contributes settings defines them in `settings.json`, and one that contributes menus in `menus.json`, each beside `module.json`, as section 5 describes. A module without parts may leave `module.json` out until it gains one, but a module the build lists must have it. An id is lowercase kebab-case and never `shell`. Dependencies form no cycle, and a build refuses a module whose dependency it does not include. The build validates the declarations, orders them after their dependencies and writes the runtime's view of them: each module's id, display name, dependencies, runtime package, contributions and settings, without its parts. The runtime reads that from `_build/modules/declarations.json` in the repository it is installed in, as the desktop finds the window's build there; the packaged layout is decided with packaging. The window's parts and menus reach the window through source the build generates. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
 
 ### Lifecycle
 
@@ -138,7 +138,7 @@ The shell owns registration, collisions, user overrides, persistence and removal
 |---|---|---|
 | Views | Content for a panel, in a dock or in the middle, with its title and icon | Docks, splits, hides and restores it |
 | Documents | Content for a tab in the middle, with its title and the breadcrumb the top bar shows for it | Opens, arranges, previews and restores tabs |
-| Commands | Named actions, each with a title, an optional icon and an optional default key, from its window part or its runtime part | Runs them by name, with optional JSON arguments, from shortcuts, the top bar, the status bar and menus and, later, search |
+| Commands | Named actions, each with a title, an optional icon and an optional default key, from its window part or its runtime part | Runs them by name, with optional JSON arguments, from shortcuts, the top bar, the status bar, menus and command search |
 | Shortcuts | A default key for a command | Dispatches keys to commands, reports collisions and applies the person's bindings |
 | Top bar | Actions for the window's top row, from its window part: an icon, a title and a command to run, which it may update or hide | Shows them as icon buttons beside the window controls and the active document's breadcrumb, in module order and then declared order; an action whose command is not registered is disabled. The shell's own top bar actions are shell components, not registrations |
 | Status bar | Items for its left or right side, from its window part: text, an icon or both, a tooltip and optionally a command to run, which it may update or hide | Shows them along the bottom of the window by side, in module order and then declared order, with the shell's own items, which are shell components rather than registrations, at the right end; an item with a command is a button, disabled while the command is not registered. An item runs a command and opens no popover of its own; a module that needs one waits for the shell to offer it |
@@ -204,7 +204,7 @@ The application scope belongs to the shell. A module that owns a kind of object,
 
 ### Notifications
 
-The shell owns notifications. A module decides when something deserves one; muting, for example for one conversation, is a setting at that object's scope, applied by the module. The shell shows a notification without taking focus. Opening it brings TeamRun's window forward and runs the notification's command. The person can turn notifications off entirely or for one module in Settings.
+The shell owns notifications. A module decides when something deserves one; muting, for example for one conversation, is a setting at that object's scope, applied by the module. The shell shows a notification without taking focus. Opening it brings TeamRun's window forward and runs the notification's command. The person can turn notifications off entirely or for one module in Settings: that stops the window's toasts and the operating system's notifications and leaves each notification in the list. Do not disturb, below, does the same for one device.
 
 A module declares its notification kinds in `contributes.notifications`. A part posts a notification of one of them through its context and gets a handle that updates or dismisses it:
 
@@ -246,7 +246,7 @@ A module declares its notification kinds in `contributes.notifications`. A part 
 ### Builds and lifetime
 
 - The first client may start a runtime; later clients attach only to their own build, carrying the same modules without separate module-protocol negotiation.
-- A newer build takes over a directory an older build's runtime owns by itself. It asks the older runtime to stop; if work is in progress, the person makes section 9's choice to wait for it or stop it; then the older runtime exits and the newer one starts. An older build that finds a newer runtime hands the person over to the newer build instead of starting. The person is never asked to find and quit another TeamRun.
+- A newer build takes over a directory an older build's runtime owns by itself. It asks the older runtime to stop; if work is in progress, the person makes section 9's choice to wait for it or stop it; then the older runtime exits and the newer one starts. An older build that finds a newer runtime hands the person over to the newer build instead of starting; a development build says that a newer one is running instead. A second desktop on a data directory, of any build, focuses the first and exits: the single-instance lock allows one desktop per data directory, and the handover is between a desktop and a runtime. The person is never asked to find and quit another TeamRun.
 - A build is newer when its product version is higher. Between two builds of the same product version, such as successive development builds, the build that is starting takes over.
 - Every build keeps this exchange from protocol version 1, so any build can stop any earlier one:
   - A handshake from another build, of any protocol version, is answered with a `BuildMismatch` failure whose details are the runtime's build identity and the program it runs from.
@@ -300,7 +300,7 @@ Migrations are ordered, explicit and transactional:
 - Refuse unknown or newer schemas rather than resetting them.
 - Destructive rollback, backup retention and cleanup of owned files require explicit policies; no automatic deletion is assumed.
 
-TeamRun does not open data written by a release that predates the shell. The runtime refuses such a data directory, as it refuses an unknown schema, and neither migrates nor resets it. The shell's own entries never count as such data, even before the shell's database exists: the ownership database and the `discovery`, `backups`, `desktop` (Electron's profile), `modules`, `work` and `logs` folders. The window explains the refusal and offers to move that data aside: at the person's request, the runtime renames its folder, deletes nothing, and starts with an empty data directory.
+TeamRun does not open data written by a release that predates the shell. The runtime refuses such a data directory, as it refuses an unknown schema, and neither migrates nor resets it. The shell's own entries never count as such data, even before the shell's database exists: the ownership database and the `discovery`, `backups`, `desktop` (Electron's profile), `modules`, `work` and `logs` folders. The window explains the refusal and offers to move that data aside. At the person's request, the runtime moves everything in the data directory that is not one of its own entries into a new folder beside it, named `<data directory>-before-shell-<time>`, deletes nothing, and carries on with an empty data directory.
 
 ## 8. Window
 
