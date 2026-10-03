@@ -143,7 +143,7 @@ export class RuntimeStartup {
     if (Object.isNull(this.connectionValue) || this.isClosed)
       return;
     this.connectionValue = null;
-    void this.startAsync();
+    this.startAsync().catch((error: unknown) => this.update(StartupState.failed(String(error))));
   }
 
   private update(state: StartupState): void {

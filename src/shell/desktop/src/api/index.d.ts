@@ -2737,7 +2737,8 @@ export declare class RuntimeStartup {
 
   /**
    * Starts or attaches to the runtime, stopping an older build's runtime only when it is idle. Reconnects when the
-   * runtime disconnects until {@link close}.
+   * runtime disconnects until {@link close}; a reconnection that fails for any other reason shows the failure and
+   * offers to try again.
    *
    * @returns A promise that settles once the state is ready or shows why not.
    * @throws Any failure other than the launcher's refusals, as a rejection.
