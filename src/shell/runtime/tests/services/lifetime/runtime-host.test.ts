@@ -110,13 +110,17 @@ export class RuntimeHostTests {
       connection.sendMessages(new Request("cli:1", ShellMethods.work, null));
       const idle = await connection.readTextAsync();
       const work = host.work.begin("Indexing the project");
+      const began = await connection.readTextAsync();
       connection.sendMessages(new Request("cli:2", ShellMethods.work, null));
       const busy = await connection.readTextAsync();
       work[Symbol.dispose]();
+      const ended = await connection.readTextAsync();
       connection.sendMessages(new Request("cli:3", ShellMethods.stop, new StopRequest(StopPolicy.IfIdle).toJson()));
 
-      Assert.areEqual("{\"kind\":\"Response\",\"id\":\"cli:1\",\"payload\":{\"descriptions\":[]}}", idle);
-      Assert.areEqual("{\"kind\":\"Response\",\"id\":\"cli:2\",\"payload\":{\"descriptions\":[\"Indexing the project\"]}}", busy);
+      Assert.areEqual("{\"kind\":\"Response\",\"id\":\"cli:1\",\"payload\":{\"descriptions\":[],\"sequence\":0}}", idle);
+      Assert.areEqual("{\"kind\":\"Event\",\"name\":\"shell.work\",\"payload\":{\"descriptions\":[\"Indexing the project\"],\"sequence\":1}}", began);
+      Assert.areEqual("{\"kind\":\"Response\",\"id\":\"cli:2\",\"payload\":{\"descriptions\":[\"Indexing the project\"],\"sequence\":1}}", busy);
+      Assert.areEqual("{\"kind\":\"Event\",\"name\":\"shell.work\",\"payload\":{\"descriptions\":[],\"sequence\":2}}", ended);
       Assert.isFalse(work.signal.aborted);
       Assert.areEqual("request", await host.waitForStopAsync());
     });
@@ -308,6 +312,27 @@ export class RuntimeHostTests {
         JSON.stringify(ModuleStatusList.fromJson(responses[1]?.payload).toJson()));
       Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "deactivated")));
       Assert.isTrue((await readFile(fixture.dataDirectory.runtimeLog, "utf8")).startsWith("The module broken: Its runtime part could not be loaded.\nError [ERR_MODULE_NOT_FOUND]"));
+    });
+  }
+
+  @TestMethod
+  public reportsAModulesWorkAndStopsItOnlyWhenAskedToStopTheWork(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["clock", RuntimeHostTests.createWorkPart()]]));
+      const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+
+      connection.sendMessages(new Request("desktop:1", ShellMethods.runCommand, new CommandRun(QualifiedName.parse("clock.tick"), null).toJson()));
+      const began = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      const refused = await RuntimeHostTests.callAsync(connection, "desktop:2", ShellMethods.stop, new StopRequest(StopPolicy.IfIdle).toJson());
+      connection.sendMessages(new Request("desktop:3", ShellMethods.stop, new StopRequest(StopPolicy.StopWork).toJson()));
+      const ended = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      await host.waitForStopAsync();
+
+      Assert.areEqual("shell.work|{\"descriptions\":[\"Ticking\"],\"sequence\":1}|null", `${began[0].name.text}|${JSON.stringify(began[0].payload)}|${JSON.stringify(began[1].payload)}`);
+      Assert.areEqual(`${FailureCode.Conflict}|{"descriptions":["Ticking"]}`, `${refused.failure?.code}|${JSON.stringify(refused.failure?.details)}`);
+      Assert.areEqual("shell.work|{\"descriptions\":[],\"sequence\":2}|null", `${ended[0].name.text}|${JSON.stringify(ended[0].payload)}|${JSON.stringify(ended[1].payload)}`);
+      Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateWorkFolder("clock"), "aborted")));
+      Assert.isTrue((await readFile(fixture.dataDirectory.runtimeLog, "utf8")).includes("clock: Ticking began\n"));
     });
   }
 
@@ -581,6 +606,35 @@ export class RuntimeHostTests {
       "    } }, false);",
       "    context.registerCommand(tick);",
       "    context.registerCommand(pause);",
+      "  }",
+      "",
+      "  async deactivateAsync() {",
+      "  }",
+      "}",
+      ""
+    ].join("\n");
+  }
+
+  private static createWorkPart(): string {
+    const api = pathToFileURL(path.join(path.dirname(RuntimeEntry.entryPath), "..", "api", "index.js")).href;
+    return [
+      "import { writeFileSync } from \"node:fs\";",
+      "import path from \"node:path\";",
+      "",
+      `import { RuntimeCommand } from ${JSON.stringify(api)};`,
+      "",
+      "export class RuntimePart {",
+      "  async activateAsync(context) {",
+      "    context.registerCommand(new RuntimeCommand(\"clock.tick\", \"Tick\", \"timer\", \"Mod+Alt+T\", { handleAsync: async () => {",
+      "      const folder = await context.getWorkFolderAsync();",
+      "      const work = context.beginWork(\"Ticking\");",
+      "      context.log.write(\"Ticking began\");",
+      "      work.signal.addEventListener(\"abort\", () => {",
+      "        writeFileSync(path.join(folder, \"aborted\"), \"\");",
+      "        work[Symbol.dispose]();",
+      "      });",
+      "      return null;",
+      "    } }));",
       "  }",
       "",
       "  async deactivateAsync() {",

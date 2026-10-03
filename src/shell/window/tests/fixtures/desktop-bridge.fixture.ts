@@ -18,6 +18,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly eventListeners: Set<(name: string, payload: unknown) => void> = new Set();
   private readonly menuListeners: Set<(id: string) => void> = new Set();
   private readonly openedListeners: Set<(id: number) => void> = new Set();
+  private readonly quitListeners: Set<(question: unknown) => void> = new Set();
 
   public readonly platform: string;
   public appearance: unknown = null;
@@ -40,6 +41,8 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public readonly copied: string[] = [];
   public isCopyAccepted: boolean = true;
   public logFolderOpens: number = 0;
+  public readonly quitAnswers: string[] = [];
+  public readonly logged: string[] = [];
   public logFolderOpened: Promise<boolean> = Promise.resolve(true);
   public readonly menuBars: JsonObject[] = [];
   public readonly edits: string[] = [];
@@ -162,6 +165,25 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public onNotificationOpened(listener: (id: number) => void): () => void {
     this.openedListeners.add(listener);
     return () => this.openedListeners.delete(listener);
+  }
+
+  public onQuitQuestion(listener: (question: unknown) => void): () => void {
+    this.quitListeners.add(listener);
+    return () => this.quitListeners.delete(listener);
+  }
+
+  public answerQuit(choice: string): Promise<boolean> {
+    this.quitAnswers.push(choice);
+    return Promise.resolve(true);
+  }
+
+  public logModule(moduleId: string, message: string): void {
+    this.logged.push(`${moduleId}: ${message}`);
+  }
+
+  public askToQuit(question: unknown): void {
+    for (const listener of this.quitListeners)
+      listener(question);
   }
 
   public publishNotificationOpened(id: number): void {

@@ -87,6 +87,7 @@ export class Resources {
   public static readonly mutedModuleInvalid: string = "A muted module must have an id.";
   public static readonly notificationSequenceInvalid: string = "A notification's sequence must be a whole number from 1.";
   public static readonly currentSequenceInvalid: string = "The notifications' sequence must be a whole number from 0.";
+  public static readonly workSequenceInvalid: string = "The work's sequence must be a whole number from 0.";
   public static readonly commandSequenceInvalid: string = "The commands' sequence must be a whole number from 0.";
   public static readonly macPlatform: string = "darwin";
   public static readonly standardPlatform: string = "win32";

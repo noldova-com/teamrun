@@ -21,7 +21,7 @@ class ModuleMenusTests {
     places: [{ name: "notes.templates", title: "New from template" }, { name: "notes.tools", title: "Notes", menuBar: true }],
     groups: [
       { name: "notes.create", place: "shell.file", items: [{ command: "notes.newNote" }, { submenu: "notes.templates" }] },
-      { name: "notes.sorting", place: "notes.tools", exclusive: true, items: [{ command: "notes.sortBy", arguments: { by: "title" } }] }
+      { name: "notes.sorting", place: "notes.tools", exclusive: true, items: [{ command: "notes.sortBy", arguments: { by: "title" }, label: "By title" }] }
     ]
   };
 
@@ -35,7 +35,7 @@ class ModuleMenusTests {
         places: [{ name: "notes.templates", title: "New from template", menuBar: false }, { name: "notes.tools", title: "Notes", menuBar: true }],
         groups: [
           { name: "notes.create", place: "shell.file", exclusive: false, items: [{ command: "notes.newNote", arguments: {} }, { submenu: "notes.templates" }] },
-          { name: "notes.sorting", place: "notes.tools", exclusive: true, items: [{ command: "notes.sortBy", arguments: { by: "title" } }] }
+          { name: "notes.sorting", place: "notes.tools", exclusive: true, items: [{ command: "notes.sortBy", arguments: { by: "title" }, label: "By title" }] }
         ]
       });
     });
@@ -97,9 +97,9 @@ class ModuleMenusTests {
         await ModuleMenusTests.assertRefusedAsync(repository, { places: ModuleMenusTests.places(), groups }, problem);
     });
 
-    test("an item that is neither a command nor its module's own submenu, or with arguments that are not an object, is refused", async t => {
+    test("an item that is neither a command nor its module's own submenu, or with arguments that are not an object or a blank label, is refused", async t => {
       const repository = await ModuleMenusTests.createAsync(t, ModuleMenusTests.VALID);
-      const shape = "must make each item of the group notes.create either a command with optional arguments or a submenu";
+      const shape = "must make each item of the group notes.create either a command with optional arguments and label, or a submenu";
       const cases: readonly [unknown, string][] = [
         [{ command: "notes.newNote", title: "New" }, shape],
         [{ submenu: "notes.templates", command: "notes.newNote" }, shape],
@@ -107,7 +107,10 @@ class ModuleMenusTests {
         [{ submenu: "tasks.tools" }, "opens tasks.tools as a submenu in the group notes.create, which is not one of its own places"],
         [{ command: "newNote" }, "must name a command \"<id>.<name>\" for each item of the group notes.create"],
         [{ command: "notes.newNote", arguments: [1] }, "must give the arguments of notes.newNote in the group notes.create as a JSON object"],
-        [{ command: "notes.newNote", arguments: null }, "must give the arguments of notes.newNote in the group notes.create as a JSON object"]
+        [{ command: "notes.newNote", arguments: null }, "must give the arguments of notes.newNote in the group notes.create as a JSON object"],
+        [{ command: "notes.newNote", label: " " }, "must give the label of notes.newNote in the group notes.create as text that is not blank"],
+        [{ command: "notes.newNote", label: 1 }, "must give the label of notes.newNote in the group notes.create as text that is not blank"],
+        [{ command: "notes.newNote", label: null }, "must give the label of notes.newNote in the group notes.create as text that is not blank"]
       ];
 
       for (const [item, problem] of cases)

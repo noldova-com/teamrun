@@ -61,6 +61,10 @@ export class CommandService {
     return this.canRun(this.find(name), commandArguments);
   }
 
+  public isApplicable(name: string, commandArguments: JsonValue = null): boolean {
+    return this.ask(() => this.find(name).isApplicable(commandArguments));
+  }
+
   public titleOf(name: string): string {
     return this.find(name).title;
   }
@@ -83,8 +87,12 @@ export class CommandService {
   }
 
   private canRun(command: CommandContribution, commandArguments: JsonValue): boolean {
+    return this.ask(() => command.isEnabled(commandArguments));
+  }
+
+  private ask(question: () => boolean): boolean {
     try {
-      return command.isEnabled(commandArguments);
+      return question();
     }
     catch (error) {
       this.errors.handleError(error);

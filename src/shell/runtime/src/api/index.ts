@@ -39,6 +39,7 @@ export type { IProcessStarter } from "../interfaces/process-starter.js";
 export type { IRuntimeClientListener } from "../interfaces/runtime-client-listener.js";
 export type { IRuntimeDiscoveryJson } from "../interfaces/runtime-discovery-json.js";
 export type { IModuleDatabase } from "../interfaces/module-database.js";
+export type { IModuleLog } from "../interfaces/module-log.js";
 export type { IModuleSettings } from "../interfaces/module-settings.js";
 export type { IRuntimePart } from "../interfaces/runtime-part.js";
 export type { IRuntimePartContext } from "../interfaces/runtime-part-context.js";

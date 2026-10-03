@@ -114,10 +114,15 @@ export class Resources {
     "menu-item-height",
     "menu-item-inset",
     "menu-item-padding",
+    "menu-trail-gap",
     "menu-separator-spacing",
     "tooltip-width",
     "tooltip-padding",
     "popover-width",
+    "dialog-width",
+    "dialog-title-padding",
+    "dialog-body-padding",
+    "dialog-actions-padding",
     "quick-input-width",
     "quick-input-margin",
     "quick-input-padding",
@@ -224,6 +229,11 @@ export class Resources {
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
   public static readonly menuPaneClass: string = "tr-menu-pane";
+  public static readonly dialogPaneClass: string = "tr-dialog-pane";
+  public static readonly dialogBackdropClass: string = "tr-dialog-backdrop";
+  public static readonly dialogTitleIdPrefix: string = "tr-dialog-title-";
+  public static readonly dialogTitleIdToken: string = "tr-dialog-title-id";
+  public static readonly noLimit: string = "none";
   public static readonly dropdownPaneClass: string = "tr-dropdown-pane";
   public static readonly listboxSelector: string = "[role=listbox]";
   public static readonly tabKey: string = "Tab";
