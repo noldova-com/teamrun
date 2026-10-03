@@ -275,6 +275,8 @@ export class Resources {
   public static readonly helpMenuTitle: string = "Help";
   public static readonly tabMenuTitle: string = "Tab";
   public static readonly windowPartMenusToken: string = "The build's module menus";
+  public static readonly placeInput: string = "place";
+  public static readonly contextInput: string = "context";
   public static readonly invalidContributionName: string = "A contribution name has the form <module id>.<name>.";
   public static readonly invalidModuleId: string = "A module id is lowercase kebab-case.";
   public static readonly windowPartLoadFailed: string = "Its window part could not be loaded.";
@@ -380,6 +382,10 @@ export class Resources {
 
   public static formatCommandRegistered(name: string): string {
     return `The command ${name} is already registered.`;
+  }
+
+  public static formatForeignMenu(place: string): string {
+    return `A module may open only its own menus and those of the modules it depends on, not ${place}.`;
   }
 
   public static formatForeignName(moduleId: string, name: string): string {

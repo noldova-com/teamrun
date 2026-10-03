@@ -17,6 +17,7 @@ export interface IWindowPartContext {
   registerView(view: ViewContribution): void;
   registerDocument(document: DocumentContribution): void;
   registerCommand(command: CommandContribution): void;
+  isAllowed(name: string): boolean;
   runCommandAsync(name: string, commandArguments?: JsonValue): Promise<JsonValue>;
   openDocument(name: string, instance: string, title: string, options?: IDocumentOptions): void;
   keepDocument(name: string, instance: string): void;

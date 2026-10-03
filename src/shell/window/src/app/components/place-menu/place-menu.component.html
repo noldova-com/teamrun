@@ -1,0 +1,26 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<ng-template #placeMenu>
+  <tr-menu class="tr-place-menu" [attr.data-place]="place()">
+    @for (section of sections(); track section.group; let first = $first) {
+      @if (!first) {
+        <tr-menu-separator />
+      }
+      @for (row of section.rows; track $index) {
+        @if (asCommand(row); as command) {
+          <button tr-menu-item class="tr-place-menu-item" [attr.data-command]="command.command" [label]="command.title" [icon]="command.icon"
+            [shortcut]="command.key" [disabled]="!command.isEnabled" (triggered)="run(command)"></button>
+        } @else if (asSubmenu(row); as submenu) {
+          <tr-place-menu #nested [place]="submenu.place" [context]="context()" />
+          <button tr-menu-item class="tr-place-menu-submenu" [attr.data-submenu]="submenu.place" [label]="submenu.title" [trMenuTriggerFor]="nested.menu()"></button>
+        }
+      }
+    }
+  </tr-menu>
+</ng-template>

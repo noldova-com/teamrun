@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+export { MenuDirective } from "../app/directives/menu.directive";
 export { DockSide } from "../app/enums/dock-side";
 export type { IDocumentOptions } from "../app/interfaces/i-document-options";
 export type { IWindowPart } from "../app/interfaces/i-window-part";

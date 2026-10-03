@@ -113,8 +113,12 @@ export class WindowPartContext implements IWindowPartContext {
       throw new WindowPartAccessException(Resources.formatForeignContribution(this.moduleId, name));
   }
 
+  public isAllowed(name: string): boolean {
+    return this.owners.includes(name.substring(0, name.indexOf(Resources.contributionSeparator)));
+  }
+
   private requireAllowed(name: string): void {
-    if (!this.owners.includes(name.substring(0, name.indexOf(Resources.contributionSeparator))))
+    if (!this.isAllowed(name))
       throw new WindowPartAccessException(Resources.formatForeignName(this.moduleId, name));
   }
 }
