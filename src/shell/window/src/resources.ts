@@ -244,7 +244,10 @@ export class Resources {
     [DockSide.Right]: "Resize the right dock",
     [DockSide.Bottom]: "Resize the bottom dock"
   };
-  public static readonly resizeSplitLabel: string = "Resize the split";
+  public static readonly resizeSplitLabels: Readonly<Record<SplitAxis, string>> = {
+    [SplitAxis.Horizontal]: "Resize the pane on the left",
+    [SplitAxis.Vertical]: "Resize the pane above"
+  };
   public static readonly versionField: string = "version";
   public static readonly docksField: string = "docks";
   public static readonly middleField: string = "middle";
