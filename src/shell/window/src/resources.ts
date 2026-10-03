@@ -244,6 +244,13 @@ export class Resources {
   public static readonly nameParameter: string = "name";
   public static readonly titleParameter: string = "title";
   public static readonly iconParameter: string = "icon";
+  public static readonly textParameter: string = "text";
+  public static readonly tooltipParameter: string = "tooltip";
+  public static readonly commandParameter: string = "command";
+  public static readonly statusBarItemKind: string = "status bar item";
+  public static readonly topBarActionKind: string = "top bar action";
+  public static readonly statusBarItemEmpty: string = "A status bar item shows text, an icon or both.";
+  public static readonly statusBarItemUnnamed: string = "A status bar item that shows only an icon needs a tooltip, which is also its accessible name.";
   public static readonly defaultKeyParameter: string = "defaultKey";
   public static readonly invalidContributionName: string = "A contribution name has the form <module id>.<name>.";
   public static readonly invalidModuleId: string = "A module id is lowercase kebab-case.";
@@ -346,6 +353,14 @@ export class Resources {
 
   public static formatUndeclaredCommand(moduleId: string, name: string): string {
     return `The module ${moduleId} does not declare the command ${name}.`;
+  }
+
+  public static formatUndeclaredContribution(moduleId: string, kind: string, name: string): string {
+    return `The module ${moduleId} does not declare the ${kind} ${name}.`;
+  }
+
+  public static formatContributionRegistered(kind: string, name: string): string {
+    return `The ${kind} ${name} is already registered.`;
   }
 
   public static formatCommandRegistered(name: string): string {

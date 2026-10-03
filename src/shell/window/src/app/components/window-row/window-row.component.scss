@@ -34,3 +34,7 @@
   display: flex;
   align-items: center;
 }
+
+.tr-window-row-action {
+  app-region: no-drag;
+}
