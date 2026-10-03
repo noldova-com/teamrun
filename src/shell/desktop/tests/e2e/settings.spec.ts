@@ -126,3 +126,20 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-first-frame");
   });
 });
+
+test.describe("settings on macOS", () => {
+  test.skip(process.platform !== "darwin", "Windows and Linux open Settings by its key and command search.");
+
+  test("Settings… in the application menu shows its key and opens Settings", async ({ desktop }) => {
+    const item = (): Promise<readonly [string, boolean, string] | null> => desktop.application.evaluate(({ Menu }) => {
+      const found = Menu.getApplicationMenu()?.getMenuItemById("shell.app/shell.settings/0");
+      return found ? [found.label, found.enabled, String(found.accelerator)] as const : null;
+    });
+
+    await expect.poll(item).toEqual(["Settings…", true, "Command+,"]);
+    await desktop.application.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("shell.app/shell.settings/0")?.click());
+
+    await expect(desktop.window.locator("tr-settings")).toBeVisible();
+    await expect(settingsTab(desktop.window)).toHaveAttribute("aria-selected", "true");
+  });
+});

@@ -67,7 +67,11 @@ describe("MenuBarService", () => {
     const menus = JsonReader.fromValue(tree).readObjectArray("menus").map(t => t.toJson());
 
     expect(menus.map(t => t["place"])).toEqual(["shell.app", "shell.file", "shell.edit", "shell.view", "notes.tools", "shell.window", "shell.help"]);
-    expect(menus[0]).toEqual({ place: "shell.app", title: Resources.productName, rows: [] });
+    expect(menus[0]).toEqual({
+      place: "shell.app", title: Resources.productName, rows: [
+        { type: "command", id: "shell.app/shell.settings/0", label: "Settings…", key: "Mod+Comma", enabled: false, check: "None", checked: false }
+      ]
+    });
     expect(menus[4]).toEqual({
       place: "notes.tools", title: "Notes", rows: [
         { type: "command", id: "notes.tools/notes.sorting/0", label: "Sort by", key: null, enabled: true, check: "Radio", checked: false },

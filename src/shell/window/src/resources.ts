@@ -374,6 +374,7 @@ export class Resources {
   public static readonly docksGroup: string = "shell.docks";
   public static readonly bottomDockGroup: string = "shell.bottomDock";
   public static readonly layoutGroup: string = "shell.layout";
+  public static readonly settingsGroup: string = "shell.settings";
   public static readonly windowPartMenusToken: string = "The build's module menus";
   public static readonly placeInput: string = "place";
   public static readonly contextInput: string = "context";

@@ -182,7 +182,7 @@ A module adds groups to the shell's places, its own and those of the modules it 
 
 A window part opens its own places and its dependencies' as context menus with the `trMenu` directive, giving a place and a context object. The context is merged into each item's arguments, the item's own fields winning, so one declared item acts on whatever the menu was opened on.
 
-The shell's own groups put Close the tab in File, and command search, showing or hiding each dock, the bottom dock across the window or between the side docks, and Reset the layout in View. On macOS the window gives the desktop the main menu's rows whenever they change, and the desktop builds the native menu bar from them: a row shows its key without taking it from the window, so the window's key handling stays the only one, and choosing a row runs it in the window. The Edit and Window menus keep the system's own items, with their keys, before the shell's and modules' rows.
+The shell's own groups put Close the tab in File, and command search, showing or hiding each dock, the bottom dock across the window or between the side docks and Reset the layout in View, and Settings… in the macOS application menu after About. On macOS the window gives the desktop the main menu's rows whenever they change, and the desktop builds the native menu bar from them: a row shows its key without taking it from the window, so the window's key handling stays the only one, and choosing a row runs it in the window. The Edit and Window menus keep the system's own items, with their keys, before the shell's and modules' rows.
 
 ### Settings
 
