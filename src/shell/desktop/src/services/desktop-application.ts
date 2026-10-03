@@ -24,6 +24,7 @@ import type { IIpcEvent } from "../interfaces/i-ipc-event.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import { StartupStateKind } from "../enums/startup-state-kind.js";
 import { DesktopSettings } from "../models/desktop-settings.js";
+import { MenuBar } from "../models/menu-bar.js";
 import { TaskbarIdentity } from "../models/taskbar-identity.js";
 import { SenderInfo } from "../models/sender-info.js";
 import type { StartupState } from "../models/startup-state.js";
@@ -33,6 +34,7 @@ import { Resources } from "../resources.js";
 import { AppIcons } from "./app-icons.js";
 import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
+import { MenuBarTemplate } from "./menu-bar-template.js";
 import { DeviceIdentity } from "./device-identity.js";
 import { OpenWindow } from "./open-window.js";
 import { RuntimeStartup } from "./runtime-startup.js";
@@ -148,6 +150,7 @@ export class DesktopApplication {
     session.setPermissionCheckHandler(() => false);
     this.electron.ipcMain.on(Resources.readyChannel, (event, appearance) => this.show(event, appearance));
     this.electron.ipcMain.on(Resources.appearanceChannel, (event, appearance) => this.repaint(event, appearance));
+    this.electron.ipcMain.on(Resources.menuBarChannel, (event, menuBar) => this.showMenuBar(event, menuBar));
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
     this.electron.ipcMain.handle(Resources.readStartupChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.startup.current.toJson());
     this.electron.ipcMain.handle(Resources.startupActionChannel, (event, action) => Object.isNull(this.findTrusted(event)) ? false : this.startup.actAsync(action));
@@ -327,6 +330,19 @@ export class DesktopApplication {
 
   private show(event: IIpcEvent, appearance: unknown): void {
     this.repaint(event, appearance)?.markPainted();
+  }
+
+  private showMenuBar(event: IIpcEvent, menuBar: unknown): void {
+    if (Object.isNull(this.findTrusted(event)) || !this.settings.isMac)
+      return;
+    const contentsId = event.sender.id;
+    try {
+      const template = MenuBarTemplate.build(MenuBar.fromJson(menuBar), id => this.windows.get(contentsId)?.window.webContents.send(Resources.menuCommandChannel, id));
+      this.electron.menu.setApplicationMenu(this.electron.menu.buildFromTemplate(template));
+    }
+    catch (error) {
+      this.log.write(Resources.formatMenuBarRejected(String(error)));
+    }
   }
 
   private repaint(event: IIpcEvent, appearance: unknown): OpenWindow | null {

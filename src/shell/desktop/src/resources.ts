@@ -241,6 +241,10 @@ export class Resources {
     return `The runtime starter could not start the runtime: ${failure}`;
   }
 
+  public static formatMenuBarRejected(reason: string): string {
+    return `The window sent a menu bar that is not valid, so the menu bar is unchanged: ${reason}`;
+  }
+
   public static formatAppearanceRejected(reason: string): string {
     return `The window reported an appearance that is not valid, so it is shown without it: ${reason}`;
   }
