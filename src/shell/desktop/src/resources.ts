@@ -45,7 +45,10 @@ export class Resources {
     ShellMethods.notifications.text,
     ShellMethods.postNotification.text,
     ShellMethods.updateNotification.text,
-    ShellMethods.dismissNotification.text
+    ShellMethods.dismissNotification.text,
+    ShellMethods.markNotificationsRead.text,
+    ShellMethods.clearNotifications.text,
+    ShellMethods.setDoNotDisturb.text
   ];
   public static readonly untrustedRequest: string = `Only ${Resources.applicationName}'s own window may call the runtime.`;
   public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
@@ -135,7 +138,8 @@ export class Resources {
   public static readonly windowStoppedAgainRecord: string = "The window's page stopped again within 10 s of a reload, so the person was offered the log folder instead of another reload.";
   public static readonly mainWindow: string = "main";
   public static readonly runtimeNotConnected: string = `${Resources.applicationName} is not connected to its runtime.`;
-  public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout is not kept.";
+  public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout and Do not disturb are not kept.";
+  public static readonly isOnField: string = "isOn";
   public static readonly windowMinimumWidth: number = 640;
   public static readonly windowMinimumHeight: number = 400;
   public static readonly windowWidth: number = 1280;
@@ -180,6 +184,10 @@ export class Resources {
 
   public static formatWindowStateFailed(method: string, message: string): string {
     return `The runtime refused ${method}: ${message}`;
+  }
+
+  public static formatEventNotForwarded(name: string, reason: string): string {
+    return `The runtime's event ${name} could not be passed to the window: ${reason}`;
   }
 
   public static formatBoundsUnsaved(reason: string): string {

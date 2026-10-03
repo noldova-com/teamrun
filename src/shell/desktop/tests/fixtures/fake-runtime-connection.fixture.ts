@@ -13,6 +13,7 @@ import type { IRuntimeConnection } from "@noldova/teamrun-shell-desktop";
 export class FakeRuntimeConnection implements IRuntimeConnection {
   public readonly states: Map<string, JsonObject> = new Map();
   public readonly calls: string[] = [];
+  public readonly payloads: JsonValue[] = [];
   public isClosed: boolean = false;
   public isFailing: boolean = false;
   public onCall?: () => void;
@@ -21,6 +22,7 @@ export class FakeRuntimeConnection implements IRuntimeConnection {
 
   public callAsync(method: QualifiedName, payload: JsonValue): Promise<Response> {
     this.calls.push(method.text);
+    this.payloads.push(payload);
     this.onCall?.();
     if (!Object.isUndefined(this.rejection))
       return Promise.reject(this.rejection);

@@ -3907,6 +3907,49 @@ export declare class NotificationCenter {
   public update(id: number, post: NotificationPost): boolean;
 
   /**
+   * Reports the list again unchanged, for a change the list does not hold, such as a device's Do not disturb.
+   *
+   * @example
+   * ```ts
+   * import type { NotificationCenter } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function announceQuiet(notifications: NotificationCenter): void {
+   *   notifications.republish();
+   * }
+   * ```
+   */
+  public republish(): void;
+
+  /**
+   * Marks every notification read; nothing is reported when all already were.
+   *
+   * @example
+   * ```ts
+   * import type { NotificationCenter } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function open(notifications: NotificationCenter): void {
+   *   notifications.markAllRead();
+   * }
+   * ```
+   */
+  public markAllRead(): void;
+
+  /**
+   * Removes every notification that reports no work in progress; those still in progress stay, because their modules update
+   * them.
+   *
+   * @example
+   * ```ts
+   * import type { NotificationCenter } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function clearAll(notifications: NotificationCenter): void {
+   *   notifications.clearFinished();
+   * }
+   * ```
+   */
+  public clearFinished(): void;
+
+  /**
    * Removes a notification; one that is gone is ignored.
    *
    * @param id The notification's id.

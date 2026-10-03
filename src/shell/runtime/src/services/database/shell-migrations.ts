@@ -11,6 +11,7 @@ import { Resources } from "../../resources.js";
 
 export class ShellMigrations {
   public static readonly all: readonly Migration[] = [
-    new Migration(Resources.windowStatesMigration, [Resources.createWindowStatesStatement])
+    new Migration(Resources.windowStatesMigration, [Resources.createWindowStatesStatement]),
+    new Migration(Resources.quietDevicesMigration, [Resources.createQuietDevicesStatement])
   ];
 }

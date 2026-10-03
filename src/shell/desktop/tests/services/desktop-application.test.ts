@@ -15,7 +15,7 @@ import { setImmediate } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, Event, Failure, FailureCode, PreShellData, QualifiedName, Response, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
+import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeBuild, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
 import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
 
@@ -30,6 +30,10 @@ import { FakeRuntimeLauncher } from "../fixtures/fake-runtime-launcher.fixture.j
 
 @TestClass
 export class DesktopApplicationTests {
+  private static readonly NOTIFICATION_METHODS: readonly string[] = [
+    "shell.notifications", "shell.postNotification", "shell.updateNotification", "shell.dismissNotification", "shell.markNotificationsRead", "shell.clearNotifications"
+  ];
+
   private static readonly MODULE_URL: string = pathToFileURL("/teamrun/node_modules/@noldova/teamrun-shell-desktop/main.js").href;
   private static readonly DEVELOPMENT_APP_ID: string = `com.noldova.teamrun.development.${createHash("sha256")
     .update(resolve(dirname(fileURLToPath(DesktopApplicationTests.MODULE_URL)), "..", "..", ".."))
@@ -577,7 +581,7 @@ export class DesktopApplicationTests {
     const read = await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", event);
     const write = await DesktopApplicationTests.invokeAsync(electron, "teamrun:writeLayout", event, { version: 1 });
 
-    const failure = { code: "Unavailable", message: "This device has no identity, so the window's layout is not kept." };
+    const failure = { code: "Unavailable", message: "This device has no identity, so the window's layout and Do not disturb are not kept." };
     Assert.areEqual(JSON.stringify([failure, failure]), JSON.stringify([read["failure"], write["failure"]]));
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "This device's identity").length);
   }
@@ -614,7 +618,7 @@ export class DesktopApplicationTests {
     connection.answers.set("shell.modules", Response.success("r", { modules: [] }));
     connection.answers.set("shell.commands", Response.success("r", { commands: [] }));
     connection.answers.set("shell.runCommand", Response.success("r", 3));
-    for (const name of ["shell.notifications", "shell.postNotification", "shell.updateNotification", "shell.dismissNotification"])
+    for (const name of DesktopApplicationTests.NOTIFICATION_METHODS)
       connection.answers.set(name, Response.success("r", name));
     connection.answers.set("notes.missing", Response.failure("r", new Failure(FailureCode.NotFound, "There is no such note.")));
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
@@ -625,7 +629,7 @@ export class DesktopApplicationTests {
     const commands = await DesktopApplicationTests.requestAsync(electron, event, "shell.commands", null);
     const ran = await DesktopApplicationTests.requestAsync(electron, event, "shell.runCommand", { name: "clock.tick", arguments: null });
     const notifications = [];
-    for (const name of ["shell.notifications", "shell.postNotification", "shell.updateNotification", "shell.dismissNotification"])
+    for (const name of DesktopApplicationTests.NOTIFICATION_METHODS)
       notifications.push((await DesktopApplicationTests.requestAsync(electron, event, name, null)).payload);
     const missing = await DesktopApplicationTests.requestAsync(electron, event, "notes.missing", null);
 
@@ -633,7 +637,7 @@ export class DesktopApplicationTests {
     Assert.areEqual(JSON.stringify({ modules: [] }), JSON.stringify(modules.payload));
     Assert.areEqual(JSON.stringify({ commands: [] }), JSON.stringify(commands.payload));
     Assert.areEqual("3", JSON.stringify(ran.payload));
-    Assert.areEqual("shell.notifications,shell.postNotification,shell.updateNotification,shell.dismissNotification", notifications.join(","));
+    Assert.areEqual(DesktopApplicationTests.NOTIFICATION_METHODS.join(","), notifications.join(","));
     Assert.areEqual(JSON.stringify({ code: "NotFound", message: "There is no such note." }), JSON.stringify(missing.failure?.toJson()));
   }
 
@@ -675,6 +679,62 @@ export class DesktopApplicationTests {
     await Assert.throwsAsync(() => DesktopApplicationTests.requestAsync(electron, event, "notes.open", null), TypeError);
     Assert.areEqual(JSON.stringify({ code: "Unavailable", message: "TeamRun is not connected to its runtime." }), JSON.stringify(unconnected.failure?.toJson()));
     Assert.areEqual(JSON.stringify({ code: "Unavailable", message: "The connection to the runtime closed." }), JSON.stringify(closed.failure?.toJson()));
+  }
+
+  @TestMethod
+  public async addsItsOwnDeviceToItsWindowsNotificationRequestsAndRefusesAnInvalidSwitch(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: true }));
+    connection.answers.set("shell.setDoNotDisturb", Response.success("r", null));
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const event = DesktopApplicationTests.trustedEvent("linux");
+    const unidentified = new FakeDeviceIdentity();
+    unidentified.failure = new Error("The identity file is not JSON.");
+    const lost = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new FakeRuntimeConnection()), new FakeElectron(), unidentified);
+
+    const state = await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
+    const quiet = await DesktopApplicationTests.requestAsync(electron, event, "shell.setDoNotDisturb", { isOn: true });
+    const invalid = await DesktopApplicationTests.requestAsync(electron, event, "shell.setDoNotDisturb", { isOn: "yes" });
+    const noDevice = await DesktopApplicationTests.requestAsync(lost, event, "shell.notifications", {});
+
+    const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).filter(t => t.startsWith("shell.notifications") || t.startsWith("shell.setDoNotDisturb"));
+    Assert.areEqual(
+      JSON.stringify([`shell.notifications {"device":"${FakeDeviceIdentity.ID}"}`, `shell.setDoNotDisturb {"device":"${FakeDeviceIdentity.ID}","isOn":true}`]),
+      JSON.stringify(sent));
+    Assert.areEqual("{\"notifications\":[],\"isDoNotDisturb\":true}|null", `${JSON.stringify(state.payload)}|${JSON.stringify(quiet.payload)}`);
+    Assert.areEqual(FailureCode.InvalidParams, invalid.failure?.code);
+    Assert.areEqual(FailureCode.Unavailable, noDevice.failure?.code);
+  }
+
+  @TestMethod
+  public async givesItsWindowsTheNotificationStateForTheirOwnDeviceOnly(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher();
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", DesktopApplicationTests.trustedEvent("linux"));
+    const unidentified = new FakeDeviceIdentity();
+    unidentified.failure = new Error("The identity file is not JSON.");
+    const lostLauncher = new FakeRuntimeLauncher();
+    const lost = await DesktopApplicationTests.startReadyAsync("linux", lostLauncher, new FakeElectron(), unidentified);
+    await DesktopApplicationTests.invokeAsync(lost, "teamrun:readLayout", DesktopApplicationTests.trustedEvent("linux"));
+    const broadcast = (devices: readonly string[]): Event => new Event(ShellEvents.notifications, new NotificationBroadcast([], devices).toJson());
+
+    launcher.listener?.onEvent(broadcast([FakeDeviceIdentity.ID, "desk"]));
+    launcher.listener?.onEvent(broadcast(["desk"]));
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [] }));
+    lostLauncher.listener?.onEvent(broadcast([FakeDeviceIdentity.ID]));
+
+    Assert.areEqual(
+      JSON.stringify([
+        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: true }],
+        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false }]
+      ]),
+      JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
+    Assert.areEqual(
+      JSON.stringify([["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false }]]),
+      JSON.stringify(DesktopApplicationTests.firstWindow(lost).webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.notifications could not be passed to the window").length);
   }
 
   @TestMethod

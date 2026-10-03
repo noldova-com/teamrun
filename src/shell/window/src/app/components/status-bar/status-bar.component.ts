@@ -10,11 +10,12 @@ import { ChangeDetectionStrategy, Component, inject } from "@angular/core";
 
 import { BarItemsService } from "../../services/bar-items.service";
 import { ModuleFailuresComponent } from "../module-failures/module-failures.component";
+import { NotificationsComponent } from "../notifications/notifications.component";
 import { StatusBarItemComponent } from "../status-bar-item/status-bar-item.component";
 
 @Component({
   selector: "tr-status-bar",
-  imports: [ModuleFailuresComponent, StatusBarItemComponent],
+  imports: [ModuleFailuresComponent, NotificationsComponent, StatusBarItemComponent],
   templateUrl: "./status-bar.component.html",
   styleUrl: "./status-bar.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,

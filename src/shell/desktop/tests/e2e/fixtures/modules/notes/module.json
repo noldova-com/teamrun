@@ -6,6 +6,7 @@
   "contributes": {
     "methods": ["notes.manyTabs"],
     "commands": ["notes.newNote", "notes.openNote", "notes.sortByTitle", "notes.sortByWeek", "notes.wrapLines"],
+    "notifications": ["notes.saveFailed"],
     "views": [
       "notes.list", "notes.outline", "notes.search", "notes.changes", "notes.tasks", "notes.bookmarks", "notes.teammates", "notes.conversation",
       "notes.timeline", "notes.references", "notes.activity", "notes.comments", "notes.reviews", "notes.history", "notes.terminal", "notes.problems",
