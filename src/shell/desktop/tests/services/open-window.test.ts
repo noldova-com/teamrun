@@ -12,6 +12,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { type IWindowStateStore, OpenWindow, WindowStateException, WindowStateUnavailableException } from "@noldova/teamrun-shell-desktop";
 
+import { Condition } from "../fixtures/condition.fixture.js";
 import { FakeDesktopLog } from "../fixtures/fake-desktop-log.fixture.js";
 import { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
 import { FakeDisplayHost } from "../fixtures/fake-display-host.fixture.js";
@@ -47,8 +48,7 @@ export class OpenWindowTests {
       window.close();
       const request = window.webContents.sent.find(t => t[0] === "teamrun:closeRequest");
       open.coordinator.answer(request?.[1], true);
-      for (let attempt = 0; attempt < 100 && !window.isGone; attempt++)
-        await delay(5);
+      await Condition.waitAsync(() => window.isGone);
       closed.push(window);
     }
 

@@ -12,6 +12,7 @@ import { JsonException, type JsonObject } from "@noldova/teamrun-foundation-json
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { type IWindowStateStore, WindowBoundsKeeper, WindowStateException, WindowStateUnavailableException } from "@noldova/teamrun-shell-desktop";
 
+import { Condition } from "../fixtures/condition.fixture.js";
 import { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
 import { FakeDesktopLog } from "../fixtures/fake-desktop-log.fixture.js";
 import { FakeDisplayHost } from "../fixtures/fake-display-host.fixture.js";
@@ -52,10 +53,10 @@ export class WindowBoundsKeeperTests {
 
     window.bounds = { x: 10, y: 20, width: 800, height: 600 };
     window.change("move");
-    await WindowBoundsKeeperTests.waitAsync(() => store.attempts === 1);
+    await Condition.waitAsync(() => store.attempts === 1);
     window.bounds = { x: 30, y: 40, width: 900, height: 640 };
     window.change("resize");
-    await WindowBoundsKeeperTests.waitAsync(() => store.attempts === 2);
+    await Condition.waitAsync(() => store.attempts === 2);
     const writesWhileUnreachable = store.writes.length;
     store.failure = null;
     await keeper.saveUnsavedAsync();
@@ -77,7 +78,7 @@ export class WindowBoundsKeeperTests {
     await keeper.saveUnsavedAsync();
     store.failure = new WindowStateException("The runtime refused shell.writeWindowBounds: The database is busy.");
     window.change("move");
-    await WindowBoundsKeeperTests.waitAsync(() => log.lines.length === 1);
+    await Condition.waitAsync(() => log.lines.length === 1);
     store.failure = null;
     await keeper.saveUnsavedAsync();
 
@@ -162,11 +163,5 @@ export class WindowBoundsKeeperTests {
     await delay(20);
 
     Assert.areEqual(JSON.stringify(["The window's bounds could not be saved: Error: The runtime is gone."]), JSON.stringify(log.lines));
-  }
-
-  private static async waitAsync(condition: () => boolean): Promise<void> {
-    for (let attempt = 0; attempt < 2000 && !condition(); attempt++)
-      await delay(5);
-    Assert.isTrue(condition());
   }
 }
