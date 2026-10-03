@@ -194,6 +194,19 @@ describe("TooltipDirective", () => {
     expect(tooltip()).toBeNull();
   });
 
+  it("dismisses a hover tooltip with Escape while focus is elsewhere, without moving focus", async () => {
+    const other: HTMLElement = fixture.nativeElement.querySelector(".other");
+    other.tabIndex = -1;
+    other.focus();
+    await userEvent.hover(anchor());
+    await shownAsync();
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(tooltip()).toBeNull();
+    expect(document.activeElement).toBe(other);
+  });
+
   it("shows on keyboard focus, hides on blur and dismisses with Escape without letting it reach the page", async () => {
     const escapes: KeyboardEvent[] = [];
     document.addEventListener("keydown", t => escapes.push(t));
