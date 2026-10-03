@@ -125,6 +125,20 @@ describe("TabGroupComponent", () => {
     expect(tooltip()?.getBoundingClientRect().top).toBeGreaterThan(target.getBoundingClientRect().bottom);
   });
 
+  it("shows a preview in italics with its description and keeps it on a double-click", async () => {
+    await renderAsync(prepared.openDocument(LayoutFixture.settings, true));
+    const preview = tabs(0)[2];
+
+    expect(preview?.classList.contains("tr-tab-preview")).toBe(true);
+    expect(preview?.getAttribute("aria-description")).toBe("Preview");
+    expect(tab(0, 0).hasAttribute("aria-description")).toBe(false);
+    preview?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    update();
+
+    expect(layout.layout().documents.preview).toBeNull();
+    expect(preview?.classList.contains("tr-tab-preview")).toBe(false);
+  });
+
   it("activates a clicked tab, closes a tab with its close button and starts a drag from a tab", async () => {
     await renderAsync();
     const begin = vi.spyOn(TestBed.inject(TabDragService), "begin");

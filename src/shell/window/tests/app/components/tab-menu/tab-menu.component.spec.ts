@@ -237,6 +237,18 @@ describe("TabMenuComponent", () => {
     expect(focusedKey()).toBe(LayoutFixture.search.key);
   });
 
+  it("offers to keep a preview open first, and keeps it", async () => {
+    await renderAsync(LayoutFixture.todo, Layout.createDefault(registry).openDocument(LayoutFixture.plan).openDocument(LayoutFixture.todo, true));
+    await openAsync();
+    expect(labels(".tr-tab-menu button[tr-menu-item]")[0]).toBe(Resources.keepLabel);
+
+    await clickAsync(item(".tr-tab-menu-keep"));
+
+    expect(layout.layout().documents.preview).toBeNull();
+    await openAsync();
+    expect(items(".tr-tab-menu-keep").length).toBe(0);
+  });
+
   it("closes every tab of its group", async () => {
     await renderAsync(LayoutFixture.plan);
     await openAsync();

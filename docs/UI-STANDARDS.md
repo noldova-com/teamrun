@@ -199,7 +199,7 @@ This table assigns geometry and radius tokens under sections 1, 3 and 7, with th
 | Progress | 2px bar; 1rem spinner; reveal after 300ms where delay avoids flicker | Accessible status | Progress token; empty track; completion/error remain understandable without animation |
 | Word wrap | Icon-button geometry; 1rem wrap glyph | Accessible name | Initially off; precedes Copy or diff collapse; pressed state exposed; Enter/Space activate |
 | Inline code | Text metrics; small radius | Code | Inline-code token |
-| Preview tab | Tab geometry | Panel, italic | One temporary preview per strip; explicit keep action available |
+| Preview tab | Tab geometry | Panel, italic | One temporary preview per strip, which the next preview replaces in place; described to assistive technology as "Preview". A double-click, the tab menu's Keep open or a module's own keep action keeps it; moving it keeps it too. A kept preview becomes an ordinary tab, and the preview state survives a restart |
 | Tree row while dragged | Tree-row geometry; small radius | Panel | Shell-color ghost, border and large shadow; placeholder may dim; rearrangement animation up to 150ms and disabled for reduced motion |
 | Card | Automatic height; medium radius; 1px border | Message | Raised surface |
 | Module failure card | Card geometry with 0.75rem padding, 0.5rem from the panel's edges; 1rem error icon 0.5rem from the title | Message; title 600 | Raised surface; fills a failed module's view with "<Module> didn't start" and the cause in muted text |
