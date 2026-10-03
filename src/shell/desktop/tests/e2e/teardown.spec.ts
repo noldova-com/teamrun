@@ -7,11 +7,14 @@
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import { DataDirectory, OwnershipLock } from "@noldova/teamrun-shell-runtime";
+
+import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import ProcessListFixture from "./fixtures/process-list.fixture.ts";
 
@@ -70,6 +73,48 @@ test.describe("the harness's teardown", () => {
       await writeFile(release, "");
       await rm(folder, { recursive: true, force: true, maxRetries: 10 });
     }
+  });
+
+  const runtimeFiles = (dataDirectory: string): string[] => {
+    const directory = new DataDirectory(dataDirectory);
+    return [directory.shellDatabase, `${directory.shellDatabase}-wal`, `${directory.shellDatabase}-shm`, directory.ownershipDatabase, directory.runtimeLog];
+  };
+
+  test("stops the runtime by asking it, so it closes its database and the files it held can be removed as soon as the stop returns", async ({ desktop }) => {
+    const files = runtimeFiles(desktop.dataDirectory);
+    const held = files.filter(t => existsSync(t));
+    expect(await desktop.closeAsync(true)).toBe(0);
+
+    await DesktopApplicationFixture.stopRuntimeAsync(desktop.dataDirectory);
+    const isOwned = OwnershipLock.isOwned(new DataDirectory(desktop.dataDirectory));
+    const left = files.filter(t => existsSync(t));
+    for (const file of left)
+      rmSync(file);
+
+    expect(held).toEqual(files);
+    expect(isOwned).toBe(false);
+    expect(left).toEqual([files[0], ...files.slice(3)]);
+    expect(left.filter(t => existsSync(t))).toEqual([]);
+  });
+
+  test.describe("with data from an earlier TeamRun", () => {
+    test.use({ desktopDataFiles: { "conversations.json": "[]" } });
+
+    test("stops the runtime that refuses that data, so the files it held can be removed as soon as the stop returns", async ({ desktop }) => {
+      await expect(desktop.window.getByRole("heading", { name: "Data from an earlier TeamRun" })).toBeVisible();
+      const files = runtimeFiles(desktop.dataDirectory);
+      const held = files.filter(t => existsSync(t));
+      expect(await desktop.closeAsync(true)).toBe(0);
+
+      await DesktopApplicationFixture.stopRuntimeAsync(desktop.dataDirectory);
+      const isOwned = OwnershipLock.isOwned(new DataDirectory(desktop.dataDirectory));
+      for (const file of held)
+        rmSync(file);
+
+      expect(held).toEqual(files.slice(3));
+      expect(isOwned).toBe(false);
+      expect(held.filter(t => existsSync(t))).toEqual([]);
+    });
   });
 
   test("records every process TeamRun runs, its Electron processes and its runtime, and removes its folder once they have all ended", async ({ desktop }) => {

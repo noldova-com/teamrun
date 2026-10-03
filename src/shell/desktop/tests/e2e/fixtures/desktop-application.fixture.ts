@@ -11,10 +11,12 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 
 import { type ElectronApplication, type Page, type TestInfo, _electron, expect } from "@playwright/test";
 
-import { DataDirectory, DiscoveryReader, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
+import { StopPolicy } from "@noldova/teamrun-shell-protocol";
+import { DataDirectory, DiscoveryReader, Endpoint, OwnershipLock, RuntimeBuild, RuntimeClient, type RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
 
 import ErrorOutputClassifier from "./error-output.classifier.ts";
 import OffCursorPlacement from "./off-cursor-placement.ts";
@@ -31,6 +33,8 @@ export default class DesktopApplicationFixture {
   private static readonly DATA_FOLDER: string = "data";
   private static readonly DEVICE_FOLDER: string = "device";
   private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
+  private static readonly OWNERSHIP_INTERVAL: number = 50;
+  private static readonly CLIENT_NAME: string = "ui-test";
   private static readonly PROCESS_EXIT_TIMEOUT: number = 30_000;
   private static readonly REMOVE_RETRIES: number = 3;
   private static readonly LOCKED_CODES: readonly string[] = ["EBUSY", "EPERM", "ENOTEMPTY"];
@@ -89,11 +93,22 @@ export default class DesktopApplicationFixture {
   }
 
   public static async stopRuntimeAsync(dataDirectory: string): Promise<void> {
-    const discovery = await DiscoveryReader.readAsync(new DataDirectory(dataDirectory));
-    if (discovery === null || !DesktopApplicationFixture.isAlive(discovery.processId))
-      return;
-    process.kill(discovery.processId);
-    await expect.poll(() => DesktopApplicationFixture.isAlive(discovery.processId), { timeout: DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT }).toBe(false);
+    const directory = new DataDirectory(dataDirectory);
+    const discovery = await DiscoveryReader.readAsync(directory);
+    const answer = discovery !== null && DesktopApplicationFixture.isAlive(discovery.processId)
+      ? await DesktopApplicationFixture.askToStopAsync(discovery)
+      : "it had already withdrawn its discovery file";
+    const deadline = Date.now() + DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT;
+    while (OwnershipLock.isOwned(directory)) {
+      if (Date.now() >= deadline) {
+        const seconds = DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT / 1000;
+        if (discovery === null)
+          throw new Error(`A runtime still owned ${dataDirectory} ${seconds} s after the test found it stopping, and it had no discovery file to name its process.`);
+        process.kill(discovery.processId);
+        throw new Error(`The runtime ${discovery.processId} still owned ${dataDirectory} ${seconds} s after it was asked to stop (${answer}), so the test killed it.`);
+      }
+      await delay(DesktopApplicationFixture.OWNERSHIP_INTERVAL);
+    }
   }
 
   public static isAlive(processId: number): boolean {
@@ -349,6 +364,23 @@ export default class DesktopApplicationFixture {
     if (this.childProcess === null)
       throw new Error("TeamRun was not started.");
     return this.childProcess;
+  }
+
+  private static async askToStopAsync(discovery: RuntimeDiscovery): Promise<string> {
+    try {
+      const client = await RuntimeClient.connectAsync(Endpoint.parse(discovery.endpoint), discovery.token, RuntimeBuild.identity, DesktopApplicationFixture.CLIENT_NAME,
+        { onEvent: () => undefined, onDisconnected: () => undefined });
+      try {
+        const response = await client.stopAsync(StopPolicy.StopWork);
+        return response.failure?.message ?? "it agreed";
+      }
+      finally {
+        client.close();
+      }
+    }
+    catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
   }
 
   private static readRevision(): string {
