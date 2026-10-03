@@ -11,6 +11,7 @@ import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 
 import { Resources } from "../../../resources";
+import { BottomDockSpan } from "../../enums/bottom-dock-span";
 import { DockSide } from "../../enums/dock-side";
 import type { PanelEdge } from "../../enums/panel-edge";
 import { Dock } from "./dock";
@@ -27,8 +28,9 @@ export class Layout {
   private readonly dockSides: Readonly<Record<DockSide, Dock>>;
   public readonly middle: LayoutNode;
   public readonly documents: TabGroup;
+  public readonly bottomSpan: BottomDockSpan;
 
-  public constructor(docks: readonly Dock[], middle: LayoutNode | null) {
+  public constructor(docks: readonly Dock[], middle: LayoutNode | null, bottomSpan: BottomDockSpan = BottomDockSpan.Full) {
     const documents = middle?.groups.filter(t => t.isDocuments) ?? [];
     const [document] = documents;
     if (Object.isNull(middle) || Object.isUndefined(document) || documents.length !== 1)
@@ -52,6 +54,7 @@ export class Layout {
     };
     this.middle = middle;
     this.documents = document;
+    this.bottomSpan = bottomSpan;
   }
 
   public static createDefault(registry: ViewRegistry): Layout {
@@ -163,6 +166,10 @@ export class Layout {
     return this.withDock(this.dock(side).withSize(size));
   }
 
+  public withBottomSpan(span: BottomDockSpan): Layout {
+    return span === this.bottomSpan ? this : new Layout(this.docks, this.middle, span);
+  }
+
   public resizeSplit(split: SplitNode): Layout {
     return this.withRegions(t => t.withSplit(split));
   }
@@ -184,7 +191,8 @@ export class Layout {
     return {
       [Resources.versionField]: Resources.layoutFormatVersion,
       [Resources.docksField]: Object.fromEntries(this.docks.map(t => [t.side, t.toJson()])),
-      [Resources.middleField]: this.middle.toJson()
+      [Resources.middleField]: this.middle.toJson(),
+      [Resources.bottomSpanField]: this.bottomSpan
     };
   }
 
@@ -218,6 +226,6 @@ export class Layout {
   }
 
   private copy(docks: readonly Dock[], middle: LayoutNode | null): Layout {
-    return middle === this.middle && docks.every(t => t === this.dock(t.side)) ? this : new Layout(docks, middle);
+    return middle === this.middle && docks.every(t => t === this.dock(t.side)) ? this : new Layout(docks, middle, this.bottomSpan);
   }
 }

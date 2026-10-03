@@ -276,7 +276,7 @@ Snapshot loading and event delivery can overlap: a window part replays or reconc
 
 Render external content under the [secure-coding rules](CODING-STANDARDS.md#8-secure-coding), never as markup able to reach the bridge. Open its links through the external-link path.
 
-Persisted tabs and layout restore the person's saved workspace without opening unrelated content as a side effect of initialization.
+Persisted tabs and layout restore the person's saved workspace without opening unrelated content as a side effect of initialization. The saved layout also keeps whether the bottom dock spans the window or stays between the side docks; a new or reset layout, and one saved without it, spans the window.
 
 ## 9. Active work, closing and shutdown
 

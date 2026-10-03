@@ -12,6 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import { ModuleState } from "@noldova/teamrun-shell-protocol";
 import { DockingDirection, OverlaySide } from "@noldova/teamrun-shell-ui";
 
+import { BottomDockSpan } from "./app/enums/bottom-dock-span";
 import { DockSide } from "./app/enums/dock-side";
 import { PanelEdge } from "./app/enums/panel-edge";
 import { SplitAxis } from "./app/enums/split-axis";
@@ -66,6 +67,7 @@ export class Resources {
   public static readonly dropGroupData: string = "dropGroup";
   public static readonly dropSideSelector: string = "[data-drop-side]";
   public static readonly dropSideData: string = "dropSide";
+  public static readonly dropSpanData: string = "dropSpan";
   public static readonly dropTabsSelector: string = "[data-drop-tabs]";
   public static readonly dropPlateSelector: string = "[data-drop-plate]";
   public static readonly directionSelector: string = "[data-direction]";
@@ -127,6 +129,10 @@ export class Resources {
   public static readonly moveEarlierLabel: string = "Move left";
   public static readonly moveLaterLabel: string = "Move right";
   public static readonly resetLayoutLabel: string = "Reset the layout";
+  public static readonly bottomSpanLabels: Readonly<Record<BottomDockSpan, string>> = {
+    [BottomDockSpan.Full]: "Bottom dock across the window",
+    [BottomDockSpan.Between]: "Bottom dock between the side docks"
+  };
   public static readonly documentsGroupLabel: string = "Documents";
   public static readonly groupLabelJoiner: string = ", ";
   public static readonly splitLabels: Readonly<Record<PanelEdge, string>> = {
@@ -229,6 +235,7 @@ export class Resources {
   public static readonly rootField: string = "root";
   public static readonly sizeField: string = "size";
   public static readonly collapsedField: string = "collapsed";
+  public static readonly bottomSpanField: string = "bottomSpan";
   public static readonly axisField: string = "axis";
   public static readonly childrenField: string = "children";
   public static readonly weightField: string = "weight";
