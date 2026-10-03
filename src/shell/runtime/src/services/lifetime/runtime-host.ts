@@ -11,7 +11,7 @@ import path from "node:path";
 import { inspect } from "node:util";
 
 import "@noldova/teamrun-foundation-core";
-import { type BuildIdentity, Failure, FailureCode, PreShellData, RuntimeHandover, ShellMethods } from "@noldova/teamrun-shell-protocol";
+import { type BuildIdentity, Failure, FailureCode, PreShellData, RuntimeHandover, ShellEvents, ShellMethods } from "@noldova/teamrun-shell-protocol";
 
 import { DataDirectoryState } from "../../enums/data-directory-state.js";
 import { WindowStateKind } from "../../enums/window-state-kind.js";
@@ -36,6 +36,11 @@ import { CommandsMethod } from "../modules/commands-method.js";
 import { ModuleHost } from "../modules/module-host.js";
 import { ModulesMethod } from "../modules/modules-method.js";
 import { RunCommandMethod } from "../modules/run-command-method.js";
+import { DismissNotificationMethod } from "../notifications/dismiss-notification-method.js";
+import { NotificationCenter } from "../notifications/notification-center.js";
+import { NotificationsMethod } from "../notifications/notifications-method.js";
+import { PostNotificationMethod } from "../notifications/post-notification-method.js";
+import { UpdateNotificationMethod } from "../notifications/update-notification-method.js";
 import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
 import { CommandRegistry } from "../registry/command-registry.js";
@@ -67,6 +72,7 @@ export class RuntimeHost implements IIdleParticipant {
   public readonly methods: MethodRegistry = new MethodRegistry();
   public readonly commands: CommandRegistry = new CommandRegistry();
   public readonly events: EventRegistry;
+  public readonly notifications: NotificationCenter;
   public readonly modules: ModuleHost;
   public readonly log: RuntimeLog;
 
@@ -93,11 +99,17 @@ export class RuntimeHost implements IIdleParticipant {
     this.events = new EventRegistry(this.server);
     this.publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(platform, new SystemCommand(), environment));
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
-    this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, this.commands, new PackageRuntimePartLoader(), log.diagnostics);
+    const notificationsChanged = this.events.declare(ShellEvents.notifications);
+    this.notifications = new NotificationCenter(t => notificationsChanged.publish(t.toJson()), () => new Date());
+    this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics);
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
     this.methods.register(ShellMethods.commands, new CommandsMethod(this.commands));
     this.methods.register(ShellMethods.runCommand, new RunCommandMethod(this.commands));
+    this.methods.register(ShellMethods.notifications, new NotificationsMethod(this.notifications));
+    this.methods.register(ShellMethods.postNotification, new PostNotificationMethod(this.notifications, this.modules.notificationPolicy));
+    this.methods.register(ShellMethods.updateNotification, new UpdateNotificationMethod(this.notifications, this.modules.notificationPolicy));
+    this.methods.register(ShellMethods.dismissNotification, new DismissNotificationMethod(this.notifications));
     if (!Object.isNull(database))
       this.registerShellFacilities(database);
     else {

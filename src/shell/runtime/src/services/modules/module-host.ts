@@ -19,6 +19,8 @@ import { ModuleActivation } from "../../models/module-activation.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
 import { Resources } from "../../resources.js";
 import type { DataDirectory } from "../data-directory/data-directory.js";
+import type { NotificationCenter } from "../notifications/notification-center.js";
+import { NotificationPolicy } from "../notifications/notification-policy.js";
 import type { CommandRegistry } from "../registry/command-registry.js";
 import { ModuleDatabase } from "../database/module-database.js";
 import type { EventRegistry } from "../registry/event-registry.js";
@@ -32,12 +34,14 @@ export class ModuleHost {
   private readonly methods: MethodRegistry;
   private readonly events: EventRegistry;
   private readonly commands: CommandRegistry;
+  private readonly notifications: NotificationCenter;
   private readonly loader: IRuntimePartLoader;
   private readonly diagnostics: Writable;
   private readonly statuses: Map<string, ModuleStatus> = new Map();
   private readonly activations: ModuleActivation[] = [];
 
   public readonly services: ServiceRegistry = new ServiceRegistry();
+  public readonly notificationPolicy: NotificationPolicy;
 
   public constructor(
     declarations: readonly ModuleDeclaration[],
@@ -45,6 +49,7 @@ export class ModuleHost {
     methods: MethodRegistry,
     events: EventRegistry,
     commands: CommandRegistry,
+    notifications: NotificationCenter,
     loader: IRuntimePartLoader,
     diagnostics: Writable) {
     this.declarations = declarations;
@@ -52,6 +57,8 @@ export class ModuleHost {
     this.methods = methods;
     this.events = events;
     this.commands = commands;
+    this.notifications = notifications;
+    this.notificationPolicy = new NotificationPolicy(declarations, t => this.statuses.get(t)?.state === ModuleState.Active);
     this.loader = loader;
     this.diagnostics = diagnostics;
   }
@@ -124,7 +131,7 @@ export class ModuleHost {
         return new ModuleStatus(declaration.id, ModuleState.Failed, cause);
       }
 
-    const context = new ModuleContext(declaration, this.dataDirectory, this.methods, this.events, this.commands, this.services, database);
+    const context = new ModuleContext(declaration, this.dataDirectory, this.methods, this.events, this.commands, this.notifications, this.notificationPolicy, this.services, database);
     try {
       await part.activateAsync(context);
     }

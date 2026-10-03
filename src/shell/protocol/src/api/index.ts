@@ -8,6 +8,7 @@
 
 export { FailureCode } from "../enums/failure-code.js";
 export { ModuleState } from "../enums/module-state.js";
+export { NotificationSeverity } from "../enums/notification-severity.js";
 export { StopPolicy } from "../enums/stop-policy.js";
 export { WireMessageKind } from "../enums/wire-message-kind.js";
 export { ProtocolException } from "../exceptions/protocol.exception.js";
@@ -24,12 +25,19 @@ export { KeyChord } from "../models/key-chord.js";
 export { KeyName } from "../models/key-name.js";
 export { ModuleStatus } from "../models/module-status.js";
 export { ModuleStatusList } from "../models/module-status-list.js";
+export { Notification } from "../models/notification.js";
+export { NotificationAction } from "../models/notification-action.js";
+export { NotificationList } from "../models/notification-list.js";
+export { NotificationPost } from "../models/notification-post.js";
+export { NotificationReference } from "../models/notification-reference.js";
+export { NotificationUpdate } from "../models/notification-update.js";
 export { PreShellData } from "../models/pre-shell-data.js";
 export { QualifiedName } from "../models/qualified-name.js";
 export { Request } from "../models/request.js";
 export { Response } from "../models/response.js";
 export { RunningWork } from "../models/running-work.js";
 export { RuntimeHandover } from "../models/runtime-handover.js";
+export { ShellEvents } from "../models/shell-events.js";
 export { ShellMethods } from "../models/shell-methods.js";
 export { StopRequest } from "../models/stop-request.js";
 export { WindowStateKey } from "../models/window-state-key.js";

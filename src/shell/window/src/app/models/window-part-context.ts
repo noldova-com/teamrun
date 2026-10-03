@@ -7,6 +7,7 @@
  */
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
 
 import { WindowPartAccessException } from "../exceptions/window-part-access.exception";
 import type { IWindowPartContext } from "../interfaces/i-window-part-context";
@@ -14,6 +15,7 @@ import type { IDocumentOptions } from "../interfaces/i-document-options";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
 import type { CommandContribution } from "./command-contribution";
 import type { DocumentContribution } from "./document-contribution";
+import { NotificationHandle } from "./notification-handle";
 import type { ViewContribution } from "./view-contribution";
 import { Resources } from "../../resources";
 
@@ -21,6 +23,8 @@ export class WindowPartContext implements IWindowPartContext {
   private readonly host: IWindowPartHost;
   private readonly owners: readonly string[];
   private readonly commandNames: readonly string[];
+  private readonly notificationKinds: readonly string[];
+  private readonly notificationIds: Set<number> = new Set();
   private readonly commandList: CommandContribution[] = [];
   private readonly viewList: ViewContribution[] = [];
   private readonly documentList: DocumentContribution[] = [];
@@ -28,10 +32,11 @@ export class WindowPartContext implements IWindowPartContext {
 
   public readonly moduleId: string;
 
-  public constructor(moduleId: string, dependencies: readonly string[], commandNames: readonly string[], host: IWindowPartHost) {
+  public constructor(moduleId: string, dependencies: readonly string[], commandNames: readonly string[], notificationKinds: readonly string[], host: IWindowPartHost) {
     this.moduleId = moduleId;
     this.owners = [moduleId, ...dependencies];
     this.commandNames = [...commandNames];
+    this.notificationKinds = [...notificationKinds];
     this.host = host;
   }
 
@@ -74,6 +79,13 @@ export class WindowPartContext implements IWindowPartContext {
     return this.host.runCommandAsync(name, commandArguments);
   }
 
+  public async postNotificationAsync(post: NotificationPost): Promise<NotificationHandle> {
+    this.requireNotification(post);
+    const id = await this.host.postNotificationAsync(post);
+    this.notificationIds.add(id);
+    return new NotificationHandle(id, t => this.updateNotificationAsync(id, t), () => this.dismissNotification(id));
+  }
+
   public openDocument(name: string, instance: string, title: string, options: IDocumentOptions = {}): void {
     this.requireOwn(name);
     this.host.openDocument(this.moduleId, name, instance, title, options.preview === true);
@@ -105,7 +117,27 @@ export class WindowPartContext implements IWindowPartContext {
     this.viewList.length = 0;
     this.documentList.length = 0;
     this.commandList.length = 0;
+    for (const id of [...this.notificationIds])
+      this.dismissNotification(id);
     this.host.refresh();
+  }
+
+  private async updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
+    this.requireNotification(post);
+    await this.host.updateNotificationAsync(id, post);
+  }
+
+  private dismissNotification(id: number): void {
+    if (this.notificationIds.delete(id))
+      this.host.dismissNotification(id);
+  }
+
+  private requireNotification(post: NotificationPost): void {
+    this.requireOwn(post.kind.text);
+    if (!this.notificationKinds.includes(post.kind.text))
+      throw new WindowPartAccessException(Resources.formatUndeclaredNotification(this.moduleId, post.kind.text));
+    for (const command of [...post.open === null ? [] : [post.open], ...post.actions.map(t => t.command)])
+      this.requireAllowed(command.name.text);
   }
 
   private requireOwn(name: string): void {

@@ -9,7 +9,7 @@
 import { Component, ErrorHandler, type Type } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
-import { ModuleState } from "@noldova/teamrun-shell-protocol";
+import { ModuleState, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../../../src/app/enums/dock-side";
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
@@ -63,8 +63,16 @@ class FakeWindowPart implements IWindowPart {
 describe("WindowPartHostService", () => {
   const load = (): Promise<Type<unknown>> => Promise.resolve(ContentComponent);
   const status = (id: string, state: ModuleState = ModuleState.Active, cause: string | null = null): object => ({ id, state, ...(cause === null ? {} : { cause }) });
-  const source = (moduleId: string, part: IWindowPart | Error, dependencies: readonly string[] = [], views: readonly string[] = [], commands: readonly string[] = []): WindowPartSource =>
-    new WindowPartSource(moduleId, `${moduleId[0]?.toUpperCase()}${moduleId.slice(1)}`, dependencies, views, commands, () => part instanceof Error ? Promise.reject(part) : Promise.resolve(part));
+  const source = (
+    moduleId: string,
+    part: IWindowPart | Error,
+    dependencies: readonly string[] = [],
+    views: readonly string[] = [],
+    commands: readonly string[] = [],
+    notifications: readonly string[] = []): WindowPartSource =>
+    new WindowPartSource(
+      moduleId, `${moduleId[0]?.toUpperCase()}${moduleId.slice(1)}`, dependencies, views, commands, notifications,
+      () => part instanceof Error ? Promise.reject(part) : Promise.resolve(part));
   const notesPart = (log: string[]): FakeWindowPart => new FakeWindowPart("notes", log, t => {
     t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load));
     t.registerDocument(new DocumentContribution("notes.note", load));
@@ -178,6 +186,28 @@ describe("WindowPartHostService", () => {
     expect(host.findContribution(new ViewTab("clock.face"))).toBeNull();
     expect(layout.registry().view("clock.face").isShownByDefault).toBe(false);
     expect(errors.map(t => (t as Error).message)).toEqual(["No chunk.", "The clock broke."]);
+  });
+
+  it("posts, updates and dismisses notifications through the runtime and reports a dismissal that fails", async () => {
+    const post = new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Success, null, [], null);
+    bridge.responses.set("shell.postNotification", { payload: { id: 4 } });
+    bridge.responses.set("shell.updateNotification", { payload: null });
+    bridge.responses.set("shell.dismissNotification", { failure: { code: "Unavailable", message: "Not connected." } });
+    const { host } = start([], []);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    const id = await host.postNotificationAsync(post);
+    await host.updateNotificationAsync(id, post);
+    host.dismissNotification(id);
+    await vi.waitFor(() => expect(errors.length).toBe(1));
+
+    expect(id).toBe(4);
+    expect(bridge.requests.slice(-3).map(t => [t[0], JSON.stringify(t[1])])).toEqual([
+      ["shell.postNotification", JSON.stringify(post.toJson())],
+      ["shell.updateNotification", JSON.stringify({ id: 4, post: post.toJson() })],
+      ["shell.dismissNotification", JSON.stringify({ id: 4 })]
+    ]);
+    expect((errors[0] as Error).message).toContain("Not connected.");
   });
 
   it("lists the runtime's and the window parts' commands in module order and runs both", async () => {

@@ -296,6 +296,10 @@ export class Resources {
     return `The module ${moduleId} does not declare the command ${name}.`;
   }
 
+  public static formatUndeclaredNotification(moduleId: string, kind: string): string {
+    return `The module ${moduleId} does not declare the notification kind ${kind}.`;
+  }
+
   public static formatCommandRegistered(name: string): string {
     return `The command ${name} is already registered.`;
   }

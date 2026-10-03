@@ -10,7 +10,9 @@ import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal,
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { type CommandInfo, CommandList, CommandRun, ModuleState, ModuleStatus, ModuleStatusList, ShellMethods } from "@noldova/teamrun-shell-protocol";
+import {
+  type CommandInfo, CommandList, CommandRun, ModuleState, ModuleStatus, ModuleStatusList, type NotificationPost, NotificationReference, NotificationUpdate, ShellMethods
+} from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../enums/dock-side";
 import type { IWindowPart } from "../interfaces/i-window-part";
@@ -106,6 +108,18 @@ export class WindowPartHostService implements IWindowPartHost {
 
   public runCommandAsync(name: string, commandArguments: JsonValue): Promise<JsonValue> {
     return this.commands.runAsync(name, commandArguments);
+  }
+
+  public async postNotificationAsync(post: NotificationPost): Promise<number> {
+    return NotificationReference.fromJson(await this.bridge.requestAsync(ShellMethods.postNotification.text, post.toJson())).id;
+  }
+
+  public async updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
+    await this.bridge.requestAsync(ShellMethods.updateNotification.text, new NotificationUpdate(id, post).toJson());
+  }
+
+  public dismissNotification(id: number): void {
+    this.bridge.requestAsync(ShellMethods.dismissNotification.text, new NotificationReference(id).toJson()).catch((error: unknown) => this.errors.handleError(error));
   }
 
   public refresh(): void {
@@ -213,7 +227,7 @@ export class WindowPartHostService implements IWindowPartHost {
       return new ModuleStatus(moduleId, ModuleState.Failed, Resources.windowPartLoadFailed);
     }
 
-    const activation = new WindowPartActivation(new WindowPartContext(moduleId, source.dependencies, source.commandNames, this), part);
+    const activation = new WindowPartActivation(new WindowPartContext(moduleId, source.dependencies, source.commandNames, source.notificationKinds, this), part);
     this.activations.push(activation);
     try {
       await part.activateAsync(activation.context);
