@@ -167,7 +167,7 @@ This table assigns geometry and radius tokens under sections 1, 3 and 7, with th
 
 | Component | Default geometry | Text role | Surface and behavior |
 |---|---|---|---|
-| Window row | 2.1875rem high | Panel; title 600 | Shell; window controls, the active document's breadcrumb and the top bar's actions, with no divider beneath; the actions are icon buttons outside the drag region, named and labelled by their titles |
+| Window row | 2.1875rem high | Panel; title 600 | Shell; window controls, the active document's breadcrumb and the top bar's actions, ending with the shell's **Search commands**, with no divider beneath; the actions are icon buttons outside the drag region, named and labelled by their titles |
 | Status bar | 1.75rem high; 0.5rem side inset; items are 1.25rem high pills with 0.375rem side padding, 0.25rem apart; hover radius | Label | Shell; items on the left and right, with no divider above; an item with a command is a button with toolbar hover, meeting section 7's target size through its spacing; truncated text keeps its full text in the tooltip and accessible name |
 | Module failures item | Status-bar item; 1rem error icon 0.25rem from its text | Label | Shown at the status bar's right end only while a module is failed or blocked; the error icon with text such as "1 module didn't start", never color alone; opens the module failures popover |
 | Panel card | 1px border; large radius; 0.25rem gaps and outer side/bottom margin | Inherited | Shell for groups in a dock, panel for groups in the middle; meets the window row above |

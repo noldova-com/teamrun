@@ -54,7 +54,7 @@ test.describe("command search", () => {
     await expect(options(window).first()).toHaveAttribute("data-item", "notes.newNote");
   });
 
-  test("runs a runtime part's command chosen with the pointer, leaves out a disabled command, and returns focus when dismissed", async ({ desktop }) => {
+  test("opens from the top bar, runs a runtime part's command chosen with the pointer, leaves out a disabled command, and returns focus when dismissed", async ({ desktop }) => {
     const window = desktop.window;
     const ticks = window.locator("[data-fixture-content=clock-ticks]");
     const tab = window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]");
@@ -62,7 +62,8 @@ test.describe("command search", () => {
     await tab.click();
     await expect(tab).toBeFocused();
 
-    await window.keyboard.press("ControlOrMeta+Shift+KeyP");
+    await window.locator("tr-window-row").getByRole("button", { name: "Search commands" }).click();
+    await expect(field(window)).toBeFocused();
     await window.keyboard.type("tick");
     await pane(window).locator("[data-item=\"clock.tick\"]").click();
 
