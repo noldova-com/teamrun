@@ -139,6 +139,14 @@ describe("ShellCommandsService", () => {
       .toEqual([true, false, false]);
   });
 
+  it("closes a group's only tab, which closes the group and leaves no tab of it to focus", async () => {
+    const group = layout.layout().groupOf(changes)?.id ?? -1;
+
+    await runAsync("shell.closeTab", tab(changes.key));
+
+    expect([layout.layout().isOpen(changes), layout.layout().group(group)]).toEqual([false, null]);
+  });
+
   it("moves a tab to another group that accepts it, and to no other", async () => {
     const other = layout.layout().groupOf(changes)?.id ?? -1;
     const own = layout.layout().groupOf(search)?.id ?? -1;
