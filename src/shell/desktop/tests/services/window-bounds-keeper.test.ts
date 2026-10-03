@@ -10,8 +10,9 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { JsonException, type JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { type IWindowStateStore, WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
+import { type IWindowStateStore, WindowBoundsKeeper, WindowStateException, WindowStateUnavailableException } from "@noldova/teamrun-shell-desktop";
 
+import { Condition } from "../fixtures/condition.fixture.js";
 import { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
 import { FakeDesktopLog } from "../fixtures/fake-desktop-log.fixture.js";
 import { FakeDisplayHost } from "../fixtures/fake-display-host.fixture.js";
@@ -20,6 +21,7 @@ class MemoryStore implements IWindowStateStore {
   public value: JsonObject | null;
   public readonly writes: JsonObject[] = [];
   public failure: Error | null = null;
+  public attempts: number = 0;
 
   public constructor(value: JsonObject | null) {
     this.value = value;
@@ -30,6 +32,7 @@ class MemoryStore implements IWindowStateStore {
   }
 
   public writeAsync(value: JsonObject): Promise<void> {
+    this.attempts++;
     if (this.failure !== null)
       return Promise.reject(this.failure);
     this.writes.push(value);
@@ -39,6 +42,50 @@ class MemoryStore implements IWindowStateStore {
 
 @TestClass
 export class WindowBoundsKeeperTests {
+  @TestMethod
+  public async keepsBoundsItCouldNotSaveWhileTheRuntimeWasUnreachableAndSavesTheNewestOnce(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
+    const store = new MemoryStore(null);
+    const log = new FakeDesktopLog();
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 1, log);
+    await keeper.restoreAsync(store);
+    store.failure = new WindowStateUnavailableException("TeamRun is not connected to its runtime.");
+
+    window.bounds = { x: 10, y: 20, width: 800, height: 600 };
+    window.change("move");
+    await Condition.waitAsync(() => store.attempts === 1);
+    window.bounds = { x: 30, y: 40, width: 900, height: 640 };
+    window.change("resize");
+    await Condition.waitAsync(() => store.attempts === 2);
+    const writesWhileUnreachable = store.writes.length;
+    store.failure = null;
+    await keeper.saveUnsavedAsync();
+    await keeper.saveUnsavedAsync();
+
+    Assert.areEqual(0, writesWhileUnreachable);
+    Assert.areEqual(0, log.lines.length);
+    Assert.areEqual(JSON.stringify([{ x: 30, y: 40, width: 900, height: 640, maximized: false }]), JSON.stringify(store.writes));
+  }
+
+  @TestMethod
+  public async savesNothingWhenNoBoundsAreUnsavedAndStillReportsARefusal(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
+    const store = new MemoryStore(null);
+    const log = new FakeDesktopLog();
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 1, log);
+    await keeper.restoreAsync(store);
+
+    await keeper.saveUnsavedAsync();
+    store.failure = new WindowStateException("The runtime refused shell.writeWindowBounds: The database is busy.");
+    window.change("move");
+    await Condition.waitAsync(() => log.lines.length === 1);
+    store.failure = null;
+    await keeper.saveUnsavedAsync();
+
+    Assert.areEqual(JSON.stringify(["The window's bounds could not be saved: WindowStateException: The runtime refused shell.writeWindowBounds: The database is busy."]), JSON.stringify(log.lines));
+    Assert.areEqual(1, store.writes.length);
+  }
+
   @TestMethod
   public async restoresSavedBoundsThatADisplayShows(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);

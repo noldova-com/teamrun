@@ -38,7 +38,8 @@ export class DesktopApiTests {
         "WindowBoundsKeeper",
         "WindowRecovery",
         "WindowState",
-        "WindowStateException"
+        "WindowStateException",
+        "WindowStateUnavailableException"
       ]),
       JSON.stringify(Object.keys(api).sort()));
   }

@@ -10,7 +10,6 @@ import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
@@ -57,7 +56,8 @@ export class RuntimeServerTests {
       fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
 
       const [connection, answer] = await fixture.handshakeAsync("desktop");
-      await delay(200);
+      const silent = await fixture.connectAsync();
+      await silent.waitForCloseAsync();
       connection.sendMessages(new Request("desktop:1", RuntimeServerTests.ECHO, { path: "notes.md" }));
       const response = await connection.readResponseAsync();
 
@@ -101,7 +101,7 @@ export class RuntimeServerTests {
       await connection.waitForCloseAsync();
 
       await Assert.throwsAsync(() => connection.readTextAsync(), Error);
-      await RuntimeServerTests.waitForAsync(() => fixture.server.sessionCount === 0);
+      await fixture.waitUntilAsync(() => fixture.server.sessionCount === 0);
       Assert.areEqual(2, fixture.changes);
     });
   }
@@ -161,7 +161,8 @@ export class RuntimeServerTests {
       RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.UnknownMethod, "The method notes.echo is not registered.", "tester:1");
       for (let index = 0; index < 3; index++)
         RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.InvalidMessage, "Only requests and cancellations may follow the handshake.", null);
-      await delay(50);
+      connection.sendMessages(new Request("tester:4", RuntimeServerTests.ECHO, null));
+      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.UnknownMethod, "The method notes.echo is not registered.", "tester:4");
       Assert.isFalse(connection.isClosed);
     });
   }
@@ -171,6 +172,7 @@ export class RuntimeServerTests {
     return RuntimeServerTests.runAsync(undefined, async fixture => {
       const signals: AbortSignal[] = [];
       fixture.methods.register(RuntimeServerTests.WAIT, RuntimeServerTests.createWaitHandler(signals));
+      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
       const connection = await fixture.authenticateAsync();
 
       connection.sendMessages(new Request("tester:1", RuntimeServerTests.WAIT, null), new Request("tester:1", RuntimeServerTests.WAIT, null));
@@ -184,7 +186,8 @@ export class RuntimeServerTests {
       RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.Cancelled, "The request was cancelled.", "tester:1");
       Assert.areEqual(1, signals.length);
       Assert.areEqual(true, signals[0]?.aborted);
-      await delay(50);
+      connection.sendMessages(new Request("tester:2", RuntimeServerTests.ECHO, null));
+      Assert.areEqual("tester:2", (await connection.readResponseAsync()).id);
       Assert.areEqual(0, connection.frameCount);
     });
   }
@@ -241,14 +244,15 @@ export class RuntimeServerTests {
   public abortsRunningRequestsWhenTheConnectionCloses(): Promise<void> {
     return RuntimeServerTests.runAsync(undefined, async fixture => {
       const signals: AbortSignal[] = [];
-      fixture.methods.register(RuntimeServerTests.WAIT, RuntimeServerTests.createWaitHandler(signals));
+      const started = Promise.withResolvers<void>();
+      fixture.methods.register(RuntimeServerTests.WAIT, RuntimeServerTests.createWaitHandler(signals, started));
       const connection = await fixture.authenticateAsync();
       connection.sendMessages(new Request("tester:1", RuntimeServerTests.WAIT, null));
-      await RuntimeServerTests.waitForAsync(() => signals.length === 1);
+      await started.promise;
 
       connection.reset();
 
-      await RuntimeServerTests.waitForAsync(() => fixture.server.sessionCount === 0);
+      await fixture.waitUntilAsync(() => fixture.server.sessionCount === 0);
       Assert.areEqual(true, signals[0]?.aborted);
     });
   }
@@ -273,7 +277,8 @@ export class RuntimeServerTests {
         "A connection from another build may only ask the runtime to stop.",
         "older:1");
       Assert.areEqual("{\"client\":\"older\",\"payload\":{\"policy\":\"IfIdle\"}}", JSON.stringify((await connection.readResponseAsync()).payload));
-      await delay(50);
+      connection.sendMessages(new Request("older:3", ShellMethods.stop, { policy: "IfIdle" }));
+      Assert.areEqual("older:3", (await connection.readResponseAsync()).id);
       Assert.areEqual(0, connection.frameCount);
     });
   }
@@ -374,21 +379,22 @@ export class RuntimeServerTests {
   public closesConnectionsThatDoNotEndWithinTheGrace(): Promise<void> {
     return RuntimeServerTests.runAsync(undefined, async fixture => {
       await fixture.connectAsync(true);
-      await RuntimeServerTests.waitForAsync(() => fixture.server.sessionCount === 1);
+      await fixture.waitUntilAsync(() => fixture.server.sessionCount === 1);
       const started = Date.now();
 
       await fixture.server.closeAsync();
       await fixture.server.closeAsync();
 
-      await RuntimeServerTests.waitForAsync(() => fixture.server.sessionCount === 0);
+      await fixture.waitUntilAsync(() => fixture.server.sessionCount === 0);
       Assert.isTrue(Date.now() - started >= 1_900, "the server waits for the grace before closing");
     });
   }
 
-  private static createWaitHandler(signals: AbortSignal[]): IMethodHandler {
+  private static createWaitHandler(signals: AbortSignal[], started: PromiseWithResolvers<void> = Promise.withResolvers<void>()): IMethodHandler {
     return {
       handleAsync: async (context: RequestContext): Promise<JsonValue> => {
         signals.push(context.signal);
+        started.resolve();
         await once(context.signal, "abort");
         return "late";
       }
@@ -399,15 +405,6 @@ export class RuntimeServerTests {
     Assert.areEqual(id, response.id);
     Assert.areEqual(code, response.failure?.code);
     Assert.areEqual(message, response.failure?.message);
-  }
-
-  private static async waitForAsync(condition: () => boolean): Promise<void> {
-    const deadline = Date.now() + 3_000;
-    while (!condition()) {
-      if (Date.now() >= deadline)
-        throw new Error("The condition did not hold in time.");
-      await delay(10);
-    }
   }
 
   private static async runAsync(settings: ServerSettings | undefined, test: (fixture: RuntimeServerFixture) => Promise<void>, listen: boolean = true): Promise<void> {

@@ -8,6 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 
+import { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
 import type { IDesktopLog } from "../interfaces/i-desktop-log.js";
 import type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
 import type { IDisplayHost } from "../interfaces/i-display-host.js";
@@ -101,7 +102,9 @@ export class OpenWindow {
     this.closing = null;
     if (!canClose || this.window.isDestroyed())
       return;
-    await this.bounds.saveAsync().catch((error: unknown) => this.log.write(Resources.formatBoundsUnsaved(String(error))));
+    await this.bounds.saveAsync().catch((error: unknown) => this.log.write(error instanceof WindowStateUnavailableException
+      ? Resources.formatBoundsLostAtClose(error.message)
+      : Resources.formatBoundsUnsaved(String(error))));
     if (this.window.isDestroyed())
       return;
     this.canClose = true;

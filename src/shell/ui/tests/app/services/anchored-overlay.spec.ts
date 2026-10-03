@@ -64,11 +64,6 @@ describe("AnchoredOverlay", () => {
     return new OverlayAnchoring(OverlaySide.below, OverlayAlignment.Start, gap);
   }
 
-  async function settledAsync(): Promise<void> {
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    await new Promise(resolve => requestAnimationFrame(resolve));
-  }
-
   it("places an attached component where its bounds put it and reports the placement", () => {
     const content = overlay.openComponent(new ComponentPortal(ContentComponent), anchor(), below());
     content.changeDetectorRef.detectChanges();
@@ -113,18 +108,36 @@ describe("AnchoredOverlay", () => {
     expect(overlay.element.style.maxHeight).toBe(`${limit}px`);
   });
 
-  it("drops a reposition its content asked for when it closes first", async () => {
-    const content = overlay.openComponent(new ComponentPortal(ContentComponent), anchor(), below());
-    content.instance.height.set(200);
-    content.changeDetectorRef.detectChanges();
-    const reposition = vi.spyOn(overlay, "reposition");
-    await new Promise(resolve => setTimeout(resolve));
-    overlay.close();
+  it("drops a reposition its content asked for when it closes before the next frame", () => {
+    const notify: (() => void)[] = [];
+    vi.stubGlobal("ResizeObserver", class {
+      public constructor(callback: () => void) {
+        notify.push(callback);
+      }
 
-    await settledAsync();
+      public observe(): void {
+      }
 
-    expect(reposition).not.toHaveBeenCalled();
-    expect(overlay.placement).toBeNull();
+      public disconnect(): void {
+      }
+    });
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    try {
+      overlay.openComponent(new ComponentPortal(ContentComponent), anchor(), below());
+      const reposition = vi.spyOn(overlay, "reposition");
+
+      notify.forEach(t => t());
+      notify.forEach(t => t());
+      overlay.close();
+      vi.runAllTimers();
+
+      expect(reposition).not.toHaveBeenCalled();
+      expect(overlay.placement).toBeNull();
+    }
+    finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
   });
 
   it("reports an ancestor scroll that moves its anchor, but not a scroll inside itself or elsewhere", async () => {
