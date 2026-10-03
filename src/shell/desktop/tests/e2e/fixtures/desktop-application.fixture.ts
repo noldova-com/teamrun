@@ -41,6 +41,7 @@ export default class DesktopApplicationFixture {
   private electronApplication: ElectronApplication | null = null;
   private page: Page | null = null;
   private childProcess: ChildProcess | null = null;
+  private isKeptOffCursor: boolean = false;
 
   public readonly failures: string[] = [];
   public closeMilliseconds: number | null = null;
@@ -136,6 +137,8 @@ export default class DesktopApplicationFixture {
   }
 
   public async useViewportAsync(width: number, height: number): Promise<void> {
+    this.isKeptOffCursor = true;
+    await this.moveOffCursorAsync();
     const session = await this.window.context().newCDPSession(this.window);
     await session.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
     await expect.poll(() => this.window.evaluate(() => [innerWidth, innerHeight, devicePixelRatio])).toEqual([width, height, 1]);
@@ -174,6 +177,8 @@ export default class DesktopApplicationFixture {
 
   public async disposeAsync(hasFailed: boolean = this.testInfo.status !== this.testInfo.expectedStatus): Promise<void> {
     const isRunning = this.electronApplication !== null && Object.is(this.requireProcess().exitCode, null);
+    if (isRunning && this.isKeptOffCursor && await this.isCursorInsideAsync())
+      this.failures.push("The real cursor came back inside the window, so its position could reach the test's pointer events.");
     if (hasFailed)
       await this.keepDiagnosticsAsync(isRunning);
     if (isRunning)
@@ -258,6 +263,39 @@ export default class DesktopApplicationFixture {
     await expect.poll(() => this.isVisibleAsync()).toBe(true);
     await expect.poll(async () => (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.productVersion)
       .toBe(RuntimeBuild.identity.productVersion);
+    if (this.isKeptOffCursor)
+      await this.moveOffCursorAsync();
+  }
+
+  private async moveOffCursorAsync(): Promise<void> {
+    await this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.unmaximize());
+    await expect.poll(() => this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isMaximized())).toBe(false);
+    await this.application.evaluate(({ BrowserWindow, screen }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (window === undefined)
+        return;
+      const cursor = screen.getCursorScreenPoint();
+      const bounds = window.getBounds();
+      if (cursor.x < bounds.x || cursor.y < bounds.y || cursor.x >= bounds.x + bounds.width || cursor.y >= bounds.y + bounds.height)
+        return;
+      const [shift] = [
+        { x: cursor.x + 1 - bounds.x, y: 0 },
+        { x: cursor.x - bounds.x - bounds.width, y: 0 },
+        { x: 0, y: cursor.y + 1 - bounds.y },
+        { x: 0, y: cursor.y - bounds.y - bounds.height }
+      ].sort((a, b) => Math.abs(a.x) + Math.abs(a.y) - Math.abs(b.x) - Math.abs(b.y));
+      window.setBounds({ ...bounds, x: bounds.x + (shift?.x ?? 0), y: bounds.y + (shift?.y ?? 0) });
+    });
+    await expect.poll(() => this.isCursorInsideAsync()).toBe(false);
+    await expect.poll(() => this.window.evaluate(() => document.querySelector(":hover") === null)).toBe(true);
+  }
+
+  private async isCursorInsideAsync(): Promise<boolean> {
+    return await this.application.evaluate(({ BrowserWindow, screen }) => {
+      const cursor = screen.getCursorScreenPoint();
+      const bounds = BrowserWindow.getAllWindows()[0]?.getBounds();
+      return bounds !== undefined && cursor.x >= bounds.x && cursor.y >= bounds.y && cursor.x < bounds.x + bounds.width && cursor.y < bounds.y + bounds.height;
+    });
   }
 
   private requireProcess(): ChildProcess {

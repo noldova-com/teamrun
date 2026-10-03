@@ -143,6 +143,8 @@ Capture established UI state using declared animation policy and framework stabi
 
 The shared desktop UI suite uses a 1920 × 1080 renderer viewport at one device pixel per CSS pixel at normal zoom. Captures remain 1920 × 1080 pixels during zoom tests; the recorded CSS viewport and pixel ratio reflect the zoom. Verify the actual viewport and PNG dimensions so host display defaults cannot silently reduce the evidence resolution.
 
+Chromium sends pointer events at the real cursor's position while that cursor lies inside the window, independently of the test's virtual mouse. So once a workflow emulates its viewport, the harness moves the window just far enough that the real cursor lies outside it. It moves the window again after each start and waits until the page reports no hovered element. A workflow that ends with the real cursor back inside the window fails.
+
 Screenshots are review evidence only. They are not compared pixel by pixel, and there are no screenshot baselines; behavior, computed-style, contrast and accessibility checks prove the UI. A PR that changes the appearance links its before and after screenshots.
 
 CI reports expose identities, steps, outcomes, screenshots and traces under an explicit artifact-retention policy. Uploading them is review evidence, not verification: a failed upload is tried three times with a pause, and when it still fails the job warns and, if the checks and workflows passed, stays green; the summary says when the screenshot link is missing because its upload failed. Failed tests still fail the job. Preserve startup, execution, capture and cleanup failures. Section 8 governs committed evidence; results apply only to the recorded build/environment.
