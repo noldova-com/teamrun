@@ -79,14 +79,12 @@ test.describe("notifications", () => {
   });
 
   test("Do not disturb silences the bell, lasts across a restart and is the same setting on the Notifications page", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await bell(window).click();
 
     await list(window).getByRole("checkbox", { name: "Do not disturb" }).check();
     await expect(bell(window).locator(".tr-notifications-icon")).toHaveText("notifications_off");
     await desktop.restartAsync();
-    await desktop.useSuiteViewportAsync();
 
     await expect(bell(desktop.window).locator(".tr-notifications-icon")).toHaveText("notifications_off");
     await expect(bell(desktop.window)).toHaveAttribute("aria-label", /, Do not disturb$/);
@@ -101,7 +99,6 @@ test.describe("notifications", () => {
   });
 
   test("a module whose notifications are turned off on the Notifications page still adds them to the list, without a toast or a count", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     const toasts = window.locator(".tr-toast");
     const modules = window.locator("tr-setting-row[data-setting=\"shell.mutedModules\"]");
@@ -142,7 +139,6 @@ test.describe("notifications", () => {
   });
 
   test("a toast follows the component table, never takes focus and closes on Close", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
     await tickWithFocusAsync(desktop);
@@ -174,7 +170,6 @@ test.describe("notifications", () => {
   });
 
   test("the bell and its list follow the component table", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
 

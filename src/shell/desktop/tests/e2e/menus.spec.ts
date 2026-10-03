@@ -52,7 +52,6 @@ function expectInside(box: Readonly<Record<"left" | "top" | "right" | "bottom", 
 
 test.describe("menus", () => {
   test("a tab's menu works from the keyboard: rows, type-ahead, a submenu in and out, Escape and focus return", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     const notes = tab(window, "view/notes.list");
     await notes.focus();
@@ -87,10 +86,10 @@ test.describe("menus", () => {
 
     await expect(menus(window)).toHaveCount(0);
     await expect(notes).toBeFocused();
+    await desktop.checkpointAsync("menus-keyboard");
   });
 
   test("a menu at the window's right edge ends at its trigger, flips its submenu to the left, stays within the bounds and closes on a click outside", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     const actions = window.locator("tr-tab-group[data-side=Right] .tr-tab-group-menu").first();
     await actions.click();
@@ -114,7 +113,6 @@ test.describe("menus", () => {
   });
 
   test("the overflow list starts with Close all, lists every document, marks the current one, scrolls within 20 rows and shows a cut title in a tooltip", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await expect(window.locator(`${documentsGroup} tr-tab`)).toHaveCount(50);
     const selected = await window.locator(`${documentsGroup} tr-tab[aria-selected=true]`).getAttribute("data-tab-key");

@@ -39,7 +39,6 @@ async function expectPreviewAsync(locator: Locator, isPreview: boolean): Promise
 
 test.describe("preview tabs", () => {
   test("a note opened from the list is an italic preview that the next one replaces, and a double-click keeps it", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
 
     await listItem(window, 1).click();
@@ -60,10 +59,10 @@ test.describe("preview tabs", () => {
     await expect(tab(window, 3)).toHaveCount(0);
     await expectPreviewAsync(tab(window, 4), false);
     await expect.poll(() => documentKeys(window)).toEqual(["document/notes.note/1", "document/notes.note/2", "document/notes.note/week-2", "document/notes.note/week-4"]);
+    await desktop.checkpointAsync("preview-tabs-kept");
   });
 
   test("a preview is kept from the keyboard through its tab menu", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await listItem(window, 5).click();
     await expectPreviewAsync(tab(window, 5), true);
@@ -79,14 +78,12 @@ test.describe("preview tabs", () => {
   });
 
   test("a preview keeps its place and its preview state after a restart", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     await listItem(desktop.window, 6).dblclick();
     await listItem(desktop.window, 7).click();
     await expectPreviewAsync(tab(desktop.window, 7), true);
     const before = await documentKeys(desktop.window);
 
     await desktop.restartAsync();
-    await desktop.useSuiteViewportAsync();
 
     await expect.poll(() => documentKeys(desktop.window)).toEqual(before);
     await expectPreviewAsync(tab(desktop.window, 7), true);
