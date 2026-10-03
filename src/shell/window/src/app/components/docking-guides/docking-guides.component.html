@@ -13,9 +13,12 @@ LICENSE file in the root directory of this source tree.
     }
     @for (side of sides; track side) {
       @let box = overlay().guide(side);
-      <tr-docking-guide class="tr-docking-side" [direction]="resources.sideDirections[side]" [chosen]="isSide(side)" [attr.data-drop-side]="side"
-        [style.left.rem]="box.x" [style.top.rem]="box.y" />
+      <tr-docking-guide class="tr-docking-side" [direction]="resources.sideDirections[side]" [chosen]="isChosen(targetOf(side))" [attr.data-drop-side]="side"
+        [attr.data-drop-span]="targetOf(side).span" [style.left.rem]="box.x" [style.top.rem]="box.y" />
     }
+    @let outer = overlay().outerGuide();
+    <tr-docking-guide class="tr-docking-side tr-docking-outer" [direction]="resources.sideDirections.Bottom" [chosen]="isChosen(outerTarget)"
+      [attr.data-drop-side]="outerTarget.side" [attr.data-drop-span]="outerTarget.span" [style.left.rem]="outer.x" [style.top.rem]="outer.y" />
     @if (plateFrame(); as frame) {
       @let box = overlay().plate(frame);
       <tr-docking-plate class="tr-docking-group-plate" data-drop-plate [attr.data-drop-group]="frame.group.id" [chosen]="plateChoice(frame)"

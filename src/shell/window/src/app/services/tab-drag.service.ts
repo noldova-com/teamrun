@@ -12,6 +12,7 @@ import { Injectable, type Signal, type WritableSignal, inject, signal } from "@a
 import "@noldova/teamrun-foundation-core";
 
 import { Resources } from "../../resources";
+import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
 import { PanelEdge } from "../enums/panel-edge";
 import type { DropTarget } from "../models/layout/drop-target";
@@ -124,9 +125,10 @@ export class TabDragService {
   }
 
   private dockingTargetAt(element: Element, group: TabGroup | null): DropTarget | null {
-    const side = Object.values(DockSide).find(t => t === element.closest<HTMLElement>(Resources.dropSideSelector)?.dataset[Resources.dropSideData]);
+    const sideGuide = element.closest<HTMLElement>(Resources.dropSideSelector);
+    const side = Object.values(DockSide).find(t => t === sideGuide?.dataset[Resources.dropSideData]);
     if (!Object.isUndefined(side))
-      return new SideDropTarget(side);
+      return new SideDropTarget(side, Object.values(BottomDockSpan).find(t => t === sideGuide?.dataset[Resources.dropSpanData]) ?? null);
     const plate = element.closest(Resources.dropPlateSelector);
     const guide = element.closest<HTMLElement>(Resources.directionSelector);
     if (Object.isNull(plate) || Object.isNull(guide) || Object.isNull(group))

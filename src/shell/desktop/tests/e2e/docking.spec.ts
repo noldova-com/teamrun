@@ -123,16 +123,51 @@ test.describe("docking", () => {
   test("a side guide docks the tab along that whole side, centered in its landing area", async ({ desktop }) => {
     const window = desktop.window;
     await startDragAsync(window, notes);
-    await moveOverAsync(window, window.locator("[data-drop-side=Bottom]"));
+    await moveOverAsync(window, window.locator("[data-drop-side=Bottom][data-drop-span=Between]"));
 
     const preview = await centerOf(window.locator(".tr-docking-preview"));
-    const guide = await centerOf(window.locator("[data-drop-side=Bottom]"));
+    const guide = await centerOf(window.locator("[data-drop-side=Bottom][data-drop-span=Between]"));
     expect(Math.abs(preview.x - guide.x)).toBeLessThan(1);
     expect(Math.abs(preview.y - guide.y)).toBeLessThan(1);
     await window.mouse.up();
 
     await expect(window.locator("tr-tab-group[data-side=Bottom]")).toHaveCount(1);
     await expect(window.locator("tr-tab-group[data-side=Bottom] tr-tab")).toHaveAttribute("data-tab-key", notes);
+  });
+
+  test("the outer bottom guide docks the tab along the whole bottom, under the side docks, and the inner one between them", async ({ desktop }) => {
+    await desktop.useSuiteViewportAsync();
+    const window = desktop.window;
+    const outer = window.locator(".tr-docking-outer");
+    const inner = window.locator("[data-drop-side=Bottom][data-drop-span=Between]");
+    const rectOf = (selector: string): Promise<{ left: number; right: number; top: number; bottom: number }> =>
+      window.locator(selector).first().evaluate(t => {
+        const box = t.getBoundingClientRect();
+        return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+      });
+    await startDragAsync(window, notes);
+    await moveOverAsync(window, outer);
+
+    await expect(outer).toHaveClass(/tr-docking-guide-chosen/);
+    const workspace = await rectOf("tr-workspace");
+    const preview = await rectOf(".tr-docking-preview");
+    const guide = await rectOf(".tr-docking-outer");
+    const innerGuide = await rectOf("[data-drop-side=Bottom][data-drop-span=Between]");
+    expect(preview.right - preview.left).toBeGreaterThan(workspace.right - workspace.left - 20);
+    expect(Math.abs((guide.left + guide.right) / 2 - (workspace.left + workspace.right) / 2)).toBeLessThan(1);
+    expect(innerGuide.bottom).toBeLessThan(guide.top);
+    await window.mouse.up();
+
+    await expect.poll(() => rectOf("tr-tab-group[data-side=Bottom]").then(t => t.right - t.left)).toBeGreaterThan(workspace.right - workspace.left - 20);
+    expect((await rectOf("tr-tab-group[data-side=Left]")).bottom).toBeLessThan((await rectOf("tr-tab-group[data-side=Bottom]")).top);
+
+    await startDragAsync(window, clock);
+    await moveOverAsync(window, inner);
+    await expect(inner).toHaveClass(/tr-docking-guide-chosen/);
+    await window.mouse.up();
+
+    await expect.poll(async () => (await rectOf("tr-tab-group[data-side=Bottom]")).left).toBeGreaterThanOrEqual((await rectOf("tr-tab-group[data-side=Left]")).right);
+    expect((await rectOf("tr-tab-group[data-side=Left]")).bottom).toBeGreaterThan((await rectOf("tr-tab-group[data-side=Bottom]")).top);
   });
 
   test("dropping away from every target or pressing Escape changes nothing", async ({ desktop }) => {
@@ -206,6 +241,51 @@ test.describe("docking", () => {
     await expect(tab(window, secondNote)).toHaveAttribute("aria-selected", "true");
   });
 
+  test("the bottom dock spans the window under the side docks, or stays between them when chosen, and keeps that choice", async ({ desktop }) => {
+    await desktop.useSuiteViewportAsync();
+    const sideRects = (): Promise<Readonly<Record<string, { left: number; right: number; top: number; bottom: number }>>> => desktop.window.locator("tr-tab-group[data-side]")
+      .evaluateAll(groups => Object.fromEntries(groups.map(group => {
+        const box = group.getBoundingClientRect();
+        return [group.getAttribute("data-side") ?? "", { left: Math.round(box.left), right: Math.round(box.right), top: Math.round(box.top), bottom: Math.round(box.bottom) }];
+      })));
+    const spansWindow = async (): Promise<boolean> => {
+      const rects = await sideRects();
+      return [rects["Left"], rects["Bottom"]].every(t => t !== undefined)
+        && (rects["Bottom"]?.left ?? 0) <= (rects["Left"]?.left ?? 0) && (rects["Left"]?.bottom ?? 0) < (rects["Bottom"]?.top ?? 0);
+    };
+    const staysBetween = async (): Promise<boolean> => {
+      const rects = await sideRects();
+      return (rects["Bottom"]?.left ?? 0) >= (rects["Left"]?.right ?? Infinity) && (rects["Left"]?.bottom ?? 0) > (rects["Bottom"]?.top ?? Infinity);
+    };
+    const chooseAsync = async (name: string): Promise<void> => {
+      await tab(desktop.window, notes).focus();
+      await desktop.window.keyboard.press("Shift+F10");
+      await desktop.window.getByRole("menuitemradio", { name }).click();
+      await closeMenusAsync(desktop.window);
+    };
+    await tab(desktop.window, notes).focus();
+    await desktop.window.keyboard.press("Shift+F10");
+    await desktop.window.getByRole("menuitem", { name: "Dock", exact: true }).click();
+    await desktop.window.getByRole("menuitem", { name: "Dock at the bottom" }).click();
+    await closeMenusAsync(desktop.window);
+
+    await expect.poll(spansWindow).toBe(true);
+    await desktop.window.keyboard.press("Shift+F10");
+    await expect(desktop.window.getByRole("menuitemradio", { name: "Bottom dock across the window" })).toHaveAttribute("aria-checked", "true");
+    await desktop.window.keyboard.press("Escape");
+    await closeMenusAsync(desktop.window);
+    await chooseAsync("Bottom dock between the side docks");
+    await expect.poll(staysBetween).toBe(true);
+
+    await desktop.reopenAsync();
+    await desktop.useSuiteViewportAsync();
+
+    await expect(tab(desktop.window, notes)).toBeVisible();
+    await expect.poll(staysBetween).toBe(true);
+    await chooseAsync("Bottom dock across the window");
+    await expect.poll(spansWindow).toBe(true);
+  });
+
   test("Reset the layout returns the views to their default places", async ({ desktop }) => {
     const window = desktop.window;
     const initial = await describeGroupsAsync(window);
@@ -240,7 +320,7 @@ test.describe("docking", () => {
 
   test("a view whose module is absent keeps its place and returns there with its module", async ({ desktop }) => {
     await startDragAsync(desktop.window, clock);
-    await moveOverAsync(desktop.window, desktop.window.locator("[data-drop-side=Bottom]"));
+    await moveOverAsync(desktop.window, desktop.window.locator("[data-drop-side=Bottom][data-drop-span=Between]"));
     await desktop.window.mouse.up();
     await expect(desktop.window.locator("tr-tab-group[data-side=Bottom]")).toHaveCount(1);
     const before = await describePlacesAsync(desktop.window);

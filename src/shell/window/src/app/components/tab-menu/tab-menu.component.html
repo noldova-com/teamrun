@@ -57,6 +57,10 @@ LICENSE file in the root directory of this source tree.
       <button tr-menu-item class="tr-tab-menu-close-all" [icon]="resources.closeAllGlyph" [label]="resources.closeAllLabel" (triggered)="closeAll(group)"></button>
     }
     <tr-menu-separator />
+    @for (span of spans; track span) {
+      <button tr-menu-item class="tr-tab-menu-bottom-span" [attr.data-span]="span" [label]="resources.bottomSpanLabels[span]" [checked]="isSpan(span)"
+        (triggered)="setBottomSpan(span)"></button>
+    }
     <button tr-menu-item class="tr-tab-menu-reset" [icon]="resources.resetLayoutGlyph" [label]="resources.resetLayoutLabel" (triggered)="reset()"></button>
   </tr-menu>
 </ng-template>

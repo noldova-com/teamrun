@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { BottomDockSpan } from "../../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../../src/app/enums/dock-side";
 import { Bounds } from "../../../../src/app/models/layout/bounds";
 import { DockingOverlay } from "../../../../src/app/models/layout/docking-overlay";
@@ -26,17 +27,28 @@ describe("DockingOverlay", () => {
     return found;
   }
 
-  it("centers each side guide in the area a docked tab would take", () => {
+  it("centers each side guide in the area a docked tab would take, the bottom one in the area between the side docks", () => {
     const geometry = new LayoutGeometry(120, 60, Layout.createDefault(registry), registry);
     const overlay = new DockingOverlay(geometry);
 
     for (const side of sides) {
-      const area = geometry.sidePreview(side);
+      const area = (side === DockSide.Bottom ? geometry.withBottomSpan(BottomDockSpan.Between) : geometry).sidePreview(side);
       const guide = overlay.guide(side);
       expect([guide.width, guide.height]).toEqual([Resources.dockingGuideSize, Resources.dockingGuideSize]);
       expect(guide.x + guide.width / 2).toBeCloseTo(area.x + area.width / 2);
       expect(guide.y + guide.height / 2).toBeCloseTo(area.y + area.height / 2);
     }
+  });
+
+  it("puts the outer guide at the window's bottom edge, centred across it, and lifts the bottom guide clear of it", () => {
+    const geometry = new LayoutGeometry(120, 60, Layout.createDefault(registry).openView(LayoutFixture.terminal, registry).resizeDock(DockSide.Bottom, 10), registry);
+    const overlay = new DockingOverlay(geometry);
+    const outer = overlay.outerGuide();
+    const inner = overlay.guide(DockSide.Bottom);
+
+    expect(outer).toEqual(new Bounds(0.25 + (119.5 - 2.5) / 2, 59.75 - 0.25 - 2.5, 2.5, 2.5));
+    expect(inner.bottom).toBeCloseTo(outer.y - Resources.dockingPlateClearance);
+    expect(inner.x + inner.width / 2).toBeCloseTo(geometry.middle.x + geometry.middle.width / 2);
   });
 
   it("centers a group's plate on the group when no side guide is in the way", () => {
@@ -62,6 +74,6 @@ describe("DockingOverlay", () => {
     expect(right.right).toBeCloseTo(overlay.guide(DockSide.Right).x - clearance);
     expect(bottom.bottom).toBeCloseTo(overlay.guide(DockSide.Bottom).y - clearance);
     for (const plate of [left, right, bottom])
-      expect(sides.some(t => plate.overlaps(overlay.guide(t)))).toBe(false);
+      expect([...sides.map(t => overlay.guide(t)), overlay.outerGuide()].some(t => plate.overlaps(t))).toBe(false);
   });
 });
