@@ -7,9 +7,11 @@
  */
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
 
 import type { CommandContribution } from "../models/command-contribution";
 import type { DocumentContribution } from "../models/document-contribution";
+import type { NotificationHandle } from "../models/notification-handle";
 import type { StatusBarItem } from "../models/status-bar-item";
 import type { StatusBarItemContribution } from "../models/status-bar-item-contribution";
 import type { TopBarAction } from "../models/top-bar-action";
@@ -24,6 +26,7 @@ export interface IWindowPartContext {
   registerStatusBarItem(item: StatusBarItemContribution): StatusBarItem;
   registerTopBarAction(action: TopBarActionContribution): TopBarAction;
   runCommandAsync(name: string, commandArguments?: JsonValue): Promise<JsonValue>;
+  postNotificationAsync(post: NotificationPost): Promise<NotificationHandle>;
   openDocument(name: string, instance: string, title: string, options?: IDocumentOptions): void;
   keepDocument(name: string, instance: string): void;
   requestAsync(method: string, parameters: JsonValue): Promise<JsonValue>;

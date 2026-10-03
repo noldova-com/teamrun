@@ -10,7 +10,7 @@ import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { type Event, QualifiedName } from "@noldova/teamrun-shell-protocol";
+import { CommandRun, type Event, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 import {
   CommandRegistry,
   DataDirectory,
@@ -18,6 +18,8 @@ import {
   MethodRegistry,
   ModuleContext,
   ModuleDeclaration,
+  NotificationCenter,
+  NotificationPolicy,
   RegistrationException,
   RuntimeCommand,
   ServiceAccessException,
@@ -32,7 +34,7 @@ export class ModuleContextTests {
     "Notes",
     ["tasks"],
     "@noldova/teamrun-modules-notes-runtime",
-    new Map([["methods", ["notes.list"]], ["events", ["notes.changed"]], ["commands", ["notes.newNote"]]]));
+    new Map([["methods", ["notes.list"]], ["events", ["notes.changed"]], ["commands", ["notes.newNote"]], ["notifications", ["notes.saved"]]]));
 
   @TestMethod
   public namesTheModuleAndItsFolder(): void {
@@ -135,7 +137,53 @@ export class ModuleContextTests {
     Assert.areEqual(1, events.length);
   }
 
-  private static create(methods: MethodRegistry, events: EventRegistry, services: ServiceRegistry, commands: CommandRegistry = new CommandRegistry()): ModuleContext {
-    return new ModuleContext(ModuleContextTests.NOTES, new DataDirectory(ModuleContextTests.ROOT), methods, events, commands, services);
+  @TestMethod
+  public postsUpdatesAndDismissesItsNotificationsAndDismissesThemAllWhenDisposed(): void {
+    const notifications = new NotificationCenter(() => undefined, () => new Date());
+    const context = ModuleContextTests.create(new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), new CommandRegistry(), notifications);
+    notifications.post(ModuleContextTests.post("tasks.due", "Due", "tasks.show"));
+
+    const saved = context.postNotification(ModuleContextTests.post("notes.saved", "Saved", "tasks.show"));
+    const second = context.postNotification(ModuleContextTests.post("notes.saved", "Second", "notes.newNote"));
+    saved.update(ModuleContextTests.post("notes.saved", "Saved again", null));
+    second.dismiss();
+    second.dismiss();
+    const gone = Assert.throws(() => second.update(ModuleContextTests.post("notes.saved", "Back", null)), RegistrationException);
+    const listed = notifications.list.notifications.map(t => `${t.id}:${t.post.title}`).join(",");
+    context[Symbol.dispose]();
+
+    Assert.areEqual("2:Saved again,1:Due", listed);
+    Assert.areEqual(`Notification ${second.id} is gone; it was dismissed or its module stopped.`, gone.message);
+    Assert.areEqual("Due", notifications.list.notifications.map(t => t.post.title).join(","));
+  }
+
+  @TestMethod
+  public refusesAnUndeclaredKindOrAnotherModulesCommandOnPostAndOnUpdate(): void {
+    const notifications = new NotificationCenter(() => undefined, () => new Date());
+    const context = ModuleContextTests.create(new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), new CommandRegistry(), notifications);
+    const saved = context.postNotification(ModuleContextTests.post("notes.saved", "Saved", null));
+
+    const undeclared = Assert.throws(() => context.postNotification(ModuleContextTests.post("notes.deleted", "Deleted", null)), RegistrationException);
+    const foreign = Assert.throws(() => saved.update(ModuleContextTests.post("notes.saved", "Saved", "calendar.show")), RegistrationException);
+
+    Assert.areEqual("The module notes does not declare notes.deleted among its notifications.", undeclared.message);
+    Assert.areEqual("The module notes may not offer the command calendar.show in a notification; it must be its own or a dependency's.", foreign.message);
+    Assert.areEqual("Saved", notifications.list.notifications.map(t => t.post.title).join(","));
+  }
+
+  private static post(kind: string, title: string, action: string | null): NotificationPost {
+    const actions = action === null ? [] : [new NotificationAction("Show", new CommandRun(QualifiedName.parse(action), null))];
+    return new NotificationPost(QualifiedName.parse(kind), null, title, null, NotificationSeverity.Info, null, actions, null);
+  }
+
+  private static create(
+    methods: MethodRegistry,
+    events: EventRegistry,
+    services: ServiceRegistry,
+    commands: CommandRegistry = new CommandRegistry(),
+    notifications: NotificationCenter = new NotificationCenter(() => undefined, () => new Date())): ModuleContext {
+    return new ModuleContext(
+      ModuleContextTests.NOTES, new DataDirectory(ModuleContextTests.ROOT), methods, events, commands,
+      notifications, new NotificationPolicy([ModuleContextTests.NOTES], () => true), services);
   }
 }

@@ -19,6 +19,7 @@ export class WindowPartSource {
   public readonly commandNames: readonly string[];
   public readonly statusBarItemNames: readonly string[];
   public readonly topBarActionNames: readonly string[];
+  public readonly notificationKinds: readonly string[];
   public readonly load: () => Promise<IWindowPart>;
 
   public constructor(
@@ -29,6 +30,7 @@ export class WindowPartSource {
     commandNames: readonly string[],
     statusBarItemNames: readonly string[],
     topBarActionNames: readonly string[],
+    notificationKinds: readonly string[],
     load: () => Promise<IWindowPart>) {
     if (!Resources.moduleIdPattern.test(moduleId))
       throw new ArgumentException(Resources.invalidModuleId, "moduleId");
@@ -40,6 +42,7 @@ export class WindowPartSource {
     this.commandNames = [...commandNames];
     this.statusBarItemNames = [...statusBarItemNames];
     this.topBarActionNames = [...topBarActionNames];
+    this.notificationKinds = [...notificationKinds];
     this.load = load;
   }
 }

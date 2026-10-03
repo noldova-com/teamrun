@@ -96,7 +96,7 @@ Each module declares itself in `module.json` at its folder's root, with exactly 
 | `displayName` | The name people see |
 | `parts` | Its parts, each once: `runtime`, `window` or `cli`, each with a folder of that name |
 | `dependencies` | The ids of the modules it depends on |
-| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `views`, `documents`, `statusBarItems`, `topBarActions` and `themes`, each of the form `<id>.<name>` with a camelCase name |
+| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `notifications`, `views`, `documents`, `statusBarItems`, `topBarActions` and `themes`, each of the form `<id>.<name>` with a camelCase name |
 
 A module without parts may leave the file out until it gains one. Dependencies form no cycle, and a build includes every module a listed module depends on. The build validates the declarations, orders them after their dependencies and writes them for the runtime, which reads them from `_build/modules/declarations.json` in the repository it is installed in, as the desktop finds the window's build there; the packaged layout is decided with packaging. A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
 
@@ -109,7 +109,7 @@ The runtime decides which modules are active, and the window and the CLI follow 
 3. A module is active when its runtime part, if any, and all dependencies have activated. Otherwise the runtime records its failure; the shell and unaffected modules continue.
 4. After handshake and reconnection, window/CLI hosts receive active modules and failures before sending module requests. They activate only active modules' parts, in dependency order. The window restores its saved layout once, after its parts first activate, so documents a part opens while activating appear in it.
 5. Window/CLI activation failure affects that host alone: withdraw the failed part's contributions and do not activate dependent parts there. Runtime parts continue serving other clients.
-6. The window shows a status-bar item while a module is failed or blocked. Its popover lists each such module with its cause and offers the details to copy, redacted, and the data directory's log folder. A failed module's views keep their places and say why it didn't start. Nothing retries, because modules activate when the runtime starts. A build with a notifications module shows failures there, and the status-bar item remains for builds without one. The CLI reports failures needed by the requested command.
+6. The window shows a status-bar item while a module is failed or blocked. Its popover lists each such module with its cause and offers the details to copy, redacted, and the data directory's log folder. A failed module's views keep their places and say why it didn't start. Nothing retries, because modules activate when the runtime starts. Module failures keep this item; they are not notifications. The CLI reports failures needed by the requested command.
 7. Hosts deactivate parts in reverse order, releasing contributions, subscriptions, timers, files and child processes.
 
 Activation stays light. A part loads heavy code when its first view opens or its first request arrives.
@@ -144,7 +144,7 @@ The shell owns registration, collisions, user overrides, persistence and removal
 | Status bar | Items for its left or right side, from its window part: text, an icon or both, a tooltip and optionally a command to run, which it may update or hide | Shows them along the bottom of the window by side, in module order and then declared order, with the shell's own items, which are shell components rather than registrations, at the right end; an item with a command is a button, disabled while the command is not registered. An item runs a command and opens no popover of its own; a module that needs one waits for the shell to offer it |
 | Main menu | Items for the application menus (File, Edit, View, Help) or a menu of its own | Builds the menus and shows them in the macOS menu bar; their items are also reachable through command search. Without contributed menus, macOS shows a standard application, Edit and Window menu, so Quit, Copy and Paste work |
 | Context menus | Items for the shell's context and panel menus and for its own | Shows them in declared order |
-| Notifications | Operating-system notifications: a title, text and the command that opening one runs | Shows them through the operating system's notification service when the person's settings allow it |
+| Notifications | Notifications of the kinds it declares, from its runtime or window part: a title, optional text, a severity, an optional command that opening one runs, up to two actions and optional progress | Holds them for the runtime's life and shows them in the window and, when TeamRun's window isn't focused, through the operating system's notification service when the person's settings allow it |
 | Settings | Settings with defaults and the scopes that may override them, their pages, and setting scopes for the objects it owns | Stores the values per scope, resolves the effective value, shows the pages and reports changes |
 | Themes | Themes in its declaration: for each, colors for the light and dark modes and a look, as data. The declaration lists only theme names so far; the format of that data is decided when a second theme is built | Offers them in Settings and applies the person's theme and mode before the window paints; uses the default theme when the chosen one is absent |
 | Protocol | Methods and events | Authenticates, routes and delivers them |
@@ -175,7 +175,15 @@ The application scope belongs to the shell. A module that owns a kind of object,
 
 ### Notifications
 
-A module decides when something deserves a notification; muting, for example for one conversation, is a setting at that object's scope, applied by the module. The shell shows a notification without taking focus. Opening it brings TeamRun's window forward and runs the notification's command. The person can turn notifications off entirely or for one module in Settings.
+The shell owns notifications. A module decides when something deserves one; muting, for example for one conversation, is a setting at that object's scope, applied by the module. The shell shows a notification without taking focus. Opening it brings TeamRun's window forward and runs the notification's command. The person can turn notifications off entirely or for one module in Settings.
+
+A module declares its notification kinds in `contributes.notifications`. A part posts a notification of one of them through its context and gets a handle that updates or dismisses it:
+
+- Its commands, the one opening it runs and those of its actions, are the module's own or a dependency's. A post with an undeclared kind or another module's command is refused.
+- Posting the same kind and key again replaces the earlier notification: it keeps its id and returns to the top, unread, because a new post is a new occurrence that deserves attention. An update through the handle is the same occurrence changing, such as progress moving on, so it keeps its place, time and whether it was read, and never changes its kind.
+- The runtime holds the list, newest first, for its own life. It keeps at most 100, dropping the oldest that report no work in progress.
+- Windows read the list with `shell.notifications` and follow the event of the same name, which carries the whole list after every change. A window part posts with `shell.postNotification` and changes or removes its notifications with `shell.updateNotification` and `shell.dismissNotification`; a post for a module that is not active is refused.
+- When a module's runtime part deactivates, all of its notifications are dismissed. When a window part is withdrawn, the notifications it posted are dismissed.
 
 ## 6. Runtime ownership and local protocol
 

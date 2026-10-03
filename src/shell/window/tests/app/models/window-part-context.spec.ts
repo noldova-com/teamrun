@@ -10,6 +10,7 @@ import { Component, type Type } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { WindowPartAccessException } from "../../../src/app/exceptions/window-part-access.exception";
@@ -62,6 +63,20 @@ class FakeWindowPartHost implements IWindowPartHost {
     return Promise.resolve({ name, commandArguments });
   }
 
+  public postNotificationAsync(post: NotificationPost): Promise<number> {
+    this.calls.push(`post ${post.title}`);
+    return Promise.resolve(this.calls.length);
+  }
+
+  public updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
+    this.calls.push(`update ${id} ${post.title}`);
+    return Promise.resolve();
+  }
+
+  public dismissNotification(id: number): void {
+    this.calls.push(`dismiss ${id}`);
+  }
+
   public refresh(): void {
     this.calls.push("refresh");
   }
@@ -73,6 +88,9 @@ class FakeWindowPartHost implements IWindowPartHost {
 }
 
 describe("WindowPartContext", () => {
+  const notification = (kind: string, title: string, action: string | null): NotificationPost => new NotificationPost(
+    QualifiedName.parse(kind), null, title, null, NotificationSeverity.Info, null,
+    action === null ? [] : [new NotificationAction("Show", new CommandRun(QualifiedName.parse(action), null))], null);
   const load = (): Promise<Type<unknown>> => Promise.resolve(ListComponent);
   const view = (name: string): ViewContribution => new ViewContribution(name, "Notes", "sticky_note_2", DockSide.Left, true, load);
   let host: FakeWindowPartHost;
@@ -80,9 +98,34 @@ describe("WindowPartContext", () => {
 
   beforeEach(() => {
     host = new FakeWindowPartHost();
-    const source = new WindowPartSource("notes", "Notes", ["tasks"], [], ["notes.newNote", "notes.taken"], ["notes.count", "notes.sync"], ["notes.compose", "notes.share"],
+    const source = new WindowPartSource("notes", "Notes", ["tasks"], [], ["notes.newNote", "notes.taken"], ["notes.count", "notes.sync"], ["notes.compose", "notes.share"], ["notes.saved"],
       () => Promise.reject<IWindowPart>(new Error("unused")));
     context = new WindowPartContext(source, host);
+  });
+
+  it("posts, updates and dismisses its declared notifications, and dismisses the rest when withdrawn", async () => {
+    const first = await context.postNotificationAsync(notification("notes.saved", "Saved", "tasks.show"));
+    const second = await context.postNotificationAsync(notification("notes.saved", "Saved again", "notes.newNote"));
+    await first.updateAsync(notification("notes.saved", "Saved twice", null));
+    first.dismiss();
+    first.dismiss();
+    context.withdraw();
+    second.dismiss();
+
+    expect([first.id, second.id]).toEqual([1, 2]);
+    expect(host.calls).toEqual(["post Saved", "post Saved again", "update 1 Saved twice", "dismiss 1", "dismiss 2", "refresh"]);
+  });
+
+  it("refuses a notification of another module, an undeclared kind or another module's command, before and on update", async () => {
+    const posted = await context.postNotificationAsync(notification("notes.saved", "Saved", null));
+
+    await expect(context.postNotificationAsync(notification("tasks.due", "Due", null))).rejects.toThrowError(WindowPartAccessException);
+    await expect(context.postNotificationAsync(notification("notes.deleted", "Deleted", null)))
+      .rejects.toThrowError("The module notes does not declare the notification kind notes.deleted.");
+    await expect(context.postNotificationAsync(notification("notes.saved", "Saved", "calendar.show"))).rejects.toThrowError(WindowPartAccessException);
+    await expect(posted.updateAsync(new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Info,
+      new CommandRun(QualifiedName.parse("clock.open"), null), [], null))).rejects.toThrowError(WindowPartAccessException);
+    expect(host.calls).toEqual(["post Saved"]);
   });
 
   it("registers its module's own views and documents and has the host refresh after each", () => {

@@ -249,6 +249,7 @@ export class Resources {
   public static readonly commandParameter: string = "command";
   public static readonly statusBarItemKind: string = "status bar item";
   public static readonly topBarActionKind: string = "top bar action";
+  public static readonly notificationKind: string = "notification kind";
   public static readonly statusBarItemEmpty: string = "A status bar item shows text, an icon or both.";
   public static readonly statusBarItemUnnamed: string = "A status bar item that shows only an icon needs a tooltip, which is also its accessible name.";
   public static readonly defaultKeyParameter: string = "defaultKey";

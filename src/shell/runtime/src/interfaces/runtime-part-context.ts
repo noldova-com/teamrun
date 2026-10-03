@@ -6,7 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
+
 import type { EventChannel } from "../models/event-channel.js";
+import type { NotificationHandle } from "../models/notification-handle.js";
 import type { RuntimeCommand } from "../models/runtime-command.js";
 import type { IMethodHandler } from "./method-handler.js";
 import type { IModuleDatabase } from "./module-database.js";
@@ -21,6 +24,8 @@ export interface IRuntimePartContext {
   declareEvent(name: string): EventChannel;
 
   registerCommand(command: RuntimeCommand): void;
+
+  postNotification(post: NotificationPost): NotificationHandle;
 
   publishService(name: string, service: object): void;
 

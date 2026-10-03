@@ -12,7 +12,7 @@ import type { Writable } from "node:stream";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import type { BuildIdentity, CommandInfo, CommandList, Event, Failure, ModuleStatusList, PreShellData, QualifiedName, Response, RunningWork, RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
+import type { BuildIdentity, CommandInfo, CommandList, Event, Failure, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, QualifiedName, Response, RunningWork, RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
 
 /**
  * What a data directory holds, judged from its top-level entries other than the
@@ -1867,6 +1867,26 @@ export interface IRuntimePartContext {
   registerCommand(command: RuntimeCommand): void;
 
   /**
+   * Posts a notification of a kind the module's declaration contributes; posting the same kind and key again replaces the
+   * earlier one. Its commands must be the module's own or a dependency's. It is dismissed when the module deactivates.
+   *
+   * @param post What to show.
+   * @returns The notification's handle, which updates or dismisses it.
+   * @throws {RegistrationException} When the declaration does not contribute the kind, or a command belongs to another
+   * module that is not a dependency.
+   * @example
+   * ```ts
+   * import type { IRuntimePartContext, NotificationHandle } from "@noldova/teamrun-shell-runtime";
+   * import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function announce(context: IRuntimePartContext): NotificationHandle {
+   *   return context.postNotification(new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null));
+   * }
+   * ```
+   */
+  postNotification(post: NotificationPost): NotificationHandle;
+
+  /**
    * Publishes a service for the modules that depend on this one.
    *
    * @param name The service's name, `<id>.<name>` with the module's own id.
@@ -3212,6 +3232,11 @@ export declare class RuntimeHost implements IIdleParticipant {
   public readonly commands: CommandRegistry;
 
   /**
+   * The runtime's notifications, which `shell.notifications` lists and its event follows.
+   */
+  public readonly notifications: NotificationCenter;
+
+  /**
    * The registry of events published to clients.
    */
   public readonly events: EventRegistry;
@@ -3319,15 +3344,21 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * @param methods The registry its methods join.
    * @param events The registry its events join.
    * @param commands The registry its commands join.
+   * @param notifications The runtime's notifications, which its posts join.
+   * @param notificationPolicy The rules its posts follow.
    * @param services The registry its services join.
    * @param database The module's open database, when its runtime part declares migrations.
    * @example
    * ```ts
-   * import { CommandRegistry, DataDirectory, EventRegistry, MethodRegistry, ModuleContext, ModuleDeclaration, ServiceRegistry } from "@noldova/teamrun-shell-runtime";
+   * import {
+   *   CommandRegistry, DataDirectory, EventRegistry, MethodRegistry, ModuleContext, ModuleDeclaration, NotificationCenter, NotificationPolicy, ServiceRegistry
+   * } from "@noldova/teamrun-shell-runtime";
    *
    * export function createContext(events: EventRegistry): ModuleContext {
    *   const notes = new ModuleDeclaration("notes", "Notes", [], null, new Map());
-   *   return new ModuleContext(notes, new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(), new ServiceRegistry());
+   *   return new ModuleContext(
+   *     notes, new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(),
+   *     new NotificationCenter(() => undefined, () => new Date()), new NotificationPolicy([notes], () => true), new ServiceRegistry());
    * }
    * ```
    */
@@ -3337,6 +3368,8 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
     methods: MethodRegistry,
     events: EventRegistry,
     commands: CommandRegistry,
+    notifications: NotificationCenter,
+    notificationPolicy: NotificationPolicy,
     services: ServiceRegistry,
     database?: IModuleDatabase);
 
@@ -3404,6 +3437,25 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * ```
    */
   public registerCommand(command: RuntimeCommand): void;
+
+  /**
+   * See {@link IRuntimePartContext.postNotification}.
+   *
+   * @param post What to show.
+   * @returns The notification's handle.
+   * @throws {RegistrationException} When the declaration does not contribute the kind, or a command belongs to another
+   * module that is not a dependency.
+   * @example
+   * ```ts
+   * import type { ModuleContext, NotificationHandle } from "@noldova/teamrun-shell-runtime";
+   * import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function announce(context: ModuleContext): NotificationHandle {
+   *   return context.postNotification(new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Success, null, [], null));
+   * }
+   * ```
+   */
+  public postNotification(post: NotificationPost): NotificationHandle;
 
   /**
    * See {@link IRuntimePartContext.publishService}.
@@ -3492,6 +3544,12 @@ export declare class ModuleHost {
   public readonly services: ServiceRegistry;
 
   /**
+   * The rules notifications follow: a kind its module declares, a module that is active for a window's post, and commands
+   * that are the module's own or a dependency's.
+   */
+  public readonly notificationPolicy: NotificationPolicy;
+
+  /**
    * Creates the host.
    *
    * @param declarations The build's module declarations.
@@ -3499,19 +3557,30 @@ export declare class ModuleHost {
    * @param methods The registry the modules' methods join.
    * @param events The registry the modules' events join.
    * @param commands The registry the modules' commands join.
+   * @param notifications The runtime's notifications; a module's are dismissed when it deactivates.
    * @param loader Loads runtime parts.
    * @param diagnostics Receives the full error of each part that cannot be
    * loaded, activated or deactivated, which the module statuses leave out.
    * @example
    * ```ts
-   * import { CommandRegistry, DataDirectory, type EventRegistry, MethodRegistry, ModuleHost, PackageRuntimePartLoader } from "@noldova/teamrun-shell-runtime";
+   * import { CommandRegistry, DataDirectory, type EventRegistry, MethodRegistry, ModuleHost, NotificationCenter, PackageRuntimePartLoader } from "@noldova/teamrun-shell-runtime";
    *
    * export function createHost(events: EventRegistry): ModuleHost {
-   *   return new ModuleHost([], new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(), new PackageRuntimePartLoader(), process.stderr);
+   *   return new ModuleHost(
+   *     [], new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(),
+   *     new NotificationCenter(() => undefined, () => new Date()), new PackageRuntimePartLoader(), process.stderr);
    * }
    * ```
    */
-  public constructor(declarations: readonly ModuleDeclaration[], dataDirectory: DataDirectory, methods: MethodRegistry, events: EventRegistry, commands: CommandRegistry, loader: IRuntimePartLoader, diagnostics: Writable);
+  public constructor(
+    declarations: readonly ModuleDeclaration[],
+    dataDirectory: DataDirectory,
+    methods: MethodRegistry,
+    events: EventRegistry,
+    commands: CommandRegistry,
+    notifications: NotificationCenter,
+    loader: IRuntimePartLoader,
+    diagnostics: Writable);
 
   /**
    * Where every module stands, in activation order, as `shell.modules`
@@ -3702,6 +3771,226 @@ export declare class RuntimeCommand {
    * ```
    */
   public constructor(name: string, title: string, icon: string | null, defaultKey: string | null, handler: IMethodHandler);
+}
+
+/**
+ * A posted notification as its runtime part holds it.
+ */
+export declare class NotificationHandle {
+  /**
+   * The notification's id.
+   */
+  public readonly id: number;
+
+  /**
+   * Creates the handle.
+   *
+   * @param id The notification's id.
+   * @param change Replaces the notification's post.
+   * @param remove Dismisses the notification.
+   * @example
+   * ```ts
+   * import { NotificationHandle } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const handle: NotificationHandle = new NotificationHandle(1, () => undefined, () => undefined);
+   * ```
+   */
+  public constructor(id: number, change: (post: NotificationPost) => void, remove: () => void);
+
+  /**
+   * Replaces the notification's post, keeping its place, time and whether it was read; the kind stays the same.
+   *
+   * @param post The new post.
+   * @throws {RegistrationException} When the post's kind or commands are not allowed, its kind differs, or the
+   * notification is gone.
+   * @example
+   * ```ts
+   * import type { NotificationHandle } from "@noldova/teamrun-shell-runtime";
+   * import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function finish(handle: NotificationHandle): void {
+   *   handle.update(new NotificationPost(QualifiedName.parse("clock.sync"), null, "Synced", null, NotificationSeverity.Success, null, [], 1));
+   * }
+   * ```
+   */
+  public update(post: NotificationPost): void;
+
+  /**
+   * Dismisses the notification; dismissing it again does nothing.
+   *
+   * @example
+   * ```ts
+   * import type { NotificationHandle } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function withdraw(handle: NotificationHandle): void {
+   *   handle.dismiss();
+   * }
+   * ```
+   */
+  public dismiss(): void;
+}
+
+/**
+ * The runtime's notifications, newest first, for the runtime's life. It keeps at most 100, dropping the oldest that report
+ * no work in progress, and reports every change.
+ */
+export declare class NotificationCenter {
+  /**
+   * Creates the center.
+   *
+   * @param publish Receives the whole list after every change.
+   * @param now The clock that times new posts.
+   * @example
+   * ```ts
+   * import { NotificationCenter } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const notifications: NotificationCenter = new NotificationCenter(t => console.log(t.notifications.length), () => new Date());
+   * ```
+   */
+  public constructor(publish: (list: NotificationList) => void, now: () => Date);
+
+  /**
+   * The notifications, newest first.
+   */
+  public get list(): NotificationList;
+
+  /**
+   * Finds a notification by its id.
+   *
+   * @param id The notification's id.
+   * @returns The notification, or `undefined` when it is gone.
+   * @example
+   * ```ts
+   * import type { NotificationCenter } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isPosted(notifications: NotificationCenter, id: number): boolean {
+   *   return notifications.find(id) !== undefined;
+   * }
+   * ```
+   */
+  public find(id: number): Notification | undefined;
+
+  /**
+   * Adds a notification at the top, unread. One with the same kind and key is replaced and keeps its id.
+   *
+   * @param post What was posted, already allowed.
+   * @returns The notification's id.
+   * @example
+   * ```ts
+   * import type { NotificationCenter } from "@noldova/teamrun-shell-runtime";
+   * import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function announce(notifications: NotificationCenter): number {
+   *   return notifications.post(new NotificationPost(QualifiedName.parse("clock.alarm"), "morning", "Alarm", null, NotificationSeverity.Info, null, [], null));
+   * }
+   * ```
+   */
+  public post(post: NotificationPost): number;
+
+  /**
+   * Replaces a notification's post, keeping its place, time and whether it was read.
+   *
+   * @param id The notification's id.
+   * @param post The new post, already allowed.
+   * @returns Whether the notification was there.
+   * @throws {RegistrationException} When the post's kind differs from the notification's.
+   * @example
+   * ```ts
+   * import type { NotificationCenter } from "@noldova/teamrun-shell-runtime";
+   * import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function change(notifications: NotificationCenter, id: number, post: NotificationPost): boolean {
+   *   return notifications.update(id, post);
+   * }
+   * ```
+   */
+  public update(id: number, post: NotificationPost): boolean;
+
+  /**
+   * Removes a notification; one that is gone is ignored.
+   *
+   * @param id The notification's id.
+   * @example
+   * ```ts
+   * import type { NotificationCenter } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function remove(notifications: NotificationCenter, id: number): void {
+   *   notifications.dismiss(id);
+   * }
+   * ```
+   */
+  public dismiss(id: number): void;
+
+  /**
+   * Removes every notification of a module's kinds.
+   *
+   * @param moduleId The module's id.
+   * @example
+   * ```ts
+   * import type { NotificationCenter } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function clear(notifications: NotificationCenter): void {
+   *   notifications.dismissOwnedBy("clock");
+   * }
+   * ```
+   */
+  public dismissOwnedBy(moduleId: string): void;
+}
+
+/**
+ * The rules a notification follows before the runtime holds it.
+ */
+export declare class NotificationPolicy {
+  /**
+   * Creates the policy.
+   *
+   * @param declarations The build's module declarations.
+   * @param isActive Whether a module is active.
+   * @example
+   * ```ts
+   * import { NotificationPolicy } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const policy: NotificationPolicy = new NotificationPolicy([], () => true);
+   * ```
+   */
+  public constructor(declarations: readonly ModuleDeclaration[], isActive: (moduleId: string) => boolean);
+
+  /**
+   * Checks a window part's post: its kind's module is active and declares the kind, and its commands are that module's own
+   * or a dependency's.
+   *
+   * @param post The post.
+   * @returns Why the post is refused, safe to show, or `null` when it is allowed.
+   * @example
+   * ```ts
+   * import type { NotificationPolicy } from "@noldova/teamrun-shell-runtime";
+   * import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function isAllowed(policy: NotificationPolicy, post: NotificationPost): boolean {
+   *   return policy.findRefusal(post) === null;
+   * }
+   * ```
+   */
+  public findRefusal(post: NotificationPost): string | null;
+
+  /**
+   * Checks a runtime part's post: the declaration contributes its kind, and its commands are the module's own or a
+   * dependency's.
+   *
+   * @param declaration The posting module's declaration.
+   * @param post The post.
+   * @throws {RegistrationException} When either does not hold.
+   * @example
+   * ```ts
+   * import type { ModuleDeclaration, NotificationPolicy } from "@noldova/teamrun-shell-runtime";
+   * import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function check(policy: NotificationPolicy, clock: ModuleDeclaration, post: NotificationPost): void {
+   *   policy.requireDeclared(clock, post);
+   * }
+   * ```
+   */
+  public requireDeclared(declaration: ModuleDeclaration, post: NotificationPost): void;
 }
 
 /**
