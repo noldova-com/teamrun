@@ -10,6 +10,7 @@ import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 
 export interface IDesktopBridge {
   readonly platform: string;
+  readonly appearance: unknown;
 
   notifyReady(appearance: JsonObject): void;
   notifyAppearance(appearance: JsonObject): void;
@@ -25,6 +26,7 @@ export interface IDesktopBridge {
   readBuild(): Promise<unknown>;
   copyText(text: string): Promise<boolean>;
   openLogFolder(): Promise<boolean>;
+  keepAppearance(preferences: JsonObject): void;
   edit(action: string): Promise<boolean>;
   setMenuBar(menuBar: JsonObject): void;
   onMenuCommand(listener: (id: string) => void): () => void;

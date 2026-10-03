@@ -92,6 +92,12 @@ export class Resources {
   public static readonly deviceIdField: string = "id";
   public static readonly createOnlyFlag: string = "wx";
   public static readonly textEncoding: BufferEncoding = "utf8";
+  public static readonly appearanceFile: string = "appearance.json";
+  public static readonly temporarySuffix: string = ".tmp";
+  public static readonly appearanceArgument: string = "--teamrun-appearance=";
+  public static readonly appearanceLimit: number = 4096;
+  public static readonly appearanceTooLarge: string = "The appearance preferences are larger than 4096 characters.";
+  public static readonly keepAppearanceChannel: string = "teamrun:keepAppearance";
   public static readonly uuidPattern: RegExp = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   public static readonly hashPrefix: string = "#";
   public static readonly queryPrefix: string = "?";
@@ -265,6 +271,18 @@ export class Resources {
 
   public static formatStarterFailed(failure: string): string {
     return `The runtime starter could not start the runtime: ${failure}`;
+  }
+
+  public static formatAppearanceUnread(reason: string): string {
+    return `The device's last appearance could not be read, so the window starts in the default appearance: ${reason}`;
+  }
+
+  public static formatAppearanceUnsaved(reason: string): string {
+    return `The device's appearance could not be kept for the next start: ${reason}`;
+  }
+
+  public static formatPreferencesRejected(reason: string): string {
+    return `The window's appearance preferences are not valid, so they are not kept: ${reason}`;
   }
 
   public static formatMenuBarRejected(reason: string): string {

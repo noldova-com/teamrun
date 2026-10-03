@@ -22,6 +22,7 @@ import { SideDropTarget } from "../models/layout/side-drop-target";
 import { SplitDropTarget } from "../models/layout/split-drop-target";
 import type { Tab } from "../models/layout/tab";
 import { TabDropTarget } from "../models/layout/tab-drop-target";
+import { ShellDocuments } from "../models/shell-documents";
 import { TabTarget } from "../models/tab-target";
 import { Resources } from "../../resources";
 import { CommandSearchService } from "./command-search.service";
@@ -64,6 +65,9 @@ export class ShellCommandsService {
       () => this.editAsync(action), () => this.edits.canRun(action))),
     new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, null,
       () => this.done(() => this.search.open())),
+    new CommandContribution(Resources.openSettingsCommand, Resources.openSettingsTitle, Resources.settingsGlyph, null,
+      () => this.done(() => this.layout.openDocument(ShellDocuments.settingsTab)),
+      () => this.layout.registry().hasDocument(ShellDocuments.settings.name)),
     new CommandContribution(Resources.resetLayoutCommand, Resources.resetLayoutLabel, Resources.resetLayoutGlyph, null, () => this.done(() => this.layout.reset())),
     ...Object.values(BottomDockSpan).map(span => new CommandContribution(Resources.bottomSpanCommands[span], Resources.bottomSpanLabels[span], Resources.bottomSpanGlyphs[span], null,
       () => this.done(() => this.layout.setBottomSpan(span)), () => true, () => this.layout.layout().bottomSpan === span)),

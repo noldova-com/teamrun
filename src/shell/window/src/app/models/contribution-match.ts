@@ -12,9 +12,9 @@ import type { WindowPartContext } from "./window-part-context";
 
 export class ContributionMatch {
   public readonly loadComponent: () => Promise<Type<unknown>>;
-  public readonly context: WindowPartContext;
+  public readonly context: WindowPartContext | null;
 
-  public constructor(loadComponent: () => Promise<Type<unknown>>, context: WindowPartContext) {
+  public constructor(loadComponent: () => Promise<Type<unknown>>, context: WindowPartContext | null) {
     this.loadComponent = loadComponent;
     this.context = context;
   }

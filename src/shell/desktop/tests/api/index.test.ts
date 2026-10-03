@@ -15,6 +15,7 @@ export class DesktopApiTests {
   public exportsTheCompleteRuntimeSurface(): void {
     Assert.areEqual(
       JSON.stringify([
+        "AppearanceStore",
         "CloseCoordinator",
         "DesktopApplication",
         "DesktopLog",

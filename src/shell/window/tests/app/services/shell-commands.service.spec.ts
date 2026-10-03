@@ -14,6 +14,7 @@ import { BottomDockSpan } from "../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import type { CommandContribution } from "../../../src/app/models/command-contribution";
 import { Layout } from "../../../src/app/models/layout/layout";
+import { ViewRegistry } from "../../../src/app/models/layout/view-registry";
 import type { LayoutService } from "../../../src/app/services/layout.service";
 import { CommandSearchService } from "../../../src/app/services/command-search.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
@@ -61,11 +62,21 @@ describe("ShellCommandsService", () => {
       "shell.closeTab", "shell.keepTab", "shell.closeOtherTabs", "shell.closeTabsToTheRight", "shell.closeAllTabs", "shell.moveTabLeft", "shell.moveTabRight",
       "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight", "shell.dockTabBottom",
       "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut", "shell.copy", "shell.paste", "shell.selectAll",
-      "shell.showCommands", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
+      "shell.showCommands", "shell.openSettings", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
     expect(service.commands.every(t => t.title.length > 0 && t.icon !== null)).toBe(true);
     expect(service.commands.filter(t => t.defaultKey !== null)).toEqual([]);
     expect(command("shell.keepTab").title).toBe("Keep the tab open");
+  });
+
+  it("opens Settings as a kept document, or reveals the open one, and is enabled only while the document is registered", async () => {
+    await runAsync("shell.openSettings");
+    const opened = layout.layout().documents;
+    layout.setRegistry(new ViewRegistry([], ["notes.note"]));
+
+    expect([opened.active?.key, opened.preview]).toEqual([settings.key, null]);
+    expect(opened.tabs.filter(t => t.equals(settings)).length).toBe(1);
+    expect(enabled("shell.openSettings")).toBe(false);
   });
 
   it("edits the field that had focus before a menu took it, restoring the field and its selection first, and only when the field allows the edit", async () => {
@@ -159,12 +170,12 @@ describe("ShellCommandsService", () => {
     const names = new Set(service.commands.map(t => t.name));
 
     expect(labels("win32")).toEqual([
-      ["shell.showCommands", "Ctrl+Shift+P"], ["shell.closeTab", "Ctrl+W"], ["shell.nextTab", "Ctrl+Tab"], ["shell.nextTab", "Ctrl+PageDown"],
+      ["shell.showCommands", "Ctrl+Shift+P"], ["shell.openSettings", "Ctrl+,"], ["shell.closeTab", "Ctrl+W"], ["shell.nextTab", "Ctrl+Tab"], ["shell.nextTab", "Ctrl+PageDown"],
       ["shell.previousTab", "Ctrl+Shift+Tab"], ["shell.previousTab", "Ctrl+PageUp"], ["shell.toggleLeftDock", "Ctrl+B"], ["shell.toggleBottomDock", "Ctrl+J"],
       ["shell.toggleRightDock", "Ctrl+Alt+B"]
     ]);
     expect(labels("darwin")).toEqual([
-      ["shell.showCommands", "⇧⌘P"], ["shell.closeTab", "⌘W"], ["shell.nextTab", "⌃⇥"], ["shell.nextTab", "⌥⌘→"],
+      ["shell.showCommands", "⇧⌘P"], ["shell.openSettings", "⌘,"], ["shell.closeTab", "⌘W"], ["shell.nextTab", "⌃⇥"], ["shell.nextTab", "⌥⌘→"],
       ["shell.previousTab", "⌃⇧⇥"], ["shell.previousTab", "⌥⌘←"], ["shell.toggleLeftDock", "⌘B"], ["shell.toggleBottomDock", "⌘J"],
       ["shell.toggleRightDock", "⌥⌘B"]
     ]);
