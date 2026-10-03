@@ -2837,8 +2837,8 @@ export declare class SenderPolicy {
 /**
  * Shows new notifications through the operating system while no TeamRun window is focused. A notification is new when
  * its sequence is above every one seen since the window last read the notifications, so it counts from the same point
- * as the window's toasts; while a window loads, broadcasts wait for its read. Updates, work in progress and
- * notifications posted while Do not disturb is on for the device never show. An operating system notification closes
+ * as the window's toasts; while a window loads, broadcasts wait for its read. Updates, work in progress, notifications
+ * from a muted module and those posted while Do not disturb is on for the device never show. An operating system notification closes
  * when its notification is dismissed or replaced, and a failure to show one is logged once.
  */
 export declare class SystemNotifier {
@@ -2923,7 +2923,7 @@ export declare class SystemNotifier {
    * import { NotificationBroadcast } from "@noldova/teamrun-shell-protocol";
    *
    * export function clear(notifier: SystemNotifier): void {
-   *   notifier.receive(new NotificationBroadcast([], [], 0));
+   *   notifier.receive(new NotificationBroadcast([], [], [], 0));
    * }
    * ```
    */
@@ -3032,7 +3032,8 @@ export declare class RuntimeWindowStateStore implements IWindowStateStore {
 
 /**
  * The desktop's log, `logs/desktop.log` in the data directory, mirrored to standard error. One desktop runs per data
- * directory, so the desktop alone owns the file.
+ * directory, so the desktop alone owns the file. It stays within its size limit by becoming `logs/desktop.previous.log`
+ * when it fills.
  */
 export declare class DesktopLog implements IDesktopLog {
   /**
