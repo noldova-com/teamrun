@@ -60,6 +60,7 @@ export { WindowStateKey } from "../models/window-state-key.js";
 export { WindowStateValue } from "../models/window-state-value.js";
 export { WindowStateWrite } from "../models/window-state-write.js";
 export { WireMessage } from "../models/wire-message.js";
+export { WorkReport } from "../models/work-report.js";
 export { FrameWriter } from "../services/frame-writer.js";
 export { FrameReader } from "../services/frame.reader.js";
 export { WireContract } from "../services/wire-contract.js";

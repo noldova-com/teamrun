@@ -57,7 +57,7 @@ export class CommandService {
   }
 
   public isEnabled(name: string, commandArguments: JsonValue = null): boolean {
-    return this.find(name).isEnabled(commandArguments);
+    return this.canRun(this.find(name), commandArguments);
   }
 
   public keyLabel(name: string): string | null {
@@ -69,12 +69,22 @@ export class CommandService {
       return false;
     const name = this.shortcuts().find(event);
     const command = this.commands().find(t => t.name === name);
-    if (Object.isUndefined(command) || !command.isEnabled(null))
+    if (Object.isUndefined(command) || !this.canRun(command, null))
       return false;
 
     event.preventDefault();
     this.report(command.runAsync(null));
     return true;
+  }
+
+  private canRun(command: CommandContribution, commandArguments: JsonValue): boolean {
+    try {
+      return command.isEnabled(commandArguments);
+    }
+    catch (error) {
+      this.errors.handleError(error);
+      return false;
+    }
   }
 
   private report(running: Promise<JsonValue>): void {

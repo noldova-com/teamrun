@@ -1560,6 +1560,59 @@ export declare class SettingException extends MethodFailureException {
 }
 
 /**
+ * Thrown when another build's runtime owns the data directory and the client
+ * was told not to take it over.
+ */
+export declare class BuildMismatchException extends Exception {
+  /**
+   * The running runtime's build identity and the program it runs from.
+   */
+  public readonly handover: RuntimeHandover;
+
+  /**
+   * Creates the exception.
+   *
+   * @param handover The running runtime's identity and program.
+   * @example
+   * ```ts
+   * import { type BuildIdentity, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
+   * import { BuildMismatchException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function refuse(running: BuildIdentity): never {
+   *   throw new BuildMismatchException(new RuntimeHandover(running, "/opt/teamrun/teamrun"));
+   * }
+   * ```
+   */
+  public constructor(handover: RuntimeHandover);
+}
+
+/**
+ * Thrown when no runtime owns the data directory and the client was told not
+ * to start one.
+ */
+export declare class NoRuntimeException extends Exception {
+  /**
+   * The data directory's root.
+   */
+  public readonly root: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param root The data directory's root.
+   * @example
+   * ```ts
+   * import { NoRuntimeException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function refuse(root: string): never {
+   *   throw new NoRuntimeException(root);
+   * }
+   * ```
+   */
+  public constructor(root: string);
+}
+
+/**
  * The exception thrown when a newer build's runtime owns the data directory, so this older build hands the person over to it.
  */
 export declare class RuntimeHandoverException extends Exception {
@@ -2247,6 +2300,38 @@ export declare class CapabilityToken {
    * ```
    */
   public matches(candidate: string): boolean;
+}
+
+/**
+ * How {@link RuntimeLauncher.attachAsync} treats a missing runtime and
+ * another build's runtime.
+ */
+export declare class AttachOptions {
+  /**
+   * Whether to start a runtime when none runs.
+   */
+  public readonly start: boolean;
+
+  /**
+   * Whether to ask an older build's runtime, or another build of the same
+   * version, to stop and take its place.
+   */
+  public readonly takeOver: boolean;
+
+  /**
+   * Creates the options.
+   *
+   * @param start Whether to start a runtime when none runs; yes by default.
+   * @param takeOver Whether to take over another build's runtime; yes by
+   * default.
+   * @example
+   * ```ts
+   * import { AttachOptions } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const attachOnly: AttachOptions = new AttachOptions(false, false);
+   * ```
+   */
+  public constructor(start?: boolean, takeOver?: boolean);
 }
 
 /**
@@ -3156,7 +3241,10 @@ export declare class RuntimeLauncher {
    * @param clientName The client's name.
    * @param listener Receives events and the disconnection.
    * @param policy What to do when an older runtime has work in progress. Defaults to {@link StopPolicy.IfIdle}.
+   * @param options Whether to start a runtime when none runs and whether to take over an older build's runtime. Both default to yes.
    * @returns A promise of the connected client.
+   * @throws {NoRuntimeException} Rejected when no runtime runs and the options say not to start one.
+   * @throws {BuildMismatchException} Rejected when an older build's runtime, or another build of the same version, owns the directory and the options say not to take it over.
    * @throws {RuntimeHandoverException} Rejected when a newer build's runtime owns the directory.
    * @throws {PreShellDataFoundException} Rejected when the runtime refuses until data from before the shell is moved aside.
    * @throws {WorkInProgressException} Rejected when an older runtime has work in progress and the policy is to stop only if idle.
@@ -3171,7 +3259,7 @@ export declare class RuntimeLauncher {
    * }
    * ```
    */
-  public attachAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy): Promise<RuntimeClient>;
+  public attachAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy, options?: AttachOptions): Promise<RuntimeClient>;
 
   /**
    * Like {@link attachAsync}, but first moves data from before the shell aside when the runtime refuses because of it. Call it after the person agreed to the move.

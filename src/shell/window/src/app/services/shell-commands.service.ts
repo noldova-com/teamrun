@@ -21,6 +21,7 @@ import type { Tab } from "../models/layout/tab";
 import { TabDropTarget } from "../models/layout/tab-drop-target";
 import { TabTarget } from "../models/tab-target";
 import { Resources } from "../../resources";
+import { CommandSearchService } from "./command-search.service";
 import { LayoutService } from "./layout.service";
 import { TabStripService } from "./tab-strip.service";
 
@@ -28,6 +29,7 @@ import { TabStripService } from "./tab-strip.service";
 export class ShellCommandsService {
   private readonly layout: LayoutService = inject(LayoutService);
   private readonly strips: TabStripService = inject(TabStripService);
+  private readonly search: CommandSearchService = inject(CommandSearchService);
   private readonly document: Document = inject(DOCUMENT);
   private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
 
@@ -49,6 +51,8 @@ export class ShellCommandsService {
       t => this.place(t.tab, new SideDropTarget(side)), t => t.tab.isMovable)),
     ...Object.values(DockSide).map(side => new CommandContribution(Resources.toggleDockCommands[side], Resources.toggleDockTitles[side], Resources.hideDockGlyphs[side], null,
       () => this.done(() => this.layout.toggleDock(side)))),
+    new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, Resources.showCommandsKey,
+      () => this.done(() => this.search.open())),
     new CommandContribution(Resources.resetLayoutCommand, Resources.resetLayoutLabel, Resources.resetLayoutGlyph, null, () => this.done(() => this.layout.reset())),
     new CommandContribution(Resources.showAllTabsCommand, Resources.overflowLabel, Resources.overflowGlyph, null,
       commandArguments => this.done(() => {

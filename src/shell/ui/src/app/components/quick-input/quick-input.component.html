@@ -1,0 +1,29 @@
+<input #field class="tr-quick-input-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="true" [attr.aria-controls]="listId"
+  [attr.aria-activedescendant]="activeId()" [attr.aria-label]="label()" [placeholder]="label()" [value]="query()" spellcheck="false" autocomplete="off"
+  (input)="query.set(field.value)" (keydown)="onKey($event)" />
+<div class="tr-quick-input-list tr-scroll-reveal" role="listbox" [id]="listId" [attr.aria-label]="label()">
+  @for (item of items(); track item.id; let index = $index) {
+    <div class="tr-quick-input-option" role="option" [id]="optionId(index)" [attr.aria-selected]="index === active()" [attr.data-item]="item.id"
+      (click)="choose(index)">
+      @if (item.icon; as glyph) {
+        <span class="tr-quick-input-icon material-symbols-rounded" aria-hidden="true">{{ glyph }}</span>
+      }
+      <span class="tr-quick-input-title">
+        @for (segment of item.segments; track $index) {
+          @if (segment.isMatch) {
+            <mark class="tr-quick-input-match">{{ segment.text }}</mark>
+          } @else {
+            {{ segment.text }}
+          }
+        }
+      </span>
+      @if (item.detail; as detail) {
+        <span class="tr-quick-input-detail">{{ detail }}</span>
+      }
+      @if (item.keyLabel; as keys) {
+        <span class="tr-quick-input-key">{{ keys }}</span>
+      }
+    </div>
+  }
+</div>
+<span class="tr-quick-input-status" role="status">{{ status() }}</span>

@@ -150,6 +150,7 @@ export class Resources {
   public static readonly stopMember: string = "stop";
   public static readonly moveAsideMember: string = "moveAside";
   public static readonly modulesMember: string = "modules";
+  public static readonly workMember: string = "work";
   public static readonly readWindowBoundsMember: string = "readWindowBounds";
   public static readonly writeWindowBoundsMember: string = "writeWindowBounds";
   public static readonly readWindowLayoutMember: string = "readWindowLayout";

@@ -934,6 +934,68 @@ export declare class RunningWork {
 }
 
 /**
+ * The work a runtime has in progress, as `shell.work` answers it. Unlike
+ * `RunningWork`, the list may be empty.
+ */
+export declare class WorkReport {
+  /**
+   * Sentences describing each piece of work, in the order the runtime lists
+   * them.
+   */
+  public readonly descriptions: readonly string[];
+
+  /**
+   * Creates the report.
+   *
+   * @param descriptions The descriptions, possibly none, none whitespace
+   * only. The report keeps its own copy.
+   * @throws ArgumentException synchronously when a description is null,
+   * empty or whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { WorkReport } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const report: WorkReport = new WorkReport(["Indexing the project"]);
+   * ```
+   */
+  public constructor(descriptions: readonly string[]);
+
+  /**
+   * Reads the report from its wire form. Unknown fields are ignored.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The report.
+   * @throws JsonException synchronously when `descriptions` is missing or
+   * holds a blank description.
+   *
+   * @example
+   * ```ts
+   * import { WorkReport } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const report: WorkReport = WorkReport.fromJson({ descriptions: [] });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): WorkReport;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `descriptions` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { WorkReport } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new WorkReport([]).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
  * Where one module stands in the runtime: an active module has no cause; a
  * failed or blocked one has a cause that is safe to show, without a stack or
  * a path outside the data directory.
@@ -1165,6 +1227,12 @@ export declare class ShellMethods {
    * is unaffected.
    */
   public static readonly modules: QualifiedName;
+
+  /**
+   * `shell.work`: asks the runtime what work is in progress, without
+   * stopping anything; it answers with a `WorkReport`.
+   */
+  public static readonly work: QualifiedName;
 
   /**
    * `shell.commands`: asks the runtime for the commands its active modules'
