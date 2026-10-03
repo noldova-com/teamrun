@@ -1,0 +1,117 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-quick-input-gap);
+  box-sizing: border-box;
+  width: min(var(--tr-quick-input-width), calc(100vw - var(--tr-space-4)));
+  max-height: calc(100% - var(--tr-quick-input-margin));
+  min-height: 0;
+  margin-top: var(--tr-quick-input-margin);
+  padding: var(--tr-quick-input-padding);
+  border: var(--tr-border-width) solid var(--tr-menu-border);
+  border-radius: var(--tr-radius-large);
+  background-color: var(--tr-quick-input);
+  box-shadow: var(--tr-shadow-xlarge);
+  font-family: var(--tr-font-sans);
+  font-size: var(--tr-text-panel);
+  line-height: var(--tr-line-panel);
+}
+
+.tr-quick-input-field {
+  flex: none;
+  box-sizing: border-box;
+  min-height: var(--tr-field-height);
+  margin: 0;
+  padding: 0 var(--tr-field-padding);
+  border: var(--tr-border-width) solid var(--tr-input-border);
+  border-radius: var(--tr-radius-small);
+  background-color: var(--tr-input);
+  color: var(--tr-input-text);
+  font: inherit;
+  outline: none;
+}
+
+.tr-quick-input-field::placeholder {
+  color: var(--tr-placeholder);
+}
+
+.tr-quick-input-field:focus {
+  border-color: var(--tr-accent);
+}
+
+.tr-quick-input-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.tr-quick-input-option {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--tr-menu-item-padding);
+  min-height: var(--tr-menu-item-height);
+  padding-inline: var(--tr-menu-item-padding);
+  border-radius: var(--tr-radius-medium);
+  color: var(--tr-menu-text);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tr-quick-input-option:hover {
+  background-color: var(--tr-hover);
+}
+
+.tr-quick-input-option[aria-selected="true"] {
+  background-color: var(--tr-selected);
+}
+
+.tr-quick-input-icon {
+  flex: none;
+  font-size: var(--tr-icon);
+}
+
+.tr-quick-input-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tr-quick-input-match {
+  background: none;
+  color: inherit;
+  font-weight: 600;
+}
+
+.tr-quick-input-detail,
+.tr-quick-input-key {
+  flex: none;
+  color: var(--tr-text-muted);
+}
+
+.tr-quick-input-detail {
+  margin-inline-end: auto;
+}
+
+.tr-quick-input-key {
+  margin-inline-start: auto;
+}
+
+.tr-quick-input-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
