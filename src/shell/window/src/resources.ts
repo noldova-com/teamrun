@@ -197,6 +197,8 @@ export class Resources {
   public static readonly panelSizeSetting: string = "shell.panelSize";
   public static readonly messageSizeSetting: string = "shell.messageSize";
   public static readonly codeSizeSetting: string = "shell.codeSize";
+  public static readonly doNotDisturbSetting: string = "shell.doNotDisturb";
+  public static readonly mutedModulesSetting: string = "shell.mutedModules";
   public static readonly appearanceUnreadable: string = "The appearance preferences could not be read.";
   public static readonly notificationsPage: string = "Notifications";
   public static readonly shortcutsPage: string = "Keyboard shortcuts";
@@ -548,7 +550,6 @@ export class Resources {
     return `The module ${moduleId} does not declare the command ${name}.`;
   }
 
-  public static readonly isOnField: string = "isOn";
   public static readonly notificationsGlyph: string = "notifications";
   public static readonly notificationsOffGlyph: string = "notifications_off";
   public static readonly notificationsTitle: string = "Notifications";
@@ -615,6 +616,10 @@ export class Resources {
 
   public static formatUnsupportedVersion(version: number): string {
     return `Layout format version ${version} is not supported; this build reads version ${Resources.layoutFormatVersion}.`;
+  }
+
+  public static formatModuleNotifications(displayName: string): string {
+    return `${displayName} notifications`;
   }
 
   public static formatResetLabel(title: string): string {

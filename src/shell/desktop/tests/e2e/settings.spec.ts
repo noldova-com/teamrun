@@ -44,8 +44,22 @@ async function nativeBackgroundAsync(desktop: DesktopApplicationFixture): Promis
 }
 
 test.describe("settings", () => {
+  test("a module's window part changes its setting, its runtime part uses the new value, and the value outlives reopening the window", async ({ desktop }) => {
+    const step = (): Locator => desktop.window.locator("[data-fixture-content=clock-step]");
+    await expect(step()).toHaveText("Step: 1");
+
+    await desktop.window.locator("[data-fixture-content=clock-step-up]").click();
+    await expect(step()).toHaveText("Step: 2");
+    await desktop.window.locator("[data-fixture-content=notes-list]").click();
+    await desktop.window.keyboard.press("ControlOrMeta+Alt+KeyT");
+
+    await expect(desktop.window.locator("[data-fixture-content=clock-ticks]")).toHaveText("Ticks: 2");
+    await desktop.reopenAsync();
+    await expect(step()).toHaveText("Step: 2");
+    await desktop.checkpointAsync("settings-module-step");
+  });
+
   test("Settings opens by its key as one document, lists its pages and shows the shell's keys", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
 
     await openSettingsAsync(window);
@@ -61,7 +75,6 @@ test.describe("settings", () => {
   });
 
   test("search filters every page by title, description and name, marking the matches, and choosing a page ends it", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await openSettingsAsync(window);
 
@@ -79,7 +92,6 @@ test.describe("settings", () => {
   });
 
   test("changing the mode, a font and a size repaints the window at once, marks them modified, and Reset returns each", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await openSettingsAsync(window);
     const mode = await otherModeAsync(window);
@@ -104,7 +116,6 @@ test.describe("settings", () => {
   });
 
   test("a restart paints the first frame in the chosen mode, before the runtime has given the window any setting", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await openSettingsAsync(window);
     const mode = await otherModeAsync(window);
@@ -122,7 +133,6 @@ test.describe("settings", () => {
     expect(await desktop.window.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.documentElement).colorScheme]))
       .toEqual([windowColors[mode], mode.toLowerCase()]);
     expect(await nativeBackgroundAsync(desktop)).toBe(mode === "Dark" ? "#181818" : "#F8F8F8");
-    await desktop.useSuiteViewportAsync();
     await desktop.checkpointAsync("settings-first-frame");
   });
 });

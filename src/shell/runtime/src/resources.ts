@@ -81,9 +81,10 @@ export class Resources {
   public static readonly windowStatesMigration: string = "window-states";
   public static readonly quietDevicesMigration: string = "quiet-devices";
   public static readonly createQuietDevicesStatement: string = "CREATE TABLE quiet_devices (device TEXT PRIMARY KEY) STRICT";
-  public static readonly readQuietDevicesStatement: string = "SELECT device FROM quiet_devices";
-  public static readonly addQuietDeviceStatement: string = "INSERT INTO quiet_devices (device) VALUES (?) ON CONFLICT (device) DO NOTHING";
-  public static readonly removeQuietDeviceStatement: string = "DELETE FROM quiet_devices WHERE device = ?";
+  public static readonly quietDevicesMovedMigration: string = "quiet-devices-moved";
+  public static readonly forgetDoNotDisturbStatement: string =
+    "DELETE FROM setting_values WHERE name = 'shell.doNotDisturb' AND scope_name = '' AND scope_id = '' AND device <> ''";
+  public static readonly dropQuietDevicesStatement: string = "DROP TABLE quiet_devices";
   public static readonly settingsMigration: string = "settings";
   public static readonly createSettingValuesStatement: string =
     "CREATE TABLE setting_values (name TEXT NOT NULL, scope_name TEXT NOT NULL, scope_id TEXT NOT NULL, device TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (name, scope_name, scope_id, device)) STRICT";
@@ -117,6 +118,11 @@ export class Resources {
   public static readonly ownershipWaitMilliseconds: number = 250;
   public static readonly backupWakeMilliseconds: number = 25;
   public static readonly privateFileMode: number = 0o600;
+  public static readonly logSizeLimit: number = 1048576;
+  public static readonly logRecordShare: number = 4;
+  public static readonly missingFileErrorCode: string = "ENOENT";
+  public static readonly utf8ContinuationMask: number = 0xC0;
+  public static readonly utf8ContinuationBits: number = 0x80;
   public static readonly privateFolderMode: number = 0o700;
   public static readonly exclusiveWriteFlag: string = "wx";
   public static readonly temporarySuffix: string = ".tmp";
@@ -218,8 +224,8 @@ export class Resources {
   public static readonly defaultCodeSize: number = 14;
   public static readonly doNotDisturbTitle: string = "Do not disturb";
   public static readonly doNotDisturbDescription: string = "Holds back notifications on this device; they still collect in the list.";
-  public static readonly mutedModulesTitle: string = "Muted modules";
-  public static readonly mutedModulesDescription: string = "Modules whose notifications are not shown.";
+  public static readonly mutedModulesTitle: string = "Notifications from modules";
+  public static readonly mutedModulesDescription: string = "A module turned off still adds its notifications to the list, without toasts or operating system notifications.";
   public static readonly settingScopesKind: string = "settingScopes";
   public static readonly settingsField: string = "settings";
   public static readonly nameParameterName: string = "name";
@@ -599,6 +605,10 @@ export class Resources {
 
   public static formatStartLogNameInvalid(name: string): string {
     return `"${name}" is not the name of a start log.`;
+  }
+
+  public static formatRuntimeLogUnavailable(reason: string): string {
+    return `The runtime's log could not be written, so it is no longer written to: ${reason}`;
   }
 
   public static formatStartLogName(unique: string): string {

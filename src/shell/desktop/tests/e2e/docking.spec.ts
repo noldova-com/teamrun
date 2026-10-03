@@ -90,7 +90,6 @@ function contrast(foreground: string, background: string): number {
 
 test.describe("docking", () => {
   test.beforeEach(async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     await expect(tab(desktop.window, notes)).toBeVisible();
     await expect(tab(desktop.window, secondNote)).toBeVisible();
   });
@@ -140,7 +139,6 @@ test.describe("docking", () => {
   });
 
   test("the outer bottom guide docks the tab along the whole bottom, under the side docks, and the inner one between them", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     const outer = window.locator(".tr-docking-outer");
     const inner = window.locator("[data-drop-side=Bottom][data-drop-span=Between]");
@@ -293,7 +291,6 @@ test.describe("docking", () => {
   });
 
   test("the bottom dock spans the window under the side docks, or stays between them when chosen through its commands, and keeps that choice", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const sideRects = (): Promise<Readonly<Record<string, { left: number; right: number; top: number; bottom: number }>>> => desktop.window.locator("tr-tab-group[data-side]")
       .evaluateAll(groups => Object.fromEntries(groups.map(group => {
         const box = group.getBoundingClientRect();
@@ -330,7 +327,6 @@ test.describe("docking", () => {
     await desktop.checkpointAsync("bottom-dock-between-the-side-docks");
 
     await desktop.reopenAsync();
-    await desktop.useSuiteViewportAsync();
 
     await expect(tab(desktop.window, notes)).toBeVisible();
     await expect.poll(staysBetween).toBe(true);
@@ -392,7 +388,6 @@ test.describe("docking", () => {
       const before = await describePlacesAsync(desktop.window);
 
       await (reopen ? desktop.reopenAsync() : desktop.restartAsync());
-      await desktop.useSuiteViewportAsync();
 
       await expect(tab(desktop.window, outline)).toBeVisible();
       await expect.poll(() => describePlacesAsync(desktop.window)).toEqual(before);
@@ -406,13 +401,11 @@ test.describe("docking", () => {
     const before = await describePlacesAsync(desktop.window);
 
     await desktop.restartAsync(() => BuildVariantFixture.swapInAsync(withoutClock));
-    await desktop.useSuiteViewportAsync();
     await expect(tab(desktop.window, notes)).toBeVisible();
     await expect(tab(desktop.window, clock)).toHaveCount(0);
     await expect(desktop.window.locator("tr-tab-group[data-side=Bottom]")).toHaveCount(0);
 
     await desktop.restartAsync(() => BuildVariantFixture.restoreAsync());
-    await desktop.useSuiteViewportAsync();
     await expect(tab(desktop.window, clock)).toBeVisible();
     await expect.poll(() => describePlacesAsync(desktop.window)).toEqual(before);
   });
