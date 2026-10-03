@@ -802,9 +802,10 @@ export class DesktopApplicationTests {
     await DesktopApplicationTests.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
 
     launcher.listener?.onDisconnected();
+    const readsBeforeTheMove = window.boundsReads;
     window.bounds = { x: 40, y: 60, width: 900, height: 640 };
     window.change("move");
-    await delay(700);
+    await DesktopApplicationTests.waitAsync(() => window.boundsReads > readsBeforeTheMove, 2000);
     const writesWhileGone = [...first.calls, ...second.calls].filter(t => t === "shell.writeWindowBounds").length;
     reconnect(second);
     await DesktopApplicationTests.waitAsync(() => second.calls.includes("shell.writeWindowBounds"));
@@ -830,8 +831,9 @@ export class DesktopApplicationTests {
     await DesktopApplicationTests.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
 
     launcher.listener?.onDisconnected();
+    const readsBeforeTheMove = window.boundsReads;
     window.change("move");
-    await delay(700);
+    await DesktopApplicationTests.waitAsync(() => window.boundsReads > readsBeforeTheMove, 2000);
     reconnect(second);
     await DesktopApplicationTests.waitAsync(() => DesktopApplicationTests.readErrors(process, "The window's bounds").length > 0);
 

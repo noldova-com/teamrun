@@ -20,6 +20,7 @@ class MemoryStore implements IWindowStateStore {
   public value: JsonObject | null;
   public readonly writes: JsonObject[] = [];
   public failure: Error | null = null;
+  public attempts: number = 0;
 
   public constructor(value: JsonObject | null) {
     this.value = value;
@@ -30,6 +31,7 @@ class MemoryStore implements IWindowStateStore {
   }
 
   public writeAsync(value: JsonObject): Promise<void> {
+    this.attempts++;
     if (this.failure !== null)
       return Promise.reject(this.failure);
     this.writes.push(value);
@@ -50,10 +52,10 @@ export class WindowBoundsKeeperTests {
 
     window.bounds = { x: 10, y: 20, width: 800, height: 600 };
     window.change("move");
-    await delay(20);
+    await WindowBoundsKeeperTests.waitAsync(() => store.attempts === 1);
     window.bounds = { x: 30, y: 40, width: 900, height: 640 };
     window.change("resize");
-    await delay(20);
+    await WindowBoundsKeeperTests.waitAsync(() => store.attempts === 2);
     const writesWhileUnreachable = store.writes.length;
     store.failure = null;
     await keeper.saveUnsavedAsync();
@@ -75,7 +77,7 @@ export class WindowBoundsKeeperTests {
     await keeper.saveUnsavedAsync();
     store.failure = new WindowStateException("The runtime refused shell.writeWindowBounds: The database is busy.");
     window.change("move");
-    await delay(20);
+    await WindowBoundsKeeperTests.waitAsync(() => log.lines.length === 1);
     store.failure = null;
     await keeper.saveUnsavedAsync();
 
@@ -160,5 +162,11 @@ export class WindowBoundsKeeperTests {
     await delay(20);
 
     Assert.areEqual(JSON.stringify(["The window's bounds could not be saved: Error: The runtime is gone."]), JSON.stringify(log.lines));
+  }
+
+  private static async waitAsync(condition: () => boolean): Promise<void> {
+    for (let attempt = 0; attempt < 2000 && !condition(); attempt++)
+      await delay(5);
+    Assert.isTrue(condition());
   }
 }
