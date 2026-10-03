@@ -17,6 +17,7 @@ import { type ElectronApplication, type Page, type TestInfo, _electron, expect }
 import { DataDirectory, DiscoveryReader, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
 import ErrorOutputClassifier from "./error-output.classifier.ts";
+import ProcessListFixture from "./process-list.fixture.ts";
 
 export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
@@ -29,6 +30,9 @@ export default class DesktopApplicationFixture {
   private static readonly DATA_FOLDER: string = "data";
   private static readonly DEVICE_FOLDER: string = "device";
   private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
+  private static readonly PROCESS_EXIT_TIMEOUT: number = 30_000;
+  private static readonly REMOVE_RETRIES: number = 3;
+  private static readonly LOCKED_CODES: readonly string[] = ["EBUSY", "EPERM", "ENOTEMPTY"];
   private static readonly TRACE_FILE: string = "trace.zip";
   private static readonly WINDOWS_FILE: string = "windows.json";
   private static readonly DIAGNOSTIC_TIMEOUT: number = 10_000;
@@ -42,6 +46,7 @@ export default class DesktopApplicationFixture {
   private page: Page | null = null;
   private childProcess: ChildProcess | null = null;
   private isKeptOffCursor: boolean = false;
+  private readonly recorded: Set<number> = new Set();
 
   public readonly failures: string[] = [];
   public closeMilliseconds: number | null = null;
@@ -96,6 +101,10 @@ export default class DesktopApplicationFixture {
     catch {
       return false;
     }
+  }
+
+  public get recordedProcessIds(): readonly number[] {
+    return [...this.recorded];
   }
 
   public get application(): ElectronApplication {
@@ -160,6 +169,7 @@ export default class DesktopApplicationFixture {
   public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
     const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
+    await this.recordProcessesAsync();
     const started = Date.now();
     await this.application.close();
     this.closeMilliseconds = Date.now() - started;
@@ -184,7 +194,35 @@ export default class DesktopApplicationFixture {
     if (isRunning)
       await this.closeAsync();
     await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
-    await rm(this.root, { recursive: true, force: true, maxRetries: 10 });
+    await this.removeFolderAsync();
+  }
+
+  private async removeFolderAsync(): Promise<void> {
+    await this.failIfRunningAsync(await ProcessListFixture.waitForSignalsAsync([...this.recorded], DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT));
+    try {
+      await rm(this.root, { recursive: true, force: true });
+      return;
+    }
+    catch (error) {
+      if (!DesktopApplicationFixture.LOCKED_CODES.includes((error as NodeJS.ErrnoException).code ?? ""))
+        throw error;
+    }
+    await this.failIfRunningAsync(await ProcessListFixture.waitForExitAsync([...this.recorded], DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT));
+    await rm(this.root, { recursive: true, force: true, maxRetries: DesktopApplicationFixture.REMOVE_RETRIES });
+  }
+
+  private async recordProcessesAsync(): Promise<void> {
+    const electron = await this.application.evaluate(({ app }) => app.getAppMetrics().map(t => t.pid));
+    const runtime = await this.readRuntimeProcessIdAsync();
+    for (const processId of [...electron, ...runtime === undefined ? [] : [runtime]])
+      this.recorded.add(processId);
+  }
+
+  private async failIfRunningAsync(running: readonly number[]): Promise<void> {
+    if (running.length === 0)
+      return;
+    const described = await ProcessListFixture.describeAsync(running);
+    throw new Error(`TeamRun's processes ${described} still run ${DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT / 1000} s after it closed, so its folder ${this.root} is kept.`);
   }
 
   private async keepDiagnosticsAsync(isRunning: boolean): Promise<void> {
@@ -263,6 +301,7 @@ export default class DesktopApplicationFixture {
     await expect.poll(() => this.isVisibleAsync()).toBe(true);
     await expect.poll(async () => (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.productVersion)
       .toBe(RuntimeBuild.identity.productVersion);
+    await this.recordProcessesAsync();
     if (this.isKeptOffCursor)
       await this.moveOffCursorAsync();
   }
