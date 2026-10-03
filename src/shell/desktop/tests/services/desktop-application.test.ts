@@ -129,8 +129,8 @@ export class DesktopApplicationTests {
 
   @TestMethod
   @TestData("win32", "null")
-  @TestData("darwin", "[\"appMenu\",\"editMenu\",\"windowMenu\"]")
-  public async setsTheStandardMenuOnlyOnMacOS(platform: string, menu: string): Promise<void> {
+  @TestData("darwin", "[{\"role\":\"appMenu\"},{\"role\":\"editMenu\"},{\"role\":\"window\",\"submenu\":[{\"role\":\"minimize\"},{\"role\":\"zoom\"},{\"type\":\"separator\"},{\"role\":\"close\",\"label\":\"Close Window\",\"accelerator\":\"Command+Shift+W\"},{\"type\":\"separator\"},{\"role\":\"front\"}]}]")
+  public async setsTheStandardMenuOnlyOnMacOSLeavingCommandWToTheWindow(platform: string, menu: string): Promise<void> {
     const electron = await DesktopApplicationTests.startReadyAsync(platform);
 
     Assert.areEqual(menu, JSON.stringify(electron.menu.menu));
@@ -470,15 +470,19 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public handsAPackagedBuildOverToANewerBuildAndQuits(): Promise<void> {
+  public handsAPackagedBuildOverToANewerBuildWithItsDataArgumentsAndQuits(): Promise<void> {
     const handover = new RuntimeHandoverException(new RuntimeHandover(new BuildIdentity("2.0.0", 1, "newer"), "/opt/teamrun/teamrun"));
-    const process = new FakeDesktopProcess("linux");
+    const process = new FakeDesktopProcess("linux", [
+      "/opt/teamrun/teamrun-1", "--data-dir=/work/data", "--inspect=9229", "--user-data-dir=/work/profile", "--device-dir=/work/device", "--data-dir-extra"
+    ]);
     const electron = new FakeElectron(true, true);
     DesktopApplicationTests.start(electron, process, new FakeRuntimeLauncher(handover));
     return electron.app.becomeReadyAsync().then(async () => {
       await setImmediate();
 
-      Assert.areEqual(JSON.stringify(["/opt/teamrun/teamrun"]), JSON.stringify(process.started));
+      Assert.areEqual(
+        JSON.stringify([["/opt/teamrun/teamrun", "--data-dir=/work/data", "--user-data-dir=/work/profile", "--device-dir=/work/device"]]),
+        JSON.stringify(process.started));
       Assert.areEqual("quit", electron.app.calls.at(-1));
     });
   }

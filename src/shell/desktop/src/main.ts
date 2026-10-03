@@ -49,7 +49,7 @@ DesktopApplication.start(
     isDefaultApp: process.defaultApp === true,
     errorOutput: process.stderr,
     processId: process.pid,
-    startDetached: t => spawn(t, [], { detached: true, stdio: "ignore" }).unref(),
+    startDetached: (path, args) => spawn(path, [...args], { detached: true, stdio: "ignore" }).unref(),
     endProcess: t => process.kill(t, "SIGKILL")
   },
   import.meta.url,
