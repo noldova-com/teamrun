@@ -14,6 +14,7 @@ import { DockingDirection, OverlaySide } from "@noldova/teamrun-shell-ui";
 
 import { BottomDockSpan } from "./app/enums/bottom-dock-span";
 import { DockSide } from "./app/enums/dock-side";
+import { EditAction } from "./app/enums/edit-action";
 import { PanelEdge } from "./app/enums/panel-edge";
 import { SplitAxis } from "./app/enums/split-axis";
 import { productName } from "../../../generated/product";
@@ -289,6 +290,35 @@ export class Resources {
   public static readonly separatorRowType: string = "separator";
   public static readonly menuRowPathSeparator: string = "/";
   public static readonly menuGlyph: string = "menu";
+  public static readonly focusInEvent: string = "focusin";
+  public static readonly focusOutEvent: string = "focusout";
+  public static readonly transientFocusSelector: string = ".cdk-overlay-container, [data-tr-chrome]";
+  public static readonly textInputTypes: readonly string[] = ["text", "search", "url", "tel", "password", "email", "number"];
+  public static readonly editingGroup: string = "shell.editing";
+  public static readonly editCommands: Readonly<Record<EditAction, string>> = {
+    [EditAction.Undo]: "shell.undo",
+    [EditAction.Redo]: "shell.redo",
+    [EditAction.Cut]: "shell.cut",
+    [EditAction.Copy]: "shell.copy",
+    [EditAction.Paste]: "shell.paste",
+    [EditAction.SelectAll]: "shell.selectAll"
+  };
+  public static readonly editTitles: Readonly<Record<EditAction, string>> = {
+    [EditAction.Undo]: "Undo",
+    [EditAction.Redo]: "Redo",
+    [EditAction.Cut]: "Cut",
+    [EditAction.Copy]: "Copy",
+    [EditAction.Paste]: "Paste",
+    [EditAction.SelectAll]: "Select all"
+  };
+  public static readonly editGlyphs: Readonly<Record<EditAction, string>> = {
+    [EditAction.Undo]: "undo",
+    [EditAction.Redo]: "redo",
+    [EditAction.Cut]: "content_cut",
+    [EditAction.Copy]: "content_copy",
+    [EditAction.Paste]: "content_paste",
+    [EditAction.SelectAll]: "select_all"
+  };
   public static readonly menuLabel: string = "Menu";
   public static readonly shellOwner: string = "shell";
   public static readonly fileMenu: string = "shell.file";

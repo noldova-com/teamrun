@@ -57,6 +57,30 @@ export class FakeWindowContents implements IWindowContents {
     this.calls.push("crash");
   }
 
+  public undo(): void {
+    this.calls.push("undo");
+  }
+
+  public redo(): void {
+    this.calls.push("redo");
+  }
+
+  public cut(): void {
+    this.calls.push("cut");
+  }
+
+  public copy(): void {
+    this.calls.push("copy");
+  }
+
+  public paste(): void {
+    this.calls.push("paste");
+  }
+
+  public selectAll(): void {
+    this.calls.push("selectAll");
+  }
+
   public getOSProcessId(): number {
     return this.osProcessId;
   }

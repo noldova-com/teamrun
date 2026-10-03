@@ -188,7 +188,7 @@ describe("WindowRowComponent", () => {
     await Promise.resolve();
 
     expect([button.classList.contains("tr-window-row-menu"), button.getAttribute("aria-label"), getComputedStyle(button).getPropertyValue("app-region")]).toEqual([true, "Menu", "no-drag"]);
-    expect(places.map(t => t.getAttribute("data-place"))).toEqual(["shell.file", "shell.view"]);
+    expect(places.map(t => t.getAttribute("data-place"))).toEqual(["shell.file", "shell.edit", "shell.view"]);
     expect(runs).toEqual([{ template: "plan" }]);
   });
 

@@ -22,15 +22,17 @@ import { SubmenuRow } from "../models/submenu-row";
 import { WindowPartTokens } from "../models/window-part-tokens";
 import { ShellMenus } from "../models/shell-menus";
 import { CommandService } from "./command.service";
+import { DesktopBridgeService } from "./desktop-bridge.service";
 
 @Injectable({ providedIn: "root" })
 export class MenuService {
   private readonly commands: CommandService = inject(CommandService);
   private readonly declarations: readonly MenuDeclarations[] = inject(WindowPartTokens.menus);
   private readonly activeValue: WritableSignal<readonly string[]> = signal([]);
+  private readonly shell: MenuDeclarations = ShellMenus.of(inject(DesktopBridgeService).isMac);
 
   public readonly active: Signal<readonly MenuDeclarations[]> = computed(() => [
-    ShellMenus.declarations,
+    this.shell,
     ...this.activeValue().flatMap(t => this.declarations.filter(u => u.moduleId === t))
   ]);
 

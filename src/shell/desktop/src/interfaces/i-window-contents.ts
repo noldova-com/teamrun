@@ -23,5 +23,11 @@ export interface IWindowContents {
   isCrashed(): boolean;
   reload(): void;
   forcefullyCrashRenderer(): void;
+  undo(): void;
+  redo(): void;
+  cut(): void;
+  copy(): void;
+  paste(): void;
+  selectAll(): void;
   getOSProcessId(): number;
 }

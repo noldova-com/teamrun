@@ -38,6 +38,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public logFolderOpens: number = 0;
   public logFolderOpened: Promise<boolean> = Promise.resolve(true);
   public readonly menuBars: JsonObject[] = [];
+  public readonly edits: string[] = [];
 
   public constructor(platform: string) {
     this.platform = platform;
@@ -129,6 +130,11 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public openLogFolder(): Promise<boolean> {
     this.logFolderOpens++;
     return this.logFolderOpened;
+  }
+
+  public edit(action: string): Promise<boolean> {
+    this.edits.push(action);
+    return Promise.resolve(true);
   }
 
   public setMenuBar(menuBar: JsonObject): void {

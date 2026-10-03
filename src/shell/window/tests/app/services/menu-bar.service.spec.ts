@@ -58,7 +58,7 @@ describe("MenuBarService", () => {
     const bar = start();
 
     expect(bar.places().map(t => t.name)).toEqual(["shell.file", "shell.edit", "shell.view", "notes.tools", "shell.window", "shell.help"]);
-    expect(bar.shownPlaces().map(t => t.title)).toEqual(["File", "View", "Notes"]);
+    expect(bar.shownPlaces().map(t => t.title)).toEqual(["File", "Edit", "View", "Notes"]);
   });
 
   it("describes each menu's rows for the desktop, with ids, keys, enabled and checked state, separators and submenus", () => {
@@ -79,7 +79,10 @@ describe("MenuBarService", () => {
         { type: "command", id: "notes.tools/notes.more/1", label: "Locked", key: null, enabled: false, check: "None", checked: false }
       ]
     });
-    expect(menus[1]).toEqual({ place: "shell.edit", title: "Edit", rows: [] });
+    expect(menus[1]).toEqual({
+      place: "shell.edit", title: "Edit", rows: ["Undo", "Redo", "Cut", "Copy", "Paste", "Select all"]
+        .map((t, i) => ({ type: "command", id: `shell.edit/shell.editing/${i}`, label: t, key: null, enabled: false, check: "None", checked: false }))
+    });
   });
 
   it("runs the row an id names with its arguments, including one in a submenu", async () => {
