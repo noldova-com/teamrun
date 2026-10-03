@@ -14,4 +14,5 @@ import { ChangeDetectionStrategy, Component } from "@angular/core";
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class NotesListComponent {
+  protected readonly notes: readonly string[] = Array.from({ length: 40 }, (_, index) => `Meeting notes, week ${index + 1}`);
 }

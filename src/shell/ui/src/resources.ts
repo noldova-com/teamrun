@@ -6,9 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { TooltipPosition } from "@angular/material/tooltip";
+
+import type { FocusOrigin } from "@angular/cdk/a11y";
 
 import { DockingDirection } from "./app/enums/docking-direction";
+import { OverlayAlignment } from "./app/enums/overlay-alignment";
 import { SashOrientation } from "./app/enums/sash-orientation";
 import { ColorToken } from "./app/models/color-token";
 
@@ -30,6 +32,7 @@ export class Resources {
     new ColorToken("--tr-selected", "list.inactiveSelectionBackground", "list.activeSelectionBackground"),
     new ColorToken("--tr-toolbar-hover", "toolbar.hoverBackground"),
     new ColorToken("--tr-scrollbar", "scrollbarSlider.background"),
+    new ColorToken("--tr-scrollbar-active", "scrollbarSlider.hoverBackground", "scrollbarSlider.background"),
     new ColorToken("--tr-title-bar", "titleBar.activeBackground"),
     new ColorToken("--tr-title-bar-text", "titleBar.activeForeground"),
     new ColorToken("--tr-input", "input.background"),
@@ -90,6 +93,8 @@ export class Resources {
     "tab-height",
     "tab-pill",
     "tab-inset",
+    "tab-max-width",
+    "scrollbar-size",
     "tab-label-inset",
     "tab-action-allowance",
     "tab-action-slot",
@@ -115,6 +120,7 @@ export class Resources {
     "status-bar-height",
     "status-bar-inset",
     "status-bar-item-padding",
+    "status-bar-item-height",
     "status-bar-item-gap",
     "button-height",
     "button-padding"
@@ -172,10 +178,35 @@ export class Resources {
   };
   public static readonly verticalOrientation: string = "vertical";
   public static readonly horizontalOrientation: string = "horizontal";
-  public static readonly tooltipPosition: TooltipPosition = "above";
   public static readonly tooltipShowDelay: number = 0;
   public static readonly tooltipHideDelay: number = 0;
-  public static readonly tooltipTouchendHideDelay: number = 1500;
+  public static readonly tooltipPaneClass: string = "tr-tooltip-pane";
+  public static readonly tooltipTextInput: string = "text";
+  public static readonly overlayAlignmentFactors: Readonly<Record<OverlayAlignment, number>> = {
+    [OverlayAlignment.Center]: 0.5,
+    [OverlayAlignment.Start]: 0,
+    [OverlayAlignment.End]: 1
+  };
+  public static readonly resizeEvent: string = "resize";
+  public static readonly pointerLeaveEvent: "pointerleave" = "pointerleave";
+  public static readonly scrollEvent: string = "scroll";
+  public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
+  public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
+  public static readonly menuPaneClass: string = "tr-menu-pane";
+  public static readonly submenuGlyph: string = "chevron_right";
+  public static readonly contextMenuKey: string = "ContextMenu";
+  public static readonly menuKey: string = "F10";
+  public static readonly clickEvent: string = "click";
+  public static readonly auxclickEvent: string = "auxclick";
+  public static readonly secondaryButton: number = 2;
+  public static readonly truncationSelector: string = "[data-truncates]";
+  public static readonly chromeAttribute: string = "data-tr-chrome";
+  public static readonly chromeSelector: string = "[data-tr-chrome]";
+  public static readonly topChrome: string = "top";
+  public static readonly bottomChrome: string = "bottom";
+  public static readonly overlayGapLook: string = "space-2";
+  public static readonly windowRowLook: string = "window-row-height";
+  public static readonly statusBarLook: string = "status-bar-height";
   public static readonly middleButton: number = 1;
   public static readonly primaryButton: number = 0;
 

@@ -1,0 +1,68 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--tr-menu-item-padding);
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: var(--tr-menu-item-height);
+  margin: 0;
+  padding-block: 0;
+  padding-inline: calc(var(--tr-menu-item-inset) + var(--tr-menu-item-padding));
+  border: 0;
+  background: none;
+  color: var(--tr-menu-text);
+  font: inherit;
+  text-align: start;
+  white-space: nowrap;
+  outline: none;
+}
+
+:host::before {
+  position: absolute;
+  z-index: -1;
+  inset-block: 0;
+  inset-inline: var(--tr-menu-item-inset);
+  border-radius: var(--tr-radius-medium);
+  content: "";
+}
+
+:host(:not([aria-disabled="true"]):is(:hover, :focus-visible, [aria-expanded="true"]))::before {
+  background-color: var(--tr-hover);
+}
+
+:host([aria-current="true"])::before {
+  background-color: var(--tr-selected);
+}
+
+:host([aria-disabled="true"]) {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tr-menu-item-icon,
+.tr-menu-item-chevron {
+  flex: none;
+  font-size: var(--tr-icon);
+}
+
+.tr-menu-item-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tr-menu-item-chevron {
+  margin-inline-start: var(--tr-space-4);
+}

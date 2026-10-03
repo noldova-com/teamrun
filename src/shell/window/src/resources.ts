@@ -8,7 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 import { ModuleState } from "@noldova/teamrun-shell-protocol";
-import { DockingDirection } from "@noldova/teamrun-shell-ui";
+import { DockingDirection, OverlaySide } from "@noldova/teamrun-shell-ui";
 
 import { DockSide } from "./app/enums/dock-side";
 import { PanelEdge } from "./app/enums/panel-edge";
@@ -53,14 +53,12 @@ export class Resources {
   public static readonly primaryButton: number = 0;
   public static readonly dragThreshold: number = 4;
   public static readonly escapeKey: string = "Escape";
-  public static readonly menuKey: string = "F10";
-  public static readonly contextMenuKey: string = "ContextMenu";
+  public static readonly popoverPaneClass: string = "tr-popover-pane";
   public static readonly pointerMoveEvent: "pointermove" = "pointermove";
   public static readonly pointerUpEvent: "pointerup" = "pointerup";
   public static readonly pointerCancelEvent: "pointercancel" = "pointercancel";
   public static readonly keyDownEvent: "keydown" = "keydown";
   public static readonly blurEvent: "blur" = "blur";
-  public static readonly contextMenuEvent: "contextmenu" = "contextmenu";
   public static readonly draggingClass: string = "tr-tab-dragging";
   public static readonly dropGroupSelector: string = "[data-drop-group]";
   public static readonly dropGroupData: string = "dropGroup";
@@ -76,7 +74,6 @@ export class Resources {
   public static readonly tabKeyData: string = "tabKey";
   public static readonly tabCloseSelector: string = ".tr-tab-close";
   public static readonly selectedTabSelector: string = ".tr-tab-selected";
-  public static readonly tabStripSelector: string = ".tr-tab-group-strip";
   public static readonly revealOptions: ScrollIntoViewOptions = { block: "nearest", inline: "nearest" };
   public static readonly arrowLeftKey: string = "ArrowLeft";
   public static readonly arrowRightKey: string = "ArrowRight";
@@ -107,8 +104,11 @@ export class Resources {
   public static readonly splitGlyph: string = "splitscreen";
   public static readonly dockGlyph: string = "dock_to_right";
   public static readonly closeGlyph: string = "close";
-  public static readonly moveEarlierGlyph: string = "chevron_left";
-  public static readonly moveLaterGlyph: string = "chevron_right";
+  public static readonly closeOthersGlyph: string = "tab_close";
+  public static readonly closeToTheRightGlyph: string = "tab_close_right";
+  public static readonly closeAllGlyph: string = "clear_all";
+  public static readonly moveEarlierGlyph: string = "arrow_back";
+  public static readonly moveLaterGlyph: string = "arrow_forward";
   public static readonly resetLayoutGlyph: string = "restart_alt";
   public static readonly panelActionsLabel: string = "Panel actions";
   public static readonly overflowGlyph: string = "expand_more";
@@ -117,6 +117,9 @@ export class Resources {
   public static readonly splitLabel: string = "Split";
   public static readonly dockLabel: string = "Dock";
   public static readonly closeTabLabel: string = "Close";
+  public static readonly closeOthersLabel: string = "Close others";
+  public static readonly closeToTheRightLabel: string = "Close to the right";
+  public static readonly closeAllLabel: string = "Close all";
   public static readonly moveEarlierLabel: string = "Move left";
   public static readonly moveLaterLabel: string = "Move right";
   public static readonly resetLayoutLabel: string = "Reset the layout";
@@ -148,6 +151,12 @@ export class Resources {
     [DockSide.Left]: "Hide the left dock",
     [DockSide.Right]: "Hide the right dock",
     [DockSide.Bottom]: "Hide the bottom dock"
+  };
+  public static readonly dockStripSelector: string = ".tr-dock-strip";
+  public static readonly dockStripTooltipSides: Readonly<Record<DockSide, OverlaySide>> = {
+    [DockSide.Left]: OverlaySide.end,
+    [DockSide.Right]: OverlaySide.start,
+    [DockSide.Bottom]: OverlaySide.above
   };
   public static readonly hideDockGlyphs: Readonly<Record<DockSide, string>> = {
     [DockSide.Left]: "left_panel_close",
