@@ -38,6 +38,7 @@ import { OpenWindow } from "./open-window.js";
 import { RuntimeStartup } from "./runtime-startup.js";
 import { RuntimeWindowStateStore } from "./runtime-window-state-store.js";
 import { SenderPolicy } from "./sender-policy.js";
+import { SystemNotifier } from "./system-notifier.js";
 import { WindowFactory } from "./window-factory.js";
 import { WindowRecovery } from "./window-recovery.js";
 
@@ -55,11 +56,13 @@ export class DesktopApplication {
   private readonly policy: SenderPolicy;
   private readonly factory: WindowFactory;
   private readonly startup: RuntimeStartup;
+  private readonly notifier: SystemNotifier;
   private readonly readDeviceAsync: (folder: string) => Promise<string>;
   private readonly windows: Map<number, OpenWindow> = new Map();
   private readonly restored: WeakSet<OpenWindow> = new WeakSet();
   private device: Promise<string | null> = Promise.resolve(null);
   private knownDevice: string | null = null;
+  private isReady: boolean = false;
 
   private constructor(
     electron: IElectron,
@@ -82,6 +85,7 @@ export class DesktopApplication {
     this.log = log;
     this.policy = new SenderPolicy(settings.windowUrl);
     this.factory = new WindowFactory(settings, this.policy, electron, taskbar, icons);
+    this.notifier = new SystemNotifier(electron.notifications, log, () => icons.window, () => this.isAnyWindowFocused(), t => this.openNotification(t));
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t));
   }
 
@@ -169,6 +173,7 @@ export class DesktopApplication {
     const window = this.factory.create(WindowState.createDefault());
     const contentsId = window.webContents.id;
     const open = new OpenWindow(window, this.electron.screen, this.log);
+    window.webContents.on(Resources.didStartLoadingEvent, () => this.notifier.hold());
     new WindowRecovery(open, this.electron.dialog, this.log, this.process, () => this.electron.app.quit(), () => this.openLogFolderAsync(), Resources.reloadCrashLimit, Resources.rendererEndLimit);
     this.windows.set(contentsId, open);
     window.once(Resources.closedEvent, () => this.windows.delete(contentsId));
@@ -180,6 +185,10 @@ export class DesktopApplication {
   private publish(state: StartupState): void {
     if (!DesktopApplication.UNOWNED_STATES.includes(state.kind))
       this.log.open();
+    const isReady = state.kind === StartupStateKind.Ready;
+    if (isReady !== this.isReady)
+      this.notifier.reset();
+    this.isReady = isReady;
     for (const open of this.windows.values())
       if (!open.window.isDestroyed()) {
         open.window.webContents.send(Resources.startupStateChannel, state.toJson());
@@ -194,6 +203,25 @@ export class DesktopApplication {
     for (const open of this.windows.values())
       if (!open.window.isDestroyed())
         open.window.webContents.send(Resources.runtimeEventChannel, event.name.text, payload);
+  }
+
+  private beginNotifier(epoch: number, device: string, response: Response): void {
+    if (response.hasFailed)
+      return;
+    try {
+      this.notifier.begin(epoch, device, NotificationState.fromJson(response.payload).sequence);
+    }
+    catch (error) {
+      this.log.write(Resources.formatNotificationsNotRead(String(error)));
+    }
+  }
+
+  private isAnyWindowFocused(): boolean {
+    return [...this.windows.values()].some(t => !t.window.isDestroyed() && t.window.isFocused());
+  }
+
+  private openNotification(id: number): void {
+    this.focus()?.window.webContents.send(Resources.notificationOpenedChannel, id);
   }
 
   private async requestAsync(event: IIpcEvent, method: unknown, payload: unknown): Promise<JsonObject> {
@@ -215,6 +243,7 @@ export class DesktopApplication {
   private readStateForDevice(event: Event): JsonObject | undefined {
     try {
       const broadcast = NotificationBroadcast.fromJson(event.payload);
+      this.notifier.receive(broadcast);
       return (Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.sequence) : broadcast.stateFor(this.knownDevice)).toJson();
     }
     catch (error) {
@@ -224,11 +253,15 @@ export class DesktopApplication {
   }
 
   private async requestForDeviceAsync(name: QualifiedName, value: JsonValue): Promise<JsonObject> {
+    const epoch = this.notifier.epoch;
     const device = await this.device;
     if (Object.isNull(device))
       return DesktopApplication.fail(FailureCode.Unavailable, Resources.deviceNotIdentified);
-    if (name.text === ShellMethods.notifications.text)
-      return (await this.callAsync(name, new NotificationsQuery(device).toJson())).toJson();
+    if (name.text === ShellMethods.notifications.text) {
+      const response = await this.callAsync(name, new NotificationsQuery(device).toJson());
+      this.beginNotifier(epoch, device, response);
+      return response.toJson();
+    }
     let isOn: boolean;
     try {
       isOn = JsonReader.fromValue(value).readBoolean(Resources.isOnField);
@@ -353,13 +386,14 @@ export class DesktopApplication {
     return this.windows.get(event.sender.id) ?? null;
   }
 
-  private focus(): void {
+  private focus(): OpenWindow | null {
     const [open] = this.windows.values();
     if (Object.isUndefined(open))
-      return;
+      return null;
     if (open.window.isMinimized())
       open.window.restore();
     open.window.focus();
+    return open;
   }
 
   private static fail(code: FailureCode, message: string): JsonObject {

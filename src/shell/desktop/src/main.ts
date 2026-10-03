@@ -9,7 +9,7 @@
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 
-import { BrowserWindow, Menu, app, clipboard, dialog, ipcMain, screen, session, shell, utilityProcess } from "electron";
+import { BrowserWindow, Menu, Notification, app, clipboard, dialog, ipcMain, screen, session, shell, utilityProcess } from "electron";
 
 import "@noldova/teamrun-foundation-core";
 import { ChildProcessStarter, RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
@@ -36,6 +36,7 @@ DesktopApplication.start(
         return Object.isNull(window) ? dialog.showMessageBox(options) : dialog.showMessageBox(window, options);
       }
     },
+    notifications: { isSupported: () => Notification.isSupported(), create: t => new Notification(t) },
     createWindow: t => new BrowserWindow(t)
   },
   {
