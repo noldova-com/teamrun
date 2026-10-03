@@ -22,6 +22,7 @@ describe("DesktopBridgeService", () => {
   const complete = {
     platform: "linux",
     notifyReady: (): void => undefined,
+    notifyAppearance: (): void => undefined,
     onCloseRequest: (): (() => void) => () => undefined,
     answerClose: (): Promise<boolean> => Promise.resolve(true),
     readStartup: (): Promise<unknown> => Promise.resolve(null),
@@ -40,6 +41,7 @@ describe("DesktopBridgeService", () => {
     ["a value that is not an object", "teamrun"],
     ["no platform", { ...complete, platform: 1 }],
     ["no notifyReady", { ...complete, notifyReady: null }],
+    ["no notifyAppearance", { ...complete, notifyAppearance: null }],
     ["no onCloseRequest", { ...complete, onCloseRequest: null }],
     ["no answerClose", { ...complete, answerClose: null }],
     ["no readStartup", { ...complete, readStartup: null }],
@@ -79,6 +81,15 @@ describe("DesktopBridgeService", () => {
     TestBed.inject(DesktopBridgeService).notifyReady(new WindowAppearance("rgb(1, 2, 3)", "rgb(4, 5, 6)", "rgb(7, 8, 9)", 35));
 
     expect(bridge.appearances).toEqual([{ background: "rgb(1, 2, 3)", titleBar: "rgb(4, 5, 6)", titleBarText: "rgb(7, 8, 9)", titleBarHeight: 35 }]);
+  });
+
+  it("reports a change of the appearance as JSON, apart from the first report", () => {
+    const bridge = DesktopBridgeFixture.install();
+
+    TestBed.inject(DesktopBridgeService).notifyAppearance(new WindowAppearance("rgb(1, 2, 3)", "rgb(4, 5, 6)", "rgb(7, 8, 9)", 35));
+
+    expect(bridge.changes).toEqual([{ background: "rgb(1, 2, 3)", titleBar: "rgb(4, 5, 6)", titleBarText: "rgb(7, 8, 9)", titleBarHeight: 35 }]);
+    expect(bridge.appearances).toEqual([]);
   });
 
   it("passes close requests on until unsubscribed and answers them", async () => {
