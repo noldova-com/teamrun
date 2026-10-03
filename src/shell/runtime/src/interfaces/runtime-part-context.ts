@@ -11,8 +11,10 @@ import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
 import type { EventChannel } from "../models/event-channel.js";
 import type { NotificationHandle } from "../models/notification-handle.js";
 import type { RuntimeCommand } from "../models/runtime-command.js";
+import type { WorkItem } from "../models/work-item.js";
 import type { IMethodHandler } from "./method-handler.js";
 import type { IModuleDatabase } from "./module-database.js";
+import type { IModuleLog } from "./module-log.js";
 import type { IModuleSettings } from "./module-settings.js";
 
 export interface IRuntimePartContext {
@@ -21,6 +23,12 @@ export interface IRuntimePartContext {
   readonly database: IModuleDatabase;
 
   readonly settings: IModuleSettings;
+
+  readonly log: IModuleLog;
+
+  getWorkFolderAsync(): Promise<string>;
+
+  beginWork(description: string): WorkItem;
 
   registerMethod(name: string, handler: IMethodHandler): void;
 

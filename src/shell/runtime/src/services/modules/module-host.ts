@@ -19,6 +19,7 @@ import { ModuleActivation } from "../../models/module-activation.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
 import { Resources } from "../../resources.js";
 import type { DataDirectory } from "../data-directory/data-directory.js";
+import type { DiagnosticRedactor } from "../diagnostics/diagnostic-redactor.js";
 import type { NotificationCenter } from "../notifications/notification-center.js";
 import { NotificationPolicy } from "../notifications/notification-policy.js";
 import type { CommandRegistry } from "../registry/command-registry.js";
@@ -27,6 +28,7 @@ import type { EventRegistry } from "../registry/event-registry.js";
 import type { MethodRegistry } from "../registry/method-registry.js";
 import { ServiceRegistry } from "../registry/service-registry.js";
 import type { SettingsService } from "../settings/settings-service.js";
+import type { WorkTracker } from "../work/work-tracker.js";
 import { ModuleContext } from "./module-context.js";
 
 export class ModuleHost {
@@ -38,6 +40,8 @@ export class ModuleHost {
   private readonly notifications: NotificationCenter;
   private readonly loader: IRuntimePartLoader;
   private readonly diagnostics: Writable;
+  private readonly work: WorkTracker;
+  private readonly redactor: DiagnosticRedactor;
   private readonly statuses: Map<string, ModuleStatus> = new Map();
   private readonly activations: ModuleActivation[] = [];
 
@@ -52,7 +56,9 @@ export class ModuleHost {
     commands: CommandRegistry,
     notifications: NotificationCenter,
     loader: IRuntimePartLoader,
-    diagnostics: Writable) {
+    diagnostics: Writable,
+    work: WorkTracker,
+    redactor: DiagnosticRedactor) {
     this.declarations = declarations;
     this.dataDirectory = dataDirectory;
     this.methods = methods;
@@ -62,6 +68,8 @@ export class ModuleHost {
     this.notificationPolicy = new NotificationPolicy(declarations, t => this.statuses.get(t)?.state === ModuleState.Active);
     this.loader = loader;
     this.diagnostics = diagnostics;
+    this.work = work;
+    this.redactor = redactor;
   }
 
   public get report(): ModuleStatusList {
@@ -137,7 +145,8 @@ export class ModuleHost {
       }
 
     const context = new ModuleContext(
-      declaration, this.dataDirectory, this.methods, this.events, this.commands, this.notifications, this.notificationPolicy, this.services, settings, database);
+      declaration, this.dataDirectory, this.methods, this.events, this.commands, this.notifications, this.notificationPolicy, this.services, settings,
+      this.work, this.diagnostics, this.redactor, database);
     try {
       await part.activateAsync(context);
     }

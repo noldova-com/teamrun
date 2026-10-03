@@ -127,6 +127,10 @@ export class WindowPartHostService implements IWindowPartHost {
       this.pendingOpens.push(new PendingDocument(moduleId, name, instance, title, isPreview));
   }
 
+  public log(moduleId: string, message: string): void {
+    this.bridge.logModule(moduleId, message);
+  }
+
   public keepDocument(moduleId: string, name: string, instance: string): void {
     if (this.isLayoutLoaded)
       this.opener.keep(moduleId, name, instance);

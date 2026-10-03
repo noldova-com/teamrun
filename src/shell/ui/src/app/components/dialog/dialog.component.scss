@@ -1,0 +1,51 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(var(--tr-dialog-width), calc(100vw - var(--tr-space-2) * 2));
+  max-height: calc(100vh - var(--tr-window-row-height) - var(--tr-status-bar-height) - var(--tr-space-2) * 2);
+  border: var(--tr-border-width) solid var(--tr-widget-border);
+  border-radius: var(--tr-radius-large);
+  background-color: var(--tr-dialog);
+  box-shadow: var(--tr-shadow-xlarge);
+  color: var(--tr-text);
+  font-family: var(--tr-font-sans);
+  font-size: var(--tr-text-panel);
+  line-height: var(--tr-line-panel);
+}
+
+.tr-dialog-title {
+  flex: none;
+  margin: 0;
+  padding: var(--tr-dialog-title-padding);
+  font-size: inherit;
+  font-weight: var(--tr-weight-emphasis);
+  line-height: inherit;
+  overflow-wrap: anywhere;
+}
+
+.tr-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--tr-dialog-body-padding);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+.tr-dialog-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tr-space-2);
+  padding: var(--tr-dialog-actions-padding);
+}

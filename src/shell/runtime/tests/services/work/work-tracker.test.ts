@@ -25,9 +25,33 @@ export class WorkTrackerTests {
     indexing[Symbol.dispose]();
     indexing[Symbol.dispose]();
     Assert.areEqual("Running the tests", tracker.descriptions.join(","));
+    const report = tracker.report;
     running[Symbol.dispose]();
     Assert.isTrue(tracker.isEmpty);
     Assert.areEqual(4, changes);
+    Assert.areEqual("Running the tests|3", `${report.descriptions.join(",")}|${report.sequence}`);
+    Assert.areEqual(4, tracker.report.sequence);
+  }
+
+  @TestMethod
+  public abortsAndEndsOnlyTheItemsOfOneOwner(): void {
+    let changes = 0;
+    const tracker = new WorkTracker(() => changes++);
+    const shell = tracker.begin("Backing up");
+    const saving = tracker.begin("Saving the notes", "notes");
+    const indexing = tracker.begin("Indexing the notes", "notes");
+    const syncing = tracker.begin("Syncing the tasks", "tasks");
+
+    tracker.endOwnedBy("notes");
+    tracker.endOwnedBy("notes");
+    saving[Symbol.dispose]();
+
+    Assert.areEqual("Backing up,Syncing the tasks", tracker.descriptions.join(","));
+    Assert.isTrue(saving.signal.aborted);
+    Assert.isTrue(indexing.signal.aborted);
+    Assert.isFalse(shell.signal.aborted);
+    Assert.isFalse(syncing.signal.aborted);
+    Assert.areEqual(5, changes);
   }
 
   @TestMethod

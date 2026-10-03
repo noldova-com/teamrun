@@ -10,8 +10,10 @@ import { TestBed } from "@angular/core/testing";
 
 import { JsonException } from "@noldova/teamrun-foundation-json";
 
+import { QuitChoice } from "../../../src/app/enums/quit-choice";
 import { DesktopBridgeException } from "../../../src/app/exceptions/desktop-bridge.exception";
 import { RuntimeRequestException } from "../../../src/app/exceptions/runtime-request.exception";
+import type { QuitQuestion } from "../../../src/app/models/quit-question";
 import { WindowAppearance } from "../../../src/app/models/window-appearance";
 import { DesktopBridgeService } from "../../../src/app/services/desktop-bridge.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
@@ -36,7 +38,10 @@ describe("DesktopBridgeService", () => {
     copyText: (): Promise<boolean> => Promise.resolve(true),
     openLogFolder: (): Promise<boolean> => Promise.resolve(true),
     keepAppearance: (): void => undefined,
-    onNotificationOpened: (): (() => void) => () => undefined
+    onNotificationOpened: (): (() => void) => () => undefined,
+    onQuitQuestion: (): (() => void) => () => undefined,
+    answerQuit: (): Promise<boolean> => Promise.resolve(true),
+    logModule: (): void => undefined
   };
   const incomplete: readonly [string, unknown][] = [
     ["nothing", undefined],
@@ -57,7 +62,10 @@ describe("DesktopBridgeService", () => {
     ["no copyText", { ...complete, copyText: null }],
     ["no openLogFolder", { ...complete, openLogFolder: null }],
     ["no keepAppearance", { ...complete, keepAppearance: null }],
-    ["no onNotificationOpened", { ...complete, onNotificationOpened: null }]
+    ["no onNotificationOpened", { ...complete, onNotificationOpened: null }],
+    ["no onQuitQuestion", { ...complete, onQuitQuestion: null }],
+    ["no answerQuit", { ...complete, answerQuit: null }],
+    ["no logModule", { ...complete, logModule: null }]
   ];
 
   for (const [name, value] of incomplete)
@@ -229,6 +237,23 @@ describe("DesktopBridgeService", () => {
 
     expect(service.initialAppearance).toEqual({ "shell.mode": "Dark" });
     expect(bridge.keptAppearances).toEqual([{ "shell.mode": "Light" }]);
+  });
+
+  it("passes on the question about work in progress or its end, answers it and writes a module's log lines through the desktop", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const service = TestBed.inject(DesktopBridgeService);
+    const questions: (QuitQuestion | null)[] = [];
+
+    const stop = service.onQuitQuestion(t => questions.push(t));
+    bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: true });
+    bridge.askToQuit(null);
+    stop();
+    bridge.askToQuit(null);
+    const isTaken = await service.answerQuitAsync(QuitChoice.Wait);
+    service.logModule("clock", "Ticked");
+
+    expect(questions.map(t => t === null ? null : [t.descriptions, t.isWaiting])).toEqual([[["Indexing the project"], true], null]);
+    expect([isTaken, bridge.quitAnswers, bridge.logged]).toEqual([true, ["Wait"], ["clock: Ticked"]]);
   });
 
   it("refuses a kept layout that is not a JSON object", async () => {

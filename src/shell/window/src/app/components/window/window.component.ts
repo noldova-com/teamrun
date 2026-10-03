@@ -13,6 +13,7 @@ import { AppearanceService } from "@noldova/teamrun-shell-ui";
 import { AppearanceSettingsService } from "../../services/appearance-settings.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { LayoutService } from "../../services/layout.service";
+import { QuitService } from "../../services/quit.service";
 import { StartupService } from "../../services/startup.service";
 import { WindowPartHostService } from "../../services/window-part-host.service";
 import { StartupComponent } from "../startup/startup.component";
@@ -39,7 +40,9 @@ export class WindowComponent {
     inject(AppearanceService);
     inject(AppearanceSettingsService);
     inject(WindowPartHostService);
-    inject(DestroyRef).onDestroy(this.bridge.onCloseRequest(t => void this.closeAsync(t)));
+    const destroyed = inject(DestroyRef);
+    destroyed.onDestroy(this.bridge.onCloseRequest(t => void this.closeAsync(t)));
+    destroyed.onDestroy(inject(QuitService).listen());
   }
 
   private async closeAsync(requestId: string): Promise<void> {
