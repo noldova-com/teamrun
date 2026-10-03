@@ -28,7 +28,6 @@ function icon(window: Page, key: string): Locator {
 
 test.describe("activity bar", () => {
   test.beforeEach(async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     await expect(desktop.window.locator(`tr-tab[data-tab-key="${notes}"]`)).toBeVisible();
   });
 
