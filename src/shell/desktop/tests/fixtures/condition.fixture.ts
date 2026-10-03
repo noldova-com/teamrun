@@ -14,10 +14,10 @@ export class Condition {
   private static readonly LIMIT: number = 10_000;
   private static readonly INTERVAL: number = 5;
 
-  public static async waitAsync(condition: () => boolean): Promise<void> {
+  public static async waitAsync(condition: () => boolean | Promise<boolean>): Promise<void> {
     const deadline = Date.now() + Condition.LIMIT;
-    while (!condition() && Date.now() < deadline)
+    while (!await condition() && Date.now() < deadline)
       await delay(Condition.INTERVAL);
-    Assert.isTrue(condition());
+    Assert.isTrue(await condition());
   }
 }
