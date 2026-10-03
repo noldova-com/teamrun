@@ -17,6 +17,7 @@ import { FakeDialogHost } from "./fake-dialog-host.fixture.js";
 import { FakeDisplayHost } from "./fake-display-host.fixture.js";
 import { FakeIpcHost } from "./fake-ipc-host.fixture.js";
 import { FakeMenuHost } from "./fake-menu-host.fixture.js";
+import { FakeNotificationHost } from "./fake-notification-host.fixture.js";
 import { FakePermissionHost } from "./fake-permission-host.fixture.js";
 import { FakeShellHost } from "./fake-shell-host.fixture.js";
 
@@ -30,6 +31,7 @@ export class FakeElectron implements IElectron {
   public readonly clipboard: FakeClipboardHost = new FakeClipboardHost();
   public readonly shell: FakeShellHost = new FakeShellHost();
   public readonly dialog: FakeDialogHost = new FakeDialogHost();
+  public readonly notifications: FakeNotificationHost = new FakeNotificationHost();
   public readonly windows: FakeDesktopWindow[] = [];
 
   public constructor(hasLock: boolean = true, isPackaged: boolean = false) {

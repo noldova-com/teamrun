@@ -27,6 +27,7 @@ export interface IDesktopWindow {
   isVisible(): boolean;
   isDestroyed(): boolean;
   isMinimized(): boolean;
+  isFocused(): boolean;
   show(): void;
   restore(): void;
   focus(): void;
