@@ -61,6 +61,10 @@ LICENSE file in the root directory of this source tree.
         [disabled]="!isEnabled(resources.closeAllTabsCommand)" [shortcut]="keyOf(resources.closeAllTabsCommand)" (triggered)="run(resources.closeAllTabsCommand)"></button>
     }
     <tr-menu-separator />
+    @for (span of spans; track span) {
+      <button tr-menu-item class="tr-tab-menu-bottom-span" [attr.data-span]="span" [label]="resources.bottomSpanLabels[span]" [checked]="isSpan(span)"
+        (triggered)="setBottomSpan(span)"></button>
+    }
     <button tr-menu-item class="tr-tab-menu-reset" [icon]="resources.resetLayoutGlyph" [label]="resources.resetLayoutLabel"
       [shortcut]="keyOf(resources.resetLayoutCommand)" (triggered)="run(resources.resetLayoutCommand)"></button>
   </tr-menu>

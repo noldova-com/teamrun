@@ -12,6 +12,7 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { MenuTriggerDirective } from "@noldova/teamrun-shell-ui";
 
 import { TabMenuComponent } from "../../../../src/app/components/tab-menu/tab-menu.component";
+import { BottomDockSpan } from "../../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../../src/app/enums/dock-side";
 import { DocumentTab } from "../../../../src/app/models/layout/document-tab";
 import { Layout } from "../../../../src/app/models/layout/layout";
@@ -106,11 +107,11 @@ describe("TabMenuComponent", () => {
 
     expect(labels(".tr-tab-menu button[tr-menu-item]")).toEqual([
       Resources.moveToLabel, Resources.splitLabel, Resources.dockLabel, Resources.moveEarlierLabel, Resources.moveLaterLabel, Resources.closeTabLabel, Resources.closeOthersLabel,
-      Resources.closeToTheRightLabel, Resources.closeAllLabel, Resources.resetLayoutLabel
+      Resources.closeToTheRightLabel, Resources.closeAllLabel, Resources.bottomSpanLabels.Full, Resources.bottomSpanLabels.Between, Resources.resetLayoutLabel
     ]);
     expect(items(".tr-tab-menu button[tr-menu-item]").map(t => t.querySelector(".tr-menu-item-icon")?.textContent)).toEqual([
       Resources.moveToGlyph, Resources.splitGlyph, Resources.dockGlyph, Resources.moveEarlierGlyph, Resources.moveLaterGlyph, Resources.closeGlyph, Resources.closeOthersGlyph,
-      Resources.closeToTheRightGlyph, Resources.closeAllGlyph, Resources.resetLayoutGlyph
+      Resources.closeToTheRightGlyph, Resources.closeAllGlyph, undefined, undefined, Resources.resetLayoutGlyph
     ]);
     expect(items(".tr-tab-menu tr-menu-separator").length).toBe(2);
     expect(isDisabled(".tr-tab-menu-earlier")).toBe(true);
@@ -182,10 +183,23 @@ describe("TabMenuComponent", () => {
     expect(layout.layout().documents.tabs).toEqual([LayoutFixture.todo]);
   });
 
+  it("keeps the bottom dock across the window or between the side docks, checking the current choice", async () => {
+    await renderAsync(LayoutFixture.files);
+    await openAsync();
+    const checked = (): (string | null)[] => items(".tr-tab-menu-bottom-span").map(t => t.getAttribute("aria-checked"));
+    expect(checked()).toEqual(["true", "false"]);
+
+    await clickAsync(item(".tr-tab-menu-bottom-span[data-span=\"Between\"]"));
+    expect(layout.layout().bottomSpan).toBe(BottomDockSpan.Between);
+    await openAsync();
+
+    expect(checked()).toEqual(["false", "true"]);
+  });
+
   it("offers only closing and resetting for a tab outside the layout, and moving nowhere when no other group takes it", async () => {
     await renderAsync(new ViewTab("absent.view"));
     await openAsync();
-    expect(items(".tr-tab-menu button[tr-menu-item]").map(t => [...t.classList].find(name => name.startsWith("tr-tab-menu-")))).toEqual(["tr-tab-menu-close", "tr-tab-menu-reset"]);
+    expect(items(".tr-tab-menu button[tr-menu-item]").map(t => [...t.classList].find(name => name.startsWith("tr-tab-menu-")))).toEqual(["tr-tab-menu-close", "tr-tab-menu-bottom-span", "tr-tab-menu-bottom-span", "tr-tab-menu-reset"]);
     await clickAsync(item(".tr-tab-menu-close"));
     expect(focusedKey()).toBeUndefined();
 

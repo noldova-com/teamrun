@@ -12,6 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import { DockingDirection, DockingGuideComponent, DockingPlateComponent } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
+import { BottomDockSpan } from "../../enums/bottom-dock-span";
 import { DockSide } from "../../enums/dock-side";
 import type { Bounds } from "../../models/layout/bounds";
 import { DockingOverlay } from "../../models/layout/docking-overlay";
@@ -48,8 +49,14 @@ export class DockingGuidesComponent {
     return frame;
   });
 
-  protected isSide(side: DockSide): boolean {
-    return new SideDropTarget(side).equals(this.drag.target());
+  protected readonly outerTarget: SideDropTarget = new SideDropTarget(DockSide.Bottom, BottomDockSpan.Full);
+
+  protected targetOf(side: DockSide): SideDropTarget {
+    return new SideDropTarget(side, side === DockSide.Bottom ? BottomDockSpan.Between : null);
+  }
+
+  protected isChosen(target: SideDropTarget): boolean {
+    return target.equals(this.drag.target());
   }
 
   protected plateChoice(frame: GroupFrame): DockingDirection | null {

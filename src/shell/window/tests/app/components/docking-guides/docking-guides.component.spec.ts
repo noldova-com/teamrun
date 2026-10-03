@@ -10,6 +10,7 @@ import { Component } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import { DockingGuidesComponent } from "../../../../src/app/components/docking-guides/docking-guides.component";
+import { BottomDockSpan } from "../../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../../src/app/enums/dock-side";
 import { DockingOverlay } from "../../../../src/app/models/layout/docking-overlay";
 import { Layout } from "../../../../src/app/models/layout/layout";
@@ -101,9 +102,11 @@ describe("DockingGuidesComponent", () => {
     moveOver(".group[data-drop-group=\"0\"]");
 
     const sides = [...host.querySelectorAll<HTMLElement>(".tr-docking-side")];
-    expect(sides.map(t => [t.dataset["dropSide"], t.dataset["direction"]])).toEqual([["Left", "Left"], ["Right", "Right"], ["Bottom", "Bottom"]]);
+    expect(sides.map(t => [t.dataset["dropSide"], t.dataset["direction"], t.dataset["dropSpan"]]))
+      .toEqual([["Left", "Left", undefined], ["Right", "Right", undefined], ["Bottom", "Bottom", "Between"], ["Bottom", "Bottom", "Full"]]);
     for (const side of Object.values(DockSide))
-      expectBox(find(`.tr-docking-side[data-drop-side="${side}"]`), overlay.guide(side).x, overlay.guide(side).y);
+      expectBox(find(`.tr-docking-side[data-drop-side="${side}"]:not(.tr-docking-outer)`), overlay.guide(side).x, overlay.guide(side).y);
+    expectBox(find(".tr-docking-outer"), overlay.outerGuide().x, overlay.outerGuide().y);
     const plate = find("tr-docking-plate");
     expect(plate?.dataset["dropGroup"]).toBe("0");
     expect(plate?.hasAttribute("data-drop-plate")).toBe(true);
@@ -137,6 +140,22 @@ describe("DockingGuidesComponent", () => {
     expect(find("tr-docking-plate [data-direction=\"Center\"]")?.classList.contains("tr-docking-guide-chosen")).toBe(true);
     moveOver("tr-docking-plate");
     expect(host.querySelectorAll(".tr-docking-guide-chosen").length).toBe(0);
+  });
+
+  it("previews and docks along the whole bottom from the outer guide, and between the side docks from the inner one", () => {
+    for (const [selector, span] of [[".tr-docking-outer", BottomDockSpan.Full], [".tr-docking-side[data-drop-span=\"Between\"]", BottomDockSpan.Between]] as const) {
+      start(LayoutFixture.files);
+      moveOver(".group[data-drop-group=\"0\"]");
+      moveOver(selector);
+      const preview = layout.geometry().withBottomSpan(span).sidePreview(DockSide.Bottom);
+
+      expect(find(selector)?.classList.contains("tr-docking-guide-chosen")).toBe(true);
+      expectBox(find(".tr-docking-preview"), preview.x, preview.y);
+      expectRem(find(".tr-docking-preview")?.style.width, preview.width);
+      document.dispatchEvent(new PointerEvent("pointerup", { button: 0, clientX: 300, clientY: 200 }));
+      fixture.detectChanges();
+      expect([layout.layout().sideOf(layout.layout().groupOf(LayoutFixture.files)?.id ?? -1), layout.layout().bottomSpan]).toEqual([DockSide.Bottom, span]);
+    }
   });
 
   it("shows no plate over the dragged view's own group when it is the only tab there", () => {

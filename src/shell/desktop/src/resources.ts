@@ -22,6 +22,7 @@ export class Resources {
   public static readonly iconPathParameter: string = "iconPath";
   public static readonly relaunchCommandParameter: string = "relaunchCommand";
   public static readonly readyChannel: string = "teamrun:ready";
+  public static readonly appearanceChannel: string = "teamrun:appearance";
   public static readonly closeRequestChannel: string = "teamrun:closeRequest";
   public static readonly closeAnswerChannel: string = "teamrun:closeAnswer";
   public static readonly startupStateChannel: string = "teamrun:startupState";

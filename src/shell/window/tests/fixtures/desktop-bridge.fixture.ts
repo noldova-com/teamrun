@@ -20,6 +20,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public readonly platform: string;
   public readonly appearances: JsonObject[] = [];
+  public readonly changes: JsonObject[] = [];
   public readonly answers: string[] = [];
   public readonly actions: string[] = [];
   public startup: unknown = { kind: "Ready", details: [] };
@@ -65,6 +66,10 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public notifyReady(appearance: JsonObject): void {
     this.appearances.push(appearance);
+  }
+
+  public notifyAppearance(appearance: JsonObject): void {
+    this.changes.push(appearance);
   }
 
   public onCloseRequest(listener: (requestId: string) => void): () => void {

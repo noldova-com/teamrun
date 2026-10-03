@@ -35,6 +35,10 @@ export class DesktopBridgeService {
     this.bridge.notifyReady(appearance.toJson());
   }
 
+  public notifyAppearance(appearance: WindowAppearance): void {
+    this.bridge.notifyAppearance(appearance.toJson());
+  }
+
   public onCloseRequest(listener: (requestId: string) => void): () => void {
     return this.bridge.onCloseRequest(listener);
   }
@@ -113,6 +117,7 @@ export class DesktopBridgeService {
     return Object.isObject(value) &&
       Object.isString(Reflect.get(value, nameof<IDesktopBridge>(t => t.platform))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.notifyReady))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.notifyAppearance))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onCloseRequest))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerClose))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readStartup))) &&

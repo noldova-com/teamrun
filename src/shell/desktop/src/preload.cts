@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld("teamrun", {
   notifyReady(appearance: unknown): void {
     ipcRenderer.send("teamrun:ready", appearance);
   },
+  notifyAppearance(appearance: unknown): void {
+    ipcRenderer.send("teamrun:appearance", appearance);
+  },
   onCloseRequest(listener: (requestId: string) => void): () => void {
     const handler = (_event: IpcRendererEvent, requestId: string): void => listener(requestId);
     ipcRenderer.on("teamrun:closeRequest", handler);

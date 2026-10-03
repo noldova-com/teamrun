@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, ElementRef, ErrorHandler, afterNextRender, inject } from "@angular/core";
+import { ChangeDetectionStrategy, Component, ElementRef, ErrorHandler, afterNextRender, afterRenderEffect, inject } from "@angular/core";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { IconButtonComponent, OverlaySide, TooltipDirective } from "@noldova/teamrun-shell-ui";
+import { AppearanceService, IconButtonComponent, OverlaySide, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { WindowAppearance } from "../../models/window-appearance";
 import { BarItemsService } from "../../services/bar-items.service";
@@ -38,7 +38,16 @@ export class WindowRowComponent {
 
   public constructor() {
     const host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+    const appearance = inject(AppearanceService);
+    let isReported = false;
     afterNextRender(() => this.bridge.notifyReady(WindowAppearance.read(host)));
+    afterRenderEffect(() => {
+      appearance.theme();
+      appearance.mode();
+      if (isReported)
+        this.bridge.notifyAppearance(WindowAppearance.read(host));
+      isReported = true;
+    });
   }
 
   protected isAvailable(command: string): boolean {

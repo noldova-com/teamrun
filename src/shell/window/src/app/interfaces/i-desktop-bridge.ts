@@ -12,6 +12,7 @@ export interface IDesktopBridge {
   readonly platform: string;
 
   notifyReady(appearance: JsonObject): void;
+  notifyAppearance(appearance: JsonObject): void;
   onCloseRequest(listener: (requestId: string) => void): () => void;
   answerClose(requestId: string, isSaved: boolean): Promise<boolean>;
   readStartup(): Promise<unknown>;
