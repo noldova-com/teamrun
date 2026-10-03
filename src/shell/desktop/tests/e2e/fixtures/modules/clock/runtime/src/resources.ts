@@ -26,6 +26,7 @@ export class Resources {
   public static readonly tickTitle: string = "Tick";
   public static readonly tickIcon: string = "timer";
   public static readonly tickKey: string = "Mod+Alt+T";
+  public static readonly tickStepSetting: string = "clock.tickStep";
   public static readonly failureMarker: string = "fail-activation";
   public static readonly failureMessage: string = "The clock fixture was asked to fail its activation.";
 }

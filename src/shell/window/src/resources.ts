@@ -269,6 +269,7 @@ export class Resources {
   public static readonly documentField: string = "document";
   public static readonly instanceField: string = "instance";
   public static readonly keySeparator: string = "/";
+  public static readonly shellOwner: string = "shell";
   public static readonly contributionSeparator: string = ".";
   public static readonly nameParameter: string = "name";
   public static readonly titleParameter: string = "title";
@@ -299,7 +300,6 @@ export class Resources {
   public static readonly submenuField: string = "submenu";
   public static readonly commandField: string = "command";
   public static readonly argumentsField: string = "arguments";
-  public static readonly shellOwner: string = "shell";
   public static readonly fileMenu: string = "shell.file";
   public static readonly editMenu: string = "shell.edit";
   public static readonly viewMenu: string = "shell.view";

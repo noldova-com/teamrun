@@ -60,7 +60,9 @@ describe("NotificationService", () => {
     expect(unread).toBe(1);
     expect(first?.sequence).toBe(2);
     expect([service.state().isDoNotDisturb, service.firstRead()?.sequence]).toEqual([false, 0]);
-    expect(bridge.requests.map(t => t[0])).toEqual(["shell.modules", "shell.commands", "shell.notifications", "shell.modules", "shell.commands", "shell.notifications"]);
+    expect(bridge.requests.map(t => t[0])).toEqual([
+      "shell.settings", "shell.modules", "shell.commands", "shell.notifications", "shell.settings", "shell.modules", "shell.commands", "shell.notifications"
+    ]);
   });
 
   it("reports a first read that fails", async () => {

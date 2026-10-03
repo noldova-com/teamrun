@@ -1,0 +1,15 @@
+{
+  "settings": [
+    {
+      "name": "clock.tickStep",
+      "title": "Tick step",
+      "description": "How far one tick moves the count.",
+      "type": { "kind": "Number", "minimum": 1, "maximum": 5, "step": 1 },
+      "default": 1,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "Clock",
+      "group": "Ticks"
+    }
+  ]
+}

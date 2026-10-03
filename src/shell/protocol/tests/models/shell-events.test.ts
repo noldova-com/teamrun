@@ -16,4 +16,9 @@ export class ShellEventsTests {
     Assert.areEqual("shell.notifications", ShellEvents.notifications.text);
     Assert.isTrue(ShellEvents.notifications.isShell);
   }
+
+  @TestMethod
+  public namesTheSettingsEvent(): void {
+    Assert.areEqual("shell.settingsChanged", ShellEvents.settingsChanged.text);
+  }
 }
