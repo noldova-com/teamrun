@@ -9,12 +9,13 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-import { type IRuntimePart, type IRuntimePartContext, Migration } from "@noldova/teamrun-shell-runtime";
+import { type IRuntimePart, type IRuntimePartContext, Migration, RuntimeCommand } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "./resources.js";
 
 export class RuntimePart implements IRuntimePart {
   public readonly migrations: readonly Migration[] = [new Migration(Resources.readingsMigration, [Resources.createReadingsStatement])];
+  private ticks: number = 0;
 
   public async activateAsync(context: IRuntimePartContext): Promise<void> {
     if (existsSync(path.join(context.moduleFolder, Resources.failureMarker)))
@@ -28,6 +29,14 @@ export class RuntimePart implements IRuntimePart {
         return { readings: Number(database.read(Resources.countReadingsStatement)?.[Resources.countColumn]) };
       }
     });
+    const ticked = context.declareEvent(Resources.tickedEvent);
+    context.registerCommand(new RuntimeCommand(Resources.tickCommand, Resources.tickTitle, Resources.tickIcon, Resources.tickKey, {
+      handleAsync: async () => {
+        this.ticks++;
+        ticked.publish({ ticks: this.ticks });
+        return { ticks: this.ticks };
+      }
+    }));
   }
 
   public async deactivateAsync(): Promise<void> {

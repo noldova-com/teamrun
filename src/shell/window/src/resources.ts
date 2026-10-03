@@ -189,6 +189,10 @@ export class Resources {
   public static readonly instanceField: string = "instance";
   public static readonly keySeparator: string = "/";
   public static readonly contributionSeparator: string = ".";
+  public static readonly nameParameter: string = "name";
+  public static readonly titleParameter: string = "title";
+  public static readonly iconParameter: string = "icon";
+  public static readonly defaultKeyParameter: string = "defaultKey";
   public static readonly invalidContributionName: string = "A contribution name has the form <module id>.<name>.";
   public static readonly invalidModuleId: string = "A module id is lowercase kebab-case.";
   public static readonly windowPartLoadFailed: string = "Its window part could not be loaded.";
@@ -282,6 +286,18 @@ export class Resources {
 
   public static formatForeignContribution(moduleId: string, name: string): string {
     return `The module ${moduleId} may contribute only names of its own, not ${name}.`;
+  }
+
+  public static formatCommandNotFound(name: string): string {
+    return `No command named ${name} is registered; its module may not be active.`;
+  }
+
+  public static formatUndeclaredCommand(moduleId: string, name: string): string {
+    return `The module ${moduleId} does not declare the command ${name}.`;
+  }
+
+  public static formatCommandRegistered(name: string): string {
+    return `The command ${name} is already registered.`;
   }
 
   public static formatForeignName(moduleId: string, name: string): string {

@@ -16,9 +16,10 @@ export class WindowPartSource {
   public readonly displayName: string;
   public readonly dependencies: readonly string[];
   public readonly viewNames: readonly string[];
+  public readonly commandNames: readonly string[];
   public readonly load: () => Promise<IWindowPart>;
 
-  public constructor(moduleId: string, displayName: string, dependencies: readonly string[], viewNames: readonly string[], load: () => Promise<IWindowPart>) {
+  public constructor(moduleId: string, displayName: string, dependencies: readonly string[], viewNames: readonly string[], commandNames: readonly string[], load: () => Promise<IWindowPart>) {
     if (!Resources.moduleIdPattern.test(moduleId))
       throw new ArgumentException(Resources.invalidModuleId, "moduleId");
 
@@ -26,6 +27,7 @@ export class WindowPartSource {
     this.displayName = displayName;
     this.dependencies = [...dependencies];
     this.viewNames = [...viewNames];
+    this.commandNames = [...commandNames];
     this.load = load;
   }
 }

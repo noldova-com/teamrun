@@ -12,12 +12,14 @@ import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { type Event, QualifiedName } from "@noldova/teamrun-shell-protocol";
 import {
+  CommandRegistry,
   DataDirectory,
   EventRegistry,
   MethodRegistry,
   ModuleContext,
   ModuleDeclaration,
   RegistrationException,
+  RuntimeCommand,
   ServiceAccessException,
   ServiceRegistry
 } from "@noldova/teamrun-shell-runtime";
@@ -30,7 +32,7 @@ export class ModuleContextTests {
     "Notes",
     ["tasks"],
     "@noldova/teamrun-modules-notes-runtime",
-    new Map([["methods", ["notes.list"]], ["events", ["notes.changed"]]]));
+    new Map([["methods", ["notes.list"]], ["events", ["notes.changed"]], ["commands", ["notes.newNote"]]]));
 
   @TestMethod
   public namesTheModuleAndItsFolder(): void {
@@ -55,6 +57,20 @@ export class ModuleContextTests {
     Assert.areEqual("notes.changed", events[0]?.name.text);
     Assert.areEqual("The module notes does not declare notes.open among its methods.", method.message);
     Assert.areEqual("The module notes does not declare tasks.changed among its events.", event.message);
+  }
+
+  @TestMethod
+  public registersOnlyTheCommandsItsDeclarationContributes(): void {
+    const commands = new CommandRegistry();
+    const context = ModuleContextTests.create(new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), commands);
+
+    context.registerCommand(new RuntimeCommand("notes.newNote", "New note", "note_add", "Mod+Alt+N", { handleAsync: async () => null }));
+    const undeclared = Assert.throws(() => context.registerCommand(new RuntimeCommand("notes.delete", "Delete note", null, null, { handleAsync: async () => null })), RegistrationException);
+    const foreign = Assert.throws(() => context.registerCommand(new RuntimeCommand("tasks.add", "Add task", null, null, { handleAsync: async () => null })), RegistrationException);
+
+    Assert.areEqual("notes.newNote", commands.list.commands.map(t => t.name.text).join(","));
+    Assert.areEqual("The module notes does not declare notes.delete among its commands.", undeclared.message);
+    Assert.areEqual("The module notes does not declare tasks.add among its commands.", foreign.message);
   }
 
   @TestMethod
@@ -101,8 +117,10 @@ export class ModuleContextTests {
     const events: Event[] = [];
     const eventRegistry = new EventRegistry({ broadcast: t => events.push(t) });
     const services = new ServiceRegistry();
-    const context = ModuleContextTests.create(methods, eventRegistry, services);
+    const commands = new CommandRegistry();
+    const context = ModuleContextTests.create(methods, eventRegistry, services, commands);
     context.registerMethod("notes.list", { handleAsync: async () => [] });
+    context.registerCommand(new RuntimeCommand("notes.newNote", "New note", null, null, { handleAsync: async () => null }));
     const channel = context.declareEvent("notes.changed");
     context.publishService("notes.store", new Map());
 
@@ -111,12 +129,13 @@ export class ModuleContextTests {
 
     Assert.isUndefined(methods.find(new QualifiedName("notes", "list")));
     Assert.isUndefined(services.find(new QualifiedName("notes", "store")));
+    Assert.isUndefined(commands.find(new QualifiedName("notes", "newNote")));
     Assert.throws(() => channel.publish(null), RegistrationException);
     eventRegistry.declare(new QualifiedName("notes", "changed")).publish(null);
     Assert.areEqual(1, events.length);
   }
 
-  private static create(methods: MethodRegistry, events: EventRegistry, services: ServiceRegistry): ModuleContext {
-    return new ModuleContext(ModuleContextTests.NOTES, new DataDirectory(ModuleContextTests.ROOT), methods, events, services);
+  private static create(methods: MethodRegistry, events: EventRegistry, services: ServiceRegistry, commands: CommandRegistry = new CommandRegistry()): ModuleContext {
+    return new ModuleContext(ModuleContextTests.NOTES, new DataDirectory(ModuleContextTests.ROOT), methods, events, commands, services);
   }
 }

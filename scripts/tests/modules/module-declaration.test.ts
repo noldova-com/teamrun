@@ -21,7 +21,7 @@ class ModuleDeclarationTests {
     displayName: "Notes",
     parts: ["runtime", "window"],
     dependencies: ["tasks", "git-hub2"],
-    contributes: { methods: ["notes.list"], views: ["notes.list", "notes.outlineView"], themes: [] }
+    contributes: { methods: ["notes.list"], commands: ["notes.newNote"], views: ["notes.list", "notes.outlineView"], themes: [] }
   };
 
   public static register(): void {
@@ -48,7 +48,7 @@ class ModuleDeclarationTests {
         displayName: "Notes",
         dependencies: ["tasks", "git-hub2"],
         runtimePackage: "@noldova/teamrun-modules-notes-runtime",
-        contributes: { methods: ["notes.list"], views: ["notes.list", "notes.outlineView"], themes: [] }
+        contributes: { methods: ["notes.list"], commands: ["notes.newNote"], views: ["notes.list", "notes.outlineView"], themes: [] }
       });
       assert.equal(fixture.isFixture, true);
       assert.equal(fixture.runtimePackage, null);
@@ -103,7 +103,7 @@ class ModuleDeclarationTests {
 
       for (const contributes of [undefined, null, [], "views"])
         await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...valid, contributes }), "must list its contributions as an object");
-      await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...valid, contributes: { commands: [] } }), "contributes an unknown kind: commands");
+      await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...valid, contributes: { menus: [] } }), "contributes an unknown kind: menus");
       for (const views of ["notes.list", [1], ["tasks.list"], ["notes."], ["notes.List"], ["notes.list-view"], ["notes"]])
         await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...valid, contributes: { views } }), "must list its views as \"notes.<name>\", with a camelCase name");
     });

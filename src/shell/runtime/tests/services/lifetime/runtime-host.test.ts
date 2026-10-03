@@ -9,11 +9,13 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import "@noldova/teamrun-foundation-core";
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, ModuleStatusList, QualifiedName, Request, type Response, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateWrite } from "@noldova/teamrun-shell-protocol";
-import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
+import { BuildIdentity, CommandList, CommandRun, FailureCode, ModuleStatusList, QualifiedName, Request, type Response, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateWrite } from "@noldova/teamrun-shell-protocol";
+import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
 
 import type { RawConnectionFixture } from "../../fixtures/raw-connection.fixture.js";
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
@@ -285,6 +287,29 @@ export class RuntimeHostTests {
   }
 
   @TestMethod
+  public listsAndRunsItsModulesCommands(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["clock", RuntimeHostTests.createCommandPart()]]));
+      const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+
+      const listed = await RuntimeHostTests.callAsync(connection, "desktop:1", ShellMethods.commands, null);
+      const ran = await RuntimeHostTests.callAsync(connection, "desktop:2", ShellMethods.runCommand, new CommandRun(QualifiedName.parse("clock.tick"), { by: 2 }).toJson());
+      const missing = await RuntimeHostTests.callAsync(connection, "desktop:3", ShellMethods.runCommand, new CommandRun(QualifiedName.parse("clock.reset"), null).toJson());
+      const invalid = await RuntimeHostTests.callAsync(connection, "desktop:4", ShellMethods.runCommand, { name: "clock.tick" });
+      host.requestStop("test");
+      await host.waitForStopAsync();
+
+      Assert.areEqual(
+        "{\"commands\":[{\"name\":\"clock.tick\",\"title\":\"Tick\",\"icon\":\"timer\",\"defaultKey\":\"Mod+Alt+T\"}]}",
+        JSON.stringify(CommandList.fromJson(listed.payload).toJson()));
+      Assert.areEqual("{\"client\":\"desktop\",\"arguments\":{\"by\":2}}", JSON.stringify(ran.payload));
+      Assert.areEqual(FailureCode.NotFound, missing.failure?.code);
+      Assert.areEqual("The command clock.reset is not registered; its module may not be active.", missing.failure?.message);
+      Assert.areEqual(FailureCode.InvalidParams, invalid.failure?.code);
+    });
+  }
+
+  @TestMethod
   public servesAClientThatNeverAsksForModules(): Promise<void> {
     return RuntimeHostTests.runAsync(async fixture => {
       const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["notes", RuntimeHostTests.PART]]));
@@ -344,6 +369,28 @@ export class RuntimeHostTests {
       responses.set(String(response.id), response);
     }
     return responses;
+  }
+
+  private static async callAsync(connection: RawConnectionFixture, id: string, method: QualifiedName, payload: JsonValue): Promise<Response> {
+    connection.sendMessages(new Request(id, method, payload));
+    return await connection.readResponseAsync();
+  }
+
+  private static createCommandPart(): string {
+    const api = pathToFileURL(path.join(path.dirname(RuntimeEntry.entryPath), "..", "api", "index.js")).href;
+    return [
+      `import { RuntimeCommand } from ${JSON.stringify(api)};`,
+      "",
+      "export class RuntimePart {",
+      "  async activateAsync(context) {",
+      "    context.registerCommand(new RuntimeCommand(\"clock.tick\", \"Tick\", \"timer\", \"Mod+Alt+T\", { handleAsync: async request => ({ client: request.client, arguments: request.payload }) }));",
+      "  }",
+      "",
+      "  async deactivateAsync() {",
+      "  }",
+      "}",
+      ""
+    ].join("\n");
   }
 
   private static async runAsync(test: (fixture: RuntimeHostFixture) => Promise<void>): Promise<void> {

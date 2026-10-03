@@ -5,6 +5,8 @@
   "dependencies": [],
   "contributes": {
     "methods": ["clock.time", "clock.record"],
+    "events": ["clock.ticked"],
+    "commands": ["clock.tick"],
     "views": ["clock.face"]
   }
 }

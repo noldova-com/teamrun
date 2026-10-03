@@ -55,7 +55,7 @@ export class RuntimeHostFixture implements AsyncDisposable {
       const file = path.join(folder, `${id}.mjs`);
       if (source !== null)
         await writeFile(file, source);
-      declarations.push({ id, displayName: id, dependencies: [], runtimePackage: pathToFileURL(file).href, contributes: { methods: [`${id}.echo`] } });
+      declarations.push({ id, displayName: id, dependencies: [], runtimePackage: pathToFileURL(file).href, contributes: { methods: [`${id}.echo`], commands: [`${id}.tick`] } });
     }
     const declarationsFile = path.join(folder, "declarations.json");
     await writeFile(declarationsFile, JSON.stringify({ formatVersion: 1, modules: declarations }));
