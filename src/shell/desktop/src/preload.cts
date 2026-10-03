@@ -61,6 +61,9 @@ contextBridge.exposeInMainWorld("teamrun", {
   openLogFolder(): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:openLogFolder") as Promise<boolean>;
   },
+  edit(action: string): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:edit", action) as Promise<boolean>;
+  },
   setMenuBar(menuBar: unknown): void {
     ipcRenderer.send("teamrun:menuBar", menuBar);
   },

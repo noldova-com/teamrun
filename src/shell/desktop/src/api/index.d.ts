@@ -1070,6 +1070,90 @@ export interface IWindowContents {
   forcefullyCrashRenderer(): void;
 
   /**
+   * Undoes the last edit in the page's focused field.
+   *
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function undo(contents: IWindowContents): void {
+   *   contents.undo();
+   * }
+   * ```
+   */
+  undo(): void;
+
+  /**
+   * Redoes the last edit undone in the page's focused field.
+   *
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function redo(contents: IWindowContents): void {
+   *   contents.redo();
+   * }
+   * ```
+   */
+  redo(): void;
+
+  /**
+   * Cuts the page's selection in its focused field to the clipboard.
+   *
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function cut(contents: IWindowContents): void {
+   *   contents.cut();
+   * }
+   * ```
+   */
+  cut(): void;
+
+  /**
+   * Copies the page's selection to the clipboard.
+   *
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function copy(contents: IWindowContents): void {
+   *   contents.copy();
+   * }
+   * ```
+   */
+  copy(): void;
+
+  /**
+   * Pastes the clipboard into the page's focused field, replacing its selection.
+   *
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function paste(contents: IWindowContents): void {
+   *   contents.paste();
+   * }
+   * ```
+   */
+  paste(): void;
+
+  /**
+   * Selects all of the page's focused field, or all of the page when no field has focus.
+   *
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function selectAll(contents: IWindowContents): void {
+   *   contents.selectAll();
+   * }
+   * ```
+   */
+  selectAll(): void;
+
+  /**
    * Returns the operating system's id of the page's renderer process.
    *
    * @returns The process id.

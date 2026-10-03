@@ -42,7 +42,7 @@ test.describe("the menu bar on Windows and Linux", () => {
     const button = window.locator(".tr-window-row-menu");
     await expect(button).toHaveAttribute("aria-label", "Menu");
     await button.click();
-    await expect(window.locator("tr-menu.tr-window-row-menu-list button[tr-menu-item]")).toHaveText([/File/, /View/, /Notes/]);
+    await expect(window.locator("tr-menu.tr-window-row-menu-list button[tr-menu-item]")).toHaveText([/File/, /Edit/, /View/, /Notes/]);
     await window.keyboard.press("Escape");
 
     const file = await openBarMenuAsync(window, "File");
@@ -67,6 +67,27 @@ test.describe("the menu bar on Windows and Linux", () => {
     await expect(window.locator(".cdk-overlay-container tr-menu")).toHaveCount(0);
     await expect(list).toHaveCount(0);
     await expect(button).toBeFocused();
+  });
+
+  test("the Edit menu copies from one field and pastes into another, acting on the field that had focus and its selection", async ({ desktop }) => {
+    const window = desktop.window;
+    await window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]").click();
+    const tag = window.getByRole("textbox", { name: "Tag" });
+    const summary = window.getByRole("textbox", { name: "Summary" });
+    await tag.selectText();
+
+    await (await openBarMenuAsync(window, "Edit")).getByRole("menuitem", { name: "Copy" }).click();
+    await expect(tag).toBeFocused();
+    expect(await tag.evaluate(t => [(t as HTMLInputElement).selectionStart, (t as HTMLInputElement).selectionEnd])).toEqual([0, 5]);
+    await summary.click();
+    const edit = await openBarMenuAsync(window, "Edit");
+    await expect(edit.getByRole("menuitem", { name: "Cut" })).toHaveAttribute("aria-disabled", "true");
+    await edit.getByRole("menuitem", { name: "Paste" }).click();
+    await expect(summary).toHaveValue("draft");
+    await (await openBarMenuAsync(window, "Edit")).getByRole("menuitem", { name: "Undo" }).click();
+
+    await expect(summary).toHaveValue("");
+    await expect(summary).toBeFocused();
   });
 });
 

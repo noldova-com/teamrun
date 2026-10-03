@@ -11,6 +11,7 @@ import { Injectable } from "@angular/core";
 import { nameof } from "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 
+import type { EditAction } from "../enums/edit-action";
 import type { QuitChoice } from "../enums/quit-choice";
 import { DesktopBridgeException } from "../exceptions/desktop-bridge.exception";
 import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
@@ -76,6 +77,10 @@ export class DesktopBridgeService {
 
   public onEvent(listener: (name: string, payload: JsonValue) => void): () => void {
     return this.bridge.onEvent((name, payload) => listener(name, JsonReader.toJsonValue(payload)));
+  }
+
+  public editAsync(action: EditAction): Promise<boolean> {
+    return this.bridge.edit(action);
   }
 
   public setMenuBar(menuBar: JsonObject): void {
