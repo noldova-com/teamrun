@@ -79,6 +79,12 @@ export class Resources {
   public static readonly idColumn: string = "id";
   public static readonly valueColumn: string = "value";
   public static readonly windowStatesMigration: string = "window-states";
+  public static readonly quietDevicesMigration: string = "quiet-devices";
+  public static readonly createQuietDevicesStatement: string = "CREATE TABLE quiet_devices (device TEXT PRIMARY KEY) STRICT";
+  public static readonly readQuietDevicesStatement: string = "SELECT device FROM quiet_devices";
+  public static readonly addQuietDeviceStatement: string = "INSERT INTO quiet_devices (device) VALUES (?) ON CONFLICT (device) DO NOTHING";
+  public static readonly removeQuietDeviceStatement: string = "DELETE FROM quiet_devices WHERE device = ?";
+  public static readonly deviceColumn: string = "device";
   public static readonly createWindowStatesStatement: string =
     "CREATE TABLE window_states (device TEXT NOT NULL, window TEXT NOT NULL, bounds TEXT, layout TEXT, PRIMARY KEY (device, window)) STRICT";
   public static readonly errorCodeField: "errcode" = "errcode";

@@ -75,6 +75,27 @@ export class NotificationCenterTests {
   }
 
   @TestMethod
+  public marksEveryNotificationReadAndClearsAllButWorkInProgressReportingOnlyARealChange(): void {
+    const { center, published } = NotificationCenterTests.create();
+    center.post(NotificationCenterTests.post("clock.sync", null, "Syncing", NotificationPost.indeterminate));
+    center.post(NotificationCenterTests.post("clock.sync", "half", "Half", 0.5));
+    center.post(NotificationCenterTests.post("notes.saved", null, "Saved"));
+    center.post(NotificationCenterTests.post("clock.sync", "done", "Done", 1));
+
+    center.markAllRead();
+    center.markAllRead();
+    center.post(NotificationCenterTests.post("notes.saved", "new", "New"));
+    center.markAllRead();
+    const read = center.list.notifications.map(t => t.isRead);
+    center.clearFinished();
+    center.clearFinished();
+
+    Assert.areEqual("true,true,true,true,true", read.join(","));
+    Assert.areEqual("Half,Syncing", center.list.notifications.map(t => t.post.title).join(","));
+    Assert.areEqual(8, published.length);
+  }
+
+  @TestMethod
   public keepsAHundredDroppingTheOldestFinishedButNeverWorkInProgress(): void {
     const { center } = NotificationCenterTests.create();
     center.post(NotificationCenterTests.post("clock.sync", "a", "Indeterminate", NotificationPost.indeterminate));

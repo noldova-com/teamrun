@@ -12,7 +12,10 @@ import { fileURLToPath } from "node:url";
 
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
-import { type Event, Failure, FailureCode, QualifiedName, Response, type RuntimeHandover, ShellMethods, WindowStateKey, WindowStateValue, WindowStateWrite } from "@noldova/teamrun-shell-protocol";
+import {
+  DoNotDisturbChange, type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, Response, type RuntimeHandover, ShellEvents, ShellMethods,
+  WindowStateKey, WindowStateValue, WindowStateWrite
+} from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
@@ -56,6 +59,7 @@ export class DesktopApplication {
   private readonly windows: Map<number, OpenWindow> = new Map();
   private readonly restored: WeakSet<OpenWindow> = new WeakSet();
   private device: Promise<string | null> = Promise.resolve(null);
+  private knownDevice: string | null = null;
 
   private constructor(
     electron: IElectron,
@@ -133,7 +137,10 @@ export class DesktopApplication {
     this.electron.app.dock?.setIcon(this.icons.dock);
     const deviceFolder = DesktopApplication.readArgument(this.process.argv, Resources.deviceDirectoryArgument)
       ?? DeviceIdentity.locateFolder(this.process.platform, this.process.env, this.process.homeFolder);
-    this.device = this.readDeviceAsync(deviceFolder).catch((error: unknown) => {
+    this.device = this.readDeviceAsync(deviceFolder).then(t => {
+      this.knownDevice = t;
+      return t;
+    }).catch((error: unknown) => {
       this.log.write(Resources.formatDeviceUnavailable(String(error)));
       return null;
     });
@@ -180,9 +187,12 @@ export class DesktopApplication {
   }
 
   private forward(event: Event): void {
+    const payload = event.name.text === ShellEvents.notifications.text ? this.readStateForDevice(event) : event.payload;
+    if (Object.isUndefined(payload))
+      return;
     for (const open of this.windows.values())
       if (!open.window.isDestroyed())
-        open.window.webContents.send(Resources.runtimeEventChannel, event.name.text, event.payload);
+        open.window.webContents.send(Resources.runtimeEventChannel, event.name.text, payload);
   }
 
   private async requestAsync(event: IIpcEvent, method: unknown, payload: unknown): Promise<JsonObject> {
@@ -196,7 +206,36 @@ export class DesktopApplication {
       return DesktopApplication.fail(FailureCode.InvalidMessage, Resources.payloadNotJson);
     if (name.owner === Resources.shellOwner && !Resources.windowShellMethods.includes(name.text))
       return DesktopApplication.fail(FailureCode.Unauthorized, Resources.formatMethodRefused(name.text));
+    if (name.text === ShellMethods.notifications.text || name.text === ShellMethods.setDoNotDisturb.text)
+      return await this.requestForDeviceAsync(name, value);
     return (await this.callAsync(name, value)).toJson();
+  }
+
+  private readStateForDevice(event: Event): JsonObject | undefined {
+    try {
+      const broadcast = NotificationBroadcast.fromJson(event.payload);
+      return (Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false) : broadcast.stateFor(this.knownDevice)).toJson();
+    }
+    catch (error) {
+      this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
+      return undefined;
+    }
+  }
+
+  private async requestForDeviceAsync(name: QualifiedName, value: JsonValue): Promise<JsonObject> {
+    const device = await this.device;
+    if (Object.isNull(device))
+      return DesktopApplication.fail(FailureCode.Unavailable, Resources.deviceNotIdentified);
+    if (name.text === ShellMethods.notifications.text)
+      return (await this.callAsync(name, new NotificationsQuery(device).toJson())).toJson();
+    let isOn: boolean;
+    try {
+      isOn = JsonReader.fromValue(value).readBoolean(Resources.isOnField);
+    }
+    catch (error) {
+      return DesktopApplication.fail(FailureCode.InvalidParams, String(error));
+    }
+    return (await this.callAsync(name, new DoNotDisturbChange(device, isOn).toJson())).toJson();
   }
 
   private async callAsync(method: QualifiedName, payload: JsonValue): Promise<Response> {
