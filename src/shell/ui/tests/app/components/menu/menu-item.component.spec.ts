@@ -19,7 +19,7 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   imports: [MenuComponent, MenuItemComponent, MenuTriggerDirective],
   template: `
     <tr-menu>
-      <button tr-menu-item class="plain" [label]="label()" (triggered)="chosen.push('plain')"></button>
+      <button tr-menu-item class="plain" [label]="label()" [shortcut]="shortcut()" (triggered)="chosen.push('plain')"></button>
       <button tr-menu-item class="iconic" label="Close all" icon="clear_all" [disabled]="isDisabled()" (triggered)="chosen.push('iconic')"></button>
       <button tr-menu-item class="parent" label="Move to" [trMenuTriggerFor]="submenu"></button>
     </tr-menu>
@@ -32,6 +32,7 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 })
 class ItemHostComponent {
   public readonly label = signal("Rename");
+  public readonly shortcut = signal<string | null>(null);
   public readonly isDisabled = signal(true);
   public readonly chosen: string[] = [];
 }
@@ -67,6 +68,18 @@ describe("MenuItemComponent", () => {
     expect(row("plain").querySelector(".tr-menu-item-label")?.hasAttribute("data-truncates")).toBe(true);
     expect(row("plain").getAttribute("role")).toBe("menuitem");
     expect(row("plain").type).toBe("button");
+  });
+
+  it("shows its key label, muted, after its label only when it has one", () => {
+    const before = parts("plain");
+    fixture.componentInstance.shortcut.set("Ctrl+Alt+R");
+    fixture.detectChanges();
+    const label = row("plain").querySelector<HTMLElement>(".tr-menu-item-shortcut");
+
+    expect(before).toEqual(["tr-menu-item-label"]);
+    expect(parts("plain")).toEqual(["tr-menu-item-label", "tr-menu-item-shortcut"]);
+    expect(label?.textContent).toBe("Ctrl+Alt+R");
+    expect(getComputedStyle(label ?? row("plain")).color).not.toBe(getComputedStyle(row("plain")).color);
   });
 
   it("is found by type-ahead under its label as the label changes, not under its icon", () => {

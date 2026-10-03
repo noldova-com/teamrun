@@ -18,6 +18,10 @@ const firstNote = "document/notes.note/1";
 const secondNote = "document/notes.note/2";
 const withoutClock = "without-clock";
 
+async function listItemAsync(window: Page, week: number): Promise<void> {
+  await window.locator(".tr-notes-list-item", { hasText: new RegExp(`^Meeting notes, week ${week}$`) }).click();
+}
+
 function tab(window: Page, key: string): Locator {
   return window.locator(`tr-tab[data-tab-key="${key}"]`);
 }
@@ -204,6 +208,31 @@ test.describe("docking", () => {
     await window.keyboard.press("Home");
     await expect(tab(window, secondNote)).toBeFocused();
     await expect(tab(window, secondNote)).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("the tab menu closes the tabs to the right, the others and all of a group, and splits a view off", async ({ desktop }) => {
+    const window = desktop.window;
+    await listItemAsync(window, 1);
+    await window.locator("tr-tab[data-tab-key='document/notes.note/week-1']").dblclick();
+    await expect.poll(() => tabKeysOf(groupOf(window, firstNote))).toEqual([firstNote, secondNote, "document/notes.note/week-1"]);
+
+    await tab(window, secondNote).click({ button: "right" });
+    await window.getByRole("menuitem", { name: "Close to the right" }).click();
+    await expect.poll(() => tabKeysOf(groupOf(window, firstNote))).toEqual([firstNote, secondNote]);
+    await tab(window, firstNote).click({ button: "right" });
+    await window.getByRole("menuitem", { name: "Close others" }).click();
+    await expect.poll(() => tabKeysOf(groupOf(window, firstNote))).toEqual([firstNote]);
+    await tab(window, firstNote).click({ button: "right" });
+    await window.getByRole("menuitem", { name: "Close all" }).click();
+    await expect(window.locator("tr-tab[data-tab-key^='document/']")).toHaveCount(0);
+
+    await tab(window, outline).click({ button: "right" });
+    await window.getByRole("menuitem", { name: "Split", exact: true }).click();
+    await window.getByRole("menuitem", { name: "Split down" }).click();
+    await closeMenusAsync(window);
+    await expect.poll(() => tabKeysOf(groupOf(window, outline))).toEqual([outline]);
+    await expect.poll(() => tabKeysOf(groupOf(window, notes))).toEqual([notes]);
+    await expect(tab(window, outline)).toBeFocused();
   });
 
   test("Reset the layout returns the views to their default places", async ({ desktop }) => {

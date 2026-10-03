@@ -13,6 +13,7 @@ import { DockSide } from "../../../src/app/enums/dock-side";
 import { PanelEdge } from "../../../src/app/enums/panel-edge";
 import { Layout } from "../../../src/app/models/layout/layout";
 import { LayoutReader } from "../../../src/app/models/layout/layout.reader";
+import { ViewTab } from "../../../src/app/models/layout/view-tab";
 import { SideDropTarget } from "../../../src/app/models/layout/side-drop-target";
 import { SplitDropTarget } from "../../../src/app/models/layout/split-drop-target";
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
@@ -119,6 +120,19 @@ describe("LayoutService", () => {
 
     expect(service.layout().documents.tabs).toEqual([]);
     expect(service.layout().isOpen(LayoutFixture.files)).toBe(true);
+  });
+
+  it("makes the group of an activated or focused tab the current group, keeping it when an absent tab is activated", async () => {
+    await loadAsync(prepared());
+    expect(service.currentGroup()).toBe(service.layout().documents);
+
+    service.activate(LayoutFixture.files);
+    const left = service.layout().groupOf(LayoutFixture.files);
+    service.activate(new ViewTab("gone.view"));
+
+    expect(service.currentGroup()).toBe(left);
+    service.focusGroup(service.layout().documents.id);
+    expect(service.currentGroup()).toBe(service.layout().documents);
   });
 
   it("resizes a split through its handle", async () => {

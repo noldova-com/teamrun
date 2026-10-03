@@ -67,6 +67,12 @@
   text-overflow: ellipsis;
 }
 
-.tr-menu-item-chevron {
+.tr-menu-item-chevron,
+.tr-menu-item-shortcut {
   margin-inline-start: var(--tr-space-4);
+}
+
+.tr-menu-item-shortcut {
+  flex: none;
+  color: var(--tr-text-muted);
 }

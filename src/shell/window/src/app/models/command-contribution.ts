@@ -19,8 +19,16 @@ export class CommandContribution {
   public readonly icon: string | null;
   public readonly defaultKey: KeyChord | null;
   public readonly runAsync: (commandArguments: JsonValue) => Promise<JsonValue>;
+  public readonly isEnabled: (commandArguments: JsonValue) => boolean;
 
-  public constructor(name: string, title: string, icon: string | null, defaultKey: string | null, runAsync: (commandArguments: JsonValue) => Promise<JsonValue>) {
+  public constructor(
+    name: string,
+    title: string,
+    icon: string | null,
+    defaultKey: string | null,
+    runAsync: (commandArguments: JsonValue) => Promise<JsonValue>,
+    isEnabled: (commandArguments: JsonValue) => boolean = CommandContribution.isAlwaysEnabled
+  ) {
     ArgumentException.throwIfNullOrWhitespace(title, Resources.titleParameter);
     if (!Object.isNull(icon))
       ArgumentException.throwIfNullOrWhitespace(icon, Resources.iconParameter);
@@ -30,5 +38,10 @@ export class CommandContribution {
     this.icon = icon;
     this.defaultKey = Object.isNull(defaultKey) ? null : KeyChord.parseDefault(defaultKey, Resources.defaultKeyParameter);
     this.runAsync = runAsync;
+    this.isEnabled = isEnabled;
+  }
+
+  private static isAlwaysEnabled(): boolean {
+    return true;
   }
 }

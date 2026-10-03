@@ -195,7 +195,7 @@ describe("WindowPartHostService", () => {
 
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
-    expect(commands.commands().map(t => [t.name, t.title, t.icon, t.defaultKey?.text ?? null])).toEqual([
+    expect(commands.commands().filter(t => !t.name.startsWith("shell.")).map(t => [t.name, t.title, t.icon, t.defaultKey?.text ?? null])).toEqual([
       ["clock.tick", "Tick", "timer", "Mod+Alt+T"],
       ["notes.sync", "Sync", null, null],
       ["notes.newNote", "New note", "note_add", "Mod+Alt+N"]
@@ -220,7 +220,7 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(host.generation()).toBe(2));
 
     expect(errors.map(t => (t as Error).message)).toEqual(["The command notes.sync is already registered."]);
-    expect(commands.commands().map(t => t.title)).toEqual(["Sync"]);
+    expect(commands.commands().filter(t => !t.name.startsWith("shell.")).map(t => t.title)).toEqual(["Sync"]);
     expect(host.isCommandRegistered("notes.sync")).toBe(true);
     expect(host.failures().length).toBe(0);
   });
