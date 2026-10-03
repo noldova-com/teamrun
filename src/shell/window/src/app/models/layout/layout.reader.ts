@@ -82,11 +82,15 @@ export class LayoutReader {
     const active = Object.isNull(index) ? null : tabs[index];
     if (Object.isUndefined(active))
       throw new JsonException(Resources.inactiveTab, json.path);
+    const previewIndex = json.hasField(Resources.previewField) ? json.readNullableInteger(Resources.previewField) : null;
+    const preview = Object.isNull(previewIndex) ? null : tabs[previewIndex];
+    if (Object.isUndefined(preview))
+      throw new JsonException(Resources.previewOutsideGroup, json.path);
     const isDocuments = json.hasField(Resources.documentsField) && json.readBoolean(Resources.documentsField);
     if (isDocuments)
-      return LayoutReader.construct(json, () => new DocumentGroup(tabs, active));
+      return LayoutReader.construct(json, () => new DocumentGroup(tabs, active, preview));
     const id = this.nextId++;
-    return LayoutReader.construct(json, () => new TabGroup(id, tabs, active));
+    return LayoutReader.construct(json, () => new TabGroup(id, tabs, active, preview));
   }
 
   private readTab(json: JsonReader): Tab {

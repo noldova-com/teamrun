@@ -75,8 +75,12 @@ export class LayoutService {
     return saving;
   }
 
-  public openDocument(tab: DocumentTab): void {
-    this.update(this.layoutState().openDocument(tab));
+  public openDocument(tab: DocumentTab, isPreview: boolean = false): void {
+    this.update(this.layoutState().openDocument(tab, isPreview));
+  }
+
+  public keep(tab: Tab): void {
+    this.update(this.layoutState().keep(tab));
   }
 
   public place(tab: Tab, target: DropTarget): void {

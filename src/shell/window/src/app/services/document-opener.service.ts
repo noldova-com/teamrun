@@ -20,14 +20,23 @@ export class DocumentOpenerService {
   private readonly layout: LayoutService = inject(LayoutService);
   private readonly labels: TabLabelService = inject(TabLabelService);
 
-  public open(moduleId: string, name: string, instance: string, title: string): void {
+  public open(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
+    this.requireOwnDocument(moduleId, name);
+    ArgumentException.throwIfNullOrWhitespace(title, "title");
+    const tab = new DocumentTab(name, instance);
+    this.labels.setTitle(tab, title);
+    this.layout.openDocument(tab, isPreview);
+  }
+
+  public keep(moduleId: string, name: string, instance: string): void {
+    this.requireOwnDocument(moduleId, name);
+    this.layout.keep(new DocumentTab(name, instance));
+  }
+
+  private requireOwnDocument(moduleId: string, name: string): void {
     if (!name.startsWith(`${moduleId}${Resources.contributionSeparator}`))
       throw new ArgumentException(Resources.formatForeignDocument(moduleId, name), "name");
     if (!this.layout.registry().hasDocument(name))
       throw new ArgumentException(Resources.formatUnregisteredDocument(name), "name");
-    ArgumentException.throwIfNullOrWhitespace(title, "title");
-    const tab = new DocumentTab(name, instance);
-    this.labels.setTitle(tab, title);
-    this.layout.openDocument(tab);
   }
 }

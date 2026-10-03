@@ -10,11 +10,13 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 
 import type { DocumentContribution } from "../models/document-contribution";
 import type { ViewContribution } from "../models/view-contribution";
+import type { IDocumentOptions } from "./i-document-options";
 
 export interface IWindowPartContext {
   registerView(view: ViewContribution): void;
   registerDocument(document: DocumentContribution): void;
-  openDocument(name: string, instance: string, title: string): void;
+  openDocument(name: string, instance: string, title: string, options?: IDocumentOptions): void;
+  keepDocument(name: string, instance: string): void;
   requestAsync(method: string, parameters: JsonValue): Promise<JsonValue>;
   onEvent(event: string, listener: (payload: JsonValue) => void): () => void;
 }
