@@ -35,8 +35,12 @@ class FakeWindowPartHost implements IWindowPartHost {
     return () => this.listeners.delete(listener);
   }
 
-  public openDocument(moduleId: string, name: string, instance: string, title: string): void {
-    this.calls.push(`open ${moduleId} ${name} ${instance} ${title}`);
+  public openDocument(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
+    this.calls.push(`open ${moduleId} ${name} ${instance} ${title}${isPreview ? " as a preview" : ""}`);
+  }
+
+  public keepDocument(moduleId: string, name: string, instance: string): void {
+    this.calls.push(`keep ${moduleId} ${name} ${instance}`);
   }
 
   public refresh(): void {
@@ -74,14 +78,18 @@ describe("WindowPartContext", () => {
     expect(() => context.registerView(view("clock.face"))).toThrowError(WindowPartAccessException);
     expect(() => context.registerDocument(new DocumentContribution("notesx.note", load))).toThrowError(WindowPartAccessException);
     expect(() => context.openDocument("clock.page", "1", "Page")).toThrowError(WindowPartAccessException);
+    expect(() => context.keepDocument("clock.page", "1")).toThrowError(WindowPartAccessException);
     expect(context.views).toEqual([]);
     expect(host.calls).toEqual([]);
   });
 
-  it("opens its own documents through the host", () => {
+  it("opens its own documents through the host, as previews when asked, and keeps them", () => {
     context.openDocument("notes.note", "1", "Note 1");
+    context.openDocument("notes.note", "2", "Note 2", { preview: true });
+    context.openDocument("notes.note", "3", "Note 3", { preview: false });
+    context.keepDocument("notes.note", "2");
 
-    expect(host.calls).toEqual(["open notes notes.note 1 Note 1"]);
+    expect(host.calls).toEqual(["open notes notes.note 1 Note 1", "open notes notes.note 2 Note 2 as a preview", "open notes notes.note 3 Note 3", "keep notes notes.note 2"]);
   });
 
   it("calls its own module's and its dependencies' methods and refuses others", async () => {

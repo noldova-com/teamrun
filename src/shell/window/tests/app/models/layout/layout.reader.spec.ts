@@ -116,6 +116,15 @@ describe("LayoutReader", () => {
     expect(failure(saved({ Left: dock(group({ view: "terminal.shell", instance: 1 })) })).path).toBe("$.docks.Left.root.tabs.0.instance");
   });
 
+  it("reads and writes a group's preview, reads a missing or empty one as none, and names a preview outside its group", () => {
+    const read = LayoutReader.read(saved({ Left: dock({ tabs: [{ view: "files.tree" }, { view: "files.search" }], active: 0, preview: 1 }) }, { ...documents, preview: null }));
+
+    expect(read.dock(DockSide.Left).root?.groups[0]?.preview).toEqual(search);
+    expect(read.documents.preview).toBeNull();
+    expect(read.toJson()).toEqual(saved({ Left: dock({ tabs: [{ view: "files.tree" }, { view: "files.search" }], active: 0, preview: 1 }) }));
+    expect(failure(saved({ Left: dock({ tabs: [{ view: "files.tree" }], active: 0, preview: 1 }) })).path).toBe("$.docks.Left.root");
+  });
+
   it("refuses a layout without one documents group in the middle", () => {
     expect(failure(saved({ Left: dock(documents) })).path).toBe("$");
     expect(failure(saved({}, group({ view: "files.tree" }))).path).toBe("$");

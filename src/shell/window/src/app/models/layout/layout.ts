@@ -101,10 +101,15 @@ export class Layout {
     return this.withDock(dock.withRoot(opened).withCollapsed(false));
   }
 
-  public openDocument(tab: DocumentTab): Layout {
+  public openDocument(tab: DocumentTab, isPreview: boolean = false): Layout {
     if (this.isOpen(tab))
-      return this.activate(tab);
-    return this.withGroup(this.documents.insert(tab, this.documents.tabs.length));
+      return isPreview ? this.activate(tab) : this.activate(tab).keep(tab);
+    return this.withGroup(isPreview ? this.documents.openPreview(tab) : this.documents.insert(tab, this.documents.tabs.length));
+  }
+
+  public keep(tab: Tab): Layout {
+    const group = this.groupOf(tab);
+    return Object.isNull(group) ? this : this.withGroup(group.keep(tab));
   }
 
   public close(tab: Tab): Layout {
@@ -166,8 +171,9 @@ export class Layout {
     const fresh = Layout.createDefault(registry);
     const documents = this.documents.tabs.filter(t => !t.isMovable);
     const active = documents.find(t => t.equals(this.documents.active)) ?? documents[0] ?? null;
+    const preview = documents.find(t => t.equals(this.documents.preview)) ?? null;
     const views = this.groups.flatMap(t => t.tabs).filter(t => t instanceof ViewTab && registry.hasView(t.name) && !fresh.isOpen(t));
-    return views.reduce((layout, t) => layout.openView(t, registry), fresh.withGroup(new DocumentGroup(documents, active)));
+    return views.reduce((layout, t) => layout.openView(t, registry), fresh.withGroup(new DocumentGroup(documents, active, preview)));
   }
 
   public withVisibleTabs(registry: ViewRegistry): Layout {
