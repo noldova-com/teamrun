@@ -97,7 +97,7 @@ class AngularProjectTests {
         new ProcessException("Installing the browser for the Angular tests failed with exit code 2."));
     });
 
-    test("the tests run the Angular CLI in src/ with a JSON report, and give its result and the spec files it ran", async t => {
+    test("the tests run the Angular CLI in src/ with a JSON report and a log of their output, and give its result and the spec files it ran", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
       const directory = path.join(repository.directory, "src");
       const report = path.join(repository.directory, "_build", "angular-tests.json");
@@ -110,6 +110,8 @@ class AngularProjectTests {
       assert.deepEqual([run.isSuccessful, run.collected], [true, ["a.spec.ts", "shell/b.spec.ts"]]);
       assert.deepEqual([silent.isSuccessful, silent.exitCode, silent.collected], [false, 1, null]);
       assert.deepEqual(reporting.runs, [[process.execPath, directory, path.join(directory, "node_modules", "@angular", "cli", "bin", "ng.js"), "test", "--reporters=default", "--reporters=json", "--output-file", report]]);
+      assert.deepEqual(reporting.logs, [path.join(repository.directory, "_build", "angular-tests.log")]);
+      assert.equal(AngularProject.LOG_FILE, "_build/angular-tests.log");
     });
 
     test("a report that is not JSON or lists no test files is refused", async t => {

@@ -8,12 +8,13 @@
 
 import type { Writable } from "node:stream";
 
-import type AngularProject from "../angular/angular-project.ts";
+import AngularProject from "../angular/angular-project.ts";
 import ProcessException from "../processes/process.exception.ts";
 import type ICheck from "./interfaces/check.ts";
 
 export default class AngularTestCheck implements ICheck {
   private static readonly NO_REPORT: string = "The Angular tests passed but wrote no report of the spec files they ran.\n";
+  private static readonly LOG_HINT: string = `The Angular tests' full output is in ${AngularProject.LOG_FILE}.\n`;
 
   private readonly project: AngularProject;
 
@@ -24,6 +25,13 @@ export default class AngularTestCheck implements ICheck {
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
+    const isPassing = await this.checkAsync(output);
+    if (!isPassing)
+      output.write(AngularTestCheck.LOG_HINT);
+    return isPassing;
+  }
+
+  private async checkAsync(output: Writable): Promise<boolean> {
     try {
       const run = await this.project.testAsync();
       if (!run.isSuccessful)
