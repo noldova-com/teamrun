@@ -7,6 +7,7 @@
  */
 
 import { AriaDescriber, FocusMonitor } from "@angular/cdk/a11y";
+import { DOCUMENT } from "@angular/common";
 import { ComponentPortal } from "@angular/cdk/portal";
 import { type ComponentRef, DestroyRef, Directive, ElementRef, Injector, effect, inject, input } from "@angular/core";
 
@@ -47,6 +48,12 @@ export class TooltipDirective {
   public constructor() {
     const describer = inject(AriaDescriber);
     const focus = inject(FocusMonitor);
+    const document = inject(DOCUMENT);
+    const dismissOnEscape = (event: KeyboardEvent): void => {
+      if (event.key === Resources.escapeKey)
+        this.hide();
+    };
+    document.addEventListener(Resources.keydownEvent, dismissOnEscape);
     const subscription = focus.monitor(this.host).subscribe(origin => {
       if (origin === Resources.keyboardFocusOrigin)
         this.show();
@@ -66,6 +73,7 @@ export class TooltipDirective {
         this.hide();
     });
     inject(DestroyRef).onDestroy(() => {
+      document.removeEventListener(Resources.keydownEvent, dismissOnEscape);
       subscription.unsubscribe();
       focus.stopMonitoring(this.host);
       this.clearTimers();
