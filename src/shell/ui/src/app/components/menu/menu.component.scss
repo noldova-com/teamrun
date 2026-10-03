@@ -7,8 +7,10 @@
  */
 
 :host {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-auto-rows: min-content;
+  align-content: start;
   box-sizing: border-box;
   min-height: 0;
   max-width: calc(100vw - var(--tr-space-4));
