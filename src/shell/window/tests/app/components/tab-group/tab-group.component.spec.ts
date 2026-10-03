@@ -282,7 +282,9 @@ describe("TabGroupComponent", () => {
     search?.dispatchEvent(new KeyboardEvent("keydown", { key: "F10", shiftKey: true, bubbles: true, cancelable: true }));
     update();
     await fixture.whenStable();
-    document.querySelector<HTMLButtonElement>(".cdk-overlay-container tr-menu[data-place='shell.tab'] button[data-submenu='shell.tabMoveTo']")?.click();
+    const moveTo = document.querySelector<HTMLButtonElement>(".cdk-overlay-container tr-menu[data-place='shell.tab'] button[data-submenu='shell.tabMoveTo']");
+    const icon = moveTo?.querySelector(".tr-menu-item-icon")?.textContent;
+    moveTo?.click();
     update();
     await fixture.whenStable();
     const destinations = [...document.querySelectorAll<HTMLButtonElement>(".cdk-overlay-container tr-menu[data-place='shell.tabMoveTo'] button[tr-menu-item]")];
@@ -290,6 +292,7 @@ describe("TabGroupComponent", () => {
     update();
     await fixture.whenStable();
 
+    expect(icon).toBe(Resources.moveToGlyph);
     expect(destinations.map(t => t.querySelector(".tr-menu-item-label")?.textContent)).toEqual([LayoutFixture.changes.name, Resources.documentsGroupLabel]);
     expect(layout.layout().groupOf(LayoutFixture.search)?.isDocuments).toBe(true);
     expect(document.activeElement?.getAttribute("data-tab-key")).toBe(LayoutFixture.search.key);
