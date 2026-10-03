@@ -39,6 +39,9 @@ export class Resources {
   public static readonly copyTextChannel: string = "teamrun:copyText";
   public static readonly openLogFolderChannel: string = "teamrun:openLogFolder";
   public static readonly notificationOpenedChannel: string = "teamrun:notificationOpened";
+  public static readonly quitQuestionChannel: string = "teamrun:quitQuestion";
+  public static readonly quitAnswerChannel: string = "teamrun:quitAnswer";
+  public static readonly moduleLogChannel: string = "teamrun:moduleLog";
   public static readonly copyTextLimit: number = 65536;
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
@@ -136,6 +139,8 @@ export class Resources {
   public static readonly connectingShowLimit: number = 2_000;
   public static readonly paintShowLimit: number = 10_000;
   public static readonly logLineSeparator: string = "\n";
+  public static readonly lineBreakPattern: RegExp = /\r?\n/;
+  public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   public static readonly logFileMode: number = 0o600;
   public static readonly reloadCrashLimit: number = 10_000;
   public static readonly rendererEndLimit: number = 5_000;
@@ -161,11 +166,15 @@ export class Resources {
   public static readonly runtimeNotConnected: string = `${Resources.applicationName} is not connected to its runtime.`;
   public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout and Do not disturb are not kept.";
   public static readonly isOnField: string = "isOn";
+  public static readonly descriptionsField: string = "descriptions";
+  public static readonly isWaitingField: string = "isWaiting";
   public static readonly windowMinimumWidth: number = 640;
   public static readonly windowMinimumHeight: number = 400;
   public static readonly windowWidth: number = 1280;
   public static readonly windowHeight: number = 800;
   public static readonly closeAnswerTimeout: number = 5000;
+  public static readonly workQueryTimeout: number = 2000;
+  public static readonly moduleLogLimit: number = 65536;
   public static readonly executableField: string = "executable";
   public static readonly argumentsField: string = "arguments";
   public static readonly errorFileField: string = "errorFile";
@@ -235,6 +244,18 @@ export class Resources {
 
   public static formatEventNotForwarded(name: string, reason: string): string {
     return `The runtime's event ${name} could not be passed to the window: ${reason}`;
+  }
+
+  public static formatWorkNotRead(reason: string): string {
+    return `The runtime's work could not be read before quitting, so ${Resources.applicationName} quits without asking: ${reason}`;
+  }
+
+  public static formatWorkNotStopped(reason: string): string {
+    return `The runtime's work could not be stopped: ${reason}`;
+  }
+
+  public static formatModuleLogLine(moduleId: string, line: string): string {
+    return `${moduleId}: ${line}`;
   }
 
   public static formatBoundsUnsaved(reason: string): string {

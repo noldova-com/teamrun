@@ -21,6 +21,7 @@ export class CommandContribution {
   public readonly runAsync: (commandArguments: JsonValue) => Promise<JsonValue>;
   public readonly isEnabled: (commandArguments: JsonValue) => boolean;
   public readonly isChecked: ((commandArguments: JsonValue) => boolean) | null;
+  public readonly isApplicable: (commandArguments: JsonValue) => boolean;
 
   public constructor(
     name: string,
@@ -28,8 +29,9 @@ export class CommandContribution {
     icon: string | null,
     defaultKey: string | null,
     runAsync: (commandArguments: JsonValue) => Promise<JsonValue>,
-    isEnabled: (commandArguments: JsonValue) => boolean = CommandContribution.isAlwaysEnabled,
-    isChecked: ((commandArguments: JsonValue) => boolean) | null = null
+    isEnabled: (commandArguments: JsonValue) => boolean = CommandContribution.always,
+    isChecked: ((commandArguments: JsonValue) => boolean) | null = null,
+    isApplicable: (commandArguments: JsonValue) => boolean = CommandContribution.always
   ) {
     ArgumentException.throwIfNullOrWhitespace(title, Resources.titleParameter);
     if (!Object.isNull(icon))
@@ -42,9 +44,10 @@ export class CommandContribution {
     this.runAsync = runAsync;
     this.isEnabled = isEnabled;
     this.isChecked = isChecked;
+    this.isApplicable = isApplicable;
   }
 
-  private static isAlwaysEnabled(): boolean {
+  private static always(): boolean {
     return true;
   }
 }

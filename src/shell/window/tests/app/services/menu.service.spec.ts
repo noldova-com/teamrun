@@ -15,6 +15,9 @@ import { MenuCheck } from "../../../src/app/enums/menu-check";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { CommandRow } from "../../../src/app/models/command-row";
 import { MenuDeclarations } from "../../../src/app/models/menu-declarations";
+import { MenuGroup } from "../../../src/app/models/menu-group";
+import { MenuItem } from "../../../src/app/models/menu-item";
+import { MenuPlace } from "../../../src/app/models/menu-place";
 import type { MenuSection } from "../../../src/app/models/menu-section";
 import { SubmenuRow } from "../../../src/app/models/submenu-row";
 import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
@@ -116,6 +119,29 @@ describe("MenuService", () => {
     expect(menus.resolve("notes.archive")).toEqual([]);
   });
 
+  it("shows an item's own label, leaves out a row whose command does not apply, and fills a dynamic group from its provider until it is withdrawn", () => {
+    const menus = start(new MenuDeclarations("notes", [new MenuPlace("notes.recent", "Recent", false)], [
+      new MenuGroup("notes.labelled", "shell.file", false, [MenuItem.ofCommand("notes.newNote", {}, "New"), MenuItem.ofCommand("notes.missing", {}, "Gone"),
+        MenuItem.ofCommand("notes.archive", {}, "Archive")]),
+      MenuGroup.dynamic("notes.recentNotes", "notes.recent", false)
+    ]));
+    TestBed.inject(CommandService).setCommands([
+      new CommandContribution("notes.newNote", "New note", null, null, () => Promise.resolve(null)),
+      new CommandContribution("notes.archive", "Archive the note", null, null, () => Promise.resolve(null), () => true, null, () => false),
+      new CommandContribution("notes.openNote", "Open note", null, null, () => Promise.resolve(null))
+    ]);
+    menus.setActiveModules(["notes"]);
+    const before = menus.resolve("notes.recent");
+
+    const withdraw = menus.provideGroup("notes.recentNotes", t => [MenuItem.ofCommand("notes.openNote", { week: 3 }, `Week 3 for ${String(t["by"])}`)]);
+    const provided = menus.resolve("notes.recent", { by: "Ross" });
+    withdraw();
+
+    expect(describeSections(menus.resolve("shell.file"))).toEqual([["New", "Gone (disabled)"]]);
+    expect([before, menus.resolve("notes.recent")]).toEqual([[], []]);
+    expect(describeSections(provided)).toEqual([["Week 3 for Ross"]]);
+  });
+
   it("shows a row whose command's enabled check throws as disabled and reports the failure", () => {
     const menus = start(notes);
     const reported = vi.spyOn(TestBed.inject(ErrorHandler), "handleError").mockImplementation(() => undefined);
@@ -124,7 +150,7 @@ describe("MenuService", () => {
     })]);
     menus.setActiveModules(["notes"]);
 
-    expect(describeSections(menus.resolve("shell.file"))).toEqual([["Close the tab (disabled) Ctrl+W"], ["New note (disabled)"]]);
+    expect(describeSections(menus.resolve("shell.file"))).toEqual([["New note (disabled)"]]);
     expect(reported).toHaveBeenCalledOnce();
   });
 });

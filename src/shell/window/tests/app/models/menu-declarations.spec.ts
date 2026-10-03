@@ -17,12 +17,12 @@ describe("MenuDeclarations", () => {
   it("reads a module's places, groups and items from the build's description", () => {
     const menus = MenuDeclarations.fromJson("notes", {
       places: [{ name: "notes.tools", title: "Notes", menuBar: true }],
-      groups: [{ name: "notes.sorting", place: "notes.tools", exclusive: true, items: [{ command: "notes.sortBy", arguments: { by: "title" } }, { submenu: "notes.templates" }] }]
+      groups: [{ name: "notes.sorting", place: "notes.tools", exclusive: true, items: [{ command: "notes.sortBy", arguments: { by: "title" }, label: "By title" }, { submenu: "notes.templates" }] }]
     });
 
     expect(menus.moduleId).toBe("notes");
     expect(menus.places).toEqual([new MenuPlace("notes.tools", "Notes", true)]);
-    expect(menus.groups).toEqual([new MenuGroup("notes.sorting", "notes.tools", true, [MenuItem.ofCommand("notes.sortBy", { by: "title" }), MenuItem.ofSubmenu("notes.templates")])]);
+    expect(menus.groups).toEqual([new MenuGroup("notes.sorting", "notes.tools", true, [MenuItem.ofCommand("notes.sortBy", { by: "title" }, "By title"), MenuItem.ofSubmenu("notes.templates")])]);
     expect([menus.groups[0]?.items[1]?.command, menus.groups[0]?.items[1]?.submenu, menus.groups[0]?.items[0]?.submenu]).toEqual([null, "notes.templates", null]);
   });
 
@@ -34,5 +34,11 @@ describe("MenuDeclarations", () => {
     expect(() => MenuItem.ofCommand("sortBy")).toThrowError(ArgumentException);
     expect(() => MenuItem.ofSubmenu("templates")).toThrowError(ArgumentException);
     expect(MenuItem.ofCommand("notes.sortBy").commandArguments).toEqual({});
+    expect(() => MenuItem.ofCommand("notes.sortBy", {}, " ")).toThrowError(ArgumentException);
+    expect(() => new MenuPlace("notes.tools", "Notes", false, " ")).toThrowError(ArgumentException);
+    expect(() => new MenuGroup("notes.recent", "notes.tools", false, [MenuItem.ofCommand("notes.sortBy")], true))
+      .toThrowError("A dynamic menu group has no declared items; its owner supplies them.");
+    expect([MenuGroup.dynamic("notes.recent", "notes.tools", false).isDynamic, MenuGroup.dynamic("notes.recent", "notes.tools", false).items]).toEqual([true, []]);
+    expect([new MenuPlace("notes.tools", "Notes", false, "build").icon, MenuItem.ofCommand("notes.sortBy").label]).toEqual(["build", null]);
   });
 });

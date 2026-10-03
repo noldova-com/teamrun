@@ -17,6 +17,7 @@ import { type ElectronApplication, type Page, type TestInfo, _electron, expect }
 import { DataDirectory, DiscoveryReader, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
 import ErrorOutputClassifier from "./error-output.classifier.ts";
+import OffCursorPlacement from "./off-cursor-placement.ts";
 import ProcessListFixture from "./process-list.fixture.ts";
 
 export default class DesktopApplicationFixture {
@@ -309,22 +310,18 @@ export default class DesktopApplicationFixture {
   private async moveOffCursorAsync(): Promise<void> {
     await this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.unmaximize());
     await expect.poll(() => this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isMaximized())).toBe(false);
-    await this.application.evaluate(({ BrowserWindow, screen }) => {
+    const state = await this.application.evaluate(({ BrowserWindow, screen }) => {
       const window = BrowserWindow.getAllWindows()[0];
-      if (window === undefined)
-        return;
-      const cursor = screen.getCursorScreenPoint();
-      const bounds = window.getBounds();
-      if (cursor.x < bounds.x || cursor.y < bounds.y || cursor.x >= bounds.x + bounds.width || cursor.y >= bounds.y + bounds.height)
-        return;
-      const [shift] = [
-        { x: cursor.x + 1 - bounds.x, y: 0 },
-        { x: cursor.x - bounds.x - bounds.width, y: 0 },
-        { x: 0, y: cursor.y + 1 - bounds.y },
-        { x: 0, y: cursor.y - bounds.y - bounds.height }
-      ].sort((a, b) => Math.abs(a.x) + Math.abs(a.y) - Math.abs(b.x) - Math.abs(b.y));
-      window.setBounds({ ...bounds, x: bounds.x + (shift?.x ?? 0), y: bounds.y + (shift?.y ?? 0) });
+      return window === undefined ? null : { cursor: screen.getCursorScreenPoint(), bounds: window.getBounds(), displays: screen.getAllDisplays().map(t => t.bounds) };
     });
+    if (state !== null)
+      await OffCursorPlacement.placeAsync(state.bounds, state.cursor, state.displays, target => this.application.evaluate(({ BrowserWindow }, next) => {
+        const window = BrowserWindow.getAllWindows()[0];
+        if (window === undefined)
+          throw new Error("The window is gone.");
+        window.setBounds(next);
+        return window.getBounds();
+      }, target));
     await expect.poll(() => this.isCursorInsideAsync()).toBe(false);
     await expect.poll(() => this.window.evaluate(() => document.querySelector(":hover") === null)).toBe(true);
   }

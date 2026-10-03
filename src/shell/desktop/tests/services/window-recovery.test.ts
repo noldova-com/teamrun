@@ -12,6 +12,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import { OpenWindow, WindowRecovery } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
+import { FakeCloseGuard } from "../fixtures/fake-close-guard.fixture.js";
 import { FakeDesktopLog } from "../fixtures/fake-desktop-log.fixture.js";
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
@@ -28,7 +29,7 @@ class Recovered {
 
   public constructor(answers: readonly number[], reloadCrashLimit: number = 10_000, rendererEndLimit: number = 1_000) {
     this.dialog = new FakeDialogHost(answers);
-    new WindowRecovery(new OpenWindow(this.window, new FakeDisplayHost(), this.log), this.dialog, this.log, this.process, () => this.quits++, () => {
+    new WindowRecovery(new OpenWindow(this.window, new FakeDisplayHost(), this.log, new FakeCloseGuard()), this.dialog, this.log, this.process, () => this.quits++, () => {
       this.logFolders++;
       return Promise.resolve(true);
     }, reloadCrashLimit, rendererEndLimit);
