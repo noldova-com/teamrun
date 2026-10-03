@@ -6,43 +6,67 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, afterNextRender, afterRenderEffect, effect, inject } from "@angular/core";
+import { NgTemplateOutlet } from "@angular/common";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, signal, viewChild } from "@angular/core";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { AppearanceService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OverlaySide, TooltipDirective } from "@noldova/teamrun-shell-ui";
+import { AppearanceService, IconButtonComponent, MenuBarComponent, MenuBarItemComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OverlaySide, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
+import { MenuBarStyle } from "../../enums/menu-bar-style";
 import { WindowAppearance } from "../../models/window-appearance";
 import { BarItemsService } from "../../services/bar-items.service";
 import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { MenuBarService } from "../../services/menu-bar.service";
+import { SettingsService } from "../../services/settings.service";
 import { PlaceMenuComponent } from "../place-menu/place-menu.component";
 
 @Component({
   selector: "tr-window-row",
-  imports: [IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, PlaceMenuComponent, TooltipDirective],
+  imports: [IconButtonComponent, MenuBarComponent, MenuBarItemComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, NgTemplateOutlet, PlaceMenuComponent, TooltipDirective],
   templateUrl: "./window-row.component.html",
   styleUrl: "./window-row.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     "data-tr-chrome": "top",
-    "[class.tr-window-row-mac]": "isMac"
+    "[class.tr-window-row-mac]": "isMac",
+    "(document:keydown)": "pressed($event)",
+    "(document:keyup)": "released($event)",
+    "(document:pointerdown)": "isAltAlone = false"
   }
 })
 export class WindowRowComponent {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly commands: CommandService = inject(CommandService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
+  private readonly settings: SettingsService = inject(SettingsService);
+  private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly foldedValue: WritableSignal<boolean> = signal(false);
+  private readonly bar: Signal<ElementRef<HTMLElement> | undefined> = viewChild("bar", { read: ElementRef });
+  private readonly menuButton: Signal<ElementRef<HTMLElement> | undefined> = viewChild("menuButton", { read: ElementRef });
+  private readonly start: Signal<ElementRef<HTMLElement> | undefined> = viewChild("start", { read: ElementRef });
+  private readonly end: Signal<ElementRef<HTMLElement> | undefined> = viewChild("end", { read: ElementRef });
+  private returnFocus: HTMLElement | null = null;
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly isMac: boolean = this.bridge.isMac;
   protected readonly bars: BarItemsService = inject(BarItemsService);
   protected readonly menuBar: MenuBarService = inject(MenuBarService);
   protected readonly below: OverlaySide = OverlaySide.below;
+  protected readonly isFolded: Signal<boolean> = this.foldedValue.asReadonly();
+  protected readonly style: Signal<MenuBarStyle> = computed(() => {
+    const value = this.settings.values().get(Resources.menuBarSetting);
+    return value === MenuBarStyle.Button || value === MenuBarStyle.Hidden ? value : MenuBarStyle.Inline;
+  });
+  protected readonly isBarShown: Signal<boolean> = computed(() => !this.isMac && this.style() === MenuBarStyle.Inline && this.menuBar.shownPlaces().length > 0);
+  protected readonly isButtonShown: Signal<boolean> = computed(() =>
+    !this.isMac && this.menuBar.shownPlaces().length > 0 && (this.style() === MenuBarStyle.Button || (this.style() === MenuBarStyle.Inline && this.isFolded())));
+
+  protected isAltAlone: boolean = false;
 
   public constructor() {
-    const host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+    const host = this.host;
     const appearance = inject(AppearanceService);
     let isReported = false;
     afterNextRender(() => this.bridge.notifyReady(WindowAppearance.read(host)));
@@ -53,10 +77,33 @@ export class WindowRowComponent {
         this.bridge.notifyAppearance(WindowAppearance.read(host));
       isReported = true;
     });
+    const observer = new ResizeObserver(() => this.measure());
+    afterRenderEffect(() => {
+      observer.disconnect();
+      for (const element of [host, this.bar()?.nativeElement, this.start()?.nativeElement, this.end()?.nativeElement])
+        if (!Object.isUndefined(element))
+          observer.observe(element);
+    });
+    inject(DestroyRef).onDestroy(() => observer.disconnect());
     if (this.isMac) {
       effect(() => this.bridge.setMenuBar(this.menuBar.tree()));
       inject(DestroyRef).onDestroy(this.bridge.onMenuCommand(t => this.menuBar.run(t)));
     }
+  }
+
+  protected pressed(event: KeyboardEvent): void {
+    this.isAltAlone = event.key === Resources.altKey && !event.repeat;
+    if (event.key === Resources.functionKey && !event.altKey && !event.ctrlKey && !event.shiftKey && !event.metaKey)
+      this.focusMenu(event);
+    else if (event.key === Resources.escapeKey && this.isReturnable(event.target))
+      this.giveFocusBack(event);
+  }
+
+  protected released(event: KeyboardEvent): void {
+    const isAlone = this.isAltAlone && event.key === Resources.altKey;
+    this.isAltAlone = false;
+    if (isAlone)
+      this.focusMenu(event);
   }
 
   protected isAvailable(command: string): boolean {
@@ -65,5 +112,45 @@ export class WindowRowComponent {
 
   protected run(command: string, commandArguments: JsonValue): void {
     this.commands.runAsync(command, commandArguments).catch((error: unknown) => this.errors.handleError(error));
+  }
+
+  private focusMenu(event: Event): void {
+    const target = this.isFolded() || this.style() !== MenuBarStyle.Inline
+      ? this.menuButton()?.nativeElement
+      : this.bar()?.nativeElement.querySelector<HTMLElement>(Resources.menuBarItemSelector);
+    if (Object.isUndefined(target) || Object.isNull(target) || this.isMac)
+      return;
+
+    event.preventDefault();
+    const active = this.host.ownerDocument.activeElement;
+    if (!this.host.contains(active))
+      this.returnFocus = active as HTMLElement | null;
+    target.focus();
+  }
+
+  private isReturnable(target: EventTarget | null): boolean {
+    return target instanceof HTMLElement && this.host.contains(target) && target.getAttribute(Resources.ariaExpandedAttribute) !== Resources.trueValue && !Object.isNull(this.returnFocus);
+  }
+
+  private giveFocusBack(event: Event): void {
+    event.preventDefault();
+    const target = this.returnFocus as HTMLElement;
+    this.returnFocus = null;
+    if (target.isConnected)
+      target.focus();
+  }
+
+  private measure(): void {
+    const bar = this.bar()?.nativeElement;
+    const start = this.start()?.nativeElement;
+    const end = this.end()?.nativeElement;
+    if (Object.isUndefined(bar) || Object.isUndefined(start) || Object.isUndefined(end)) {
+      this.foldedValue.set(false);
+      return;
+    }
+
+    const style = getComputedStyle(this.host);
+    const room = this.host.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - start.offsetWidth - end.offsetWidth - Resources.windowRowMinimumDragWidth;
+    this.foldedValue.set(bar.offsetWidth > room);
   }
 }

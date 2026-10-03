@@ -6,13 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ErrorHandler } from "@angular/core";
+import { ErrorHandler, signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import { AppearanceService, DefaultTheme, ModePreference, type Theme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
 import { WindowRowComponent } from "../../../../src/app/components/window-row/window-row.component";
+import { TopBarSide } from "../../../../src/app/enums/top-bar-side";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { MenuDeclarations } from "../../../../src/app/models/menu-declarations";
 import { TopBarAction } from "../../../../src/app/models/top-bar-action";
@@ -23,6 +24,7 @@ import { BarItemsService } from "../../../../src/app/services/bar-items.service"
 import { CommandSearchService } from "../../../../src/app/services/command-search.service";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { MenuService } from "../../../../src/app/services/menu.service";
+import { SettingsService } from "../../../../src/app/services/settings.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { FixtureTheme } from "../../../../../ui/tests/fixtures/fixture-theme";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
@@ -190,9 +192,25 @@ describe("WindowRowComponent", () => {
     TestBed.inject(MenuService).setActiveModules(["notes"]);
   }
 
+  function useMenuBarStyle(style: string): void {
+    TestBed.configureTestingModule({ providers: [{ provide: SettingsService, useValue: { values: signal(new Map([["shell.menuBar", style]])) } }] });
+  }
+
+  async function settle(fixture: { whenStable(): Promise<unknown> }): Promise<void> {
+    await fixture.whenStable();
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    await fixture.whenStable();
+  }
+
+  function press(target: EventTarget, key: string, type: "keydown" | "keyup" = "keydown", init: KeyboardEventInit = {}): void {
+    const keyCode = ({ ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Escape: 27 } as Record<string, number>)[key] ?? 0;
+    target.dispatchEvent(new KeyboardEvent(type, { key, keyCode, bubbles: true, cancelable: true, ...init }));
+  }
+
   it("opens the menu bar's places from a menu button at the row's start on Windows and Linux, outside the drag region", async () => {
     const runs: JsonValue[] = [];
     DesktopBridgeFixture.install("win32");
+    useMenuBarStyle("Button");
     useNotesMenus(runs);
     apply();
 
@@ -208,6 +226,199 @@ describe("WindowRowComponent", () => {
     expect([button.classList.contains("tr-window-row-menu"), button.getAttribute("aria-label"), getComputedStyle(button).getPropertyValue("app-region")]).toEqual([true, "Menu", "no-drag"]);
     expect(places.map(t => t.getAttribute("data-place"))).toEqual(["shell.file", "shell.edit", "shell.view"]);
     expect(runs).toEqual([{ template: "plan" }]);
+  });
+
+  it("shows the places as a menu bar of items that open their menus below them and run their rows, outside the drag region", async () => {
+    const runs: JsonValue[] = [];
+    DesktopBridgeFixture.install("win32");
+    useNotesMenus(runs);
+    apply();
+
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    fixture.detectChanges();
+    await settle(fixture);
+    const row: HTMLElement = fixture.nativeElement;
+    const bar = row.querySelector("tr-menu-bar") as HTMLElement;
+    const items = [...bar.querySelectorAll<HTMLButtonElement>("button.tr-window-row-menu-bar-item")];
+    items[0]?.click();
+    await fixture.whenStable();
+    const menu = document.querySelector("tr-menu[data-place='shell.file']") as HTMLElement;
+    (menu.querySelector("button[data-command='notes.newNote']") as HTMLButtonElement).click();
+    await Promise.resolve();
+
+    expect([bar.getAttribute("role"), bar.getAttribute("aria-label"), getComputedStyle(bar).getPropertyValue("app-region")]).toEqual(["menubar", "Menus", "no-drag"]);
+    expect(items.map(t => [t.getAttribute("data-place"), t.textContent.trim(), t.getAttribute("role")])).toEqual([
+      ["shell.file", "File", "menuitem"], ["shell.edit", "Edit", "menuitem"], ["shell.view", "View", "menuitem"]
+    ]);
+    expect(row.querySelector(".tr-window-row-menu")).toBeNull();
+    expect(runs).toEqual([{ template: "plan" }]);
+  });
+
+  it("moves between the menu bar's items with the arrow keys and opens a menu with the down arrow", async () => {
+    DesktopBridgeFixture.install("win32");
+    useNotesMenus([]);
+    apply();
+
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    fixture.detectChanges();
+    await settle(fixture);
+    const items = [...fixture.nativeElement.querySelectorAll("button.tr-window-row-menu-bar-item")] as HTMLButtonElement[];
+    items[0]?.focus();
+    press(items[0] as HTMLElement, "ArrowRight");
+    const second = document.activeElement;
+    press(items[1] as HTMLElement, "ArrowDown");
+    await settle(fixture);
+
+    expect(second).toBe(items[1]);
+    expect(items[1]?.getAttribute("aria-expanded")).toBe("true");
+    expect(document.querySelector("tr-menu[data-place='shell.edit']")).not.toBeNull();
+  });
+
+  it("folds the menu bar into the menu button while the row cannot fit it and unfolds it when it can", async () => {
+    DesktopBridgeFixture.install("win32");
+    useNotesMenus([]);
+    apply();
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    const row: HTMLElement = fixture.nativeElement;
+    row.style.width = "1000px";
+    fixture.detectChanges();
+    await settle(fixture);
+    const wide = [row.querySelector(".tr-window-row-menu"), row.querySelector("tr-menu-bar")?.classList.contains("tr-window-row-menu-bar-folded")];
+
+    row.style.width = "150px";
+    await settle(fixture);
+    fixture.detectChanges();
+    const bar = row.querySelector("tr-menu-bar") as HTMLElement;
+    const narrow = [row.querySelector(".tr-window-row-menu") === null, bar.classList.contains("tr-window-row-menu-bar-folded"), bar.getAttribute("aria-hidden"), bar.hasAttribute("inert"), getComputedStyle(bar).visibility];
+
+    row.style.width = "1000px";
+    await settle(fixture);
+    fixture.detectChanges();
+
+    expect(wide).toEqual([null, false]);
+    expect(narrow).toEqual([false, true, "true", true, "hidden"]);
+    expect(row.querySelector(".tr-window-row-menu")).toBeNull();
+    expect(bar.classList.contains("tr-window-row-menu-bar-folded")).toBe(false);
+  });
+
+  it("shows neither the bar nor the button when the menus are hidden, and ignores Alt and F10", async () => {
+    DesktopBridgeFixture.install("win32");
+    useMenuBarStyle("Hidden");
+    useNotesMenus([]);
+    apply();
+    const field = document.createElement("input");
+    document.body.append(field);
+    field.focus();
+
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    fixture.detectChanges();
+    await settle(fixture);
+    press(field, "F10");
+    press(field, "Alt");
+    press(field, "Alt", "keyup");
+
+    expect(fixture.nativeElement.querySelector("tr-menu-bar, .tr-window-row-menu")).toBeNull();
+    expect(document.activeElement).toBe(field);
+    field.remove();
+  });
+
+  it("focuses the first menu with F10 or a lone Alt, not with Alt used in a chord or after a click, and Escape gives the focus back", async () => {
+    DesktopBridgeFixture.install("win32");
+    useNotesMenus([]);
+    apply();
+    const field = document.createElement("input");
+    document.body.append(field);
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    fixture.detectChanges();
+    await settle(fixture);
+    const first = fixture.nativeElement.querySelector("button.tr-window-row-menu-bar-item") as HTMLElement;
+    const focused: (Element | null)[] = [];
+
+    field.focus();
+    press(field, "F10", "keydown", { shiftKey: true });
+    press(field, "Alt");
+    press(field, "x", "keydown", { altKey: true });
+    press(field, "Alt", "keyup");
+    press(field, "Alt");
+    document.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    press(field, "Alt", "keyup");
+    focused.push(document.activeElement);
+    press(field, "F10");
+    focused.push(document.activeElement);
+    press(first, "F10");
+    press(first, "Escape");
+    focused.push(document.activeElement);
+    press(field, "Alt");
+    press(field, "Alt", "keyup");
+    focused.push(document.activeElement);
+    field.remove();
+    press(first, "Escape");
+    press(first, "Escape");
+    focused.push(document.activeElement);
+
+    expect(focused).toEqual([field, first, field, first, first]);
+    field.remove();
+  });
+
+  it("focuses the menu button instead when the menus are a button, and keeps Escape for an open menu", async () => {
+    DesktopBridgeFixture.install("win32");
+    useMenuBarStyle("Button");
+    useNotesMenus([]);
+    apply();
+    const field = document.createElement("input");
+    document.body.append(field);
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    fixture.detectChanges();
+    await settle(fixture);
+    const button = fixture.nativeElement.querySelector(".tr-window-row-menu") as HTMLButtonElement;
+
+    field.focus();
+    press(field, "F10");
+    const focused = document.activeElement;
+    button.setAttribute("aria-expanded", "true");
+    press(button, "Escape");
+    const stayed = document.activeElement;
+
+    expect([focused, stayed]).toEqual([button, button]);
+    field.remove();
+  });
+
+  it("does not move focus to a menu on macOS", async () => {
+    DesktopBridgeFixture.install("darwin");
+    useNotesMenus([]);
+    apply();
+    const field = document.createElement("input");
+    document.body.append(field);
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    fixture.detectChanges();
+    await settle(fixture);
+
+    field.focus();
+    press(field, "F10");
+
+    expect(document.activeElement).toBe(field);
+    expect(fixture.nativeElement.querySelector("tr-menu-bar")).toBeNull();
+    field.remove();
+  });
+
+  it("puts the actions placed at the start right after the menu and the others before command search", async () => {
+    DesktopBridgeFixture.install("win32");
+    useNotesMenus([]);
+    apply();
+    const action = (name: string, side: TopBarSide): TopBarAction =>
+      new TopBarAction(new TopBarActionContribution(name, new TopBarActionState("note_add", name, "notes.newNote"), side), () => undefined);
+    TestBed.inject(BarItemsService).set([], [action("notes.print", TopBarSide.End), action("notes.back", TopBarSide.Start), action("notes.forward", TopBarSide.Start)]);
+
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    fixture.detectChanges();
+    await settle(fixture);
+    const row: HTMLElement = fixture.nativeElement;
+
+    expect([...row.children].map(t => `${t.tagName.toLowerCase()}.${[...t.classList].find(u => u.startsWith("tr-window-row-"))}`)).toEqual([
+      "tr-menu-bar.tr-window-row-menu-bar", "div.tr-window-row-start", "div.tr-window-row-breadcrumb", "div.tr-window-row-actions"
+    ]);
+    expect([...row.querySelectorAll(".tr-window-row-start button")].map(t => t.getAttribute("data-tr-item"))).toEqual(["notes.back", "notes.forward"]);
+    expect([...row.querySelectorAll(".tr-window-row-actions button")].map(t => t.getAttribute("data-tr-item") ?? "search")).toEqual(["notes.print", "search"]);
   });
 
   it("has no menu button on macOS, sends the menu bar to the desktop and runs the row the desktop reports until it is removed", async () => {

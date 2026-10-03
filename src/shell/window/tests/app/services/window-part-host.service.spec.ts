@@ -376,7 +376,7 @@ describe("WindowPartHostService", () => {
     ], [status("clock"), status("notes")]);
     const bars = TestBed.inject(BarItemsService);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
-    const shown = [bars.leftItems().map(t => t.name), bars.rightItems().map(t => t.name), bars.topBarActions().map(t => t.name)];
+    const shown = [bars.leftItems().map(t => t.name), bars.rightItems().map(t => t.name), bars.endActions().map(t => t.name)];
 
     bridge.responses.set("shell.modules", { payload: { modules: [status("clock", ModuleState.Failed, "It broke."), status("notes")] } });
     bridge.publishStartup({ kind: "Connecting", details: [] });
@@ -384,7 +384,7 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(host.generation()).toBe(2));
 
     expect(shown).toEqual([["clock.zone", "notes.count"], ["clock.ticks"], ["clock.reset", "notes.compose"]]);
-    expect([bars.leftItems().map(t => t.name), bars.rightItems(), bars.topBarActions().map(t => t.name)]).toEqual([["notes.count"], [], ["notes.compose"]]);
+    expect([bars.leftItems().map(t => t.name), bars.rightItems(), bars.endActions().map(t => t.name)]).toEqual([["notes.count"], [], ["notes.compose"]]);
     expect(errors).toEqual([]);
   });
 
