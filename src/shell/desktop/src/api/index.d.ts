@@ -357,16 +357,18 @@ export interface IDesktopProcess {
    * Starts another program, detached, for the hand-over to a newer build.
    *
    * @param executablePath The program.
+   * @param args Its arguments: the start's data directory, user data and
+   * device directory arguments, so the newer build opens the same data.
    * @example
    * ```ts
    * import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
    *
    * export function handOver(process: IDesktopProcess): void {
-   *   process.startDetached("/opt/teamrun/teamrun");
+   *   process.startDetached("/opt/teamrun/teamrun", ["--data-dir=/home/person/work-data"]);
    * }
    * ```
    */
-  startDetached(executablePath: string): void;
+  startDetached(executablePath: string, args: readonly string[]): void;
 
   /**
    * Ends another process at once, for a window's page that did not stop when asked.

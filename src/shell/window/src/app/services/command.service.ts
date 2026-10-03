@@ -24,12 +24,13 @@ import { ShellCommandsService } from "./shell-commands.service";
 export class CommandService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
-  private readonly shellCommands: readonly CommandContribution[] = inject(ShellCommandsService).commands;
+  private readonly shell: ShellCommandsService = inject(ShellCommandsService);
+  private readonly shellCommands: readonly CommandContribution[] = this.shell.commands;
   private readonly moduleCommands: WritableSignal<readonly CommandContribution[]> = signal([]);
   private readonly bindingsValue: WritableSignal<readonly ShortcutBinding[]> = signal([]);
 
   public readonly commands: Signal<readonly CommandContribution[]> = computed(() => [...this.shellCommands, ...this.moduleCommands()]);
-  public readonly shortcuts: Signal<ShortcutMap> = computed(() => new ShortcutMap(this.commands(), this.bindingsValue(), this.bridge.platform));
+  public readonly shortcuts: Signal<ShortcutMap> = computed(() => new ShortcutMap(this.shell.keys(this.bridge.platform), this.commands(), this.bindingsValue(), this.bridge.platform));
 
   public constructor() {
     const document = inject(DOCUMENT);

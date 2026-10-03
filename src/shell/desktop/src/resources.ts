@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { MenuItemConstructorOptions } from "electron";
+
 import { ShellMethods } from "@noldova/teamrun-shell-protocol";
 
 export class Resources {
@@ -14,6 +16,21 @@ export class Resources {
   public static readonly appUserModelId: string = "__APPLICATION_ID__";
   public static readonly developmentAppUserModelId: string = "__DEVELOPMENT_APPLICATION_ID__";
   public static readonly checkoutHashAlgorithm: string = "sha256";
+  public static readonly macMenu: MenuItemConstructorOptions[] = [
+    { role: "appMenu" },
+    { role: "editMenu" },
+    {
+      role: "window",
+      submenu: [
+        { role: "minimize" },
+        { role: "zoom" },
+        { type: "separator" },
+        { role: "close", label: "Close Window", accelerator: "Command+Shift+W" },
+        { type: "separator" },
+        { role: "front" }
+      ]
+    }
+  ];
   public static readonly hexEncoding: "hex" = "hex";
   public static readonly checkoutHashLength: number = 8;
   public static readonly idSeparator: string = ".";
@@ -79,6 +96,7 @@ export class Resources {
   public static readonly runAsNodeValue: string = "1";
   public static readonly workWaitInterval: number = 2000;
   public static readonly deviceDirectoryArgument: string = "--device-dir=";
+  public static readonly handoverArguments: readonly string[] = [Resources.dataDirectoryArgument, Resources.userDataArgument, Resources.deviceDirectoryArgument];
   public static readonly windowsPlatform: string = "win32";
   public static readonly localAppDataVariable: string = "LOCALAPPDATA";
   public static readonly windowsLocalAppData: readonly string[] = ["AppData", "Local"];

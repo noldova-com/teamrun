@@ -11,6 +11,7 @@ import { EnvironmentInjector, Injectable, afterNextRender, inject } from "@angul
 
 import "@noldova/teamrun-foundation-core";
 import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
+import { KeyChord } from "@noldova/teamrun-shell-protocol";
 
 import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
@@ -46,13 +47,15 @@ export class ShellCommandsService {
       t => this.place(t.tab, new TabDropTarget(t.group.id, t.index - 1)), t => !t.isFirst),
     this.tabCommand(Resources.moveTabRightCommand, Resources.moveTabRightTitle, Resources.moveLaterGlyph,
       t => this.place(t.tab, new TabDropTarget(t.group.id, t.index + 2)), t => !t.isLast),
+    this.tabCommand(Resources.nextTabCommand, Resources.nextTabTitle, Resources.nextTabGlyph, t => this.show(t, 1), t => t.group.tabs.length > 1),
+    this.tabCommand(Resources.previousTabCommand, Resources.previousTabTitle, Resources.previousTabGlyph, t => this.show(t, -1), t => t.group.tabs.length > 1),
     ...Object.values(PanelEdge).map(edge => this.tabCommand(Resources.splitTabCommands[edge], Resources.splitTabTitles[edge], Resources.splitGlyphs[edge],
       t => this.place(t.tab, new SplitDropTarget(t.group.id, edge)), t => t.canSplit)),
     ...Object.values(DockSide).map(side => this.tabCommand(Resources.dockTabCommands[side], Resources.dockTabTitles[side], Resources.dockGlyphs[side],
       t => this.place(t.tab, new SideDropTarget(side)), t => t.tab.isMovable)),
     ...Object.values(DockSide).map(side => new CommandContribution(Resources.toggleDockCommands[side], Resources.toggleDockTitles[side], Resources.hideDockGlyphs[side], null,
       () => this.done(() => this.layout.toggleDock(side)))),
-    new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, Resources.showCommandsKey,
+    new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, null,
       () => this.done(() => this.search.open())),
     new CommandContribution(Resources.resetLayoutCommand, Resources.resetLayoutLabel, Resources.resetLayoutGlyph, null, () => this.done(() => this.layout.reset())),
     ...Object.values(BottomDockSpan).map(span => new CommandContribution(Resources.bottomSpanCommands[span], Resources.bottomSpanLabels[span], Resources.bottomSpanGlyphs[span], null,
@@ -68,6 +71,10 @@ export class ShellCommandsService {
         return !Object.isNull(group) && this.strips.isOverflowing(group);
       })
   ];
+
+  public keys(platform: string): readonly (readonly [KeyChord, string])[] {
+    return Resources.shellKeys.flatMap(([command, standard, mac]) => (platform === Resources.macPlatform ? mac : standard).map(t => [KeyChord.parse(t), command] as const));
+  }
 
   private tabCommand(name: string, title: string, icon: string, run: (target: TabTarget) => void, isEnabled: (target: TabTarget) => boolean): CommandContribution {
     return new CommandContribution(name, title, icon, null,
@@ -103,6 +110,15 @@ export class ShellCommandsService {
     const next = this.layout.layout().group(target.group.id)?.active ?? null;
     if (!Object.isNull(next))
       this.focus(next);
+  }
+
+  private show(target: TabTarget, step: number): void {
+    const count = target.group.tabs.length;
+    const index = (target.index + step + count) % count;
+    for (const tab of target.group.tabs.slice(index, index + 1)) {
+      this.layout.activate(tab);
+      this.focus(tab);
+    }
   }
 
   private closeKeeping(tabs: readonly Tab[], kept: Tab): void {

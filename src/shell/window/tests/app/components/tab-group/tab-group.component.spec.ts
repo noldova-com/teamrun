@@ -228,10 +228,10 @@ describe("TabGroupComponent", () => {
     expect(document.activeElement).toBe(tab(0, 0));
   });
 
-  it("moves between tabs with the arrow keys, Home and End", async () => {
+  it("moves between tabs with the arrow keys, Home and End, and leaves an arrow with Ctrl, Cmd or Option to the commands", async () => {
     await renderAsync(prepared.openDocument(LayoutFixture.settings));
-    const press = (key: string): KeyboardEvent => {
-      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+    const press = (key: string, modifiers: KeyboardEventInit = {}): KeyboardEvent => {
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...modifiers });
       tab(0, 0).dispatchEvent(event);
       update();
       return event;
@@ -247,6 +247,7 @@ describe("TabGroupComponent", () => {
     press("End");
     expect(layout.layout().documents.active).toEqual(LayoutFixture.settings);
     expect(press("a").defaultPrevented).toBe(false);
+    expect([{ ctrlKey: true }, { metaKey: true, altKey: true }, { altKey: true }].map(t => press("ArrowRight", t).defaultPrevented)).toEqual([false, false, false]);
     expect(layout.layout().documents.active).toEqual(LayoutFixture.settings);
   });
 

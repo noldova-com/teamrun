@@ -14,7 +14,7 @@ export class FakeMenuHost implements IMenuHost {
   public menu: unknown = undefined;
 
   public buildFromTemplate(template: MenuItemConstructorOptions[]): unknown {
-    return template.map(t => t.role);
+    return template;
   }
 
   public setApplicationMenu(menu: unknown): void {
