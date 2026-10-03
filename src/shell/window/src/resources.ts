@@ -105,6 +105,7 @@ export class Resources {
   public static readonly dockGlyph: string = "dock_to_right";
   public static readonly closeGlyph: string = "close";
   public static readonly closeOthersGlyph: string = "tab_close";
+  public static readonly keepGlyph: string = "keep";
   public static readonly closeToTheRightGlyph: string = "tab_close_right";
   public static readonly closeAllGlyph: string = "clear_all";
   public static readonly moveEarlierGlyph: string = "arrow_back";
@@ -117,6 +118,7 @@ export class Resources {
   public static readonly splitLabel: string = "Split";
   public static readonly dockLabel: string = "Dock";
   public static readonly closeTabLabel: string = "Close";
+  public static readonly keepLabel: string = "Keep open";
   public static readonly closeOthersLabel: string = "Close others";
   public static readonly closeToTheRightLabel: string = "Close to the right";
   public static readonly closeAllLabel: string = "Close all";
@@ -180,6 +182,7 @@ export class Resources {
   public static readonly weightField: string = "weight";
   public static readonly tabsField: string = "tabs";
   public static readonly activeField: string = "active";
+  public static readonly previewField: string = "preview";
   public static readonly documentsField: string = "documents";
   public static readonly viewField: string = "view";
   public static readonly documentField: string = "document";
@@ -201,6 +204,7 @@ export class Resources {
   public static readonly emptyViewGroup: string = "A group of views has at least one tab.";
   public static readonly repeatedTab: string = "A tab appears only once in a layout.";
   public static readonly inactiveTab: string = "The active tab must be one of the group's tabs, and a group with tabs has one.";
+  public static readonly previewOutsideGroup: string = "The preview tab must be one of the group's tabs.";
   public static readonly documentOutsideDocuments: string = "Document tabs stay in the documents group.";
   public static readonly missingDocumentsGroup: string = "The middle holds exactly one documents group.";
   public static readonly documentsInDock: string = "The documents group stays in the middle.";

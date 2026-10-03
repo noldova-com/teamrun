@@ -13,7 +13,9 @@ export interface IWindowPartHost {
 
   onEvent(listener: (name: string, payload: JsonValue) => void): () => void;
 
-  openDocument(moduleId: string, name: string, instance: string, title: string): void;
+  openDocument(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void;
+
+  keepDocument(moduleId: string, name: string, instance: string): void;
 
   isCommandRegistered(name: string): boolean;
 

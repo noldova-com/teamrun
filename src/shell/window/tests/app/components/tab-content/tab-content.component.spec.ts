@@ -66,6 +66,7 @@ describe("TabContentComponent", () => {
     requestAsync: () => Promise.resolve(null),
     onEvent: () => () => undefined,
     openDocument: () => undefined,
+    keepDocument: () => undefined,
     isCommandRegistered: () => false,
     runCommandAsync: () => Promise.resolve(null),
     refresh: () => undefined

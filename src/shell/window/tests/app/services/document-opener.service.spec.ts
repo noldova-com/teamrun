@@ -38,9 +38,9 @@ describe("DocumentOpenerService", () => {
   });
 
   it("opens a module's own document with its title and activates it when opened again with a new title", () => {
-    opener.open("notes", "notes.note", "1", "Note 1");
-    opener.open("notes", "notes.note", "2", "Note 2");
-    opener.open("notes", "notes.note", "1", "First note");
+    opener.open("notes", "notes.note", "1", "Note 1", false);
+    opener.open("notes", "notes.note", "2", "Note 2", false);
+    opener.open("notes", "notes.note", "1", "First note", false);
     const first = new DocumentTab("notes.note", "1");
 
     expect(layout.layout().documents.tabs).toEqual([first, new DocumentTab("notes.note", "2")]);
@@ -48,11 +48,23 @@ describe("DocumentOpenerService", () => {
     expect(labels.of(first).title).toBe("First note");
   });
 
+  it("opens a document as a preview that the next preview replaces, and keeps it on request", () => {
+    opener.open("notes", "notes.note", "1", "Note 1", true);
+    opener.open("notes", "notes.note", "2", "Note 2", true);
+    opener.keep("notes", "notes.note", "2");
+    const second = new DocumentTab("notes.note", "2");
+
+    expect(layout.layout().documents.tabs).toEqual([second]);
+    expect(layout.layout().documents.preview).toBeNull();
+    expect(() => opener.keep("clock", "notes.note", "2")).toThrow(ArgumentException);
+    expect(() => opener.keep("notes", "notes.page", "2")).toThrow(ArgumentException);
+  });
+
   it("refuses another module's document, an unregistered one and an empty title", () => {
-    expect(() => opener.open("clock", "notes.note", "1", "Note 1")).toThrow(ArgumentException);
-    expect(() => opener.open("note", "notes.note", "1", "Note 1")).toThrow(ArgumentException);
-    expect(() => opener.open("notes", "notes.page", "1", "Page")).toThrow(ArgumentException);
-    expect(() => opener.open("notes", "notes.note", "1", " ")).toThrow(ArgumentException);
+    expect(() => opener.open("clock", "notes.note", "1", "Note 1", false)).toThrow(ArgumentException);
+    expect(() => opener.open("note", "notes.note", "1", "Note 1", false)).toThrow(ArgumentException);
+    expect(() => opener.open("notes", "notes.page", "1", "Page", false)).toThrow(ArgumentException);
+    expect(() => opener.open("notes", "notes.note", "1", " ", false)).toThrow(ArgumentException);
     expect(layout.layout().documents.tabs).toEqual([]);
   });
 });

@@ -97,6 +97,10 @@ export class TabMenuComponent {
     this.layout.closeTabs(group.tabs);
   }
 
+  protected keep(): void {
+    this.layout.keep(this.tab());
+  }
+
   protected reset(): void {
     this.layout.reset();
   }
