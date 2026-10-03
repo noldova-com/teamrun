@@ -17,7 +17,6 @@ import type { MenuDeclarations } from "../models/menu-declarations";
 import type { MenuGroup } from "../models/menu-group";
 import type { MenuItem } from "../models/menu-item";
 import type { MenuPlace } from "../models/menu-place";
-import type { MenuRow } from "../models/menu-row";
 import { MenuSection } from "../models/menu-section";
 import { SubmenuRow } from "../models/submenu-row";
 import { WindowPartTokens } from "../models/window-part-tokens";
@@ -51,7 +50,7 @@ export class MenuService {
       .filter(t => t.rows.length > 0);
   }
 
-  private resolveItem(group: MenuGroup, item: MenuItem, context: JsonObject): readonly MenuRow[] {
+  private resolveItem(group: MenuGroup, item: MenuItem, context: JsonObject): readonly (CommandRow | SubmenuRow)[] {
     if (!Object.isNull(item.submenu)) {
       const place = this.findPlace(item.submenu);
       return Object.isNull(place) ? [] : [new SubmenuRow(place.name, place.title)];

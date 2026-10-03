@@ -9,6 +9,7 @@
 import { MenuRow } from "./menu-row";
 
 export class SubmenuRow extends MenuRow {
+  public readonly isSubmenu: true = true;
   public readonly place: string;
 
   public constructor(place: string, title: string) {

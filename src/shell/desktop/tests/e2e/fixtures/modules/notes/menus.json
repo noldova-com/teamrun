@@ -1,0 +1,102 @@
+{
+  "places": [
+    {
+      "name": "notes.listItem",
+      "title": "Note"
+    },
+    {
+      "name": "notes.templates",
+      "title": "New from template"
+    },
+    {
+      "name": "notes.tools",
+      "title": "Notes",
+      "menuBar": true
+    }
+  ],
+  "groups": [
+    {
+      "name": "notes.create",
+      "place": "shell.file",
+      "items": [
+        {
+          "command": "notes.newNote"
+        },
+        {
+          "submenu": "notes.templates"
+        }
+      ]
+    },
+    {
+      "name": "notes.fromTemplate",
+      "place": "notes.templates",
+      "items": [
+        {
+          "command": "notes.newNote",
+          "arguments": {
+            "template": "plan"
+          }
+        }
+      ]
+    },
+    {
+      "name": "notes.open",
+      "place": "notes.listItem",
+      "items": [
+        {
+          "command": "notes.openNote"
+        },
+        {
+          "submenu": "notes.templates"
+        }
+      ]
+    },
+    {
+      "name": "notes.sorting",
+      "place": "notes.listItem",
+      "exclusive": true,
+      "items": [
+        {
+          "command": "notes.sortBy",
+          "arguments": {
+            "by": "title"
+          }
+        },
+        {
+          "command": "notes.sortBy",
+          "arguments": {
+            "by": "week"
+          }
+        }
+      ]
+    },
+    {
+      "name": "notes.display",
+      "place": "notes.listItem",
+      "items": [
+        {
+          "command": "notes.wrapLines"
+        }
+      ]
+    },
+    {
+      "name": "notes.toolsSorting",
+      "place": "notes.tools",
+      "exclusive": true,
+      "items": [
+        {
+          "command": "notes.sortBy",
+          "arguments": {
+            "by": "title"
+          }
+        },
+        {
+          "command": "notes.sortBy",
+          "arguments": {
+            "by": "week"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -9,6 +9,8 @@
 import { JsonReader } from "@noldova/teamrun-foundation-json";
 import { CommandContribution, DockSide, DocumentContribution, type IWindowPart, type IWindowPartContext, ViewContribution } from "@noldova/teamrun-shell-window";
 
+import { NotesState } from "./notes-state";
+
 export class NotesWindowPart implements IWindowPart {
   private static readonly MANY_VIEWS: readonly [string, string, string, DockSide][] = [
     ["notes.search", "Search", "search", DockSide.Left],
@@ -57,6 +59,19 @@ export class NotesWindowPart implements IWindowPart {
       context.openDocument("notes.note", String(count), `Note ${count}`);
       return count;
     }));
+    context.registerCommand(new CommandContribution("notes.openNote", "Open note", "open_in_new", null, async commandArguments => {
+      const note = JsonReader.fromValue(commandArguments);
+      context.openDocument("notes.note", `week-${note.readInteger("week")}`, note.readString("title"));
+      return null;
+    }, commandArguments => JsonReader.fromValue(commandArguments).hasField("week")));
+    context.registerCommand(new CommandContribution("notes.sortBy", "Sort by", "sort", null, async commandArguments => {
+      NotesState.sortBy.set(JsonReader.fromValue(commandArguments).readString("by"));
+      return null;
+    }, () => true, commandArguments => NotesState.sortBy() === JsonReader.fromValue(commandArguments).readString("by")));
+    context.registerCommand(new CommandContribution("notes.wrapLines", "Wrap lines", "wrap_text", null, async () => {
+      NotesState.wrapsLines.update(t => !t);
+      return null;
+    }, () => true, () => NotesState.wrapsLines()));
     if (!JsonReader.fromValue(await context.requestAsync("notes.manyTabs", null)).readBoolean("isMany"))
       return;
     for (const [name, title, icon, side] of NotesWindowPart.MANY_VIEWS)

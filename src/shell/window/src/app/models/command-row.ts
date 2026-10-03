@@ -12,6 +12,7 @@ import type { MenuCheck } from "../enums/menu-check";
 import { MenuRow } from "./menu-row";
 
 export class CommandRow extends MenuRow {
+  public readonly isSubmenu: false = false;
   public readonly command: string;
   public readonly commandArguments: JsonObject;
   public readonly key: string | null;

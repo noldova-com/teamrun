@@ -13,12 +13,12 @@ LICENSE file in the root directory of this source tree.
         <tr-menu-separator />
       }
       @for (row of section.rows; track $index) {
-        @if (asCommand(row); as command) {
-          <button tr-menu-item class="tr-place-menu-item" [attr.data-command]="command.command" [label]="command.title" [icon]="command.icon"
-            [shortcut]="command.key" [disabled]="!command.isEnabled" (triggered)="run(command)"></button>
-        } @else if (asSubmenu(row); as submenu) {
-          <tr-place-menu #nested [place]="submenu.place" [context]="context()" />
-          <button tr-menu-item class="tr-place-menu-submenu" [attr.data-submenu]="submenu.place" [label]="submenu.title" [trMenuTriggerFor]="nested.menu()"></button>
+        @if (row.isSubmenu) {
+          <tr-place-menu #nested [place]="row.place" [context]="context()" />
+          <button tr-menu-item class="tr-place-menu-submenu" [attr.data-submenu]="row.place" [label]="row.title" [trMenuTriggerFor]="nested.menu()"></button>
+        } @else {
+          <button tr-menu-item class="tr-place-menu-item" [attr.data-command]="row.command" [label]="row.title" [icon]="row.icon"
+            [shortcut]="row.key" [disabled]="!row.isEnabled" (triggered)="run(row)"></button>
         }
       }
     }

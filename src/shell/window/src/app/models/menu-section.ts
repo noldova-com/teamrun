@@ -6,13 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { MenuRow } from "./menu-row";
+import type { CommandRow } from "./command-row";
+import type { SubmenuRow } from "./submenu-row";
 
 export class MenuSection {
   public readonly group: string;
-  public readonly rows: readonly MenuRow[];
+  public readonly rows: readonly (CommandRow | SubmenuRow)[];
 
-  public constructor(group: string, rows: readonly MenuRow[]) {
+  public constructor(group: string, rows: readonly (CommandRow | SubmenuRow)[]) {
     this.group = group;
     this.rows = [...rows];
   }
