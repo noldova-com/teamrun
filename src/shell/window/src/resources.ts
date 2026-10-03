@@ -174,6 +174,8 @@ export class Resources {
   public static readonly moveTabLeftCommand: string = "shell.moveTabLeft";
   public static readonly moveTabRightCommand: string = "shell.moveTabRight";
   public static readonly resetLayoutCommand: string = "shell.resetLayout";
+  public static readonly nextTabCommand: string = "shell.nextTab";
+  public static readonly previousTabCommand: string = "shell.previousTab";
   public static readonly showAllTabsCommand: string = "shell.showAllTabs";
   public static readonly splitTabCommands: Readonly<Record<PanelEdge, string>> = {
     [PanelEdge.Left]: "shell.splitTabLeft",
@@ -198,6 +200,10 @@ export class Resources {
   public static readonly closeAllTabsTitle: string = "Close all tabs in the group";
   public static readonly moveTabLeftTitle: string = "Move the tab left";
   public static readonly moveTabRightTitle: string = "Move the tab right";
+  public static readonly nextTabTitle: string = "Show the next tab";
+  public static readonly previousTabTitle: string = "Show the previous tab";
+  public static readonly nextTabGlyph: string = "keyboard_tab";
+  public static readonly previousTabGlyph: string = "keyboard_tab_rtl";
   public static readonly splitTabTitles: Readonly<Record<PanelEdge, string>> = {
     [PanelEdge.Left]: "Split the tab left",
     [PanelEdge.Right]: "Split the tab right",
@@ -218,7 +224,15 @@ export class Resources {
   public static readonly showCommandsCommand: string = "shell.showCommands";
   public static readonly showCommandsTitle: string = "Show all commands";
   public static readonly showCommandsGlyph: string = "search";
-  public static readonly showCommandsKey: string = "Mod+Shift+P";
+  public static readonly shellKeys: readonly (readonly [string, readonly string[], readonly string[]])[] = [
+    ["shell.showCommands", ["Mod+Shift+P"], ["Mod+Shift+P"]],
+    ["shell.closeTab", ["Mod+W"], ["Mod+W"]],
+    ["shell.nextTab", ["Ctrl+Tab", "Ctrl+PageDown"], ["Ctrl+Tab", "Mod+Alt+ArrowRight"]],
+    ["shell.previousTab", ["Ctrl+Shift+Tab", "Ctrl+PageUp"], ["Ctrl+Shift+Tab", "Mod+Alt+ArrowLeft"]],
+    ["shell.toggleLeftDock", ["Mod+B"], ["Mod+B"]],
+    ["shell.toggleBottomDock", ["Mod+J"], ["Mod+J"]],
+    ["shell.toggleRightDock", ["Mod+Alt+B"], ["Mod+Alt+B"]]
+  ];
   public static readonly commandSearchLabel: string = "Search commands";
   public static readonly commandSearchPaneClass: string = "tr-command-search-pane";
   public static readonly windowRowSelector: string = "tr-window-row";
@@ -245,7 +259,13 @@ export class Resources {
     [DockSide.Right]: "Resize the right dock",
     [DockSide.Bottom]: "Resize the bottom dock"
   };
-  public static readonly resizeSplitLabel: string = "Resize the split";
+  public static readonly tabIdPrefix: string = "tr-tab-";
+  public static readonly tabIdSeparator: string = "-";
+  public static readonly tabPanelIdPrefix: string = "tr-tab-panel-";
+  public static readonly resizeSplitLabels: Readonly<Record<SplitAxis, string>> = {
+    [SplitAxis.Horizontal]: "Resize the pane on the left",
+    [SplitAxis.Vertical]: "Resize the pane above"
+  };
   public static readonly versionField: string = "version";
   public static readonly docksField: string = "docks";
   public static readonly middleField: string = "middle";
@@ -272,6 +292,8 @@ export class Resources {
   public static readonly textParameter: string = "text";
   public static readonly tooltipParameter: string = "tooltip";
   public static readonly commandParameter: string = "command";
+  public static readonly viewKind: string = "view";
+  public static readonly documentKind: string = "document";
   public static readonly statusBarItemKind: string = "status bar item";
   public static readonly topBarActionKind: string = "top bar action";
   public static readonly notificationKind: string = "notification kind";

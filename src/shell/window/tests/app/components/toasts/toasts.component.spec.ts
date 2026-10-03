@@ -13,6 +13,8 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { CommandRun, Notification, NotificationAction, NotificationPost, NotificationSeverity, NotificationState, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { ToastsComponent } from "../../../../src/app/components/toasts/toasts.component";
+import { WindowPartSource } from "../../../../src/app/models/window-part-source";
+import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { NotificationService } from "../../../../src/app/services/notification.service";
 import { ToastService } from "../../../../src/app/services/toast.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
@@ -32,6 +34,16 @@ class FakeNotificationService {
     this.calls.push(`run ${command.name.text}`);
     return this.failure === null ? Promise.resolve(null) : Promise.reject(this.failure);
   }
+}
+
+
+async function expectTooltipAsync(button: HTMLElement | null | undefined, text: string): Promise<void> {
+  const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === text);
+  button?.dispatchEvent(new PointerEvent("pointerenter"));
+  await vi.waitFor(() => expect(tooltip()).toBeDefined());
+  button?.dispatchEvent(new PointerEvent("pointerleave"));
+  await vi.waitFor(() => expect(tooltip()).toBeUndefined());
+  expect(button?.hasAttribute("title")).toBe(false);
 }
 
 describe("ToastsComponent", () => {
@@ -64,6 +76,7 @@ describe("ToastsComponent", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: NotificationService, useValue: notifications },
+        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
     });
@@ -89,7 +102,17 @@ describe("ToastsComponent", () => {
     expect(second?.querySelector("span.tr-toast-title")?.textContent).toBe("Title 1");
     expect(second?.querySelector("progress")?.hasAttribute("value")).toBe(false);
     expect(second?.querySelector(".tr-toast-close")?.getAttribute("aria-label")).toBe("Close");
+    await expectTooltipAsync(second?.querySelector<HTMLElement>(".tr-toast-close"), "Close");
     expect(regions).toEqual([["polite", "Title 1"], ["assertive", "Title 2. The disk is full."]]);
+  });
+
+  it("names each toast's module, by its display name when it has a window part, and the time it was posted", async () => {
+    const clock = new Notification(2, 2, new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null),
+      "2026-10-03T08:05:00.000Z", false);
+    const fixture = await renderAsync(clock, toast(1));
+
+    expect(toasts(fixture).map(t => t.querySelector(".tr-toast-meta")?.textContent?.split(" · ")[0])).toEqual(["Notes", "clock"]);
+    expect(toasts(fixture)[1]?.querySelector(".tr-toast-meta")?.textContent).toMatch(/ · \d{1,2}:05/);
   });
 
   it("runs an action or the open command and closes the toast, closes one on Close and reports an action that fails", async () => {

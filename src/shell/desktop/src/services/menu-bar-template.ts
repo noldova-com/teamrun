@@ -26,22 +26,38 @@ export class MenuBarTemplate {
   private static readonly APP_ITEMS: readonly MenuItemConstructorOptions[] = [
     { role: "services" }, MenuBarTemplate.SEPARATOR, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, MenuBarTemplate.SEPARATOR, { role: "quit" }
   ];
-  private static readonly WINDOW_ITEMS: readonly MenuItemConstructorOptions[] = [{ role: "minimize" }, { role: "zoom" }, MenuBarTemplate.SEPARATOR, { role: "front" }];
+  private static readonly WINDOW_ITEMS: readonly MenuItemConstructorOptions[] = [
+    { role: "minimize" }, { role: "zoom" }, MenuBarTemplate.SEPARATOR, { role: "close", label: Resources.closeWindowLabel, accelerator: Resources.closeWindowAccelerator },
+    MenuBarTemplate.SEPARATOR, { role: "front" }
+  ];
 
   public static build(bar: MenuBar, run: (id: string) => void): MenuItemConstructorOptions[] {
     const app = bar.menus.find(t => t.place === Resources.appMenu)?.rows.map(t => MenuBarTemplate.itemOf(t, run)) ?? [];
-    return [
-      { label: Resources.applicationName, submenu: [{ role: "about" }, MenuBarTemplate.SEPARATOR, ...MenuBarTemplate.before(app, MenuBarTemplate.APP_ITEMS)] },
-      ...bar.menus.filter(t => t.place !== Resources.appMenu).flatMap(t => MenuBarTemplate.menuOf(t, run))
-    ];
+    return [MenuBarTemplate.appMenu(app), ...bar.menus.filter(t => t.place !== Resources.appMenu).flatMap(t => MenuBarTemplate.menuOf(t, run))];
+  }
+
+  public static standard(): MenuItemConstructorOptions[] {
+    return [MenuBarTemplate.appMenu([]), MenuBarTemplate.editMenu(Resources.editTitle, []), MenuBarTemplate.windowMenu(Resources.windowTitle, [])];
+  }
+
+  private static appMenu(rows: readonly MenuItemConstructorOptions[]): MenuItemConstructorOptions {
+    return { label: Resources.applicationName, submenu: [{ role: "about" }, MenuBarTemplate.SEPARATOR, ...MenuBarTemplate.before(rows, MenuBarTemplate.APP_ITEMS)] };
+  }
+
+  private static editMenu(title: string, rows: readonly MenuItemConstructorOptions[]): MenuItemConstructorOptions {
+    return { label: title, submenu: MenuBarTemplate.after(MenuBarTemplate.EDIT_ITEMS, rows) };
+  }
+
+  private static windowMenu(title: string, rows: readonly MenuItemConstructorOptions[]): MenuItemConstructorOptions {
+    return { label: title, role: "window", submenu: MenuBarTemplate.after(MenuBarTemplate.WINDOW_ITEMS, rows) };
   }
 
   private static menuOf(menu: MenuBarMenu, run: (id: string) => void): MenuItemConstructorOptions[] {
     const rows = menu.rows.map(t => MenuBarTemplate.itemOf(t, run));
     if (menu.place === Resources.editMenu)
-      return [{ label: menu.title, submenu: MenuBarTemplate.after(MenuBarTemplate.EDIT_ITEMS, rows) }];
+      return [MenuBarTemplate.editMenu(menu.title, rows)];
     if (menu.place === Resources.windowMenu)
-      return [{ label: menu.title, role: "window", submenu: MenuBarTemplate.after(MenuBarTemplate.WINDOW_ITEMS, rows) }];
+      return [MenuBarTemplate.windowMenu(menu.title, rows)];
     if (rows.length === 0)
       return [];
     return [{ label: menu.title, submenu: rows, ...menu.place === Resources.helpMenu ? { role: "help" } : {} }];

@@ -65,6 +65,11 @@ export class TabGroupComponent {
   protected readonly group: Signal<TabGroup> = computed(() => this.frame().group);
   protected readonly surface: Signal<PanelSurface> = computed(() => Object.isNull(this.frame().side) ? PanelSurface.Panel : PanelSurface.Shell);
   protected readonly isShell: Signal<boolean> = computed(() => this.surface() === PanelSurface.Shell);
+  protected readonly panelId: Signal<string> = computed(() => `${Resources.tabPanelIdPrefix}${this.group().id}`);
+  protected readonly activeTabId: Signal<string | null> = computed(() => {
+    const index = this.group().tabs.findIndex(t => t.equals(this.group().active));
+    return index < 0 ? null : this.tabId(index);
+  });
   protected readonly hideSide: Signal<DockSide | null> = computed(() => {
     const side = this.frame().side;
     return !Object.isNull(side) && this.layout.layout().dock(side).root?.cornerGroup.id === this.group().id ? side : null;
@@ -83,6 +88,10 @@ export class TabGroupComponent {
       }
     });
     inject(DestroyRef).onDestroy(() => strips.setOverflowing(this.group().id, false));
+  }
+
+  protected tabId(index: number): string {
+    return `${Resources.tabIdPrefix}${this.group().id}${Resources.tabIdSeparator}${index}`;
   }
 
   protected choose(tab: Tab): void {
@@ -105,7 +114,8 @@ export class TabGroupComponent {
   protected onStripKey(event: KeyboardEvent): void {
     const tabs = this.group().tabs;
     const current = tabs.findIndex(t => t.equals(this.group().active));
-    const tab = tabs[this.indexFor(event.key, current, tabs.length)];
+    const key = event.ctrlKey || event.metaKey || event.altKey ? String.empty : event.key;
+    const tab = tabs[this.indexFor(key, current, tabs.length)];
     if (Object.isUndefined(tab))
       return;
     event.preventDefault();

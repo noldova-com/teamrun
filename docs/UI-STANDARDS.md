@@ -155,6 +155,19 @@ Use spacing tokens of 0.25, 0.5, 0.75, 1 and 1.5rem with section 8's component m
 - Operable UI text, placeholders, tooltips and informative secondary text meet at least 4.5:1 contrast at normal sizes. Large text follows the applicable 3:1 threshold. Disabled-control exceptions apply only to genuinely inoperable controls, not unselected tabs or historical information. Measure the composited foreground/background pair in every relevant state. See [text contrast](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html).
 - Essential control boundaries, state indicators and focus cues meet at least 3:1 against adjacent colors where required for identification. Decorative separators are not substitutes for an identifiable control. Color alone does not communicate success, error, availability or identity. See [non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html).
 - Use semantic controls, accessible names and associated labels. Icon-only actions expose their purpose. Errors and help text are associated with their inputs; a tooltip or placeholder is not the only label. Expose selected, expanded, checked, pressed and disabled states through the appropriate semantics.
+- The shell's default keys follow common desktop conventions; menus show them:
+
+  | Command | Windows and Linux | macOS |
+  |---|---|---|
+  | Show all commands | Ctrl+Shift+P | ⇧⌘P |
+  | Close the tab | Ctrl+W | ⌘W |
+  | Show the next tab | Ctrl+Tab, Ctrl+PageDown | ⌃⇥, ⌥⌘→ |
+  | Show the previous tab | Ctrl+Shift+Tab, Ctrl+PageUp | ⌃⇧⇥, ⌥⌘← |
+  | Show or hide the left dock | Ctrl+B | ⌘B |
+  | Show or hide the bottom dock | Ctrl+J | ⌘J |
+  | Show or hide the right dock | Ctrl+Alt+B | ⌥⌘B |
+
+  The next and previous tab move through the current group's tabs and wrap at either end. Other shell commands have no default key.
 - All operations are usable by keyboard with a predictable focus order. Tabs, lists, menus and completion use their established keyboard patterns; activation and dismissal cannot depend on middle-click, double-click, drag or a context menu alone.
 - Modal dialogs receive appropriate initial focus, contain focus while open, make the background inert and return focus to the opener or a sensible surviving control when closed. Escape dismisses a dismissible overlay; forms with unsaved work use an explicit discard policy. Non-modal search and popovers do not accidentally trap focus. See the [modal-dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
 - Dialogs are the shell's own, drawn in the window. The one exception is a window whose page has stopped or no longer responds: the page cannot draw then, so the desktop asks with the operating system's message box, in the product's voice, with the safe choice as default.

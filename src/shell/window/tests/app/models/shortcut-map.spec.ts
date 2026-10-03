@@ -20,8 +20,8 @@ describe("ShortcutMap", () => {
   it("finds the command a key runs, by the platform's modifiers", () => {
     const commands = [command("notes.newNote", "Mod+Alt+N"), command("clock.tick", "Ctrl+Alt+T")];
 
-    const windows = new ShortcutMap(commands, [], "win32");
-    const mac = new ShortcutMap(commands, [], "darwin");
+    const windows = new ShortcutMap([], commands, [], "win32");
+    const mac = new ShortcutMap([], commands, [], "darwin");
 
     expect(windows.find(new KeyboardEvent("keydown", press("n", "KeyN", { ctrlKey: true, altKey: true })))).toBe("notes.newNote");
     expect(mac.find(new KeyboardEvent("keydown", press("n", "KeyN", { metaKey: true, altKey: true })))).toBe("notes.newNote");
@@ -35,13 +35,31 @@ describe("ShortcutMap", () => {
   it("lets the first command keep a contested key and records each collision", () => {
     const commands = [command("clock.tick", "Mod+Alt+T"), command("notes.toggle", "Ctrl+Alt+T"), command("tasks.today", "Mod+Alt+T")];
 
-    const windows = new ShortcutMap(commands, [], "linux");
-    const mac = new ShortcutMap(commands, [], "darwin");
+    const windows = new ShortcutMap([], commands, [], "linux");
+    const mac = new ShortcutMap([], commands, [], "darwin");
 
     expect(windows.collisions.map(t => [t.key.text, t.keptBy, t.refused])).toEqual([["Ctrl+Alt+T", "clock.tick", "notes.toggle"], ["Mod+Alt+T", "clock.tick", "tasks.today"]]);
     expect(mac.collisions.map(t => [t.key.text, t.keptBy, t.refused])).toEqual([["Mod+Alt+T", "clock.tick", "tasks.today"]]);
     expect(windows.keyOf("notes.toggle")).toBeNull();
     expect(mac.keyOf("notes.toggle")?.text).toBe("Ctrl+Alt+T");
+  });
+
+  it("gives the shell's keys before modules' defaults, several per command with the first shown, and only to commands that exist", () => {
+    const commands = [command("shell.nextTab", null), command("notes.next", "Ctrl+PageDown"), command("notes.newNote", "Mod+Alt+N")];
+    const shellKeys = [[KeyChord.parse("Ctrl+Tab"), "shell.nextTab"], [KeyChord.parse("Ctrl+PageDown"), "shell.nextTab"], [KeyChord.parse("Mod+W"), "shell.closeTab"]] as const;
+
+    const map = new ShortcutMap(shellKeys, commands, [new ShortcutBinding("notes.newNote", KeyChord.parse("Mod+W"))], "win32");
+
+    expect(map.keyOf("shell.nextTab")?.text).toBe("Ctrl+Tab");
+    expect(map.find(new KeyboardEvent("keydown", press("PageDown", "PageDown", { ctrlKey: true })))).toBe("shell.nextTab");
+    expect(map.keyOf("notes.newNote")?.text).toBe("Mod+W");
+    expect(map.collisions.map(t => [t.key.text, t.keptBy, t.refused])).toEqual([["Ctrl+PageDown", "shell.nextTab", "notes.next"]]);
+  });
+
+  it("drops the shell's keys for a command the person bound", () => {
+    const map = new ShortcutMap([[KeyChord.parse("Mod+B"), "shell.toggleLeftDock"]], [command("shell.toggleLeftDock", null)], [new ShortcutBinding("shell.toggleLeftDock", null)], "linux");
+
+    expect(map.keyOf("shell.toggleLeftDock")).toBeNull();
   });
 
   it("puts the person's bindings before the defaults and unbinds a command bound to no key", () => {
@@ -53,7 +71,7 @@ describe("ShortcutMap", () => {
       new ShortcutBinding("clock.tick", KeyChord.parse("Mod+Alt+T"))
     ];
 
-    const map = new ShortcutMap(commands, bindings, "win32");
+    const map = new ShortcutMap([], commands, bindings, "win32");
 
     expect(map.keyOf("tasks.today")?.text).toBe("Mod+Alt+T");
     expect(map.keyOf("notes.newNote")).toBeNull();

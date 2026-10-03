@@ -59,12 +59,12 @@ describe("ShellCommandsService", () => {
   it("offers the shell's tab and layout commands, each with a title and an icon and none with a default key", () => {
     expect(service.commands.map(t => t.name)).toEqual([
       "shell.closeTab", "shell.keepTab", "shell.closeOtherTabs", "shell.closeTabsToTheRight", "shell.closeAllTabs", "shell.moveTabLeft", "shell.moveTabRight",
-      "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight", "shell.dockTabBottom",
+      "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight", "shell.dockTabBottom",
       "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut", "shell.copy", "shell.paste", "shell.selectAll",
       "shell.showCommands", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
     expect(service.commands.every(t => t.title.length > 0 && t.icon !== null)).toBe(true);
-    expect(service.commands.filter(t => t.defaultKey !== null).map(t => [t.name, t.defaultKey?.text])).toEqual([["shell.showCommands", "Mod+Shift+P"]]);
+    expect(service.commands.filter(t => t.defaultKey !== null)).toEqual([]);
     expect(command("shell.keepTab").title).toBe("Keep the tab open");
   });
 
@@ -152,6 +152,39 @@ describe("ShellCommandsService", () => {
     expect(layout.layout().groupOf(search)?.tabs).toEqual([search]);
     await runAsync("shell.dockTabBottom", tab(search.key));
     expect(layout.layout().sideOf(layout.layout().groupOf(search)?.id ?? -1)).toBe(DockSide.Bottom);
+  });
+
+  it("keys the most-used commands by the platform's conventions, each key once and each command one of its own", () => {
+    const labels = (platform: string): string[][] => service.keys(platform).map(([key, name]) => [name, key.label(platform)]);
+    const names = new Set(service.commands.map(t => t.name));
+
+    expect(labels("win32")).toEqual([
+      ["shell.showCommands", "Ctrl+Shift+P"], ["shell.closeTab", "Ctrl+W"], ["shell.nextTab", "Ctrl+Tab"], ["shell.nextTab", "Ctrl+PageDown"],
+      ["shell.previousTab", "Ctrl+Shift+Tab"], ["shell.previousTab", "Ctrl+PageUp"], ["shell.toggleLeftDock", "Ctrl+B"], ["shell.toggleBottomDock", "Ctrl+J"],
+      ["shell.toggleRightDock", "Ctrl+Alt+B"]
+    ]);
+    expect(labels("darwin")).toEqual([
+      ["shell.showCommands", "⇧⌘P"], ["shell.closeTab", "⌘W"], ["shell.nextTab", "⌃⇥"], ["shell.nextTab", "⌥⌘→"],
+      ["shell.previousTab", "⌃⇧⇥"], ["shell.previousTab", "⌥⌘←"], ["shell.toggleLeftDock", "⌘B"], ["shell.toggleBottomDock", "⌘J"],
+      ["shell.toggleRightDock", "⌥⌘B"]
+    ]);
+    for (const platform of ["linux", "darwin"]) {
+      const keys = service.keys(platform);
+      expect(keys.every(([key], index) => keys.findIndex(([other]) => other.isSameOn(key, platform)) === index)).toBe(true);
+      expect(keys.every(([, name]) => names.has(name))).toBe(true);
+    }
+  });
+
+  it("shows the next or previous tab of the current group, wrapping at either end, when the group has another", async () => {
+    layout.activate(settings);
+    await runAsync("shell.nextTab");
+    expect(layout.layout().documents.active).toEqual(plan);
+    await runAsync("shell.previousTab");
+    expect(layout.layout().documents.active).toEqual(settings);
+    await runAsync("shell.previousTab", tab(plan.key));
+    expect(layout.layout().documents.active).toEqual(settings);
+
+    expect([enabled("shell.nextTab", tab(changes.key)), enabled("shell.previousTab", tab(files.key))]).toEqual([false, true]);
   });
 
   it("opens the command search", async () => {

@@ -79,6 +79,7 @@ export class Resources {
   public static readonly runAsNodeValue: string = "1";
   public static readonly workWaitInterval: number = 2000;
   public static readonly deviceDirectoryArgument: string = "--device-dir=";
+  public static readonly handoverArguments: readonly string[] = [Resources.dataDirectoryArgument, Resources.userDataArgument, Resources.deviceDirectoryArgument];
   public static readonly windowsPlatform: string = "win32";
   public static readonly localAppDataVariable: string = "LOCALAPPDATA";
   public static readonly windowsLocalAppData: readonly string[] = ["AppData", "Local"];
@@ -211,6 +212,10 @@ export class Resources {
   public static readonly acceleratorSeparator: string = "+";
   public static readonly invalidMenuBar: string = "The menu bar is not valid.";
   public static readonly speechLabel: string = "Speech";
+  public static readonly editTitle: string = "Edit";
+  public static readonly windowTitle: string = "Window";
+  public static readonly closeWindowLabel: string = "Close Window";
+  public static readonly closeWindowAccelerator: string = "Command+Shift+W";
   public static readonly invalidColor: string = "A window color is a hexadecimal color or an rgb() or rgba() color.";
   public static readonly colorPattern: RegExp = /^(?:#[0-9A-Fa-f]{3,8}|rgba?\([0-9., %/]+\))$/;
 

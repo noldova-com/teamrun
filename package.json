@@ -31,6 +31,7 @@
   "scripts": {
     "build": "node scripts/build.ts",
     "start": "node scripts/desktop/start.ts",
+    "teamrun": "node scripts/desktop/teamrun.ts",
     "test": "node scripts/test.ts",
     "test:ui": "node scripts/ui-workflows.ts"
   },

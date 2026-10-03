@@ -27,6 +27,7 @@ export default class ModuleArtifacts {
   private static readonly FORMAT_VERSION: number = 1;
   private static readonly SOURCE_PREFIX: string = "src/";
   private static readonly VIEWS_KIND: string = "views";
+  private static readonly DOCUMENTS_KIND: string = "documents";
   private static readonly COMMANDS_KIND: string = "commands";
   private static readonly NOTIFICATIONS_KIND: string = "notifications";
   private static readonly STATUS_BAR_ITEMS_KIND: string = "statusBarItems";
@@ -60,6 +61,7 @@ export default class ModuleArtifacts {
       .filter(t => t.windowEntry !== null)
       .map(t => `  new WindowPartSource(${JSON.stringify(t.id)}, ${JSON.stringify(t.displayName)}, ${JSON.stringify(t.dependencies)}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.VIEWS_KIND) ?? [])}, `
+        + `${JSON.stringify(t.contributions.get(ModuleArtifacts.DOCUMENTS_KIND) ?? [])}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.COMMANDS_KIND) ?? [])}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.STATUS_BAR_ITEMS_KIND) ?? [])}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.TOP_BAR_ACTIONS_KIND) ?? [])}, `

@@ -12,7 +12,7 @@ import {
 } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import { AnchoredOverlay, OverlayAlignment, OverlayAnchoring, OverlayBoundsService, OverlaySide } from "@noldova/teamrun-shell-ui";
+import { AnchoredOverlay, OverlayAlignment, OverlayAnchoring, OverlayBoundsService, OverlaySide, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { NotificationService } from "../../services/notification.service";
 import { Resources } from "../../../resources";
@@ -20,7 +20,7 @@ import { NotificationsPopoverComponent } from "../notifications-popover/notifica
 
 @Component({
   selector: "tr-notifications",
-  imports: [NotificationsPopoverComponent],
+  imports: [NotificationsPopoverComponent, TooltipDirective],
   templateUrl: "./notifications.component.html",
   styleUrl: "./notifications.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -33,6 +33,7 @@ export class NotificationsComponent {
   private overlay: AnchoredOverlay | null = null;
 
   protected readonly resources: typeof Resources = Resources;
+  protected readonly above: OverlaySide = OverlaySide.above;
   protected readonly isOpen: WritableSignal<boolean> = signal(false);
   protected readonly unread: Signal<number> = this.notifications.unreadCount;
   protected readonly isQuiet: Signal<boolean> = computed(() => this.notifications.state().isDoNotDisturb);

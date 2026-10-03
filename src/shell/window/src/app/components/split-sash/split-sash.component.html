@@ -6,4 +6,5 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-<tr-sash class="tr-split-sash" [orientation]="orientation()" [label]="resources.resizeSplitLabel" [value]="value()" (resize)="resize($event)" />
+<tr-sash class="tr-split-sash" [orientation]="orientation()" [label]="resources.resizeSplitLabels[handle().split.axis]" [value]="value()"
+  [minimum]="pixels(handle().minimumLength)" [maximum]="pixels(handle().maximumLength)" (resize)="resize($event)" />

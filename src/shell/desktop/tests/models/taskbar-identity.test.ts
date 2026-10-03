@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
@@ -54,6 +56,24 @@ export class TaskbarIdentityTests {
       relaunchCommand: command,
       relaunchDisplayName: "TeamRun"
     }), JSON.stringify(identity.toAppDetails()));
+  }
+
+  @TestMethod
+  public async givesALinkedCheckoutTheIdOfTheFolderItLinksTo(): Promise<void> {
+    const root = await mkdtemp(path.join(tmpdir(), "teamrun-taskbar-"));
+    try {
+      const checkout = path.join(root, "checkout");
+      const linked = path.join(root, "linked");
+      await mkdir(checkout);
+      await symlink(checkout, linked, "junction");
+      const appId = (folder: string): string =>
+        TaskbarIdentity.create(false, TaskbarIdentityTests.PROGRAM, path.join(folder, "node_modules", "@noldova", "teamrun-shell-desktop", "main.js"), [], TaskbarIdentityTests.WORK).appId;
+
+      Assert.areEqual(appId(checkout), appId(linked));
+    }
+    finally {
+      await rm(root, { recursive: true, force: true });
+    }
   }
 
   @TestMethod
