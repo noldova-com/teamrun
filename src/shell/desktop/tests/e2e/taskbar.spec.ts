@@ -39,6 +39,7 @@ test.describe("the Windows taskbar", () => {
     expect(exitCode).toBe(0);
     await expect.poll(() => desktop.application.evaluate(() => Reflect.get(globalThis, "teamrunSecondInstance") as boolean)).toBe(true);
     expect(await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+    await desktop.checkpointAsync("taskbar-relaunch");
   });
 
   test("the program's icon, which the taskbar shows, is the outlined icon in light and in dark mode", async ({ desktop }) => {

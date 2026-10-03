@@ -136,6 +136,21 @@ describe("SettingRowComponent", () => {
     expect(changes).toEqual([["clock", "notes"], ["clock"]]);
   });
 
+  it("checks the modules not chosen when inverse, so unchecking one chooses it", async () => {
+    const row = render(SettingsFixture.mutedModules, ["notes"]);
+    fixture.componentRef.setInput("isInverse", true);
+    fixture.detectChanges();
+    const checked = [...row.querySelectorAll<HTMLInputElement>("input[type=checkbox]")].map(t => t.checked);
+
+    await page.getByRole("checkbox", { name: "Clock" }).click();
+    fixture.componentRef.setInput("value", ["clock", "notes"]);
+    fixture.detectChanges();
+    await page.getByRole("checkbox", { name: "Notes" }).click();
+
+    expect(checked).toEqual([true, false]);
+    expect(changes).toEqual([["clock", "notes"], ["clock"]]);
+  });
+
   for (const mode of AppearanceFixture.modes)
     for (const theme of AppearanceFixture.themes)
       it(`follows the component table in the ${theme.id} theme in ${mode} mode`, async () => {

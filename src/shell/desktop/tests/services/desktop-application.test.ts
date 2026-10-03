@@ -1026,10 +1026,9 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async addsItsOwnDeviceToItsWindowsNotificationRequestsAndRefusesAnInvalidSwitch(): Promise<void> {
+  public async addsItsOwnDeviceToItsWindowsNotificationReadsAndRefusesTheirDoNotDisturbSwitch(): Promise<void> {
     const connection = new FakeRuntimeConnection();
-    connection.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: true, sequence: 2 }));
-    connection.answers.set("shell.setDoNotDisturb", Response.success("r", null));
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: true, mutedModules: ["notes"], sequence: 2 }));
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopApplicationTests.trustedEvent("linux");
     const unidentified = new FakeDeviceIdentity();
@@ -1038,15 +1037,12 @@ export class DesktopApplicationTests {
 
     const state = await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
     const quiet = await DesktopApplicationTests.requestAsync(electron, event, "shell.setDoNotDisturb", { isOn: true });
-    const invalid = await DesktopApplicationTests.requestAsync(electron, event, "shell.setDoNotDisturb", { isOn: "yes" });
     const noDevice = await DesktopApplicationTests.requestAsync(lost, event, "shell.notifications", {});
 
     const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).filter(t => t.startsWith("shell.notifications") || t.startsWith("shell.setDoNotDisturb"));
-    Assert.areEqual(
-      JSON.stringify([`shell.notifications {"device":"${FakeDeviceIdentity.ID}"}`, `shell.setDoNotDisturb {"device":"${FakeDeviceIdentity.ID}","isOn":true}`]),
-      JSON.stringify(sent));
-    Assert.areEqual("{\"notifications\":[],\"isDoNotDisturb\":true,\"sequence\":2}|null", `${JSON.stringify(state.payload)}|${JSON.stringify(quiet.payload)}`);
-    Assert.areEqual(FailureCode.InvalidParams, invalid.failure?.code);
+    Assert.areEqual(JSON.stringify([`shell.notifications {"device":"${FakeDeviceIdentity.ID}"}`]), JSON.stringify(sent));
+    Assert.areEqual("{\"notifications\":[],\"isDoNotDisturb\":true,\"mutedModules\":[\"notes\"],\"sequence\":2}", JSON.stringify(state.payload));
+    Assert.areEqual(FailureCode.Unauthorized, quiet.failure?.code);
     Assert.areEqual(FailureCode.Unavailable, noDevice.failure?.code);
   }
 
@@ -1062,7 +1058,7 @@ export class DesktopApplicationTests {
     const lostLauncher = new FakeRuntimeLauncher();
     const lost = await DesktopApplicationTests.startReadyAsync("linux", lostLauncher, new FakeElectron(), unidentified);
     await DesktopApplicationTests.invokeAsync(lost, "teamrun:readLayout", DesktopApplicationTests.trustedEvent("linux"));
-    const broadcast = (devices: readonly string[]): Event => new Event(ShellEvents.notifications, new NotificationBroadcast([], devices, 4).toJson());
+    const broadcast = (devices: readonly string[]): Event => new Event(ShellEvents.notifications, new NotificationBroadcast([], devices, ["notes"], 4).toJson());
 
     launcher.listener?.onEvent(broadcast([FakeDeviceIdentity.ID, "desk"]));
     launcher.listener?.onEvent(broadcast(["desk"]));
@@ -1071,12 +1067,12 @@ export class DesktopApplicationTests {
 
     Assert.areEqual(
       JSON.stringify([
-        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: true, sequence: 4 }],
-        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false, sequence: 4 }]
+        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: true, mutedModules: ["notes"], sequence: 4 }],
+        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false, mutedModules: ["notes"], sequence: 4 }]
       ]),
       JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
     Assert.areEqual(
-      JSON.stringify([["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false, sequence: 4 }]]),
+      JSON.stringify([["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false, mutedModules: ["notes"], sequence: 4 }]]),
       JSON.stringify(DesktopApplicationTests.firstWindow(lost).webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.notifications could not be passed to the window").length);
   }
@@ -1085,17 +1081,17 @@ export class DesktopApplicationTests {
   public async showsTheOperatingSystemANotificationPostedAfterItsWindowsReadWhileNoWindowIsFocusedAndOpensItInTheWindow(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const early = DesktopApplicationTests.wireNotification(1, "Early");
-    connection.answers.set("shell.notifications", Response.success("r", { notifications: [early], isDoNotDisturb: false, sequence: 1 }));
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [early], isDoNotDisturb: false, mutedModules: [], sequence: 1 }));
     const launcher = new FakeRuntimeLauncher(connection);
     const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher);
     const window = DesktopApplicationTests.firstWindow(electron);
     const later = DesktopApplicationTests.wireNotification(2, "Later");
 
-    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [early], quietDevices: [], sequence: 1 }));
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [early], quietDevices: [], mutedModules: [], sequence: 1 }));
     await DesktopApplicationTests.requestAsync(electron, DesktopApplicationTests.trustedEvent("linux"), "shell.notifications", {});
-    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [later, early], quietDevices: [], sequence: 2 }));
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [later, early], quietDevices: [], mutedModules: [], sequence: 2 }));
     window.isFocusedNow = true;
-    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(3, "Focused"), later, early], quietDevices: [], sequence: 3 }));
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(3, "Focused"), later, early], quietDevices: [], mutedModules: [], sequence: 3 }));
     window.isMinimizedNow = true;
     electron.notifications.created[0]?.click();
 
@@ -1109,7 +1105,7 @@ export class DesktopApplicationTests {
   public async holdsTheOperatingSystemsNotificationsWhileItsWindowReloadsUntilTheWindowReadsAgain(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const alarm = DesktopApplicationTests.wireNotification(1, "Alarm");
-    connection.answers.set("shell.notifications", Response.success("r", { notifications: [alarm], isDoNotDisturb: false, sequence: 1 }));
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [alarm], isDoNotDisturb: false, mutedModules: [], sequence: 1 }));
     const launcher = new FakeRuntimeLauncher(connection);
     const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher);
     const window = DesktopApplicationTests.firstWindow(electron);
@@ -1118,11 +1114,11 @@ export class DesktopApplicationTests {
     const reposted = DesktopApplicationTests.wireNotification(2, "Re-posted by the window");
 
     window.webContents.startLoading();
-    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [reposted, alarm], quietDevices: [], sequence: 2 }));
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [reposted, alarm], quietDevices: [], mutedModules: [], sequence: 2 }));
     const whileLoading = electron.notifications.created.length;
-    connection.answers.set("shell.notifications", Response.success("r", { notifications: [reposted, alarm], isDoNotDisturb: false, sequence: 2 }));
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [reposted, alarm], isDoNotDisturb: false, mutedModules: [], sequence: 2 }));
     await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
-    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(3, "Posted after"), reposted, alarm], quietDevices: [], sequence: 3 }));
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(3, "Posted after"), reposted, alarm], quietDevices: [], mutedModules: [], sequence: 3 }));
 
     Assert.areEqual(0, whileLoading);
     Assert.areEqual("Posted after", electron.notifications.created.map(t => t.title).join(","));
@@ -1144,7 +1140,7 @@ export class DesktopApplicationTests {
     const lostLauncher = new FakeRuntimeLauncher(new FakeRuntimeConnection());
     const lost = await DesktopApplicationTests.startReadyAsync("linux", lostLauncher, new FakeElectron(), unidentified);
     const event = DesktopApplicationTests.trustedEvent("linux");
-    const posted = new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(1, "Alarm")], quietDevices: [], sequence: 1 });
+    const posted = new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(1, "Alarm")], quietDevices: [], mutedModules: [], sequence: 1 });
 
     await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
     await DesktopApplicationTests.requestAsync(lost, event, "shell.notifications", {});
@@ -1152,7 +1148,7 @@ export class DesktopApplicationTests {
     lostLauncher.listener?.onEvent(posted);
     first.answers.set("shell.notifications", Response.success("r", { notifications: [] }));
     await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
-    first.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: false, sequence: 1 }));
+    first.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: false, mutedModules: [], sequence: 1 }));
     await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
     launcher.listener?.onDisconnected();
     reconnect(second);

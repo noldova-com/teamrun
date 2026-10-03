@@ -16,7 +16,6 @@ export { WireMessageKind } from "../enums/wire-message-kind.js";
 export { ProtocolException } from "../exceptions/protocol.exception.js";
 export type { IKeyStroke } from "../interfaces/key-stroke.js";
 export { BuildIdentity } from "../models/build-identity.js";
-export { DoNotDisturbChange } from "../models/do-not-disturb-change.js";
 export { Cancel } from "../models/cancel.js";
 export { CommandInfo } from "../models/command-info.js";
 export { CommandList } from "../models/command-list.js";

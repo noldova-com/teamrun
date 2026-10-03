@@ -37,6 +37,7 @@ export class SettingRowComponent {
   public readonly isSet = input<boolean>(false);
   public readonly query = input<string>("");
   public readonly modules = input<readonly SelectOption[]>([]);
+  public readonly isInverse = input<boolean>(false);
   public readonly changed = output<JsonValue>();
   public readonly reset = output<void>();
 
@@ -68,7 +69,8 @@ export class SettingRowComponent {
     this.choose((event.target as HTMLInputElement).value);
   }
 
-  protected toggleModule(id: string, isChosen: boolean): void {
+  protected toggleModule(id: string, isChecked: boolean): void {
+    const isChosen = isChecked !== this.isInverse();
     const chosen = new Set(this.chosenModules());
     if (isChosen)
       chosen.add(id);
