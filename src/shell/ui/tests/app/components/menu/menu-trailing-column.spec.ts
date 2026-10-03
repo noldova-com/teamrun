@@ -56,12 +56,13 @@ describe("a menu's trailing column", () => {
     expect(new Set(edges).size).toBe(1);
   });
 
-  it("keeps at least 2rem between the widest label and the trailing column", () => {
-    const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+  it("keeps at least the theme's trail gap, 2rem, between the widest label and the trailing column", () => {
+    const gap = Number.parseFloat(getComputedStyle(fixture.nativeElement.querySelector(".a .tr-menu-item-trail")).marginInlineStart);
     const widest = Math.max(...[".a", ".b", ".c", ".d", ".e"].map(t => box(`${t} .tr-menu-item-label`).right));
     const trailing = Math.min(...[".a .tr-menu-item-shortcut", ".b .tr-menu-item-shortcut", ".e .tr-menu-item-shortcut"].map(t => box(t).left));
 
-    expect(trailing - widest).toBeGreaterThanOrEqual(2 * rem - 1);
+    expect(trailing - widest).toBeGreaterThanOrEqual(gap - 1);
+    expect(gap).toBe(2 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize));
   });
 
   it("lines every label up after the icon column, with or without an icon, and keeps shortcuts muted", () => {

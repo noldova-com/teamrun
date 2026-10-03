@@ -79,7 +79,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--tr-menu-item-padding);
-  margin-inline-start: 2rem;
+  margin-inline-start: var(--tr-menu-trail-gap);
 }
 
 .tr-menu-item-shortcut {
