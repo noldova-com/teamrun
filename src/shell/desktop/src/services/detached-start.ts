@@ -11,6 +11,7 @@ import { ChildProcessStarter, type IProcessStarter } from "@noldova/teamrun-shel
 import type { IParentPort } from "../interfaces/i-parent-port.js";
 import { DetachedStartReply } from "../models/detached-start-reply.js";
 import { DetachedStartRequest } from "../models/detached-start-request.js";
+import { Resources } from "../resources.js";
 
 export class DetachedStart {
   public static async runAsync(message: unknown, port: IParentPort, starter: IProcessStarter = new ChildProcessStarter()): Promise<void> {
@@ -22,6 +23,8 @@ export class DetachedStart {
     catch (error) {
       reply = DetachedStartReply.failed(String(error));
     }
+    const acknowledged = new Promise<void>(resolve => port.once(Resources.messageEvent, resolve));
     port.postMessage(reply.toJson());
+    await acknowledged;
   }
 }
