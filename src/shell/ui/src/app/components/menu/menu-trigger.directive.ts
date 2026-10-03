@@ -16,7 +16,6 @@ import { OverlayAlignment } from "../../enums/overlay-alignment";
 import { OverlayAnchoring } from "../../models/overlay-anchoring";
 import { OverlaySide } from "../../models/overlay-side";
 import { AnchoredOverlay } from "../../services/anchored-overlay";
-import { PointerPositionService } from "../../services/pointer-position.service";
 import { Resources } from "../../../resources";
 
 @Directive({
@@ -34,7 +33,6 @@ export class MenuTriggerDirective extends CdkMenuTrigger {
 
   public constructor() {
     super();
-    inject(PointerPositionService);
     this.overlayRef = this.anchored.overlayRef;
     this.anchored.originScrolls.pipe(takeUntil(this.destroyed)).subscribe(() => this.menuStack.closeAll());
   }
