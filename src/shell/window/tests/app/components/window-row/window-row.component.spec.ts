@@ -47,6 +47,7 @@ describe("WindowRowComponent", () => {
     const style = getComputedStyle(row);
 
     expect(row.classList.contains("tr-window-row-mac")).toBe(false);
+    expect(row.getAttribute("data-tr-chrome")).toBe("top");
     expect(style.getPropertyValue("app-region")).toBe("drag");
     expect(style.paddingLeft).toBe("0px");
     expect(style.paddingRight).toBe("0px");

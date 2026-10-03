@@ -7,11 +7,12 @@
  */
 
 import { DOCUMENT } from "@angular/common";
-import { ChangeDetectionStrategy, Component, EnvironmentInjector, type Signal, afterNextRender, computed, inject, input, viewChild } from "@angular/core";
-import { MatDividerModule } from "@angular/material/divider";
-import { type MatMenu, MatMenuModule } from "@angular/material/menu";
+import {
+  ChangeDetectionStrategy, Component, EnvironmentInjector, type Signal, type TemplateRef, afterNextRender, computed, inject, input, viewChild
+} from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
+import { MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
 import { DockSide } from "../../enums/dock-side";
@@ -27,7 +28,7 @@ import { TabLabelService } from "../../services/tab-label.service";
 
 @Component({
   selector: "tr-tab-menu",
-  imports: [MatDividerModule, MatMenuModule],
+  imports: [MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective],
   templateUrl: "./tab-menu.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -44,19 +45,14 @@ export class TabMenuComponent {
   protected readonly destinations: Signal<readonly TabGroup[]> = computed(() => this.layout.layout().groups.filter(t => t.accepts(this.tab()) && !t.has(this.tab())));
 
   public readonly tab = input.required<Tab>();
-  public readonly menu: Signal<MatMenu> = viewChild.required<MatMenu>("tabMenu");
-
-  public openFromKeyboard(event: KeyboardEvent): void {
-    const element = event.currentTarget;
-    if (!(element instanceof HTMLElement) || (event.key !== Resources.contextMenuKey && !(event.key === Resources.menuKey && event.shiftKey)))
-      return;
-    event.preventDefault();
-    const bounds = element.getBoundingClientRect();
-    element.dispatchEvent(new MouseEvent(Resources.contextMenuEvent, { bubbles: true, cancelable: true, clientX: bounds.left, clientY: bounds.bottom }));
-  }
+  public readonly menu: Signal<TemplateRef<unknown>> = viewChild.required<TemplateRef<unknown>>("tabMenu");
 
   protected indexIn(group: TabGroup): number {
     return group.tabs.findIndex(t => t.equals(this.tab()));
+  }
+
+  protected canSplit(group: TabGroup): boolean {
+    return group.isDocuments || group.tabs.length > 1;
   }
 
   protected labelOf(group: TabGroup): string {
@@ -85,6 +81,20 @@ export class TabMenuComponent {
     const next = Object.isNull(group) ? null : this.layout.layout().group(group.id)?.active ?? null;
     if (!Object.isNull(next))
       this.focusTab(next);
+  }
+
+  protected closeOthers(group: TabGroup): void {
+    this.layout.closeTabs(group.tabs.filter(t => !t.equals(this.tab())));
+    this.focusTab(this.tab());
+  }
+
+  protected closeToTheRight(group: TabGroup): void {
+    this.layout.closeTabs(group.tabs.slice(this.indexIn(group) + 1));
+    this.focusTab(this.tab());
+  }
+
+  protected closeAll(group: TabGroup): void {
+    this.layout.closeTabs(group.tabs);
   }
 
   protected reset(): void {

@@ -16,4 +16,6 @@ import { ChangeDetectionStrategy, Component, input, type InputSignal } from "@an
 export class NoteComponent {
   public readonly instance: InputSignal<string> = input.required<string>();
   public readonly title: InputSignal<string> = input.required<string>();
+
+  protected readonly sections: readonly string[] = ["Context", "Goals", "Decisions", "Open questions", "Risks", "Timeline", "Owners", "Dependencies", "Testing", "Rollout", "Follow-ups", "Notes from review"];
 }

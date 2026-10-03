@@ -6,13 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import {
-  ChangeDetectionStrategy, Component, ElementRef, type Signal, type WritableSignal, afterRenderEffect, computed, inject, input, signal
-} from "@angular/core";
-import { MatMenuModule } from "@angular/material/menu";
+import { ChangeDetectionStrategy, Component, ElementRef, EnvironmentInjector, type Signal, afterNextRender, computed, inject, input } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import { AppearanceService, IconButtonComponent, PanelCardComponent, PanelSurface, TabComponent } from "@noldova/teamrun-shell-ui";
+import {
+  ContextMenuTriggerDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, OverlayAlignment, OverlaySide,
+  PanelCardComponent, PanelSurface, TabComponent, TooltipDirective
+} from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
 import type { DockSide } from "../../enums/dock-side";
@@ -23,10 +23,14 @@ import { LayoutService } from "../../services/layout.service";
 import { TabDragService } from "../../services/tab-drag.service";
 import { TabLabelService } from "../../services/tab-label.service";
 import { TabMenuComponent } from "../tab-menu/tab-menu.component";
+import { TabScrollerDirective } from "./tab-scroller.directive";
 
 @Component({
   selector: "tr-tab-group",
-  imports: [IconButtonComponent, MatMenuModule, PanelCardComponent, TabComponent, TabMenuComponent],
+  imports: [
+    ContextMenuTriggerDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, PanelCardComponent, TabComponent,
+    TabMenuComponent, TabScrollerDirective, TooltipDirective
+  ],
   templateUrl: "./tab-group.component.html",
   styleUrl: "./tab-group.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -41,14 +45,18 @@ import { TabMenuComponent } from "../tab-menu/tab-menu.component";
 })
 export class TabGroupComponent {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
 
   protected readonly resources: typeof Resources = Resources;
+  protected readonly below: OverlaySide = OverlaySide.below;
+  protected readonly besides: OverlaySide = OverlaySide.end;
+  protected readonly end: OverlayAlignment = OverlayAlignment.End;
   protected readonly layout: LayoutService = inject(LayoutService);
   protected readonly drag: TabDragService = inject(TabDragService);
   protected readonly labels: TabLabelService = inject(TabLabelService);
-  protected readonly isOverflowing: WritableSignal<boolean> = signal(false);
   protected readonly group: Signal<TabGroup> = computed(() => this.frame().group);
   protected readonly surface: Signal<PanelSurface> = computed(() => Object.isNull(this.frame().side) ? PanelSurface.Panel : PanelSurface.Shell);
+  protected readonly isShell: Signal<boolean> = computed(() => this.surface() === PanelSurface.Shell);
   protected readonly hideSide: Signal<DockSide | null> = computed(() => {
     const side = this.frame().side;
     return !Object.isNull(side) && this.layout.layout().dock(side).root?.cornerGroup.id === this.group().id ? side : null;
@@ -56,23 +64,17 @@ export class TabGroupComponent {
 
   public readonly frame = input.required<GroupFrame>();
 
-  public constructor() {
-    const appearance = inject(AppearanceService);
-    afterRenderEffect(() => {
-      this.frame();
-      appearance.typography();
-      for (const strip of this.host.querySelectorAll<HTMLElement>(Resources.tabStripSelector)) {
-        strip.querySelectorAll(Resources.selectedTabSelector).forEach(t => t.scrollIntoView(Resources.revealOptions));
-        this.isOverflowing.set(strip.scrollWidth > strip.clientWidth);
-      }
-    });
-  }
-
   protected choose(tab: Tab): void {
     this.layout.activate(tab);
-    for (const element of this.host.querySelectorAll<HTMLElement>(Resources.tabKeySelector))
-      if (element.dataset[Resources.tabKeyData] === tab.key)
-        element.focus();
+    afterNextRender(() => {
+      for (const element of this.host.querySelectorAll<HTMLElement>(Resources.tabKeySelector))
+        if (element.dataset[Resources.tabKeyData] === tab.key)
+          element.focus();
+    }, { injector: this.environment });
+  }
+
+  protected closeAll(): void {
+    this.layout.closeTabs(this.group().tabs);
   }
 
   protected onStripKey(event: KeyboardEvent): void {

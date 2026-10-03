@@ -66,6 +66,7 @@ describe("TabComponent", () => {
 
   it("is a tab with its label, selection state and roving tab stop", () => {
     expect(tab().getAttribute("role")).toBe("tab");
+    expect(tab().getAttribute("aria-label")).toBe("Readme");
     expect(tab().getAttribute("aria-selected")).toBe("false");
     expect(tab().getAttribute("tabindex")).toBe("-1");
     expect(tab().hasAttribute("aria-busy")).toBe(false);
@@ -81,6 +82,22 @@ describe("TabComponent", () => {
     expect(tab().getAttribute("aria-selected")).toBe("true");
     expect(tab().getAttribute("tabindex")).toBe("0");
     expect(part(".tr-tab-icon")?.textContent).toBe("description");
+  });
+
+  it("caps its width, ends a long label with an ellipsis and keeps the full title as its name and its icon whole", () => {
+    const title = "Shell architecture review: the module contract, runtime boundaries and what the window may cache between restarts";
+    update(() => {
+      host.label.set(title);
+      host.icon.set("description");
+    });
+    const label = part(".tr-tab-label") ?? tab();
+    const icon = part(".tr-tab-icon") ?? tab();
+
+    expect(tab().getBoundingClientRect().width).toBeLessThanOrEqual(parseFloat(getComputedStyle(tab()).maxWidth));
+    expect(label.scrollWidth).toBeGreaterThan(label.clientWidth);
+    expect(getComputedStyle(label).textOverflow).toBe("ellipsis");
+    expect(icon.getBoundingClientRect().width).toBe(parseFloat(getComputedStyle(icon).fontSize));
+    expect(tab().getAttribute("aria-label")).toBe(title);
   });
 
   it("activates on click, Enter and Space", () => {
@@ -190,6 +207,8 @@ describe("TabComponent", () => {
         expect(pill.backgroundColor).toBe(AppearanceFixture.readColor(theme, mode, "list.inactiveSelectionBackground"));
         AppearanceFixture.expectLook(tabStyle.minHeight, theme, "tab-height", "min-height");
         AppearanceFixture.expectLook(tabStyle.paddingLeft, theme, "tab-inset", "padding-left");
+        AppearanceFixture.expectLook(tabStyle.maxWidth, theme, "tab-max-width", "max-width");
+        AppearanceFixture.expectLook(getComputedStyle(part(".tr-tab-action") ?? tab()).marginLeft, theme, "space-1", "margin-left");
         AppearanceFixture.expectLook(pill.minHeight, theme, "tab-pill", "min-height");
         AppearanceFixture.expectLook(pill.paddingLeft, theme, "tab-label-inset", "padding-left");
         AppearanceFixture.expectLook(pill.borderTopLeftRadius, theme, "radius-small", "border-top-left-radius");

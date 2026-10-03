@@ -19,6 +19,7 @@ import { Resources } from "../../../resources";
   host: {
     "class": "tr-tab",
     "role": "tab",
+    "[attr.aria-label]": "label()",
     "[attr.aria-selected]": "selected()",
     "[attr.aria-busy]": "working() || null",
     "[attr.tabindex]": "selected() ? 0 : -1",

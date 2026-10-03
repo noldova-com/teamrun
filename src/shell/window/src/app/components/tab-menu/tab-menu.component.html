@@ -6,51 +6,54 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-<mat-menu #tabMenu="matMenu" class="tr-tab-menu">
-  @if (group(); as group) {
-    @if (tab().isMovable) {
-      <button mat-menu-item class="tr-tab-menu-move" [matMenuTriggerFor]="moveMenu" [disabled]="destinations().length === 0">
-        <span class="material-symbols-rounded" aria-hidden="true">{{ resources.moveToGlyph }}</span><span>{{ resources.moveToLabel }}</span>
-      </button>
-      <button mat-menu-item class="tr-tab-menu-split" [matMenuTriggerFor]="splitMenu" [disabled]="!group.isDocuments && group.tabs.length === 1">
-        <span class="material-symbols-rounded" aria-hidden="true">{{ resources.splitGlyph }}</span><span>{{ resources.splitLabel }}</span>
-      </button>
-      <button mat-menu-item class="tr-tab-menu-dock" [matMenuTriggerFor]="dockMenu">
-        <span class="material-symbols-rounded" aria-hidden="true">{{ resources.dockGlyph }}</span><span>{{ resources.dockLabel }}</span>
-      </button>
+<ng-template #tabMenu>
+  <tr-menu class="tr-tab-menu">
+    @if (group(); as group) {
+      @if (tab().isMovable) {
+        <button tr-menu-item class="tr-tab-menu-move" [icon]="resources.moveToGlyph" [label]="resources.moveToLabel" [disabled]="destinations().length === 0"
+          [trMenuTriggerFor]="destinations().length === 0 ? null : moveMenu"></button>
+        <button tr-menu-item class="tr-tab-menu-split" [icon]="resources.splitGlyph" [label]="resources.splitLabel" [disabled]="!canSplit(group)"
+          [trMenuTriggerFor]="canSplit(group) ? splitMenu : null"></button>
+        <button tr-menu-item class="tr-tab-menu-dock" [icon]="resources.dockGlyph" [label]="resources.dockLabel" [trMenuTriggerFor]="dockMenu"></button>
+      }
+      <button tr-menu-item class="tr-tab-menu-earlier" [icon]="resources.moveEarlierGlyph" [label]="resources.moveEarlierLabel" [disabled]="indexIn(group) === 0"
+        (triggered)="shift(group, -1)"></button>
+      <button tr-menu-item class="tr-tab-menu-later" [icon]="resources.moveLaterGlyph" [label]="resources.moveLaterLabel"
+        [disabled]="indexIn(group) === group.tabs.length - 1" (triggered)="shift(group, 1)"></button>
+      <ng-template #moveMenu>
+        <tr-menu>
+          @for (destination of destinations(); track destination.id) {
+            <button tr-menu-item class="tr-tab-menu-destination" [attr.data-group]="destination.id" [label]="labelOf(destination)" (triggered)="moveTo(destination)"></button>
+          }
+        </tr-menu>
+      </ng-template>
+      <ng-template #splitMenu>
+        <tr-menu>
+          @for (edge of edges; track edge) {
+            <button tr-menu-item class="tr-tab-menu-split-edge" [attr.data-edge]="edge" [icon]="resources.splitGlyphs[edge]" [label]="resources.splitLabels[edge]"
+              (triggered)="split(group, edge)"></button>
+          }
+        </tr-menu>
+      </ng-template>
+      <ng-template #dockMenu>
+        <tr-menu>
+          @for (side of sides; track side) {
+            <button tr-menu-item class="tr-tab-menu-dock-side" [attr.data-side]="side" [icon]="resources.dockGlyphs[side]" [label]="resources.dockLabels[side]"
+              (triggered)="dock(side)"></button>
+          }
+        </tr-menu>
+      </ng-template>
+      <tr-menu-separator />
     }
-    <button mat-menu-item class="tr-tab-menu-earlier" [disabled]="indexIn(group) === 0" (click)="shift(group, -1)">
-      <span class="material-symbols-rounded" aria-hidden="true">{{ resources.moveEarlierGlyph }}</span><span>{{ resources.moveEarlierLabel }}</span>
-    </button>
-    <button mat-menu-item class="tr-tab-menu-later" [disabled]="indexIn(group) === group.tabs.length - 1" (click)="shift(group, 1)">
-      <span class="material-symbols-rounded" aria-hidden="true">{{ resources.moveLaterGlyph }}</span><span>{{ resources.moveLaterLabel }}</span>
-    </button>
-    <mat-menu #moveMenu="matMenu">
-      @for (destination of destinations(); track destination.id) {
-        <button mat-menu-item class="tr-tab-menu-destination" [attr.data-group]="destination.id" (click)="moveTo(destination)">{{ labelOf(destination) }}</button>
-      }
-    </mat-menu>
-    <mat-menu #splitMenu="matMenu">
-      @for (edge of edges; track edge) {
-        <button mat-menu-item class="tr-tab-menu-split-edge" [attr.data-edge]="edge" (click)="split(group, edge)">
-          <span class="material-symbols-rounded" aria-hidden="true">{{ resources.splitGlyphs[edge] }}</span><span>{{ resources.splitLabels[edge] }}</span>
-        </button>
-      }
-    </mat-menu>
-    <mat-menu #dockMenu="matMenu">
-      @for (side of sides; track side) {
-        <button mat-menu-item class="tr-tab-menu-dock-side" [attr.data-side]="side" (click)="dock(side)">
-          <span class="material-symbols-rounded" aria-hidden="true">{{ resources.dockGlyphs[side] }}</span><span>{{ resources.dockLabels[side] }}</span>
-        </button>
-      }
-    </mat-menu>
-    <mat-divider />
-  }
-  <button mat-menu-item class="tr-tab-menu-close" (click)="close()">
-    <span class="material-symbols-rounded" aria-hidden="true">{{ resources.closeGlyph }}</span><span>{{ resources.closeTabLabel }}</span>
-  </button>
-  <mat-divider />
-  <button mat-menu-item class="tr-tab-menu-reset" (click)="reset()">
-    <span class="material-symbols-rounded" aria-hidden="true">{{ resources.resetLayoutGlyph }}</span><span>{{ resources.resetLayoutLabel }}</span>
-  </button>
-</mat-menu>
+    <button tr-menu-item class="tr-tab-menu-close" [icon]="resources.closeGlyph" [label]="resources.closeTabLabel" (triggered)="close()"></button>
+    @if (group(); as group) {
+      <button tr-menu-item class="tr-tab-menu-close-others" [icon]="resources.closeOthersGlyph" [label]="resources.closeOthersLabel" [disabled]="group.tabs.length < 2"
+        (triggered)="closeOthers(group)"></button>
+      <button tr-menu-item class="tr-tab-menu-close-right" [icon]="resources.closeToTheRightGlyph" [label]="resources.closeToTheRightLabel"
+        [disabled]="indexIn(group) === group.tabs.length - 1" (triggered)="closeToTheRight(group)"></button>
+      <button tr-menu-item class="tr-tab-menu-close-all" [icon]="resources.closeAllGlyph" [label]="resources.closeAllLabel" (triggered)="closeAll(group)"></button>
+    }
+    <tr-menu-separator />
+    <button tr-menu-item class="tr-tab-menu-reset" [icon]="resources.resetLayoutGlyph" [label]="resources.resetLayoutLabel" (triggered)="reset()"></button>
+  </tr-menu>
+</ng-template>

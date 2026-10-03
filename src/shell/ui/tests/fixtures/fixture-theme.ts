@@ -145,6 +145,8 @@ export class FixtureTheme {
     ["tab-height", "2.25rem"],
     ["tab-pill", "1.75rem"],
     ["tab-inset", "0.25rem"],
+    ["tab-max-width", "18rem"],
+    ["scrollbar-size", "0.5rem"],
     ["tab-label-inset", "0.625rem"],
     ["tab-action-allowance", "2rem"],
     ["tab-action-slot", "1.625rem"],
@@ -170,6 +172,7 @@ export class FixtureTheme {
     ["status-bar-height", "1.5rem"],
     ["status-bar-inset", "0.75rem"],
     ["status-bar-item-padding", "0.5rem"],
+    ["status-bar-item-height", "1.125rem"],
     ["status-bar-item-gap", "0.375rem"],
     ["button-height", "1.875rem"],
     ["button-padding", "0.75rem"]

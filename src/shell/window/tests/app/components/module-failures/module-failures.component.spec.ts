@@ -107,6 +107,36 @@ describe("ModuleFailuresComponent", () => {
     expect(item(fixture).getAttribute("aria-expanded")).toBe("true");
   });
 
+  it("closes its popover when something around the item scrolls", async () => {
+    const fixture = await renderAsync();
+    await openAsync(fixture);
+
+    (fixture.nativeElement as HTMLElement).style.marginTop = "40px";
+    (fixture.nativeElement as HTMLElement).dispatchEvent(new Event("scroll"));
+    await fixture.whenStable();
+
+    expect(popover()).toBeNull();
+    expect(item(fixture).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("places its popover above the item, a gap away and end-aligned with it", async () => {
+    AppearanceFixture.apply();
+    failures.set([clock, notes]);
+    const fixture = await renderAsync();
+    const host: HTMLElement = fixture.nativeElement;
+    Object.assign(host.style, { position: "fixed", right: "4rem", bottom: "0.25rem" });
+    host.setAttribute("data-tr-chrome", "bottom");
+
+    const surface = await openAsync(fixture);
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const box = surface.getBoundingClientRect();
+    const anchor = item(fixture).getBoundingClientRect();
+    const gap = parseFloat(getComputedStyle(document.documentElement).fontSize) * 0.5;
+
+    expect(anchor.top - box.bottom).toBeCloseTo(gap, 1);
+    expect(box.right).toBeCloseTo(anchor.right, 1);
+  });
+
   it("closes on Escape and returns focus to the item, but not on other keys", async () => {
     const fixture = await renderAsync();
     const surface = await openAsync(fixture);
@@ -247,6 +277,7 @@ describe("ModuleFailuresComponent", () => {
         expect(itemStyle.backgroundColor).toBe("rgba(0, 0, 0, 0)");
         expect(icon.color).toBe(AppearanceFixture.readColor(theme, mode, "errorForeground"));
         AppearanceFixture.expectLook(itemStyle.paddingLeft, theme, "status-bar-item-padding", "padding-left");
+        AppearanceFixture.expectLook(itemStyle.height, theme, "status-bar-item-height", "height");
         AppearanceFixture.expectLook(itemStyle.borderTopLeftRadius, theme, "radius-hover", "border-top-left-radius");
         AppearanceFixture.expectLook(icon.fontSize, theme, "icon", "font-size");
         expect(surface.backgroundColor).toBe(AppearanceFixture.readColor(theme, mode, "menu.background"));

@@ -11,6 +11,7 @@ import { TestBed } from "@angular/core/testing";
 
 import { ModuleState } from "@noldova/teamrun-shell-protocol";
 
+import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { TabContentComponent } from "../../../../src/app/components/tab-content/tab-content.component";
 import type { IWindowPartContext } from "../../../../src/app/interfaces/i-window-part-context";
 import { ContributionMatch } from "../../../../src/app/models/contribution-match";
@@ -112,7 +113,7 @@ describe("TabContentComponent", () => {
     fixture.componentRef.setInput("tab", tab);
     await fixture.whenStable();
     const element: HTMLElement = fixture.nativeElement;
-    const isEmpty = element.children.length === 0;
+    const isEmpty = element.querySelector(".tr-tab-content-text")?.children.length === 0;
 
     host.contributions.set(tab.key, new ContributionMatch(() => Promise.resolve(TestViewComponent), context));
     host.generation.set(1);
@@ -120,5 +121,32 @@ describe("TabContentComponent", () => {
 
     expect(isEmpty).toBe(true);
     expect(element.querySelector(".view")?.textContent).toBe("notes");
+  });
+
+  it("scrolls with a stable gutter and a hover-revealed thumb while its content keeps the text color", async () => {
+    AppearanceFixture.apply();
+    try {
+      const tab = new ViewTab("notes.list");
+      host.contributions.set(tab.key, new ContributionMatch(() => Promise.resolve(TestViewComponent), context));
+      const fixture = TestBed.createComponent(TabContentComponent);
+      fixture.componentRef.setInput("tab", tab);
+      await fixture.whenStable();
+      const element: HTMLElement = fixture.nativeElement;
+      const view = element.querySelector(".view") ?? element;
+      const probe = document.createElement("div");
+      probe.style.color = "var(--tr-text)";
+      document.body.append(probe);
+      const text = getComputedStyle(probe).color;
+      probe.remove();
+
+      expect(element.classList.contains("tr-scroll-reveal")).toBe(true);
+      expect(getComputedStyle(element).scrollbarGutter).toBe("stable");
+      expect(getComputedStyle(element).color).toBe("rgba(0, 0, 0, 0)");
+      expect(getComputedStyle(view).color).toBe(text);
+      expect(text).not.toBe("rgba(0, 0, 0, 0)");
+    }
+    finally {
+      AppearanceFixture.reset();
+    }
   });
 });
