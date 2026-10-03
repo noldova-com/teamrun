@@ -16,6 +16,7 @@
         @if (isIndeterminate(toast) || progressOf(toast) !== null) {
           <progress class="tr-toast-progress" max="1" [attr.value]="progressOf(toast)" [attr.aria-label]="toast.post.title"></progress>
         }
+        <span class="tr-toast-meta">{{ moduleName(toast) }} · {{ timeOf(toast) }}</span>
         @if (toast.post.actions.length > 0) {
           <div class="tr-toast-actions">
             @for (action of toast.post.actions; track $index) {
@@ -24,7 +25,7 @@
           </div>
         }
       </div>
-      <button type="button" tr-icon-button class="tr-toast-close" [icon]="resources.closeGlyph" [label]="resources.closeToastLabel" [attr.title]="resources.closeToastLabel" (click)="close(toast)"></button>
+      <button type="button" tr-icon-button class="tr-toast-close" [icon]="resources.closeGlyph" [label]="resources.closeToastLabel" [trTooltip]="resources.closeToastLabel" (click)="close(toast)"></button>
     </section>
   }
 </div>

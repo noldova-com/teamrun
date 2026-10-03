@@ -53,7 +53,7 @@ export class MenuService {
   private resolveItem(group: MenuGroup, item: MenuItem, context: JsonObject): readonly (CommandRow | SubmenuRow)[] {
     if (!Object.isNull(item.submenu)) {
       const place = this.findPlace(item.submenu);
-      return Object.isNull(place) ? [] : [new SubmenuRow(place.name, place.title)];
+      return Object.isNull(place) || this.resolve(place.name, context).length === 0 ? [] : [new SubmenuRow(place.name, place.title)];
     }
     const name = String(item.command);
     const commandArguments = { ...context, ...item.commandArguments };
@@ -61,7 +61,7 @@ export class MenuService {
     if (Object.isUndefined(command))
       return [new CommandRow(name, commandArguments, name, null, null, false, MenuCheck.None, false)];
     const check = Object.isNull(command.isChecked) ? MenuCheck.None : group.isExclusive ? MenuCheck.Radio : MenuCheck.Checkbox;
-    return [new CommandRow(name, commandArguments, command.title, command.icon, this.commands.keyLabel(name), command.isEnabled(commandArguments), check,
+    return [new CommandRow(name, commandArguments, command.title, command.icon, this.commands.keyLabel(name), this.commands.isEnabled(name, commandArguments), check,
       command.isChecked?.(commandArguments) ?? false)];
   }
 }

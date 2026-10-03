@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
@@ -75,7 +76,7 @@ describe("MenuService", () => {
     expect(menus.active().map(t => t.moduleId)).toEqual(["shell", "tasks", "notes"]);
     expect(describeSections(menus.resolve("notes.listItem", { week: 3 }))).toEqual([
       ["Add a task"],
-      ["Open note (disabled) Ctrl+Alt+O", "New from template >"],
+      ["Open note (disabled) Ctrl+Alt+O"],
       ["Sort by Radio:false", "Sort by Radio:true"],
       ["Wrap lines Checkbox:true", "notes.missing (disabled)"]
     ]);
@@ -93,14 +94,37 @@ describe("MenuService", () => {
     expect((closed as CommandRow).commandArguments).toEqual({ title: "Week 3", pinned: true, week: 0 });
   });
 
-  it("offers a submenu by its place's title and leaves out a submenu whose place is not active and a place with no rows", () => {
-    const menus = start(notes);
+  it("offers a submenu with rows by its place's title, and leaves out one whose place has no rows or is not active", () => {
+    const filled = MenuDeclarations.fromJson("notes", {
+      places: [
+        { name: "notes.listItem", title: "Note", menuBar: false },
+        { name: "notes.templates", title: "New from template", menuBar: false },
+        { name: "notes.archive", title: "Archive", menuBar: false }
+      ],
+      groups: [
+        { name: "notes.open", place: "notes.listItem", exclusive: false, items: [{ submenu: "notes.templates" }, { submenu: "notes.archive" }, { submenu: "notes.gone" }] },
+        { name: "notes.fromTemplate", place: "notes.templates", exclusive: false, items: [{ command: "notes.newNote", arguments: { template: "plan" } }] }
+      ]
+    });
+    const menus = start(filled);
     menus.setActiveModules(["notes"]);
 
     const rows = menus.resolve("notes.listItem").flatMap(t => t.rows);
 
     expect(rows.filter(t => t instanceof SubmenuRow).map(t => [t.title, (t as SubmenuRow).place])).toEqual([["New from template", "notes.templates"]]);
-    expect(menus.resolve("notes.templates")).toEqual([]);
-    expect(describeSections(menus.resolve("shell.file"))).toEqual([["Close the tab (disabled) Ctrl+W"], ["New note"]]);
+    expect(describeSections(menus.resolve("notes.templates"))).toEqual([["New note"]]);
+    expect(menus.resolve("notes.archive")).toEqual([]);
+  });
+
+  it("shows a row whose command's enabled check throws as disabled and reports the failure", () => {
+    const menus = start(notes);
+    const reported = vi.spyOn(TestBed.inject(ErrorHandler), "handleError").mockImplementation(() => undefined);
+    TestBed.inject(CommandService).setCommands([new CommandContribution("notes.newNote", "New note", null, null, () => Promise.resolve(null), () => {
+      throw new Error("No note to start from.");
+    })]);
+    menus.setActiveModules(["notes"]);
+
+    expect(describeSections(menus.resolve("shell.file"))).toEqual([["Close the tab (disabled) Ctrl+W"], ["New note (disabled)"]]);
+    expect(reported).toHaveBeenCalledOnce();
   });
 });

@@ -27,10 +27,22 @@ export class SplitHandle {
     this.leadingLength = leadingLength;
   }
 
+  public get minimumLength(): number {
+    return this.leadingMinimum;
+  }
+
+  public get maximumLength(): number {
+    return this.leadingMinimum + this.pairWeight * Math.max(0, this.sharedLength);
+  }
+
+  private get pairWeight(): number {
+    return this.split.parts.reduce((sum, t, index) => index === this.index || index === this.index + 1 ? sum + t.weight : sum, 0);
+  }
+
   public resize(leadingLength: number): SplitNode {
     if (this.sharedLength <= 0)
       return this.split;
-    const pair = this.split.parts.reduce((sum, t, index) => index === this.index || index === this.index + 1 ? sum + t.weight : sum, 0);
+    const pair = this.pairWeight;
     const share = Math.min(pair, Math.max(0, (leadingLength - this.leadingMinimum) / this.sharedLength));
     const parts = this.split.parts.map((t, index) => new SplitPart(t.node, index === this.index ? share : index === this.index + 1 ? pair - share : t.weight));
     return new SplitNode(this.split.id, this.split.axis, parts);
