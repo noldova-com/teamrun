@@ -16,7 +16,8 @@ export class ProtocolApiTests {
     const exportNames = [
       "BuildIdentity", "Cancel", "DoNotDisturbChange", "CommandInfo", "CommandList", "CommandRun", "Event", "Failure", "FailureCode", "FrameReader", "FrameWriter", "Handshake", "KeyChord", "KeyName", "ModuleState", "ModuleStatus", "ModuleStatusList", "Notification", "NotificationAction", "NotificationBroadcast",
       "NotificationList", "NotificationPost", "NotificationReference", "NotificationState", "NotificationSeverity", "NotificationUpdate", "NotificationsQuery", "PreShellData",
-      "ProtocolException", "QualifiedName", "Request", "Response", "RunningWork", "RuntimeHandover", "ShellEvents", "ShellMethods", "StopPolicy", "StopRequest", "WindowStateKey", "WindowStateValue", "WindowStateWrite", "WireContract", "WireDecoder", "WireMessage", "WireMessageKind"
+      "ProtocolException", "QualifiedName", "Request", "Response", "RunningWork", "RuntimeHandover", "SettingDefinition", "SettingEntry", "SettingKey", "SettingKind", "SettingLocality", "SettingOption",
+      "SettingScope", "SettingType", "SettingValue", "SettingsQuery", "SettingsSnapshot", "ShellEvents", "ShellMethods", "StopPolicy", "StopRequest", "WindowStateKey", "WindowStateValue", "WindowStateWrite", "WireContract", "WireDecoder", "WireMessage", "WireMessageKind"
     ];
 
     Assert.areEqual(exportNames.sort().join(","), Object.keys(api).sort().join(","));

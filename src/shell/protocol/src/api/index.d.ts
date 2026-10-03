@@ -183,6 +183,52 @@ export declare enum StopPolicy {
 }
 
 /**
+ * The kind of value a setting holds.
+ */
+export declare enum SettingKind {
+  /**
+   * `true` or `false`.
+   */
+  Boolean = "Boolean",
+
+  /**
+   * One of a list of named options, held as the option's value.
+   */
+  Choice = "Choice",
+
+  /**
+   * A number from a minimum to a maximum, in whole steps from the minimum.
+   */
+  Number = "Number",
+
+  /**
+   * A string up to a maximum length.
+   */
+  Text = "Text",
+
+  /**
+   * A list of distinct module ids.
+   */
+  Modules = "Modules"
+}
+
+/**
+ * Where a setting's value is kept.
+ */
+export declare enum SettingLocality {
+  /**
+   * One value for each device, never carried to another device.
+   */
+  Device = "Device",
+
+  /**
+   * One value for the data directory, which a later synchronization may
+   * carry to other devices.
+   */
+  Shared = "Shared"
+}
+
+/**
  * The exception thrown when a connection's frames break the protocol, such
  * as a frame over the maximum length.
  */
@@ -1089,6 +1135,12 @@ export declare class ShellEvents {
    * `NotificationBroadcast`.
    */
   public static readonly notifications: QualifiedName;
+
+  /**
+   * `shell.settingsChanged`: a setting's value changed; its payload is a
+   * `SettingValue` with the value now in effect for its key.
+   */
+  public static readonly settingsChanged: QualifiedName;
 }
 
 /**
@@ -1192,6 +1244,28 @@ export declare class ShellMethods {
    * `WindowStateWrite`.
    */
   public static readonly writeWindowLayout: QualifiedName;
+
+  /**
+   * `shell.settings`: asks for every setting's definition and its value for
+   * the application; its payload is a `SettingsQuery` and its answer a
+   * `SettingsSnapshot`.
+   */
+  public static readonly settings: QualifiedName;
+
+  /**
+   * `shell.setSetting`: sets a setting's value; its payload is a
+   * `SettingValue`. An unknown setting fails with `NotFound`; a value the
+   * setting does not accept, a scope it does not list, or a device setting
+   * without a device fails with `InvalidParams`.
+   */
+  public static readonly setSetting: QualifiedName;
+
+  /**
+   * `shell.resetSetting`: returns a setting to the value of its enclosing
+   * scopes or its default; its payload is a `SettingKey`. It fails as
+   * `shell.setSetting` does.
+   */
+  public static readonly resetSetting: QualifiedName;
 }
 
 /**
@@ -1228,6 +1302,804 @@ export interface IKeyStroke {
    * Whether Cmd on macOS, or the Windows or Super key, is held.
    */
   readonly metaKey: boolean;
+}
+
+/**
+ * One option of a choice setting: the value stored and the title people
+ * see.
+ */
+export declare class SettingOption {
+  /**
+   * The value a setting holds when this option is chosen.
+   */
+  public readonly value: string;
+
+  /**
+   * The title people see.
+   */
+  public readonly title: string;
+
+  /**
+   * Creates the option.
+   *
+   * @param value The stored value; not blank.
+   * @param title The title people see; not blank.
+   * @throws ArgumentException synchronously when either is blank.
+   *
+   * @example
+   * ```ts
+   * import { SettingOption } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const option: SettingOption = new SettingOption("Dark", "Dark");
+   * ```
+   */
+  public constructor(value: string, title: string);
+
+  /**
+   * Reads an option from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The option.
+   * @throws JsonException synchronously when a field is missing, blank or
+   * not a string, or another field is present.
+   *
+   * @example
+   * ```ts
+   * import { SettingOption } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const option: SettingOption = SettingOption.fromJson({ value: "Dark", title: "Dark" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): SettingOption;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `value` and `title` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { SettingOption } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new SettingOption("Dark", "Dark").toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The type of a setting's value: its kind and the limits of that kind. It
+ * decides which values a setting accepts.
+ */
+export declare class SettingType {
+  /**
+   * The kind of value.
+   */
+  public readonly kind: SettingKind;
+
+  /**
+   * A choice's options; empty for the other kinds.
+   */
+  public readonly options: readonly SettingOption[];
+
+  /**
+   * A number's minimum; `null` for the other kinds.
+   */
+  public readonly minimum: number | null;
+
+  /**
+   * A number's maximum; `null` for the other kinds.
+   */
+  public readonly maximum: number | null;
+
+  /**
+   * A number's step from its minimum; `null` for the other kinds.
+   */
+  public readonly step: number | null;
+
+  /**
+   * A text's maximum length; `null` for the other kinds.
+   */
+  public readonly maxLength: number | null;
+
+  /**
+   * Creates the type of a setting that is on or off.
+   *
+   * @returns The boolean type.
+   *
+   * @example
+   * ```ts
+   * import { SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const type: SettingType = SettingType.boolean();
+   * ```
+   */
+  public static boolean(): SettingType;
+
+  /**
+   * Creates the type of a setting that holds one of its options' values.
+   *
+   * @param options The options; at least one, with distinct values.
+   * @returns The choice type.
+   * @throws ArgumentException synchronously when there is no option or two
+   * share a value.
+   *
+   * @example
+   * ```ts
+   * import { SettingOption, SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const type: SettingType = SettingType.choice([new SettingOption("Light", "Light"), new SettingOption("Dark", "Dark")]);
+   * ```
+   */
+  public static choice(options: readonly SettingOption[]): SettingType;
+
+  /**
+   * Creates the type of a setting that holds a number from a minimum to a
+   * maximum, in whole steps from the minimum.
+   *
+   * @param minimum The smallest value; finite.
+   * @param maximum The largest value; finite and not below the minimum.
+   * @param step The distance between values; finite and positive.
+   * @returns The number type.
+   * @throws ArgumentException synchronously when a limit is not finite, the
+   * maximum is below the minimum or the step is not positive.
+   *
+   * @example
+   * ```ts
+   * import { SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const type: SettingType = SettingType.number(12, 18, 1);
+   * ```
+   */
+  public static number(minimum: number, maximum: number, step: number): SettingType;
+
+  /**
+   * Creates the type of a setting that holds a string up to a length.
+   *
+   * @param maxLength The longest string accepted; a positive integer.
+   * @returns The text type.
+   * @throws ArgumentException synchronously when the length is not a
+   * positive integer.
+   *
+   * @example
+   * ```ts
+   * import { SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const type: SettingType = SettingType.text(200);
+   * ```
+   */
+  public static text(maxLength: number): SettingType;
+
+  /**
+   * Creates the type of a setting that holds a list of distinct module
+   * ids.
+   *
+   * @returns The modules type.
+   *
+   * @example
+   * ```ts
+   * import { SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const type: SettingType = SettingType.modules();
+   * ```
+   */
+  public static modules(): SettingType;
+
+  /**
+   * Reads a type from its wire form: `kind` and the fields of that kind.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The type.
+   * @throws JsonException synchronously when the kind is unknown, a field of
+   * the kind is missing or invalid, or a field of another kind is present.
+   *
+   * @example
+   * ```ts
+   * import { SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const type: SettingType = SettingType.fromJson({ kind: "Number", minimum: 12, maximum: 18, step: 1 });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): SettingType;
+
+  /**
+   * Tells whether a value fits the type: a boolean; one of the options'
+   * values; a number within the limits on a step; a string within the
+   * length; or a list of distinct, non-blank strings.
+   *
+   * @param value The value.
+   * @returns Whether the type accepts it.
+   *
+   * @example
+   * ```ts
+   * import { SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const accepted: boolean = SettingType.number(12, 18, 1).accepts(14);
+   * ```
+   */
+  public accepts(value: JsonValue): boolean;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `kind` field and the fields of that kind.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = SettingType.text(200).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * One object of a setting scope, such as one conversation: the scope's name
+ * and the object's id. A value set for it overrides the values of the
+ * scopes that enclose it.
+ */
+export declare class SettingScope {
+  /**
+   * The scope's name, which the module that owns the objects declares.
+   */
+  public readonly name: QualifiedName;
+
+  /**
+   * The object's id, as its owner defines it.
+   */
+  public readonly id: string;
+
+  /**
+   * Creates the scope reference.
+   *
+   * @param name The scope's name.
+   * @param id The object's id; not blank.
+   * @throws ArgumentException synchronously when the id is blank.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingScope } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const scope: SettingScope = new SettingScope(QualifiedName.parse("chat.conversation"), "c42");
+   * ```
+   */
+  public constructor(name: QualifiedName, id: string);
+
+  /**
+   * Reads a scope reference from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The scope reference.
+   * @throws JsonException synchronously when the name is not a qualified
+   * name, the id is blank, or another field is present.
+   *
+   * @example
+   * ```ts
+   * import { SettingScope } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const scope: SettingScope = SettingScope.fromJson({ name: "chat.conversation", id: "c42" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): SettingScope;
+
+  /**
+   * Tells whether another reference names the same object of the same
+   * scope.
+   *
+   * @param other The other reference, or `null`.
+   * @returns Whether both name the same scope and id.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingScope } from "@noldova/teamrun-shell-protocol";
+   *
+   * const name: QualifiedName = QualifiedName.parse("chat.conversation");
+   * export const same: boolean = new SettingScope(name, "c42").equals(new SettingScope(name, "c42"));
+   * ```
+   */
+  public equals(other: SettingScope | null): boolean;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `name` and `id` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { QualifiedName, SettingScope } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new SettingScope(QualifiedName.parse("chat.conversation"), "c42").toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A setting's definition: what it is, the values it accepts, its default,
+ * where its value is kept, the scopes that may override it, and where
+ * Settings shows it. A module declares its own in `settings.json`; the
+ * shell declares its own the same way.
+ */
+export declare class SettingDefinition {
+  /**
+   * The setting's name, `<owner>.<name>`.
+   */
+  public readonly name: QualifiedName;
+
+  /**
+   * The title people see.
+   */
+  public readonly title: string;
+
+  /**
+   * What the setting does, in a sentence.
+   */
+  public readonly description: string;
+
+  /**
+   * The values it accepts.
+   */
+  public readonly type: SettingType;
+
+  /**
+   * The value in effect when none is set.
+   */
+  public readonly defaultValue: JsonValue;
+
+  /**
+   * Whether the value is kept per device or shared.
+   */
+  public readonly locality: SettingLocality;
+
+  /**
+   * The scopes whose objects may override the application's value; none
+   * for a device setting.
+   */
+  public readonly scopes: readonly QualifiedName[];
+
+  /**
+   * The Settings page that shows it.
+   */
+  public readonly page: string;
+
+  /**
+   * The group on that page.
+   */
+  public readonly group: string;
+
+  /**
+   * Creates the definition.
+   *
+   * @param name The setting's name.
+   * @param title The title; not blank.
+   * @param description The description; not blank.
+   * @param type The values it accepts.
+   * @param defaultValue The default; a value the type accepts.
+   * @param locality Where the value is kept.
+   * @param scopes The scopes that may override it; distinct, and none for a
+   * device setting.
+   * @param page The Settings page; not blank.
+   * @param group The group on the page; not blank.
+   * @throws ArgumentException synchronously when a text is blank, the type
+   * does not accept the default, or the scopes repeat or are given for a
+   * device setting.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingDefinition, SettingLocality, SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const definition: SettingDefinition = new SettingDefinition(
+   *   QualifiedName.parse("chat.sendWithEnter"), "Send with Enter", "Sends a message when Enter is pressed.",
+   *   SettingType.boolean(), true, SettingLocality.Shared, [QualifiedName.parse("chat.conversation")], "Chat", "Composer");
+   * ```
+   */
+  public constructor(
+    name: QualifiedName,
+    title: string,
+    description: string,
+    type: SettingType,
+    defaultValue: JsonValue,
+    locality: SettingLocality,
+    scopes: readonly QualifiedName[],
+    page: string,
+    group: string);
+
+  /**
+   * Reads a definition from its wire form, the form `settings.json` uses.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The definition.
+   * @throws JsonException synchronously when a field is missing or invalid
+   * or another field is present.
+   *
+   * @example
+   * ```ts
+   * import { SettingDefinition } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const definition: SettingDefinition = SettingDefinition.fromJson({
+   *   name: "chat.sendWithEnter", title: "Send with Enter", description: "Sends a message when Enter is pressed.",
+   *   type: { kind: "Boolean" }, default: true, locality: "Shared", scopes: [], page: "Chat", group: "Composer"
+   * });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): SettingDefinition;
+
+  /**
+   * Tells whether objects of a scope may override the setting.
+   *
+   * @param scope The scope's name.
+   * @returns Whether the setting lists the scope.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingDefinition, SettingLocality, SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * const conversation: QualifiedName = QualifiedName.parse("chat.conversation");
+   * export const scoped: boolean = new SettingDefinition(
+   *   QualifiedName.parse("chat.sendWithEnter"), "Send with Enter", "Sends a message when Enter is pressed.",
+   *   SettingType.boolean(), true, SettingLocality.Shared, [conversation], "Chat", "Composer").isScopedBy(conversation);
+   * ```
+   */
+  public isScopedBy(scope: QualifiedName): boolean;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The fields `fromJson` reads.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { QualifiedName, SettingDefinition, SettingLocality, SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new SettingDefinition(
+   *   QualifiedName.parse("chat.sendWithEnter"), "Send with Enter", "Sends a message when Enter is pressed.",
+   *   SettingType.boolean(), true, SettingLocality.Shared, [], "Chat", "Composer").toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * Which value of a setting is meant: the setting, the scope object it is
+ * set for or `null` for the application, and the device for a device
+ * setting. The payload of `shell.resetSetting`.
+ */
+export declare class SettingKey {
+  /**
+   * The setting's name.
+   */
+  public readonly name: QualifiedName;
+
+  /**
+   * The scope object, or `null` for the application.
+   */
+  public readonly scope: SettingScope | null;
+
+  /**
+   * The device, for a device setting; `null` otherwise.
+   */
+  public readonly device: string | null;
+
+  /**
+   * Creates the key.
+   *
+   * @param name The setting's name.
+   * @param scope The scope object; `null` by default, the application.
+   * @param device The device; `null` by default. Not blank when given.
+   * @throws ArgumentException synchronously when the device is blank.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingKey } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const key: SettingKey = new SettingKey(QualifiedName.parse("shell.doNotDisturb"), null, "1b4e28ba-2fa1-41d2-883f-0016d3cca427");
+   * ```
+   */
+  public constructor(name: QualifiedName, scope?: SettingScope | null, device?: string | null);
+
+  /**
+   * Reads a key from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The key.
+   * @throws JsonException synchronously when the name is missing or not a
+   * qualified name, the scope or device is invalid, or another field is
+   * present.
+   *
+   * @example
+   * ```ts
+   * import { SettingKey } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const key: SettingKey = SettingKey.fromJson({ name: "chat.sendWithEnter", scope: { name: "chat.conversation", id: "c42" } });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): SettingKey;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `name` field, and the `scope` and `device` fields when
+   * given.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { QualifiedName, SettingKey } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new SettingKey(QualifiedName.parse("shell.mode")).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A setting's value for a key: the payload of `shell.setSetting`, and of
+ * `shell.settingsChanged`, where it is the value now in effect.
+ */
+export declare class SettingValue {
+  /**
+   * Which value.
+   */
+  public readonly key: SettingKey;
+
+  /**
+   * The value.
+   */
+  public readonly value: JsonValue;
+
+  /**
+   * Creates the value.
+   *
+   * @param key Which value.
+   * @param value The value.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingKey, SettingValue } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const value: SettingValue = new SettingValue(new SettingKey(QualifiedName.parse("shell.mode")), "Dark");
+   * ```
+   */
+  public constructor(key: SettingKey, value: JsonValue);
+
+  /**
+   * Reads a value from its wire form: the key's fields and `value`.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The value.
+   * @throws JsonException synchronously when `value` is missing, the key is
+   * invalid, or another field is present.
+   *
+   * @example
+   * ```ts
+   * import { SettingValue } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const value: SettingValue = SettingValue.fromJson({ name: "shell.mode", value: "Dark" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): SettingValue;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The key's fields and `value`.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { QualifiedName, SettingKey, SettingValue } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new SettingValue(new SettingKey(QualifiedName.parse("shell.mode")), "Dark").toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A setting's value in effect for the application, and whether it is set
+ * or the default.
+ */
+export declare class SettingEntry {
+  /**
+   * The setting's name.
+   */
+  public readonly name: QualifiedName;
+
+  /**
+   * The value in effect.
+   */
+  public readonly value: JsonValue;
+
+  /**
+   * Whether a value is set; `false` when the default is in effect.
+   */
+  public readonly isSet: boolean;
+
+  /**
+   * Creates the entry.
+   *
+   * @param name The setting's name.
+   * @param value The value in effect.
+   * @param isSet Whether a value is set.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingEntry } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const entry: SettingEntry = new SettingEntry(QualifiedName.parse("shell.mode"), "System", false);
+   * ```
+   */
+  public constructor(name: QualifiedName, value: JsonValue, isSet: boolean);
+
+  /**
+   * Reads an entry from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The entry.
+   * @throws JsonException synchronously when a field is missing or invalid
+   * or another field is present.
+   *
+   * @example
+   * ```ts
+   * import { SettingEntry } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const entry: SettingEntry = SettingEntry.fromJson({ name: "shell.mode", value: "Dark", isSet: true });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): SettingEntry;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `name`, `value` and `isSet` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { QualifiedName, SettingEntry } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new SettingEntry(QualifiedName.parse("shell.mode"), "System", false).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The answer of `shell.settings`: every setting's definition and its entry
+ * for the application.
+ */
+export declare class SettingsSnapshot {
+  /**
+   * The definitions.
+   */
+  public readonly definitions: readonly SettingDefinition[];
+
+  /**
+   * The entries, each for a defined setting.
+   */
+  public readonly entries: readonly SettingEntry[];
+
+  /**
+   * Creates the snapshot.
+   *
+   * @param definitions The definitions; distinct names.
+   * @param entries The entries; distinct, each naming a definition.
+   * @throws ArgumentException synchronously when a name repeats or an entry
+   * names no definition.
+   *
+   * @example
+   * ```ts
+   * import { SettingsSnapshot } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const snapshot: SettingsSnapshot = new SettingsSnapshot([], []);
+   * ```
+   */
+  public constructor(definitions: readonly SettingDefinition[], entries: readonly SettingEntry[]);
+
+  /**
+   * Reads a snapshot from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The snapshot.
+   * @throws JsonException synchronously when a list is missing, an item is
+   * invalid, a name repeats or an entry names no definition, or another
+   * field is present.
+   *
+   * @example
+   * ```ts
+   * import { SettingsSnapshot } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const snapshot: SettingsSnapshot = SettingsSnapshot.fromJson({ definitions: [], entries: [] });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): SettingsSnapshot;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `definitions` and `entries` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { SettingsSnapshot } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new SettingsSnapshot([], []).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The payload of `shell.settings`: the device whose device settings the
+ * answer gives. The desktop sets it for a window.
+ */
+export declare class SettingsQuery {
+  /**
+   * The device, or `null`, when device settings are at their defaults.
+   */
+  public readonly device: string | null;
+
+  /**
+   * Creates the query.
+   *
+   * @param device The device, or `null`; not blank when given.
+   * @throws ArgumentException synchronously when the device is blank.
+   *
+   * @example
+   * ```ts
+   * import { SettingsQuery } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const query: SettingsQuery = new SettingsQuery("1b4e28ba-2fa1-41d2-883f-0016d3cca427");
+   * ```
+   */
+  public constructor(device: string | null);
+
+  /**
+   * Reads a query from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The query.
+   * @throws JsonException synchronously when the device is blank or another
+   * field is present.
+   *
+   * @example
+   * ```ts
+   * import { SettingsQuery } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const query: SettingsQuery = SettingsQuery.fromJson({ device: "1b4e28ba-2fa1-41d2-883f-0016d3cca427" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): SettingsQuery;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `device` field when given.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { SettingsQuery } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new SettingsQuery(null).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
 }
 
 /**

@@ -41,4 +41,9 @@ export class ShellMethodsTests {
       JSON.stringify(["shell.readWindowBounds", "shell.writeWindowBounds", "shell.readWindowLayout", "shell.writeWindowLayout"]),
       JSON.stringify([ShellMethods.readWindowBounds, ShellMethods.writeWindowBounds, ShellMethods.readWindowLayout, ShellMethods.writeWindowLayout].map(t => t.text)));
   }
+
+  @TestMethod
+  public namesTheSettingsMethods(): void {
+    Assert.areEqual("shell.settings,shell.setSetting,shell.resetSetting", [ShellMethods.settings, ShellMethods.setSetting, ShellMethods.resetSetting].map(t => t.text).join(","));
+  }
 }

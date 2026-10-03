@@ -151,6 +151,27 @@ export class Resources {
   public static readonly writeWindowBoundsMember: string = "writeWindowBounds";
   public static readonly readWindowLayoutMember: string = "readWindowLayout";
   public static readonly writeWindowLayoutMember: string = "writeWindowLayout";
+  public static readonly settingsMember: string = "settings";
+  public static readonly setSettingMember: string = "setSetting";
+  public static readonly resetSettingMember: string = "resetSetting";
+  public static readonly settingsChangedMember: string = "settingsChanged";
+  public static readonly optionsField: string = "options";
+  public static readonly minimumField: string = "minimum";
+  public static readonly maximumField: string = "maximum";
+  public static readonly stepField: string = "step";
+  public static readonly maxLengthField: string = "maxLength";
+  public static readonly descriptionField: string = "description";
+  public static readonly typeField: string = "type";
+  public static readonly defaultField: string = "default";
+  public static readonly localityField: string = "locality";
+  public static readonly scopesField: string = "scopes";
+  public static readonly pageField: string = "page";
+  public static readonly groupField: string = "group";
+  public static readonly scopeField: string = "scope";
+  public static readonly isSetField: string = "isSet";
+  public static readonly definitionsField: string = "definitions";
+  public static readonly entriesField: string = "entries";
+  public static readonly stepTolerance: number = 1e-9;
   public static readonly textParameterName: string = "text";
   public static readonly maximumFrameLengthParameterName: string = "maximumFrameLength";
 
@@ -163,6 +184,16 @@ export class Resources {
   public static readonly moduleCauseInvalid: string = "An active module has no cause, and a failed or blocked module has one that is not blank.";
   public static readonly responseOutcomeAmbiguous: string = "A response cannot carry both a payload and a failure.";
   public static readonly unknownField: string = "The field is not part of this message, which accepts no unknown fields.";
+  public static readonly settingTextInvalid: string = "A setting's title, description, page and group must not be blank.";
+  public static readonly settingOptionsInvalid: string = "A choice needs at least one option, each with a distinct value and a title, none of them blank.";
+  public static readonly settingRangeInvalid: string = "A number needs a finite minimum no greater than its finite maximum and a positive step.";
+  public static readonly settingMaxLengthInvalid: string = "A text's maximum length must be a positive integer.";
+  public static readonly settingTypeFieldsInvalid: string = "A setting's type carries only the fields of its kind: options for a choice, minimum, maximum and step for a number, maxLength for a text.";
+  public static readonly settingDefaultInvalid: string = "A setting's default must be a value its type accepts.";
+  public static readonly settingScopesInvalid: string = "A setting's scopes must be distinct, and a device setting takes none.";
+  public static readonly settingScopeIdInvalid: string = "A scope's object id must not be blank.";
+  public static readonly settingDeviceInvalid: string = "A device, when given, must not be blank.";
+  public static readonly settingEntriesInvalid: string = "Settings must be distinct, and each entry must name a defined setting.";
 
   public static formatNotificationActionsTooMany(maximum: number): string {
     return `A notification has at most ${maximum} actions.`;
