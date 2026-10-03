@@ -123,7 +123,8 @@ export class Resources {
     "status-bar-item-height",
     "status-bar-item-gap",
     "button-height",
-    "button-padding"
+    "button-padding",
+    "checkbox-size"
   ];
   public static readonly shapes: ReadonlyMap<string, readonly string[]> = new Map([["tab", ["pill"]]]);
   public static readonly defaultThemeId: string = "shell.default";

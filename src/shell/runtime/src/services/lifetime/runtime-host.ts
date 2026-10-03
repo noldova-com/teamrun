@@ -11,7 +11,7 @@ import path from "node:path";
 import { inspect } from "node:util";
 
 import "@noldova/teamrun-foundation-core";
-import { type BuildIdentity, Failure, FailureCode, PreShellData, RuntimeHandover, ShellEvents, ShellMethods } from "@noldova/teamrun-shell-protocol";
+import { type BuildIdentity, Failure, FailureCode, NotificationBroadcast, PreShellData, RuntimeHandover, ShellEvents, ShellMethods } from "@noldova/teamrun-shell-protocol";
 
 import { DataDirectoryState } from "../../enums/data-directory-state.js";
 import { WindowStateKind } from "../../enums/window-state-kind.js";
@@ -36,10 +36,14 @@ import { CommandsMethod } from "../modules/commands-method.js";
 import { ModuleHost } from "../modules/module-host.js";
 import { ModulesMethod } from "../modules/modules-method.js";
 import { RunCommandMethod } from "../modules/run-command-method.js";
+import { ClearNotificationsMethod } from "../notifications/clear-notifications-method.js";
 import { DismissNotificationMethod } from "../notifications/dismiss-notification-method.js";
+import { DoNotDisturbStore } from "../notifications/do-not-disturb-store.js";
+import { MarkNotificationsReadMethod } from "../notifications/mark-notifications-read-method.js";
 import { NotificationCenter } from "../notifications/notification-center.js";
 import { NotificationsMethod } from "../notifications/notifications-method.js";
 import { PostNotificationMethod } from "../notifications/post-notification-method.js";
+import { SetDoNotDisturbMethod } from "../notifications/set-do-not-disturb-method.js";
 import { UpdateNotificationMethod } from "../notifications/update-notification-method.js";
 import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
@@ -66,6 +70,7 @@ export class RuntimeHost implements IIdleParticipant {
   private discovery: RuntimeDiscovery | null = null;
   private movingAside: Promise<void> | null = null;
   private isStopping: boolean = false;
+  private readonly quietDevices: Set<string> = new Set();
 
   public readonly identity: BuildIdentity;
   public readonly work: WorkTracker;
@@ -100,16 +105,13 @@ export class RuntimeHost implements IIdleParticipant {
     this.publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(platform, new SystemCommand(), environment));
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
     const notificationsChanged = this.events.declare(ShellEvents.notifications);
-    this.notifications = new NotificationCenter(t => notificationsChanged.publish(t.toJson()), () => new Date());
+    this.notifications = new NotificationCenter(
+      t => notificationsChanged.publish(new NotificationBroadcast(t.notifications, [...this.quietDevices].sort()).toJson()), () => new Date());
     this.modules = new ModuleHost(declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics);
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
     this.methods.register(ShellMethods.commands, new CommandsMethod(this.commands));
     this.methods.register(ShellMethods.runCommand, new RunCommandMethod(this.commands));
-    this.methods.register(ShellMethods.notifications, new NotificationsMethod(this.notifications));
-    this.methods.register(ShellMethods.postNotification, new PostNotificationMethod(this.notifications, this.modules.notificationPolicy));
-    this.methods.register(ShellMethods.updateNotification, new UpdateNotificationMethod(this.notifications, this.modules.notificationPolicy));
-    this.methods.register(ShellMethods.dismissNotification, new DismissNotificationMethod(this.notifications));
     if (!Object.isNull(database))
       this.registerShellFacilities(database);
     else {
@@ -201,6 +203,14 @@ export class RuntimeHost implements IIdleParticipant {
     this.methods.register(ShellMethods.writeWindowBounds, new WindowStateWriteMethod(store, WindowStateKind.Bounds));
     this.methods.register(ShellMethods.readWindowLayout, new WindowStateReadMethod(store, WindowStateKind.Layout));
     this.methods.register(ShellMethods.writeWindowLayout, new WindowStateWriteMethod(store, WindowStateKind.Layout));
+    const quietDevices = new DoNotDisturbStore(database, this.quietDevices);
+    this.methods.register(ShellMethods.notifications, new NotificationsMethod(this.notifications, quietDevices));
+    this.methods.register(ShellMethods.postNotification, new PostNotificationMethod(this.notifications, this.modules.notificationPolicy));
+    this.methods.register(ShellMethods.updateNotification, new UpdateNotificationMethod(this.notifications, this.modules.notificationPolicy));
+    this.methods.register(ShellMethods.dismissNotification, new DismissNotificationMethod(this.notifications));
+    this.methods.register(ShellMethods.markNotificationsRead, new MarkNotificationsReadMethod(this.notifications));
+    this.methods.register(ShellMethods.clearNotifications, new ClearNotificationsMethod(this.notifications));
+    this.methods.register(ShellMethods.setDoNotDisturb, new SetDoNotDisturbMethod(quietDevices, () => this.notifications.republish()));
   }
 
   private async listenAsync(platform: string): Promise<Endpoint> {

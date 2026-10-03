@@ -57,7 +57,8 @@ describe("DefaultTheme", () => {
       ["docking-guide", "2.5rem"],
       ["menu-item-height", "1.625rem"],
       ["tooltip-width", "43.75rem"],
-      ["popover-width", "27.5rem"]
+      ["popover-width", "27.5rem"],
+      ["checkbox-size", "1.125rem"]
     ];
 
     for (const [name, value] of expected)

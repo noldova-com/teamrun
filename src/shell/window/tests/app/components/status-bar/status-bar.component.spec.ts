@@ -35,11 +35,12 @@ describe("StatusBarComponent", () => {
     return fixture.nativeElement;
   }
 
-  it("has an empty left and right side", () => {
+  it("has an empty left side and the notifications bell on its right side", () => {
     const bar = render();
 
     expect([...bar.children].map(t => t.className)).toEqual(["tr-status-bar-side tr-status-bar-left", "tr-status-bar-side tr-status-bar-right"]);
-    expect(bar.textContent).toBe("");
+    expect(bar.children[0]?.textContent).toBe("");
+    expect(bar.querySelector(".tr-status-bar-right button.tr-notifications-item")?.getAttribute("aria-label")).toBe("Notifications");
     expect(bar.getAttribute("data-tr-chrome")).toBe("bottom");
   });
 
@@ -53,7 +54,7 @@ describe("StatusBarComponent", () => {
     const names = (side: Element | undefined): readonly (string | null)[] => [...side?.children ?? []].map(t => t.getAttribute("data-tr-item") ?? t.tagName.toLowerCase());
 
     expect(names(bar.children[0])).toEqual(["notes.count", "clock.zone"]);
-    expect(names(bar.children[1])).toEqual(["clock.ticks", "notes.sync", "tr-module-failures"]);
+    expect(names(bar.children[1])).toEqual(["clock.ticks", "notes.sync", "tr-notifications", "tr-module-failures"]);
   });
 
   for (const mode of AppearanceFixture.modes)

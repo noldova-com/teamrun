@@ -7,24 +7,25 @@
  */
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { NotificationState, NotificationsQuery } from "@noldova/teamrun-shell-protocol";
+import { DoNotDisturbChange } from "@noldova/teamrun-shell-protocol";
 
 import type { IMethodHandler } from "../../interfaces/method-handler.js";
 import type { RequestContext } from "../../models/request-context.js";
 import type { DoNotDisturbStore } from "./do-not-disturb-store.js";
-import type { NotificationCenter } from "./notification-center.js";
 
-export class NotificationsMethod implements IMethodHandler {
-  private readonly notifications: NotificationCenter;
+export class SetDoNotDisturbMethod implements IMethodHandler {
   private readonly store: DoNotDisturbStore;
+  private readonly changed: () => void;
 
-  public constructor(notifications: NotificationCenter, store: DoNotDisturbStore) {
-    this.notifications = notifications;
+  public constructor(store: DoNotDisturbStore, changed: () => void) {
     this.store = store;
+    this.changed = changed;
   }
 
   public async handleAsync(context: RequestContext): Promise<JsonValue> {
-    const query = NotificationsQuery.fromJson(context.payload);
-    return new NotificationState(this.notifications.list.notifications, this.store.isQuiet(query.device)).toJson();
+    const change = DoNotDisturbChange.fromJson(context.payload);
+    this.store.set(change.device, change.isOn);
+    this.changed();
+    return null;
   }
 }

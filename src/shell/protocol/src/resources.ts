@@ -54,6 +54,8 @@ export class Resources {
   public static readonly postNotificationMember: string = "postNotification";
   public static readonly updateNotificationMember: string = "updateNotification";
   public static readonly dismissNotificationMember: string = "dismissNotification";
+  public static readonly markNotificationsReadMember: string = "markNotificationsRead";
+  public static readonly clearNotificationsMember: string = "clearNotifications";
   public static readonly keyField: string = "key";
   public static readonly textField: string = "text";
   public static readonly severityField: string = "severity";
@@ -65,6 +67,10 @@ export class Resources {
   public static readonly postedAtField: string = "postedAt";
   public static readonly isReadField: string = "isRead";
   public static readonly notificationsField: string = "notifications";
+  public static readonly isOnField: string = "isOn";
+  public static readonly isDoNotDisturbField: string = "isDoNotDisturb";
+  public static readonly quietDevicesField: string = "quietDevices";
+  public static readonly setDoNotDisturbMember: string = "setDoNotDisturb";
   public static readonly keyParameterName: string = "key";
   public static readonly commandTitleInvalid: string = "A command's title must not be blank.";
   public static readonly commandIconInvalid: string = "A command's icon, when it has one, must not be blank.";
@@ -75,6 +81,7 @@ export class Resources {
   public static readonly notificationActionTitleInvalid: string = "A notification action's title must not be blank.";
   public static readonly notificationIdInvalid: string = "A notification's id must be a whole number from 1.";
   public static readonly notificationTimeInvalid: string = "A notification's time must be a date and time.";
+  public static readonly quietDeviceInvalid: string = "A device with Do not disturb on must have an id.";
   public static readonly macPlatform: string = "darwin";
   public static readonly standardPlatform: string = "win32";
   public static readonly keySeparator: string = "+";
