@@ -61,7 +61,7 @@ describe("MenuItemComponent", () => {
   }
 
   function parts(name: string): (string | null)[] {
-    return [...row(name).children].map(t => t.className.split(" ")[0] ?? null);
+    return [...row(name).children].flatMap(t => t.classList.contains("tr-menu-item-trail") ? [...t.children] : [t]).map(t => t.className.split(" ")[0] ?? null);
   }
 
   it("shows its icon, its label marked for truncation, and a chevron only when it opens a submenu", () => {

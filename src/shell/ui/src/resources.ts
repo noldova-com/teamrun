@@ -114,6 +114,7 @@ export class Resources {
     "menu-item-height",
     "menu-item-inset",
     "menu-item-padding",
+    "menu-trail-gap",
     "menu-separator-spacing",
     "tooltip-width",
     "tooltip-padding",
