@@ -322,6 +322,7 @@ export class Resources {
   public static readonly closeGroup: string = "shell.close";
   public static readonly searchGroup: string = "shell.search";
   public static readonly docksGroup: string = "shell.docks";
+  public static readonly bottomDockGroup: string = "shell.bottomDock";
   public static readonly layoutGroup: string = "shell.layout";
   public static readonly windowPartMenusToken: string = "The build's module menus";
   public static readonly placeInput: string = "place";

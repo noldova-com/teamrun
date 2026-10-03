@@ -51,6 +51,12 @@ test.describe("the menu bar on Windows and Linux", () => {
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"] .tr-tab-label")).toHaveText("Note 3");
     await (await openBarMenuAsync(window, "Notes")).getByRole("menuitemradio", { name: "Sort by title" }).click();
     await expect(list).toHaveAttribute("data-sort", "title");
+    const spans = await openBarMenuAsync(window, "View");
+    await expect(spans.getByRole("menuitemradio", { name: "Bottom dock across the window" })).toHaveAttribute("aria-checked", "true");
+    await spans.getByRole("menuitemradio", { name: "Bottom dock between the side docks" }).click();
+    await expect((await openBarMenuAsync(window, "View")).getByRole("menuitemradio", { name: "Bottom dock between the side docks" })).toHaveAttribute("aria-checked", "true");
+    await window.keyboard.press("Escape");
+    await window.keyboard.press("Escape");
     const view = await openBarMenuAsync(window, "View");
     await expect(view.getByRole("menuitemcheckbox", { name: "Show or hide the left dock" })).toHaveAttribute("aria-checked", "true");
     await view.getByRole("menuitemcheckbox", { name: "Show or hide the left dock" }).click();
