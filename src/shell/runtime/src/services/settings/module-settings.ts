@@ -8,7 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { QualifiedName, SettingKey, SettingValue, type SettingScope } from "@noldova/teamrun-shell-protocol";
+import { QualifiedName, type SettingChange, SettingKey, SettingValue, type SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import { RegistrationException } from "../../exceptions/registration.exception.js";
 import type { IModuleSettings } from "../../interfaces/module-settings.js";
@@ -39,7 +39,7 @@ export class ModuleSettings implements IModuleSettings {
     this.settings.reset(new SettingKey(this.requireOwn(name), scope, device));
   }
 
-  public onChanged(name: string, listener: (change: SettingValue) => void): void {
+  public onChanged(name: string, listener: (change: SettingChange) => void): void {
     const watched = this.requireReadable(name);
     this.registrations.push(this.settings.onChanged(t => {
       if (t.key.name.text === watched.text)

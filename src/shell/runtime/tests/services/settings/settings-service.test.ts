@@ -10,6 +10,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import {
   FailureCode,
   QualifiedName,
+  type SettingChange,
   SettingDefinition,
   SettingKey,
   SettingLocality,
@@ -48,7 +49,7 @@ export class SettingsServiceTests {
 
     Assert.areEqual("true,false,true", [before, set, settings.service.read(key)].join(","));
     Assert.areEqual("false,true", [entry?.value, entry?.isSet].join(","));
-    Assert.areEqual(JSON.stringify(["{\"name\":\"chat.sendWithEnter\",\"value\":false}", "{\"name\":\"chat.sendWithEnter\",\"value\":true}"]), JSON.stringify(changes));
+    Assert.areEqual(JSON.stringify(["{\"name\":\"chat.sendWithEnter\",\"value\":false,\"isSet\":true}", "{\"name\":\"chat.sendWithEnter\",\"value\":true,\"isSet\":false}"]), JSON.stringify(changes));
     Assert.isFalse(settings.service.snapshot(null).entries.some(t => t.isSet));
   }
 
@@ -72,7 +73,7 @@ export class SettingsServiceTests {
   @TestMethod
   public async keepsOneSharedValueWhateverDeviceAWriteNames(): Promise<void> {
     await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
-    const changes: SettingValue[] = [];
+    const changes: SettingChange[] = [];
     settings.service.onChanged(t => changes.push(t));
 
     settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND, null, "d1"), false));
@@ -153,7 +154,7 @@ export class SettingsServiceTests {
   @TestMethod
   public async stopsTellingAListenerOnceItIsDisposed(): Promise<void> {
     await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
-    const changes: SettingValue[] = [];
+    const changes: SettingChange[] = [];
     const listening = settings.service.onChanged(t => changes.push(t));
 
     settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND), false));

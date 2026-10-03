@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
-  DoNotDisturbChange, type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, Response, type RuntimeHandover, SettingKey, SettingValue,
+  DoNotDisturbChange, type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, Response, type RuntimeHandover, SettingChange, SettingKey,
   ShellEvents, ShellMethods, WindowStateKey, WindowStateValue, WindowStateWrite
 } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
@@ -245,10 +245,10 @@ export class DesktopApplication {
 
   private readSettingForDevice(event: Event): JsonValue | undefined {
     try {
-      const change = SettingValue.fromJson(event.payload);
+      const change = SettingChange.fromJson(event.payload);
       if (Object.isNull(change.key.device))
         return event.payload;
-      return change.key.device === this.knownDevice ? new SettingValue(new SettingKey(change.key.name, change.key.scope), change.value).toJson() : undefined;
+      return change.key.device === this.knownDevice ? new SettingChange(new SettingKey(change.key.name, change.key.scope), change.value, change.isSet).toJson() : undefined;
     }
     catch (error) {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));

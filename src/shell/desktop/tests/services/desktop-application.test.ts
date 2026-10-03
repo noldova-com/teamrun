@@ -890,15 +890,15 @@ export class DesktopApplicationTests {
     const window = DesktopApplicationTests.firstWindow(electron);
     const changed = new QualifiedName("shell", "settingsChanged");
 
-    launcher.listener?.onEvent(new Event(changed, { name: "shell.mode", value: "Dark" }));
-    launcher.listener?.onEvent(new Event(changed, { name: "shell.panelSize", device: FakeDeviceIdentity.ID, value: 15 }));
-    launcher.listener?.onEvent(new Event(changed, { name: "shell.panelSize", device: "another", value: 16 }));
+    launcher.listener?.onEvent(new Event(changed, { name: "shell.mode", value: "Dark", isSet: true }));
+    launcher.listener?.onEvent(new Event(changed, { name: "shell.panelSize", device: FakeDeviceIdentity.ID, value: 13, isSet: false }));
+    launcher.listener?.onEvent(new Event(changed, { name: "shell.panelSize", device: "another", value: 16, isSet: true }));
     launcher.listener?.onEvent(new Event(changed, { value: 17 }));
 
     Assert.areEqual(
       JSON.stringify([
-        ["teamrun:runtimeEvent", "shell.settingsChanged", { name: "shell.mode", value: "Dark" }],
-        ["teamrun:runtimeEvent", "shell.settingsChanged", { name: "shell.panelSize", value: 15 }]
+        ["teamrun:runtimeEvent", "shell.settingsChanged", { name: "shell.mode", value: "Dark", isSet: true }],
+        ["teamrun:runtimeEvent", "shell.settingsChanged", { name: "shell.panelSize", value: 13, isSet: false }]
       ]),
       JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.settingsChanged could not be passed to the window").length);

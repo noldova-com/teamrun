@@ -43,6 +43,7 @@ export { Request } from "../models/request.js";
 export { Response } from "../models/response.js";
 export { RunningWork } from "../models/running-work.js";
 export { RuntimeHandover } from "../models/runtime-handover.js";
+export { SettingChange } from "../models/setting-change.js";
 export { SettingDefinition } from "../models/setting-definition.js";
 export { SettingEntry } from "../models/setting-entry.js";
 export { SettingKey } from "../models/setting-key.js";

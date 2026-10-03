@@ -473,9 +473,9 @@ export class RuntimeHostTests {
         snapshot.definitions.map(t => t.name.text).join(","));
       Assert.areEqual("InvalidParams,NotFound,InvalidParams", ["desktop:5", "desktop:6", "desktop:7"].map(t => responses.get(t)?.failure?.code).join(","));
       Assert.areEqual(JSON.stringify([
-        "{\"name\":\"shell.mode\",\"value\":\"Dark\"}",
-        "{\"name\":\"shell.doNotDisturb\",\"device\":\"d1\",\"value\":true}",
-        "{\"name\":\"shell.mode\",\"value\":\"System\"}"
+        "{\"name\":\"shell.mode\",\"value\":\"Dark\",\"isSet\":true}",
+        "{\"name\":\"shell.doNotDisturb\",\"device\":\"d1\",\"value\":true,\"isSet\":true}",
+        "{\"name\":\"shell.mode\",\"value\":\"System\",\"isSet\":false}"
       ]), JSON.stringify(events.map(t => JSON.stringify(t.payload))));
       Assert.isTrue(events.every(t => t.name.text === "shell.settingsChanged"));
     });

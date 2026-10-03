@@ -10,7 +10,7 @@ import { Component, type Type } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName, SettingKey, SettingScope, SettingValue } from "@noldova/teamrun-shell-protocol";
+import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName, SettingChange, SettingKey, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { WindowPartAccessException } from "../../../src/app/exceptions/window-part-access.exception";
@@ -35,7 +35,7 @@ class FakeWindowPartHost implements IWindowPartHost {
   public readonly calls: string[] = [];
   public readonly listeners: Set<(name: string, payload: JsonValue) => void> = new Set();
   public readonly registered: Set<string> = new Set(["notes.taken"]);
-  public readonly settingListeners: Set<(change: SettingValue) => void> = new Set();
+  public readonly settingListeners: Set<(change: SettingChange) => void> = new Set();
 
   public requestAsync(method: string, payload: JsonValue): Promise<JsonValue> {
     this.calls.push(`request ${method}`);
@@ -92,12 +92,12 @@ class FakeWindowPartHost implements IWindowPartHost {
     return Promise.resolve();
   }
 
-  public onSettingChanged(listener: (change: SettingValue) => void): () => void {
+  public onSettingChanged(listener: (change: SettingChange) => void): () => void {
     this.settingListeners.add(listener);
     return () => this.settingListeners.delete(listener);
   }
 
-  public changeSetting(change: SettingValue): void {
+  public changeSetting(change: SettingChange): void {
     for (const listener of this.settingListeners)
       listener(change);
   }
@@ -163,10 +163,10 @@ describe("WindowPartContext", () => {
     await context.writeSettingAsync("notes.sortBy", "title", folder);
     await context.resetSettingAsync("notes.sortBy");
     await context.resetSettingAsync("notes.sortBy", folder);
-    host.changeSetting(new SettingValue(new SettingKey(QualifiedName.parse("shell.mode")), "Dark"));
-    host.changeSetting(new SettingValue(new SettingKey(QualifiedName.parse("tasks.size"), folder), 2));
+    host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("shell.mode")), "Dark", true));
+    host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("tasks.size"), folder), 2, true));
     context.withdraw();
-    host.changeSetting(new SettingValue(new SettingKey(QualifiedName.parse("tasks.size")), 3));
+    host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("tasks.size")), 3, true));
 
     expect(read).toEqual(["notes.sortBy value", "tasks.size value", "shell.mode value", undefined]);
     expect(host.calls).toEqual(["write notes.sortBy \"date\" app", "write notes.sortBy \"title\" f1", "reset notes.sortBy app", "reset notes.sortBy f1", "refresh"]);

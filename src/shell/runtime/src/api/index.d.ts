@@ -14,7 +14,7 @@ import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-ex
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type {
   BuildIdentity, CommandInfo, CommandList, Event, Failure, FailureCode, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, QualifiedName, Response,
-  RunningWork, RuntimeHandover, SettingDefinition, SettingKey, SettingScope, SettingValue, SettingsSnapshot, StopPolicy
+  RunningWork, RuntimeHandover, SettingChange, SettingDefinition, SettingKey, SettingScope, SettingValue, SettingsSnapshot, StopPolicy
 } from "@noldova/teamrun-shell-protocol";
 
 /**
@@ -1922,7 +1922,7 @@ export interface IModuleSettings {
    * }
    * ```
    */
-  onChanged(name: string, listener: (change: SettingValue) => void): void;
+  onChanged(name: string, listener: (change: SettingChange) => void): void;
 
   /**
    * Records which scope object encloses one of the module's scope objects,
@@ -3934,7 +3934,7 @@ export declare class SettingsService {
    * }
    * ```
    */
-  public onChanged(listener: (change: SettingValue) => void): Disposable;
+  public onChanged(listener: (change: SettingChange) => void): Disposable;
 }
 
 /**

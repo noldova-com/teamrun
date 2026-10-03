@@ -138,9 +138,9 @@ describe("WindowPartHostService", () => {
 
     await host.writeSettingAsync("shell.mode", "Dark", null);
     await host.resetSettingAsync("shell.mode", null);
-    bridge.publishEvent("shell.settingsChanged", { name: "shell.mode", value: "Dark" });
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.mode", value: "Dark", isSet: true });
     stop();
-    bridge.publishEvent("shell.settingsChanged", { name: "shell.mode", value: "Light" });
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.mode", value: "Light", isSet: true });
 
     expect([host.readSetting("shell.mode"), settings.read("shell.mode")]).toEqual(["Light", "Light"]);
     expect(heard).toEqual(["shell.mode"]);

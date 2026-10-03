@@ -194,7 +194,7 @@ A module defines each setting it contributes in `settings.json`, an object whose
 | `scopes` | The setting scopes that may override it, its module's own or a dependency's; a device setting has none |
 | `page`, `group` | Where Settings shows it |
 
-The shell keeps the values in its database and reports every change with the event `shell.settingsChanged`, whose payload is the changed key and the value now in effect. A part reads the settings of its module, its dependencies and the shell, and changes only its own module's. A window reads them all with `shell.settings` and changes them with `shell.setSetting` and `shell.resetSetting`; the desktop adds its device to these requests and passes a device's change only to that device's windows. A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
+The shell keeps the values in its database and reports every change with the event `shell.settingsChanged`, whose payload is the changed key, the value now in effect and whether a value is stored for the key, false after a reset. A part reads the settings of its module, its dependencies and the shell, and changes only its own module's. A window reads them all with `shell.settings` and changes them with `shell.setSetting` and `shell.resetSetting`; the desktop adds its device to these requests and passes a device's change only to that device's windows. A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
 
 ### Setting scopes
 

@@ -1137,8 +1137,8 @@ export declare class ShellEvents {
   public static readonly notifications: QualifiedName;
 
   /**
-   * `shell.settingsChanged`: a setting's value changed; its payload is a
-   * `SettingValue` with the value now in effect for its key.
+   * `shell.settingsChanged`: a setting's value was set or reset; its payload
+   * is a `SettingChange` with the value now in effect for its key.
    */
   public static readonly settingsChanged: QualifiedName;
 }
@@ -1845,8 +1845,79 @@ export declare class SettingKey {
 }
 
 /**
- * A setting's value for a key: the payload of `shell.setSetting`, and of
- * `shell.settingsChanged`, where it is the value now in effect.
+ * A change to a setting's value for a key, the payload of
+ * `shell.settingsChanged`: the value now in effect and whether a value is
+ * stored for the key, false after a reset.
+ */
+export declare class SettingChange {
+  /**
+   * Which value changed.
+   */
+  public readonly key: SettingKey;
+
+  /**
+   * The value now in effect for the key.
+   */
+  public readonly value: JsonValue;
+
+  /**
+   * Whether a value is stored for the key: true after a set, false after a
+   * reset, when the value comes from an enclosing scope or the default.
+   */
+  public readonly isSet: boolean;
+
+  /**
+   * Creates the change.
+   *
+   * @param key Which value changed.
+   * @param value The value now in effect for the key.
+   * @param isSet Whether a value is stored for the key.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingChange, SettingKey } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const change: SettingChange = new SettingChange(new SettingKey(QualifiedName.parse("shell.mode")), "System", false);
+   * ```
+   */
+  public constructor(key: SettingKey, value: JsonValue, isSet: boolean);
+
+  /**
+   * Reads a change from its wire form: the key's fields, `value` and `isSet`.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The change.
+   * @throws JsonException synchronously when `value` or `isSet` is missing
+   * or invalid, the key is invalid, or another field is present.
+   *
+   * @example
+   * ```ts
+   * import { SettingChange } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const change: SettingChange = SettingChange.fromJson({ name: "shell.mode", value: "Dark", isSet: true });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): SettingChange;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The key's fields, `value` and `isSet`.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { QualifiedName, SettingChange, SettingKey } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new SettingChange(new SettingKey(QualifiedName.parse("shell.mode")), "Dark", true).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A setting's value for a key: the payload of `shell.setSetting`.
  */
 export declare class SettingValue {
   /**

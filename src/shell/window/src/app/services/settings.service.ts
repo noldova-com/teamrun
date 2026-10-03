@@ -12,6 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   QualifiedName,
+  SettingChange,
   SettingKey,
   SettingValue,
   SettingsQuery,
@@ -29,10 +30,11 @@ export class SettingsService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly definitionList: WritableSignal<readonly SettingDefinition[]> = signal([]);
   private readonly valueMap: WritableSignal<ReadonlyMap<string, JsonValue>> = signal(new Map());
-  private readonly listeners: Set<(change: SettingValue) => void> = new Set();
+  private readonly setNames: WritableSignal<ReadonlySet<string>> = signal(new Set());
+  private readonly listeners: Set<(change: SettingChange) => void> = new Set();
   private loads: number = 0;
   private loading: number = 0;
-  private received: SettingValue[] = [];
+  private received: SettingChange[] = [];
 
   public readonly definitions: Signal<readonly SettingDefinition[]> = this.definitionList.asReadonly();
   public readonly values: Signal<ReadonlyMap<string, JsonValue>> = this.valueMap.asReadonly();
@@ -40,7 +42,7 @@ export class SettingsService {
   public constructor() {
     inject(DestroyRef).onDestroy(this.bridge.onEvent((name, payload) => {
       if (name === ShellEvents.settingsChanged.text)
-        this.apply(SettingValue.fromJson(payload));
+        this.apply(SettingChange.fromJson(payload));
     }));
   }
 
@@ -52,6 +54,7 @@ export class SettingsService {
       if (load === this.loads) {
         this.definitionList.set(snapshot.definitions);
         this.valueMap.set(new Map(snapshot.entries.map(t => [t.name.text, t.value])));
+        this.setNames.set(new Set(snapshot.entries.filter(t => t.isSet).map(t => t.name.text)));
         for (const change of this.received)
           this.store(change);
       }
@@ -66,6 +69,10 @@ export class SettingsService {
     return computed(() => this.valueMap().get(name));
   }
 
+  public isSet(name: string): Signal<boolean> {
+    return computed(() => this.setNames().has(name));
+  }
+
   public read(name: string): JsonValue | undefined {
     return this.valueMap().get(name);
   }
@@ -78,12 +85,12 @@ export class SettingsService {
     await this.bridge.requestAsync(ShellMethods.resetSetting.text, new SettingKey(QualifiedName.parse(name), scope).toJson());
   }
 
-  public onChanged(listener: (change: SettingValue) => void): () => void {
+  public onChanged(listener: (change: SettingChange) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
-  private apply(change: SettingValue): void {
+  private apply(change: SettingChange): void {
     if (this.loading > 0)
       this.received.push(change);
     this.store(change);
@@ -91,8 +98,11 @@ export class SettingsService {
       listener(change);
   }
 
-  private store(change: SettingValue): void {
-    if (Object.isNull(change.key.scope))
-      this.valueMap.update(t => new Map([...t, [change.key.name.text, change.value]]));
+  private store(change: SettingChange): void {
+    if (!Object.isNull(change.key.scope))
+      return;
+    const name = change.key.name.text;
+    this.valueMap.update(t => new Map([...t, [name, change.value]]));
+    this.setNames.update(t => new Set(change.isSet ? [...t, name] : [...t].filter(u => u !== name)));
   }
 }

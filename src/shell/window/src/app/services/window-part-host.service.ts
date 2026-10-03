@@ -12,7 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   type CommandInfo, CommandList, CommandRun, ModuleState, ModuleStatus, ModuleStatusList, type NotificationPost, NotificationReference, NotificationUpdate, type SettingScope,
-  type SettingValue, ShellMethods
+  type SettingChange, ShellMethods
 } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../enums/dock-side";
@@ -108,7 +108,7 @@ export class WindowPartHostService implements IWindowPartHost {
     return this.settings.resetAsync(name, scope);
   }
 
-  public onSettingChanged(listener: (change: SettingValue) => void): () => void {
+  public onSettingChanged(listener: (change: SettingChange) => void): () => void {
     return this.settings.onChanged(listener);
   }
 

@@ -7,7 +7,7 @@
  */
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import type { SettingScope, SettingValue } from "@noldova/teamrun-shell-protocol";
+import type { SettingChange, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 export interface IModuleSettings {
   read(name: string, scope?: SettingScope | null, device?: string | null): JsonValue;
@@ -16,7 +16,7 @@ export interface IModuleSettings {
 
   reset(name: string, scope?: SettingScope | null, device?: string | null): void;
 
-  onChanged(name: string, listener: (change: SettingValue) => void): void;
+  onChanged(name: string, listener: (change: SettingChange) => void): void;
 
   setScopeParent(scope: SettingScope, parent: SettingScope | null): void;
 

@@ -17,7 +17,7 @@ import {
   SettingLocality,
   SettingScope,
   SettingType,
-  SettingValue,
+  SettingChange,
   SettingsSnapshot
 } from "@noldova/teamrun-shell-protocol";
 
@@ -34,7 +34,8 @@ describe("SettingsService", () => {
   const snapshot = (modeValue: JsonValue): unknown => ({
     payload: new SettingsSnapshot(definitions, [new SettingEntry(mode, modeValue, modeValue !== "System"), new SettingEntry(size, 13, false)]).toJson()
   });
-  const change = (name: QualifiedName, value: JsonValue, scope: SettingScope | null = null): JsonValue => new SettingValue(new SettingKey(name, scope), value).toJson();
+  const change = (name: QualifiedName, value: JsonValue, scope: SettingScope | null = null, isSet: boolean = true): JsonValue =>
+    new SettingChange(new SettingKey(name, scope), value, isSet).toJson();
   let bridge: DesktopBridgeFixture;
   let service: SettingsService;
 
@@ -54,6 +55,7 @@ describe("SettingsService", () => {
 
     expect(service.definitions().map(t => t.name.text)).toEqual(["shell.mode", "shell.panelSize"]);
     expect([value(), service.read("shell.panelSize"), service.read("shell.other")]).toEqual(["Dark", 13, undefined]);
+    expect(["shell.mode", "shell.panelSize", "shell.other"].map(t => service.isSet(t)())).toEqual([true, false, false]);
     expect(bridge.requests).toEqual([["shell.settings", {}]]);
   });
 
@@ -73,8 +75,9 @@ describe("SettingsService", () => {
     ]);
   });
 
-  it("follows changes, keeping only those without a scope as values, and tells each listener until it stops", async () => {
+  it("follows changes, keeping only those without a scope as values and whether each is stored, and tells each listener until it stops", async () => {
     await service.loadAsync();
+    const isModeSet = service.isSet("shell.mode");
     const heard: string[] = [];
     const stop = service.onChanged(t => heard.push(`${t.key.name.text}=${String(t.value)}${t.key.scope === null ? "" : ` in ${t.key.scope.id}`}`));
 
@@ -83,9 +86,12 @@ describe("SettingsService", () => {
     bridge.publishEvent("shell.notifications", { notifications: [] });
     stop();
     bridge.publishEvent("shell.settingsChanged", change(size, 15));
+    const wasModeSet = isModeSet();
+    bridge.publishEvent("shell.settingsChanged", change(mode, "System", null, false));
 
     expect(heard).toEqual(["shell.mode=Light", "shell.mode=Dark in c1"]);
-    expect([service.read("shell.mode"), service.read("shell.panelSize")]).toEqual(["Light", 15]);
+    expect([service.read("shell.mode"), service.read("shell.panelSize")]).toEqual(["System", 15]);
+    expect([wasModeSet, isModeSet(), service.isSet("shell.panelSize")()]).toEqual([true, false, true]);
   });
 
   it("keeps a change that arrives during a load over the loaded value, and ignores a load that a later one overtook", async () => {

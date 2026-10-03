@@ -13,12 +13,13 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   FailureCode,
   QualifiedName,
+  SettingChange,
   SettingEntry,
   SettingKey,
   SettingLocality,
   SettingScope,
   SettingsSnapshot,
-  SettingValue,
+  type SettingValue,
   type SettingDefinition
 } from "@noldova/teamrun-shell-protocol";
 
@@ -30,7 +31,7 @@ export class SettingsService {
   private readonly database: ShellDatabase;
   private readonly diagnostics: Writable;
   private readonly definitions: ReadonlyMap<string, SettingDefinition>;
-  private readonly listeners: Set<(change: SettingValue) => void> = new Set();
+  private readonly listeners: Set<(change: SettingChange) => void> = new Set();
   private readonly reported: Set<string> = new Set();
 
   public constructor(database: ShellDatabase, definitions: readonly SettingDefinition[], diagnostics: Writable) {
@@ -75,13 +76,13 @@ export class SettingsService {
       throw new SettingException(Resources.formatSettingValueInvalid(key.name.text), FailureCode.InvalidParams);
 
     this.database.run(Resources.writeSettingStatement, ...SettingsService.columns(key), JSON.stringify(write.value));
-    this.notify(new SettingValue(key, write.value));
+    this.notify(new SettingChange(key, write.value, true));
   }
 
   public reset(key: SettingKey): void {
     const normalized = this.normalize(this.define(key.name), key);
     this.database.run(Resources.resetSettingStatement, ...SettingsService.columns(normalized));
-    this.notify(new SettingValue(normalized, this.read(normalized)));
+    this.notify(new SettingChange(normalized, this.read(normalized), false));
   }
 
   public setScopeParent(scope: SettingScope, parent: SettingScope | null): void {
@@ -98,7 +99,7 @@ export class SettingsService {
     });
   }
 
-  public onChanged(listener: (change: SettingValue) => void): Disposable {
+  public onChanged(listener: (change: SettingChange) => void): Disposable {
     this.listeners.add(listener);
     return { [Symbol.dispose]: () => this.listeners.delete(listener) };
   }
@@ -161,7 +162,7 @@ export class SettingsService {
     return undefined;
   }
 
-  private notify(change: SettingValue): void {
+  private notify(change: SettingChange): void {
     for (const listener of [...this.listeners])
       listener(change);
   }
