@@ -58,17 +58,19 @@ test.describe("command search", () => {
     const window = desktop.window;
     const ticks = window.locator("[data-fixture-content=clock-ticks]");
     const tab = window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]");
+    const button = window.locator("tr-window-row").getByRole("button", { name: "Search commands" });
     await expect(ticks).toHaveText("No ticks");
-    await tab.click();
-    await expect(tab).toBeFocused();
 
-    await window.locator("tr-window-row").getByRole("button", { name: "Search commands" }).click();
+    await button.click();
     await expect(field(window)).toBeFocused();
     await window.keyboard.type("tick");
     await pane(window).locator("[data-item=\"clock.tick\"]").click();
 
     await expect(ticks).toHaveText("Ticks: 1");
     await expect(pane(window)).toHaveCount(0);
+    await expect(button).toBeFocused();
+    await tab.click();
+    await expect(tab).toBeFocused();
 
     await window.keyboard.press("ControlOrMeta+Shift+KeyP");
     await window.keyboard.type("keep the tab");
