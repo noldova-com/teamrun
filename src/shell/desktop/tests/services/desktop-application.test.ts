@@ -217,6 +217,7 @@ export class DesktopApplicationTests {
 
     electron.ipcMain.send("teamrun:menuBar", DesktopApplicationTests.trustedEvent("darwin"), {
       menus: [
+        { place: "shell.app", title: "TeamRun", rows: [command("shell.app/shell.settings/0", "Settings…", "Mod+Comma", true, "None", false)] },
         { place: "shell.file", title: "File", rows: [command("shell.file/notes.create/0", "New note", "Mod+Alt+N", true, "None", false)] },
         { place: "shell.edit", title: "Edit", rows: [] },
         { place: "shell.view", title: "View", rows: [command("shell.view/shell.docks/0", "Left dock", "Ctrl+Shift+F5", true, "Checkbox", true), { type: "separator" }] },
@@ -239,7 +240,11 @@ export class DesktopApplicationTests {
     const edit = electron.menu.templates.at(-1)?.[1]?.submenu;
 
     Assert.areEqual(JSON.stringify([
-      { role: "appMenu" },
+      {
+        label: template[0]?.label, submenu: [{ role: "about" }, { type: "separator" },
+          { id: "shell.app/shell.settings/0", label: "Settings…", enabled: true, type: "normal", checked: false, accelerator: "Command+,", registerAccelerator: false },
+          { type: "separator" }, { role: "services" }, { type: "separator" }, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, { type: "separator" }, { role: "quit" }]
+      },
       { label: "File", submenu: [{ id: "shell.file/notes.create/0", label: "New note", enabled: true, type: "normal", checked: false, accelerator: "Alt+Command+N", registerAccelerator: false }] },
       {
         label: "Edit", submenu: [{ role: "undo" }, { role: "redo" }, { type: "separator" }, { role: "cut" }, { role: "copy" }, { role: "paste" }, { role: "pasteAndMatchStyle" },

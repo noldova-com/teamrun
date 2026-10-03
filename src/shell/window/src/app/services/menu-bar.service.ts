@@ -34,7 +34,7 @@ export class MenuBarService {
   public readonly shownPlaces: Signal<readonly MenuPlace[]> = computed(() => this.places().filter(t => this.menus.resolve(t.name).length > 0));
 
   public readonly tree: Signal<JsonObject> = computed(() => ({
-    [Resources.menusField]: this.places().map(t => ({ [Resources.placeField]: t.name, [Resources.titleField]: t.title, [Resources.rowsField]: this.rowsOf([t.name]) }))
+    [Resources.menusField]: [...this.menus.active().flatMap(t => t.places).filter(t => t.name === Resources.appMenu), ...this.places()].map(t => ({ [Resources.placeField]: t.name, [Resources.titleField]: t.title, [Resources.rowsField]: this.rowsOf([t.name]) }))
   }));
 
   public run(id: string): void {

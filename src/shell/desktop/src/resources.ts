@@ -188,6 +188,7 @@ export class Resources {
   public static readonly enabledField: string = "enabled";
   public static readonly checkField: string = "check";
   public static readonly checkedField: string = "checked";
+  public static readonly appMenu: string = "shell.app";
   public static readonly editMenu: string = "shell.edit";
   public static readonly windowMenu: string = "shell.window";
   public static readonly helpMenu: string = "shell.help";

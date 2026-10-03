@@ -20,7 +20,8 @@ export class ShellMenus {
     new MenuPlace(Resources.viewMenu, Resources.viewMenuTitle, true),
     new MenuPlace(Resources.windowMenu, Resources.windowMenuTitle, true),
     new MenuPlace(Resources.helpMenu, Resources.helpMenuTitle, true),
-    new MenuPlace(Resources.tabMenu, Resources.tabMenuTitle, false)
+    new MenuPlace(Resources.tabMenu, Resources.tabMenuTitle, false),
+    new MenuPlace(Resources.appMenu, Resources.appMenuTitle, false)
   ], [
     new MenuGroup(Resources.closeGroup, Resources.fileMenu, false, [MenuItem.ofCommand(Resources.closeTabCommand)]),
     new MenuGroup(Resources.docksGroup, Resources.viewMenu, false, Object.values(DockSide).map(t => MenuItem.ofCommand(Resources.toggleDockCommands[t]))),
