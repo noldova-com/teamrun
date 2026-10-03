@@ -31,7 +31,7 @@ test.describe("module menus", () => {
 
     const menu = await openNoteMenuAsync(window, 3);
 
-    await expect(menu.getByRole("menuitem")).toHaveText(["Open note", "New from template", "Sort by title", "Sort by week", "Wrap lines"].map(t => new RegExp(t)));
+    await expect(menu.locator("button[tr-menu-item]")).toHaveText(["Open note", "New from template", "Sort by title", "Sort by week", "Wrap lines"].map(t => new RegExp(t)));
     await expect(menu.locator("tr-menu-separator")).toHaveCount(2);
     await menu.getByRole("menuitem", { name: "Open note" }).click();
     await expect(menu).toHaveCount(0);
@@ -52,18 +52,24 @@ test.describe("module menus", () => {
     await expect(window.locator("tr-status-bar-item[data-tr-item=\"notes.count\"]")).toHaveText("3 notes");
   });
 
-  test("an exclusive group switches the sorting and a checked command toggles", async ({ desktop }) => {
+  test("an exclusive group is a set of radio rows that switches the sorting, and a checked command is a checkbox row that toggles", async ({ desktop }) => {
     const window = desktop.window;
     const list = window.locator(".tr-notes-list-items");
-    await expect(list).toHaveAttribute("data-sort", "week");
+    let menu = await openNoteMenuAsync(window, 2);
+    await expect(menu.getByRole("menuitemradio", { name: "Sort by week" })).toHaveAttribute("aria-checked", "true");
+    await expect(menu.getByRole("menuitemradio", { name: "Sort by title" })).toHaveAttribute("aria-checked", "false");
+    await expect(menu.getByRole("menuitemcheckbox", { name: "Wrap lines" })).toHaveAttribute("aria-checked", "false");
 
-    await (await openNoteMenuAsync(window, 2)).getByRole("menuitem", { name: "Sort by title" }).click();
+    await menu.getByRole("menuitemradio", { name: "Sort by title" }).click();
     await expect(list).toHaveAttribute("data-sort", "title");
     await expect(list.locator(".tr-notes-list-item").nth(1)).toHaveText("Meeting notes, week 10");
-    await (await openNoteMenuAsync(window, 2)).getByRole("menuitem", { name: "Wrap lines" }).click();
+    await (await openNoteMenuAsync(window, 2)).getByRole("menuitemcheckbox", { name: "Wrap lines" }).click();
     await expect(list).toHaveClass(/tr-notes-list-wrapped/);
-    await (await openNoteMenuAsync(window, 2)).getByRole("menuitem", { name: "Wrap lines" }).click();
+    menu = await openNoteMenuAsync(window, 2);
 
-    await expect(list).not.toHaveClass(/tr-notes-list-wrapped/);
+    await expect(menu.getByRole("menuitemradio", { name: "Sort by title" })).toHaveAttribute("aria-checked", "true");
+    await expect(menu.getByRole("menuitemradio", { name: "Sort by week" })).toHaveAttribute("aria-checked", "false");
+    await expect(menu.getByRole("menuitemcheckbox", { name: "Wrap lines" })).toHaveAttribute("aria-checked", "true");
+    await expect(menu.locator(".tr-menu-item-check")).toHaveCount(2);
   });
 });

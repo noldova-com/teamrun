@@ -18,7 +18,8 @@ LICENSE file in the root directory of this source tree.
           <button tr-menu-item class="tr-place-menu-submenu" [attr.data-submenu]="row.place" [label]="row.title" [trMenuTriggerFor]="nested.menu()"></button>
         } @else {
           <button tr-menu-item class="tr-place-menu-item" [attr.data-command]="row.command" [label]="row.title" [icon]="row.icon"
-            [shortcut]="row.key" [disabled]="!row.isEnabled" (triggered)="run(row)"></button>
+            [shortcut]="row.key" [checked]="row.check === menuCheck.None ? null : row.isChecked" [checkbox]="row.check === menuCheck.Checkbox"
+            [disabled]="!row.isEnabled" (triggered)="run(row)"></button>
         }
       }
     }

@@ -198,6 +198,7 @@ export class Resources {
   public static readonly checkedGlyph: string = "check";
   public static readonly menuItemRole: string = "menuitem";
   public static readonly menuItemRadioRole: string = "menuitemradio";
+  public static readonly menuItemCheckboxRole: string = "menuitemcheckbox";
   public static readonly contextMenuKey: string = "ContextMenu";
   public static readonly menuKey: string = "F10";
   public static readonly clickEvent: string = "click";

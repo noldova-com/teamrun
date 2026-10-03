@@ -11,6 +11,7 @@ import { ChangeDetectionStrategy, Component, ErrorHandler, type Signal, type Tem
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective } from "@noldova/teamrun-shell-ui";
 
+import { MenuCheck } from "../../enums/menu-check";
 import type { CommandRow } from "../../models/command-row";
 import type { MenuSection } from "../../models/menu-section";
 import { CommandService } from "../../services/command.service";
@@ -31,6 +32,7 @@ export class PlaceMenuComponent {
   public readonly context = input<JsonObject>({});
   public readonly menu: Signal<TemplateRef<unknown>> = viewChild.required<TemplateRef<unknown>>("placeMenu");
 
+  protected readonly menuCheck: typeof MenuCheck = MenuCheck;
   protected readonly sections: Signal<readonly MenuSection[]> = computed(() => this.menus.resolve(this.place(), this.context()));
 
   protected run(row: CommandRow): void {
