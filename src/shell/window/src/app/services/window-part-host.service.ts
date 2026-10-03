@@ -12,7 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   type CommandInfo, CommandList, CommandRun, ModuleState, ModuleStatus, ModuleStatusList, type NotificationPost, NotificationReference, NotificationUpdate, type SettingScope,
-  type SettingChange, ShellMethods
+  type SettingChange, ShellEvents, ShellMethods
 } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../enums/dock-side";
@@ -60,6 +60,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private pendingOpens: PendingDocument[] = [];
   private moduleOrder: readonly string[] = [];
   private runtimeCommands: readonly CommandContribution[] = [];
+  private readonly runtimeStates: WritableSignal<CommandList | null> = signal(null);
   private readonly failuresValue: WritableSignal<readonly ModuleFailure[]> = signal([]);
   private readonly generationValue: WritableSignal<number> = signal(0);
   private isReady: boolean = false;
@@ -70,7 +71,9 @@ export class WindowPartHostService implements IWindowPartHost {
   public readonly generation: Signal<number> = this.generationValue.asReadonly();
 
   public constructor() {
-    inject(DestroyRef).onDestroy(this.bridge.onStartup(t => this.follow(t)));
+    const destroyRef = inject(DestroyRef);
+    destroyRef.onDestroy(this.bridge.onStartup(t => this.follow(t)));
+    destroyRef.onDestroy(this.bridge.onEvent((name, payload) => this.receiveCommands(name, payload)));
     void this.bridge.readStartupAsync().then(t => this.follow(t));
   }
 
@@ -178,6 +181,8 @@ export class WindowPartHostService implements IWindowPartHost {
   }
 
   private follow(state: StartupState): void {
+    if (!state.isReady)
+      this.runtimeStates.set(null);
     if (state.isReady && !this.isReady)
       this.reloading = this.reloading.then(() => this.reloadAsync()).catch((error: unknown) => this.errors.handleError(error));
     this.isReady = state.isReady;
@@ -205,7 +210,9 @@ export class WindowPartHostService implements IWindowPartHost {
     await this.settings.loadAsync();
     const report = ModuleStatusList.fromJson(await this.bridge.requestAsync(ShellMethods.modules.text, null));
     this.moduleOrder = report.modules.map(t => t.id);
-    this.runtimeCommands = CommandList.fromJson(await this.bridge.requestAsync(ShellMethods.commands.text, null)).commands.map(t => this.describeRuntimeCommand(t));
+    const commands = CommandList.fromJson(await this.bridge.requestAsync(ShellMethods.commands.text, null));
+    this.applyCommands(commands);
+    this.runtimeCommands = commands.commands.map(t => this.describeRuntimeCommand(t));
     const active = new Set<string>();
     const statuses: ModuleStatus[] = [];
     for (const status of report.modules) {
@@ -243,7 +250,30 @@ export class WindowPartHostService implements IWindowPartHost {
       info.title,
       info.icon,
       info.defaultKey?.text ?? null,
-      t => this.bridge.requestAsync(ShellMethods.runCommand.text, new CommandRun(info.name, t).toJson()));
+      t => this.bridge.requestAsync(ShellMethods.runCommand.text, new CommandRun(info.name, t).toJson()),
+      () => this.findRuntimeState(info)?.isEnabled ?? false,
+      Object.isNull(info.isChecked) ? null : () => this.findRuntimeState(info)?.isChecked === true);
+  }
+
+  private findRuntimeState(info: CommandInfo): CommandInfo | undefined {
+    return this.runtimeStates()?.commands.find(t => t.name.text === info.name.text);
+  }
+
+  private receiveCommands(name: string, payload: JsonValue): void {
+    if (name !== ShellEvents.commandsChanged.text)
+      return;
+    try {
+      this.applyCommands(CommandList.fromJson(payload));
+    }
+    catch (error) {
+      this.errors.handleError(error);
+    }
+  }
+
+  private applyCommands(commands: CommandList): void {
+    const current = this.runtimeStates();
+    if (Object.isNull(current) || commands.sequence > current.sequence)
+      this.runtimeStates.set(commands);
   }
 
   private describeFailure(status: ModuleStatus): ModuleFailure {

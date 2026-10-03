@@ -86,7 +86,7 @@ export class RuntimeHost implements IIdleParticipant {
   public readonly identity: BuildIdentity;
   public readonly work: WorkTracker;
   public readonly methods: MethodRegistry = new MethodRegistry();
-  public readonly commands: CommandRegistry = new CommandRegistry();
+  public readonly commands: CommandRegistry;
   public readonly events: EventRegistry;
   public readonly notifications: NotificationCenter;
   public readonly modules: ModuleHost;
@@ -116,6 +116,8 @@ export class RuntimeHost implements IIdleParticipant {
     this.publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(platform, new SystemCommand(), environment));
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
     this.workEvent = this.events.declare(ShellEvents.work);
+    const commandsChanged = this.events.declare(ShellEvents.commandsChanged);
+    this.commands = new CommandRegistry(t => commandsChanged.publish(t.toJson()));
     const notificationsChanged = this.events.declare(ShellEvents.notifications);
     this.notifications = new NotificationCenter(
       t => notificationsChanged.publish(new NotificationBroadcast(t.notifications, [...this.quietDevices].sort(), this.notifications.sequence).toJson()), () => new Date());

@@ -224,6 +224,7 @@ export class Resources {
   public static readonly settingsField: string = "settings";
   public static readonly nameParameterName: string = "name";
   public static readonly defaultKeyParameterName: string = "defaultKey";
+  public static readonly isCheckedParameterName: string = "isChecked";
   public static readonly dataDirectoryVariable: string = "__DATA_DIRECTORY_VARIABLE__";
   public static readonly defaultDataFolder: readonly string[] = "__DATA_FOLDER__".split(Resources.folderSeparator);
   public static readonly developmentDataFolder: readonly string[] = ["_build", "data"];
@@ -454,6 +455,14 @@ export class Resources {
 
   public static formatNotificationNotFound(id: number): string {
     return `Notification ${id} is gone; it was dismissed or its module stopped.`;
+  }
+
+  public static formatCommandNotCheckable(name: string): string {
+    return `The command ${name} is not checkable; give it a checked state when it is created.`;
+  }
+
+  public static formatCommandNotEnabled(name: string): string {
+    return `The command ${name} is not enabled now.`;
   }
 
   public static formatCommandNotFound(name: string): string {

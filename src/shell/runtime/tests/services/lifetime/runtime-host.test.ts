@@ -346,16 +346,28 @@ export class RuntimeHostTests {
       const ran = await RuntimeHostTests.callAsync(connection, "desktop:2", ShellMethods.runCommand, new CommandRun(QualifiedName.parse("clock.tick"), { by: 2 }).toJson());
       const missing = await RuntimeHostTests.callAsync(connection, "desktop:3", ShellMethods.runCommand, new CommandRun(QualifiedName.parse("clock.reset"), null).toJson());
       const invalid = await RuntimeHostTests.callAsync(connection, "desktop:4", ShellMethods.runCommand, { name: "clock.tick" });
+      connection.sendMessages(new Request("desktop:5", ShellMethods.runCommand, new CommandRun(QualifiedName.parse("clock.pause"), null).toJson()));
+      const changes = [await connection.readEventAsync(), await connection.readEventAsync()];
+      const paused = await connection.readResponseAsync();
+      const refused = await RuntimeHostTests.callAsync(connection, "desktop:6", ShellMethods.runCommand, new CommandRun(QualifiedName.parse("clock.tick"), null).toJson());
       host.requestStop("test");
       await host.waitForStopAsync();
 
       Assert.areEqual(
-        "{\"commands\":[{\"name\":\"clock.tick\",\"title\":\"Tick\",\"icon\":\"timer\",\"defaultKey\":\"Mod+Alt+T\"}]}",
+        "{\"commands\":[{\"name\":\"clock.tick\",\"title\":\"Tick\",\"icon\":\"timer\",\"defaultKey\":\"Mod+Alt+T\"},{\"name\":\"clock.pause\",\"title\":\"Pause\",\"isChecked\":false}],\"sequence\":2}",
         JSON.stringify(CommandList.fromJson(listed.payload).toJson()));
       Assert.areEqual("{\"client\":\"desktop\",\"arguments\":{\"by\":2}}", JSON.stringify(ran.payload));
       Assert.areEqual(FailureCode.NotFound, missing.failure?.code);
       Assert.areEqual("The command clock.reset is not registered; its module may not be active.", missing.failure?.message);
       Assert.areEqual(FailureCode.InvalidParams, invalid.failure?.code);
+      Assert.areEqual("shell.commandsChanged,shell.commandsChanged", changes.map(t => t.name.text).join(","));
+      Assert.areEqual([
+        "{\"commands\":[{\"name\":\"clock.tick\",\"title\":\"Tick\",\"icon\":\"timer\",\"defaultKey\":\"Mod+Alt+T\"},{\"name\":\"clock.pause\",\"title\":\"Pause\",\"isChecked\":true}],\"sequence\":3}",
+        "{\"commands\":[{\"name\":\"clock.tick\",\"title\":\"Tick\",\"icon\":\"timer\",\"defaultKey\":\"Mod+Alt+T\",\"isEnabled\":false},{\"name\":\"clock.pause\",\"title\":\"Pause\",\"isChecked\":true}],\"sequence\":4}"
+      ].join("|"), changes.map(t => JSON.stringify(t.payload)).join("|"));
+      Assert.isFalse(paused.hasFailed);
+      Assert.areEqual(FailureCode.Unavailable, refused.failure?.code);
+      Assert.areEqual("The command clock.tick is not enabled now.", refused.failure?.message);
     });
   }
 
@@ -579,7 +591,14 @@ export class RuntimeHostTests {
       "",
       "export class RuntimePart {",
       "  async activateAsync(context) {",
-      "    context.registerCommand(new RuntimeCommand(\"clock.tick\", \"Tick\", \"timer\", \"Mod+Alt+T\", { handleAsync: async request => ({ client: request.client, arguments: request.payload }) }));",
+      "    const tick = new RuntimeCommand(\"clock.tick\", \"Tick\", \"timer\", \"Mod+Alt+T\", { handleAsync: async request => ({ client: request.client, arguments: request.payload }) });",
+      "    const pause = new RuntimeCommand(\"clock.pause\", \"Pause\", null, null, { handleAsync: async () => {",
+      "      pause.setChecked(true);",
+      "      tick.setEnabled(false);",
+      "      return null;",
+      "    } }, false);",
+      "    context.registerCommand(tick);",
+      "    context.registerCommand(pause);",
       "  }",
       "",
       "  async deactivateAsync() {",

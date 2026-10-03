@@ -1235,6 +1235,13 @@ export declare class ShellEvents {
    * `WorkReport` of all the work now in progress.
    */
   public static readonly work: QualifiedName;
+
+  /**
+   * `shell.commandsChanged`: a runtime command was registered or withdrawn,
+   * or its enabled or checked state changed; its payload is the whole
+   * `CommandList`, with a sequence greater than any list before it.
+   */
+  public static readonly commandsChanged: QualifiedName;
 }
 
 /**
@@ -2516,12 +2523,26 @@ export declare class CommandInfo {
   public readonly defaultKey: KeyChord | null;
 
   /**
+   * Whether the command can run now, for any arguments.
+   */
+  public readonly isEnabled: boolean;
+
+  /**
+   * Whether the command is checked, for any arguments; `null` when it is
+   * not a command that is checked or unchecked.
+   */
+  public readonly isChecked: boolean | null;
+
+  /**
    * Creates the information.
    *
    * @param name The command's name.
    * @param title The title; not whitespace only.
    * @param icon The icon, not whitespace only, or `null`.
    * @param defaultKey The default key, or `null`.
+   * @param isEnabled Whether the command can run now; `true` by default.
+   * @param isChecked Whether it is checked, or `null`, the default, when it
+   * is not checkable.
    * @throws ArgumentException synchronously when the title or the icon is
    * blank.
    *
@@ -2530,9 +2551,10 @@ export declare class CommandInfo {
    * import { CommandInfo, KeyChord, QualifiedName } from "@noldova/teamrun-shell-protocol";
    *
    * export const command: CommandInfo = new CommandInfo(QualifiedName.parse("clock.tick"), "Tick", "timer", KeyChord.parseDefault("Mod+Alt+T"));
+   * export const paused: CommandInfo = new CommandInfo(QualifiedName.parse("clock.pause"), "Pause", null, null, true, false);
    * ```
    */
-  public constructor(name: QualifiedName, title: string, icon: string | null, defaultKey: KeyChord | null);
+  public constructor(name: QualifiedName, title: string, icon: string | null, defaultKey: KeyChord | null, isEnabled?: boolean, isChecked?: boolean | null);
 
   /**
    * Reads the information from its wire form. Unknown fields are ignored.
@@ -2541,13 +2563,14 @@ export declare class CommandInfo {
    * @param path The path a failure reports; `$` by default.
    * @returns The information.
    * @throws JsonException synchronously when `name` or `title` is missing or
-   * invalid, or `icon` or `defaultKey` is invalid; its path names the field.
+   * invalid, or `icon`, `defaultKey`, `isEnabled` or `isChecked` is invalid;
+   * its path names the field.
    *
    * @example
    * ```ts
    * import { CommandInfo } from "@noldova/teamrun-shell-protocol";
    *
-   * export const command: CommandInfo = CommandInfo.fromJson({ name: "clock.tick", title: "Tick", defaultKey: "Mod+Alt+T" });
+   * export const command: CommandInfo = CommandInfo.fromJson({ name: "clock.tick", title: "Tick", defaultKey: "Mod+Alt+T", isEnabled: false });
    * ```
    */
   public static fromJson(value: unknown, path?: string): CommandInfo;
@@ -2555,8 +2578,9 @@ export declare class CommandInfo {
   /**
    * Returns the wire form.
    *
-   * @returns The `name` and `title` fields, and `icon` and `defaultKey` when
-   * the command has them.
+   * @returns The `name` and `title` fields, `icon` and `defaultKey` when the
+   * command has them, `isEnabled` only when it is `false`, and `isChecked`
+   * when the command is checkable.
    *
    * @example
    * ```ts
@@ -2570,8 +2594,9 @@ export declare class CommandInfo {
 }
 
 /**
- * The runtime commands of the active modules, in registration order: the
- * answer to `shell.commands`.
+ * The runtime commands of the active modules, in registration order, with
+ * their state: the answer to `shell.commands` and the payload of
+ * `shell.commandsChanged`.
  */
 export declare class CommandList {
   /**
@@ -2580,18 +2605,27 @@ export declare class CommandList {
   public readonly commands: readonly CommandInfo[];
 
   /**
+   * The runtime's count of command changes when the list was taken; a list
+   * with a greater sequence is newer.
+   */
+  public readonly sequence: number;
+
+  /**
    * Creates the list.
    *
    * @param commands The commands, copied.
+   * @param sequence The count of changes; a whole number from 0.
+   * @throws ArgumentException synchronously when the sequence is not a whole
+   * number from 0.
    *
    * @example
    * ```ts
    * import { CommandList } from "@noldova/teamrun-shell-protocol";
    *
-   * export const list: CommandList = new CommandList([]);
+   * export const list: CommandList = new CommandList([], 0);
    * ```
    */
-  public constructor(commands: readonly CommandInfo[]);
+  public constructor(commands: readonly CommandInfo[], sequence: number);
 
   /**
    * Reads the list from its wire form. Unknown fields are ignored.
@@ -2599,14 +2633,15 @@ export declare class CommandList {
    * @param value The untrusted value.
    * @param path The path a failure reports; `$` by default.
    * @returns The list.
-   * @throws JsonException synchronously when `commands` is missing or an
-   * entry is invalid; its path names the entry.
+   * @throws JsonException synchronously when `commands` or `sequence` is
+   * missing or invalid, or an entry is invalid; its path names the field or
+   * the entry.
    *
    * @example
    * ```ts
    * import { CommandList } from "@noldova/teamrun-shell-protocol";
    *
-   * export const list: CommandList = CommandList.fromJson({ commands: [{ name: "clock.tick", title: "Tick" }] });
+   * export const list: CommandList = CommandList.fromJson({ commands: [{ name: "clock.tick", title: "Tick" }], sequence: 1 });
    * ```
    */
   public static fromJson(value: unknown, path?: string): CommandList;
@@ -2614,14 +2649,14 @@ export declare class CommandList {
   /**
    * Returns the wire form.
    *
-   * @returns The `commands` field.
+   * @returns The `commands` and `sequence` fields.
    *
    * @example
    * ```ts
    * import type { JsonObject } from "@noldova/teamrun-foundation-json";
    * import { CommandList } from "@noldova/teamrun-shell-protocol";
    *
-   * export const json: JsonObject = new CommandList([]).toJson();
+   * export const json: JsonObject = new CommandList([], 0).toJson();
    * ```
    */
   public toJson(): JsonObject;

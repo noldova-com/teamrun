@@ -12,6 +12,7 @@ import type { FocusOrigin } from "@angular/cdk/a11y";
 import { DockingDirection } from "./app/enums/docking-direction";
 import { OverlayAlignment } from "./app/enums/overlay-alignment";
 import { SashOrientation } from "./app/enums/sash-orientation";
+import { ToolbarOrientation } from "./app/enums/toolbar-orientation";
 import { ColorToken } from "./app/models/color-token";
 
 export class Resources {
@@ -190,6 +191,11 @@ export class Resources {
   };
   public static readonly verticalOrientation: string = "vertical";
   public static readonly horizontalOrientation: string = "horizontal";
+  public static readonly toolbarDirection: "ltr" = "ltr";
+  public static readonly toolbarMoveKeys: Readonly<Record<ToolbarOrientation, readonly string[]>> = {
+    [ToolbarOrientation.Horizontal]: ["ArrowLeft", "ArrowRight", "Home", "End"],
+    [ToolbarOrientation.Vertical]: ["ArrowUp", "ArrowDown", "Home", "End"]
+  };
   public static readonly tooltipShowDelay: number = 0;
   public static readonly tooltipHideDelay: number = 0;
   public static readonly tooltipPaneClass: string = "tr-tooltip-pane";

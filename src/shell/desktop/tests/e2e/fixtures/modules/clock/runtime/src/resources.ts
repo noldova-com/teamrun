@@ -26,6 +26,8 @@ export class Resources {
   public static readonly tickTitle: string = "Tick";
   public static readonly tickIcon: string = "timer";
   public static readonly tickKey: string = "Mod+Alt+T";
+  public static readonly pauseCommand: string = "clock.pause";
+  public static readonly pauseTitle: string = "Pause ticking";
   public static readonly tickStepSetting: string = "clock.tickStep";
   public static readonly beginWorkCommand: string = "clock.beginWork";
   public static readonly beginWorkTitle: string = "Begin work";

@@ -4394,18 +4394,12 @@ export declare class MethodRegistry {
  */
 export declare class RuntimeCommand {
   /**
-   * The command's name, title, icon and default key, as `shell.commands`
-   * reports them.
-   */
-  public readonly info: CommandInfo;
-
-  /**
    * Runs the command.
    */
   public readonly handler: IMethodHandler;
 
   /**
-   * Creates the command.
+   * Creates the command, enabled.
    *
    * @param name The command's name, `<module id>.<name>`.
    * @param title What menus and search show; not whitespace only.
@@ -4413,6 +4407,9 @@ export declare class RuntimeCommand {
    * @param defaultKey The key the command asks for, such as `Mod+Alt+T`, or
    * `null`; see `KeyChord.parseDefault` for the keys a default may use.
    * @param handler Runs the command.
+   * @param isChecked Whether the command starts checked, which makes it a
+   * checkbox or radio row in menus, or `null`, the default, for a command
+   * that is never checked.
    * @throws {ArgumentException} When the name, title, icon or default key is
    * invalid; the parameter names which.
    * @example
@@ -4420,9 +4417,70 @@ export declare class RuntimeCommand {
    * import { RuntimeCommand } from "@noldova/teamrun-shell-runtime";
    *
    * export const tick: RuntimeCommand = new RuntimeCommand("clock.tick", "Tick", "timer", "Mod+Alt+T", { handleAsync: async context => context.payload });
+   * export const pause: RuntimeCommand = new RuntimeCommand("clock.pause", "Pause", null, null, { handleAsync: async () => null }, false);
    * ```
    */
-  public constructor(name: string, title: string, icon: string | null, defaultKey: string | null, handler: IMethodHandler);
+  public constructor(name: string, title: string, icon: string | null, defaultKey: string | null, handler: IMethodHandler, isChecked?: boolean | null);
+
+  /**
+   * The command's name, title, icon, default key and state, as
+   * `shell.commands` reports them. The state is one for all arguments.
+   */
+  public get info(): CommandInfo;
+
+  /**
+   * Enables or disables the command. A disabled command's menu rows are
+   * disabled, command search leaves it out, its key is left alone and
+   * `shell.runCommand` refuses it. Windows follow the change through
+   * `shell.commandsChanged`; setting the state it has changes nothing.
+   *
+   * @param isEnabled Whether the command can run.
+   * @example
+   * ```ts
+   * import type { RuntimeCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function pauseTicks(tick: RuntimeCommand): void {
+   *   tick.setEnabled(false);
+   * }
+   * ```
+   */
+  public setEnabled(isEnabled: boolean): void;
+
+  /**
+   * Checks or unchecks a command created with a checked state. Windows
+   * follow the change through `shell.commandsChanged`; setting the state it
+   * has changes nothing.
+   *
+   * @param isChecked Whether the command is checked.
+   * @throws {ArgumentException} When the command was created without a
+   * checked state.
+   * @example
+   * ```ts
+   * import type { RuntimeCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function showPaused(pause: RuntimeCommand, isPaused: boolean): void {
+   *   pause.setChecked(isPaused);
+   * }
+   * ```
+   */
+  public setChecked(isChecked: boolean): void;
+
+  /**
+   * Follows the command's state: the listener is called after each change.
+   *
+   * @param listener Called after the command is enabled, disabled, checked
+   * or unchecked.
+   * @returns The registration; disposing it stops the listener.
+   * @example
+   * ```ts
+   * import type { Registration, RuntimeCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function watch(command: RuntimeCommand, report: (isEnabled: boolean) => void): Registration {
+   *   return command.onChanged(() => report(command.info.isEnabled));
+   * }
+   * ```
+   */
+  public onChanged(listener: () => void): Registration;
 }
 
 /**
@@ -4699,7 +4757,24 @@ export declare class NotificationPolicy {
  */
 export declare class CommandRegistry {
   /**
-   * The registered commands, as `shell.commands` answers.
+   * Creates the registry.
+   *
+   * @param changed Receives the whole list after each registration, removal
+   * and state change, each with the next sequence; nothing by default.
+   * @example
+   * ```ts
+   * import { CommandRegistry, type EventChannel } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createCommands(changed: EventChannel): CommandRegistry {
+   *   return new CommandRegistry(t => changed.publish(t.toJson()));
+   * }
+   * ```
+   */
+  public constructor(changed?: (list: CommandList) => void);
+
+  /**
+   * The registered commands and their state, in registration order, as
+   * `shell.commands` answers; its sequence counts the changes so far.
    */
   public get list(): CommandList;
 
