@@ -8,6 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 
+import { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
 import type { IDesktopLog } from "../interfaces/i-desktop-log.js";
 import type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
 import type { IDisplayHost } from "../interfaces/i-display-host.js";
@@ -23,6 +24,7 @@ export class WindowBoundsKeeper {
   private readonly log: IDesktopLog;
   private store: IWindowStateStore | null = null;
   private timer: NodeJS.Timeout | null = null;
+  private hasUnsaved: boolean = false;
 
   public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog) {
     this.window = window;
@@ -58,7 +60,14 @@ export class WindowBoundsKeeper {
     if (Object.isNull(this.store) || this.window.isDestroyed())
       return;
     const bounds = this.window.getNormalBounds();
+    this.hasUnsaved = true;
     await this.store.writeAsync(new WindowState(bounds.x, bounds.y, bounds.width, bounds.height, this.window.isMaximized()).toJson());
+    this.hasUnsaved = false;
+  }
+
+  public async saveUnsavedAsync(): Promise<void> {
+    if (this.hasUnsaved)
+      await this.saveAsync();
   }
 
   public cancelSave(): void {
@@ -71,6 +80,9 @@ export class WindowBoundsKeeper {
     if (Object.isNull(this.store))
       return;
     this.cancelSave();
-    this.timer = setTimeout(() => void this.saveAsync().catch((error: unknown) => this.log.write(Resources.formatBoundsUnsaved(String(error)))), this.saveDelay);
+    this.timer = setTimeout(() => void this.saveAsync().catch((error: unknown) => {
+      if (!(error instanceof WindowStateUnavailableException))
+        this.log.write(Resources.formatBoundsUnsaved(String(error)));
+    }), this.saveDelay);
   }
 }

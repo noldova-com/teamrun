@@ -7,12 +7,15 @@
  */
 
 import "@noldova/teamrun-foundation-core";
+import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { type QualifiedName, type Response, type WindowStateKey, WindowStateValue, WindowStateWrite } from "@noldova/teamrun-shell-protocol";
+import { ConnectionException } from "@noldova/teamrun-shell-runtime";
 
 import type { IRuntimeConnection } from "../interfaces/i-runtime-connection.js";
 import type { IWindowStateStore } from "../interfaces/i-window-state-store.js";
 import { WindowStateException } from "../exceptions/window-state.exception.js";
+import { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
 import { Resources } from "../resources.js";
 
 export class RuntimeWindowStateStore implements IWindowStateStore {
@@ -40,8 +43,16 @@ export class RuntimeWindowStateStore implements IWindowStateStore {
   private async callAsync(method: QualifiedName, payload: JsonObject): Promise<Response> {
     const connection = this.connection();
     if (Object.isNull(connection))
-      throw new WindowStateException(Resources.runtimeNotConnected);
-    const response = await connection.callAsync(method, payload);
+      throw new WindowStateUnavailableException(Resources.runtimeNotConnected);
+    let response: Response;
+    try {
+      response = await connection.callAsync(method, payload);
+    }
+    catch (error) {
+      if (!(error instanceof ConnectionException))
+        throw error;
+      throw new WindowStateUnavailableException(error.message, new ExceptionOptions(error));
+    }
     if (!Object.isUndefined(response.failure))
       throw new WindowStateException(Resources.formatWindowStateFailed(method.text, response.failure.message));
     return response;

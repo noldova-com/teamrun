@@ -179,6 +179,10 @@ export class Resources {
     return `The window's bounds could not be saved: ${reason}`;
   }
 
+  public static formatBoundsLostAtClose(reason: string): string {
+    return `The window closed without saving its bounds, because the runtime could not be reached; the last position is lost: ${reason}`;
+  }
+
   public static formatBoundsNotRestored(reason: string): string {
     return `The window's saved bounds could not be restored, so it opens with its default bounds: ${reason}`;
   }
