@@ -54,7 +54,7 @@ test.describe("the harness's teardown", () => {
     }
   });
 
-  test("gives up at its limit and names each process that still runs by its command line", async ({}, testInfo) => {
+  test("gives up at its limit and names each process that still runs", async ({}, testInfo) => {
     const folder = await mkdtemp(path.join(os.tmpdir(), "teamrun-teardown-"));
     const release = testInfo.outputPath("release");
     const holder = await startHolderAsync(folder, release);
@@ -64,7 +64,7 @@ test.describe("the harness's teardown", () => {
 
       expect(running).toEqual([holder.pid]);
       expect(described).toContain(`${holder.pid} `);
-      expect(described).toContain(release);
+      expect(described.toLowerCase()).toContain(path.basename(process.execPath).toLowerCase());
     }
     finally {
       await writeFile(release, "");

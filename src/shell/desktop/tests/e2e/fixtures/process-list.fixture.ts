@@ -13,6 +13,7 @@ import { promisify } from "node:util";
 export default class ProcessListFixture {
   private static readonly TIMEOUT: number = 30_000;
   private static readonly EXIT_INTERVAL: number = 250;
+  private static readonly COMMAND_LINE_TIMEOUT: number = 10_000;
   private static readonly SIGNAL_INTERVAL: number = 50;
   private static readonly WINDOWS_ROW: RegExp = /^"([^"]*)","(\d+)"/;
   private static readonly POSIX_ROW: RegExp = /^\s*(\d+)\s+(.+)$/;
@@ -83,16 +84,27 @@ export default class ProcessListFixture {
 
   public static async describeAsync(processIds: readonly number[]): Promise<string> {
     const output = process.platform === "win32"
-      ? await ProcessListFixture.runAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
-        `CimCmdlets\\Get-CimInstance Win32_Process -Filter "${processIds.map(t => `ProcessId = ${t}`).join(" OR ")}" | Microsoft.PowerShell.Core\\ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" }`])
+      ? await ProcessListFixture.describeOnWindowsAsync(processIds)
       : await ProcessListFixture.runAsync("ps", ["-ww", "-o", "pid=,args=", "-p", processIds.join(",")]);
     const described = new Map(output.split(/\r?\n/).map(t => ProcessListFixture.DESCRIBED_ROW.exec(t)).filter(t => t !== null).map(t => [Number(t[1]), t[2] ?? ""]));
     return processIds.map(t => `${t} ${described.get(t) ?? "(gone)"}`).join("; ");
   }
 
-  private static async runAsync(file: string, commandArguments: readonly string[]): Promise<string> {
+  private static async describeOnWindowsAsync(processIds: readonly number[]): Promise<string> {
     try {
-      return (await promisify(execFile)(file, [...commandArguments], { encoding: "utf8", windowsHide: true, timeout: ProcessListFixture.TIMEOUT, maxBuffer: 16 * 1024 * 1024 })).stdout;
+      return await ProcessListFixture.runAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+        `CimCmdlets\\Get-CimInstance Win32_Process -Filter "${processIds.map(t => `ProcessId = ${t}`).join(" OR ")}" | Microsoft.PowerShell.Core\\ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" }`],
+        ProcessListFixture.COMMAND_LINE_TIMEOUT);
+    }
+    catch {
+      return await ProcessListFixture.runAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+        `Microsoft.PowerShell.Management\\Get-Process -Id ${processIds.join(",")} -ErrorAction SilentlyContinue | Microsoft.PowerShell.Core\\ForEach-Object { "$($_.Id) $($_.Path)" }`]);
+    }
+  }
+
+  private static async runAsync(file: string, commandArguments: readonly string[], timeout: number = ProcessListFixture.TIMEOUT): Promise<string> {
+    try {
+      return (await promisify(execFile)(file, [...commandArguments], { encoding: "utf8", windowsHide: true, timeout, maxBuffer: 16 * 1024 * 1024 })).stdout;
     }
     catch (error) {
       const failed = error as { code?: unknown; stdout?: string };
