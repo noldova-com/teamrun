@@ -15,7 +15,7 @@ export class NotificationListTests {
   @TestMethod
   public pinsItsWireFormAndKeepsItsOwnCopyInOrder(): void {
     const post = new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null);
-    const source = [new Notification(2, post, "2026-10-03T08:01:00.000Z", false), new Notification(1, post, "2026-10-03T08:00:00.000Z", true)];
+    const source = [new Notification(2, 2, post, "2026-10-03T08:01:00.000Z", false), new Notification(1, 1, post, "2026-10-03T08:00:00.000Z", true)];
 
     const list = new NotificationList(source);
     source.pop();

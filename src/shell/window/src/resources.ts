@@ -373,6 +373,11 @@ export class Resources {
   public static readonly dismissLabel: string = "Dismiss";
   public static readonly checkGlyph: string = "check";
   public static readonly unreadLimit: number = 9;
+  public static readonly toastLimit: number = 3;
+  public static readonly hoverSelector: string = ":hover";
+  public static readonly toastDuration: number = 8000;
+  public static readonly toastKindInterval: number = 5000;
+  public static readonly closeToastLabel: string = "Close";
   public static readonly severityGlyphs: Readonly<Record<NotificationSeverity, string>> = {
     [NotificationSeverity.Info]: "info",
     [NotificationSeverity.Success]: "check_circle",

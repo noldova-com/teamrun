@@ -215,7 +215,7 @@ export class DesktopApplication {
   private readStateForDevice(event: Event): JsonObject | undefined {
     try {
       const broadcast = NotificationBroadcast.fromJson(event.payload);
-      return (Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false) : broadcast.stateFor(this.knownDevice)).toJson();
+      return (Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.sequence) : broadcast.stateFor(this.knownDevice)).toJson();
     }
     catch (error) {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));

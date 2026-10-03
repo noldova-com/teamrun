@@ -1836,6 +1836,12 @@ export declare class Notification {
   public readonly id: number;
 
   /**
+   * Its place in the order the runtime received posts, from 1: each post and re-post takes the next number, and an update
+   * keeps it.
+   */
+  public readonly sequence: number;
+
+  /**
    * What its module posted, as last updated.
    */
   public readonly post: NotificationPost;
@@ -1854,21 +1860,23 @@ export declare class Notification {
    * Creates the notification.
    *
    * @param id The id.
+   * @param sequence Its place in the order of posts.
    * @param post What was posted.
    * @param postedAt When it was posted.
    * @param isRead Whether it was read.
-   * @throws ArgumentException synchronously when the id is not a whole number from 1 or the time is not a date and time.
+   * @throws ArgumentException synchronously when the id or the sequence is not a whole number from 1 or the time is not a date
+   * and time.
    *
    * @example
    * ```ts
    * import { Notification, NotificationPost } from "@noldova/teamrun-shell-protocol";
    *
    * export function hold(post: NotificationPost): Notification {
-   *   return new Notification(1, post, new Date().toISOString(), false);
+   *   return new Notification(1, 1, post, new Date().toISOString(), false);
    * }
    * ```
    */
-  public constructor(id: number, post: NotificationPost, postedAt: string, isRead: boolean);
+  public constructor(id: number, sequence: number, post: NotificationPost, postedAt: string, isRead: boolean);
 
   /**
    * Reads the notification from its wire form, which accepts no unknown fields.
@@ -1883,7 +1891,7 @@ export declare class Notification {
    * import { Notification } from "@noldova/teamrun-shell-protocol";
    *
    * export const notification: Notification = Notification.fromJson({
-   *   id: 1, post: { kind: "clock.alarm", title: "Alarm", severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false
+   *   id: 1, sequence: 1, post: { kind: "clock.alarm", title: "Alarm", severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false
    * });
    * ```
    */
@@ -1892,7 +1900,7 @@ export declare class Notification {
   /**
    * Returns the wire form.
    *
-   * @returns The `id`, `post`, `postedAt` and `isRead` fields.
+   * @returns The `id`, `sequence`, `post`, `postedAt` and `isRead` fields.
    *
    * @example
    * ```ts
@@ -2227,19 +2235,26 @@ export declare class NotificationState {
   public readonly isDoNotDisturb: boolean;
 
   /**
+   * The sequence of the runtime's latest post, or 0 before any; a later notification has a higher sequence.
+   */
+  public readonly sequence: number;
+
+  /**
    * Creates the state.
    *
    * @param notifications The notifications, newest first.
    * @param isDoNotDisturb Whether Do not disturb is on for the device.
+   * @param sequence The sequence of the latest post.
+   * @throws ArgumentException synchronously when the sequence is not a whole number from 0.
    *
    * @example
    * ```ts
    * import { NotificationState } from "@noldova/teamrun-shell-protocol";
    *
-   * export const state: NotificationState = new NotificationState([], false);
+   * export const state: NotificationState = new NotificationState([], false, 0);
    * ```
    */
-  public constructor(notifications: readonly Notification[], isDoNotDisturb: boolean);
+  public constructor(notifications: readonly Notification[], isDoNotDisturb: boolean, sequence: number);
 
   /**
    * Reads the state from its wire form, which accepts no unknown fields.
@@ -2253,7 +2268,7 @@ export declare class NotificationState {
    * ```ts
    * import { NotificationState } from "@noldova/teamrun-shell-protocol";
    *
-   * export const state: NotificationState = NotificationState.fromJson({ notifications: [], isDoNotDisturb: true });
+   * export const state: NotificationState = NotificationState.fromJson({ notifications: [], isDoNotDisturb: true, sequence: 4 });
    * ```
    */
   public static fromJson(value: unknown, path?: string): NotificationState;
@@ -2261,14 +2276,14 @@ export declare class NotificationState {
   /**
    * Returns the wire form.
    *
-   * @returns The `notifications` and `isDoNotDisturb` fields.
+   * @returns The `notifications`, `isDoNotDisturb` and `sequence` fields.
    *
    * @example
    * ```ts
    * import type { JsonObject } from "@noldova/teamrun-foundation-json";
    * import { NotificationState } from "@noldova/teamrun-shell-protocol";
    *
-   * export const json: JsonObject = new NotificationState([], false).toJson();
+   * export const json: JsonObject = new NotificationState([], false, 0).toJson();
    * ```
    */
   public toJson(): JsonObject;
@@ -2290,20 +2305,26 @@ export declare class NotificationBroadcast {
   public readonly quietDevices: readonly string[];
 
   /**
+   * The sequence of the runtime's latest post, or 0 before any.
+   */
+  public readonly sequence: number;
+
+  /**
    * Creates the broadcast.
    *
    * @param notifications The notifications, newest first.
    * @param quietDevices The devices with Do not disturb on.
-   * @throws ArgumentException synchronously when a device is blank.
+   * @param sequence The sequence of the latest post.
+   * @throws ArgumentException synchronously when a device is blank or the sequence is not a whole number from 0.
    *
    * @example
    * ```ts
    * import { NotificationBroadcast } from "@noldova/teamrun-shell-protocol";
    *
-   * export const broadcast: NotificationBroadcast = new NotificationBroadcast([], ["laptop"]);
+   * export const broadcast: NotificationBroadcast = new NotificationBroadcast([], ["laptop"], 0);
    * ```
    */
-  public constructor(notifications: readonly Notification[], quietDevices: readonly string[]);
+  public constructor(notifications: readonly Notification[], quietDevices: readonly string[], sequence: number);
 
   /**
    * Reads the broadcast from its wire form, which accepts no unknown fields.
@@ -2317,7 +2338,7 @@ export declare class NotificationBroadcast {
    * ```ts
    * import { NotificationBroadcast } from "@noldova/teamrun-shell-protocol";
    *
-   * export const broadcast: NotificationBroadcast = NotificationBroadcast.fromJson({ notifications: [], quietDevices: [] });
+   * export const broadcast: NotificationBroadcast = NotificationBroadcast.fromJson({ notifications: [], quietDevices: [], sequence: 0 });
    * ```
    */
   public static fromJson(value: unknown, path?: string): NotificationBroadcast;
@@ -2326,13 +2347,13 @@ export declare class NotificationBroadcast {
    * Returns the state one device sees.
    *
    * @param device The device's id.
-   * @returns The notifications, with Do not disturb on when the device is among the quiet ones.
+   * @returns The notifications and the sequence, with Do not disturb on when the device is among the quiet ones.
    *
    * @example
    * ```ts
    * import { NotificationBroadcast, type NotificationState } from "@noldova/teamrun-shell-protocol";
    *
-   * export const state: NotificationState = new NotificationBroadcast([], ["laptop"]).stateFor("laptop");
+   * export const state: NotificationState = new NotificationBroadcast([], ["laptop"], 0).stateFor("laptop");
    * ```
    */
   public stateFor(device: string): NotificationState;
@@ -2340,14 +2361,14 @@ export declare class NotificationBroadcast {
   /**
    * Returns the wire form.
    *
-   * @returns The `notifications` and `quietDevices` fields.
+   * @returns The `notifications`, `quietDevices` and `sequence` fields.
    *
    * @example
    * ```ts
    * import type { JsonObject } from "@noldova/teamrun-foundation-json";
    * import { NotificationBroadcast } from "@noldova/teamrun-shell-protocol";
    *
-   * export const json: JsonObject = new NotificationBroadcast([], []).toJson();
+   * export const json: JsonObject = new NotificationBroadcast([], [], 0).toJson();
    * ```
    */
   public toJson(): JsonObject;

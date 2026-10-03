@@ -70,6 +70,7 @@ export class Resources {
   public static readonly isOnField: string = "isOn";
   public static readonly isDoNotDisturbField: string = "isDoNotDisturb";
   public static readonly quietDevicesField: string = "quietDevices";
+  public static readonly sequenceField: string = "sequence";
   public static readonly setDoNotDisturbMember: string = "setDoNotDisturb";
   public static readonly keyParameterName: string = "key";
   public static readonly commandTitleInvalid: string = "A command's title must not be blank.";
@@ -82,6 +83,8 @@ export class Resources {
   public static readonly notificationIdInvalid: string = "A notification's id must be a whole number from 1.";
   public static readonly notificationTimeInvalid: string = "A notification's time must be a date and time.";
   public static readonly quietDeviceInvalid: string = "A device with Do not disturb on must have an id.";
+  public static readonly notificationSequenceInvalid: string = "A notification's sequence must be a whole number from 1.";
+  public static readonly currentSequenceInvalid: string = "The notifications' sequence must be a whole number from 0.";
   public static readonly macPlatform: string = "darwin";
   public static readonly standardPlatform: string = "win32";
   public static readonly keySeparator: string = "+";
