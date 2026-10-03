@@ -12,7 +12,7 @@ The command line reports on the data directory's runtime and runs the runtime's 
 |---|---|
 | `teamrun status` | Reports the runtime's build, the data directory, the modules and where each stands, and the work in progress. Never starts a runtime. |
 | `teamrun commands` | Lists the runtime's commands, with each one's name, title and module. The window's commands are not reachable from the command line. |
-| `teamrun run <command> [<json> \| --args-file <path> \| -]` | Runs one of the runtime's commands and prints its result. Its arguments are JSON, given inline, read from a file, or read from standard input with `-`. Pressing Ctrl+C cancels the command. |
+| `teamrun run <command> [<json> \| --args-file <path> \| -]` | Runs one of the runtime's commands and prints its result; a command that is not enabled now is refused. Its arguments are JSON, given inline, read from a file, or read from standard input with `-`. Pressing Ctrl+C cancels the command. |
 | `teamrun open` | Starts TeamRun with the same data directory, or brings its window forward when it already runs. |
 | `teamrun help` | Prints the usage. |
 

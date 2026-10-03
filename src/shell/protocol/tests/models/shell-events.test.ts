@@ -21,4 +21,9 @@ export class ShellEventsTests {
   public namesTheSettingsEvent(): void {
     Assert.areEqual("shell.settingsChanged", ShellEvents.settingsChanged.text);
   }
+
+  @TestMethod
+  public namesTheCommandsEvent(): void {
+    Assert.areEqual("shell.commandsChanged", ShellEvents.commandsChanged.text);
+  }
 }

@@ -8,6 +8,7 @@
 
 import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
+import { EditAction } from "../enums/edit-action";
 import { PanelEdge } from "../enums/panel-edge";
 import { MenuDeclarations } from "./menu-declarations";
 import { MenuGroup } from "./menu-group";
@@ -16,7 +17,7 @@ import { MenuPlace } from "./menu-place";
 import { Resources } from "../../resources";
 
 export class ShellMenus {
-  public static readonly declarations: MenuDeclarations = new MenuDeclarations(Resources.shellOwner, [
+  private static readonly PLACES: readonly MenuPlace[] = [
     new MenuPlace(Resources.fileMenu, Resources.fileMenuTitle, true),
     new MenuPlace(Resources.editMenu, Resources.editMenuTitle, true),
     new MenuPlace(Resources.viewMenu, Resources.viewMenuTitle, true),
@@ -27,7 +28,10 @@ export class ShellMenus {
     new MenuPlace(Resources.tabSplitMenu, Resources.splitLabel, false, Resources.splitGlyph),
     new MenuPlace(Resources.tabDockMenu, Resources.dockLabel, false, Resources.dockGlyph),
     new MenuPlace(Resources.appMenu, Resources.appMenuTitle, false)
-  ], [
+  ];
+  private static readonly EDITING: MenuGroup = new MenuGroup(Resources.editingGroup, Resources.editMenu, false,
+    Object.values(EditAction).map(t => MenuItem.ofCommand(Resources.editCommands[t])));
+  private static readonly GROUPS: readonly MenuGroup[] = [
     new MenuGroup(Resources.closeGroup, Resources.fileMenu, false, [MenuItem.ofCommand(Resources.closeTabCommand)]),
     new MenuGroup(Resources.searchGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.showCommandsCommand)]),
     new MenuGroup(Resources.docksGroup, Resources.viewMenu, false,
@@ -53,5 +57,9 @@ export class ShellMenus {
       Object.values(PanelEdge).map(t => MenuItem.ofCommand(Resources.splitTabCommands[t], {}, Resources.splitLabels[t]))),
     new MenuGroup(Resources.tabDockGroup, Resources.tabDockMenu, false,
       Object.values(DockSide).map(t => MenuItem.ofCommand(Resources.dockTabCommands[t], {}, Resources.dockLabels[t])))
-  ]);
+  ];
+
+  public static of(isMac: boolean): MenuDeclarations {
+    return new MenuDeclarations(Resources.shellOwner, ShellMenus.PLACES, isMac ? ShellMenus.GROUPS : [ShellMenus.EDITING, ...ShellMenus.GROUPS]);
+  }
 }

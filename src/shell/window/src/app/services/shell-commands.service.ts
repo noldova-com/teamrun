@@ -15,6 +15,7 @@ import { KeyChord } from "@noldova/teamrun-shell-protocol";
 
 import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
+import { EditAction } from "../enums/edit-action";
 import { PanelEdge } from "../enums/panel-edge";
 import { CommandContribution } from "../models/command-contribution";
 import { SideDropTarget } from "../models/layout/side-drop-target";
@@ -25,6 +26,8 @@ import { TabDropTarget } from "../models/layout/tab-drop-target";
 import { TabTarget } from "../models/tab-target";
 import { Resources } from "../../resources";
 import { CommandSearchService } from "./command-search.service";
+import { DesktopBridgeService } from "./desktop-bridge.service";
+import { EditTargetService } from "./edit-target.service";
 import { LayoutService } from "./layout.service";
 import { TabStripService } from "./tab-strip.service";
 
@@ -33,6 +36,8 @@ export class ShellCommandsService {
   private readonly layout: LayoutService = inject(LayoutService);
   private readonly strips: TabStripService = inject(TabStripService);
   private readonly search: CommandSearchService = inject(CommandSearchService);
+  private readonly edits: EditTargetService = inject(EditTargetService);
+  private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly document: Document = inject(DOCUMENT);
   private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
 
@@ -64,6 +69,8 @@ export class ShellCommandsService {
       commandArguments => this.targetOf(commandArguments)?.tab.isMovable ?? false),
     ...Object.values(DockSide).map(side => new CommandContribution(Resources.toggleDockCommands[side], Resources.toggleDockTitles[side], Resources.hideDockGlyphs[side], null,
       () => this.done(() => this.layout.toggleDock(side)), () => true, () => this.layout.layout().dock(side).isExpanded)),
+    ...Object.values(EditAction).map(action => new CommandContribution(Resources.editCommands[action], Resources.editTitles[action], Resources.editGlyphs[action], null,
+      () => this.editAsync(action), () => this.edits.canRun(action))),
     new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, null,
       () => this.done(() => this.search.open())),
     new CommandContribution(Resources.resetLayoutCommand, Resources.resetLayoutLabel, Resources.resetLayoutGlyph, null, () => this.done(() => this.layout.reset())),
@@ -159,6 +166,12 @@ export class ShellCommandsService {
   private focus(tab: Tab): void {
     afterNextRender(() => [...this.document.querySelectorAll<HTMLElement>(Resources.tabKeySelector)]
       .find(t => t.dataset[Resources.tabKeyData] === tab.key)?.focus(), { injector: this.environment });
+  }
+
+  private async editAsync(action: EditAction): Promise<JsonValue> {
+    if (this.edits.canRun(action) && await this.edits.restoreAsync())
+      await this.bridge.editAsync(action);
+    return null;
   }
 
   private done(action: () => void): Promise<JsonValue> {
