@@ -118,7 +118,12 @@ describe("TabGroupComponent", () => {
     expect(group(1).querySelector(".tr-tab-group-actions")?.classList.contains("tr-tab-group-actions-shell")).toBe(true);
     expect(group(0).querySelector(".tr-tab-group-actions")?.classList.contains("tr-tab-group-actions-shell")).toBe(false);
     expect(tabs(0).map(t => t.dataset["tabKey"])).toEqual([LayoutFixture.plan.key, LayoutFixture.todo.key]);
-    expect(group(0).querySelector("[role=tabpanel]")).not.toBeNull();
+    const panel = group(1).querySelector<HTMLElement>("[role=tabpanel]");
+    expect(tabs(1).map(t => t.id)).toEqual(["tr-tab-1-0", "tr-tab-1-1"]);
+    expect([panel?.id, panel?.getAttribute("aria-labelledby")]).toEqual(["tr-tab-panel-1", "tr-tab-1-1"]);
+    layout.closeTabs(layout.layout().documents.tabs);
+    update();
+    expect(group(0).querySelector("[role=tabpanel]")?.hasAttribute("aria-labelledby")).toBe(false);
   });
 
   it("shows a tab's title below it only while its label is cut short", async () => {

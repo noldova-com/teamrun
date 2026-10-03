@@ -244,6 +244,9 @@ export class Resources {
     [DockSide.Right]: "Resize the right dock",
     [DockSide.Bottom]: "Resize the bottom dock"
   };
+  public static readonly tabIdPrefix: string = "tr-tab-";
+  public static readonly tabIdSeparator: string = "-";
+  public static readonly tabPanelIdPrefix: string = "tr-tab-panel-";
   public static readonly resizeSplitLabels: Readonly<Record<SplitAxis, string>> = {
     [SplitAxis.Horizontal]: "Resize the pane on the left",
     [SplitAxis.Vertical]: "Resize the pane above"
