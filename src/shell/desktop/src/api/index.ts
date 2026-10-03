@@ -8,8 +8,10 @@
 
 export type { IApplicationHost } from "../interfaces/i-application-host.js";
 export type { IClipboardHost } from "../interfaces/i-clipboard-host.js";
+export type { IDesktopLog } from "../interfaces/i-desktop-log.js";
 export type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 export type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
+export type { IDialogHost } from "../interfaces/i-dialog-host.js";
 export type { IDisplayHost } from "../interfaces/i-display-host.js";
 export type { IDockHost } from "../interfaces/i-dock-host.js";
 export type { IElectron } from "../interfaces/i-electron.js";
@@ -43,10 +45,13 @@ export { WindowAppearance } from "../models/window-appearance.js";
 export { WindowState } from "../models/window-state.js";
 export { CloseCoordinator } from "../services/close-coordinator.js";
 export { DesktopApplication } from "../services/desktop-application.js";
+export { DesktopLog } from "../services/desktop-log.js";
 export { DetachedStart } from "../services/detached-start.js";
 export { DeviceIdentity } from "../services/device-identity.js";
+export { OpenWindow } from "../services/open-window.js";
 export { RuntimeStartup } from "../services/runtime-startup.js";
 export { RuntimeWindowStateStore } from "../services/runtime-window-state-store.js";
 export { SenderPolicy } from "../services/sender-policy.js";
 export { UtilityProcessStarter } from "../services/utility-process-starter.js";
 export { WindowBoundsKeeper } from "../services/window-bounds-keeper.js";
+export { WindowRecovery } from "../services/window-recovery.js";

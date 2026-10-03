@@ -34,6 +34,8 @@ export class Resources {
   public static readonly discoveryFolderName: string = "discovery";
   public static readonly runtimeLogFileName: string = "runtime.log";
   public static readonly previousRuntimeLogFileName: string = "runtime.previous.log";
+  public static readonly desktopLogFileName: string = "desktop.log";
+  public static readonly previousDesktopLogFileName: string = "desktop.previous.log";
   public static readonly startLogPrefix: string = "start-";
   public static readonly startLogExtension: string = ".log";
   public static readonly discoveryFileName: string = "runtime.json";

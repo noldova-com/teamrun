@@ -7,7 +7,8 @@
  */
 
 import { createHash } from "node:crypto";
-import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay, setImmediate } from "node:timers/promises";
@@ -201,23 +202,17 @@ export class DesktopApplicationTests {
 
   @TestMethod
   public async showsTheWindowWithoutAnAppearanceItCannotUse(): Promise<void> {
-    const electron = await DesktopApplicationTests.startReadyAsync("linux");
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
     const window = DesktopApplicationTests.firstWindow(electron);
-    const written: string[] = [];
-    const write = process.stderr.write;
-    process.stderr.write = ((text: string): boolean => written.push(text) > 0) as typeof process.stderr.write;
-    try {
-      electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), { background: "red" });
-      await DesktopApplicationTests.waitAsync(() => window.isShown);
-    }
-    finally {
-      process.stderr.write = write;
-    }
+
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), { background: "red" });
+    await DesktopApplicationTests.waitAsync(() => window.isShown);
 
     Assert.isNull(window.backgroundColor);
     Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
-    Assert.areEqual(JSON.stringify(["The window reported an appearance that is not valid, so it is shown without it: JsonException: $.titleBar: The field is required.\n"]),
-      JSON.stringify(written));
+    Assert.areEqual(JSON.stringify(["The window reported an appearance that is not valid, so it is shown without it: JsonException: $.titleBar: The field is required."]),
+      JSON.stringify(DesktopApplicationTests.readErrors(process, "The window reported")));
   }
 
   @TestMethod
@@ -562,18 +557,16 @@ export class DesktopApplicationTests {
   public async answersThatItKeepsNoLayoutWhenTheDeviceHasNoIdentity(): Promise<void> {
     const device = new FakeDeviceIdentity();
     device.failure = new Error("The identity file is not JSON.");
-    const written = await DesktopApplicationTests.captureErrorsAsync(async () => {
-      const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), device);
-      const event = DesktopApplicationTests.trustedEvent("linux");
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), device, process);
+    const event = DesktopApplicationTests.trustedEvent("linux");
 
-      const read = await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", event);
-      const write = await DesktopApplicationTests.invokeAsync(electron, "teamrun:writeLayout", event, { version: 1 });
+    const read = await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", event);
+    const write = await DesktopApplicationTests.invokeAsync(electron, "teamrun:writeLayout", event, { version: 1 });
 
-      const failure = { code: "Unavailable", message: "This device has no identity, so the window's layout is not kept." };
-      Assert.areEqual(JSON.stringify([failure, failure]), JSON.stringify([read["failure"], write["failure"]]));
-    });
-
-    Assert.areEqual(1, written.length);
+    const failure = { code: "Unavailable", message: "This device has no identity, so the window's layout is not kept." };
+    Assert.areEqual(JSON.stringify([failure, failure]), JSON.stringify([read["failure"], write["failure"]]));
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "This device's identity").length);
   }
 
   @TestMethod
@@ -740,32 +733,32 @@ export class DesktopApplicationTests {
   @TestMethod
   public async closesEvenWhenTheBoundsCannotBeSaved(): Promise<void> {
     const connection = new FakeRuntimeConnection();
-    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection), new FakeElectron(), new FakeDeviceIdentity(), process);
     const window = DesktopApplicationTests.firstWindow(electron);
     await DesktopApplicationTests.waitAsync(() => connection.calls.length > 0);
     connection.isFailing = true;
-    const written = await DesktopApplicationTests.captureErrorsAsync(async () => {
-      window.close();
-      electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
-      await DesktopApplicationTests.waitAsync(() => window.isGone);
-    });
 
-    Assert.isTrue(written[0]?.startsWith("The window's bounds could not be saved: WindowStateException: The runtime refused shell.writeWindowBounds") === true);
+    window.close();
+    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    await DesktopApplicationTests.waitAsync(() => window.isGone);
+
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The window's bounds could not be saved: WindowStateException: The runtime refused shell.writeWindowBounds").length);
   }
 
   @TestMethod
   public async showsTheWindowWithItsDefaultBoundsWhenTheSavedOnesCannotBeUsed(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     connection.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { width: 10 });
-    const written = await DesktopApplicationTests.captureErrorsAsync(async () => {
-      const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
-      const window = DesktopApplicationTests.firstWindow(electron);
-      electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
-      await DesktopApplicationTests.waitAsync(() => window.isShown);
-      Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
-    });
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
 
-    Assert.isTrue(written[0]?.startsWith("The window's saved bounds could not be restored, so it opens with its default bounds:") === true);
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    await DesktopApplicationTests.waitAsync(() => window.isShown);
+
+    Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The window's saved bounds could not be restored, so it opens with its default bounds:").length);
   }
 
   @TestMethod
@@ -773,15 +766,15 @@ export class DesktopApplicationTests {
     const device = new FakeDeviceIdentity();
     device.failure = new Error("The identity file is not JSON.");
     const connection = new FakeRuntimeConnection();
-    const written = await DesktopApplicationTests.captureErrorsAsync(async () => {
-      const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection), new FakeElectron(), device);
-      const window = DesktopApplicationTests.firstWindow(electron);
-      electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
-      await DesktopApplicationTests.waitAsync(() => window.isShown);
-    });
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection), new FakeElectron(), device, process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    await DesktopApplicationTests.waitAsync(() => window.isShown);
 
     Assert.areEqual(0, connection.calls.length);
-    Assert.isTrue(written[0]?.startsWith("This device's identity could not be read, so window bounds are not kept:") === true);
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "This device's identity could not be read, so window bounds are not kept:").length);
   }
 
   @TestMethod
@@ -851,6 +844,61 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async startsItsLogOnceARuntimeOwnsTheDataDirectoryAndNeverInDataFromBeforeTheShell(): Promise<void> {
+    const data = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const owned = join(data, "owned");
+      const refused = join(data, "refused");
+      await mkdir(owned);
+      await mkdir(refused);
+      const ownedProcess = new FakeDesktopProcess("linux", [`--data-dir=${owned}`]);
+      const refusedProcess = new FakeDesktopProcess("linux", [`--data-dir=${refused}`]);
+      const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), ownedProcess);
+      const refusal = new FakeRuntimeLauncher(new PreShellDataFoundException(new PreShellData(refused)));
+      const refusedElectron = await DesktopApplicationTests.startReadyAsync("linux", refusal, new FakeElectron(), new FakeDeviceIdentity(), refusedProcess);
+
+      electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), { background: "red" });
+      refusedElectron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), { background: "red" });
+      await DesktopApplicationTests.waitAsync(() => DesktopApplicationTests.firstWindow(refusedElectron).isShown);
+
+      const lines = (await readFile(join(owned, "logs", "desktop.log"), "utf8")).trimEnd().split("\n");
+      Assert.areEqual(1, lines.length);
+      Assert.isTrue(/^\d{4}-\d\d-\d\dT[\d:.]+Z The window reported an appearance that is not valid/.test(lines[0] ?? ""));
+      Assert.isFalse(existsSync(join(refused, "logs")));
+      Assert.areEqual(1, DesktopApplicationTests.readErrors(refusedProcess, "The window reported").length);
+    }
+    finally {
+      await rm(data, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async quitsOrOpensTheLogFolderAsThePersonChoosesForAWindowWhosePageStops(): Promise<void> {
+    const data = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const quitting = new FakeElectron();
+      quitting.dialog.answers.push(1);
+      const looping = new FakeElectron();
+      looping.dialog.answers.push(0, 0);
+      await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), quitting);
+      await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), looping, new FakeDeviceIdentity(), new FakeDesktopProcess("linux", [`--data-dir=${data}`]));
+
+      DesktopApplicationTests.firstWindow(quitting).webContents.goAway("crashed", 5);
+      DesktopApplicationTests.firstWindow(looping).webContents.goAway("crashed", 5);
+      await DesktopApplicationTests.waitAsync(() => DesktopApplicationTests.firstWindow(looping).webContents.calls.includes("reload"));
+      DesktopApplicationTests.firstWindow(looping).webContents.goAway("crashed", 5);
+      await DesktopApplicationTests.waitAsync(() => looping.shell.opened.length === 1);
+
+      Assert.areEqual(1, quitting.app.calls.filter(t => t === "quit").length);
+      Assert.areEqual(JSON.stringify([join(data, "logs")]), JSON.stringify(looping.shell.opened));
+      Assert.areEqual(0, looping.app.calls.filter(t => t === "quit").length);
+    }
+    finally {
+      await rm(data, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
   public async reportsALogFolderItCannotCreateOrOpen(): Promise<void> {
     const data = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
     try {
@@ -859,20 +907,20 @@ export class DesktopApplicationTests {
       const unopened = new FakeElectron();
       const uncreated = new FakeElectron();
       unopened.shell.failure = "There is no file manager.";
-      DesktopApplicationTests.start(unopened, new FakeDesktopProcess("linux", [`--data-dir=${data}`]));
-      DesktopApplicationTests.start(uncreated, new FakeDesktopProcess("linux", [`--data-dir=${blocked}`]));
+      const unopenedProcess = new FakeDesktopProcess("linux", [`--data-dir=${data}`]);
+      const uncreatedProcess = new FakeDesktopProcess("linux", [`--data-dir=${blocked}`]);
+      DesktopApplicationTests.start(unopened, unopenedProcess);
+      DesktopApplicationTests.start(uncreated, uncreatedProcess);
       await unopened.app.becomeReadyAsync();
       await uncreated.app.becomeReadyAsync();
       const answers: boolean[] = [];
 
-      const written = await DesktopApplicationTests.captureErrorsAsync(async () => {
-        answers.push(await (unopened.ipcMain.invoke("teamrun:openLogFolder", DesktopApplicationTests.trustedEvent("linux")) as Promise<boolean>));
-        answers.push(await (uncreated.ipcMain.invoke("teamrun:openLogFolder", DesktopApplicationTests.trustedEvent("linux")) as Promise<boolean>));
-      });
+      answers.push(await (unopened.ipcMain.invoke("teamrun:openLogFolder", DesktopApplicationTests.trustedEvent("linux")) as Promise<boolean>));
+      answers.push(await (uncreated.ipcMain.invoke("teamrun:openLogFolder", DesktopApplicationTests.trustedEvent("linux")) as Promise<boolean>));
 
       Assert.areEqual(JSON.stringify([false, false]), JSON.stringify(answers));
-      Assert.areEqual("The log folder could not be opened: There is no file manager.\n", written[0]);
-      Assert.isTrue(written[1]?.startsWith("The log folder could not be opened: Error:") === true);
+      Assert.areEqual(JSON.stringify(["The log folder could not be opened: There is no file manager."]), JSON.stringify(DesktopApplicationTests.readErrors(unopenedProcess, "The log folder")));
+      Assert.isTrue(DesktopApplicationTests.readErrors(uncreatedProcess, "The log folder")[0]?.startsWith("The log folder could not be opened: Error:") === true);
       Assert.areEqual(0, uncreated.shell.opened.length);
     }
     finally {
@@ -886,17 +934,8 @@ export class DesktopApplicationTests {
     Assert.isTrue(condition());
   }
 
-  private static async captureErrorsAsync(action: () => Promise<void>): Promise<string[]> {
-    const written: string[] = [];
-    const write = process.stderr.write;
-    process.stderr.write = ((text: string): boolean => written.push(text) > 0) as typeof process.stderr.write;
-    try {
-      await action();
-    }
-    finally {
-      process.stderr.write = write;
-    }
-    return written;
+  private static readErrors(process: FakeDesktopProcess, prefix: string): string[] {
+    return process.errors.split("\n").map(t => t.slice(t.indexOf(" ") + 1)).filter(t => t.startsWith(prefix));
   }
 
   private static start(
@@ -916,8 +955,9 @@ export class DesktopApplicationTests {
     platform: string,
     launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher(),
     electron: FakeElectron = new FakeElectron(),
-    device: FakeDeviceIdentity = new FakeDeviceIdentity()): Promise<FakeElectron> {
-    DesktopApplicationTests.start(electron, new FakeDesktopProcess(platform), launcher, device);
+    device: FakeDeviceIdentity = new FakeDeviceIdentity(),
+    process: FakeDesktopProcess = new FakeDesktopProcess(platform)): Promise<FakeElectron> {
+    DesktopApplicationTests.start(electron, process, launcher, device);
     await electron.app.becomeReadyAsync();
     await setImmediate();
     return electron;

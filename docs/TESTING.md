@@ -126,7 +126,7 @@ Verify normal closure, interruption and failure cleanup, including child process
 
 ### UI screenshots and reports
 
-Each workflow captures named screenshot checkpoints on every target and attaches relevant page/component captures to their test/step, including passing runs, keeping them with the run. On failure, retain a trace and capture any usable window. Report capture failure without replacing the original failure.
+Each workflow captures named screenshot checkpoints on every target and attaches relevant page/component captures to their test/step, including passing runs, keeping them with the run. On failure, retain a trace and capture any usable window. A failure while starting the application keeps the same evidence: the trace, each window's page and screenshot, each window's visibility, address, loading and crash state from the main process, and the data directory's logs, before the harness closes the application, removes its folders and reports the original failure. Each capture has a deadline. Report capture failure without replacing the original failure. Playwright starts Electron with its hang monitor disabled, so the workflows cannot see a page stop responding; package tests cover that path, and a workflow that stops a page ends its renderer process itself rather than asking Electron to crash it, which some targets do not do reliably.
 
 Capture established UI state using declared animation policy and framework stabilization; generic waits must not misread animation cancellation as failure. Test animations explicitly when relevant. Record platform, viewport, scale, theme, mode and font settings.
 

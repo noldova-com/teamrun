@@ -580,6 +580,16 @@ export declare class DataDirectory {
   public get previousRuntimeLog(): string;
 
   /**
+   * The path of the desktop's log, `logs/desktop.log`, which the desktop owns.
+   */
+  public get desktopLog(): string;
+
+  /**
+   * The path of the previous desktop start's log, `logs/desktop.previous.log`.
+   */
+  public get previousDesktopLog(): string;
+
+  /**
    * The path of the database backups folder, `backups`.
    */
   public get backupsFolder(): string;
@@ -968,6 +978,43 @@ export declare class ModuleDatabase extends MigratedDatabase implements IModuleD
    * ```
    */
   public static openAsync(directory: DataDirectory, moduleId: string, migrations: readonly Migration[], moment?: Date): Promise<ModuleDatabase>;
+}
+
+/**
+ * Removes what a diagnostic must not show: the home folder becomes `~`, and opaque values such as tokens become
+ * `[redacted]`.
+ */
+export declare class DiagnosticRedactor {
+  /**
+   * Creates the redactor.
+   *
+   * @param homeFolder The home folder to show as `~`, matched with either path separator and in any case.
+   * @example
+   * ```ts
+   * import { homedir } from "node:os";
+   *
+   * import { DiagnosticRedactor } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const redactor: DiagnosticRedactor = new DiagnosticRedactor(homedir());
+   * ```
+   */
+  public constructor(homeFolder: string);
+
+  /**
+   * Redacts a diagnostic.
+   *
+   * @param text The diagnostic.
+   * @returns The diagnostic with the home folder shown as `~` and opaque values replaced.
+   * @example
+   * ```ts
+   * import { DiagnosticRedactor } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function redact(text: string): string {
+   *   return new DiagnosticRedactor("/home/person").redact(text);
+   * }
+   * ```
+   */
+  public redact(text: string): string;
 }
 
 /**

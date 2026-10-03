@@ -54,8 +54,8 @@ export class RawConnectionFixture implements Disposable {
     this.socket.write(messages.map(t => `${t.toText()}\n`).join(""));
   }
 
-  public async readTextAsync(): Promise<string> {
-    const deadline = Date.now() + RawConnectionFixture.ANSWER_TIMEOUT;
+  public async readTextAsync(timeoutMilliseconds: number = RawConnectionFixture.ANSWER_TIMEOUT): Promise<string> {
+    const deadline = Date.now() + timeoutMilliseconds;
     while (this.frames.length === 0) {
       if (this.socket.closed || Date.now() >= deadline)
         throw new Error("No frame arrived.");
@@ -64,8 +64,8 @@ export class RawConnectionFixture implements Disposable {
     return String(this.frames.shift());
   }
 
-  public async readResponseAsync(): Promise<Response> {
-    const message = new WireDecoder().decode(await this.readTextAsync());
+  public async readResponseAsync(timeoutMilliseconds: number = RawConnectionFixture.ANSWER_TIMEOUT): Promise<Response> {
+    const message = new WireDecoder().decode(await this.readTextAsync(timeoutMilliseconds));
     if (!(message instanceof Response))
       throw new Error(`Expected a response, not ${message.toText()}.`);
     return message;
