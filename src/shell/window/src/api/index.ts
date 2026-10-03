@@ -12,6 +12,7 @@ export type { IWindowPart } from "../app/interfaces/i-window-part";
 export type { IWindowPartContext } from "../app/interfaces/i-window-part-context";
 export { CommandContribution } from "../app/models/command-contribution";
 export { DocumentContribution } from "../app/models/document-contribution";
+export { MenuDeclarations } from "../app/models/menu-declarations";
 export { ViewContribution } from "../app/models/view-contribution";
 export { WindowPartSource } from "../app/models/window-part-source";
 export { WindowPartTokens } from "../app/models/window-part-tokens";
