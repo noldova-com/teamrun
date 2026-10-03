@@ -19,4 +19,10 @@ export class TypographyPainter {
     style.setProperty(Resources.sansFontVariable, typography.interfaceFont === FontChoice.System ? Resources.systemSansFonts : Resources.noldovaSansFonts);
     style.setProperty(Resources.monoFontVariable, typography.codeFont === FontChoice.System ? Resources.systemMonoFonts : Resources.noldovaMonoFonts);
   }
+
+  public static erase(element: HTMLElement): void {
+    const style = element.style;
+    for (const name of [Resources.fontSizeProperty, Resources.messageSizeVariable, Resources.codeSizeVariable, Resources.sansFontVariable, Resources.monoFontVariable])
+      style.removeProperty(name);
+  }
 }

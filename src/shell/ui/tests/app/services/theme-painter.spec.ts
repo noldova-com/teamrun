@@ -74,6 +74,18 @@ describe("ThemePainter", () => {
     expect(element.getAttribute("data-tr-tab-shape")).toBe("pill");
   });
 
+  it("erases everything it painted and nothing else", () => {
+    const painter = new ThemePainter(DefaultTheme.theme);
+    element.style.setProperty("--other", "kept");
+    element.setAttribute("data-other", "kept");
+    painter.paint(element, FixtureTheme.theme, ThemeMode.Dark);
+
+    painter.erase(element);
+
+    expect([...element.style]).toEqual(["--other"]);
+    expect(element.getAttributeNames()).toEqual(["data-other", "style"]);
+  });
+
   it("refuses to paint, naming the value, when even the default theme lacks it", () => {
     const empty = new Theme("fixture.empty", "Empty", new Map(), new Map(), new Map(), new Map());
     const withoutLook = FixtureTheme.create(new Map(), new Map([["tab", "pill"]]));
