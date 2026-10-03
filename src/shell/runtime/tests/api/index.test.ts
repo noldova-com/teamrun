@@ -44,6 +44,7 @@ export class RuntimeApiTests {
       "IdleMonitor",
       "LaunchException",
       "LaunchSettings",
+      "LogFile",
       "MethodFailureException",
       "MethodRegistry",
       "Migration",

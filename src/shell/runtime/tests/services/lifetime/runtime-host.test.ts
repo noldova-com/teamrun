@@ -278,7 +278,7 @@ export class RuntimeHostTests {
       host.requestStop("test");
       await host.waitForStopAsync();
 
-      Assert.areEqual("The module notes failed.\n", await readFile(fixture.dataDirectory.runtimeLog, "utf8"));
+      Assert.isTrue(/^\S+Z The module notes failed\.\n$/.test(await readFile(fixture.dataDirectory.runtimeLog, "utf8")));
     });
   }
 
@@ -311,7 +311,7 @@ export class RuntimeHostTests {
         "{\"modules\":[{\"id\":\"notes\",\"state\":\"Active\"},{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its runtime part could not be loaded.\"}]}",
         JSON.stringify(ModuleStatusList.fromJson(responses[1]?.payload).toJson()));
       Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "deactivated")));
-      Assert.isTrue((await readFile(fixture.dataDirectory.runtimeLog, "utf8")).startsWith("The module broken: Its runtime part could not be loaded.\nError [ERR_MODULE_NOT_FOUND]"));
+      Assert.isTrue(/^\S+Z The module broken: Its runtime part could not be loaded\.\nError \[ERR_MODULE_NOT_FOUND\]/.test(await readFile(fixture.dataDirectory.runtimeLog, "utf8")));
     });
   }
 

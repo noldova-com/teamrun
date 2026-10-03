@@ -3031,7 +3031,8 @@ export declare class RuntimeWindowStateStore implements IWindowStateStore {
 
 /**
  * The desktop's log, `logs/desktop.log` in the data directory, mirrored to standard error. One desktop runs per data
- * directory, so the desktop alone owns the file.
+ * directory, so the desktop alone owns the file. It stays within its size limit by becoming `logs/desktop.previous.log`
+ * when it fills.
  */
 export declare class DesktopLog implements IDesktopLog {
   /**
