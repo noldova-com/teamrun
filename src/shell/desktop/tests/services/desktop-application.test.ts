@@ -815,6 +815,31 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async reportsBoundsTheRuntimeRefusesOnceItIsReadyAgain(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    const second = new FakeRuntimeConnection();
+    second.isFailing = true;
+    let reconnect: (connection: FakeRuntimeConnection) => void = () => undefined;
+    const launcher = new FakeRuntimeLauncher(first, new Promise<FakeRuntimeConnection>(resolve => {
+      reconnect = resolve;
+    }));
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    await DesktopApplicationTests.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
+
+    launcher.listener?.onDisconnected();
+    window.change("move");
+    await delay(700);
+    reconnect(second);
+    await DesktopApplicationTests.waitAsync(() => DesktopApplicationTests.readErrors(process, "The window's bounds").length > 0);
+
+    Assert.areEqual(JSON.stringify(["The window's bounds could not be saved: WindowStateException: The runtime refused shell.writeWindowBounds: The database is busy."]),
+      JSON.stringify(DesktopApplicationTests.readErrors(process, "The window's bounds")));
+  }
+
+  @TestMethod
   public async tellsOnlyItsOwnWindowWhichBuildItIs(): Promise<void> {
     const electron = await DesktopApplicationTests.startReadyAsync("linux");
 
