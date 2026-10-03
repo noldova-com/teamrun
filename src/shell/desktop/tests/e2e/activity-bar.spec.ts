@@ -26,6 +26,20 @@ function icon(window: Page, key: string): Locator {
   return strip(window).locator(`[data-view="${key}"]`);
 }
 
+async function dragAsync(window: Page, source: Locator, target: Locator, down: number): Promise<void> {
+  const from = await source.boundingBox();
+  if (from === null)
+    throw new Error("The dragged element is not visible.");
+  await window.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await window.mouse.down();
+  await window.mouse.move(from.x + from.width / 2 + 12, from.y + from.height / 2 + 12, { steps: 3 });
+  const to = await target.boundingBox();
+  if (to === null)
+    throw new Error("The drop target is not visible.");
+  await window.mouse.move(to.x + to.width / 2, to.y + to.height * down, { steps: 6 });
+  await window.mouse.up();
+}
+
 test.describe("activity bar", () => {
   test.beforeEach(async ({ desktop }) => {
     await expect(desktop.window.locator(`tr-tab[data-tab-key="${notes}"]`)).toBeVisible();
@@ -54,6 +68,21 @@ test.describe("activity bar", () => {
     await setDockStyleAsync(window, "shell.leftDockStyle", "Tabs");
     await expect(strip(window)).toHaveCount(0);
     await expect(group.locator("[role=tablist]")).toBeVisible();
+  });
+
+  test("a tab drops into the strip between icons, and an icon drags out like its tab", async ({ desktop }) => {
+    const window = desktop.window;
+    const clock = "view/clock.face";
+    await setDockStyleAsync(window, "shell.leftDockStyle", "Icons");
+    await expect(icon(window, outline)).toBeVisible();
+
+    await dragAsync(window, window.locator(`tr-tab[data-tab-key="${clock}"]`), icon(window, notes), 0.85);
+    await expect(icon(window, clock)).toBeVisible();
+    expect(await strip(window).locator(".tr-dock-strip-view").evaluateAll(t => t.map(u => u.getAttribute("data-view")))).toEqual([notes, clock, outline]);
+
+    await dragAsync(window, icon(window, outline), window.locator("[data-drop-side=Right]"), 0.5);
+    await expect(window.locator(`tr-tab-group[data-side=Right] tr-tab[data-tab-key="${outline}"]`)).toBeVisible();
+    await expect(icon(window, outline)).toHaveCount(0);
   });
 
   test("a view's badge shows after its tab's title, then on its icon, and joins its accessible name", async ({ desktop }) => {

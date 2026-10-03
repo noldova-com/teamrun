@@ -149,6 +149,36 @@ describe("DockComponent", () => {
     expect(query("tr-sash")).not.toBeNull();
   });
 
+  it("drags an icon like its tab, marking where it lands between icons, at the end of the group above when between two groups", async () => {
+    await renderAsync(DockSide.Left, Layout.createDefault(registry).splitGroup(LayoutFixture.search, 1, PanelEdge.Bottom));
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
+    fixture.detectChanges();
+    const icon = (key: string): HTMLElement => query(`.tr-dock-strip-view[data-view="${key}"]`) as HTMLElement;
+    const treeGroup = layout.layout().groupOf(LayoutFixture.files)?.id ?? -1;
+    const searchGroup = layout.layout().groupOf(LayoutFixture.search)?.id ?? -1;
+    const targets = [icon("view/files.tree"), icon("view/files.search")].map(t => [t.dataset["dropBefore"], t.dataset["dropAfter"], t.dataset["dropAxis"]]);
+    const pointAt = (element: HTMLElement, fraction: number): { clientX: number; clientY: number } => {
+      const bounds = element.getBoundingClientRect();
+      return { clientX: bounds.left + bounds.width / 2, clientY: bounds.top + bounds.height * fraction };
+    };
+
+    icon("view/files.search").dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true, ...pointAt(icon("view/files.search"), 0.5) }));
+    document.dispatchEvent(new PointerEvent("pointermove", pointAt(icon("view/files.tree"), 0.9)));
+    fixture.detectChanges();
+    const marked = [icon("view/files.search").classList.contains("tr-dock-strip-drop-before"), icon("view/files.search").classList.contains("tr-dock-strip-dragged")];
+    document.dispatchEvent(new PointerEvent("pointerup"));
+    fixture.detectChanges();
+
+    expect(targets).toEqual([[`${treeGroup}:0`, `${treeGroup}:1`, "vertical"], [`${treeGroup}:1`, `${searchGroup}:1`, "vertical"]]);
+    expect(marked).toEqual([true, true]);
+    expect(layout.layout().group(treeGroup)?.tabs).toEqual([LayoutFixture.files, LayoutFixture.search]);
+    icon("view/files.tree").dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true, ...pointAt(icon("view/files.tree"), 0.5) }));
+    document.dispatchEvent(new PointerEvent("pointermove", pointAt(icon("view/files.search"), 0.9)));
+    fixture.detectChanges();
+    expect(icon("view/files.search").classList.contains("tr-dock-strip-drop-after")).toBe(true);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+  });
+
   it("closes the dock from the icon of a view it shows, and opens it at the chosen view from any other", async () => {
     await renderAsync(DockSide.Left, Layout.createDefault(registry).openView(LayoutFixture.search, registry));
     bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
