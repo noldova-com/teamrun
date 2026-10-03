@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, inject, signal, type WritableSignal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal, type WritableSignal } from "@angular/core";
 
 import { JsonReader } from "@noldova/teamrun-foundation-json";
 import { WindowPartTokens } from "@noldova/teamrun-shell-window";
@@ -18,9 +18,12 @@ import { WindowPartTokens } from "@noldova/teamrun-shell-window";
 })
 export class ClockFaceComponent {
   protected readonly answer: WritableSignal<string> = signal("");
+  protected readonly ticks: WritableSignal<string> = signal("No ticks");
 
   public constructor() {
-    inject(WindowPartTokens.context).requestAsync("clock.time", null).then(
+    const context = inject(WindowPartTokens.context);
+    inject(DestroyRef).onDestroy(context.onEvent("clock.ticked", t => this.ticks.set(`Ticks: ${JsonReader.fromValue(t).readInteger("ticks")}`)));
+    context.requestAsync("clock.time", null).then(
       t => this.answer.set(`The runtime's time is ${JsonReader.fromValue(t).readString("time")}`),
       (error: unknown) => this.answer.set(`The runtime did not answer: ${String(error)}`));
   }

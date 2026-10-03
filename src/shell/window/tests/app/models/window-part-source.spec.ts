@@ -15,18 +15,20 @@ describe("WindowPartSource", () => {
   const part: IWindowPart = { moduleId: "notes", activateAsync: () => Promise.resolve(), deactivateAsync: () => Promise.resolve() };
   const load = (): Promise<IWindowPart> => Promise.resolve(part);
 
-  it("keeps its module's id, name, dependencies, views and loader, copying the lists", async () => {
+  it("keeps its module's id, name, dependencies, views, commands and loader, copying the lists", async () => {
     const dependencies = ["tasks"];
     const views = ["notes.list"];
-    const source = new WindowPartSource("notes", "Notes", dependencies, views, load);
+    const commands = ["notes.newNote"];
+    const source = new WindowPartSource("notes", "Notes", dependencies, views, commands, load);
     dependencies.push("clock");
     views.push("notes.outline");
+    commands.push("notes.delete");
 
-    expect([source.moduleId, source.displayName, source.dependencies, source.viewNames]).toEqual(["notes", "Notes", ["tasks"], ["notes.list"]]);
+    expect([source.moduleId, source.displayName, source.dependencies, source.viewNames, source.commandNames]).toEqual(["notes", "Notes", ["tasks"], ["notes.list"], ["notes.newNote"]]);
     expect(await source.load()).toBe(part);
   });
 
   it("refuses a module id that is not lowercase kebab-case", () => {
-    expect(() => new WindowPartSource("Notes", "Notes", [], [], load)).toThrowError(ArgumentException);
+    expect(() => new WindowPartSource("Notes", "Notes", [], [], [], load)).toThrowError(ArgumentException);
   });
 });

@@ -144,6 +144,9 @@ export class Resources {
   public static readonly deactivateMember: "deactivateAsync" = "deactivateAsync";
   public static readonly methodsKind: string = "methods";
   public static readonly eventsKind: string = "events";
+  public static readonly commandsKind: string = "commands";
+  public static readonly nameParameterName: string = "name";
+  public static readonly defaultKeyParameterName: string = "defaultKey";
   public static readonly dataDirectoryVariable: string = "__DATA_DIRECTORY_VARIABLE__";
   public static readonly defaultDataFolder: readonly string[] = "__DATA_FOLDER__".split(Resources.folderSeparator);
   public static readonly developmentDataFolder: readonly string[] = ["_build", "data"];
@@ -354,6 +357,14 @@ export class Resources {
 
   public static formatSocketPathTooLong(socketPath: string): string {
     return `The local socket path "${socketPath}" exceeds ${Resources.maximumSocketPathLength} bytes; use a data directory with a shorter path.`;
+  }
+
+  public static formatCommandRegistered(name: string): string {
+    return `The command ${name} is already registered.`;
+  }
+
+  public static formatCommandNotFound(name: string): string {
+    return `The command ${name} is not registered; its module may not be active.`;
   }
 
   public static formatMethodRegistered(name: string): string {

@@ -25,7 +25,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public layout: unknown = null;
   public readonly requests: [string, JsonValue][] = [];
   public answer: unknown = { payload: null };
-  public readonly responses: Map<string, unknown> = new Map([["shell.modules", { payload: { modules: [] } }]]);
+  public readonly responses: Map<string, unknown> = new Map<string, unknown>([["shell.modules", { payload: { modules: [] } }], ["shell.commands", { payload: { commands: [] } }]]);
   public build: unknown = { productVersion: "1.2.3", fingerprint: "abc123" };
   public readonly copied: string[] = [];
   public isCopyAccepted: boolean = true;

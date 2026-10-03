@@ -27,6 +27,7 @@ export default class ModuleArtifacts {
   private static readonly FORMAT_VERSION: number = 1;
   private static readonly SOURCE_PREFIX: string = "src/";
   private static readonly VIEWS_KIND: string = "views";
+  private static readonly COMMANDS_KIND: string = "commands";
   private static readonly SOURCE_IMPORT: string = "import { WindowPartSource } from \"@noldova/teamrun-shell-window\";\n";
   private static readonly OUTPUT_DECLARATIONS_SEGMENTS: readonly string[] = ["modules", "declarations.json"];
 
@@ -56,6 +57,7 @@ export default class ModuleArtifacts {
       .filter(t => t.windowEntry !== null)
       .map(t => `  new WindowPartSource(${JSON.stringify(t.id)}, ${JSON.stringify(t.displayName)}, ${JSON.stringify(t.dependencies)}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.VIEWS_KIND) ?? [])}, `
+        + `${JSON.stringify(t.contributions.get(ModuleArtifacts.COMMANDS_KIND) ?? [])}, `
         + `() => import("../${String(t.windowEntry).slice(ModuleArtifacts.SOURCE_PREFIX.length)}").then(t => t.windowPart))`);
     const list = sources.length === 0 ? "[]" : `[\n${sources.join(",\n")}\n]`;
     await ModuleArtifacts.writeFileAsync(
