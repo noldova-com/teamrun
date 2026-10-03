@@ -27,6 +27,7 @@ import { StatusBarItemContribution } from "../../../src/app/models/status-bar-it
 import { StatusBarItemState } from "../../../src/app/models/status-bar-item-state";
 import { TopBarActionContribution } from "../../../src/app/models/top-bar-action-contribution";
 import { TopBarActionState } from "../../../src/app/models/top-bar-action-state";
+import { ViewBadge } from "../../../src/app/models/view-badge";
 import { ViewContribution } from "../../../src/app/models/view-contribution";
 import { WindowPartSource } from "../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
@@ -484,6 +485,23 @@ describe("WindowPartHostService", () => {
     expect(loads.length).toBe(1);
     expect(errors.map(t => (t as Error).message)).toEqual(["tasks did not stop"]);
     expect(host.findContribution(new ViewTab("notes.list"))?.context?.moduleId).toBe("notes");
+  });
+
+  it("shows the badge a window part sets on its view, set again when the part reactivates", async () => {
+    const badge = new ViewBadge(2, "2 new");
+    const notes = new FakeWindowPart("notes", log, t => t.setViewBadge("notes.list", badge));
+    const { host } = start([source("notes", notes, [], ["notes.list"])], [status("notes")]);
+    const labels = TestBed.inject(TabLabelService);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const shown = labels.badgeOf(new ViewTab("notes.list"));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(shown).toBe(badge);
+    expect(labels.badgeOf(new ViewTab("notes.list"))).toBe(badge);
+    expect(log).toContain("deactivate notes");
   });
 
   it("passes requests and events to and from the runtime", async () => {

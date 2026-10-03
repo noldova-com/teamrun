@@ -13,14 +13,24 @@ import "@noldova/teamrun-foundation-core";
 import { Resources } from "../../resources";
 import type { Tab } from "../models/layout/tab";
 import { TabLabel } from "../models/layout/tab-label";
+import type { ViewBadge } from "../models/view-badge";
 
 @Injectable({ providedIn: "root" })
 export class TabLabelService {
   private readonly labels: WritableSignal<ReadonlyMap<string, TabLabel>> = signal(new Map());
   private readonly titles: WritableSignal<ReadonlyMap<string, string>> = signal(new Map());
+  private readonly badges: WritableSignal<ReadonlyMap<string, ViewBadge>> = signal(new Map());
 
   public register(name: string, label: TabLabel): void {
     this.labels.update(t => new Map([...t, [name, label]]));
+  }
+
+  public setBadge(view: string, badge: ViewBadge | null): void {
+    this.badges.update(t => new Map([...t].filter(([name]) => name !== view).concat(Object.isNull(badge) ? [] : [[view, badge]])));
+  }
+
+  public badgeOf(tab: Tab): ViewBadge | null {
+    return tab.isMovable ? this.badges().get(tab.name) ?? null : null;
   }
 
   public setTitle(tab: Tab, title: string): void {

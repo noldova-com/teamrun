@@ -109,6 +109,10 @@ export class Resources {
     "docking-guide",
     "docking-guide-icon",
     "docking-plate-gap",
+    "badge",
+    "badge-dot",
+    "badge-padding",
+    "badge-text",
     "menu-padding",
     "menu-label-padding",
     "menu-item-height",
@@ -208,6 +212,8 @@ export class Resources {
     [SashOrientation.Horizontal]: "ArrowDown"
   };
   public static readonly verticalOrientation: string = "vertical";
+  public static readonly badgeLimit: number = 99;
+  public static readonly badgeOverflow: string = "99+";
   public static readonly horizontalOrientation: string = "horizontal";
   public static readonly toolbarDirection: "ltr" = "ltr";
   public static readonly toolbarMoveKeys: Readonly<Record<ToolbarOrientation, readonly string[]>> = {
@@ -294,6 +300,10 @@ export class Resources {
 
   public static formatTextSizeOutOfRange(parameterName: string, size: number): string {
     return `The ${parameterName} must be from ${Resources.minimumTextSize} to ${Resources.maximumTextSize} CSS pixels; ${size} is outside that range.`;
+  }
+
+  public static formatBadged(label: string, badge: string): string {
+    return `${label}, ${badge}`;
   }
 
   public static formatCloseTab(label: string): string {

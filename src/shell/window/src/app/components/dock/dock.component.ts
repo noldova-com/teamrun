@@ -10,7 +10,7 @@ import { ChangeDetectionStrategy, Component, type Signal, computed, inject, inpu
 
 import "@noldova/teamrun-foundation-core";
 import {
-  AppearanceService, IconButtonComponent, OverlaySide, PanelCardComponent, PanelSurface, SashComponent, SashOrientation, ToolbarDirective, ToolbarItemDirective, ToolbarOrientation,
+  AppearanceService, BadgeComponent, IconButtonComponent, OverlaySide, PanelCardComponent, PanelSurface, SashComponent, SashOrientation, ToolbarDirective, ToolbarItemDirective, ToolbarOrientation,
   TooltipDirective
 } from "@noldova/teamrun-shell-ui";
 
@@ -26,7 +26,7 @@ import { TabLabelService } from "../../services/tab-label.service";
 
 @Component({
   selector: "tr-dock",
-  imports: [IconButtonComponent, PanelCardComponent, SashComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective],
+  imports: [BadgeComponent, IconButtonComponent, PanelCardComponent, SashComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective],
   templateUrl: "./dock.component.html",
   styleUrl: "./dock.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,

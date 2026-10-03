@@ -18,8 +18,14 @@ LICENSE file in the root directory of this source tree.
           }
           @for (tab of entry[1]; track tab.key) {
             @let label = labels.of(tab);
-            <button type="button" tr-icon-button trToolbarItem class="tr-dock-strip-view" [attr.data-view]="tab.key" [icon]="label.icon" [label]="label.title"
-              [pressed]="isShowing(entry[0], tab)" [trTooltip]="label.title" [trTooltipSide]="tooltipSide()" [trTooltipBeside]="resources.dockStripSelector" (click)="toggle(entry[0], tab)"></button>
+            @let badge = labels.badgeOf(tab);
+            <button type="button" tr-icon-button trToolbarItem class="tr-dock-strip-view" [attr.data-view]="tab.key" [icon]="label.icon"
+              [label]="badge ? resources.formatBadged(label.title, badge.description) : label.title"
+              [pressed]="isShowing(entry[0], tab)" [trTooltip]="label.title" [trTooltipSide]="tooltipSide()" [trTooltipBeside]="resources.dockStripSelector" (click)="toggle(entry[0], tab)">
+              @if (badge) {
+                <tr-badge class="tr-dock-strip-badge" [count]="badge.count" />
+              }
+            </button>
           }
         }
       </tr-panel-card>
