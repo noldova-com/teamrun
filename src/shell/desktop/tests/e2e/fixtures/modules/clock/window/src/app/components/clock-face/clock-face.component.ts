@@ -9,10 +9,11 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal, type WritableSignal } from "@angular/core";
 
 import { JsonReader } from "@noldova/teamrun-foundation-json";
-import { type IWindowPartContext, WindowPartTokens } from "@noldova/teamrun-shell-window";
+import { type IWindowPartContext, MenuDirective, WindowPartTokens } from "@noldova/teamrun-shell-window";
 
 @Component({
   selector: "tr-clock-face",
+  imports: [MenuDirective],
   templateUrl: "./clock-face.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush
 })

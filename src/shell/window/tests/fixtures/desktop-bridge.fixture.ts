@@ -32,7 +32,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public answer: unknown = { payload: null };
   public readonly responses: Map<string, unknown> = new Map<string, unknown>([
     ["shell.modules", { payload: { modules: [] } }],
-    ["shell.commands", { payload: { commands: [] } }],
+    ["shell.commands", { payload: { commands: [], sequence: 0 } }],
     ["shell.notifications", { payload: { notifications: [], isDoNotDisturb: false, sequence: 0 } }],
     ["shell.settings", { payload: { definitions: [], entries: [] } }]
   ]);

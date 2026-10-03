@@ -281,7 +281,7 @@ describe("WindowPartHostService", () => {
         return "opened";
       }));
     });
-    bridge.responses.set("shell.commands", { payload: { commands: [{ name: "notes.sync", title: "Sync" }, { name: "clock.tick", title: "Tick", icon: "timer", defaultKey: "Mod+Alt+T" }] } });
+    bridge.responses.set("shell.commands", { payload: { commands: [{ name: "notes.sync", title: "Sync" }, { name: "clock.tick", title: "Tick", icon: "timer", defaultKey: "Mod+Alt+T" }], sequence: 2 } });
     bridge.responses.set("shell.runCommand", { payload: 3 });
     const { host } = start([source("notes", notes, [], [], ["notes.newNote"])], [status("clock"), status("notes")]);
     const commands = TestBed.inject(CommandService);
@@ -298,6 +298,66 @@ describe("WindowPartHostService", () => {
     expect(bridge.requests.at(-1)).toEqual(["shell.runCommand", { name: "clock.tick", arguments: { by: 2 } }]);
     expect(runs).toEqual(["notes.newNote {\"folder\":\"inbox\"}"]);
     expect([host.isCommandRegistered("clock.tick"), host.isCommandRegistered("notes.newNote"), host.isCommandRegistered("notes.open")]).toEqual([true, true, false]);
+  });
+
+  it("follows the runtime commands' enabled and checked state from the first answer and each newer change", async () => {
+    const tick = (isEnabled: boolean): object => ({ name: "clock.tick", title: "Tick", ...isEnabled ? {} : { isEnabled } });
+    const pause = (isChecked: boolean): object => ({ name: "clock.pause", title: "Pause", isChecked });
+    bridge.responses.set("shell.commands", { payload: { commands: [tick(false), pause(false)], sequence: 2 } });
+    const { host } = start([], [status("clock")]);
+    const commands = TestBed.inject(CommandService);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const state = (): readonly unknown[] => ["clock.tick", "clock.pause"].map(t => [commands.isEnabled(t), commands.commands().find(u => u.name === t)?.isChecked?.(null) ?? null]);
+    const first = state();
+
+    bridge.publishEvent("shell.commandsChanged", { commands: [tick(true), pause(true)], sequence: 3 });
+    const changed = state();
+    bridge.publishEvent("shell.commandsChanged", { commands: [tick(false), pause(false)], sequence: 1 });
+    bridge.publishEvent("notes.changed", { commands: [], sequence: 9 });
+    bridge.publishEvent("shell.commandsChanged", { commands: [tick(false)] });
+    const afterOlder = state();
+    bridge.publishEvent("shell.commandsChanged", { commands: [pause(true)], sequence: 4 });
+
+    expect(first).toEqual([[false, null], [true, false]]);
+    expect(changed).toEqual([[true, null], [true, true]]);
+    expect(afterOlder).toEqual(changed);
+    expect(state()).toEqual([[false, null], [true, true]]);
+    expect(errors.map(t => (t as Error).name)).toEqual(["JsonException"]);
+  });
+
+  it("keeps a change that arrives before the first answer over the older answer", async () => {
+    let resolve: (value: unknown) => void = () => undefined;
+    const answer = new Promise<unknown>(t => {
+      resolve = t;
+    });
+    bridge.responses.set("shell.commands", answer);
+    const { host } = start([], [status("clock")]);
+    const commands = TestBed.inject(CommandService);
+    await vi.waitFor(() => expect(bridge.requests.map(t => t[0])).toContain("shell.commands"));
+
+    bridge.publishEvent("shell.commandsChanged", { commands: [{ name: "clock.tick", title: "Tick", isEnabled: false }], sequence: 5 });
+    resolve({ payload: { commands: [{ name: "clock.tick", title: "Tick" }], sequence: 4 } });
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    expect(commands.isEnabled("clock.tick")).toBe(false);
+    expect(errors).toEqual([]);
+  });
+
+  it("disables the runtime commands while the runtime is away and takes a new runtime's first answer whatever its sequence", async () => {
+    bridge.responses.set("shell.commands", { payload: { commands: [{ name: "clock.tick", title: "Tick" }], sequence: 7 } });
+    const { host } = start([], [status("clock")]);
+    const commands = TestBed.inject(CommandService);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const before = commands.isEnabled("clock.tick");
+
+    bridge.responses.set("shell.commands", { payload: { commands: [{ name: "clock.tick", title: "Tick" }, { name: "clock.reset", title: "Reset" }], sequence: 1 } });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    const away = commands.isEnabled("clock.tick");
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect([before, away]).toEqual([true, false]);
+    expect([commands.isEnabled("clock.tick"), commands.isEnabled("clock.reset")]).toEqual([true, true]);
   });
 
   it("shows the window parts' bar items in module order and withdraws a module's items when it no longer activates", async () => {
@@ -330,12 +390,12 @@ describe("WindowPartHostService", () => {
 
   it("fails a window part that registers a command the runtime part registered, and replaces the commands when the runtime returns", async () => {
     const notes = new FakeWindowPart("notes", log, t => t.registerCommand(new CommandContribution("notes.sync", "Sync", null, null, () => Promise.resolve(null))));
-    bridge.responses.set("shell.commands", { payload: { commands: [{ name: "notes.sync", title: "Sync" }] } });
+    bridge.responses.set("shell.commands", { payload: { commands: [{ name: "notes.sync", title: "Sync" }], sequence: 1 } });
     const { host } = start([source("notes", notes, [], [], ["notes.sync"])], [status("notes")]);
     const commands = TestBed.inject(CommandService);
     await vi.waitFor(() => expect(host.failures().length).toBe(1));
 
-    bridge.responses.set("shell.commands", { payload: { commands: [] } });
+    bridge.responses.set("shell.commands", { payload: { commands: [], sequence: 0 } });
     bridge.publishStartup({ kind: "Connecting", details: [] });
     bridge.publishStartup({ kind: "Ready", details: [] });
     await vi.waitFor(() => expect(host.generation()).toBe(2));
