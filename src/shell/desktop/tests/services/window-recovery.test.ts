@@ -6,11 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { setTimeout as delay } from "node:timers/promises";
+import { setImmediate } from "node:timers/promises";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { OpenWindow, WindowRecovery } from "@noldova/teamrun-shell-desktop";
 
+import { Condition } from "../fixtures/condition.fixture.js";
 import { FakeDesktopLog } from "../fixtures/fake-desktop-log.fixture.js";
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
@@ -38,7 +39,7 @@ class Recovered {
   }
 
   public static async settleAsync(): Promise<void> {
-    await delay(10);
+    await setImmediate();
   }
 }
 
@@ -111,7 +112,8 @@ export class WindowRecoveryTests {
 
     recovered.window.webContents.goAway("crashed", 5);
     await Recovered.settleAsync();
-    await delay(40);
+    const reloadSeenAt = Date.now();
+    await Condition.waitAsync(() => Date.now() - reloadSeenAt > 20);
     recovered.window.webContents.goAway("crashed", 5);
     await Recovered.settleAsync();
 
@@ -191,7 +193,7 @@ export class WindowRecoveryTests {
     recovered.window.change("unresponsive");
     await Recovered.settleAsync();
     const callsBeforeItWent = [...recovered.window.webContents.calls];
-    await delay(40);
+    await Condition.waitAsync(() => recovered.process.ended.length === 1);
     recovered.window.webContents.goAway("killed", 9);
     await Recovered.settleAsync();
 
@@ -208,15 +210,15 @@ export class WindowRecoveryTests {
 
   @TestMethod
   public async recordsAPageProcessItCannotEndAndLeavesAClosedWindowsProcessAlone(): Promise<void> {
+    const closed = new Recovered([1], 10_000, 20);
     const failing = new Recovered([1], 10_000, 20);
     failing.process.endFailure = new Error("No such process.");
-    const closed = new Recovered([1], 10_000, 20);
 
-    failing.window.change("unresponsive");
     closed.window.change("unresponsive");
+    failing.window.change("unresponsive");
     await Recovered.settleAsync();
     closed.window.destroy();
-    await delay(40);
+    await Condition.waitAsync(() => failing.window.webContents.calls.includes("reload"));
 
     Assert.areEqual("The window's page did not stop when asked, and its process could not be ended, so the desktop reloads it: Error: No such process.", failing.log.lines.at(-1));
     Assert.areEqual(JSON.stringify(["crash", "reload"]), JSON.stringify(failing.window.webContents.calls));
@@ -235,7 +237,7 @@ export class WindowRecoveryTests {
     none.window.change("unresponsive");
     own.window.change("unresponsive");
     await Recovered.settleAsync();
-    await delay(40);
+    await Condition.waitAsync(() => none.window.webContents.calls.includes("reload") && own.window.webContents.calls.includes("reload"));
     none.window.webContents.goAway("crashed", 5);
     await Recovered.settleAsync();
 

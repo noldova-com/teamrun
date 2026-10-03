@@ -15,6 +15,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import { DetachedStart, DetachedStartReply, DetachedStartRequest } from "@noldova/teamrun-shell-desktop";
 import { type IProcessStarter, LaunchException } from "@noldova/teamrun-shell-runtime";
 
+import { Condition } from "../fixtures/condition.fixture.js";
 import { FakeParentPort } from "../fixtures/fake-parent-port.fixture.js";
 
 @TestClass
@@ -30,7 +31,7 @@ export class DetachedStartTests {
 
       const processId = DetachedStartReply.fromJson(port.messages[0]).requireProcessId();
       Assert.isTrue(processId > 0);
-      await DetachedStartTests.waitForAsync(async () => (await readFile(errorFile, "utf8")).includes("started"));
+      await Condition.waitAsync(async () => (await readFile(errorFile, "utf8")).includes("started"));
       Assert.areEqual(1, port.messages.length);
     });
   }
@@ -57,7 +58,7 @@ export class DetachedStartTests {
     const answering = DetachedStart.runAsync(new DetachedStartRequest("node", [], "start.log", {}).toJson(), port, starter).then(() => {
       isSettled = true;
     });
-    await DetachedStartTests.waitForAsync(() => Promise.resolve(port.messages.length === 1));
+    await Condition.waitAsync(() => Promise.resolve(port.messages.length === 1));
     await new Promise(resolve => setImmediate(resolve));
 
     Assert.isFalse(isSettled);
@@ -77,15 +78,6 @@ export class DetachedStartTests {
 
     Assert.areEqual("LaunchException: The runtime could not be started with node.", DetachedStartReply.fromJson(port.messages[0]).failure);
     Assert.isTrue(String(DetachedStartReply.fromJson(port.messages[1]).failure).startsWith("JsonException: "));
-  }
-
-  private static async waitForAsync(condition: () => Promise<boolean>): Promise<void> {
-    const deadline = Date.now() + 5_000;
-    while (!await condition()) {
-      if (Date.now() >= deadline)
-        throw new Error("The condition did not hold in time.");
-      await new Promise(resolve => setTimeout(resolve, 25));
-    }
   }
 
   private static async runInFolderAsync(test: (folder: string) => Promise<void>): Promise<void> {

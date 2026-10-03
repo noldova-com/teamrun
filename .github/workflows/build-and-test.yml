@@ -145,29 +145,56 @@ jobs:
         run: node scripts/classify-changes.ts
 
   validate:
-    name: Build and test (${{ matrix.target }})
+    name: Build and test (${{ matrix.label }})
     needs: changes
     if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - target: Linux x64
+          - label: Linux x64
+            target: Linux x64
+            part: all
             runner: ubuntu-24.04
             architecture: x64
-          - target: Linux ARM64
+          - label: Linux ARM64
+            target: Linux ARM64
+            part: all
             runner: ubuntu-24.04-arm
             architecture: arm64
-          - target: Windows x64
+          - label: Windows x64, tests
+            target: Windows x64
+            part: tests
             runner: windows-2025
             architecture: x64
-          - target: Windows ARM64
+          - label: Windows x64, UI workflows
+            target: Windows x64
+            part: workflows
+            runner: windows-2025
+            architecture: x64
+          - label: Windows ARM64, tests
+            target: Windows ARM64
+            part: tests
             runner: windows-11-arm
             architecture: arm64
-          - target: macOS x64
+          - label: Windows ARM64, UI workflows
+            target: Windows ARM64
+            part: workflows
+            runner: windows-11-arm
+            architecture: arm64
+          - label: macOS x64, tests
+            target: macOS x64
+            part: tests
             runner: macos-15-intel
             architecture: x64
-          - target: macOS ARM64
+          - label: macOS x64, UI workflows
+            target: macOS x64
+            part: workflows
+            runner: macos-15-intel
+            architecture: x64
+          - label: macOS ARM64
+            target: macOS ARM64
+            part: all
             runner: macos-15
             architecture: arm64
     runs-on: ${{ matrix.runner }}
@@ -237,17 +264,20 @@ jobs:
           exit 1
 
       - name: Build
+        if: matrix.part != 'workflows'
         run: npm run build
 
       - name: Test
+        if: matrix.part != 'workflows'
         run: npm test
 
       - name: Let Electron's sandbox start on Linux
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && matrix.part != 'tests'
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Test the UI workflows
         id: ui
+        if: matrix.part != 'tests'
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
             xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui
