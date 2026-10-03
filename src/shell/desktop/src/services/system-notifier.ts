@@ -7,7 +7,7 @@
  */
 
 import "@noldova/teamrun-foundation-core";
-import type { Notification, NotificationBroadcast } from "@noldova/teamrun-shell-protocol";
+import { type Notification, type NotificationBroadcast, NotificationPost } from "@noldova/teamrun-shell-protocol";
 
 import type { IDesktopLog } from "../interfaces/i-desktop-log.js";
 import type { INotificationHost } from "../interfaces/i-notification-host.js";
@@ -80,8 +80,13 @@ export class SystemNotifier {
     if (broadcast.quietDevices.includes(start.device) || this.isAnyWindowFocused() || !this.host.isSupported())
       return;
     for (const notification of [...broadcast.notifications].reverse())
-      if (notification.sequence > highest && Object.isNull(notification.post.progress))
+      if (notification.sequence > highest && !SystemNotifier.isInProgress(notification))
         this.show(notification);
+  }
+
+  private static isInProgress(notification: Notification): boolean {
+    const progress = notification.post.progress;
+    return progress === NotificationPost.indeterminate || (Object.isNumber(progress) && progress < 1);
   }
 
   private show(notification: Notification): void {
