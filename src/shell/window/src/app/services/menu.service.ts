@@ -29,6 +29,7 @@ export class MenuService {
   private readonly commands: CommandService = inject(CommandService);
   private readonly declarations: readonly MenuDeclarations[] = inject(WindowPartTokens.menus);
   private readonly activeValue: WritableSignal<readonly string[]> = signal([]);
+  private readonly providers: WritableSignal<ReadonlyMap<string, (context: JsonObject) => readonly MenuItem[]>> = signal(new Map());
   private readonly shell: MenuDeclarations = ShellMenus.of(inject(DesktopBridgeService).isMac);
 
   public readonly active: Signal<readonly MenuDeclarations[]> = computed(() => [
@@ -40,6 +41,11 @@ export class MenuService {
     this.activeValue.set([...moduleIds]);
   }
 
+  public provideGroup(group: string, provider: (context: JsonObject) => readonly MenuItem[]): () => void {
+    this.providers.update(t => new Map([...t, [group, provider]]));
+    return () => this.providers.update(t => new Map([...t].filter(u => u[0] !== group)));
+  }
+
   public findPlace(name: string): MenuPlace | null {
     return this.active().flatMap(t => t.places).find(t => t.name === name) ?? null;
   }
@@ -48,22 +54,28 @@ export class MenuService {
     return this.active()
       .flatMap(t => t.groups)
       .filter(t => t.place === place)
-      .map(t => new MenuSection(t.name, t.items.flatMap(u => this.resolveItem(t, u, context))))
+      .map(t => new MenuSection(t.name, this.itemsOf(t, context).flatMap(u => this.resolveItem(t, u, context))))
       .filter(t => t.rows.length > 0);
+  }
+
+  private itemsOf(group: MenuGroup, context: JsonObject): readonly MenuItem[] {
+    return group.isDynamic ? this.providers().get(group.name)?.(context) ?? [] : group.items;
   }
 
   private resolveItem(group: MenuGroup, item: MenuItem, context: JsonObject): readonly (CommandRow | SubmenuRow)[] {
     if (!Object.isNull(item.submenu)) {
       const place = this.findPlace(item.submenu);
-      return Object.isNull(place) || this.resolve(place.name, context).length === 0 ? [] : [new SubmenuRow(place.name, place.title)];
+      return Object.isNull(place) || this.resolve(place.name, context).length === 0 ? [] : [new SubmenuRow(place.name, place.title, place.icon)];
     }
     const name = String(item.command);
     const commandArguments = { ...context, ...item.commandArguments };
     const command = this.commands.commands().find(t => t.name === name);
     if (Object.isUndefined(command))
-      return [new CommandRow(name, commandArguments, name, null, null, false, MenuCheck.None, false)];
+      return [new CommandRow(name, commandArguments, item.label ?? name, null, null, false, MenuCheck.None, false)];
+    if (!this.commands.isApplicable(name, commandArguments))
+      return [];
     const check = Object.isNull(command.isChecked) ? MenuCheck.None : group.isExclusive ? MenuCheck.Radio : MenuCheck.Checkbox;
-    return [new CommandRow(name, commandArguments, command.title, command.icon, this.commands.keyLabel(name), this.commands.isEnabled(name, commandArguments), check,
+    return [new CommandRow(name, commandArguments, item.label ?? command.title, command.icon, this.commands.keyLabel(name), this.commands.isEnabled(name, commandArguments), check,
       command.isChecked?.(commandArguments) ?? false)];
   }
 }
