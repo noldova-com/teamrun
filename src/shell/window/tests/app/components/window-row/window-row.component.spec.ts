@@ -9,16 +9,19 @@
 import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
-import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import { AppearanceService, DefaultTheme, ModePreference, type Theme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
 import { WindowRowComponent } from "../../../../src/app/components/window-row/window-row.component";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
+import { MenuDeclarations } from "../../../../src/app/models/menu-declarations";
 import { TopBarAction } from "../../../../src/app/models/top-bar-action";
 import { TopBarActionContribution } from "../../../../src/app/models/top-bar-action-contribution";
 import { TopBarActionState } from "../../../../src/app/models/top-bar-action-state";
+import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { BarItemsService } from "../../../../src/app/services/bar-items.service";
 import { CommandService } from "../../../../src/app/services/command.service";
+import { MenuService } from "../../../../src/app/services/menu.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { FixtureTheme } from "../../../../../ui/tests/fixtures/fixture-theme";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
@@ -152,5 +155,60 @@ describe("WindowRowComponent", () => {
 
     expect(row.classList.contains("tr-window-row-mac")).toBe(true);
     expect(getComputedStyle(row).paddingLeft).toBe("78px");
+  });
+
+  function useNotesMenus(runs: JsonValue[]): void {
+    TestBed.configureTestingModule({
+      providers: [{
+        provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
+          places: [], groups: [{ name: "notes.create", place: "shell.file", exclusive: false, items: [{ command: "notes.newNote", arguments: { template: "plan" } }] }]
+        })]
+      }]
+    });
+    TestBed.inject(CommandService).setCommands([new CommandContribution("notes.newNote", "New note", null, null, async t => {
+      runs.push(t);
+      return null;
+    })]);
+    TestBed.inject(MenuService).setActiveModules(["notes"]);
+  }
+
+  it("opens the menu bar's places from a menu button at the row's start on Windows and Linux, outside the drag region", async () => {
+    const runs: JsonValue[] = [];
+    DesktopBridgeFixture.install("win32");
+    useNotesMenus(runs);
+    apply();
+
+    const row = render();
+    const button = row.firstElementChild as HTMLButtonElement;
+    button.click();
+    const list = document.querySelector("tr-menu.tr-window-row-menu-list") as HTMLElement;
+    const places = [...list.querySelectorAll<HTMLButtonElement>("button.tr-window-row-menu-place")];
+    places[0]?.click();
+    (document.querySelector("tr-menu[data-place='shell.file'] button[data-command='notes.newNote']") as HTMLButtonElement).click();
+    await Promise.resolve();
+
+    expect([button.classList.contains("tr-window-row-menu"), button.getAttribute("aria-label"), getComputedStyle(button).getPropertyValue("app-region")]).toEqual([true, "Menu", "no-drag"]);
+    expect(places.map(t => t.getAttribute("data-place"))).toEqual(["shell.file", "shell.view"]);
+    expect(runs).toEqual([{ template: "plan" }]);
+  });
+
+  it("has no menu button on macOS, sends the menu bar to the desktop and runs the row the desktop reports until it is removed", async () => {
+    const runs: JsonValue[] = [];
+    const bridge = DesktopBridgeFixture.install("darwin");
+    useNotesMenus(runs);
+    apply();
+    const listeners = bridge.listenerCount;
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    await fixture.whenStable();
+
+    bridge.chooseMenuCommand("shell.file/notes.create/0");
+    await Promise.resolve();
+    fixture.destroy();
+
+    expect(fixture.nativeElement.querySelector(".tr-window-row-menu")).toBeNull();
+    expect(JsonReader.fromValue(bridge.menuBars.at(-1) ?? {}).readObjectArray("menus").map(t => t.readString("place")))
+      .toEqual(["shell.file", "shell.edit", "shell.view", "shell.window", "shell.help"]);
+    expect(runs).toEqual([{ template: "plan" }]);
+    expect(bridge.listenerCount).toBe(listeners);
   });
 });

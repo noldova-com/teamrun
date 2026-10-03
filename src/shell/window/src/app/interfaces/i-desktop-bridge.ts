@@ -25,4 +25,6 @@ export interface IDesktopBridge {
   readBuild(): Promise<unknown>;
   copyText(text: string): Promise<boolean>;
   openLogFolder(): Promise<boolean>;
+  setMenuBar(menuBar: JsonObject): void;
+  onMenuCommand(listener: (id: string) => void): () => void;
 }
