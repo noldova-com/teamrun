@@ -27,7 +27,7 @@ export class FakeDesktopProcess implements IDesktopProcess {
       callback();
     }
   });
-  public readonly started: string[] = [];
+  public readonly started: (readonly string[])[] = [];
   public readonly ended: number[] = [];
   public readonly processId: number = 1000;
   public endFailure: Error | null = null;
@@ -43,8 +43,8 @@ export class FakeDesktopProcess implements IDesktopProcess {
     return this.written;
   }
 
-  public startDetached(executablePath: string): void {
-    this.started.push(executablePath);
+  public startDetached(executablePath: string, args: readonly string[]): void {
+    this.started.push([executablePath, ...args]);
   }
 
   public endProcess(processId: number): void {

@@ -381,7 +381,7 @@ export class DesktopApplication {
   private handOver(handover: RuntimeHandover): boolean {
     if (!this.isPackaged)
       return false;
-    this.process.startDetached(handover.executablePath);
+    this.process.startDetached(handover.executablePath, this.process.argv.filter(t => Resources.handoverArguments.some(u => t.startsWith(u))));
     this.electron.app.quit();
     return true;
   }
