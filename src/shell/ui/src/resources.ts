@@ -197,6 +197,8 @@ export class Resources {
     [DockingDirection.Top]: "Place above",
     [DockingDirection.Bottom]: "Place below"
   };
+  public static readonly progressMinimum: number = 0;
+  public static readonly progressMaximum: number = 1;
   public static readonly sashHoverDelay: number = 300;
   public static readonly sashKeyboardStep: number = 8;
   public static readonly sashDecreaseKeys: Readonly<Record<SashOrientation, string>> = {

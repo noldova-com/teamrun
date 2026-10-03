@@ -17,6 +17,7 @@ export { MenuItemComponent } from "../app/components/menu/menu-item.component";
 export { MenuSeparatorComponent } from "../app/components/menu/menu-separator.component";
 export { MenuTriggerDirective } from "../app/components/menu/menu-trigger.directive";
 export { MenuComponent } from "../app/components/menu/menu.component";
+export { ProgressComponent } from "../app/components/progress/progress.component";
 export { PanelCardComponent } from "../app/components/panel-card/panel-card.component";
 export { QuickInputComponent } from "../app/components/quick-input/quick-input.component";
 export { SashComponent } from "../app/components/sash/sash.component";

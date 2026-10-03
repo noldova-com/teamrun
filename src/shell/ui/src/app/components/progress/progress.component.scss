@@ -1,0 +1,45 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--tr-progress) 25%, transparent);
+}
+
+.tr-progress-bar {
+  display: block;
+  width: calc(var(--tr-progress-fraction) * 100%);
+  height: 100%;
+  background: var(--tr-progress);
+}
+
+:host(.tr-progress-indeterminate) .tr-progress-bar {
+  width: 40%;
+  animation: tr-progress-slide 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host(.tr-progress-indeterminate) .tr-progress-bar {
+    margin-inline-start: 30%;
+    animation: none;
+  }
+}
+
+@keyframes tr-progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(250%);
+  }
+}
