@@ -18,7 +18,7 @@ import { type ElectronApplication, type Page, type TestInfo, _electron, expect }
 import { DataDirectory, DiscoveryReader, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
 import ErrorOutputClassifier from "./error-output.classifier.ts";
-import ProcessListFixture from "./process-list.fixture.ts";
+import ProcessListFixture, { type ListedProcess } from "./process-list.fixture.ts";
 
 export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
@@ -32,7 +32,7 @@ export default class DesktopApplicationFixture {
   private static readonly DEVICE_FOLDER: string = "device";
   private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
   private static readonly PROCESS_EXIT_TIMEOUT: number = 30_000;
-  private static readonly PROCESS_EXIT_INTERVAL: number = 50;
+  private static readonly PROCESS_EXIT_INTERVAL: number = 250;
   private static readonly TRACE_FILE: string = "trace.zip";
   private static readonly WINDOWS_FILE: string = "windows.json";
   private static readonly DIAGNOSTIC_TIMEOUT: number = 10_000;
@@ -45,7 +45,7 @@ export default class DesktopApplicationFixture {
   private electronApplication: ElectronApplication | null = null;
   private page: Page | null = null;
   private childProcess: ChildProcess | null = null;
-  private readonly processIds: Set<number> = new Set();
+  private processes: ListedProcess[] = [];
 
   public readonly failures: string[] = [];
   public closeMilliseconds: number | null = null;
@@ -191,29 +191,30 @@ export default class DesktopApplicationFixture {
   }
 
   private async recordProcessesAsync(child: ChildProcess): Promise<void> {
-    for (const processId of [...this.processIds].filter(t => !DesktopApplicationFixture.isAlive(t)))
-      this.processIds.delete(processId);
-    if (child.pid === undefined)
+    const listed = await ProcessListFixture.readProcessesAsync();
+    this.processes = this.processes.filter(t => ProcessListFixture.isListed(listed, t));
+    const main = listed.find(t => t.processId === child.pid);
+    if (main === undefined)
       return;
-    for (const processId of [child.pid, ...await ProcessListFixture.readDescendantsAsync(child.pid)])
-      this.processIds.add(processId);
+    for (const recorded of [main, ...ProcessListFixture.descendants(listed, main.processId)])
+      if (!this.processes.some(t => t.processId === recorded.processId && t.started === recorded.started))
+        this.processes.push(recorded);
   }
 
   private async waitForProcessesAsync(): Promise<void> {
-    if (this.childProcess?.pid !== undefined)
-      this.processIds.add(this.childProcess.pid);
     const deadline = Date.now() + DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT;
-    let running = [...this.processIds].filter(t => DesktopApplicationFixture.isAlive(t));
-    this.awaitedProcessIds = running;
+    let listed = await ProcessListFixture.readProcessesAsync();
+    let running = this.processes.filter(t => ProcessListFixture.isListed(listed, t));
     while (running.length > 0 && Date.now() < deadline) {
+      this.awaitedProcessIds = running.map(t => t.processId);
       await delay(DesktopApplicationFixture.PROCESS_EXIT_INTERVAL);
-      running = running.filter(t => DesktopApplicationFixture.isAlive(t));
+      listed = await ProcessListFixture.readProcessesAsync();
+      running = running.filter(t => ProcessListFixture.isListed(listed, t));
     }
     this.awaitedProcessIds = [];
     if (running.length === 0)
       return;
-    const names = ProcessListFixture.readNames(running);
-    const described = running.map(t => `${names.get(t) ?? "unknown"} (${t})`).join(", ");
+    const described = running.map(t => `${t.name} (${t.processId})`).join(", ");
     throw new Error(`TeamRun's processes ${described} still run ${DesktopApplicationFixture.PROCESS_EXIT_TIMEOUT / 1000} s after it closed, so its folder ${this.root} is kept.`);
   }
 
@@ -293,6 +294,7 @@ export default class DesktopApplicationFixture {
     await expect.poll(() => this.isVisibleAsync()).toBe(true);
     await expect.poll(async () => (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.productVersion)
       .toBe(RuntimeBuild.identity.productVersion);
+    await this.recordProcessesAsync(application.process());
   }
 
   private requireProcess(): ChildProcess {
