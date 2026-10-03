@@ -39,5 +39,6 @@ test.describe("the development app", () => {
     if (process.platform === "linux")
       for (const processId of [desktop.application.process().pid ?? 0, runtime])
         expect(readlinkSync(`/proc/${processId}/exe`)).toBe(program);
+    await desktop.checkpointAsync("development-app");
   });
 });

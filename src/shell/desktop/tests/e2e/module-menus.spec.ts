@@ -127,6 +127,7 @@ test.describe("module menus", () => {
     await menu.getByRole("menuitem", { name: "Open note" }).click();
     await expect(menu).toHaveCount(0);
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/week-3\"] .tr-tab-label")).toHaveText("Meeting notes, week 3");
+    await desktop.checkpointAsync("module-menus-context");
   });
 
   test("a submenu opens the module's own place and runs its item", async ({ desktop }) => {

@@ -39,5 +39,6 @@ test.describe("the command line", () => {
     expect(tick.code, tick.error).toBe(0);
     expect(JSON.parse(tick.output)).toEqual({ ticks: 1 });
     expect(await desktop.readRuntimeProcessIdAsync()).toBeGreaterThan(0);
+    await desktop.checkpointAsync("cli-window");
   });
 });
