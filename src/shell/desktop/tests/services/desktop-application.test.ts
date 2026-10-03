@@ -90,59 +90,27 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  @TestData("win32", false, true, "icon-dark.ico", "icon-light.ico")
-  @TestData("win32", true, false, "icon-light.ico", "icon-dark.ico")
-  @TestData("linux", false, true, "icon-light-512.png", "icon-dark-512.png")
-  @TestData("linux", true, false, "icon-dark-512.png", "icon-light-512.png")
-  public async givesItsWindowTheIconForTheSystemsAppearanceAndFollowsItsChanges(
-    platform: string, isDark: boolean, isTaskbarDark: boolean, first: string, changed: string): Promise<void> {
-    const electron = new FakeElectron();
-    electron.theme.change(isDark, isTaskbarDark);
-    await DesktopApplicationTests.startReadyAsync(platform, undefined, electron);
-    const window = DesktopApplicationTests.firstWindow(electron);
+  @TestData("win32", "icon-dark.ico")
+  @TestData("linux", "icon-dark-512.png")
+  public givesItsWindowTheOneOutlinedIconWhateverTheSystemsAppearance(platform: string, icon: string): Promise<void> {
+    return DesktopApplicationTests.startReadyAsync(platform).then(electron => {
+      const window = DesktopApplicationTests.firstWindow(electron);
 
-    electron.theme.change(!isDark, !isTaskbarDark);
-
-    Assert.areEqual(DesktopApplicationTests.icon(first), window.options.icon);
-    Assert.areEqual(JSON.stringify([DesktopApplicationTests.icon(changed)]), JSON.stringify(window.icons));
-    Assert.areEqual(platform === "win32" ? DesktopApplicationTests.icon(changed) : undefined, window.appDetails?.appIconPath);
+      Assert.areEqual(DesktopApplicationTests.icon(icon), window.options.icon);
+      Assert.areEqual(platform === "win32" ? DesktopApplicationTests.icon(icon) : undefined, window.appDetails?.appIconPath);
+    });
   }
 
   @TestMethod
-  public async describesItsWindowToTheWindowsTaskbarWithTheIconForTheTaskbarsAppearance(): Promise<void> {
-    const electron = new FakeElectron();
-    electron.theme.change(false, true);
-
-    await DesktopApplicationTests.startReadyAsync("win32", undefined, electron);
-
-    Assert.areEqual(DesktopApplicationTests.icon("icon-dark.ico"), DesktopApplicationTests.firstWindow(electron).appDetails?.appIconPath);
-  }
-
-  @TestMethod
-  public async stopsFollowingTheAppearanceForAClosedWindow(): Promise<void> {
-    const electron = await DesktopApplicationTests.startReadyAsync("linux");
-    const window = DesktopApplicationTests.firstWindow(electron);
-
-    window.destroy();
-    electron.theme.change(true, true);
-
-    Assert.areEqual(0, electron.theme.count("updated"));
-    Assert.areEqual(0, window.icons.length);
-  }
-
-  @TestMethod
-  public async showsItsIconInTheDockOnMacOSAndLeavesTheWindowsIconToTheBundle(): Promise<void> {
+  public showsItsIconInTheDockOnMacOSAndLeavesTheWindowsIconToTheBundle(): Promise<void> {
     const electron = new FakeElectron();
     const dock = new FakeDockHost();
     electron.app.dock = dock;
 
-    await DesktopApplicationTests.startReadyAsync("darwin", undefined, electron);
-    electron.theme.change(true, true);
-
-    Assert.areEqual(JSON.stringify([DesktopApplicationTests.icon("icon-dock-512.png")]), JSON.stringify(dock.icons));
-    Assert.isUndefined(DesktopApplicationTests.firstWindow(electron).options.icon);
-    Assert.areEqual(0, DesktopApplicationTests.firstWindow(electron).icons.length);
-    Assert.areEqual(0, electron.theme.count("updated"));
+    return DesktopApplicationTests.startReadyAsync("darwin", undefined, electron).then(() => {
+      Assert.areEqual(JSON.stringify([DesktopApplicationTests.icon("icon-dock-512.png")]), JSON.stringify(dock.icons));
+      Assert.isUndefined(DesktopApplicationTests.firstWindow(electron).options.icon);
+    });
   }
 
   @TestMethod

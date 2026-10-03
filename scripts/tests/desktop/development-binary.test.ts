@@ -101,9 +101,9 @@ class DevelopmentBinaryTests {
         ["Electron's manifest", () => repository.writeAsync({ "node_modules/electron/package.json": "{ \"version\": \"44.5.2\" }\n" })],
         ["the product version", () => repository.writeAsync({ "package.json": DevelopmentBinaryTests.formatManifest("1.2.4") })],
         ["the product identity", () => repository.writeAsync({ "package.json": DevelopmentBinaryTests.formatManifest("1.2.4", { publisher: "Other Works" }) })],
-        ["the icon", async () => repository.writeAsync({ [`${DevelopmentBinaryTests.FIXTURE_ICONS}/icon-dark.ico`]: await readFile(path.join(DevelopmentBinaryTests.ICONS, "icon-light.ico")) })],
+        ["the icon", async () => repository.writeAsync({ [`${DevelopmentBinaryTests.FIXTURE_ICONS}/icon-dark.ico`]: Buffer.from("another icon") })],
         ["the macOS icon", async () =>
-          repository.writeAsync({ [`${DevelopmentBinaryTests.FIXTURE_ICONS}/icon-dock-512.png`]: await readFile(path.join(DevelopmentBinaryTests.ICONS, "icon-light-512.png")) })],
+          repository.writeAsync({ [`${DevelopmentBinaryTests.FIXTURE_ICONS}/icon-dock-512.png`]: await readFile(path.join(DevelopmentBinaryTests.ICONS, "icon-dark-512.png")) })],
         ["the CPU", async () => prepareAsync("arm64")],
         ["a stale stamp", () => writeFile(path.join(output, DevelopmentBinaryTests.STAMP), "stale")],
         ["a missing executable", () => rm(binary)]

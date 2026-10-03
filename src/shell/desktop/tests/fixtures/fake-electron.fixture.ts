@@ -19,7 +19,6 @@ import { FakeIpcHost } from "./fake-ipc-host.fixture.js";
 import { FakeMenuHost } from "./fake-menu-host.fixture.js";
 import { FakePermissionHost } from "./fake-permission-host.fixture.js";
 import { FakeShellHost } from "./fake-shell-host.fixture.js";
-import { FakeThemeHost } from "./fake-theme-host.fixture.js";
 
 export class FakeElectron implements IElectron {
   public readonly app: FakeApplicationHost;
@@ -30,7 +29,6 @@ export class FakeElectron implements IElectron {
   public readonly screen: FakeDisplayHost = new FakeDisplayHost();
   public readonly clipboard: FakeClipboardHost = new FakeClipboardHost();
   public readonly shell: FakeShellHost = new FakeShellHost();
-  public readonly theme: FakeThemeHost = new FakeThemeHost();
   public readonly dialog: FakeDialogHost = new FakeDialogHost();
   public readonly windows: FakeDesktopWindow[] = [];
 
