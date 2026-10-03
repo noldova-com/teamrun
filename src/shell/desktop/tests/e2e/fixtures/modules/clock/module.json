@@ -6,10 +6,11 @@
   "contributes": {
     "methods": ["clock.time", "clock.record"],
     "events": ["clock.ticked"],
-    "commands": ["clock.tick"],
+    "commands": ["clock.tick", "clock.pause"],
     "notifications": ["clock.alarm", "clock.sync"],
     "views": ["clock.face"],
     "statusBarItems": ["clock.ticks"],
-    "settings": ["clock.tickStep"]
+    "settings": ["clock.tickStep"],
+    "menus": ["clock.controls"]
   }
 }

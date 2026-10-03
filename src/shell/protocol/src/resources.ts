@@ -47,6 +47,8 @@ export class Resources {
   public static readonly iconField: string = "icon";
   public static readonly defaultKeyField: string = "defaultKey";
   public static readonly commandsField: string = "commands";
+  public static readonly isEnabledField: string = "isEnabled";
+  public static readonly isCheckedField: string = "isChecked";
   public static readonly argumentsField: string = "arguments";
   public static readonly commandsMember: string = "commands";
   public static readonly runCommandMember: string = "runCommand";
@@ -85,6 +87,7 @@ export class Resources {
   public static readonly quietDeviceInvalid: string = "A device with Do not disturb on must have an id.";
   public static readonly notificationSequenceInvalid: string = "A notification's sequence must be a whole number from 1.";
   public static readonly currentSequenceInvalid: string = "The notifications' sequence must be a whole number from 0.";
+  public static readonly commandSequenceInvalid: string = "The commands' sequence must be a whole number from 0.";
   public static readonly macPlatform: string = "darwin";
   public static readonly standardPlatform: string = "win32";
   public static readonly keySeparator: string = "+";
@@ -159,6 +162,7 @@ export class Resources {
   public static readonly setSettingMember: string = "setSetting";
   public static readonly resetSettingMember: string = "resetSetting";
   public static readonly settingsChangedMember: string = "settingsChanged";
+  public static readonly commandsChangedMember: string = "commandsChanged";
   public static readonly optionsField: string = "options";
   public static readonly minimumField: string = "minimum";
   public static readonly maximumField: string = "maximum";
