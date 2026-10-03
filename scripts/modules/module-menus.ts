@@ -20,7 +20,7 @@ export default class ModuleMenus {
   private static readonly FIELDS: readonly string[] = ["places", "groups"];
   private static readonly PLACE_FIELDS: readonly string[] = ["name", "title", "menuBar"];
   private static readonly GROUP_FIELDS: readonly string[] = ["name", "place", "exclusive", "items"];
-  private static readonly COMMAND_FIELDS: readonly string[] = ["command", "arguments"];
+  private static readonly COMMAND_FIELDS: readonly string[] = ["command", "arguments", "label"];
   private static readonly SUBMENU_FIELDS: readonly string[] = ["submenu"];
   private static readonly QUALIFIED_NAME: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.[a-z][a-zA-Z0-9]*$/;
   private static readonly MEMBER_PATTERN: RegExp = /^[a-z][a-zA-Z0-9]*$/;
@@ -116,7 +116,7 @@ export default class ModuleMenus {
   private static readItem(value: unknown, group: string, declared: readonly string[], fail: (problem: string) => ModuleException): MenuItem {
     const isSubmenu = typeof value === "object" && value !== null && "submenu" in value;
     const record = ModuleMenus.readRecord(value, isSubmenu ? ModuleMenus.SUBMENU_FIELDS : ModuleMenus.COMMAND_FIELDS, fail,
-      `must make each item of the group ${group} either a command with optional arguments or a submenu`);
+      `must make each item of the group ${group} either a command with optional arguments and label, or a submenu`);
     if (isSubmenu) {
       const submenu = record.get("submenu");
       if (typeof submenu !== "string" || !declared.includes(submenu))
@@ -129,7 +129,10 @@ export default class ModuleMenus {
     const commandArguments = record.has("arguments") ? record.get("arguments") : {};
     if (typeof commandArguments !== "object" || commandArguments === null || Array.isArray(commandArguments))
       throw fail(`must give the arguments of ${command} in the group ${group} as a JSON object`);
-    return new MenuItem(command, { ...commandArguments }, null);
+    const label = record.get("label");
+    if (record.has("label") && (typeof label !== "string" || label.trim().length === 0))
+      throw fail(`must give the label of ${command} in the group ${group} as text that is not blank`);
+    return new MenuItem(command, { ...commandArguments }, null, typeof label === "string" ? label : null);
   }
 
   private static refuseCycles(groups: readonly MenuGroup[], fail: (problem: string) => ModuleException): void {

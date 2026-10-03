@@ -81,8 +81,16 @@ export class DataDirectory {
   }
 
   public locateModuleFolder(id: string): string {
+    return path.join(this.modulesFolder, DataDirectory.requireModuleId(id));
+  }
+
+  public locateWorkFolder(id: string): string {
+    return path.join(this.workFolder, DataDirectory.requireModuleId(id));
+  }
+
+  private static requireModuleId(id: string): string {
     if (!Resources.moduleIdPattern.test(id) || id === Resources.reservedModuleId)
       throw new ArgumentException(Resources.moduleIdInvalid, Resources.idParameterName);
-    return path.join(this.modulesFolder, id);
+    return id;
   }
 }

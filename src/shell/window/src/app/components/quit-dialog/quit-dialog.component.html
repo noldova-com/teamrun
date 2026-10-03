@@ -1,0 +1,35 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (quit.question(); as question) {
+  <tr-dialog [title]="question.isWaiting ? resources.quitWaitingTitle : resources.quitTitle" (dismissed)="quit.answer(choices.Cancel)">
+    <div class="tr-quit-work" aria-live="polite">
+      <p class="tr-quit-text">{{ question.isWaiting ? resources.quitWaitingText : resources.quitText }}</p>
+      <ul class="tr-quit-list">
+        @for (description of question.shown; track $index) {
+          <li>{{ description }}</li>
+        }
+        @if (question.hiddenCount > 0) {
+          <li class="tr-quit-more">{{ resources.formatMoreWork(question.hiddenCount) }}</li>
+        }
+      </ul>
+    </div>
+    @if (!question.isWaiting) {
+      <p class="tr-quit-text">{{ resources.quitHint }}</p>
+    }
+    @if (!question.isWaiting) {
+      <button tr-button trDialogAction type="button" [attr.data-tr-quit]="choices.Wait" (click)="quit.answer(choices.Wait)">{{ resources.waitThenQuit }}</button>
+    }
+    <button tr-button trDialogAction type="button" [variant]="secondary" [attr.data-tr-quit]="choices.Stop" (click)="quit.answer(choices.Stop)">
+      {{ resources.stopWorkAndQuit }}
+    </button>
+    <button #cancel tr-button trDialogAction type="button" [variant]="secondary" [attr.data-tr-quit]="choices.Cancel" (click)="quit.answer(choices.Cancel)">
+      {{ resources.cancel }}
+    </button>
+  </tr-dialog>
+}

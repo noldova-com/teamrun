@@ -15,12 +15,16 @@ export class MenuPlace {
   public readonly name: string;
   public readonly title: string;
   public readonly isMenuBar: boolean;
+  public readonly icon: string | null;
 
-  public constructor(name: string, title: string, isMenuBar: boolean) {
+  public constructor(name: string, title: string, isMenuBar: boolean, icon: string | null = null) {
     ArgumentException.throwIfNullOrWhitespace(title, Resources.titleParameter);
+    if (!Object.isNull(icon))
+      ArgumentException.throwIfNullOrWhitespace(icon, Resources.iconParameter);
 
     this.name = QualifiedName.parse(name, Resources.nameParameter).text;
     this.title = title;
     this.isMenuBar = isMenuBar;
+    this.icon = icon;
   }
 }

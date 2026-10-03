@@ -6,6 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { mkdir } from "node:fs/promises";
+import type { Writable } from "node:stream";
+
 import "@noldova/teamrun-foundation-core";
 import { type NotificationPost, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
@@ -14,14 +17,17 @@ import { RegistrationException } from "../../exceptions/registration.exception.j
 import { ServiceAccessException } from "../../exceptions/service-access.exception.js";
 import type { IMethodHandler } from "../../interfaces/method-handler.js";
 import type { IModuleDatabase } from "../../interfaces/module-database.js";
+import type { IModuleLog } from "../../interfaces/module-log.js";
 import type { IModuleSettings } from "../../interfaces/module-settings.js";
 import type { IRuntimePartContext } from "../../interfaces/runtime-part-context.js";
 import type { EventChannel } from "../../models/event-channel.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
 import { NotificationHandle } from "../../models/notification-handle.js";
 import type { RuntimeCommand } from "../../models/runtime-command.js";
+import type { WorkItem } from "../../models/work-item.js";
 import { Resources } from "../../resources.js";
 import type { DataDirectory } from "../data-directory/data-directory.js";
+import type { DiagnosticRedactor } from "../diagnostics/diagnostic-redactor.js";
 import type { NotificationCenter } from "../notifications/notification-center.js";
 import type { NotificationPolicy } from "../notifications/notification-policy.js";
 import type { CommandRegistry } from "../registry/command-registry.js";
@@ -30,6 +36,8 @@ import type { MethodRegistry } from "../registry/method-registry.js";
 import type { ServiceRegistry } from "../registry/service-registry.js";
 import { ModuleSettings } from "../settings/module-settings.js";
 import type { SettingsService } from "../settings/settings-service.js";
+import type { WorkTracker } from "../work/work-tracker.js";
+import { ModuleLog } from "./module-log.js";
 
 export class ModuleContext implements IRuntimePartContext, Disposable {
   private readonly declaration: ModuleDeclaration;
@@ -39,11 +47,14 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
   private readonly notifications: NotificationCenter;
   private readonly notificationPolicy: NotificationPolicy;
   private readonly services: ServiceRegistry;
+  private readonly work: WorkTracker;
+  private readonly workFolder: string;
   private readonly registrations: Disposable[] = [];
   private readonly moduleDatabase?: IModuleDatabase;
 
   public readonly moduleFolder: string;
   public readonly settings: IModuleSettings;
+  public readonly log: IModuleLog;
 
   public constructor(
     declaration: ModuleDeclaration,
@@ -55,6 +66,9 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     notificationPolicy: NotificationPolicy,
     services: ServiceRegistry,
     settings: SettingsService,
+    work: WorkTracker,
+    diagnostics: Writable,
+    redactor: DiagnosticRedactor,
     database?: IModuleDatabase) {
     this.declaration = declaration;
     if (!Object.isUndefined(database))
@@ -65,8 +79,11 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     this.notifications = notifications;
     this.notificationPolicy = notificationPolicy;
     this.services = services;
+    this.work = work;
     this.moduleFolder = dataDirectory.locateModuleFolder(declaration.id);
+    this.workFolder = dataDirectory.locateWorkFolder(declaration.id);
     this.settings = new ModuleSettings(declaration, settings, this.registrations);
+    this.log = new ModuleLog(declaration.id, diagnostics, redactor);
   }
 
   public get moduleId(): string {
@@ -77,6 +94,15 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     if (Object.isUndefined(this.moduleDatabase))
       throw new ModuleDatabaseException(Resources.formatNoModuleDatabase(this.declaration.id));
     return this.moduleDatabase;
+  }
+
+  public async getWorkFolderAsync(): Promise<string> {
+    await mkdir(this.workFolder, { recursive: true });
+    return this.workFolder;
+  }
+
+  public beginWork(description: string): WorkItem {
+    return this.work.begin(description, this.declaration.id);
   }
 
   public registerMethod(name: string, handler: IMethodHandler): void {
@@ -125,6 +151,7 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     for (const registration of this.registrations.splice(0).reverse())
       registration[Symbol.dispose]();
     this.notifications.dismissOwnedBy(this.declaration.id);
+    this.work.endOwnedBy(this.declaration.id);
   }
 
   private updateNotification(id: number, post: NotificationPost): void {

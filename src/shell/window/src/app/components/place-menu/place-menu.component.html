@@ -15,7 +15,7 @@ LICENSE file in the root directory of this source tree.
       @for (row of section.rows; track $index) {
         @if (row.isSubmenu) {
           <tr-place-menu #nested [place]="row.place" [context]="context()" />
-          <button tr-menu-item class="tr-place-menu-submenu" [attr.data-submenu]="row.place" [label]="row.title" [trMenuTriggerFor]="nested.menu()"></button>
+          <button tr-menu-item class="tr-place-menu-submenu" [attr.data-submenu]="row.place" [label]="row.title" [icon]="row.icon" [trMenuTriggerFor]="nested.menu()"></button>
         } @else {
           <button tr-menu-item class="tr-place-menu-item" [attr.data-command]="row.command" [label]="row.title" [icon]="row.icon"
             [shortcut]="row.key" [checked]="row.check === menuCheck.None ? null : row.isChecked" [checkbox]="row.check === menuCheck.Checkbox"

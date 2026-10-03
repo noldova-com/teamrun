@@ -128,6 +128,10 @@ export class WindowPartContext implements IWindowPartContext {
     this.host.keepDocument(this.moduleId, name, instance);
   }
 
+  public log(message: string): void {
+    this.host.log(this.moduleId, message);
+  }
+
   public async requestAsync(method: string, parameters: JsonValue): Promise<JsonValue> {
     this.requireAllowed(method);
     return this.host.requestAsync(method, parameters);

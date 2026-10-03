@@ -6,9 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { existsSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
+import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import {
   CommandRun, type Event, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName, SettingDefinition, SettingKey, SettingLocality, SettingScope, SettingType, SettingValue
@@ -16,6 +19,7 @@ import {
 import {
   CommandRegistry,
   DataDirectory,
+  DiagnosticRedactor,
   EventRegistry,
   MethodRegistry,
   ModuleContext,
@@ -27,14 +31,18 @@ import {
   ServiceAccessException,
   ServiceRegistry,
   SettingException,
-  type SettingsService
+  type SettingsService,
+  WorkTracker
 } from "@noldova/teamrun-shell-runtime";
 
 import { SettingsFixture } from "../../fixtures/settings.fixture.js";
+import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
+import { TextOutputFixture } from "../../fixtures/text-output.fixture.js";
 
 @TestClass
 export class ModuleContextTests {
   private static readonly ROOT: string = path.resolve("teamrun-data");
+  private static readonly HOME: string = path.resolve("home", "person");
   private static readonly NOTES: ModuleDeclaration = new ModuleDeclaration(
     "notes",
     "Notes",
@@ -54,6 +62,60 @@ export class ModuleContextTests {
 
     Assert.areEqual("notes", context.moduleId);
     Assert.areEqual(path.join(ModuleContextTests.ROOT, "modules", "notes"), context.moduleFolder);
+  }
+
+  @TestMethod
+  public async writesTheModulesLinesRedactedEachStartingWithItsId(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
+    const diagnostics = new TextOutputFixture();
+    const context = ModuleContextTests.create(
+      settings.service, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), undefined, undefined, undefined, diagnostics);
+    const token = "a".repeat(40);
+
+    context.log.write(`Synced ${path.join(ModuleContextTests.HOME, "notes")}\r\nwith ${token}\n`);
+
+    Assert.areEqual(`notes: Synced ${path.join("~", "notes")}\nnotes: with [redacted]\n`, diagnostics.text);
+  }
+
+  @TestMethod
+  public async createsTheModulesWorkFolderWhenFirstAskedForIt(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const context = ModuleContextTests.create(
+      settings.service, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), undefined, undefined, undefined, undefined, folder.path);
+    const expected = path.join(folder.path, "work", "notes");
+    const before = existsSync(expected);
+
+    const first = await context.getWorkFolderAsync();
+    await writeFile(path.join(first, "draft.txt"), "kept");
+    const second = await context.getWorkFolderAsync();
+
+    Assert.isFalse(before);
+    Assert.areEqual(expected, first);
+    Assert.areEqual(expected, second);
+    Assert.areEqual("kept", await readFile(path.join(second, "draft.txt"), "utf8"));
+  }
+
+  @TestMethod
+  public async reportsTheModulesWorkAndAbortsAndEndsWhatIsStillOpenWhenDisposed(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
+    const work = new WorkTracker(() => undefined);
+    const shell = work.begin("Backing up");
+    const context = ModuleContextTests.create(
+      settings.service, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), undefined, undefined, work);
+
+    const saving = context.beginWork("Saving the notes");
+    const indexing = context.beginWork("Indexing the notes");
+    indexing[Symbol.dispose]();
+    const reported = work.descriptions.join(",");
+    Assert.throws(() => context.beginWork(" "), ArgumentException);
+    context[Symbol.dispose]();
+
+    Assert.areEqual("Backing up,Saving the notes", reported);
+    Assert.isTrue(saving.signal.aborted);
+    Assert.isFalse(indexing.signal.aborted);
+    Assert.isFalse(shell.signal.aborted);
+    Assert.areEqual("Backing up", work.descriptions.join(","));
   }
 
   @TestMethod
@@ -245,9 +307,13 @@ export class ModuleContextTests {
     events: EventRegistry,
     services: ServiceRegistry,
     commands: CommandRegistry = new CommandRegistry(),
-    notifications: NotificationCenter = new NotificationCenter(() => undefined, () => new Date())): ModuleContext {
+    notifications: NotificationCenter = new NotificationCenter(() => undefined, () => new Date()),
+    work: WorkTracker = new WorkTracker(() => undefined),
+    diagnostics: TextOutputFixture = new TextOutputFixture(),
+    root: string = ModuleContextTests.ROOT): ModuleContext {
     return new ModuleContext(
-      ModuleContextTests.NOTES, new DataDirectory(ModuleContextTests.ROOT), methods, events, commands,
-      notifications, new NotificationPolicy([ModuleContextTests.NOTES], () => true), services, settings);
+      ModuleContextTests.NOTES, new DataDirectory(root), methods, events, commands,
+      notifications, new NotificationPolicy([ModuleContextTests.NOTES], () => true), services, settings,
+      work, diagnostics, new DiagnosticRedactor(ModuleContextTests.HOME));
   }
 }

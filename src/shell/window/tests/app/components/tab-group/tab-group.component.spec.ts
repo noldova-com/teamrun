@@ -249,30 +249,53 @@ describe("TabGroupComponent", () => {
     actions?.click();
     update();
     await fixture.whenStable();
-    const menu = document.querySelector<HTMLElement>(".cdk-overlay-container .tr-tab-menu");
+    const menu = document.querySelector<HTMLElement>(".cdk-overlay-container tr-menu[data-place='shell.tab']");
     expect(menu).not.toBeNull();
     expect(menu?.getBoundingClientRect().right).toBeCloseTo(actions?.getBoundingClientRect().right ?? 0, 0);
     expect(menu?.getBoundingClientRect().top).toBeGreaterThanOrEqual(actions?.getBoundingClientRect().bottom ?? Infinity);
     actions?.click();
     update();
     await fixture.whenStable();
-    expect(document.querySelector(".cdk-overlay-container .tr-tab-menu")).toBeNull();
+    expect(document.querySelector(".cdk-overlay-container tr-menu[data-place='shell.tab']")).toBeNull();
 
     const key = new KeyboardEvent("keydown", { key: "F10", shiftKey: true, bubbles: true, cancelable: true });
     tab(0, 0).dispatchEvent(key);
     update();
     await fixture.whenStable();
-    const opened = document.querySelector<HTMLElement>(".cdk-overlay-container .tr-tab-menu");
+    const opened = document.querySelector<HTMLElement>(".cdk-overlay-container tr-menu[data-place='shell.tab']");
 
     expect(key.defaultPrevented).toBe(true);
     expect(opened?.getBoundingClientRect().top).toBeGreaterThanOrEqual(tab(0, 0).getBoundingClientRect().bottom);
     expect(opened?.getBoundingClientRect().left).toBeCloseTo(tab(0, 0).getBoundingClientRect().left, 0);
-    expect(document.activeElement?.classList.contains("tr-tab-menu-earlier")).toBe(true);
+    expect(document.activeElement?.getAttribute("data-command")).toBe("shell.moveTabLeft");
     document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, bubbles: true, cancelable: true }));
     update();
     await fixture.whenStable();
-    expect(document.querySelector(".cdk-overlay-container .tr-tab-menu")).toBeNull();
+    expect(document.querySelector(".cdk-overlay-container tr-menu[data-place='shell.tab']")).toBeNull();
     expect(document.activeElement).toBe(tab(0, 0));
+  });
+
+  it("moves a view's tab to the documents from its menu's Move to and focuses it there", async () => {
+    await renderAsync();
+    const search = tabs(1).find(t => t.getAttribute("data-tab-key") === LayoutFixture.search.key);
+
+    search?.dispatchEvent(new KeyboardEvent("keydown", { key: "F10", shiftKey: true, bubbles: true, cancelable: true }));
+    update();
+    await fixture.whenStable();
+    const moveTo = document.querySelector<HTMLButtonElement>(".cdk-overlay-container tr-menu[data-place='shell.tab'] button[data-submenu='shell.tabMoveTo']");
+    const icon = moveTo?.querySelector(".tr-menu-item-icon")?.textContent;
+    moveTo?.click();
+    update();
+    await fixture.whenStable();
+    const destinations = [...document.querySelectorAll<HTMLButtonElement>(".cdk-overlay-container tr-menu[data-place='shell.tabMoveTo'] button[tr-menu-item]")];
+    destinations.at(-1)?.click();
+    update();
+    await fixture.whenStable();
+
+    expect(icon).toBe(Resources.moveToGlyph);
+    expect(destinations.map(t => t.querySelector(".tr-menu-item-label")?.textContent)).toEqual([LayoutFixture.changes.name, Resources.documentsGroupLabel]);
+    expect(layout.layout().groupOf(LayoutFixture.search)?.isDocuments).toBe(true);
+    expect(document.activeElement?.getAttribute("data-tab-key")).toBe(LayoutFixture.search.key);
   });
 
   it("moves between tabs with the arrow keys, Home and End, and leaves an arrow with Ctrl, Cmd or Option to the commands", async () => {
