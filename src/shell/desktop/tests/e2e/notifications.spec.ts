@@ -208,7 +208,6 @@ test.describe("notifications", () => {
   });
 
   test("the progress bar of a notification in progress is visible in the list and moves, in light and in dark", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
     const colorOf = (variable: string): Promise<string> => window.evaluate(name => {
