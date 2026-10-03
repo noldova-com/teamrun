@@ -16,6 +16,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly listeners: Set<(requestId: string) => void> = new Set();
   private readonly startupListeners: Set<(state: unknown) => void> = new Set();
   private readonly eventListeners: Set<(name: string, payload: unknown) => void> = new Set();
+  private readonly menuListeners: Set<(id: string) => void> = new Set();
   private readonly openedListeners: Set<(id: number) => void> = new Set();
   private readonly quitListeners: Set<(question: unknown) => void> = new Set();
 
@@ -41,6 +42,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public readonly quitAnswers: string[] = [];
   public readonly logged: string[] = [];
   public logFolderOpened: Promise<boolean> = Promise.resolve(true);
+  public readonly menuBars: JsonObject[] = [];
 
   public constructor(platform: string) {
     this.platform = platform;
@@ -61,7 +63,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   }
 
   public get listenerCount(): number {
-    return this.listeners.size + this.startupListeners.size + this.eventListeners.size + this.openedListeners.size;
+    return this.listeners.size + this.startupListeners.size + this.eventListeners.size + this.menuListeners.size + this.openedListeners.size;
   }
 
   public get closeListenerCount(): number {
@@ -132,6 +134,20 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public openLogFolder(): Promise<boolean> {
     this.logFolderOpens++;
     return this.logFolderOpened;
+  }
+
+  public setMenuBar(menuBar: JsonObject): void {
+    this.menuBars.push(menuBar);
+  }
+
+  public onMenuCommand(listener: (id: string) => void): () => void {
+    this.menuListeners.add(listener);
+    return () => this.menuListeners.delete(listener);
+  }
+
+  public chooseMenuCommand(id: string): void {
+    for (const listener of this.menuListeners)
+      listener(id);
   }
 
   public onNotificationOpened(listener: (id: number) => void): () => void {

@@ -78,6 +78,15 @@ export class DesktopBridgeService {
     return this.bridge.onEvent((name, payload) => listener(name, JsonReader.toJsonValue(payload)));
   }
 
+  public setMenuBar(menuBar: JsonObject): void {
+    this.bridge.setMenuBar(menuBar);
+  }
+
+  public onMenuCommand(listener: (id: string) => void): () => void {
+    return this.bridge.onMenuCommand(listener);
+  }
+
+
   public async readBuildAsync(): Promise<BuildInfo> {
     return BuildInfo.fromJson(await this.bridge.readBuild());
   }

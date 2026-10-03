@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { MenuItemConstructorOptions } from "electron";
-
 import { ShellMethods } from "@noldova/teamrun-shell-protocol";
 
 export class Resources {
@@ -16,21 +14,6 @@ export class Resources {
   public static readonly appUserModelId: string = "__APPLICATION_ID__";
   public static readonly developmentAppUserModelId: string = "__DEVELOPMENT_APPLICATION_ID__";
   public static readonly checkoutHashAlgorithm: string = "sha256";
-  public static readonly macMenu: MenuItemConstructorOptions[] = [
-    { role: "appMenu" },
-    { role: "editMenu" },
-    {
-      role: "window",
-      submenu: [
-        { role: "minimize" },
-        { role: "zoom" },
-        { type: "separator" },
-        { role: "close", label: "Close Window", accelerator: "Command+Shift+W" },
-        { type: "separator" },
-        { role: "front" }
-      ]
-    }
-  ];
   public static readonly hexEncoding: "hex" = "hex";
   public static readonly checkoutHashLength: number = 8;
   public static readonly idSeparator: string = ".";
@@ -39,6 +22,8 @@ export class Resources {
   public static readonly iconPathParameter: string = "iconPath";
   public static readonly relaunchCommandParameter: string = "relaunchCommand";
   public static readonly readyChannel: string = "teamrun:ready";
+  public static readonly menuBarChannel: string = "teamrun:menuBar";
+  public static readonly menuCommandChannel: string = "teamrun:menuCommand";
   public static readonly appearanceChannel: string = "teamrun:appearance";
   public static readonly closeRequestChannel: string = "teamrun:closeRequest";
   public static readonly closeAnswerChannel: string = "teamrun:closeAnswer";
@@ -213,6 +198,32 @@ export class Resources {
   public static readonly titleBarTextField: string = "titleBarText";
   public static readonly titleBarHeightField: string = "titleBarHeight";
   public static readonly invalidAppearance: string = "The window appearance is not valid.";
+  public static readonly menusField: string = "menus";
+  public static readonly placeField: string = "place";
+  public static readonly titleField: string = "title";
+  public static readonly rowsField: string = "rows";
+  public static readonly typeField: string = "type";
+  public static readonly idField: string = "id";
+  public static readonly labelField: string = "label";
+  public static readonly keyField: string = "key";
+  public static readonly enabledField: string = "enabled";
+  public static readonly checkField: string = "check";
+  public static readonly checkedField: string = "checked";
+  public static readonly appMenu: string = "shell.app";
+  public static readonly editMenu: string = "shell.edit";
+  public static readonly windowMenu: string = "shell.window";
+  public static readonly helpMenu: string = "shell.help";
+  public static readonly commandKey: string = "Command";
+  public static readonly controlKey: string = "Control";
+  public static readonly altKey: string = "Alt";
+  public static readonly shiftKey: string = "Shift";
+  public static readonly acceleratorSeparator: string = "+";
+  public static readonly invalidMenuBar: string = "The menu bar is not valid.";
+  public static readonly speechLabel: string = "Speech";
+  public static readonly editTitle: string = "Edit";
+  public static readonly windowTitle: string = "Window";
+  public static readonly closeWindowLabel: string = "Close Window";
+  public static readonly closeWindowAccelerator: string = "Command+Shift+W";
   public static readonly invalidColor: string = "A window color is a hexadecimal color or an rgb() or rgba() color.";
   public static readonly colorPattern: RegExp = /^(?:#[0-9A-Fa-f]{3,8}|rgba?\([0-9., %/]+\))$/;
 
@@ -274,6 +285,10 @@ export class Resources {
 
   public static formatStarterFailed(failure: string): string {
     return `The runtime starter could not start the runtime: ${failure}`;
+  }
+
+  public static formatMenuBarRejected(reason: string): string {
+    return `The window sent a menu bar that is not valid, so the menu bar is unchanged: ${reason}`;
   }
 
   public static formatAppearanceRejected(reason: string): string {

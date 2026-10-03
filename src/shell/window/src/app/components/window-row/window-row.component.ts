@@ -6,20 +6,22 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, ElementRef, ErrorHandler, afterNextRender, afterRenderEffect, inject } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, afterNextRender, afterRenderEffect, effect, inject } from "@angular/core";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { AppearanceService, IconButtonComponent, OverlaySide, TooltipDirective } from "@noldova/teamrun-shell-ui";
+import { AppearanceService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OverlaySide, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
 import { WindowAppearance } from "../../models/window-appearance";
 import { BarItemsService } from "../../services/bar-items.service";
 import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
+import { MenuBarService } from "../../services/menu-bar.service";
+import { PlaceMenuComponent } from "../place-menu/place-menu.component";
 
 @Component({
   selector: "tr-window-row",
-  imports: [IconButtonComponent, TooltipDirective],
+  imports: [IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, PlaceMenuComponent, TooltipDirective],
   templateUrl: "./window-row.component.html",
   styleUrl: "./window-row.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -36,6 +38,7 @@ export class WindowRowComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly isMac: boolean = this.bridge.isMac;
   protected readonly bars: BarItemsService = inject(BarItemsService);
+  protected readonly menuBar: MenuBarService = inject(MenuBarService);
   protected readonly below: OverlaySide = OverlaySide.below;
 
   public constructor() {
@@ -50,6 +53,10 @@ export class WindowRowComponent {
         this.bridge.notifyAppearance(WindowAppearance.read(host));
       isReported = true;
     });
+    if (this.isMac) {
+      effect(() => this.bridge.setMenuBar(this.menuBar.tree()));
+      inject(DestroyRef).onDestroy(this.bridge.onMenuCommand(t => this.menuBar.run(t)));
+    }
   }
 
   protected isAvailable(command: string): boolean {

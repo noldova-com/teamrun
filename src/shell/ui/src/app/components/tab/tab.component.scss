@@ -86,9 +86,12 @@
 .tr-tab-close {
   display: grid;
   place-items: center;
+  --tr-tab-close-target: max(var(--tr-pointer-target), var(--tr-tab-action-slot));
+
   box-sizing: border-box;
-  width: var(--tr-tab-action-slot);
-  height: var(--tr-tab-action-slot);
+  width: var(--tr-tab-close-target);
+  height: var(--tr-tab-close-target);
+  margin: calc((var(--tr-tab-action-slot) - var(--tr-tab-close-target)) / 2);
   padding: 0;
   border: 0;
   background: none;

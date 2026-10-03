@@ -230,5 +230,10 @@ describe("TabComponent", () => {
       AppearanceFixture.expectRem(getComputedStyle(pill).paddingRight, 0.25, panelSize);
       AppearanceFixture.expectRem(getComputedStyle(tab()).fontSize, 0.8125, panelSize);
       AppearanceFixture.expectPixels(tab().getBoundingClientRect().height, AppearanceFixture.toPixels(2, panelSize));
+      const close = (part(".tr-tab-close") ?? tab()).getBoundingClientRect();
+      const slot = (part(".tr-tab-action") ?? tab()).getBoundingClientRect();
+      expect(Math.min(close.width, close.height)).toBeGreaterThanOrEqual(24);
+      expect([close.left + close.width / 2, close.top + close.height / 2].map(t => Math.round(t))).toEqual([slot.left + slot.width / 2, slot.top + slot.height / 2].map(t => Math.round(t)));
+      expect(close.bottom).toBeLessThanOrEqual(tab().getBoundingClientRect().bottom);
     });
 });
