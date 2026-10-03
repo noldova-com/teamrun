@@ -79,6 +79,7 @@ test.describe("notifications", () => {
   });
 
   test("Do not disturb silences the bell, lasts across a restart and is the same setting on the Notifications page", async ({ desktop }) => {
+    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await bell(window).click();
 
