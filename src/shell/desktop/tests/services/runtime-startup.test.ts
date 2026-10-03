@@ -164,6 +164,22 @@ export class RuntimeStartupTests {
   }
 
   @TestMethod
+  public async offersToTryAgainWhenReconnectingFailsUnexpectedly(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher(new FakeRuntimeConnection(), new Error("ENOENT: no such file or directory, open 'runtime.json'"));
+    const startup = this.create(launcher);
+
+    await startup.startAsync();
+    launcher.listener?.onDisconnected();
+    await setImmediate();
+    const failed = startup.current.toJson();
+    Assert.isTrue(await startup.actAsync("retry"));
+
+    Assert.areEqual(JSON.stringify({ kind: "Failed", details: ["Error: ENOENT: no such file or directory, open 'runtime.json'"] }), JSON.stringify(failed));
+    Assert.areEqual(JSON.stringify(["Connecting", "Ready", "Connecting", "Failed", "Connecting", "Ready"]), JSON.stringify(this.published));
+    Assert.areEqual(3, launcher.calls.length);
+  }
+
+  @TestMethod
   public async ignoresTheEndOfARefusedConnection(): Promise<void> {
     const launcher = new FakeRuntimeLauncher(new PreShellDataFoundException(new PreShellData("/data/old")));
     const startup = this.create(launcher);

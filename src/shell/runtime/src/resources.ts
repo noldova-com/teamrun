@@ -133,6 +133,7 @@ export class Resources {
   public static readonly declarationsFileSegments: readonly string[] = ["_build", "modules", "declarations.json"];
   public static readonly installRootSegments: readonly string[] = ["..", "..", "..", ".."];
   public static readonly utf8Encoding: BufferEncoding = "utf8";
+  public static readonly missingFileCode: string = "ENOENT";
   public static readonly lineSeparator: string = "\n";
   public static readonly lineBreakPattern: RegExp = /\r?\n/;
   public static readonly windowsPlatform: string = "win32";

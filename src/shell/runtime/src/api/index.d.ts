@@ -1207,7 +1207,7 @@ export declare class DiscoveryReader {
    *
    * @param dataDirectory The data directory.
    * @returns A promise of the metadata, or of `null` when there is no
-   * discovery file.
+   * discovery file, including one its owner withdraws while it is being read.
    * @throws {DiscoveryFormatException} The promise rejects when the file is not
    * valid JSON or not valid metadata; the message names the file.
    * @example

@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 
 import "@noldova/teamrun-foundation-core";
@@ -35,6 +36,33 @@ export class DiscoveryReaderTests {
     await using folder = await TemporaryFolderFixture.createAsync();
 
     Assert.isNull(await DiscoveryReader.readAsync(new DataDirectory(folder.path)));
+  }
+
+  @TestMethod
+  public async findsNothingOnceTheOwnerHasWithdrawnTheFile(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const directory = new DataDirectory(folder.path);
+    using lock = OwnershipLock.acquire(directory);
+    const publisher = new DiscoveryPublisher(lock, new FolderProtectorFixture());
+    const published = new RuntimeDiscovery("127.0.0.1:52000", "token", 4242, "/opt/teamrun/node", "0.0.1", 1, "build");
+    await publisher.publishAsync(published);
+    await publisher.withdrawAsync(published);
+
+    const discovery = await DiscoveryReader.readAsync(directory);
+
+    Assert.isTrue(existsSync(directory.discoveryFolder));
+    Assert.isNull(discovery);
+  }
+
+  @TestMethod
+  public async letsAFileThatCannotBeReadFail(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const directory = new DataDirectory(folder.path);
+    await mkdir(directory.discoveryFile, { recursive: true });
+
+    const error = await Assert.throwsAsync(() => DiscoveryReader.readAsync(directory), Error);
+
+    Assert.areEqual("EISDIR", (error as NodeJS.ErrnoException).code);
   }
 
   @TestMethod
