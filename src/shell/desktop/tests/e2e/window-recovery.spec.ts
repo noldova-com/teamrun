@@ -43,4 +43,5 @@ test("a window whose page stops asks with a native box, comes back when the pers
   const log = await readFile(path.join(desktop.dataDirectory, "logs", "desktop.log"), "utf8");
   expect(log).toMatch(/^\S+ The window's page stopped: (?:crashed|killed|abnormal-exit), exit code -?\d+\.\n\S+ The person chose Reload\.\n$/);
   expect(desktop.acceptFailures(/^main: \S+ The (?:window's page stopped|person chose Reload)/)).toHaveLength(2);
+  await desktop.checkpointAsync("window-recovery-reloaded");
 });

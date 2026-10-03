@@ -27,5 +27,6 @@ test.describe("module data", () => {
 
     expect([before, after]).toEqual([1, 2]);
     expect(existsSync(path.join(desktop.dataDirectory, "modules", "clock", "clock.sqlite"))).toBe(true);
+    await desktop.checkpointAsync("module-data-restarted");
   });
 });

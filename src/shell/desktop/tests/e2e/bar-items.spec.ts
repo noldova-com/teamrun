@@ -46,6 +46,7 @@ test.describe("the status bar and the top bar", () => {
       };
     });
     expect(look).toEqual({ pill: { height: "20px", padding: ["6px", "6px"], radius: "3px" }, row: { height: "35px", region: "no-drag" }, isInRow: true });
+    await desktop.checkpointAsync("bar-items");
   });
 
   test("a module that did not start shows no items, and the failures item stays at the status bar's right end", async ({ desktop }) => {

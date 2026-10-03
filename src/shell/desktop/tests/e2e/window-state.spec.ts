@@ -26,16 +26,20 @@ test.describe("window state", () => {
     ["restarted after its runtime stopped", t => t.restartAsync()]
   ];
 
-  for (const [name, openAgainAsync] of openings)
-    test(`TeamRun ${name} opens its window where the person left it`, async ({ desktop }) => {
-      await desktop.application.evaluate(({ BrowserWindow }, bounds) => BrowserWindow.getAllWindows()[0]?.setBounds(bounds), moved);
-      await expect.poll(() => readBounds(desktop)).toEqual(moved);
+  test.describe("where the person left the window", () => {
+    test.use({ desktopWindowPlacement: true });
 
-      await openAgainAsync(desktop);
+    for (const [name, openAgainAsync] of openings)
+      test(`TeamRun ${name} opens its window where the person left it`, async ({ desktop }) => {
+        await desktop.application.evaluate(({ BrowserWindow }, bounds) => BrowserWindow.getAllWindows()[0]?.setBounds(bounds), moved);
+        await expect.poll(() => readBounds(desktop)).toEqual(moved);
 
-      await expect.poll(() => desktop.isVisibleAsync()).toBe(true);
-      expect(await readBounds(desktop)).toEqual(moved);
-    });
+        await openAgainAsync(desktop);
+
+        await expect.poll(() => desktop.isVisibleAsync()).toBe(true);
+        expect(await readBounds(desktop)).toEqual(moved);
+      });
+  });
 
   test("the window's layout outlives a restart, kept through the bridge", async ({ desktop }) => {
     await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
@@ -46,5 +50,6 @@ test.describe("window state", () => {
 
     await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
     expect(await readLayout(desktop)).toEqual({ payload: layout });
+    await desktop.checkpointAsync("window-state-restarted");
   });
 });
