@@ -75,6 +75,9 @@ contextBridge.exposeInMainWorld("teamrun", {
   keepAppearance(preferences: unknown): void {
     ipcRenderer.send("teamrun:keepAppearance", preferences);
   },
+  edit(action: string): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:edit", action) as Promise<boolean>;
+  },
   setMenuBar(menuBar: unknown): void {
     ipcRenderer.send("teamrun:menuBar", menuBar);
   },

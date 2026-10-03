@@ -1274,6 +1274,20 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async editsItsOwnWindowWithTheSixEditActionsOnly(): Promise<void> {
+    const electron = await DesktopApplicationTests.startReadyAsync("linux");
+    const trusted = DesktopApplicationTests.trustedEvent("linux");
+    const window = DesktopApplicationTests.firstWindow(electron);
+
+    const answers = ["undo", "redo", "cut", "copy", "paste", "selectAll", "reload", 5].map(t => electron.ipcMain.invoke("teamrun:edit", trusted, t));
+    const refused = electron.ipcMain.invoke("teamrun:edit", { sender: { id: 1 }, senderFrame: null }, "copy");
+
+    Assert.areEqual(JSON.stringify([true, true, true, true, true, true, false, false]), JSON.stringify(answers));
+    Assert.areEqual(false, refused);
+    Assert.areEqual(JSON.stringify(["undo", "redo", "cut", "copy", "paste", "selectAll"]), JSON.stringify(window.webContents.calls));
+  }
+
+  @TestMethod
   public async opensTheLogFolderForItsOwnWindowAndCreatesItFirst(): Promise<void> {
     const data = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
     try {
@@ -1284,7 +1298,7 @@ export class DesktopApplicationTests {
       const refused = await (electron.ipcMain.invoke("teamrun:openLogFolder", { sender: { id: 1 }, senderFrame: null }) as Promise<boolean>);
       const isOpened = await (electron.ipcMain.invoke("teamrun:openLogFolder", DesktopApplicationTests.trustedEvent("linux")) as Promise<boolean>);
 
-      Assert.isFalse(refused);
+      Assert.areEqual(false, refused);
       Assert.isTrue(isOpened);
       Assert.isTrue((await stat(join(data, "logs"))).isDirectory());
       Assert.areEqual(JSON.stringify([join(data, "logs")]), JSON.stringify(electron.shell.opened));

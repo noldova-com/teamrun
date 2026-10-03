@@ -24,6 +24,7 @@ export class Resources {
   public static readonly readyChannel: string = "teamrun:ready";
   public static readonly menuBarChannel: string = "teamrun:menuBar";
   public static readonly menuCommandChannel: string = "teamrun:menuCommand";
+  public static readonly editChannel: string = "teamrun:edit";
   public static readonly appearanceChannel: string = "teamrun:appearance";
   public static readonly closeRequestChannel: string = "teamrun:closeRequest";
   public static readonly closeAnswerChannel: string = "teamrun:closeAnswer";
