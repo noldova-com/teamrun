@@ -453,6 +453,14 @@ describe("WindowPartHostService", () => {
     expect(layout.layout().documents.preview).toBeNull();
   });
 
+  it("writes a window part's log lines through the desktop under its module's id", async () => {
+    const part = new FakeWindowPart("notes", log, t => t.log("Opened the list"));
+    const { host } = start([source("notes", part)], [status("notes")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    expect(bridge.logged).toEqual(["notes: Opened the list"]);
+  });
+
   it("reports a layout that cannot load and still opens the documents asked for", async () => {
     const { layout } = start([source("notes", notesPart(log))], [status("notes")]);
     vi.spyOn(TestBed.inject(LayoutStoreService), "readAsync").mockRejectedValue(new Error("The layout could not be read."));

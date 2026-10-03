@@ -81,6 +81,7 @@ describe("TabContentComponent", () => {
     onEvent: () => () => undefined,
     openDocument: () => undefined,
     keepDocument: () => undefined,
+    log: () => undefined,
     isCommandRegistered: () => false,
     runCommandAsync: () => Promise.resolve(null),
     postNotificationAsync: () => Promise.resolve(1),

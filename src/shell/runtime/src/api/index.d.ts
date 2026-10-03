@@ -14,7 +14,7 @@ import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-ex
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type {
   BuildIdentity, CommandInfo, CommandList, Event, Failure, FailureCode, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, QualifiedName, Response,
-  RunningWork, RuntimeHandover, SettingChange, SettingDefinition, SettingKey, SettingScope, SettingValue, SettingsSnapshot, StopPolicy
+  RunningWork, RuntimeHandover, SettingChange, SettingDefinition, SettingKey, SettingScope, SettingValue, SettingsSnapshot, StopPolicy, WorkReport
 } from "@noldova/teamrun-shell-protocol";
 
 /**
@@ -630,6 +630,24 @@ export declare class DataDirectory {
   public locateModuleFolder(id: string): string;
 
   /**
+   * Returns the path of a module's folder for work outside any project,
+   * `work/<id>`.
+   *
+   * @param id The module's id: lowercase kebab-case and not `shell`.
+   * @returns The folder's path; the folder is not created.
+   * @throws {ArgumentException} When the id is not a module id.
+   * @example
+   * ```ts
+   * import type { DataDirectory } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function locateChatWork(directory: DataDirectory): string {
+   *   return directory.locateWorkFolder("chat");
+   * }
+   * ```
+   */
+  public locateWorkFolder(id: string): string;
+
+  /**
    * Returns the path of a module's database, `modules/<id>/<id>.sqlite`.
    *
    * @param id The module's id: lowercase kebab-case and not `shell`.
@@ -1038,6 +1056,78 @@ export declare class DiagnosticRedactor {
    * ```
    */
   public redact(text: string): string;
+}
+
+/**
+ * A log file whose size is bounded. Each record is stamped with its time and redacted, and the file becomes the
+ * previous file, replacing it, when a record would take it over its size limit.
+ */
+export declare class LogFile {
+  /**
+   * Creates the log file, which is not opened yet.
+   *
+   * @param file The file to write.
+   * @param previousFile The file the log becomes when it is opened again or reaches its size limit.
+   * @param redactor Redacts every record.
+   * @param now Returns the time to stamp a record with; the current time by default.
+   * @param limit The most bytes the file holds, 1 MiB by default. A record is cut to a quarter of it.
+   * @example
+   * ```ts
+   * import { homedir } from "node:os";
+   *
+   * import { DiagnosticRedactor, LogFile } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const log: LogFile = new LogFile("/data/logs/app.log", "/data/logs/app.previous.log", new DiagnosticRedactor(homedir()));
+   * ```
+   */
+  public constructor(file: string, previousFile: string, redactor: DiagnosticRedactor, now?: () => Date, limit?: number);
+
+  /**
+   * Stamps and redacts a record.
+   *
+   * @param text The record, possibly of several lines, without its line ending.
+   * @returns The line to write: the time, the redacted record, cut to a quarter of the size limit in bytes at a character boundary, and a line ending.
+   * @example
+   * ```ts
+   * import type { LogFile } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function line(log: LogFile): string {
+   *   return log.format("The runtime started.");
+   * }
+   * ```
+   */
+  public format(text: string): string;
+
+  /**
+   * Starts an empty file. The existing file, if there is one, becomes the previous file, replacing it. When it cannot, the failure is thrown and the existing file keeps what it holds.
+   *
+   * @throws {Error} Thrown when the existing file cannot become the previous file or the file cannot be written.
+   * @example
+   * ```ts
+   * import type { LogFile } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function start(log: LogFile): void {
+   *   log.open();
+   * }
+   * ```
+   */
+  public open(): void;
+
+  /**
+   * Appends a line. When it would take the file over its size limit, the file first becomes the previous file.
+   *
+   * @param line The line from {@link LogFile.format}.
+   * @throws {Error} Thrown when the file cannot become the previous file, in which case it keeps what it holds, or cannot be written.
+   * @example
+   * ```ts
+   * import type { LogFile } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function note(log: LogFile): void {
+   *   log.append(log.format("The runtime started."));
+   * }
+   * ```
+   */
+  public append(line: string): void;
 }
 
 /**
@@ -2020,6 +2110,28 @@ export interface IModuleSettings {
 }
 
 /**
+ * A module's lines in the runtime's log.
+ */
+export interface IModuleLog {
+  /**
+   * Writes a message to `logs/runtime.log`, each of its lines starting with
+   * the module's id, with the home folder shown as `~` and opaque values such
+   * as tokens removed.
+   *
+   * @param message The message.
+   * @example
+   * ```ts
+   * import type { IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function report(context: IRuntimePartContext, count: number): void {
+   *   context.log.write(`Indexed ${count} files.`);
+   * }
+   * ```
+   */
+  write(message: string): void;
+}
+
+/**
  * What a module's runtime part may register and use. The runtime withdraws
  * everything registered through it when the part deactivates or fails to
  * activate.
@@ -2051,6 +2163,52 @@ export interface IRuntimePartContext {
    * shell's.
    */
   readonly settings: IModuleSettings;
+
+  /**
+   * The module's lines in the runtime's log.
+   */
+  readonly log: IModuleLog;
+
+  /**
+   * The module's folder in the data directory's `work` folder,
+   * `work/<id>`, for work outside any project; the module creates and
+   * removes what it puts inside.
+   *
+   * @returns A promise of the folder, created when it is first asked for.
+   * @example
+   * ```ts
+   * import path from "node:path";
+   *
+   * import type { IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function locateScratchAsync(context: IRuntimePartContext, conversation: string): Promise<string> {
+   *   return path.join(await context.getWorkFolderAsync(), conversation);
+   * }
+   * ```
+   */
+  getWorkFolderAsync(): Promise<string>;
+
+  /**
+   * Reports work in progress, which the runtime lists in `shell.work` and
+   * which keeps it from stopping while idle. TeamRun asks the person before
+   * quitting while it runs.
+   *
+   * @param description What the work is, as the person reads it.
+   * @returns The work item: its signal aborts when the person stops the
+   * work, and disposing it ends the work. Work still open ends when the part
+   * deactivates.
+   * @throws {ArgumentException} When the description is empty or whitespace.
+   * @example
+   * ```ts
+   * import type { IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function indexAsync(context: IRuntimePartContext, index: (signal: AbortSignal) => Promise<void>): Promise<void> {
+   *   using work = context.beginWork("Indexing the project");
+   *   await index(work.signal);
+   * }
+   * ```
+   */
+  beginWork(description: string): WorkItem;
 
   /**
    * Registers a handler for one of the methods the module's declaration
@@ -3153,21 +3311,23 @@ export declare class ChildProcessStarter implements IProcessStarter {
 }
 
 /**
- * The running runtime's log, `logs/runtime.log`. Opening it under ownership keeps the previous run's log as `logs/runtime.previous.log` and removes the start logs that launchers left behind.
+ * The running runtime's log, `logs/runtime.log`. Every line is stamped with its time and redacted, and the log is a {@link LogFile}: it stays within its size limit by becoming `logs/runtime.previous.log` when it fills. Opening it under ownership keeps the previous run's log as `logs/runtime.previous.log` and removes the start logs that launchers left behind.
  */
 export declare class RuntimeLog {
   /**
-   * The stream the runtime writes its diagnostics to; it writes to the log until the log closes.
+   * The stream the runtime writes its diagnostics to; each write is one record, stamped and redacted like a line, without its trailing line ending. It writes to the log until the log closes.
    */
   public readonly diagnostics: Writable;
 
   private constructor();
 
   /**
-   * Opens a new log. The current log becomes the previous one, replacing it; when that fails the new log starts anyway. Start logs other than the runtime's own are removed, and those that cannot be removed are left.
+   * Opens a new log. The current log becomes the previous one, replacing it; when that fails the open is rejected and the current log keeps what it holds. Start logs other than the runtime's own are removed, and those that cannot be removed are left.
    *
    * @param lock The held ownership of the data directory.
    * @param ownStartLogName The start log of the launcher that started this runtime, which is kept, or `null`.
+   * @param now Returns the time to stamp a line with; the current time by default.
+   * @param error Receives the report when the log can no longer be written; standard error by default.
    * @returns A promise of the open log.
    * @throws {OwnershipReleasedException} Rejected when the ownership was released.
    * @example
@@ -3181,10 +3341,10 @@ export declare class RuntimeLog {
    * }
    * ```
    */
-  public static openAsync(lock: OwnershipLock, ownStartLogName: string | null): Promise<RuntimeLog>;
+  public static openAsync(lock: OwnershipLock, ownStartLogName: string | null, now?: () => Date, error?: Writable): Promise<RuntimeLog>;
 
   /**
-   * Writes one line at once, as when the process is about to end; nothing is written after the log closes.
+   * Writes one line at once, as when the process is about to end; nothing is written after the log closes. When a line cannot be written, the failure is reported once on the error stream and nothing more is written to the log.
    *
    * @param text The line, without its line ending.
    * @example
@@ -3640,18 +3800,25 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * @param services The registry its services join.
    * @param settings The shell's settings, which the module reads and writes
    * within its rights.
+   * @param work The runtime's work in progress, which the module's work joins.
+   * @param diagnostics The runtime's log, which the module's lines join.
+   * @param redactor Removes the home folder and opaque values from the module's lines.
    * @param database The module's open database, when its runtime part declares migrations.
    * @example
    * ```ts
+   * import { homedir } from "node:os";
+   *
    * import {
-   *   CommandRegistry, DataDirectory, EventRegistry, MethodRegistry, ModuleContext, ModuleDeclaration, NotificationCenter, NotificationPolicy, ServiceRegistry, type SettingsService
+   *   CommandRegistry, DataDirectory, DiagnosticRedactor, EventRegistry, MethodRegistry, ModuleContext, ModuleDeclaration, NotificationCenter, NotificationPolicy, ServiceRegistry,
+   *   type SettingsService, WorkTracker
    * } from "@noldova/teamrun-shell-runtime";
    *
    * export function createContext(events: EventRegistry, settings: SettingsService): ModuleContext {
    *   const notes = new ModuleDeclaration("notes", "Notes", [], null, new Map());
    *   return new ModuleContext(
    *     notes, new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(),
-   *     new NotificationCenter(() => undefined, () => new Date()), new NotificationPolicy([notes], () => true), new ServiceRegistry(), settings);
+   *     new NotificationCenter(() => undefined, () => new Date()), new NotificationPolicy([notes], () => true), new ServiceRegistry(), settings,
+   *     new WorkTracker(() => undefined), process.stderr, new DiagnosticRedactor(homedir()));
    * }
    * ```
    */
@@ -3665,6 +3832,9 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
     notificationPolicy: NotificationPolicy,
     services: ServiceRegistry,
     settings: SettingsService,
+    work: WorkTracker,
+    diagnostics: Writable,
+    redactor: DiagnosticRedactor,
     database?: IModuleDatabase);
 
   /**
@@ -3683,6 +3853,43 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * The module's access to settings.
    */
   public readonly settings: IModuleSettings;
+
+  /**
+   * The module's lines in the runtime's log.
+   */
+  public readonly log: IModuleLog;
+
+  /**
+   * See {@link IRuntimePartContext.getWorkFolderAsync}.
+   *
+   * @returns A promise of the module's folder in `work`, created when it is first asked for.
+   * @example
+   * ```ts
+   * import type { ModuleContext } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function prepareAsync(context: ModuleContext): Promise<string> {
+   *   return context.getWorkFolderAsync();
+   * }
+   * ```
+   */
+  public getWorkFolderAsync(): Promise<string>;
+
+  /**
+   * See {@link IRuntimePartContext.beginWork}.
+   *
+   * @param description What the work is, as the person reads it.
+   * @returns The work item.
+   * @throws {ArgumentException} When the description is empty or whitespace.
+   * @example
+   * ```ts
+   * import type { ModuleContext, WorkItem } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function beginIndexing(context: ModuleContext): WorkItem {
+   *   return context.beginWork("Indexing the project");
+   * }
+   * ```
+   */
+  public beginWork(description: string): WorkItem;
 
   /**
    * See {@link IRuntimePartContext.registerMethod}.
@@ -3794,7 +4001,8 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
   public getService<T extends object>(name: string, type: abstract new (...args: never[]) => T): T;
 
   /**
-   * Withdraws everything registered through the context, newest first.
+   * Withdraws everything registered through the context, newest first,
+   * dismisses the module's notifications, and aborts and ends its work.
    *
    * @example
    * ```ts
@@ -4052,15 +4260,23 @@ export declare class ModuleHost {
    * @param notifications The runtime's notifications; a module's are dismissed when it deactivates.
    * @param loader Loads runtime parts.
    * @param diagnostics Receives the full error of each part that cannot be
-   * loaded, activated or deactivated, which the module statuses leave out.
+   * loaded, activated or deactivated, which the module statuses leave out,
+   * and the lines the modules log.
+   * @param work The runtime's work in progress; a module's is aborted and ended when it deactivates.
+   * @param redactor Removes the home folder and opaque values from the lines the modules log.
    * @example
    * ```ts
-   * import { CommandRegistry, DataDirectory, type EventRegistry, MethodRegistry, ModuleHost, NotificationCenter, PackageRuntimePartLoader } from "@noldova/teamrun-shell-runtime";
+   * import { homedir } from "node:os";
+   *
+   * import {
+   *   CommandRegistry, DataDirectory, DiagnosticRedactor, type EventRegistry, MethodRegistry, ModuleHost, NotificationCenter, PackageRuntimePartLoader, WorkTracker
+   * } from "@noldova/teamrun-shell-runtime";
    *
    * export function createHost(events: EventRegistry): ModuleHost {
    *   return new ModuleHost(
    *     [], new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(),
-   *     new NotificationCenter(() => undefined, () => new Date()), new PackageRuntimePartLoader(), process.stderr);
+   *     new NotificationCenter(() => undefined, () => new Date()), new PackageRuntimePartLoader(), process.stderr,
+   *     new WorkTracker(() => undefined), new DiagnosticRedactor(homedir()));
    * }
    * ```
    */
@@ -4072,7 +4288,9 @@ export declare class ModuleHost {
     commands: CommandRegistry,
     notifications: NotificationCenter,
     loader: IRuntimePartLoader,
-    diagnostics: Writable);
+    diagnostics: Writable,
+    work: WorkTracker,
+    redactor: DiagnosticRedactor);
 
   /**
    * Where every module stands, in activation order, as `shell.modules`
@@ -4553,6 +4771,68 @@ export declare class NotificationCenter {
 }
 
 /**
+ * The notification settings in effect: which devices have Do not disturb on and which modules are muted. Before the
+ * shell's database is open there are no settings, and it reports none.
+ */
+export declare class NotificationSettings {
+  /**
+   * Creates it over the settings.
+   *
+   * @param settings The shell's settings, or `null` while the shell's database is not open.
+   * @example
+   * ```ts
+   * import { NotificationSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const none: NotificationSettings = new NotificationSettings(null);
+   * ```
+   */
+  public constructor(settings: SettingsService | null);
+
+  /**
+   * The devices with `shell.doNotDisturb` stored as on, sorted.
+   */
+  public get quietDevices(): readonly string[];
+
+  /**
+   * The modules `shell.mutedModules` names, which still post into the list but show no toast or operating system
+   * notification.
+   */
+  public get mutedModules(): readonly string[];
+
+  /**
+   * Tells whether Do not disturb is on for a device.
+   *
+   * @param device The device's id.
+   * @returns `true` when the device's `shell.doNotDisturb` is on.
+   * @example
+   * ```ts
+   * import type { NotificationSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function shouldShow(settings: NotificationSettings, device: string): boolean {
+   *   return !settings.isQuiet(device);
+   * }
+   * ```
+   */
+  public isQuiet(device: string): boolean;
+
+  /**
+   * Tells whether a setting changes the notification state, so the runtime republishes it.
+   *
+   * @param name The setting's name.
+   * @returns `true` for `shell.doNotDisturb` and `shell.mutedModules`.
+   * @example
+   * ```ts
+   * import type { NotificationSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function affectsNotifications(settings: NotificationSettings): boolean {
+   *   return settings.isNotificationSetting("shell.mutedModules");
+   * }
+   * ```
+   */
+  public isNotificationSetting(name: string): boolean;
+}
+
+/**
  * The rules a notification follows before the runtime holds it.
  */
 export declare class NotificationPolicy {
@@ -4790,9 +5070,16 @@ export declare class WorkTracker {
   public get descriptions(): readonly string[];
 
   /**
+   * The work in progress as `shell.work` reports it, with its sequence: how
+   * many times work has begun or ended.
+   */
+  public get report(): WorkReport;
+
+  /**
    * Begins work.
    *
    * @param description What the work is, as shown to the person.
+   * @param owner The module whose work it is, or empty for the shell's own.
    * @returns The work item; disposing it ends the work.
    * @throws {ArgumentException} When the description is empty or whitespace.
    * @example
@@ -4800,7 +5087,7 @@ export declare class WorkTracker {
    * import type { WorkTracker } from "@noldova/teamrun-shell-runtime";
    *
    * export async function indexAsync(work: WorkTracker, index: (signal: AbortSignal) => Promise<void>): Promise<void> {
-   *   const item = work.begin("Indexing the project");
+   *   const item = work.begin("Indexing the project", "notes");
    *   try {
    *     await index(item.signal);
    *   }
@@ -4810,7 +5097,7 @@ export declare class WorkTracker {
    * }
    * ```
    */
-  public begin(description: string): WorkItem;
+  public begin(description: string, owner?: string): WorkItem;
 
   /**
    * Asks all work in progress to stop by aborting each item's signal.
@@ -4824,6 +5111,22 @@ export declare class WorkTracker {
    * ```
    */
   public cancelAll(): void;
+
+  /**
+   * Aborts and ends every item a module owns, as its runtime part
+   * deactivates.
+   *
+   * @param owner The module's id.
+   * @example
+   * ```ts
+   * import type { WorkTracker } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function endNotesWork(work: WorkTracker): void {
+   *   work.endOwnedBy("notes");
+   * }
+   * ```
+   */
+  public endOwnedBy(owner: string): void;
 }
 
 /**

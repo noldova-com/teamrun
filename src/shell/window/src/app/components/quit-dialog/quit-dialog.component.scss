@@ -1,0 +1,21 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.tr-quit-text {
+  margin: 0 0 var(--tr-space-2);
+}
+
+.tr-quit-list {
+  margin: 0 0 var(--tr-space-2);
+  padding-inline-start: var(--tr-space-6);
+}
+
+.tr-quit-more {
+  color: var(--tr-text-muted);
+  list-style: none;
+}

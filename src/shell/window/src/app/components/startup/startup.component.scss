@@ -21,7 +21,7 @@
   flex-direction: column;
   gap: var(--tr-space-2);
   box-sizing: border-box;
-  width: min(100%, 27.5rem);
+  width: min(100%, var(--tr-dialog-width));
   padding: var(--tr-space-6);
   border: var(--tr-border-width) solid var(--tr-card-border);
   border-radius: var(--tr-radius-large);

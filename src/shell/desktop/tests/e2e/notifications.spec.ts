@@ -32,6 +32,13 @@ async function tickWithFocusAsync(desktop: DesktopApplicationFixture): Promise<v
   await desktop.window.keyboard.press("ControlOrMeta+Alt+KeyT");
 }
 
+async function openNotificationsPageAsync(window: Page): Promise<void> {
+  await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
+  await window.keyboard.press("ControlOrMeta+Comma");
+  await window.locator("tr-settings").getByRole("button", { name: "Notifications", exact: true }).click();
+  await expect(window.locator("tr-setting-row[data-setting=\"shell.mutedModules\"]")).toBeVisible();
+}
+
 test.describe("notifications", () => {
   test("the bell counts the modules' notifications and its list shows them newest first, marking them read", async ({ desktop }) => {
     const window = desktop.window;
@@ -71,7 +78,7 @@ test.describe("notifications", () => {
     await expect(list(window).getByRole("button", { name: "Clear all" })).toBeDisabled();
   });
 
-  test("Do not disturb silences the bell and lasts across a restart", async ({ desktop }) => {
+  test("Do not disturb silences the bell, lasts across a restart and is the same setting on the Notifications page", async ({ desktop }) => {
     const window = desktop.window;
     await bell(window).click();
 
@@ -83,6 +90,32 @@ test.describe("notifications", () => {
     await expect(bell(desktop.window)).toHaveAttribute("aria-label", /, Do not disturb$/);
     await bell(desktop.window).click();
     await expect(list(desktop.window).getByRole("checkbox", { name: "Do not disturb" })).toBeChecked();
+    await desktop.window.keyboard.press("Escape");
+    await openNotificationsPageAsync(desktop.window);
+    const setting = desktop.window.locator("tr-setting-row[data-setting=\"shell.doNotDisturb\"]").getByRole("checkbox");
+    await expect(setting).toBeChecked();
+    await setting.uncheck();
+    await expect(bell(desktop.window).locator(".tr-notifications-icon")).toHaveText("notifications");
+  });
+
+  test("a module whose notifications are turned off on the Notifications page still adds them to the list, without a toast or a count", async ({ desktop }) => {
+    const window = desktop.window;
+    const toasts = window.locator(".tr-toast");
+    const modules = window.locator("tr-setting-row[data-setting=\"shell.mutedModules\"]");
+    await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
+    await openNotificationsPageAsync(window);
+    await expect(modules.locator(".tr-checkbox-text")).toHaveText(["Clock notifications", "Notes notifications"]);
+    await expect(modules.getByRole("checkbox", { name: "Clock notifications" })).toBeChecked();
+    await desktop.checkpointAsync("settings-notifications");
+
+    await modules.getByRole("checkbox", { name: "Clock notifications" }).uncheck();
+    await expect(bell(window).locator(".tr-notifications-count")).toHaveText("1");
+    await tickWithFocusAsync(desktop);
+    await bell(window).click();
+
+    await expect(list(window).locator(".tr-notifications-row-title").first()).toHaveText("The clock ticked");
+    await expect(toasts).toHaveCount(0);
+    await expect(modules.getByRole("checkbox", { name: "Clock notifications" })).not.toBeChecked();
   });
 
   test("a notification posted after startup shows a toast that is announced and closes by itself, and Do not disturb holds the next one back", async ({ desktop }) => {
@@ -106,7 +139,6 @@ test.describe("notifications", () => {
   });
 
   test("a toast follows the component table, never takes focus and closes on Close", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
     await tickWithFocusAsync(desktop);
@@ -138,7 +170,6 @@ test.describe("notifications", () => {
   });
 
   test("the bell and its list follow the component table", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
 
@@ -160,7 +191,7 @@ test.describe("notifications", () => {
         width: style.width, padding: style.paddingTop, border: style.borderTopWidth, borderColor: style.borderTopColor, radius: style.borderTopLeftRadius,
         background: style.backgroundColor, hasShadow: style.boxShadow !== "none",
         errorIcon: getComputedStyle(t.querySelector(".tr-notifications-row[data-severity=Error] .tr-notifications-severity") as Element).color,
-        checkbox: getComputedStyle(t.querySelector(".tr-notifications-quiet-box") as Element).width
+        checkbox: getComputedStyle(t.querySelector(".tr-notifications-quiet .tr-checkbox-box") as Element).width
       };
     });
     const [placed, anchor] = await Promise.all([list(window), bell(window)].map(t => t.evaluate(u => u.getBoundingClientRect().toJSON() as Record<string, number>)));

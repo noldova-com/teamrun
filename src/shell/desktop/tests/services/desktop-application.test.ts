@@ -381,6 +381,8 @@ export class DesktopApplicationTests {
 
     window.close();
     window.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
+    await setImmediate();
     const [request] = DesktopApplicationTests.closeRequests(window);
 
     Assert.areEqual(1, DesktopApplicationTests.closeRequests(window).length);
@@ -396,13 +398,142 @@ export class DesktopApplicationTests {
     const window = DesktopApplicationTests.firstWindow(electron);
 
     window.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
     electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], false);
     await setImmediate();
     window.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 2);
 
     Assert.isFalse(window.isGone);
     Assert.areEqual(2, DesktopApplicationTests.closeRequests(window).length);
     window.destroy();
+  }
+
+  @TestMethod
+  public async asksItsWindowBeforeQuittingWithWorkInProgressAndQuitsOnceItHasFinished(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    const launcher = new FakeRuntimeLauncher(connection);
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    window.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 1);
+    const untrusted = electron.ipcMain.invoke("teamrun:quitAnswer", { ...event, senderFrame: null }, "Wait");
+    const waiting = electron.ipcMain.invoke("teamrun:quitAnswer", event, "Wait");
+    launcher.listener?.onEvent(new Event(ShellEvents.work, { descriptions: ["Indexing the project", "Saving the notes"], sequence: 2 }));
+    launcher.listener?.onEvent(new Event(ShellEvents.work, { descriptions: "Saving" }));
+    const requestsWhileWorking = DesktopApplicationTests.closeRequests(window).length;
+    launcher.listener?.onEvent(new Event(ShellEvents.work, { descriptions: [], sequence: 3 }));
+    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
+    electron.ipcMain.invoke("teamrun:closeAnswer", event, DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    await Condition.waitAsync(() => window.isGone);
+
+    Assert.areEqual("false,true,0", [untrusted, waiting, requestsWhileWorking].join(","));
+    Assert.areEqual(JSON.stringify([
+      { descriptions: ["Indexing the project"], isWaiting: false },
+      { descriptions: ["Indexing the project"], isWaiting: true },
+      { descriptions: ["Indexing the project", "Saving the notes"], isWaiting: true },
+      null
+    ]), JSON.stringify(DesktopApplicationTests.quitQuestions(window)));
+    Assert.areEqual(2000, connection.timeouts[connection.calls.indexOf("shell.work")]);
+    Assert.isFalse(connection.calls.includes("shell.stop"));
+  }
+
+  @TestMethod
+  public async stopsTheWorkOnceItsWindowHasSavedWhenThePersonChoosesToAndStaysWhenTheyCancel(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    connection.answers.set("shell.stop", Response.failure("r", new Failure(FailureCode.Conflict, "The runtime is already stopping.")));
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    window.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 1);
+    electron.ipcMain.invoke("teamrun:quitAnswer", event, "Cancel");
+    await setImmediate();
+    const isOpenAfterCancelling = !window.isGone && DesktopApplicationTests.closeRequests(window).length === 0;
+    window.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 3);
+    electron.ipcMain.invoke("teamrun:quitAnswer", event, "Stop");
+    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
+    const stoppedBeforeSaving = connection.calls.includes("shell.stop");
+    electron.ipcMain.invoke("teamrun:closeAnswer", event, DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    await Condition.waitAsync(() => window.isGone);
+
+    Assert.isTrue(isOpenAfterCancelling);
+    Assert.isFalse(stoppedBeforeSaving);
+    Assert.areEqual("{\"policy\":\"StopWork\"}", JSON.stringify(connection.payloads[connection.calls.indexOf("shell.stop")]));
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's work could not be stopped: The runtime is already stopping.").length);
+  }
+
+  @TestMethod
+  public async quitsWithoutAskingWhenTheWorkCannotBeReadInTimeOrTheRuntimeLeavesWhileItAsks(): Promise<void> {
+    const slow = new FakeRuntimeConnection();
+    slow.deferred.set("shell.work", () => Promise.reject(new ConnectionException("The runtime did not answer shell.work in time.")));
+    const process = new FakeDesktopProcess("linux");
+    const unanswered = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(slow), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const busy = new FakeRuntimeConnection();
+    busy.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    const launcher = new FakeRuntimeLauncher(busy, new Promise<FakeRuntimeConnection>(() => undefined));
+    const leaving = await DesktopApplicationTests.startReadyAsync("linux", launcher);
+    const first = DesktopApplicationTests.firstWindow(unanswered);
+    const second = DesktopApplicationTests.firstWindow(leaving);
+
+    first.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(first).length === 1);
+    second.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(second).length === 1);
+    launcher.listener?.onDisconnected();
+    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(second).length === 1);
+
+    Assert.areEqual(0, DesktopApplicationTests.quitQuestions(first).length);
+    Assert.areEqual(2000, slow.timeouts[slow.calls.indexOf("shell.work")]);
+    Assert.areEqual(
+      1,
+      DesktopApplicationTests.readErrors(process, "The runtime's work could not be read before quitting, so TeamRun quits without asking: ConnectionException: The runtime did not answer shell.work in time.").length);
+    Assert.areEqual("null", JSON.stringify(DesktopApplicationTests.quitQuestions(second).at(-1)));
+    first.destroy();
+    second.destroy();
+  }
+
+  @TestMethod
+  public async quitsWithoutAskingWhileNoRuntimeIsConnectedOrWhenItsWorkCannotBeRead(): Promise<void> {
+    const connecting = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new Promise<FakeRuntimeConnection>(() => undefined)));
+    const failing = new FakeRuntimeConnection();
+    failing.answers.set("shell.work", Response.failure("r", new Failure(FailureCode.Internal, "The runtime is stopping.")));
+    const refused = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(failing));
+    const first = DesktopApplicationTests.firstWindow(connecting);
+    const second = DesktopApplicationTests.firstWindow(refused);
+
+    first.close();
+    second.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(first).length === 1 && DesktopApplicationTests.closeRequests(second).length === 1);
+
+    Assert.areEqual(0, DesktopApplicationTests.quitQuestions(first).length + DesktopApplicationTests.quitQuestions(second).length);
+    Assert.isTrue(failing.calls.includes("shell.work"));
+    first.destroy();
+    second.destroy();
+  }
+
+  @TestMethod
+  public async writesItsOwnWindowsModuleLinesToItsLogUnderTheModulesId(): Promise<void> {
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    electron.ipcMain.send("teamrun:moduleLog", event, "notes", "Opened the list\r\nwith 3 notes\n");
+    electron.ipcMain.send("teamrun:moduleLog", { ...event, senderFrame: null }, "notes", "Untrusted");
+    electron.ipcMain.send("teamrun:moduleLog", event, "Notes", "Not an id");
+    electron.ipcMain.send("teamrun:moduleLog", event, 7, "Not text");
+    electron.ipcMain.send("teamrun:moduleLog", event, "notes", 7);
+    electron.ipcMain.send("teamrun:moduleLog", event, "notes", "x".repeat(65_537));
+
+    Assert.areEqual(JSON.stringify(["notes: Opened the list", "notes: with 3 notes"]), JSON.stringify(process.errors.split("\n").filter(t => t.includes("notes: ")).map(t => t.slice(t.indexOf("notes: ")))));
+    Assert.areEqual(0, process.errors.split("\n").filter(t => t.includes("Untrusted") || t.includes("Not ")).length);
   }
 
   @TestMethod
@@ -895,10 +1026,9 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async addsItsOwnDeviceToItsWindowsNotificationRequestsAndRefusesAnInvalidSwitch(): Promise<void> {
+  public async addsItsOwnDeviceToItsWindowsNotificationReadsAndRefusesTheirDoNotDisturbSwitch(): Promise<void> {
     const connection = new FakeRuntimeConnection();
-    connection.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: true, sequence: 2 }));
-    connection.answers.set("shell.setDoNotDisturb", Response.success("r", null));
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: true, mutedModules: ["notes"], sequence: 2 }));
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopApplicationTests.trustedEvent("linux");
     const unidentified = new FakeDeviceIdentity();
@@ -907,15 +1037,12 @@ export class DesktopApplicationTests {
 
     const state = await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
     const quiet = await DesktopApplicationTests.requestAsync(electron, event, "shell.setDoNotDisturb", { isOn: true });
-    const invalid = await DesktopApplicationTests.requestAsync(electron, event, "shell.setDoNotDisturb", { isOn: "yes" });
     const noDevice = await DesktopApplicationTests.requestAsync(lost, event, "shell.notifications", {});
 
     const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).filter(t => t.startsWith("shell.notifications") || t.startsWith("shell.setDoNotDisturb"));
-    Assert.areEqual(
-      JSON.stringify([`shell.notifications {"device":"${FakeDeviceIdentity.ID}"}`, `shell.setDoNotDisturb {"device":"${FakeDeviceIdentity.ID}","isOn":true}`]),
-      JSON.stringify(sent));
-    Assert.areEqual("{\"notifications\":[],\"isDoNotDisturb\":true,\"sequence\":2}|null", `${JSON.stringify(state.payload)}|${JSON.stringify(quiet.payload)}`);
-    Assert.areEqual(FailureCode.InvalidParams, invalid.failure?.code);
+    Assert.areEqual(JSON.stringify([`shell.notifications {"device":"${FakeDeviceIdentity.ID}"}`]), JSON.stringify(sent));
+    Assert.areEqual("{\"notifications\":[],\"isDoNotDisturb\":true,\"mutedModules\":[\"notes\"],\"sequence\":2}", JSON.stringify(state.payload));
+    Assert.areEqual(FailureCode.Unauthorized, quiet.failure?.code);
     Assert.areEqual(FailureCode.Unavailable, noDevice.failure?.code);
   }
 
@@ -931,7 +1058,7 @@ export class DesktopApplicationTests {
     const lostLauncher = new FakeRuntimeLauncher();
     const lost = await DesktopApplicationTests.startReadyAsync("linux", lostLauncher, new FakeElectron(), unidentified);
     await DesktopApplicationTests.invokeAsync(lost, "teamrun:readLayout", DesktopApplicationTests.trustedEvent("linux"));
-    const broadcast = (devices: readonly string[]): Event => new Event(ShellEvents.notifications, new NotificationBroadcast([], devices, 4).toJson());
+    const broadcast = (devices: readonly string[]): Event => new Event(ShellEvents.notifications, new NotificationBroadcast([], devices, ["notes"], 4).toJson());
 
     launcher.listener?.onEvent(broadcast([FakeDeviceIdentity.ID, "desk"]));
     launcher.listener?.onEvent(broadcast(["desk"]));
@@ -940,12 +1067,12 @@ export class DesktopApplicationTests {
 
     Assert.areEqual(
       JSON.stringify([
-        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: true, sequence: 4 }],
-        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false, sequence: 4 }]
+        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: true, mutedModules: ["notes"], sequence: 4 }],
+        ["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false, mutedModules: ["notes"], sequence: 4 }]
       ]),
       JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
     Assert.areEqual(
-      JSON.stringify([["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false, sequence: 4 }]]),
+      JSON.stringify([["teamrun:runtimeEvent", "shell.notifications", { notifications: [], isDoNotDisturb: false, mutedModules: ["notes"], sequence: 4 }]]),
       JSON.stringify(DesktopApplicationTests.firstWindow(lost).webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.notifications could not be passed to the window").length);
   }
@@ -954,17 +1081,17 @@ export class DesktopApplicationTests {
   public async showsTheOperatingSystemANotificationPostedAfterItsWindowsReadWhileNoWindowIsFocusedAndOpensItInTheWindow(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const early = DesktopApplicationTests.wireNotification(1, "Early");
-    connection.answers.set("shell.notifications", Response.success("r", { notifications: [early], isDoNotDisturb: false, sequence: 1 }));
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [early], isDoNotDisturb: false, mutedModules: [], sequence: 1 }));
     const launcher = new FakeRuntimeLauncher(connection);
     const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher);
     const window = DesktopApplicationTests.firstWindow(electron);
     const later = DesktopApplicationTests.wireNotification(2, "Later");
 
-    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [early], quietDevices: [], sequence: 1 }));
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [early], quietDevices: [], mutedModules: [], sequence: 1 }));
     await DesktopApplicationTests.requestAsync(electron, DesktopApplicationTests.trustedEvent("linux"), "shell.notifications", {});
-    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [later, early], quietDevices: [], sequence: 2 }));
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [later, early], quietDevices: [], mutedModules: [], sequence: 2 }));
     window.isFocusedNow = true;
-    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(3, "Focused"), later, early], quietDevices: [], sequence: 3 }));
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(3, "Focused"), later, early], quietDevices: [], mutedModules: [], sequence: 3 }));
     window.isMinimizedNow = true;
     electron.notifications.created[0]?.click();
 
@@ -978,7 +1105,7 @@ export class DesktopApplicationTests {
   public async holdsTheOperatingSystemsNotificationsWhileItsWindowReloadsUntilTheWindowReadsAgain(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const alarm = DesktopApplicationTests.wireNotification(1, "Alarm");
-    connection.answers.set("shell.notifications", Response.success("r", { notifications: [alarm], isDoNotDisturb: false, sequence: 1 }));
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [alarm], isDoNotDisturb: false, mutedModules: [], sequence: 1 }));
     const launcher = new FakeRuntimeLauncher(connection);
     const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher);
     const window = DesktopApplicationTests.firstWindow(electron);
@@ -987,11 +1114,11 @@ export class DesktopApplicationTests {
     const reposted = DesktopApplicationTests.wireNotification(2, "Re-posted by the window");
 
     window.webContents.startLoading();
-    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [reposted, alarm], quietDevices: [], sequence: 2 }));
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [reposted, alarm], quietDevices: [], mutedModules: [], sequence: 2 }));
     const whileLoading = electron.notifications.created.length;
-    connection.answers.set("shell.notifications", Response.success("r", { notifications: [reposted, alarm], isDoNotDisturb: false, sequence: 2 }));
+    connection.answers.set("shell.notifications", Response.success("r", { notifications: [reposted, alarm], isDoNotDisturb: false, mutedModules: [], sequence: 2 }));
     await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
-    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(3, "Posted after"), reposted, alarm], quietDevices: [], sequence: 3 }));
+    launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(3, "Posted after"), reposted, alarm], quietDevices: [], mutedModules: [], sequence: 3 }));
 
     Assert.areEqual(0, whileLoading);
     Assert.areEqual("Posted after", electron.notifications.created.map(t => t.title).join(","));
@@ -1013,7 +1140,7 @@ export class DesktopApplicationTests {
     const lostLauncher = new FakeRuntimeLauncher(new FakeRuntimeConnection());
     const lost = await DesktopApplicationTests.startReadyAsync("linux", lostLauncher, new FakeElectron(), unidentified);
     const event = DesktopApplicationTests.trustedEvent("linux");
-    const posted = new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(1, "Alarm")], quietDevices: [], sequence: 1 });
+    const posted = new Event(ShellEvents.notifications, { notifications: [DesktopApplicationTests.wireNotification(1, "Alarm")], quietDevices: [], mutedModules: [], sequence: 1 });
 
     await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
     await DesktopApplicationTests.requestAsync(lost, event, "shell.notifications", {});
@@ -1021,7 +1148,7 @@ export class DesktopApplicationTests {
     lostLauncher.listener?.onEvent(posted);
     first.answers.set("shell.notifications", Response.success("r", { notifications: [] }));
     await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
-    first.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: false, sequence: 1 }));
+    first.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: false, mutedModules: [], sequence: 1 }));
     await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
     launcher.listener?.onDisconnected();
     reconnect(second);
@@ -1103,6 +1230,7 @@ export class DesktopApplicationTests {
     window.bounds = { x: 300, y: 150, width: 1100, height: 750 };
 
     window.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
     electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
     await Condition.waitAsync(() => window.isGone);
 
@@ -1117,9 +1245,13 @@ export class DesktopApplicationTests {
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const window = DesktopApplicationTests.firstWindow(electron);
     await Condition.waitAsync(() => connection.calls.length > 0);
-    connection.onCall = () => window.destroy();
+    connection.onCall = () => {
+      if (connection.calls.at(-1) === "shell.writeWindowBounds")
+        window.destroy();
+    };
 
     window.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
     electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
     await Condition.waitAsync(() => window.isGone);
     await setImmediate();
@@ -1137,6 +1269,7 @@ export class DesktopApplicationTests {
     connection.isFailing = true;
 
     window.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
     electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
     await Condition.waitAsync(() => window.isGone);
 
@@ -1434,6 +1567,10 @@ export class DesktopApplicationTests {
 
   private static closeRequests(window: FakeDesktopWindow): unknown[][] {
     return window.webContents.sent.filter(t => t[0] === "teamrun:closeRequest");
+  }
+
+  private static quitQuestions(window: FakeDesktopWindow): unknown[] {
+    return window.webContents.sent.filter(t => t[0] === "teamrun:quitQuestion").map(t => t[1]);
   }
 
   private static checkoutRoot(): string {

@@ -67,7 +67,6 @@ async function thumbChangesOnHoverAsync(window: Page, area: Locator, axis: "vert
 
 test.describe("the window's look", () => {
   test("tabs stop at 16rem and show a cut title in full in a tooltip below, but not a whole one", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     const long = window.locator(`${documentsGroup} tr-tab[aria-label="${architectureTitle}"]`);
     const short = window.locator(`${documentsGroup} tr-tab[aria-label="Bugs"]`);
@@ -87,10 +86,10 @@ test.describe("the window's look", () => {
     await short.hover();
     await expect(tooltip(window)).toHaveCount(0);
     expect(await short.locator(".tr-tab-label").evaluate(t => t.scrollWidth <= t.clientWidth)).toBe(true);
+    await desktop.checkpointAsync("window-look-tabs");
   });
 
   test("a collapsed dock names its views in tooltips beside its strip", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     await window.locator("tr-tab-group[data-side=Left] .tr-tab-group-hide").click();
     const strip = window.locator(".tr-dock-strip").first();
@@ -104,7 +103,6 @@ test.describe("the window's look", () => {
   });
 
   test("scroll areas have 0.375rem scrollbars whose thumb shows only while hovered, without moving their content", async ({ desktop }) => {
-    await desktop.useSuiteViewportAsync();
     const window = desktop.window;
     const content = window.locator(`${documentsGroup} tr-tab-content`);
     const scroller = window.locator(`${documentsGroup} .tr-tab-group-scroller`);
@@ -125,7 +123,7 @@ test.describe("the window's look", () => {
     await desktop.useViewportAsync(900, 700);
     const window = desktop.window;
     await window.locator(`${documentsGroup} tr-tab[aria-label="${architectureTitle}"]`).click();
-    const heading = window.locator(`${documentsGroup} h1`);
+    const heading = window.locator(`${documentsGroup} h1`, { hasText: architectureTitle });
     await expect(heading).toHaveText(architectureTitle);
 
     const lines = await heading.evaluate(t => {

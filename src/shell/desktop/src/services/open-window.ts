@@ -8,16 +8,21 @@
 
 import "@noldova/teamrun-foundation-core";
 
+import { QuitOutcome } from "../enums/quit-outcome.js";
 import { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
+import type { ICloseGuard } from "../interfaces/i-close-guard.js";
 import type { IDesktopLog } from "../interfaces/i-desktop-log.js";
 import type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
 import type { IDisplayHost } from "../interfaces/i-display-host.js";
+import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
+import type { QuitQuestion } from "../models/quit-question.js";
 import { Resources } from "../resources.js";
 import { CloseCoordinator } from "./close-coordinator.js";
 import { WindowBoundsKeeper } from "./window-bounds-keeper.js";
 
-export class OpenWindow {
+export class OpenWindow implements IQuitPrompt {
   private readonly log: IDesktopLog;
+  private readonly guard: ICloseGuard;
   private closing: Promise<void> | null = null;
   private canClose: boolean = false;
   private isPainted: boolean = false;
@@ -29,9 +34,10 @@ export class OpenWindow {
   public readonly coordinator: CloseCoordinator;
   public readonly bounds: WindowBoundsKeeper;
 
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog) {
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog, guard: ICloseGuard) {
     this.window = window;
     this.log = log;
+    this.guard = guard;
     this.coordinator = new CloseCoordinator(t => this.sendCloseRequest(t), Resources.closeAnswerTimeout);
     this.bounds = new WindowBoundsKeeper(window, displays, Resources.boundsSaveDelay, log);
     window.on(Resources.closeEvent, event => {
@@ -97,14 +103,24 @@ export class OpenWindow {
       this.window.show();
   }
 
+  public show(question: QuitQuestion | null): boolean {
+    if (this.window.isDestroyed() || this.window.webContents.isCrashed())
+      return false;
+    this.window.webContents.send(Resources.quitQuestionChannel, question?.toJson() ?? null);
+    return true;
+  }
+
   private async closeWhenSavedAsync(): Promise<void> {
-    const canClose = await this.coordinator.requestAsync();
+    const outcome = await this.guard.confirmAsync(this);
+    const canClose = outcome !== QuitOutcome.Stay && await this.coordinator.requestAsync();
     this.closing = null;
     if (!canClose || this.window.isDestroyed())
       return;
     await this.bounds.saveAsync().catch((error: unknown) => this.log.write(error instanceof WindowStateUnavailableException
       ? Resources.formatBoundsLostAtClose(error.message)
       : Resources.formatBoundsUnsaved(String(error))));
+    if (outcome === QuitOutcome.StopWork)
+      await this.guard.stopWorkAsync();
     if (this.window.isDestroyed())
       return;
     this.canClose = true;

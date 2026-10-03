@@ -14,6 +14,10 @@ function note(window: Page, week: number): Locator {
   return window.locator(".tr-notes-list-item", { hasText: new RegExp(`^Meeting notes, week ${week}$`) });
 }
 
+function noteView(window: Page, instance: string): Locator {
+  return window.locator("tr-notes-note", { has: window.locator(`[data-fixture-content="notes-note-${instance}"]`) });
+}
+
 function place(window: Page, name: string): Locator {
   return window.locator(`.cdk-overlay-container tr-menu[data-place="${name}"]`);
 }
@@ -72,8 +76,8 @@ test.describe("the menu bar on Windows and Linux", () => {
   test("the Edit menu copies from one field and pastes into another, acting on the field that had focus and its selection", async ({ desktop }) => {
     const window = desktop.window;
     await window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]").click();
-    const tag = window.getByRole("textbox", { name: "Tag" });
-    const summary = window.getByRole("textbox", { name: "Summary" });
+    const tag = noteView(window, "1").getByRole("textbox", { name: "Tag" });
+    const summary = noteView(window, "1").getByRole("textbox", { name: "Summary" });
     await tag.selectText();
 
     await (await openBarMenuAsync(window, "Edit")).getByRole("menuitem", { name: "Copy" }).click();
@@ -125,6 +129,7 @@ test.describe("module menus", () => {
     await menu.getByRole("menuitem", { name: "Open note" }).click();
     await expect(menu).toHaveCount(0);
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/week-3\"] .tr-tab-label")).toHaveText("Meeting notes, week 3");
+    await desktop.checkpointAsync("module-menus-context");
   });
 
   test("a submenu opens the module's own place and runs its item", async ({ desktop }) => {
@@ -160,5 +165,25 @@ test.describe("module menus", () => {
     await expect(menu.getByRole("menuitemradio", { name: "Sort by week" })).toHaveAttribute("aria-checked", "false");
     await expect(menu.getByRole("menuitemcheckbox", { name: "Wrap lines" })).toHaveAttribute("aria-checked", "true");
     await expect(menu.locator(".tr-menu-item-check")).toHaveCount(2);
+  });
+});
+
+test.describe("a note's fields", () => {
+  test("are found in the clicked note's view, never in the view it replaces while the window has not rendered the switch", async ({ desktop }) => {
+    const window = desktop.window;
+    const tag = noteView(window, "1").getByRole("textbox", { name: "Tag" });
+    await expect(noteView(window, "2")).toBeVisible();
+    await window.clock.install();
+    await window.clock.pauseAt(Date.now() + 1000);
+
+    await window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]").click();
+    await expect(noteView(window, "2").getByRole("textbox", { name: "Tag" })).toBeAttached();
+    await expect(tag).toHaveCount(0);
+    const selecting = tag.selectText();
+    await window.clock.resume();
+    await selecting;
+
+    await expect(noteView(window, "2")).toHaveCount(0);
+    expect(await tag.evaluate(t => [(t as HTMLInputElement).selectionStart, (t as HTMLInputElement).selectionEnd])).toEqual([0, 5]);
   });
 });

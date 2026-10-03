@@ -15,7 +15,7 @@ import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import {
-  BuildIdentity, CommandList, CommandRun, DoNotDisturbChange, Event, FailureCode, ModuleStatusList, NotificationBroadcast, NotificationPost, NotificationReference, NotificationSeverity,
+  BuildIdentity, CommandList, CommandRun, Event, FailureCode, ModuleStatusList, NotificationBroadcast, NotificationPost, NotificationReference, NotificationSeverity,
   NotificationState, NotificationUpdate, NotificationsQuery, QualifiedName, Request, Response, SettingKey, SettingValue, SettingsQuery, SettingsSnapshot, ShellMethods, StopPolicy, StopRequest,
   WindowStateKey, WindowStateWrite, WireDecoder
 } from "@noldova/teamrun-shell-protocol";
@@ -110,13 +110,17 @@ export class RuntimeHostTests {
       connection.sendMessages(new Request("cli:1", ShellMethods.work, null));
       const idle = await connection.readTextAsync();
       const work = host.work.begin("Indexing the project");
+      const began = await connection.readTextAsync();
       connection.sendMessages(new Request("cli:2", ShellMethods.work, null));
       const busy = await connection.readTextAsync();
       work[Symbol.dispose]();
+      const ended = await connection.readTextAsync();
       connection.sendMessages(new Request("cli:3", ShellMethods.stop, new StopRequest(StopPolicy.IfIdle).toJson()));
 
-      Assert.areEqual("{\"kind\":\"Response\",\"id\":\"cli:1\",\"payload\":{\"descriptions\":[]}}", idle);
-      Assert.areEqual("{\"kind\":\"Response\",\"id\":\"cli:2\",\"payload\":{\"descriptions\":[\"Indexing the project\"]}}", busy);
+      Assert.areEqual("{\"kind\":\"Response\",\"id\":\"cli:1\",\"payload\":{\"descriptions\":[],\"sequence\":0}}", idle);
+      Assert.areEqual("{\"kind\":\"Event\",\"name\":\"shell.work\",\"payload\":{\"descriptions\":[\"Indexing the project\"],\"sequence\":1}}", began);
+      Assert.areEqual("{\"kind\":\"Response\",\"id\":\"cli:2\",\"payload\":{\"descriptions\":[\"Indexing the project\"],\"sequence\":1}}", busy);
+      Assert.areEqual("{\"kind\":\"Event\",\"name\":\"shell.work\",\"payload\":{\"descriptions\":[],\"sequence\":2}}", ended);
       Assert.isFalse(work.signal.aborted);
       Assert.areEqual("request", await host.waitForStopAsync());
     });
@@ -274,7 +278,7 @@ export class RuntimeHostTests {
       host.requestStop("test");
       await host.waitForStopAsync();
 
-      Assert.areEqual("The module notes failed.\n", await readFile(fixture.dataDirectory.runtimeLog, "utf8"));
+      Assert.isTrue(/^\S+Z The module notes failed\.\n$/.test(await readFile(fixture.dataDirectory.runtimeLog, "utf8")));
     });
   }
 
@@ -307,7 +311,28 @@ export class RuntimeHostTests {
         "{\"modules\":[{\"id\":\"notes\",\"state\":\"Active\"},{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its runtime part could not be loaded.\"}]}",
         JSON.stringify(ModuleStatusList.fromJson(responses[1]?.payload).toJson()));
       Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "deactivated")));
-      Assert.isTrue((await readFile(fixture.dataDirectory.runtimeLog, "utf8")).startsWith("The module broken: Its runtime part could not be loaded.\nError [ERR_MODULE_NOT_FOUND]"));
+      Assert.isTrue(/^\S+Z The module broken: Its runtime part could not be loaded\.\nError \[ERR_MODULE_NOT_FOUND\]/.test(await readFile(fixture.dataDirectory.runtimeLog, "utf8")));
+    });
+  }
+
+  @TestMethod
+  public reportsAModulesWorkAndStopsItOnlyWhenAskedToStopTheWork(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["clock", RuntimeHostTests.createWorkPart()]]));
+      const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+
+      connection.sendMessages(new Request("desktop:1", ShellMethods.runCommand, new CommandRun(QualifiedName.parse("clock.tick"), null).toJson()));
+      const began = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      const refused = await RuntimeHostTests.callAsync(connection, "desktop:2", ShellMethods.stop, new StopRequest(StopPolicy.IfIdle).toJson());
+      connection.sendMessages(new Request("desktop:3", ShellMethods.stop, new StopRequest(StopPolicy.StopWork).toJson()));
+      const ended = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      await host.waitForStopAsync();
+
+      Assert.areEqual("shell.work|{\"descriptions\":[\"Ticking\"],\"sequence\":1}|null", `${began[0].name.text}|${JSON.stringify(began[0].payload)}|${JSON.stringify(began[1].payload)}`);
+      Assert.areEqual(`${FailureCode.Conflict}|{"descriptions":["Ticking"]}`, `${refused.failure?.code}|${JSON.stringify(refused.failure?.details)}`);
+      Assert.areEqual("shell.work|{\"descriptions\":[],\"sequence\":2}|null", `${ended[0].name.text}|${JSON.stringify(ended[0].payload)}|${JSON.stringify(ended[1].payload)}`);
+      Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateWorkFolder("clock"), "aborted")));
+      Assert.isTrue((await readFile(fixture.dataDirectory.runtimeLog, "utf8")).includes("clock: Ticking began\n"));
     });
   }
 
@@ -393,36 +418,42 @@ export class RuntimeHostTests {
   }
 
   @TestMethod
-  public keepsDoNotDisturbPerDeviceAcrossARestartAndMarksReadAndClears(): Promise<void> {
+  public followsDoNotDisturbAndMutedModulesFromTheSettingsAcrossARestartAndMarksReadAndClears(): Promise<void> {
     return RuntimeHostTests.runAsync(async fixture => {
       const declarations = await fixture.writeModulesAsync([["clock", RuntimeHostTests.createNotificationPart()]]);
       const first = await fixture.startAsync(30_000, declarations);
       const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      const doNotDisturb = (device: string): SettingKey => new SettingKey(QualifiedName.parse("shell.doNotDisturb"), null, device);
 
-      connection.sendMessages(new Request("desktop:1", ShellMethods.setDoNotDisturb, new DoNotDisturbChange("laptop", true).toJson()));
-      const quiet = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
-      connection.sendMessages(new Request("desktop:2", ShellMethods.markNotificationsRead, null));
+      connection.sendMessages(new Request("desktop:1", ShellMethods.setSetting, new SettingValue(doNotDisturb("laptop"), true).toJson()));
+      const quiet = [await connection.readEventAsync(), await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      connection.sendMessages(new Request("desktop:2", ShellMethods.setSetting, new SettingValue(new SettingKey(QualifiedName.parse("shell.mutedModules")), ["clock"]).toJson()));
+      const muted = [await connection.readEventAsync(), await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      connection.sendMessages(new Request("desktop:3", ShellMethods.setSetting, new SettingValue(new SettingKey(QualifiedName.parse("shell.panelSize"), null, "laptop"), 14).toJson()));
+      const unrelated = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
+      connection.sendMessages(new Request("desktop:4", ShellMethods.markNotificationsRead, null));
       const read = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
-      connection.sendMessages(new Request("desktop:3", ShellMethods.clearNotifications, null));
+      connection.sendMessages(new Request("desktop:5", ShellMethods.clearNotifications, null));
       const cleared = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
       first.requestStop("test");
       await first.waitForStopAsync();
       const second = await fixture.startAsync(30_000, declarations);
       const [again] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
-      const laptop = await RuntimeHostTests.callAsync(again, "desktop:4", ShellMethods.notifications, new NotificationsQuery("laptop").toJson());
-      const desk = await RuntimeHostTests.callAsync(again, "desktop:5", ShellMethods.notifications, new NotificationsQuery("desk").toJson());
-      const invalid = await RuntimeHostTests.callAsync(again, "desktop:6", ShellMethods.setDoNotDisturb, { isOn: true });
-      again.sendMessages(new Request("desktop:7", ShellMethods.setDoNotDisturb, new DoNotDisturbChange("laptop", false).toJson()));
-      const loud = [await again.readEventAsync(), await again.readResponseAsync()] as const;
+      const laptop = await RuntimeHostTests.callAsync(again, "desktop:6", ShellMethods.notifications, new NotificationsQuery("laptop").toJson());
+      const desk = await RuntimeHostTests.callAsync(again, "desktop:7", ShellMethods.notifications, new NotificationsQuery("desk").toJson());
+      again.sendMessages(new Request("desktop:8", ShellMethods.resetSetting, doNotDisturb("laptop").toJson()));
+      const loud = [await again.readEventAsync(), await again.readEventAsync(), await again.readResponseAsync()] as const;
       second.requestStop("test");
       await second.waitForStopAsync();
 
-      Assert.areEqual("laptop|null", `${NotificationBroadcast.fromJson(quiet[0].payload).quietDevices.join(",")}|${JSON.stringify(quiet[1].payload)}`);
-      Assert.areEqual("true", NotificationBroadcast.fromJson(read[0].payload).notifications.map(t => String(t.isRead)).join(","));
-      Assert.areEqual("0", String(NotificationBroadcast.fromJson(cleared[0].payload).notifications.length));
-      Assert.areEqual("true,false", [NotificationState.fromJson(laptop.payload).isDoNotDisturb, NotificationState.fromJson(desk.payload).isDoNotDisturb].join(","));
-      Assert.areEqual("|null", `${NotificationBroadcast.fromJson(loud[0].payload).quietDevices.join(",")}|${JSON.stringify(loud[1].payload)}`);
-      Assert.areEqual(FailureCode.InvalidParams, invalid.failure?.code);
+      const broadcast = (event: Event): NotificationBroadcast => NotificationBroadcast.fromJson(event.payload);
+      Assert.areEqual("shell.settingsChanged|laptop||null", `${quiet[0].name.text}|${broadcast(quiet[1]).quietDevices.join(",")}|${broadcast(quiet[1]).mutedModules.join(",")}|${JSON.stringify(quiet[2].payload)}`);
+      Assert.areEqual("laptop|clock", `${broadcast(muted[1]).quietDevices.join(",")}|${broadcast(muted[1]).mutedModules.join(",")}`);
+      Assert.areEqual("shell.settingsChanged|null", `${unrelated[0].name.text}|${JSON.stringify(unrelated[1].payload)}`);
+      Assert.areEqual("true", broadcast(read[0]).notifications.map(t => String(t.isRead)).join(","));
+      Assert.areEqual("0", String(broadcast(cleared[0]).notifications.length));
+      Assert.areEqual("true|clock,false|clock", [laptop, desk].map(t => NotificationState.fromJson(t.payload)).map(t => `${String(t.isDoNotDisturb)}|${t.mutedModules.join(",")}`).join(","));
+      Assert.areEqual("|clock", `${broadcast(loud[1]).quietDevices.join(",")}|${broadcast(loud[1]).mutedModules.join(",")}`);
     });
   }
 
@@ -495,8 +526,9 @@ export class RuntimeHostTests {
         new Request("desktop:5", ShellMethods.setSetting, new SettingValue(mode, "Blue").toJson()),
         new Request("desktop:6", ShellMethods.setSetting, new SettingValue(new SettingKey(QualifiedName.parse("shell.speed")), 1).toJson()),
         new Request("desktop:7", ShellMethods.resetSetting, new SettingKey(QualifiedName.parse("shell.doNotDisturb")).toJson()));
-      const [responses, events] = await RuntimeHostTests.readMessagesAsync(connection, 10);
+      const [responses, events] = await RuntimeHostTests.readMessagesAsync(connection, 11);
       const snapshot = SettingsSnapshot.fromJson(responses.get("desktop:3")?.payload);
+      const changes = events.filter(t => t.name.text === "shell.settingsChanged");
       const entry = (name: string): string => JSON.stringify(snapshot.entries.find(t => t.name.text === name)?.toJson());
 
       Assert.isTrue(["desktop:1", "desktop:2", "desktop:4"].every(t => responses.get(t)?.hasFailed === false));
@@ -509,8 +541,8 @@ export class RuntimeHostTests {
         "{\"name\":\"shell.mode\",\"value\":\"Dark\",\"isSet\":true}",
         "{\"name\":\"shell.doNotDisturb\",\"device\":\"d1\",\"value\":true,\"isSet\":true}",
         "{\"name\":\"shell.mode\",\"value\":\"System\",\"isSet\":false}"
-      ]), JSON.stringify(events.map(t => JSON.stringify(t.payload))));
-      Assert.isTrue(events.every(t => t.name.text === "shell.settingsChanged"));
+      ]), JSON.stringify(changes.map(t => JSON.stringify(t.payload))));
+      Assert.areEqual("shell.settingsChanged,shell.settingsChanged,shell.notifications,shell.settingsChanged", events.map(t => t.name.text).join(","));
     });
   }
 
@@ -574,6 +606,35 @@ export class RuntimeHostTests {
       "    } }, false);",
       "    context.registerCommand(tick);",
       "    context.registerCommand(pause);",
+      "  }",
+      "",
+      "  async deactivateAsync() {",
+      "  }",
+      "}",
+      ""
+    ].join("\n");
+  }
+
+  private static createWorkPart(): string {
+    const api = pathToFileURL(path.join(path.dirname(RuntimeEntry.entryPath), "..", "api", "index.js")).href;
+    return [
+      "import { writeFileSync } from \"node:fs\";",
+      "import path from \"node:path\";",
+      "",
+      `import { RuntimeCommand } from ${JSON.stringify(api)};`,
+      "",
+      "export class RuntimePart {",
+      "  async activateAsync(context) {",
+      "    context.registerCommand(new RuntimeCommand(\"clock.tick\", \"Tick\", \"timer\", \"Mod+Alt+T\", { handleAsync: async () => {",
+      "      const folder = await context.getWorkFolderAsync();",
+      "      const work = context.beginWork(\"Ticking\");",
+      "      context.log.write(\"Ticking began\");",
+      "      work.signal.addEventListener(\"abort\", () => {",
+      "        writeFileSync(path.join(folder, \"aborted\"), \"\");",
+      "        work[Symbol.dispose]();",
+      "      });",
+      "      return null;",
+      "    } }));",
       "  }",
       "",
       "  async deactivateAsync() {",

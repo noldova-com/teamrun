@@ -23,6 +23,7 @@ test.describe("restarting", () => {
     expect(await readLaunch()).toEqual(before);
     expect(before[1]).toBe("restart");
     await expect(desktop.window.locator("tr-empty-window")).toHaveText(/TeamRun\s*No modules/);
+    await desktop.checkpointAsync("restart-reopened");
   });
 
   test("TeamRun reopened within the runtime's idle grace attaches to the runtime still running", async ({ desktop }) => {

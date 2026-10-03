@@ -59,6 +59,10 @@ class FakeWindowPartHost implements IWindowPartHost {
     this.calls.push(`keep ${moduleId} ${name} ${instance}`);
   }
 
+  public log(moduleId: string, message: string): void {
+    this.calls.push(`log ${moduleId} ${message}`);
+  }
+
   public isCommandRegistered(name: string): boolean {
     return this.registered.has(name);
   }
@@ -279,6 +283,12 @@ describe("WindowPartContext", () => {
     context.keepDocument("notes.note", "2");
 
     expect(host.calls).toEqual(["open notes notes.note 1 Note 1", "open notes notes.note 2 Note 2 as a preview", "open notes notes.note 3 Note 3", "keep notes notes.note 2"]);
+  });
+
+  it("writes its log lines through the host under its module's id", () => {
+    context.log("Opened the list");
+
+    expect(host.calls).toEqual(["log notes Opened the list"]);
   });
 
   it("calls its own module's and its dependencies' methods and refuses others", async () => {

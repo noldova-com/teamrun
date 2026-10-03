@@ -17,6 +17,7 @@ test.use({ desktopVariant: BuildVariantFixture.noModules });
 test("a window whose page stops asks with a native box, comes back when the person reloads it, and records why", async ({ desktop }) => {
   const window = desktop.window;
   await expect(window.locator("tr-empty-window")).toHaveText(/TeamRun\s*No modules/);
+  await desktop.checkpointAsync("window-recovery-before");
   await desktop.application.evaluate(({ dialog }) => {
     const asked: string[] = [];
     Reflect.set(globalThis, "teamrunAskedBoxes", asked);

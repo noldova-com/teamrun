@@ -32,6 +32,7 @@ export interface IWindowPartContext {
   postNotificationAsync(post: NotificationPost): Promise<NotificationHandle>;
   openDocument(name: string, instance: string, title: string, options?: IDocumentOptions): void;
   keepDocument(name: string, instance: string): void;
+  log(message: string): void;
   requestAsync(method: string, parameters: JsonValue): Promise<JsonValue>;
   onEvent(event: string, listener: (payload: JsonValue) => void): () => void;
   readSetting(name: string): JsonValue | undefined;

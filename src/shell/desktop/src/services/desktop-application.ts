@@ -13,8 +13,8 @@ import { fileURLToPath } from "node:url";
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
-  DoNotDisturbChange, type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, Response, type RuntimeHandover, SettingChange, SettingKey,
-  ShellEvents, ShellMethods, WindowStateKey, WindowStateValue, WindowStateWrite
+  type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, Response, type RuntimeHandover, SettingChange, SettingKey,
+  ShellEvents, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
 } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
@@ -22,6 +22,7 @@ import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
 import type { IElectron } from "../interfaces/i-electron.js";
 import type { IIpcEvent } from "../interfaces/i-ipc-event.js";
+import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import type { IWindowContents } from "../interfaces/i-window-contents.js";
 import { StartupStateKind } from "../enums/startup-state-kind.js";
@@ -39,6 +40,7 @@ import { DesktopLog } from "./desktop-log.js";
 import { MenuBarTemplate } from "./menu-bar-template.js";
 import { DeviceIdentity } from "./device-identity.js";
 import { OpenWindow } from "./open-window.js";
+import { QuitCoordinator } from "./quit-coordinator.js";
 import { RuntimeStartup } from "./runtime-startup.js";
 import { RuntimeWindowStateStore } from "./runtime-window-state-store.js";
 import { SenderPolicy } from "./sender-policy.js";
@@ -69,6 +71,7 @@ export class DesktopApplication {
   private readonly factory: WindowFactory;
   private readonly startup: RuntimeStartup;
   private readonly notifier: SystemNotifier;
+  private readonly quit: QuitCoordinator;
   private readonly readDeviceAsync: (folder: string) => Promise<string>;
   private readonly deviceFolder: string;
   private readonly appearanceStore: IAppearanceStore;
@@ -106,6 +109,7 @@ export class DesktopApplication {
     this.factory = new WindowFactory(settings, this.policy, electron, taskbar, icons);
     this.notifier = new SystemNotifier(electron.notifications, log, () => icons.window, () => this.isAnyWindowFocused(), t => this.openNotification(t));
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t));
+    this.quit = new QuitCoordinator(t => this.isLastOpen(t), () => this.readWorkAsync(), () => this.stopWorkAsync());
   }
 
   public static start(
@@ -173,6 +177,8 @@ export class DesktopApplication {
     this.electron.ipcMain.on(Resources.keepAppearanceChannel, (event, preferences) => this.keepAppearance(event, preferences));
     this.electron.ipcMain.on(Resources.menuBarChannel, (event, menuBar) => this.showMenuBar(event, menuBar));
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
+    this.electron.ipcMain.handle(Resources.quitAnswerChannel, (event, choice) => this.answerQuit(event, choice));
+    this.electron.ipcMain.on(Resources.moduleLogChannel, (event, moduleId, message) => this.writeModuleLog(event, moduleId, message));
     this.electron.ipcMain.handle(Resources.readStartupChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.startup.current.toJson());
     this.electron.ipcMain.handle(Resources.startupActionChannel, (event, action) => Object.isNull(this.findTrusted(event)) ? false : this.startup.actAsync(action));
     this.electron.ipcMain.handle(Resources.readLayoutChannel, event => this.readLayoutAsync(event));
@@ -223,7 +229,7 @@ export class DesktopApplication {
   private open(): void {
     const window = this.factory.create(WindowState.createDefault(), this.appearance);
     const contentsId = window.webContents.id;
-    const open = new OpenWindow(window, this.electron.screen, this.log);
+    const open = new OpenWindow(window, this.electron.screen, this.log, this.quit);
     window.webContents.on(Resources.didStartLoadingEvent, () => this.notifier.hold());
     new WindowRecovery(open, this.electron.dialog, this.log, this.process, () => this.electron.app.quit(), () => this.openLogFolderAsync(), Resources.reloadCrashLimit, Resources.rendererEndLimit);
     this.windows.set(contentsId, open);
@@ -239,6 +245,8 @@ export class DesktopApplication {
     const isReady = state.kind === StartupStateKind.Ready;
     if (isReady !== this.isReady)
       this.notifier.reset();
+    if (!isReady)
+      this.quit.release();
     this.isReady = isReady;
     for (const open of this.windows.values())
       if (!open.window.isDestroyed()) {
@@ -248,6 +256,8 @@ export class DesktopApplication {
   }
 
   private forward(event: Event): void {
+    if (event.name.text === ShellEvents.work.text)
+      this.receiveWork(event);
     const payload = event.name.text === ShellEvents.notifications.text ? this.readStateForDevice(event)
       : event.name.text === ShellEvents.settingsChanged.text ? this.readSettingForDevice(event) : event.payload;
     if (Object.isUndefined(payload))
@@ -255,6 +265,51 @@ export class DesktopApplication {
     for (const open of this.windows.values())
       if (!open.window.isDestroyed())
         open.window.webContents.send(Resources.runtimeEventChannel, event.name.text, payload);
+  }
+
+  private receiveWork(event: Event): void {
+    try {
+      this.quit.receive(WorkReport.fromJson(event.payload));
+    }
+    catch (error) {
+      this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
+    }
+  }
+
+  private isLastOpen(prompt: IQuitPrompt): boolean {
+    return [...this.windows.values()].every(t => t === prompt);
+  }
+
+  private async readWorkAsync(): Promise<WorkReport | null> {
+    const connection = this.startup.connection;
+    if (Object.isNull(connection))
+      return null;
+    try {
+      const response = await connection.callAsync(ShellMethods.work, null, Resources.workQueryTimeout);
+      return response.hasFailed ? null : WorkReport.fromJson(response.payload);
+    }
+    catch (error) {
+      this.log.write(Resources.formatWorkNotRead(String(error)));
+      return null;
+    }
+  }
+
+  private async stopWorkAsync(): Promise<void> {
+    const failure = (await this.callAsync(ShellMethods.stop, new StopRequest(StopPolicy.StopWork).toJson())).failure;
+    if (!Object.isUndefined(failure))
+      this.log.write(Resources.formatWorkNotStopped(failure.message));
+  }
+
+  private answerQuit(event: IIpcEvent, choice: unknown): boolean {
+    const open = this.findTrusted(event);
+    return !Object.isNull(open) && this.quit.answer(open, choice);
+  }
+
+  private writeModuleLog(event: IIpcEvent, moduleId: unknown, message: unknown): void {
+    if (Object.isNull(this.findTrusted(event)) || !Object.isString(moduleId) || !Resources.moduleIdPattern.test(moduleId) || !Object.isString(message) ||
+      message.length > Resources.moduleLogLimit)
+      return;
+    this.log.write(message.trimEnd().split(Resources.lineBreakPattern).map(t => Resources.formatModuleLogLine(moduleId, t)).join(Resources.logLineSeparator));
   }
 
   private beginNotifier(epoch: number, device: string, response: Response): void {
@@ -287,8 +342,8 @@ export class DesktopApplication {
       return DesktopApplication.fail(FailureCode.InvalidMessage, Resources.payloadNotJson);
     if (name.owner === Resources.shellOwner && !Resources.windowShellMethods.includes(name.text))
       return DesktopApplication.fail(FailureCode.Unauthorized, Resources.formatMethodRefused(name.text));
-    if (name.text === ShellMethods.notifications.text || name.text === ShellMethods.setDoNotDisturb.text)
-      return await this.requestForDeviceAsync(name, value);
+    if (name.text === ShellMethods.notifications.text)
+      return await this.readNotificationsAsync(name);
     if (Resources.deviceMethods.includes(name.text))
       return await this.requestSettingsForDeviceAsync(name, value);
     return (await this.callAsync(name, value)).toJson();
@@ -320,7 +375,7 @@ export class DesktopApplication {
     try {
       const broadcast = NotificationBroadcast.fromJson(event.payload);
       this.notifier.receive(broadcast);
-      return (Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.sequence) : broadcast.stateFor(this.knownDevice)).toJson();
+      return (Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.mutedModules, broadcast.sequence) : broadcast.stateFor(this.knownDevice)).toJson();
     }
     catch (error) {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
@@ -328,24 +383,14 @@ export class DesktopApplication {
     }
   }
 
-  private async requestForDeviceAsync(name: QualifiedName, value: JsonValue): Promise<JsonObject> {
+  private async readNotificationsAsync(name: QualifiedName): Promise<JsonObject> {
     const epoch = this.notifier.epoch;
     const device = await this.device;
     if (Object.isNull(device))
       return DesktopApplication.fail(FailureCode.Unavailable, Resources.deviceNotIdentified);
-    if (name.text === ShellMethods.notifications.text) {
-      const response = await this.callAsync(name, new NotificationsQuery(device).toJson());
-      this.beginNotifier(epoch, device, response);
-      return response.toJson();
-    }
-    let isOn: boolean;
-    try {
-      isOn = JsonReader.fromValue(value).readBoolean(Resources.isOnField);
-    }
-    catch (error) {
-      return DesktopApplication.fail(FailureCode.InvalidParams, String(error));
-    }
-    return (await this.callAsync(name, new DoNotDisturbChange(device, isOn).toJson())).toJson();
+    const response = await this.callAsync(name, new NotificationsQuery(device).toJson());
+    this.beginNotifier(epoch, device, response);
+    return response.toJson();
   }
 
   private async callAsync(method: QualifiedName, payload: JsonValue): Promise<Response> {

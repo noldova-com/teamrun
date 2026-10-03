@@ -75,6 +75,7 @@ test.describe("the harness's teardown", () => {
   test("records every process TeamRun runs, its Electron processes and its runtime, and removes its folder once they have all ended", async ({ desktop }) => {
     const electron = await desktop.application.evaluate(({ app }) => app.getAppMetrics().map(t => t.pid));
     const runtime = await desktop.readRuntimeProcessIdAsync();
+    await desktop.checkpointAsync("teardown-running");
 
     await desktop.disposeAsync(false);
 
