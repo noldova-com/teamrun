@@ -130,12 +130,26 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  @TestData("win32", "null")
-  @TestData("darwin", "[\"appMenu\",\"editMenu\",\"windowMenu\"]")
-  public async setsTheStandardMenuOnlyOnMacOS(platform: string, menu: string): Promise<void> {
-    const electron = await DesktopApplicationTests.startReadyAsync(platform);
+  public async setsTheStandardMenuOnlyOnMacOSLeavingCommandWToTheWindow(): Promise<void> {
+    const windows = await DesktopApplicationTests.startReadyAsync("win32");
+    const mac = await DesktopApplicationTests.startReadyAsync("darwin");
+    const [app] = mac.menu.templates.at(-1) ?? [];
 
-    Assert.areEqual(menu, JSON.stringify(electron.menu.menu));
+    Assert.isNull(windows.menu.menu);
+    Assert.areEqual(JSON.stringify([
+      {
+        label: app?.label, submenu: [{ role: "about" }, { type: "separator" }, { role: "services" }, { type: "separator" }, { role: "hide" }, { role: "hideOthers" },
+          { role: "unhide" }, { type: "separator" }, { role: "quit" }]
+      },
+      {
+        label: "Edit", submenu: [{ role: "undo" }, { role: "redo" }, { type: "separator" }, { role: "cut" }, { role: "copy" }, { role: "paste" }, { role: "pasteAndMatchStyle" },
+          { role: "delete" }, { role: "selectAll" }, { type: "separator" }, { label: "Speech", submenu: [{ role: "startSpeaking" }, { role: "stopSpeaking" }] }]
+      },
+      {
+        label: "Window", role: "window", submenu: [{ role: "minimize" }, { role: "zoom" }, { type: "separator" },
+          { role: "close", label: "Close Window", accelerator: "Command+Shift+W" }, { type: "separator" }, { role: "front" }]
+      }
+    ]), JSON.stringify(mac.menu.menu));
   }
 
   @TestMethod
@@ -259,7 +273,8 @@ export class DesktopApplicationTests {
         ]
       },
       {
-        label: "Window", role: "window", submenu: [{ role: "minimize" }, { role: "zoom" }, { type: "separator" }, { role: "front" }, { type: "separator" },
+        label: "Window", role: "window", submenu: [{ role: "minimize" }, { role: "zoom" }, { type: "separator" },
+          { role: "close", label: "Close Window", accelerator: "Command+Shift+W" }, { type: "separator" }, { role: "front" }, { type: "separator" },
           { id: "shell.window/notes.windows/0", label: "Notes window", enabled: true, type: "normal", checked: false }]
       },
       { label: "Help", submenu: [{ id: "shell.help/notes.help/0", label: "Notes help", enabled: true, type: "normal", checked: false }], role: "help" }

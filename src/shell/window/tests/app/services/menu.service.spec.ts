@@ -101,6 +101,6 @@ describe("MenuService", () => {
 
     expect(rows.filter(t => t instanceof SubmenuRow).map(t => [t.title, (t as SubmenuRow).place])).toEqual([["New from template", "notes.templates"]]);
     expect(menus.resolve("notes.templates")).toEqual([]);
-    expect(describeSections(menus.resolve("shell.file"))).toEqual([["Close the tab (disabled)"], ["New note"]]);
+    expect(describeSections(menus.resolve("shell.file"))).toEqual([["Close the tab (disabled) Ctrl+W"], ["New note"]]);
   });
 });
