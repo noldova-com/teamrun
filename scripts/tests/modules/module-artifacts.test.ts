@@ -27,6 +27,9 @@ class ModuleArtifactsTests {
     ""
   ].join("\n");
   private static readonly SOURCE_IMPORT: string = "import { WindowPartSource } from \"@noldova/teamrun-shell-window\";\n";
+  private static readonly WRAP: Readonly<Record<string, unknown>> = {
+    name: "notes.wrap", title: "Wrap lines", description: "Wraps long lines.", type: { kind: "Boolean" }, default: true, locality: "Device", scopes: [], page: "Notes", group: "Editor"
+  };
 
   public static register(): void {
     test("the declarations and the window parts' loaders are written in build order, or empty without modules", async t => {
@@ -35,9 +38,11 @@ class ModuleArtifactsTests {
       await repository.writeAsync({
         "package.json": JSON.stringify({ teamrun: { modules: ["notes", "tasks"] } }),
         "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", parts: ["window"], dependencies: ["tasks"], contributes: {
-          views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"]
+          views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"],
+          settings: ["notes.wrap"]
         }
       }),
+        "src/modules/notes/settings.json": JSON.stringify({ settings: [ModuleArtifactsTests.WRAP] }),
         "src/modules/notes/window/src/api/index.ts": "export {};\n",
         "src/modules/tasks/module.json": JSON.stringify({ id: "tasks", displayName: "Tasks", parts: ["runtime"], dependencies: [], contributes: {} }),
         "src/modules/tasks/runtime/package.json": "{}\n",
@@ -64,12 +69,15 @@ class ModuleArtifactsTests {
       assert.deepEqual(JSON.parse(await readFile(artifacts.declarationsFile, "utf8")), {
         formatVersion: 1,
         modules: [
-          { id: "tasks", displayName: "Tasks", dependencies: [], runtimePackage: "@noldova/teamrun-modules-tasks-runtime", contributes: {} },
-          { id: "clock", displayName: "Clock", dependencies: [], runtimePackage: null, contributes: {} },
-          { id: "notes", displayName: "Notes", dependencies: ["tasks"], runtimePackage: null, contributes: {
-            views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"]
+          { id: "tasks", displayName: "Tasks", dependencies: [], runtimePackage: "@noldova/teamrun-modules-tasks-runtime", contributes: {}, settings: [] },
+          { id: "clock", displayName: "Clock", dependencies: [], runtimePackage: null, contributes: {}, settings: [] },
+          {
+            id: "notes", displayName: "Notes", dependencies: ["tasks"], runtimePackage: null, contributes: {
+              views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"],
+              settings: ["notes.wrap"]
+            },
+            settings: [ModuleArtifactsTests.WRAP]
           }
-        }
         ]
       });
       assert.equal(await readFile(artifacts.windowPartsFile, "utf8"), [

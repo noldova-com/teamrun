@@ -12,13 +12,16 @@ import path from "node:path";
 
 import type IModuleDeclarationJson from "./interfaces/module-declaration-json.ts";
 import ModuleException from "./module.exception.ts";
+import ModuleSettings from "./module-settings.ts";
 
 export default class ModuleDeclaration {
   private static readonly FILE_NAME: string = "module.json";
   private static readonly ID_PATTERN: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   private static readonly MEMBER_PATTERN: RegExp = /^[a-z][a-zA-Z0-9]*$/;
   private static readonly RESERVED_ID: string = "shell";
-  private static readonly KINDS: readonly string[] = ["methods", "events", "commands", "notifications", "views", "documents", "statusBarItems", "topBarActions", "themes"];
+  private static readonly KINDS: readonly string[] = [
+    "methods", "events", "commands", "notifications", "views", "documents", "statusBarItems", "topBarActions", "themes", ModuleSettings.SETTINGS_KIND, ModuleSettings.SCOPES_KIND
+  ];
   private static readonly FIELDS: readonly string[] = ["id", "displayName", "parts", "dependencies", "contributes"];
   private static readonly RUNTIME_PART: string = "runtime";
   private static readonly WINDOW_PART: string = "window";
@@ -32,6 +35,7 @@ export default class ModuleDeclaration {
   public readonly parts: readonly string[];
   public readonly dependencies: readonly string[];
   public readonly contributions: ReadonlyMap<string, readonly string[]>;
+  public readonly settings: readonly Readonly<Record<string, unknown>>[];
   public readonly isFixture: boolean;
 
   private constructor(
@@ -41,6 +45,7 @@ export default class ModuleDeclaration {
     parts: readonly string[],
     dependencies: readonly string[],
     contributions: ReadonlyMap<string, readonly string[]>,
+    settings: readonly Readonly<Record<string, unknown>>[],
     isFixture: boolean) {
     this.folder = folder;
     this.id = id;
@@ -48,6 +53,7 @@ export default class ModuleDeclaration {
     this.parts = parts;
     this.dependencies = dependencies;
     this.contributions = contributions;
+    this.settings = settings;
     this.isFixture = isFixture;
   }
 
@@ -93,7 +99,8 @@ export default class ModuleDeclaration {
         throw fail(`contributes an unknown kind: ${kind}`);
       contributions.set(kind, ModuleDeclaration.readNames(names, id, fail, kind));
     }
-    return new ModuleDeclaration(folder, id, displayName, parts, dependencies, contributions, isFixture);
+    const settings = await ModuleSettings.readAsync(root, folder, dependencies, contributions);
+    return new ModuleDeclaration(folder, id, displayName, parts, dependencies, contributions, settings, isFixture);
   }
 
   public get file(): string {
@@ -116,7 +123,8 @@ export default class ModuleDeclaration {
       displayName: this.displayName,
       dependencies: [...this.dependencies],
       runtimePackage: this.runtimePackage,
-      contributes: Object.fromEntries([...this.contributions].map(([kind, names]) => [kind, [...names]]))
+      contributes: Object.fromEntries([...this.contributions].map(([kind, names]) => [kind, [...names]])),
+      settings: [...this.settings]
     };
   }
 
