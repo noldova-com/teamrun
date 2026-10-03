@@ -86,6 +86,10 @@
   outline: var(--tr-border-width) solid var(--tr-accent);
 }
 
+.tr-toast-meta {
+  color: var(--tr-text-muted);
+}
+
 .tr-toast-text {
   display: -webkit-box;
   overflow: hidden;

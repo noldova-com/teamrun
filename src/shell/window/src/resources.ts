@@ -286,7 +286,13 @@ export class Resources {
     [DockSide.Right]: "Resize the right dock",
     [DockSide.Bottom]: "Resize the bottom dock"
   };
-  public static readonly resizeSplitLabel: string = "Resize the split";
+  public static readonly tabIdPrefix: string = "tr-tab-";
+  public static readonly tabIdSeparator: string = "-";
+  public static readonly tabPanelIdPrefix: string = "tr-tab-panel-";
+  public static readonly resizeSplitLabels: Readonly<Record<SplitAxis, string>> = {
+    [SplitAxis.Horizontal]: "Resize the pane on the left",
+    [SplitAxis.Vertical]: "Resize the pane above"
+  };
   public static readonly versionField: string = "version";
   public static readonly docksField: string = "docks";
   public static readonly middleField: string = "middle";
@@ -313,6 +319,8 @@ export class Resources {
   public static readonly textParameter: string = "text";
   public static readonly tooltipParameter: string = "tooltip";
   public static readonly commandParameter: string = "command";
+  public static readonly viewKind: string = "view";
+  public static readonly documentKind: string = "document";
   public static readonly statusBarItemKind: string = "status bar item";
   public static readonly topBarActionKind: string = "top bar action";
   public static readonly notificationKind: string = "notification kind";

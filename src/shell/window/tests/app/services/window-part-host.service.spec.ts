@@ -75,12 +75,13 @@ describe("WindowPartHostService", () => {
     moduleId: string,
     part: IWindowPart | Error,
     dependencies: readonly string[] = [],
-    views: readonly string[] = [],
+    views: readonly string[] = [`${moduleId}.list`],
     commands: readonly string[] = [],
     statusBarItems: readonly string[] = [],
     topBarActions: readonly string[] = [],
-    notifications: readonly string[] = []): WindowPartSource =>
-    new WindowPartSource(moduleId, `${moduleId[0]?.toUpperCase()}${moduleId.slice(1)}`, dependencies, views, commands, statusBarItems, topBarActions, notifications,
+    notifications: readonly string[] = [],
+    documents: readonly string[] = [`${moduleId}.note`]): WindowPartSource =>
+    new WindowPartSource(moduleId, `${moduleId[0]?.toUpperCase()}${moduleId.slice(1)}`, dependencies, views, documents, commands, statusBarItems, topBarActions, notifications,
       () => part instanceof Error ? Promise.reject(part) : Promise.resolve(part));
   const notesPart = (log: string[]): FakeWindowPart => new FakeWindowPart("notes", log, t => {
     t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load));
