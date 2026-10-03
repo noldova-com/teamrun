@@ -23,6 +23,11 @@ export class ShellEventsTests {
   }
 
   @TestMethod
+  public namesTheWorkEvent(): void {
+    Assert.areEqual("shell.work", ShellEvents.work.text);
+  }
+
+  @TestMethod
   public namesTheCommandsEvent(): void {
     Assert.areEqual("shell.commandsChanged", ShellEvents.commandsChanged.text);
   }

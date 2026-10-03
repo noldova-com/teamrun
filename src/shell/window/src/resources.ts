@@ -480,6 +480,23 @@ export class Resources {
   public static readonly failedTitle: string = `${Resources.productName} could not start`;
   public static readonly tryAgain: string = "Try again";
   public static readonly missingBridge: string = "The window needs the desktop's bridge, which the preload provides.";
+  public static readonly descriptionsField: string = "descriptions";
+  public static readonly isWaitingField: string = "isWaiting";
+  public static readonly quitTitle: string = "Work is still running";
+  public static readonly quitText: string = `${Resources.productName} is still working on:`;
+  public static readonly quitHint: string = "Wait for it to finish, or stop it now.";
+  public static readonly quitWaitingTitle: string = "Waiting for the work to finish";
+  public static readonly quitWaitingText: string = `${Resources.productName} quits when this work finishes:`;
+  public static readonly waitThenQuit: string = "Wait, then quit";
+  public static readonly stopWorkAndQuit: string = "Stop the work and quit";
+  public static readonly cancel: string = "Cancel";
+  public static readonly quitListLimit: number = 5;
+  public static readonly waitFocusSelector: string = "[data-tr-quit=Wait]";
+  public static readonly cancelReference: string = "cancel";
+
+  public static formatMoreWork(count: number): string {
+    return `and ${count} more`;
+  }
 
   public static formatModulesDidNotStart(count: number): string {
     return count === 1 ? "1 module didn't start" : `${count} modules didn't start`;
