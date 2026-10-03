@@ -10,14 +10,18 @@ export default class MenuItem {
   public readonly command: string | null;
   public readonly commandArguments: Readonly<Record<string, unknown>>;
   public readonly submenu: string | null;
+  public readonly label: string | null;
 
-  public constructor(command: string | null, commandArguments: Readonly<Record<string, unknown>>, submenu: string | null) {
+  public constructor(command: string | null, commandArguments: Readonly<Record<string, unknown>>, submenu: string | null, label: string | null = null) {
     this.command = command;
     this.commandArguments = commandArguments;
     this.submenu = submenu;
+    this.label = label;
   }
 
   public toJson(): Readonly<Record<string, unknown>> {
-    return this.submenu === null ? { command: this.command, arguments: this.commandArguments } : { submenu: this.submenu };
+    if (this.submenu !== null)
+      return { submenu: this.submenu };
+    return this.label === null ? { command: this.command, arguments: this.commandArguments } : { command: this.command, arguments: this.commandArguments, label: this.label };
   }
 }

@@ -35,6 +35,7 @@ export class MenuDeclarations {
         t.readBoolean(Resources.exclusiveField),
         t.readObjectArray(Resources.itemsField).map(u => u.hasField(Resources.submenuField)
           ? MenuItem.ofSubmenu(u.readString(Resources.submenuField))
-          : MenuItem.ofCommand(u.readString(Resources.commandField), u.readObject(Resources.argumentsField).toJson())))));
+          : MenuItem.ofCommand(u.readString(Resources.commandField), u.readObject(Resources.argumentsField).toJson(),
+            u.hasField(Resources.labelField) ? u.readString(Resources.labelField) : null)))));
   }
 }
