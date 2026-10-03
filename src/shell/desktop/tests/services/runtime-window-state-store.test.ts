@@ -8,7 +8,8 @@
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { ShellMethods, WindowStateKey } from "@noldova/teamrun-shell-protocol";
-import { RuntimeWindowStateStore, WindowStateException } from "@noldova/teamrun-shell-desktop";
+import { ConnectionException } from "@noldova/teamrun-shell-runtime";
+import { RuntimeWindowStateStore, WindowStateException, WindowStateUnavailableException } from "@noldova/teamrun-shell-desktop";
 
 import { FakeRuntimeConnection } from "../fixtures/fake-runtime-connection.fixture.js";
 
@@ -36,7 +37,25 @@ export class RuntimeWindowStateStoreTests {
     const detached = new RuntimeWindowStateStore(() => null, RuntimeWindowStateStoreTests.KEY, ShellMethods.readWindowLayout, ShellMethods.writeWindowLayout);
     const refused = new RuntimeWindowStateStore(() => connection, RuntimeWindowStateStoreTests.KEY, ShellMethods.readWindowLayout, ShellMethods.writeWindowLayout);
 
-    Assert.areEqual("TeamRun is not connected to its runtime.", (await Assert.throwsAsync(() => detached.readAsync(), WindowStateException)).message);
-    Assert.areEqual("The runtime refused shell.writeWindowLayout: The database is busy.", (await Assert.throwsAsync(() => refused.writeAsync({}), WindowStateException)).message);
+    Assert.areEqual("TeamRun is not connected to its runtime.", (await Assert.throwsAsync(() => detached.readAsync(), WindowStateUnavailableException)).message);
+    const refusal = await Assert.throwsAsync(() => refused.writeAsync({}), WindowStateException);
+    Assert.areEqual("The runtime refused shell.writeWindowLayout: The database is busy.", refusal.message);
+    Assert.isFalse(refusal instanceof WindowStateUnavailableException);
+  }
+
+  @TestMethod
+  public async reportsAConnectionThatFailsAsUnreachableAndPassesOtherErrorsOn(): Promise<void> {
+    const lost = new FakeRuntimeConnection();
+    lost.rejection = new ConnectionException("The runtime closed the connection.");
+    const broken = new FakeRuntimeConnection();
+    broken.rejection = new RangeError("A defect.");
+    const store = (connection: FakeRuntimeConnection): RuntimeWindowStateStore =>
+      new RuntimeWindowStateStore(() => connection, RuntimeWindowStateStoreTests.KEY, ShellMethods.readWindowBounds, ShellMethods.writeWindowBounds);
+
+    const unreachable = await Assert.throwsAsync(() => store(lost).writeAsync({}), WindowStateUnavailableException);
+    const defect = await Assert.throwsAsync(() => store(broken).writeAsync({}), RangeError);
+
+    Assert.areEqual("The runtime closed the connection.", unreachable.message);
+    Assert.areEqual("A defect.", defect.message);
   }
 }

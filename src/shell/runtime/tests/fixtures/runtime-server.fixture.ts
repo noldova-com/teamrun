@@ -18,6 +18,7 @@ export class RuntimeServerFixture implements AsyncDisposable {
   public static readonly EXECUTABLE: string = "/opt/teamrun/teamrun";
 
   private readonly connections: RawConnectionFixture[] = [];
+  private readonly waiters: Set<() => void> = new Set();
 
   public readonly methods: MethodRegistry = new MethodRegistry();
   public readonly server: RuntimeServer;
@@ -31,13 +32,31 @@ export class RuntimeServerFixture implements AsyncDisposable {
       new RuntimeHandover(RuntimeServerFixture.IDENTITY, RuntimeServerFixture.EXECUTABLE),
       this.methods,
       settings,
-      () => this.changes++);
+      () => {
+        this.changes++;
+        for (const waiter of [...this.waiters])
+          waiter();
+      });
   }
 
   public static async startAsync(settings?: ServerSettings): Promise<RuntimeServerFixture> {
     const fixture = new RuntimeServerFixture(settings);
     fixture.endpoint = await fixture.server.listenTcpAsync();
     return fixture;
+  }
+
+  public waitUntilAsync(condition: () => boolean): Promise<void> {
+    if (condition())
+      return Promise.resolve();
+    return new Promise<void>(resolve => {
+      const check = (): void => {
+        if (!condition())
+          return;
+        this.waiters.delete(check);
+        resolve();
+      };
+      this.waiters.add(check);
+    });
   }
 
   public async connectAsync(allowHalfOpen: boolean = false): Promise<RawConnectionFixture> {
