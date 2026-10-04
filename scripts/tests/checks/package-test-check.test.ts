@@ -20,6 +20,23 @@ import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
+class SelectionRunnerFixture extends ProcessRunnerFixture {
+  private readonly selection: string | null;
+
+  public constructor(exitCodes: readonly (number | null)[], selection: string | null) {
+    super(exitCodes);
+
+    this.selection = selection;
+  }
+
+  public override async runAsync(command: string, commandArguments: readonly string[], directory: string, environment?: NodeJS.ProcessEnv): Promise<number | null> {
+    const file = environment?.["TEAMRUN_TEST_SELECTION_FILE"];
+    if (file !== undefined && this.selection !== null)
+      await writeFile(file, this.selection);
+    return super.runAsync(command, commandArguments, directory, environment);
+  }
+}
+
 class PackageTestCheckTests {
   public static register(): void {
     test("a tree without tested packages passes without running anything", async t => {
@@ -71,6 +88,35 @@ class PackageTestCheckTests {
         "[{\"file\":\"main.ts\",\"reason\":\"Runs only inside Electron.\"}]"
       ]);
       assert.deepEqual(runner.environments[1], { KEPT: "yes" });
+    });
+
+    test("a filtered run passes its filters to the test framework, measures no coverage and reports what it selected", async t => {
+      const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
+      const runner = new SelectionRunnerFixture([0], JSON.stringify({ discovered: 10, selected: 3 }));
+      const check = new PackageTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, { KEPT: "yes" });
+
+      const selection = await check.runSelectedAsync(["Alpha", "category:fast"], new TextOutputFixture());
+
+      assert.deepEqual([selection.isPassing, selection.unit, selection.discovered, selection.selected, selection.unselected], [true, "package tests", 10, 3, 7]);
+      assert.equal(runner.runs.length, 1);
+      assert.deepEqual(runner.environments[0], {
+        KEPT: "yes",
+        TEAMRUN_TEST_FILTERS: JSON.stringify(["Alpha", "category:fast"]),
+        TEAMRUN_TEST_SELECTION_FILE: path.join(repository.directory, "_build", "test-selection.json")
+      });
+    });
+
+    test("a filtered run fails with its tests, passes when it selects no package test, and fails when it reported nothing", async t => {
+      const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
+      const build = new PackageBuildFixture(repository.directory);
+
+      const failing = await new PackageTestCheck(repository.directory, build, new SelectionRunnerFixture([1], JSON.stringify({ discovered: 10, selected: 3 })), {}).runSelectedAsync(["Alpha"], new TextOutputFixture());
+      const none = await new PackageTestCheck(repository.directory, build, new SelectionRunnerFixture([1], JSON.stringify({ discovered: 10, selected: 0 })), {}).runSelectedAsync(["Other"], new TextOutputFixture());
+      const silent = await new PackageTestCheck(repository.directory, build, new SelectionRunnerFixture([0], null), {}).runSelectedAsync(["Alpha"], new TextOutputFixture());
+
+      assert.deepEqual([failing.isPassing, failing.selected], [false, 3]);
+      assert.deepEqual([none.isPassing, none.selected, none.unselected], [true, 0, 10]);
+      assert.deepEqual([silent.isPassing, silent.discovered, silent.selected], [false, 0, 0]);
     });
 
     test("failing tests or incomplete coverage fail the check, and both still run", async t => {

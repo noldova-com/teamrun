@@ -17,18 +17,25 @@ export default class AngularReportRunnerFixture extends ProcessRunnerFixture {
   private static readonly PACKAGED_OPTION: string = "--packaged";
   private static readonly OUTPUT_OPTION: string = "--output";
 
-  private readonly report: string;
+  private static readonly REPORTER_DESTINATION: string = "--test-reporter-destination=";
 
-  public constructor(report: string, exitCodes: readonly (number | null)[] = []) {
+  private readonly report: string;
+  private readonly tapReport: string;
+
+  public constructor(report: string, exitCodes: readonly (number | null)[] = [], tapReport: string = "# tests 0\n") {
     super(exitCodes);
 
     this.report = report;
+    this.tapReport = tapReport;
   }
 
   public override async runAsync(command: string, commandArguments: readonly string[], directory: string, environment?: NodeJS.ProcessEnv): Promise<number | null> {
     const file = commandArguments[commandArguments.indexOf(AngularReportRunnerFixture.OUTPUT_FILE_OPTION) + 1];
     if (commandArguments.includes(AngularReportRunnerFixture.OUTPUT_FILE_OPTION) && file !== undefined)
       await writeFile(file, this.report);
+    const destination = commandArguments.find(t => t.startsWith(AngularReportRunnerFixture.REPORTER_DESTINATION) && !t.endsWith("=stdout"));
+    if (destination !== undefined)
+      await writeFile(destination.slice(AngularReportRunnerFixture.REPORTER_DESTINATION.length), this.tapReport);
     if (commandArguments.includes(AngularReportRunnerFixture.PACKAGED_OPTION)) {
       await new GalleryFile(directory).writeAsync(true);
       const output = commandArguments[commandArguments.indexOf(AngularReportRunnerFixture.OUTPUT_OPTION) + 1];
