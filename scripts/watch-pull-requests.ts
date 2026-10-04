@@ -8,9 +8,12 @@
 
 import { appendFile } from "node:fs/promises";
 import type { Writable } from "node:stream";
+import { setTimeout as delay } from "node:timers/promises";
 
 import ProcessRunner from "./processes/process-runner.ts";
+import Git from "./repository/git.ts";
 import GitHubApi from "./repository/github-api.ts";
+import MergeConflictReader from "./workflows/merge-conflict.reader.ts";
 import PullRequestEvaluator from "./workflows/pull-request-evaluator.ts";
 import PullRequestWatcher from "./workflows/pull-request-watcher.ts";
 import PullRequestReader from "./workflows/pull-request.reader.ts";
@@ -25,12 +28,14 @@ export default class WatchPullRequests {
   private readonly output: Writable;
   private readonly directory: string;
   private readonly clock: () => number;
+  private readonly wait: (milliseconds: number) => Promise<void>;
 
-  public constructor(runner: ProcessRunner, output: Writable, directory: string, clock: () => number) {
+  public constructor(runner: ProcessRunner, output: Writable, directory: string, clock: () => number, wait: (milliseconds: number) => Promise<void>) {
     this.runner = runner;
     this.output = output;
     this.directory = directory;
     this.clock = clock;
+    this.wait = wait;
   }
 
   public async runAsync(environment: NodeJS.ProcessEnv): Promise<number> {
@@ -42,7 +47,8 @@ export default class WatchPullRequests {
     }
 
     const api = new GitHubApi(repository, this.runner, this.directory);
-    const watcher = new PullRequestWatcher(api, new PullRequestReader(api), new PullRequestEvaluator(), this.clock);
+    const conflicts = new MergeConflictReader(new Git(this.directory, this.runner));
+    const watcher = new PullRequestWatcher(api, new PullRequestReader(api), new PullRequestEvaluator(), conflicts, this.clock, this.wait);
     const summary = `${WatchPullRequests.HEADING}${(await watcher.watchAsync()).join("\n")}\n`;
     await appendFile(summaryPath, summary);
     this.output.write(summary);
@@ -51,4 +57,4 @@ export default class WatchPullRequests {
 }
 
 if (import.meta.main)
-  process.exitCode = await new WatchPullRequests(new ProcessRunner(), process.stdout, process.cwd(), Date.now).runAsync(process.env);
+  process.exitCode = await new WatchPullRequests(new ProcessRunner(), process.stdout, process.cwd(), Date.now, delay).runAsync(process.env);

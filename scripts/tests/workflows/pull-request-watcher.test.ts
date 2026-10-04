@@ -9,7 +9,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import Git from "../../repository/git.ts";
 import GitHubApi from "../../repository/github-api.ts";
+import MergeConflictReader from "../../workflows/merge-conflict.reader.ts";
 import PullRequestEvaluator from "../../workflows/pull-request-evaluator.ts";
 import PullRequestFinding from "../../workflows/pull-request-finding.ts";
 import PullRequestNote from "../../workflows/pull-request-note.ts";
@@ -153,6 +155,103 @@ class PullRequestWatcherTests {
       assert.deepEqual(scenario.api.writes, ["POST /issues/3/comments", "PATCH /issues/comments/21"]);
     });
 
+    test("a conflicting pull request's queued and running build runs are cancelled, with one comment naming the conflicting files", async () => {
+      const scenario = new PullRequestScenarioFixture();
+      scenario.add({ number: 3, mergeState: "dirty", commitMinutesAgo: 5, activeRuns: [301, 302], conflicts: ["docs/a.md", "src/b.ts"] });
+
+      const lines = await PullRequestWatcherTests.watchAsync(scenario);
+
+      const head = PullRequestScenarioFixture.head(3);
+      assert.deepEqual(lines, ["- #3: cancelled (2 runs, commented)"]);
+      assert.deepEqual(scenario.api.writes, ["POST /actions/runs/301/cancel", "POST /actions/runs/302/cancel", "POST /issues/3/comments"]);
+      assert.deepEqual(scenario.api.bodies, [PullRequestNote.compose(PullRequestFinding.cancelled(PullRequestScenarioFixture.NOW, "main", ["docs/a.md", "src/b.ts"], 2), head)]);
+      assert.match(scenario.api.bodies[0] ?? "", /`main` moved, and this pull request now conflicts with it in `docs\/a\.md`, `src\/b\.ts`\. 2 runs of \*\*Build and test\*\* were cancelled, because they test /);
+      assert.deepEqual(scenario.git.commands, [
+        "fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/watch/base +refs/pull/3/head:refs/remotes/watch/head",
+        "merge-tree --write-tree --name-only --no-messages refs/remotes/watch/base refs/remotes/watch/head"
+      ]);
+    });
+
+    test("a single cancelled run is named as one, and a conflict Git no longer finds names no files", async () => {
+      const scenario = new PullRequestScenarioFixture();
+      scenario.add({ number: 3, mergeState: "dirty", commitMinutesAgo: 5, activeRuns: [301] });
+
+      const lines = await PullRequestWatcherTests.watchAsync(scenario);
+
+      assert.deepEqual(lines, ["- #3: cancelled (1 run, commented)"]);
+      assert.match(scenario.api.bodies[0] ?? "", /`main` moved, and this pull request now conflicts with it\. 1 run of \*\*Build and test\*\* was cancelled, because it tests /);
+    });
+
+    test("runs started again on a head already commented on are cancelled without another comment, and the comment is never cleared", async () => {
+      const scenario = new PullRequestScenarioFixture();
+      const head = PullRequestScenarioFixture.head(3);
+      const old = PullRequestScenarioFixture.head(4);
+      scenario.add({
+        number: 3,
+        mergeState: "dirty",
+        commitMinutesAgo: 5,
+        activeRuns: [303],
+        comments: [
+          { id: 31, login: PullRequestScenarioFixture.BOT, body: `<!-- pull-request-watch:cancelled:${head} -->\nText` },
+          { id: 32, login: PullRequestScenarioFixture.BOT, body: `<!-- pull-request-watch:cancelled:${old} -->\nText` }
+        ]
+      });
+
+      const lines = await PullRequestWatcherTests.watchAsync(scenario);
+
+      assert.deepEqual(lines, ["- #3: cancelled (1 run, already commented)"]);
+      assert.deepEqual(scenario.api.writes, ["POST /actions/runs/303/cancel"]);
+      assert.deepEqual(scenario.git.commands, []);
+    });
+
+    test("a conflicting pull request without a queued or running build run, a clean one and a draft are left alone", async () => {
+      const scenario = new PullRequestScenarioFixture();
+      scenario.add({ number: 3, mergeState: "dirty", commitMinutesAgo: 5 });
+      scenario.add({ number: 4, mergeState: "clean", activeRuns: [401] });
+      scenario.add({ number: 5, isDraft: true, mergeState: "dirty", activeRuns: [501] });
+
+      const lines = await PullRequestWatcherTests.watchAsync(scenario);
+
+      assert.deepEqual(lines, ["- #3: nothing to do", "- #4: nothing to do", "- #5: skipped, a draft"]);
+      assert.deepEqual(scenario.api.writes, []);
+      assert.deepEqual(scenario.api.requests.filter(t => t.endsWith("&per_page=100") && t.includes("/runs?")), [
+        `GET /actions/workflows/build-and-test.yml/runs?event=pull_request&head_sha=${PullRequestScenarioFixture.head(3)}&per_page=100`
+      ]);
+      assert.deepEqual(scenario.git.commands, []);
+    });
+
+    test("an unknown merge state is read again every 10 seconds until GitHub has computed it", async () => {
+      const scenario = new PullRequestScenarioFixture();
+      scenario.add({ number: 3, mergeState: "dirty", unknownMergeStates: 2, commitMinutesAgo: 5, activeRuns: [301], conflicts: ["a.ts"] });
+      const waits: number[] = [];
+
+      const lines = await PullRequestWatcherTests.watchAsync(scenario, waits);
+
+      assert.deepEqual(lines, ["- #3: cancelled (1 run, commented)"]);
+      assert.deepEqual(waits, [10_000, 10_000]);
+      assert.deepEqual(scenario.api.requests.filter(t => t === "GET /pulls/3"), ["GET /pulls/3", "GET /pulls/3", "GET /pulls/3", "GET /pulls/3"]);
+    });
+
+    test("a merge state still unknown after six reads is reported and nothing is cancelled", async () => {
+      const scenario = new PullRequestScenarioFixture();
+      scenario.add({ number: 3, mergeState: "dirty", unknownMergeStates: 7, commitMinutesAgo: 5, activeRuns: [301] });
+      const waits: number[] = [];
+
+      const lines = await PullRequestWatcherTests.watchAsync(scenario, waits);
+
+      assert.deepEqual(lines, ["- #3: merge state still unknown"]);
+      assert.deepEqual(waits, [10_000, 10_000, 10_000, 10_000, 10_000]);
+      assert.deepEqual(scenario.api.writes, []);
+    });
+
+    test("a failed cancel fails the run instead of being reported as done", async () => {
+      const scenario = new PullRequestScenarioFixture();
+      scenario.add({ number: 3, mergeState: "dirty", commitMinutesAgo: 5, activeRuns: [301] });
+      scenario.api.fail("/actions/runs/301/cancel", "HTTP 403: Resource not accessible by integration");
+
+      await assert.rejects(PullRequestWatcherTests.watchAsync(scenario), /HTTP 403: Resource not accessible by integration/);
+    });
+
     test("a failed write fails the run instead of being reported as done", async () => {
       const scenario = new PullRequestScenarioFixture();
       scenario.add({ number: 3, buildRuns: 0, commitMinutesAgo: 30 });
@@ -162,9 +261,12 @@ class PullRequestWatcherTests {
     });
   }
 
-  private static watchAsync(scenario: PullRequestScenarioFixture): Promise<readonly string[]> {
+  private static watchAsync(scenario: PullRequestScenarioFixture, waits: number[] = []): Promise<readonly string[]> {
     const api = new GitHubApi(GitHubApiFixture.REPOSITORY, scenario.api, "work");
-    return new PullRequestWatcher(api, new PullRequestReader(api), new PullRequestEvaluator(), () => PullRequestScenarioFixture.NOW.getTime()).watchAsync();
+    const conflicts = new MergeConflictReader(new Git("work", scenario.git));
+    return new PullRequestWatcher(api, new PullRequestReader(api), new PullRequestEvaluator(), conflicts, () => PullRequestScenarioFixture.NOW.getTime(), async t => {
+      waits.push(t);
+    }).watchAsync();
   }
 }
 

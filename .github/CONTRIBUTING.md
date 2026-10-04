@@ -64,9 +64,11 @@ An authorized maintainer, or an agent the maintainer designates, reviews each ch
 
 ### The pull request watch
 
-The **Watch pull requests** workflow checks every open pull request that targets `main` and is not a draft, every 15 minutes and after each **Build and test** run. It reads the repository, runs and checks and writes pull request comments only; it holds no other secret, starts no run, and never approves, merges or turns on auto-merge. Each run's summary lists every open pull request and its finding, or "nothing to do".
+The **Watch pull requests** workflow checks every open pull request that targets `main` and is not a draft, after each push to `main`, every 15 minutes and after each **Build and test** run. It reads the repository, runs and checks, writes pull request comments and cancels the runs of conflicting pull requests; it holds no other secret, starts no run, and never approves, merges or turns on auto-merge. Each run's summary lists every open pull request and its finding, or "nothing to do".
 
-For each finding it posts one comment, never twice for the same head commit, and adds a line to that comment when the finding clears or the head commit changes:
+A merge to `main` can make an open pull request conflict while its **Build and test** run still tests a revision that has to be merged again, holding runners until it ends. GitHub neither cancels such a run nor reports when a pull request starts to conflict, so the workflow does it. It reads each pull request's merge state again every 10 seconds while GitHub is still computing it, up to six reads, and reports a state still unknown. When the pull request conflicts, it cancels the queued and running **Build and test** runs of its head commit and comments once for that commit, naming the conflicting files, which it finds by merging the head into `main` with `git merge-tree` in its own checkout. A pull request that merges cleanly is left alone, and runs of `main` are never cancelled. Cancelling is the reason the workflow's token has `actions: write`; `pull-requests: write` is for its comments.
+
+For each finding below it posts one comment, never twice for the same head commit, and adds a line to that comment when the finding clears or the head commit changes:
 
 | Finding | When it is posted | What the author does |
 |---|---|---|

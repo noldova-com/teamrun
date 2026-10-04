@@ -40,6 +40,10 @@ export default class GitHubApi {
     await this.captureAsync(["api", "--method", method, this.locate(resource), "--raw-field", `body=${body}`]);
   }
 
+  public async postAsync(resource: string): Promise<void> {
+    await this.captureAsync(["api", "--method", "POST", this.locate(resource)]);
+  }
+
   private locate(resource: string): string {
     return `repos/${this.repository}${resource}`;
   }

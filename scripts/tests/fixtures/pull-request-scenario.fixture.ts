@@ -9,6 +9,7 @@
 import GitHubApiFixture from "./github-api.fixture.ts";
 import type IScenarioCheck from "./interfaces/scenario-check.ts";
 import type IScenarioPullRequest from "./interfaces/scenario-pull-request.ts";
+import MergeTreeFixture from "./merge-tree.fixture.ts";
 
 export default class PullRequestScenarioFixture {
   public static readonly NOW: Date = new Date("2026-10-04T12:00:00Z");
@@ -18,6 +19,7 @@ export default class PullRequestScenarioFixture {
   private static readonly MINUTE: number = 60_000;
 
   public readonly api: GitHubApiFixture = new GitHubApiFixture();
+  public readonly git: MergeTreeFixture = new MergeTreeFixture();
 
   private readonly open: unknown[] = [];
 
@@ -56,12 +58,18 @@ export default class PullRequestScenarioFixture {
     const ago = PullRequestScenarioFixture.ago;
     this.open.push({ number: pull.number, draft: pull.isDraft ?? false, base: { ref: pull.base ?? "main" } });
     this.api.answer("/pulls?state=open&per_page=100", this.open);
-    this.api.answer(`/pulls/${pull.number}`, {
+    const states = [...Array<string>(pull.unknownMergeStates ?? 0).fill("unknown"), pull.mergeState ?? "clean"];
+    this.api.answerInTurn(`/pulls/${pull.number}`, states.map(t => ({
       number: pull.number,
       head: { sha: head },
-      mergeable_state: pull.mergeState ?? "clean",
+      mergeable_state: t,
       auto_merge: pull.hasAutoMerge === true ? { merge_method: "squash", enabled_by: { login: "maintainer" } } : null
+    })));
+    this.api.answer(`/actions/workflows/build-and-test.yml/runs?event=pull_request&head_sha=${head}&per_page=100`, {
+      total_count: (pull.activeRuns?.length ?? 0) + 1,
+      workflow_runs: [...(pull.activeRuns ?? []).map((t, index) => ({ id: t, status: index === 0 ? "in_progress" : "queued" })), { id: 1, status: "completed" }]
     });
+    this.git.conflict(pull.number, pull.conflicts ?? []);
     this.api.answer(`/commits/${head}`, { sha: head, commit: { committer: { date: ago(pull.commitMinutesAgo ?? 120) } } });
     this.api.answer(`/commits/${head}/check-runs?per_page=100`, {
       total_count: pull.checks?.length ?? 0,

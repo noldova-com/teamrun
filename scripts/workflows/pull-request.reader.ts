@@ -24,6 +24,7 @@ export default class PullRequestReader {
   private static readonly CHANGES_REQUESTED: string = "CHANGES_REQUESTED";
   private static readonly PAGE: string = "per_page=100";
   private static readonly NO_ONE: string = "";
+  private static readonly COMPLETED: string = "completed";
 
   private readonly api: GitHubApi;
 
@@ -67,6 +68,17 @@ export default class PullRequestReader {
       await this.readBuildRunsAsync(head),
       checks,
       await this.readNotesAsync(open.number));
+  }
+
+  public async readMergeStateAsync(open: OpenPullRequest): Promise<string> {
+    return GitHubJson.text(GitHubJson.object(await this.api.readAsync(`/pulls/${open.number}`), "pull request"), "mergeable_state", "pull request");
+  }
+
+  public async listActiveBuildRunsAsync(head: string): Promise<readonly number[]> {
+    const resource = `/actions/workflows/${PullRequestReader.BUILD_WORKFLOW}/runs?event=pull_request&head_sha=${head}&${PullRequestReader.PAGE}`;
+    return GitHubJson.children(GitHubJson.object(await this.api.readAsync(resource), "workflow runs"), "workflow_runs", "workflow runs")
+      .filter(t => GitHubJson.text(t, "status", "workflow run") !== PullRequestReader.COMPLETED)
+      .map(t => GitHubJson.number(t, "id", "workflow run"));
   }
 
   private async readCommitDateAsync(revision: string): Promise<Date> {

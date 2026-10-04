@@ -46,6 +46,14 @@ class GitHubApiTests {
       assert.deepEqual((runner.captured[0] ?? []).slice(2), ["api", "--method", "PATCH", "repos/noldova-com/teamrun/issues/comments/9", "--raw-field", "body=line one\nline two"]);
     });
 
+    test("a post sends the method without a body", async () => {
+      const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "", "")]);
+
+      await new GitHubApi(GitHubApiTests.REPOSITORY, runner, "work").postAsync("/actions/runs/9/cancel");
+
+      assert.deepEqual((runner.captured[0] ?? []).slice(2), ["api", "--method", "POST", "repos/noldova-com/teamrun/actions/runs/9/cancel"]);
+    });
+
     test("a failed command and an answer that is not JSON are refused with the cause", async () => {
       const failing = new ProcessRunnerFixture([], [new ProcessResult(1, "", "HTTP 403: Resource not accessible\n")]);
       const text = new ProcessRunnerFixture([], [new ProcessResult(0, "<html>", ""), new ProcessResult(0, "<html>", "")]);

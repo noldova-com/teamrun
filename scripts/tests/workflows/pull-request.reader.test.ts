@@ -152,6 +152,15 @@ class PullRequestReaderTests {
       assert.deepEqual(pull.notes.map(t => [t.id, t.kind, t.head, t.isCleared]), [[1, "conflict", head, false], [4, "failed", head, true]]);
     });
 
+    test("a pull request's merge state is read alone, and its build runs that are not completed are listed", async () => {
+      const scenario = new PullRequestScenarioFixture();
+      scenario.add({ number: PullRequestReaderTests.NUMBER, mergeState: "dirty", activeRuns: [71, 72] });
+      const reader = PullRequestReaderTests.createReader(scenario);
+
+      assert.equal(await reader.readMergeStateAsync(PullRequestReaderTests.OPEN), "dirty");
+      assert.deepEqual(await reader.listActiveBuildRunsAsync(PullRequestScenarioFixture.head(PullRequestReaderTests.NUMBER)), [71, 72]);
+    });
+
     test("an answer of the wrong shape is refused naming the field", async () => {
       const scenario = new PullRequestScenarioFixture();
       scenario.add({ number: PullRequestReaderTests.NUMBER });

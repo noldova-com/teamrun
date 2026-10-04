@@ -11,6 +11,7 @@ export default class PullRequestFinding {
   public static readonly CONFLICT: string = "conflict";
   public static readonly FAILED: string = "failed";
   public static readonly NOT_MERGING: string = "not-merging";
+  public static readonly CANCELLED: string = "cancelled";
 
   private static readonly MINUTE: number = 60_000;
   private static readonly REVISION_LENGTH: number = 7;
@@ -59,6 +60,18 @@ export default class PullRequestFinding {
     return new PullRequestFinding(PullRequestFinding.NOT_MERGING, since, minutes,
       `Every required check passed more than ${minutes} minutes ago and auto-merge is off. `
       + "A reviewer merges the pull request or turns on auto-merge; if you are waiting for that, ask the reviewer.");
+  }
+
+  public static cancelled(since: Date, defaultBranch: string, files: readonly string[], runs: number): PullRequestFinding {
+    const where = files.length === 0 ? "" : ` in ${files.map(t => `\`${t}\``).join(", ")}`;
+    return new PullRequestFinding(PullRequestFinding.CANCELLED, since, 0,
+      `\`${defaultBranch}\` moved, and this pull request now conflicts with it${where}. `
+      + `${PullRequestFinding.countRuns(runs)} of **Build and test** ${runs === 1 ? "was" : "were"} cancelled, because ${runs === 1 ? "it tests" : "they test"} a revision that has to be merged again. `
+      + `Merge or rebase \`${defaultBranch}\` into the branch, resolve the conflicts and push; the push starts a new run.`);
+  }
+
+  public static countRuns(runs: number): string {
+    return runs === 1 ? "1 run" : `${runs} runs`;
   }
 
   public isDue(now: Date): boolean {
