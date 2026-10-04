@@ -7,7 +7,7 @@
  */
 
 import {
-  ChangeDetectionStrategy, Component, ElementRef, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, input, model,
+  ChangeDetectionStrategy, Component, ElementRef, Injector, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, input, model,
   output, signal
 } from "@angular/core";
 
@@ -26,7 +26,10 @@ export class QuickInputComponent {
   private static count: number = 0;
 
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector: Injector = inject(Injector);
   private readonly activeValue: WritableSignal<number> = signal(0);
+  private shownQuery: string = String.empty;
+  private isChoosing: boolean = false;
 
   protected readonly listId: string = `${Resources.quickInputIdPrefix}${QuickInputComponent.count++}`;
   protected readonly active: Signal<number> = this.activeValue.asReadonly();
@@ -44,6 +47,9 @@ export class QuickInputComponent {
     effect(() => {
       this.items();
       this.activeValue.set(0);
+    });
+    afterRenderEffect(() => {
+      this.shownQuery = this.query();
     });
     afterRenderEffect(() => {
       this.host.querySelector(`#${this.optionId(this.active())}`)?.scrollIntoView(Resources.revealOptions);
@@ -67,7 +73,7 @@ export class QuickInputComponent {
     }
     if (event.key === Resources.enterKey) {
       event.preventDefault();
-      this.choose(this.active());
+      this.chooseActive();
     }
     else if (event.key === Resources.escapeKey) {
       event.preventDefault();
@@ -79,6 +85,18 @@ export class QuickInputComponent {
     const item = this.items()[index];
     if (!Object.isUndefined(item))
       this.chosen.emit(item);
+  }
+
+  private chooseActive(): void {
+    if (this.query() === this.shownQuery)
+      this.choose(this.active());
+    else if (!this.isChoosing) {
+      this.isChoosing = true;
+      afterNextRender(() => {
+        this.isChoosing = false;
+        this.choose(this.active());
+      }, { injector: this.injector });
+    }
   }
 
   private indexFor(key: string): number | null {
