@@ -25,6 +25,21 @@ describe("StartupService", () => {
     expect(service.state().isReady).toBe(true);
   });
 
+  it("has started once the runtime was first ready, and reconnects whenever it is not ready after that", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    bridge.startup = { kind: "Connecting", details: [] };
+    const service = TestBed.inject(StartupService);
+    const read = (): readonly boolean[] => [service.hasStarted(), service.isReconnecting()];
+    const seen = [read()];
+
+    for (const kind of ["Failed", "Ready", "Connecting", "Failed", "Ready"]) {
+      bridge.publishStartup({ kind, details: [] });
+      seen.push(read());
+    }
+
+    expect(seen).toEqual([[false, false], [false, false], [true, false], [true, true], [true, true], [true, false]]);
+  });
+
   it("is acting while the desktop carries out the person's choice", async () => {
     const bridge = DesktopBridgeFixture.install();
     const service = TestBed.inject(StartupService);

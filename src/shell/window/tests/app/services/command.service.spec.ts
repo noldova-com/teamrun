@@ -17,6 +17,7 @@ import { WindowPartSource } from "../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../src/app/services/command.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
+import { StartupService } from "../../../src/app/services/startup.service";
 import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 import { ViewDialogFixture } from "../../fixtures/view-dialog.fixture";
@@ -84,6 +85,20 @@ describe("CommandService", () => {
     await vi.waitFor(() => expect(runs).toEqual(["notes.newNote null"]));
     expect(pressed.defaultPrevented).toBe(true);
     expect(other.defaultPrevented).toBe(false);
+  });
+
+  it("offers no command and runs none for a key while the runtime starts again", async () => {
+    const service = start("win32");
+    service.setCommands([command("notes.newNote", "Mod+Alt+N")]);
+    await vi.waitFor(() => expect(TestBed.inject(StartupService).hasStarted()).toBe(true));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    const whileStarting = [service.isEnabled("notes.newNote"), press({ key: "n", code: "KeyN", ctrlKey: true, altKey: true }).defaultPrevented];
+    bridge.publishStartup({ kind: "Ready", details: [] });
+
+    expect(whileStarting).toEqual([false, false]);
+    expect(service.isEnabled("notes.newNote")).toBe(true);
+    expect(runs).toEqual([]);
   });
 
   it("uses Cmd for Mod on macOS", async () => {

@@ -32,8 +32,10 @@ class WorkspaceHostComponent {
 }
 
 describe("WorkspaceComponent", () => {
+  let bridge: DesktopBridgeFixture;
+
   beforeEach(() => {
-    DesktopBridgeFixture.install();
+    bridge = DesktopBridgeFixture.install();
   });
 
   afterEach(() => {
@@ -68,6 +70,40 @@ describe("WorkspaceComponent", () => {
     const bounds = element.getBoundingClientRect();
     return [bounds.x - workspace.x, bounds.y - workspace.y, bounds.width, bounds.height];
   }
+
+  it("is inert while the runtime starts again and gives the focus back where it was once it is ready", async () => {
+    const fixture = await renderAsync(ViewRegistry.createEmpty());
+    const workspace = (fixture.nativeElement as HTMLElement).querySelector("tr-workspace") as HTMLElement;
+    const focused = workspace.appendChild(document.createElement("button"));
+    focused.focus();
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    await settleAsync(fixture);
+    const whileStarting = [workspace.hasAttribute("inert"), document.activeElement === focused];
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await settleAsync(fixture);
+
+    expect(whileStarting).toEqual([true, false]);
+    expect(workspace.hasAttribute("inert")).toBe(false);
+    expect(document.activeElement).toBe(focused);
+  });
+
+  it("leaves the focus where it is when the person moved it while the runtime started again", async () => {
+    const fixture = await renderAsync(ViewRegistry.createEmpty());
+    const workspace = (fixture.nativeElement as HTMLElement).querySelector("tr-workspace") as HTMLElement;
+    workspace.appendChild(document.createElement("button")).focus();
+    const outside = document.body.appendChild(document.createElement("input"));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    await settleAsync(fixture);
+    outside.focus();
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await settleAsync(fixture);
+    const active = document.activeElement;
+    outside.remove();
+
+    expect(active).toBe(outside);
+  });
 
   it("shows only the middle, with the empty-window card, when there are no modules", async () => {
     const fixture = await renderAsync(ViewRegistry.createEmpty());
