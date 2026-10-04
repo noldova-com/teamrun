@@ -8,17 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 
-import { ProductInfo } from "./models/product-info.js";
-
 export class Resources {
-  public static get productName(): string {
-    return ProductInfo.current.name;
-  }
-
-  public static get productSlug(): string {
-    return ProductInfo.current.slug;
-  }
-
   public static readonly folderSeparator: string = "/";
   public static readonly rootParameterName: string = "root";
   public static readonly idParameterName: string = "id";
@@ -141,6 +131,7 @@ export class Resources {
   public static readonly declarationsFormatVersion: number = 1;
   public static readonly declarationsFileSegments: readonly string[] = ["_build", "modules", "declarations.json"];
   public static readonly productFileSegments: readonly string[] = ["_build", "product.json"];
+  public static readonly nameField: string = "name";
   public static readonly slugField: string = "slug";
   public static readonly applicationIdField: string = "applicationId";
   public static readonly developmentApplicationIdField: string = "developmentApplicationId";
@@ -232,8 +223,8 @@ export class Resources {
   public static readonly defaultThemeId: string = "shell.default";
   public static readonly defaultThemeTitle: string = "Default";
   public static readonly themeTitle: string = "Theme";
-  public static get themeDescription(): string {
-    return `The colors and look of ${Resources.productName}.`;
+  public static formatThemeDescription(productName: string): string {
+    return `The colors and look of ${productName}.`;
   }
 
   public static readonly modeTitle: string = "Mode";
@@ -281,17 +272,9 @@ export class Resources {
   public static readonly nameParameterName: string = "name";
   public static readonly defaultKeyParameterName: string = "defaultKey";
   public static readonly isCheckedParameterName: string = "isChecked";
-  public static get dataDirectoryVariable(): string {
-    return ProductInfo.current.dataDirectoryVariable;
-  }
-
-  public static get defaultDataFolder(): readonly string[] {
-    return ProductInfo.current.dataFolder.split(Resources.folderSeparator);
-  }
-
   public static readonly developmentDataFolder: readonly string[] = ["_build", "data"];
-  public static get preShellData(): string {
-    return `This data directory holds data from a ${Resources.productName} release that predates the shell; move it aside to continue.`;
+  public static formatPreShellData(productName: string): string {
+    return `This data directory holds data from a ${productName} release that predates the shell; move it aside to continue.`;
   }
 
   public static readonly linuxPlatform: string = "linux";
@@ -338,17 +321,14 @@ export class Resources {
   public static readonly failureExitCode: number = 1;
   public static readonly launchShell: string = "/bin/bash";
   public static readonly launchDescriptors: string = "/proc/self/fd";
-  public static get launchShellArguments(): readonly string[] {
-    return [
-      "--noprofile",
-      "--norc",
-      "-p",
-      "-c",
-      "set -e; shopt -s failglob; for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done; exec -- \"$@\"",
-      `${Resources.productSlug}-launch`
-    ];
-  }
-
+  public static readonly launchShellArguments: readonly string[] = [
+    "--noprofile",
+    "--norc",
+    "-p",
+    "-c",
+    "set -e; shopt -s failglob; for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done; exec -- \"$@\""
+  ];
+  public static readonly launchNameSuffix: string = "-launch";
   public static readonly stoppedByIdle: string = "idle";
   public static readonly stoppedByRequest: string = "request";
   public static readonly stoppedBySignal: string = "signal";
@@ -377,8 +357,8 @@ export class Resources {
   public static readonly endpointUnavailable: string = "The runtime's local endpoint has no address.";
   public static readonly handshakeRequired: string = "A connection must begin with a handshake.";
   public static readonly unauthorized: string = "The capability token is not valid for this runtime.";
-  public static get buildMismatch(): string {
-    return `Another build of ${Resources.productName} owns this data directory.`;
+  public static formatBuildMismatchFailure(productName: string): string {
+    return `Another build of ${productName} owns this data directory.`;
   }
 
   public static readonly otherBuildMayOnlyStop: string = "A connection from another build may only ask the runtime to stop.";
@@ -531,8 +511,8 @@ export class Resources {
     return `The discovery file ${file} is not valid: ${reason}`;
   }
 
-  public static formatOwned(root: string): string {
-    return `Another ${Resources.productName} runtime owns the data directory ${root}.`;
+  public static formatOwned(productName: string, root: string): string {
+    return `Another ${productName} runtime owns the data directory ${root}.`;
   }
 
   public static formatPreShellData(root: string, entries: readonly string[]): string {
@@ -595,8 +575,8 @@ export class Resources {
     return `${fileName}.${unique}${Resources.temporarySuffix}`;
   }
 
-  public static formatEndpointInvalid(text: string): string {
-    return `"${text}" is not a ${Resources.productName} endpoint.`;
+  public static formatEndpointInvalid(productName: string, text: string): string {
+    return `"${text}" is not a ${productName} endpoint.`;
   }
 
   public static formatSocketPathTooLong(socketPath: string): string {
@@ -739,16 +719,16 @@ export class Resources {
     return `The runtime at ${endpoint} cannot be reached.`;
   }
 
-  public static formatHandover(productVersion: string, executablePath: string): string {
-    return `${Resources.productName} ${productVersion} at ${executablePath} owns this data directory and is newer; open that ${Resources.productName} instead.`;
+  public static formatHandover(productName: string, productVersion: string, executablePath: string): string {
+    return `${productName} ${productVersion} at ${executablePath} owns this data directory and is newer; open that ${productName} instead.`;
   }
 
   public static formatNoRuntime(root: string): string {
     return `No runtime is running for ${root}.`;
   }
 
-  public static formatBuildMismatch(productVersion: string, executablePath: string): string {
-    return `${Resources.productName} ${productVersion} at ${executablePath} owns this data directory; it is another build, and taking it over was not asked for.`;
+  public static formatBuildMismatch(productName: string, productVersion: string, executablePath: string): string {
+    return `${productName} ${productVersion} at ${executablePath} owns this data directory; it is another build, and taking it over was not asked for.`;
   }
 
   public static formatWorkInProgress(descriptions: readonly string[]): string {
@@ -791,8 +771,8 @@ export class Resources {
     return `The argument ${name} needs a value.`;
   }
 
-  public static formatPreShellFound(location: string): string {
-    return `The data directory ${location} holds data from a ${Resources.productName} release that predates the shell.`;
+  public static formatPreShellFound(productName: string, location: string): string {
+    return `The data directory ${location} holds data from a ${productName} release that predates the shell.`;
   }
 
   public static formatMoveAsideFailed(message: string): string {

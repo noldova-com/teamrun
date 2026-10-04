@@ -17,7 +17,6 @@ import BuildVariant from "./modules/build-variant.ts";
 import ModuleArtifacts from "./modules/module-artifacts.ts";
 import ModuleCatalog from "./modules/module-catalog.ts";
 import ModuleException from "./modules/module.exception.ts";
-import BuildProduct from "./packages/build-product.ts";
 import PackageBuild from "./packages/package-build.ts";
 import PackageException from "./packages/package.exception.ts";
 import ProcessRunner from "./processes/process-runner.ts";
@@ -35,7 +34,6 @@ export default class Build {
   private static readonly USAGE_EXIT_CODE: number = 2;
 
   private readonly build: PackageBuild;
-  private readonly buildProduct: BuildProduct;
   private readonly modules: ModuleCatalog;
   private readonly artifacts: ModuleArtifacts;
   private readonly product: ProductFile;
@@ -44,9 +42,8 @@ export default class Build {
   private readonly electron: ElectronBinary;
   private readonly output: Writable;
 
-  public constructor(build: PackageBuild, buildProduct: BuildProduct, modules: ModuleCatalog, artifacts: ModuleArtifacts, product: ProductFile, gallery: GalleryFile, angular: AngularProject, electron: ElectronBinary, output: Writable) {
+  public constructor(build: PackageBuild, modules: ModuleCatalog, artifacts: ModuleArtifacts, product: ProductFile, gallery: GalleryFile, angular: AngularProject, electron: ElectronBinary, output: Writable) {
     this.build = build;
-    this.buildProduct = buildProduct;
     this.modules = modules;
     this.artifacts = artifacts;
     this.product = product;
@@ -75,12 +72,10 @@ export default class Build {
       const outputIndex = names.indexOf(Build.OUTPUT_OPTION);
       const outputFolder = outputIndex < 0 ? null : path.resolve(String(values[outputIndex]));
       const declarations = await this.modules.listBuildAsync(variant.isTest, variant.excluded);
-      const packages = await this.build.buildAsync(this.output, variant);
+      const packages = await this.build.buildAsync(this.output, variant, outputFolder);
       this.output.write(packages.length === 0 ? Build.NO_PACKAGES : `Packages built and installed: ${packages.length}.\n`);
       await this.artifacts.writeAsync(declarations, outputFolder);
       this.output.write(`Modules in the build: ${declarations.length}.\n`);
-      if (packages.length > 0)
-        await this.buildProduct.writeAsync(await this.build.hashFingerprintAsync(variant), outputFolder);
       await this.product.writeAsync();
       await this.gallery.writeAsync(variant.isPackaged);
       await this.angular.prepareAsync(this.output);
@@ -104,6 +99,6 @@ if (import.meta.main) {
   const runner = new ProcessRunner();
   const root = process.cwd();
   const angular = new AngularProject(root, runner, new NpmCommand(runner, process.env));
-  const build = new Build(new PackageBuild(root, runner, process.env), new BuildProduct(root), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, new ElectronBinary(root, runner), process.stdout);
+  const build = new Build(new PackageBuild(root, runner, process.env), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, new ElectronBinary(root, runner), process.stdout);
   process.exitCode = await build.runAsync(process.argv.slice(2));
 }

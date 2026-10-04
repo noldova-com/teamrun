@@ -21,10 +21,6 @@ export default class BuildProduct {
     this.root = root;
   }
 
-  public locate(outputFolder: string | null): string {
-    return outputFolder === null ? path.join(this.root, ...BuildProduct.FILE_SEGMENTS) : path.join(outputFolder, BuildProduct.OUTPUT_FILE);
-  }
-
   public async writeAsync(fingerprint: string, outputFolder: string | null): Promise<void> {
     const manifest = await RootManifest.readAsync(this.root);
     const product = manifest.product;
@@ -43,5 +39,9 @@ export default class BuildProduct {
     const file = this.locate(outputFolder);
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, `${JSON.stringify(document, null, 2)}\n`);
+  }
+
+  private locate(outputFolder: string | null): string {
+    return outputFolder === null ? path.join(this.root, ...BuildProduct.FILE_SEGMENTS) : path.join(outputFolder, BuildProduct.OUTPUT_FILE);
   }
 }

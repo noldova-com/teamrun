@@ -17,6 +17,7 @@ import ModuleCatalog from "../modules/module-catalog.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import NpmCommand from "../toolchain/npm-command.ts";
 import BuildLayout from "./build-layout.ts";
+import BuildProduct from "./build-product.ts";
 import BuildRecord from "./build-record.ts";
 import ContentHash from "./content-hash.ts";
 import PackageBuilder from "./package-builder.ts";
@@ -36,6 +37,7 @@ export default class PackageBuild {
 
   private readonly layout: BuildLayout;
   private readonly catalog: PackageCatalog;
+  private readonly product: BuildProduct;
   private readonly modules: ModuleCatalog;
   private readonly runner: ProcessRunner;
   private readonly environment: NodeJS.ProcessEnv;
@@ -43,12 +45,13 @@ export default class PackageBuild {
   public constructor(root: string, runner: ProcessRunner, environment: NodeJS.ProcessEnv) {
     this.layout = new BuildLayout(root);
     this.catalog = new PackageCatalog(root);
+    this.product = new BuildProduct(root);
     this.modules = new ModuleCatalog(root);
     this.runner = runner;
     this.environment = environment;
   }
 
-  public async buildAsync(output: Writable, variant: BuildVariant): Promise<readonly PackageManifest[]> {
+  public async buildAsync(output: Writable, variant: BuildVariant, outputFolder: string | null = null): Promise<readonly PackageManifest[]> {
     const packages = await this.catalog.listPackagesAsync(variant.isTest);
     if (packages.length === 0)
       return packages;
@@ -88,6 +91,7 @@ export default class PackageBuild {
       }
 
     await this.requireCurrentAsync(variant);
+    await this.product.writeAsync(await this.hashFingerprintAsync(variant), outputFolder);
     return packages;
   }
 

@@ -35,7 +35,7 @@ export class ProductInfo {
 
   private constructor(reader: JsonReader) {
     const folders = reader.readObject(Resources.deviceFoldersField);
-    this.name = reader.readNonBlankString(Resources.nameParameterName);
+    this.name = reader.readNonBlankString(Resources.nameField);
     this.slug = reader.readNonBlankString(Resources.slugField);
     this.applicationId = reader.readNonBlankString(Resources.applicationIdField);
     this.developmentApplicationId = reader.readNonBlankString(Resources.developmentApplicationIdField);

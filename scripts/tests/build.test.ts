@@ -20,7 +20,6 @@ import ElectronBinary from "../desktop/electron-binary.ts";
 import BuildVariant from "../modules/build-variant.ts";
 import ModuleArtifacts from "../modules/module-artifacts.ts";
 import ModuleCatalog from "../modules/module-catalog.ts";
-import BuildProduct from "../packages/build-product.ts";
 import PackageBuild from "../packages/package-build.ts";
 import ProcessException from "../processes/process.exception.ts";
 import ProcessRunner from "../processes/process-runner.ts";
@@ -52,25 +51,45 @@ class BuildTests {
       t.after(() => repository.disposeAsync());
       await PackageTreeFixture.writeRootAsync(repository);
       await PackageTreeFixture.writePackageAsync(repository, "foundation-alpha", [], false);
+      await repository.writeAsync({
+        "package.json": JSON.stringify({ name: "fixture", version: "0.0.7", teamrun: { protocolVersion: 3, modules: ["notes"], product: ProductIdentityFixture.json }, private: true, type: "module" }),
+        "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", parts: ["window"], dependencies: [], contributes: {} }),
+        "src/modules/notes/window/src/api/index.ts": "export {};\n",
+        [`${ModuleCatalog.FIXTURE_FOLDER}/clock/module.json`]: JSON.stringify({ id: "clock", displayName: "Clock", parts: ["window"], dependencies: [], contributes: {} }),
+        [`${ModuleCatalog.FIXTURE_FOLDER}/clock/window/src/api/index.ts`]: "export {};\n"
+      });
       const output = new TextOutputFixture();
-      const variant = path.join(repository.directory, "_build", "variants", "tested");
-      const fingerprint = await new PackageBuild(repository.directory, new ProcessRunner(), process.env).hashFingerprintAsync(BuildVariant.REGULAR);
+      const tested = path.join(repository.directory, "_build", "variants", "tested");
+      const withoutNotes = path.join(repository.directory, "_build", "variants", "without-notes");
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const fingerprints = [
+        await build.hashFingerprintAsync(BuildVariant.REGULAR),
+        await build.hashFingerprintAsync(new BuildVariant(true, [])),
+        await build.hashFingerprintAsync(new BuildVariant(true, ["notes"]))
+      ];
+      const readAsync = async (file: string): Promise<Record<string, unknown>> => JSON.parse(await readFile(file, "utf8"));
 
       assert.equal(await BuildTests.create(repository.directory, output, process.env).runAsync([]), 0);
-      assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--test", "--output", variant]), 0);
-      const product = JSON.parse(await readFile(path.join(repository.directory, "_build", "product.json"), "utf8"));
+      assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--test", "--output", tested]), 0);
+      assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--test", "--output", withoutNotes, "--without", "notes"]), 0);
+      const products = [
+        await readAsync(path.join(repository.directory, "_build", "product.json")),
+        await readAsync(path.join(tested, "product.json")),
+        await readAsync(path.join(withoutNotes, "product.json"))
+      ];
 
       assert.equal(
         output.text,
-        "@noldova/teamrun-foundation-alpha: built\nPackages built and installed: 1.\nModules in the build: 0.\nNo Angular project under src/; there is nothing to prepare.\n");
-      assert.deepEqual(Object.keys(product), [
+        "@noldova/teamrun-foundation-alpha: built\nPackages built and installed: 1.\nModules in the build: 1.\nNo Angular project under src/; there is nothing to prepare.\n");
+      assert.equal(new Set(fingerprints).size, 3);
+      assert.deepEqual(products.map(t => t["build"]), fingerprints);
+      assert.deepEqual(Object.keys(products[0] ?? {}), [
         "name", "slug", "applicationId", "developmentApplicationId", "dataFolder", "deviceFolders", "dataDirectoryVariable", "icons", "version", "build"
       ]);
-      assert.equal(product.name, ProductIdentityFixture.json["name"]);
-      assert.deepEqual(product.deviceFolders, ProductIdentityFixture.json["deviceFolders"]);
-      assert.equal(product.build, fingerprint);
-      assert.equal(product.version, "0.0.7");
-      assert.deepEqual(JSON.parse(await readFile(path.join(variant, "product.json"), "utf8")), product);
+      assert.equal(products[0]?.["name"], ProductIdentityFixture.json["name"]);
+      assert.deepEqual(products[0]?.["deviceFolders"], ProductIdentityFixture.json["deviceFolders"]);
+      assert.equal(products[0]?.["version"], "0.0.7");
+      assert.deepEqual(products.map(t => ({ ...t, build: null })), products.map(() => ({ ...products[0], build: null })));
     });
 
     test("a test build adds the fixture modules, leaves out the named ones and writes the module artifacts", async t => {
@@ -216,7 +235,7 @@ class BuildTests {
 
   private static createWith(root: string, angular: AngularProject, output: TextOutputFixture, environment: NodeJS.ProcessEnv = process.env): Build {
     const runner = new ProcessRunner();
-    return new Build(new PackageBuild(root, runner, environment), new BuildProduct(root), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, new ElectronBinary(root, runner), output);
+    return new Build(new PackageBuild(root, runner, environment), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, new ElectronBinary(root, runner), output);
   }
 }
 

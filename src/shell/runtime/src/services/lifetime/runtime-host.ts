@@ -24,6 +24,7 @@ import { CapabilityToken } from "../../models/capability-token.js";
 import type { Endpoint } from "../../models/endpoint.js";
 import type { EventChannel } from "../../models/event-channel.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
+import { ProductInfo } from "../../models/product-info.js";
 import { Refusal } from "../../models/refusal.js";
 import { RuntimeBuild } from "../../models/runtime-build.js";
 import { RuntimeDiscovery } from "../../models/runtime-discovery.js";
@@ -142,7 +143,7 @@ export class RuntimeHost implements IIdleParticipant {
       this.registerShellFacilities(database);
     else {
       this.server.refuse(new Refusal(
-        new Failure(FailureCode.PreShellData, Resources.preShellData, new PreShellData(lock.dataDirectory.root).toJson()),
+        new Failure(FailureCode.PreShellData, Resources.formatPreShellData(ProductInfo.current.name), new PreShellData(lock.dataDirectory.root).toJson()),
         ShellMethods.moveAside));
       this.methods.register(ShellMethods.moveAside, new MoveAsideMethod(() => this.moveAsideAsync()));
     }
