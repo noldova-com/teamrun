@@ -250,6 +250,7 @@ A module declares its notification kinds in `contributes.notifications`. A part 
 - A stopping runtime releases ownership last, after closing its databases and its log, so a data directory that no one owns holds no file its runtime opened.
 - A starting runtime that finds the directory owned leaves it to an owner that has published discovery. An owner without discovery is starting or stopping, so the new runtime keeps trying to take over for up to five seconds and leaves as soon as that owner publishes discovery.
 - Discovery metadata is published atomically and identifies the endpoint, the owner process and the program it runs from, the product and protocol versions and the runtime's build.
+- A new owner removes the discovery metadata an earlier owner left behind before it listens, because on macOS and Linux it reuses that owner's socket path. A launcher whose token is refused tries again only when the metadata has changed since it read it, at most three times.
 - Process cleanup must establish recorded ownership, not rely on a reused process id alone.
 
 ### Endpoint and authentication
