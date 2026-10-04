@@ -20,6 +20,9 @@
   background: none;
   color: inherit;
   font: inherit;
+  font-size: var(--tr-text-panel);
+  font-weight: 400;
+  line-height: var(--tr-line-panel);
   white-space: nowrap;
   outline: none;
 }

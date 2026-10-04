@@ -155,7 +155,8 @@ export class WindowRowComponent {
     }
 
     const style = getComputedStyle(this.host);
-    const room = this.host.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - start.offsetWidth - end.offsetWidth - Resources.windowRowMinimumDragWidth;
+    const dragWidth = Resources.windowRowMinimumDragRem * parseFloat(getComputedStyle(this.host.ownerDocument.documentElement).fontSize);
+    const room = this.host.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - start.offsetWidth - end.offsetWidth - dragWidth;
     this.foldedValue.set(bar.offsetWidth > room);
   }
 }

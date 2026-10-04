@@ -9,6 +9,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import ScrollAreaFixture from "./fixtures/scroll-area.fixture.ts";
 import SettingsFixture from "./fixtures/settings.fixture.ts";
 
 function scope(window: Page, mode: "Light" | "Dark"): Locator {
@@ -80,6 +81,39 @@ test.describe("gallery", () => {
       await expect(scope(window, mode).locator(".cdk-overlay-container tr-tooltip")).toHaveText((await long.getAttribute("aria-label")) ?? "");
       await desktop.checkpointAsync(`toolbar-button-long-label-${mode.toLowerCase()}`);
       await window.mouse.move(0, 0);
+    }
+  });
+
+  test("the text field and the select write in the panel text size, and an open select's list shows its thumb while hovered, in light and in dark", async ({ desktop }) => {
+    const window = desktop.window;
+    await SettingsFixture.openGalleryAsync(window);
+
+    for (const mode of ["Light", "Dark"] as const) {
+      const specimen = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Select\"]");
+      await specimen.scrollIntoViewIfNeeded();
+      const sizes = await scope(window, mode).evaluate(t => {
+        const probe = t.appendChild(document.createElement("div"));
+        probe.style.fontSize = "var(--tr-text-panel)";
+        const panel = getComputedStyle(probe).fontSize;
+        probe.style.fontSize = "var(--tr-text-label)";
+        const label = getComputedStyle(probe).fontSize;
+        probe.remove();
+        const field = t.querySelector(".tr-gallery-specimen[aria-label=\"Text field\"] input") as Element;
+        const select = t.querySelector(".tr-gallery-specimen[aria-label=\"Select\"] .tr-select-button") as Element;
+        return { panel, label, field: getComputedStyle(field).fontSize, select: getComputedStyle(select).fontSize };
+      });
+      expect(sizes.panel).not.toBe(sizes.label);
+      expect([sizes.field, sizes.select]).toEqual([sizes.panel, sizes.panel]);
+
+      await specimen.locator(".tr-select-button").first().click();
+      const list = scope(window, mode).locator(".cdk-overlay-container .tr-select-list");
+      await expect(list).toBeVisible();
+      await list.evaluate(t => t.style.setProperty("max-height", `${(t.querySelector(".tr-select-option") as HTMLElement).offsetHeight * 1.5}px`));
+      expect(await list.evaluate(t => t.scrollHeight > t.clientHeight)).toBe(true);
+      expect(await ScrollAreaFixture.thumbChangesOnHoverAsync(window, list, "vertical")).toBe(true);
+      await desktop.checkpointAsync(`select-list-thumb-${mode.toLowerCase()}`);
+      await window.keyboard.press("Escape");
+      await expect(list).toHaveCount(0);
     }
   });
 
