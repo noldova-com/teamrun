@@ -38,7 +38,7 @@ class BuildAndTestTests {
   ];
   private static readonly BUILD_ARTIFACT: string = "name: ui-build-${{ matrix.runner }}-${{ matrix.architecture }}";
   private static readonly BUILD_UPLOAD_SETTINGS: readonly string[] = [BuildAndTestTests.BUILD_ARTIFACT, "path: ui-build.tar", "retention-days: 3", "if-no-files-found: error"];
-  private static readonly PACKED: string = "_build/archives _build/modules _build/packages _build/records _build/tests _build/variants _build/window _build/ui-builds.record " +
+  private static readonly PACKED: string = "_build/archives _build/modules _build/packages _build/product.json _build/records _build/tests _build/variants _build/window _build/ui-builds.record " +
     "node_modules/.package-lock.json node_modules/@noldova src/generated";
   private static readonly WORKFLOW_NODE_SETUPS: readonly string[] = ["Set up Node.js to classify", "Set up Node.js to install"];
   private static readonly ACTION_NODE_SETUP: string = "Set up Node.js";

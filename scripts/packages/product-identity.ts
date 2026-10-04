@@ -100,21 +100,6 @@ export default class ProductIdentity {
       ProductIdentity.readText(product, "icons"));
   }
 
-  public get placeholders(): ReadonlyMap<string, string> {
-    return new Map([
-      ["__PRODUCT_NAME__", this.name],
-      ["__PRODUCT_SLUG__", this.slug],
-      ["__APPLICATION_ID__", this.applicationId],
-      ["__DEVELOPMENT_APPLICATION_ID__", this.developmentApplicationId],
-      ["__DATA_FOLDER__", this.dataFolder],
-      ["__WINDOWS_DEVICE_FOLDER__", this.windowsDeviceFolder],
-      ["__MACOS_DEVICE_FOLDER__", this.macosDeviceFolder],
-      ["__LINUX_DEVICE_FOLDER__", this.linuxDeviceFolder],
-      ["__DATA_DIRECTORY_VARIABLE__", this.dataDirectoryVariable],
-      ["__ICONS_FOLDER__", this.icons]
-    ]);
-  }
-
   public get literals(): readonly string[] {
     return [...new Set([
       this.name,

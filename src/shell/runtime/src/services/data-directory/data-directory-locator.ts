@@ -10,6 +10,7 @@ import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 
+import { ProductInfo } from "../../models/product-info.js";
 import { Resources } from "../../resources.js";
 import { DataDirectory } from "./data-directory.js";
 
@@ -18,9 +19,9 @@ export class DataDirectoryLocator {
     if (!Object.isUndefined(explicit) && !String.isNullOrWhitespace(explicit))
       return new DataDirectory(explicit);
     if (isPackaged)
-      return new DataDirectory(path.join(homeFolder, ...Resources.defaultDataFolder));
+      return new DataDirectory(path.join(homeFolder, ...ProductInfo.current.dataFolder.split(Resources.folderSeparator)));
 
-    const variable = environment[Resources.dataDirectoryVariable];
+    const variable = environment[ProductInfo.current.dataDirectoryVariable];
     if (Object.isUndefined(variable) || String.isNullOrWhitespace(variable))
       return new DataDirectory(path.join(checkoutRoot, ...Resources.developmentDataFolder));
     return new DataDirectory(variable);

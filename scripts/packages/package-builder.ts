@@ -35,7 +35,6 @@ export default class PackageBuilder {
   private static readonly DECLARATIONS: readonly string[] = ["api", "index.d.ts"];
   private static readonly VERSION_PLACEHOLDER: string = "__VERSION__";
   private static readonly PROTOCOL_VERSION_PLACEHOLDER: string = "__PROTOCOL_VERSION__";
-  private static readonly BUILD_PLACEHOLDER: string = "__BUILD__";
   private static readonly PACK_ARGUMENTS: readonly string[] = ["pack", "--ignore-scripts", "--loglevel=error", "--pack-destination"];
   private static readonly INSTALL_ARGUMENTS: readonly string[] = ["install", "--no-save", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error"];
 
@@ -43,14 +42,12 @@ export default class PackageBuilder {
   private readonly rootManifest: RootManifest;
   private readonly runner: ProcessRunner;
   private readonly npm: NpmCommand;
-  private readonly fingerprint: string;
 
-  public constructor(layout: BuildLayout, rootManifest: RootManifest, runner: ProcessRunner, npm: NpmCommand, fingerprint: string) {
+  public constructor(layout: BuildLayout, rootManifest: RootManifest, runner: ProcessRunner, npm: NpmCommand) {
     this.layout = layout;
     this.rootManifest = rootManifest;
     this.runner = runner;
     this.npm = npm;
-    this.fingerprint = fingerprint;
   }
 
   public async buildSourceAsync(manifest: PackageManifest, archives: readonly string[]): Promise<void> {
@@ -115,9 +112,8 @@ export default class PackageBuilder {
   }
 
   private stamp(text: string): string {
-    return [...this.rootManifest.product.placeholders].reduce((stamped, [placeholder, value]) => stamped.replaceAll(placeholder, value), text)
+    return text
       .replaceAll(PackageBuilder.VERSION_PLACEHOLDER, this.rootManifest.productVersion)
-      .replaceAll(PackageBuilder.PROTOCOL_VERSION_PLACEHOLDER, String(this.rootManifest.protocolVersion))
-      .replaceAll(PackageBuilder.BUILD_PLACEHOLDER, this.fingerprint);
+      .replaceAll(PackageBuilder.PROTOCOL_VERSION_PLACEHOLDER, String(this.rootManifest.protocolVersion));
   }
 }
