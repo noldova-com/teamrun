@@ -70,7 +70,7 @@ class TestTests {
 
       assert.equal(exitCode, 0, output.text);
       assert.equal(output.text, [
-        "Filtered run: alpha, a.spec. A filtered run is not the complete gate.",
+        "Filtered run: \"alpha\", \"a.spec\". A filtered run is not the complete gate.",
         "",
         "Package tests and coverage",
         "No package has tests.",

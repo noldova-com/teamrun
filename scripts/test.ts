@@ -112,7 +112,7 @@ export default class Test {
   }
 
   private async runFilteredAsync(filters: readonly string[]): Promise<number> {
-    this.output.write(`Filtered run: ${filters.join(", ")}. A filtered run is not the complete gate.\n`);
+    this.output.write(`Filtered run: ${filters.map(t => JSON.stringify(t)).join(", ")}. A filtered run is not the complete gate.\n`);
     const build = new PackageBuild(this.root, this.runner, this.environment);
     const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
     const checks: readonly ISelectableCheck[] = [

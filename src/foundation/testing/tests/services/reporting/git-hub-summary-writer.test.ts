@@ -68,8 +68,23 @@ export class GitHubSummaryWriterTests {
 
       writer.writeTests(new TestRunResult(classResults, new TestSelection(["Sample", "Other"], 9, 1)));
       const report = readFileSync(path, "utf8");
-      for (const line of ["| Filters: | Sample, Other |", "| Discovered: | 9 |", "| Selected: | 1 |", "| Unselected: | 8 |"])
+      for (const line of ["| Filters: | <code>Sample</code> <code>Other</code> |", "| Discovered: | 9 |", "| Selected: | 1 |", "| Unselected: | 8 |"])
         Assert.isTrue(report.includes(line), line);
+    }
+    finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public escapesTheFiltersSoOneCannotBreakTheTableOrBlurIntoTheNext(): void {
+    const directory = mkdtempSync(join(tmpdir(), "teamrun-summary-"));
+    try {
+      const path = join(directory, "summary.md");
+
+      new GitHubSummaryWriter(path).writeTests(new TestRunResult([], new TestSelection(["a|b", "x, y", "<i>&"], 3, 0)));
+
+      Assert.isTrue(readFileSync(path, "utf8").includes("| Filters: | <code>a&#124;b</code> <code>x, y</code> <code>&lt;i&gt;&amp;</code> |"));
     }
     finally {
       rmSync(directory, { recursive: true, force: true });

@@ -129,7 +129,7 @@ export class TestRunEntry {
 
     const filters: string[] = [];
     for (const filter of value) {
-      if (!Object.isString(filter))
+      if (!Object.isString(filter) || filter === String.empty)
         throw new TestingException(Resources.testFiltersInvalid);
 
       filters.push(filter);
