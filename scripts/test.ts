@@ -14,6 +14,8 @@ import GalleryFile from "./angular/gallery-file.ts";
 import AngularTestCheck from "./checks/angular-test-check.ts";
 import DeclaredDependencyCheck from "./checks/declared-dependency-check.ts";
 import DocumentCheck from "./checks/document-check.ts";
+import GitHubConfigurationCheck from "./checks/github-configuration-check.ts";
+import LicenseHeaderCheck from "./checks/license-header-check.ts";
 import type ICheck from "./checks/interfaces/check.ts";
 import ModuleFolderCheck from "./checks/module-folder-check.ts";
 import ModuleImportCheck from "./checks/module-import-check.ts";
@@ -24,7 +26,9 @@ import PackagedBuildCheck from "./checks/packaged-build-check.ts";
 import ProductIdentityCheck from "./checks/product-identity-check.ts";
 import ScriptTestCheck from "./checks/script-test-check.ts";
 import ShellIndependenceCheck from "./checks/shell-independence-check.ts";
+import TestWaitCheck from "./checks/test-wait-check.ts";
 import TypeCheck from "./checks/type-check.ts";
+import WindowImportCheck from "./checks/window-import-check.ts";
 import BuildLayout from "./packages/build-layout.ts";
 import PackageBuild from "./packages/package-build.ts";
 import ModuleCatalog from "./modules/module-catalog.ts";
@@ -101,10 +105,14 @@ export default class Test {
     const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
     return [
       documents,
+      new LicenseHeaderCheck(this.root, files),
+      new TestWaitCheck(this.root, files),
+      new GitHubConfigurationCheck(this.root, files),
       new ModuleFolderCheck(this.root, modules),
       new ShellIndependenceCheck(tree),
       new ProductIdentityCheck(tree, () => ProductIdentity.readAsync(this.root)),
       new ModuleImportCheck(tree, modules),
+      new WindowImportCheck(tree),
       new NameUniquenessCheck(tree, modules),
       new DeclaredDependencyCheck(tree),
       new PackageCheck(build),

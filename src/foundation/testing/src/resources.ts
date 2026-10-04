@@ -11,6 +11,7 @@ export class Resources {
   public static readonly failedExitCode: number = 1;
   public static readonly defaultTimeoutMilliseconds: number = 30_000;
   public static readonly testShutdownGraceMilliseconds: number = 1000;
+  public static readonly waitIntervalMilliseconds: number = 25;
   public static readonly gitHubSummaryVariable: string = "GITHUB_STEP_SUMMARY";
   public static readonly filtersVariable: string = "TEAMRUN_TEST_FILTERS";
   public static readonly selectionFileVariable: string = "TEAMRUN_TEST_SELECTION_FILE";
@@ -48,6 +49,8 @@ export class Resources {
   public static readonly durationInvalid: string = "The duration must be a non-negative finite number of milliseconds.";
   public static readonly methodResultIdentityInvalid: string = "Every method result must belong to this package and class.";
   public static readonly timeoutInvalid: string = "The timeout must be a positive integer of milliseconds.";
+  public static readonly waitLimitInvalid: string = "The wait's limit must be a non-negative integer of milliseconds.";
+  public static readonly waitIntervalInvalid: string = "The wait's interval must be a positive integer of milliseconds.";
   public static readonly coverageDirectoryRequired: string = "The coverage run requires the folder of the V8 coverage reports.";
   public static readonly coverageProjectTripleRequired: string = "Each coverage project requires a package name, a production folder, a source folder and its exclusions.";
   public static readonly coverageExclusionsInvalid: string = "A coverage project's exclusions must be a JSON array of objects with a file and a reason.";

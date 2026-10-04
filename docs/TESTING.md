@@ -53,10 +53,17 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
 
 - **Deterministic tests.** A test waits on an event or a condition, never a fixed sleep. A limit only bounds a hang: it is generous and is never what the test checks. A test is never retried, and a flaky test is never skipped or quarantined as the fix.
 - **No races in the code.** Code never relies on the order of independent events, such as a process's exit against its message, or a window closing against a save. The order is made explicit, for example with a reply or an acknowledgement. Each such fix comes with a test that forces the bad order and fails on the old code.
+- **Fixed pauses are listed.** A test waits for a condition, not for a fixed time. A wait that polls uses `Wait.untilAsync` from `@noldova/teamrun-foundation-testing`, which bounds it, and fails with a message that says what it waited for. Test code pauses for a fixed time only in the files that the table at the end of this section lists, each for its reason. `npm test` refuses a fixed pause in any other test file — a timer promise from `node:timers/promises`, a promise that `setTimeout` resolves, or Playwright's `waitForTimeout` — and an entry whose file no longer pauses.
 - **Flakiness is a bug.** A flaky or racy failure seen anywhere, locally or in CI, gets its own bug issue and a small fix PR right away, never folded into other work.
 - **Stop the line.** Merging stops only while `main` itself fails, or while a flaky failure blocks merging in practice: it failed in two or more pull request runs in a day, or a passing run is rare. A stop that lasts longer than an hour is reassessed, and the reason it continues is recorded on its issue. A pull request held by a stop doesn't hold its author, who moves to their next task.
 - **Other flaky failures.** A flaky failure that doesn't block merging, such as one seen once in CI or only under artificial load, gets its own bug issue and a fix with priority, and merging continues. Once the issue is filed, the failed CI job may run again once so the affected pull request can merge, and never a second time.
 - **Repeated native runs.** A change to startup, shutdown, processes, windows or inter-process messages passes its affected tests five times in a row natively on Windows, Linux and macOS before review.
+
+| Test file | Why it pauses |
+|---|---|
+| `scripts/tests/fixtures/repository.fixture.ts` | Between bounded attempts to remove a fixture repository that Windows still holds open. |
+| `src/foundation/testing/tests/fixtures/execution/entry-lifetime.fixture.ts` | One fixture test outlasts its time limit on purpose, so the runner's time limit is tested. |
+| `src/shell/runtime/tests/services/client/runtime-launcher.test.ts` | A runtime publishes itself 600 ms after the launcher starts, so the launcher's wait past its own timeout is tested. |
 
 ## 4. Results and reporting
 
