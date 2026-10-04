@@ -118,7 +118,7 @@ export class TabDragService {
     if (Object.isNull(element))
       return null;
     const group = this.groupAt(element);
-    const docking = tab.isMovable ? this.dockingTargetAt(element, group) : null;
+    const docking = this.dockingTargetAt(tab, element, group);
     if (!Object.isNull(docking))
       return docking;
     const icon = element.closest<HTMLElement>(Resources.dropBeforeSelector);
@@ -136,21 +136,21 @@ export class TabDragService {
     return Object.isNull(group) || !group.accepts(tab) ? null : new TabDropTarget(group.id, Number(encoded.slice(separator + 1)));
   }
 
-  private dockingTargetAt(element: Element, group: TabGroup | null): DropTarget | null {
-    const sideGuide = element.closest<HTMLElement>(Resources.dropSideSelector);
+  private dockingTargetAt(tab: Tab, element: Element, group: TabGroup | null): DropTarget | null {
+    const sideGuide = tab.isMovable ? element.closest<HTMLElement>(Resources.dropSideSelector) : null;
     const side = Object.values(DockSide).find(t => t === sideGuide?.dataset[Resources.dropSideData]);
     if (!Object.isUndefined(side))
       return new SideDropTarget(side, Object.values(BottomDockSpan).find(t => t === sideGuide?.dataset[Resources.dropSpanData]) ?? null);
     const plate = element.closest(Resources.dropPlateSelector);
     const guide = element.closest<HTMLElement>(Resources.directionSelector);
-    if (Object.isNull(plate) || Object.isNull(guide) || Object.isNull(group))
+    if (Object.isNull(plate) || Object.isNull(guide) || Object.isNull(group) || !group.accepts(tab))
       return null;
     const edge = Object.values(PanelEdge).find(t => t === guide.dataset[Resources.directionData]);
     return Object.isUndefined(edge) ? new TabDropTarget(group.id, group.tabs.length) : new SplitDropTarget(group.id, edge);
   }
 
   private stripTargetAt(tab: Tab, element: Element, group: TabGroup, x: number): DropTarget | null {
-    if (Object.isNull(element.closest(Resources.dropTabsSelector)) || !group.accepts(tab) || (!tab.isMovable && !group.has(tab)))
+    if (Object.isNull(element.closest(Resources.dropTabsSelector)) || !group.accepts(tab))
       return null;
     const marker = element.closest<HTMLElement>(Resources.tabIndexSelector);
     if (Object.isNull(marker))

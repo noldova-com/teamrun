@@ -67,7 +67,8 @@ describe("ShellCommandsService", () => {
     expect(service.commands.map(t => t.name)).toEqual([
       "shell.closeTab", "shell.keepTab", "shell.closeOtherTabs", "shell.closeTabsToTheRight", "shell.closeAllTabs", "shell.moveTabLeft", "shell.moveTabRight",
       "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight",
-      "shell.dockTabBottom", "shell.moveTabToGroup", "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut",
+      "shell.dockTabBottom", "shell.moveTabToGroup", "shell.moveTabToNextGroup", "shell.moveTabToPreviousGroup", "shell.focusNextGroup", "shell.focusPreviousGroup",
+      "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut",
       "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.toggleToolbar", "shell.moveToolbarLeft", "shell.moveToolbarRight", "shell.moveToolbarUp", "shell.moveToolbarDown", "shell.hideToolbar",
       "shell.focusToolbars", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
@@ -172,12 +173,12 @@ describe("ShellCommandsService", () => {
     expect(layout.layout().sideOf(layout.layout().groupOf(search)?.id ?? -1)).toBe(DockSide.Bottom);
   });
 
-  it("leaves out what can never apply to a tab: Keep open on a kept tab, and moving, splitting or docking a document", () => {
+  it("leaves out what can never apply to a tab: Keep open on a kept tab, and docking a document", () => {
     const applies = (name: string, commandArguments: JsonValue): boolean => command(name).isApplicable(commandArguments);
 
     expect([applies("shell.keepTab", tab(settings.key)), applies("shell.keepTab", tab(plan.key))]).toEqual([true, false]);
     expect(["shell.splitTabLeft", "shell.dockTabLeft", "shell.moveTabToGroup"].map(t => [applies(t, tab(plan.key)), applies(t, tab(search.key))]))
-      .toEqual([[false, true], [false, true], [false, true]]);
+      .toEqual([[true, true], [false, true], [true, true]]);
     expect([applies("shell.closeTab", tab(plan.key)), applies("shell.closeTab", tab("missing")), applies("shell.moveTabToGroup", tab("missing"))])
       .toEqual([true, false, false]);
   });
@@ -188,6 +189,18 @@ describe("ShellCommandsService", () => {
     await runAsync("shell.closeTab", tab(changes.key));
 
     expect([layout.layout().isOpen(changes), layout.layout().group(group)]).toEqual([false, null]);
+  });
+
+  it("passes the focus to the group that remains when a closed tab was the last of its group, and has none to focus when no tab remains", async () => {
+    await runAsync("shell.splitTabRight", tab(todo.key));
+    const remaining = layout.layout().documentGroups[0];
+
+    await runAsync("shell.closeTab", tab(todo.key));
+
+    expect([layout.layout().documentGroups.map(t => t.id), layout.currentGroup().id, layout.currentGroup().active]).toEqual([[remaining?.id], remaining?.id, remaining?.active]);
+    await runAsync("shell.closeTab", tab(plan.key));
+    await runAsync("shell.closeTab", tab(settings.key));
+    expect([layout.layout().documents.tabs, layout.currentGroup().active]).toEqual([[], null]);
   });
 
   it("moves a tab to another group that accepts it, and to no other", async () => {
@@ -203,6 +216,48 @@ describe("ShellCommandsService", () => {
 
     expect(layout.layout().groupOf(search)?.id).toBe(other);
     expect(layout.layout().groupOf(search)?.tabs.at(-1)).toEqual(search);
+  });
+
+  it("splits a document into a documents group, moves a tab between the groups it can join and focuses the next or previous group, wrapping at either end", async () => {
+    const names = ["shell.moveTabToNextGroup", "shell.moveTabToPreviousGroup", "shell.focusNextGroup", "shell.focusPreviousGroup"];
+    const before = names.map(t => enabled(t, t.includes("focus") ? null : tab(plan.key)));
+
+    await runAsync("shell.splitTabRight", tab(todo.key));
+    const [first, second] = layout.layout().documentGroups;
+    const contents = (): number[] => layout.layout().documentGroups.map(t => t.tabs.length);
+
+    expect(before).toEqual([false, false, true, true]);
+    expect([first?.tabs, second?.tabs, layout.layout().documents.id]).toEqual([[plan, settings], [todo], second?.id]);
+    expect([enabled("shell.splitTabRight", tab(todo.key)), enabled("shell.splitTabRight", tab(plan.key))]).toEqual([false, true]);
+    const frames = layout.geometry().frames.filter(t => t.group.active !== null).length;
+    const visited = new Set<number>();
+    for (let step = 0; step < frames; step++) {
+      await runAsync("shell.focusNextGroup");
+      visited.add(layout.currentGroup().id);
+    }
+    expect([visited.size, visited.has(first?.id ?? -1), visited.has(second?.id ?? -1), layout.currentGroup().id]).toEqual([frames, true, true, second?.id]);
+    await runAsync("shell.focusPreviousGroup");
+    await runAsync("shell.focusNextGroup");
+    expect(layout.currentGroup().id).toBe(second?.id);
+    layout.focusGroup(first?.id ?? -1);
+    await runAsync("shell.moveTabToNextGroup", tab(plan.key));
+    expect([contents(), layout.layout().documents.id]).toEqual([[1, 2], second?.id]);
+    await runAsync("shell.moveTabToPreviousGroup", tab(plan.key));
+    await runAsync("shell.moveTabToPreviousGroup", tab(todo.key));
+    expect(contents()).toEqual([3]);
+    expect(names.map(t => enabled(t, t.includes("focus") ? null : tab(plan.key)))).toEqual([false, false, true, true]);
+  });
+
+  it("moves a view to the next or previous group, which may be a documents group, wrapping around every group", async () => {
+    const groups = layout.layout().groups;
+    const own = layout.layout().groupOf(search);
+    const next = groups[(groups.findIndex(t => t.id === own?.id) + 1) % groups.length];
+
+    await runAsync("shell.moveTabToNextGroup", tab(search.key));
+
+    expect(layout.layout().groupOf(search)?.id).toBe(next?.id);
+    await runAsync("shell.moveTabToPreviousGroup", tab(search.key));
+    expect(layout.layout().groupOf(search)?.id).toBe(own?.id);
   });
 
   it("keys the most-used commands by the platform's conventions, each key once and each command one of its own", () => {

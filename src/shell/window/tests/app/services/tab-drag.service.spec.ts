@@ -53,6 +53,7 @@ describe("TabDragService", () => {
       "<div data-drop-group=\"2\"><div data-drop-tabs><span class=\"changes\" data-tab-index=\"0\"></span></div></div>",
       "<div data-drop-plate data-drop-group=\"2\"><span class=\"arrow\" data-direction=\"Top\"></span><span class=\"center\" data-direction=\"Center\"></span>",
       "<span class=\"gap\"></span></div>",
+      "<div data-drop-plate data-drop-group=\"0\"><span class=\"documents-arrow\" data-direction=\"Left\"></span><span class=\"documents-center\" data-direction=\"Center\"></span></div>",
       "<div data-drop-plate data-drop-group=\"9\"><span class=\"stale\" data-direction=\"Left\"></span></div>",
       "<span class=\"side\" data-drop-side=\"Bottom\"></span><span class=\"unknown\" data-drop-side=\"Top\"></span>",
       "<span class=\"outside\"></span>",
@@ -214,15 +215,21 @@ describe("TabDragService", () => {
     expect(early.defaultPrevented).toBe(false);
   });
 
-  it("only reorders a document within its group", () => {
+  it("targets a document group's plate and tab strip for a document, and never a side guide or a views group", () => {
     start(LayoutFixture.plan, element("plan"));
     moveOver("side");
     expect(drag.dragging()).toEqual(LayoutFixture.plan);
     expect(drag.target()).toBeNull();
     moveOver("center");
     expect(drag.target()).toBeNull();
+    moveOver("arrow");
+    expect(drag.target()).toBeNull();
     moveOver("files");
     expect(drag.target()).toBeNull();
+    moveOver("documents-arrow");
+    expect(drag.target()).toEqual(new SplitDropTarget(0, PanelEdge.Left));
+    moveOver("documents-center");
+    expect(drag.target()).toEqual(new TabDropTarget(0, 2));
     moveOver("todo", 90);
     expect(drag.target()).toEqual(new TabDropTarget(0, 2));
     document.dispatchEvent(new PointerEvent("pointerup"));

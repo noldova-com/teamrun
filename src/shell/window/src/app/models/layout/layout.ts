@@ -28,14 +28,15 @@ import { ViewTab } from "./view-tab";
 export class Layout {
   private readonly dockSides: Readonly<Record<DockSide, Dock>>;
   public readonly middle: LayoutNode;
+  public readonly documentGroups: readonly TabGroup[];
   public readonly documents: TabGroup;
   public readonly bottomSpan: BottomDockSpan;
   public readonly toolbars: ToolbarLayout;
 
-  public constructor(docks: readonly Dock[], middle: LayoutNode | null, bottomSpan: BottomDockSpan = BottomDockSpan.Full, toolbars: ToolbarLayout = ToolbarLayout.EMPTY) {
+  public constructor(docks: readonly Dock[], middle: LayoutNode | null, bottomSpan: BottomDockSpan = BottomDockSpan.Full, toolbars: ToolbarLayout = ToolbarLayout.EMPTY, activeDocumentsId?: number) {
     const documents = middle?.groups.filter(t => t.isDocuments) ?? [];
-    const [document] = documents;
-    if (Object.isNull(middle) || Object.isUndefined(document) || documents.length !== 1)
+    const [first] = documents;
+    if (Object.isNull(middle) || Object.isUndefined(first))
       throw new ArgumentException(Resources.missingDocumentsGroup, "middle");
     const docked = docks.flatMap(t => t.root?.groups ?? []);
     const tabs = [...docked, ...middle.groups].flatMap(t => t.tabs);
@@ -55,7 +56,8 @@ export class Layout {
       [DockSide.Bottom]: Layout.dockOn(DockSide.Bottom, docks)
     };
     this.middle = middle;
-    this.documents = document;
+    this.documentGroups = documents;
+    this.documents = documents.find(t => t.id === activeDocumentsId) ?? first;
     this.bottomSpan = bottomSpan;
     this.toolbars = toolbars;
   }
@@ -117,6 +119,17 @@ export class Layout {
     return this.groups.flatMap(t => Object.isNull(t.preview) ? [] : [t.preview]).reduce<Layout>((layout, t) => layout.keep(t), this);
   }
 
+  public focusDocuments(groupId: number): Layout {
+    return groupId === this.documents.id || !this.documentGroups.some(t => t.id === groupId) ? this : new Layout(this.docks, this.middle, this.bottomSpan, this.toolbars, groupId);
+  }
+
+  public canSplit(tab: Tab, groupId: number): boolean {
+    const target = this.group(groupId);
+    if (Object.isNull(target) || (!tab.isMovable && !target.isDocuments))
+      return false;
+    return !this.isOnlyTabOf(tab, target) || this.keepsEmptyDocuments(tab, target);
+  }
+
   public keep(tab: Tab): Layout {
     const group = this.groupOf(tab);
     return Object.isNull(group) ? this : this.withGroup(group.keep(tab));
@@ -127,12 +140,12 @@ export class Layout {
     if (Object.isNull(group))
       return this;
     const rest = group.without(tab);
-    return Object.isNull(rest) ? this.withoutGroup(group.id) : this.withGroup(rest);
+    return Object.isNull(rest) || (rest.isDocuments && rest.tabs.length === 0 && this.documentGroups.length > 1) ? this.withoutGroup(group.id) : this.withGroup(rest);
   }
 
   public activate(tab: Tab): Layout {
     const group = this.groupOf(tab);
-    return Object.isNull(group) ? this : this.withGroup(group.activate(tab)).reveal(group.id);
+    return Object.isNull(group) ? this : this.withGroup(group.activate(tab)).reveal(group.id).focusDocuments(group.id);
   }
 
   public moveTab(tab: Tab, groupId: number, index: number): Layout {
@@ -140,16 +153,15 @@ export class Layout {
     if (Object.isNull(target) || !target.accepts(tab))
       return this;
     const layout = target.has(tab) ? this : this.close(tab);
-    return layout.withGroup(target.insert(tab, index)).reveal(groupId);
+    return layout.withGroup(target.insert(tab, index)).reveal(groupId).focusDocuments(groupId);
   }
 
   public splitGroup(tab: Tab, groupId: number, edge: PanelEdge): Layout {
-    const target = this.group(groupId);
-    if (Object.isNull(target) || !tab.isMovable || (target.has(tab) && target.tabs.length === 1 && !target.isDocuments))
+    if (!this.canSplit(tab, groupId))
       return this;
     const layout = this.close(tab);
-    const added = new TabGroup(layout.nextId, [tab], tab);
-    return layout.withRegions(t => t.splitGroup(groupId, added, edge, added.id + 1)).reveal(added.id);
+    const added = tab.isMovable ? new TabGroup(layout.nextId, [tab], tab) : new DocumentGroup([tab], tab, null, layout.nextId);
+    return layout.withRegions(t => t.splitGroup(groupId, added, edge, added.id + 1)).reveal(added.id).focusDocuments(added.id);
   }
 
   public dockOnSide(tab: Tab, side: DockSide): Layout {
@@ -174,11 +186,11 @@ export class Layout {
   }
 
   public withBottomSpan(span: BottomDockSpan): Layout {
-    return span === this.bottomSpan ? this : new Layout(this.docks, this.middle, span, this.toolbars);
+    return span === this.bottomSpan ? this : new Layout(this.docks, this.middle, span, this.toolbars, this.documents.id);
   }
 
   public withToolbars(toolbars: ToolbarLayout): Layout {
-    return toolbars === this.toolbars ? this : new Layout(this.docks, this.middle, this.bottomSpan, toolbars);
+    return toolbars === this.toolbars ? this : new Layout(this.docks, this.middle, this.bottomSpan, toolbars, this.documents.id);
   }
 
   public resizeSplit(split: SplitNode): Layout {
@@ -187,15 +199,15 @@ export class Layout {
 
   public reset(registry: ViewRegistry): Layout {
     const fresh = Layout.createDefault(registry);
-    const documents = this.documents.tabs.filter(t => !t.isMovable);
+    const documents = this.documentGroups.flatMap(t => t.tabs).filter(t => !t.isMovable);
     const active = documents.find(t => t.equals(this.documents.active)) ?? documents[0] ?? null;
-    const preview = documents.find(t => t.equals(this.documents.preview)) ?? null;
+    const preview = documents.find(t => t.equals(this.documents.preview)) ?? documents.find(t => this.documentGroups.some(u => t.equals(u.preview))) ?? null;
     const views = this.groups.flatMap(t => t.tabs).filter(t => t instanceof ViewTab && registry.hasView(t.name) && !fresh.isOpen(t));
     return views.reduce((layout, t) => layout.openView(t, registry), fresh.withGroup(new DocumentGroup(documents, active, preview)));
   }
 
   public withVisibleTabs(registry: ViewRegistry): Layout {
-    return this.copy(this.docks.map(t => t.withVisibleTabs(registry)), this.middle.withVisibleTabs(registry));
+    return this.copy(this.docks.map(t => t.withVisibleTabs(registry)), this.middle.withVisibleTabs(registry)).withoutEmptyDocuments();
   }
 
   public toJson(): JsonObject {
@@ -204,6 +216,7 @@ export class Layout {
       [Resources.docksField]: Object.fromEntries(this.docks.map(t => [t.side, t.toJson()])),
       [Resources.middleField]: this.middle.toJson(),
       [Resources.bottomSpanField]: this.bottomSpan,
+      [Resources.activeDocumentsField]: this.documentGroups.findIndex(t => t.id === this.documents.id),
       ...this.toolbars.isEmpty ? {} : { [Resources.toolbarsField]: this.toolbars.toJson() }
     };
   }
@@ -220,8 +233,24 @@ export class Layout {
     return this.withRegions(t => t.withGroup(group));
   }
 
+  private isOnlyTabOf(tab: Tab, group: TabGroup): boolean {
+    return group.has(tab) && group.tabs.length === 1;
+  }
+
+  private keepsEmptyDocuments(tab: Tab, group: TabGroup): boolean {
+    return group.isDocuments && tab.isMovable && this.documentGroups.length === 1;
+  }
+
   private withoutGroup(id: number): Layout {
-    return this.copy(this.docks.map(t => t.withRoot(t.root?.withoutGroup(id) ?? null)), this.middle.withoutGroup(id));
+    const ids = this.documentGroups.map(t => t.id);
+    const index = ids.indexOf(id);
+    return this.copy(this.docks.map(t => t.withRoot(t.root?.withoutGroup(id) ?? null)), this.middle.withoutGroup(id), id === this.documents.id ? ids[index - 1] ?? ids[index + 1] : this.documents.id);
+  }
+
+  private withoutEmptyDocuments(): Layout {
+    const empty = this.documentGroups.filter(t => t.tabs.length === 0);
+    const kept = empty.length === this.documentGroups.length ? empty[0] : undefined;
+    return empty.filter(t => t !== kept).reduce<Layout>((layout, t) => layout.withoutGroup(t.id), this);
   }
 
   private withRegions(change: (node: LayoutNode) => LayoutNode): Layout {
@@ -237,7 +266,7 @@ export class Layout {
     return Object.isNull(side) ? this : this.withDock(this.dock(side).withCollapsed(false));
   }
 
-  private copy(docks: readonly Dock[], middle: LayoutNode | null): Layout {
-    return middle === this.middle && docks.every(t => t === this.dock(t.side)) ? this : new Layout(docks, middle, this.bottomSpan, this.toolbars);
+  private copy(docks: readonly Dock[], middle: LayoutNode | null, documentsId: number | undefined = this.documents.id): Layout {
+    return middle === this.middle && docks.every(t => t === this.dock(t.side)) && documentsId === this.documents.id ? this : new Layout(docks, middle, this.bottomSpan, this.toolbars, documentsId);
   }
 }

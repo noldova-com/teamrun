@@ -149,6 +149,10 @@ export class Resources {
     [BottomDockSpan.Between]: "Bottom dock between the side docks"
   };
   public static readonly documentsGroupLabel: string = "Documents";
+  public static readonly moveToNextGroupLabel: string = "Move to next group";
+  public static readonly moveToPreviousGroupLabel: string = "Move to previous group";
+  public static readonly focusNextGroupLabel: string = "Focus next group";
+  public static readonly focusPreviousGroupLabel: string = "Focus previous group";
   public static readonly groupLabelJoiner: string = ", ";
   public static readonly splitLabels: Readonly<Record<PanelEdge, string>> = {
     [PanelEdge.Left]: "Split left",
@@ -337,6 +341,7 @@ export class Resources {
   public static readonly activeField: string = "active";
   public static readonly previewField: string = "preview";
   public static readonly documentsField: string = "documents";
+  public static readonly activeDocumentsField: string = "activeDocuments";
   public static readonly viewField: string = "view";
   public static readonly documentField: string = "document";
   public static readonly instanceField: string = "instance";
@@ -464,6 +469,17 @@ export class Resources {
   public static readonly tabSplitGroup: string = "shell.tabSplitEdges";
   public static readonly tabDockGroup: string = "shell.tabDockSides";
   public static readonly moveTabToGroupCommand: string = "shell.moveTabToGroup";
+  public static readonly moveTabToNextGroupCommand: string = "shell.moveTabToNextGroup";
+  public static readonly moveTabToPreviousGroupCommand: string = "shell.moveTabToPreviousGroup";
+  public static readonly moveTabToNextGroupTitle: string = "Move the tab to the next group";
+  public static readonly moveTabToPreviousGroupTitle: string = "Move the tab to the previous group";
+  public static readonly focusNextGroupCommand: string = "shell.focusNextGroup";
+  public static readonly focusPreviousGroupCommand: string = "shell.focusPreviousGroup";
+  public static readonly focusNextGroupTitle: string = "Focus the next group";
+  public static readonly focusPreviousGroupTitle: string = "Focus the previous group";
+  public static readonly focusNextGroupGlyph: string = "keyboard_double_arrow_right";
+  public static readonly focusPreviousGroupGlyph: string = "keyboard_double_arrow_left";
+  public static readonly groupsGroup: string = "shell.groups";
   public static readonly moveTabToGroupTitle: string = "Move the tab to another group";
   public static readonly groupArgument: string = "group";
   public static readonly searchGroup: string = "shell.search";
@@ -552,9 +568,9 @@ export class Resources {
   public static readonly repeatedTab: string = "A tab appears only once in a layout.";
   public static readonly inactiveTab: string = "The active tab must be one of the group's tabs, and a group with tabs has one.";
   public static readonly previewOutsideGroup: string = "The preview tab must be one of the group's tabs.";
-  public static readonly documentOutsideDocuments: string = "Document tabs stay in the documents group.";
-  public static readonly missingDocumentsGroup: string = "The middle holds exactly one documents group.";
-  public static readonly documentsInDock: string = "The documents group stays in the middle.";
+  public static readonly documentOutsideDocuments: string = "Document tabs stay in document groups.";
+  public static readonly missingDocumentsGroup: string = "The middle holds at least one document group.";
+  public static readonly documentsInDock: string = "Document groups stay in the middle.";
   public static readonly repeatedDock: string = "A layout has one dock for each side.";
   public static readonly repeatedNodeId: string = "Each group and split in a layout has its own id.";
   public static readonly repeatedViewType: string = "A view or document type is registered once.";
@@ -696,6 +712,10 @@ export class Resources {
   public static formatNotificationsLabel(unread: number, isQuiet: boolean): string {
     const state = isQuiet ? ", Do not disturb" : "";
     return unread === 0 ? `Notifications${state}` : `Notifications, ${unread} unread${state}`;
+  }
+
+  public static formatDocumentsGroup(position: number): string {
+    return `${Resources.documentsGroupLabel} ${position}`;
   }
 
   public static formatBadged(label: string, badge: string): string {

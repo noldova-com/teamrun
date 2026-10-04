@@ -186,6 +186,17 @@ describe("LayoutService", () => {
     expect([service.previewTabs(), service.layout().documents.preview, service.layout().isOpen(third), service.layout().isOpen(readme)]).toEqual([true, fourth, false, true]);
   });
 
+  it("restores which documents group is active, so a document opens there", async () => {
+    const readme = new DocumentTab("notes.note", "readme");
+    const split = prepared().splitGroup(LayoutFixture.todo, 0, PanelEdge.Right);
+    const first = split.documentGroups[0];
+    await loadAsync(split.focusDocuments(first?.id ?? -1));
+
+    expect([service.layout().documents.id, service.layout().documentGroups.length]).toEqual([first?.id, 2]);
+    service.openDocument(readme);
+    expect(service.layout().groupOf(readme)?.id).toBe(first?.id);
+  });
+
   it("spans the bottom dock across the window or keeps it between the side docks", async () => {
     await loadAsync(prepared().openView(LayoutFixture.terminal, LayoutFixture.createRegistry()));
     service.setViewport(160, 80);

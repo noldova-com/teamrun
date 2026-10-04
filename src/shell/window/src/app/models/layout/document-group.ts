@@ -14,12 +14,12 @@ import type { Tab } from "./tab";
 import { TabGroup } from "./tab-group";
 
 export class DocumentGroup extends TabGroup {
-  public constructor(tabs: readonly Tab[], active: Tab | null, preview: Tab | null = null) {
-    super(Resources.documentsGroupId, tabs, active, preview);
+  public constructor(tabs: readonly Tab[], active: Tab | null, preview: Tab | null = null, id: number = Resources.documentsGroupId) {
+    super(id, tabs, active, preview);
   }
 
-  public static createEmpty(): DocumentGroup {
-    return new DocumentGroup([], null);
+  public static createEmpty(id: number = Resources.documentsGroupId): DocumentGroup {
+    return new DocumentGroup([], null, null, id);
   }
 
   public override get isDocuments(): boolean {
@@ -39,10 +39,10 @@ export class DocumentGroup extends TabGroup {
   }
 
   protected override copy(tabs: readonly Tab[], active: Tab | null, preview: Tab | null): TabGroup {
-    return new DocumentGroup(tabs, active, preview);
+    return new DocumentGroup(tabs, active, preview, this.id);
   }
 
   protected override emptied(): TabGroup {
-    return DocumentGroup.createEmpty();
+    return DocumentGroup.createEmpty(this.id);
   }
 }

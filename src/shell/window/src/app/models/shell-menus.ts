@@ -40,6 +40,14 @@ export class ShellMenus {
     new MenuGroup(Resources.docksGroup, Resources.viewMenu, false,
       Object.values(DockSide).map(t => MenuItem.ofCommand(Resources.toggleDockCommands[t], {}, Resources.dockRowLabels[t]))),
     new MenuGroup(Resources.bottomDockGroup, Resources.viewMenu, true, Object.values(BottomDockSpan).map(t => MenuItem.ofCommand(Resources.bottomSpanCommands[t]))),
+    new MenuGroup(Resources.groupsGroup, Resources.viewMenu, false, [
+      MenuItem.ofCommand(Resources.splitTabCommands[PanelEdge.Right], {}, Resources.splitLabels[PanelEdge.Right]),
+      MenuItem.ofCommand(Resources.splitTabCommands[PanelEdge.Bottom], {}, Resources.splitLabels[PanelEdge.Bottom]),
+      MenuItem.ofCommand(Resources.moveTabToNextGroupCommand, {}, Resources.moveToNextGroupLabel),
+      MenuItem.ofCommand(Resources.moveTabToPreviousGroupCommand, {}, Resources.moveToPreviousGroupLabel),
+      MenuItem.ofCommand(Resources.focusNextGroupCommand, {}, Resources.focusNextGroupLabel),
+      MenuItem.ofCommand(Resources.focusPreviousGroupCommand, {}, Resources.focusPreviousGroupLabel)
+    ]),
     new MenuGroup(Resources.viewToolbarsGroup, Resources.viewMenu, false, [MenuItem.ofSubmenu(Resources.toolbarsMenu)]),
     MenuGroup.dynamic(Resources.toolbarListGroup, Resources.toolbarsMenu, false),
     new MenuGroup(Resources.toolbarMoveGroup, Resources.toolbarMenu, false,
@@ -53,7 +61,9 @@ export class ShellMenus {
       MenuItem.ofSubmenu(Resources.tabSplitMenu),
       MenuItem.ofSubmenu(Resources.tabDockMenu),
       MenuItem.ofCommand(Resources.moveTabLeftCommand, {}, Resources.moveEarlierLabel),
-      MenuItem.ofCommand(Resources.moveTabRightCommand, {}, Resources.moveLaterLabel)
+      MenuItem.ofCommand(Resources.moveTabRightCommand, {}, Resources.moveLaterLabel),
+      MenuItem.ofCommand(Resources.moveTabToNextGroupCommand, {}, Resources.moveToNextGroupLabel),
+      MenuItem.ofCommand(Resources.moveTabToPreviousGroupCommand, {}, Resources.moveToPreviousGroupLabel)
     ]),
     new MenuGroup(Resources.tabCloseGroup, Resources.tabMenu, false, [
       MenuItem.ofCommand(Resources.closeTabCommand, {}, Resources.closeTabLabel),

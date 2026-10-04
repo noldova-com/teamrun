@@ -12,10 +12,12 @@ import type { TabGroup } from "./layout/tab-group";
 export class TabTarget {
   public readonly tab: Tab;
   public readonly group: TabGroup;
+  public readonly canSplit: boolean;
 
-  public constructor(tab: Tab, group: TabGroup) {
+  public constructor(tab: Tab, group: TabGroup, canSplit: boolean) {
     this.tab = tab;
     this.group = group;
+    this.canSplit = canSplit;
   }
 
   public get index(): number {
@@ -32,9 +34,5 @@ export class TabTarget {
 
   public get isPreview(): boolean {
     return this.tab.equals(this.group.preview);
-  }
-
-  public get canSplit(): boolean {
-    return this.tab.isMovable && (this.group.isDocuments || this.group.tabs.length > 1);
   }
 }
