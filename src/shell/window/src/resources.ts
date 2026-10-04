@@ -718,6 +718,7 @@ export class Resources {
   public static readonly toastLimit: number = 3;
   public static readonly politeAnnouncement: AriaLivePoliteness = "polite";
   public static readonly assertiveAnnouncement: AriaLivePoliteness = "assertive";
+  public static readonly announcementSeparator: string = ". ";
   public static readonly hoverSelector: string = ":hover";
   public static readonly toastDuration: number = 8000;
   public static readonly toastKindInterval: number = 5000;

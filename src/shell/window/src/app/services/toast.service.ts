@@ -25,6 +25,7 @@ export class ToastService {
   private readonly lastByKind: Map<string, number> = new Map();
   private readonly timers: Map<number, { handle: ReturnType<typeof setTimeout> | null; remaining: number; startedAt: number }> = new Map();
   private queue: number[] = [];
+  private shown: Notification[] = [];
   private firstRead: NotificationState | null = null;
   private highestSequence: number = 0;
 
@@ -47,16 +48,8 @@ export class ToastService {
   }
 
   public close(id: number): void {
-    const timer = this.timers.get(id);
-    ToastService.clear(timer?.handle ?? null);
-    this.timers.delete(id);
-    this.queue = this.queue.filter(t => t !== id);
-    if (!this.visibleIds().includes(id))
-      return;
-    this.visibleIds.update(t => t.filter(u => u !== id));
-    let next = this.queue.shift();
-    while (!Object.isUndefined(next) && !this.show(next))
-      next = this.queue.shift();
+    this.remove(id);
+    this.announce();
   }
 
   public pause(id: number): void {
@@ -74,6 +67,19 @@ export class ToastService {
     this.startTimer(id, timer.remaining);
   }
 
+  private remove(id: number): void {
+    const timer = this.timers.get(id);
+    ToastService.clear(timer?.handle ?? null);
+    this.timers.delete(id);
+    this.queue = this.queue.filter(t => t !== id);
+    if (!this.visibleIds().includes(id))
+      return;
+    this.visibleIds.update(t => t.filter(u => u !== id));
+    let next = this.queue.shift();
+    while (!Object.isUndefined(next) && !this.show(next))
+      next = this.queue.shift();
+  }
+
   private follow(state: NotificationState, firstRead: NotificationState): void {
     const notifications = state.notifications;
     if (firstRead !== this.firstRead) {
@@ -84,13 +90,14 @@ export class ToastService {
     this.highestSequence = Math.max(highest, ...notifications.map(t => t.sequence));
     for (const id of [...this.visibleIds(), ...this.queue])
       if (!notifications.some(t => t.id === id))
-        this.close(id);
+        this.remove(id);
     for (const notification of [...notifications].reverse())
       if (notification.sequence > highest)
         this.offer(notification, state);
     for (const notification of notifications)
       if (this.visibleIds().includes(notification.id) && !this.timers.has(notification.id) && ToastService.closesByItself(notification))
         this.startTimer(notification.id, Resources.toastDuration);
+    this.announce();
   }
 
   private offer(notification: Notification, state: NotificationState): void {
@@ -112,11 +119,19 @@ export class ToastService {
     if (Object.isUndefined(notification))
       return false;
     this.visibleIds.update(t => [...t, id]);
-    const announcement = Object.isNull(notification.post.text) ? notification.post.title : `${notification.post.title}. ${notification.post.text}`;
-    void this.announcer.announce(announcement, notification.post.severity === NotificationSeverity.Error ? Resources.assertiveAnnouncement : Resources.politeAnnouncement);
+    this.shown.push(notification);
     if (ToastService.closesByItself(notification))
       this.startTimer(id, Resources.toastDuration);
     return true;
+  }
+
+  private announce(): void {
+    const shown = this.shown;
+    this.shown = [];
+    if (shown.length === 0)
+      return;
+    const text = shown.map(t => Object.isNull(t.post.text) ? t.post.title : `${t.post.title}. ${t.post.text}`).join(Resources.announcementSeparator);
+    void this.announcer.announce(text, shown.some(t => t.post.severity === NotificationSeverity.Error) ? Resources.assertiveAnnouncement : Resources.politeAnnouncement);
   }
 
   private startTimer(id: number, milliseconds: number): void {

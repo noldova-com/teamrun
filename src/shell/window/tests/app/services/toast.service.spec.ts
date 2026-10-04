@@ -80,6 +80,16 @@ describe("ToastService", () => {
     expect(announce.mock.calls).toEqual([["Title 2. Plan.md", "polite"], ["Title 3. The disk is full.", "assertive"]]);
   });
 
+  it("announces the toasts one update shows in one announcement, assertively when any of them is an error", () => {
+    const announce = vi.spyOn(TestBed.inject(LiveAnnouncer), "announce").mockResolvedValue();
+    const service = start(notification(1, "clock.alarm"));
+
+    post(false, notification(3, "notes.saved"), notification(2, "notes.failed", { severity: NotificationSeverity.Error, text: "The disk is full" }), notification(1, "clock.alarm"));
+
+    expect(shown(service)).toEqual([2, 3]);
+    expect(announce.mock.calls).toEqual([["Title 2. The disk is full. Title 3", "assertive"]]);
+  });
+
   it("waits for the first read, then toasts only what follows it, even when it saw newer state first", () => {
     const service = TestBed.inject(ToastService);
     post(false, notification(2, "notes.saved"), notification(1, "clock.alarm"));
