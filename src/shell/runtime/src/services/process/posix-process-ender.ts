@@ -60,20 +60,35 @@ export class PosixProcessEnder implements IProcessEnder {
     return new ProcessEnding(record, [], [], table.listGroup(record.processId).map(t => t.processId));
   }
 
+  private static signal(records: readonly ProcessRecord[], signal: NodeJS.Signals): readonly ProcessEnding[] {
+    const failures: ProcessEnding[] = [];
+    for (const record of records) {
+      try {
+        ProcessSignals.send(-record.processId, signal);
+      }
+      catch (error) {
+        failures.push(new ProcessEnding(record, [], [], [], error));
+      }
+    }
+    return failures;
+  }
+
   private async endGroupsAsync(records: readonly ProcessRecord[]): Promise<readonly ProcessEnding[]> {
-    for (const record of records)
-      ProcessSignals.send(-record.processId, Resources.terminateSignal);
-    if (await ProcessSignals.waitAsync(() => records.every(t => !ProcessSignals.isRunning(-t.processId)), this.settings.graceMilliseconds))
-      return records.map(t => new ProcessEnding(t));
-    return await this.killGroupsAsync(records, await this.reader.readAsync());
+    const failures = PosixProcessEnder.signal(records, Resources.terminateSignal);
+    const signalled = records.filter(t => !failures.some(u => u.record === t));
+    if (await ProcessSignals.waitAsync(() => signalled.every(t => !ProcessSignals.isRunning(-t.processId)), this.settings.graceMilliseconds))
+      return [...signalled.map(t => new ProcessEnding(t)), ...failures];
+    return [...await this.killGroupsAsync(signalled, await this.reader.readAsync()), ...failures];
   }
 
   private async killGroupsAsync(records: readonly ProcessRecord[], table: ProcessTable): Promise<readonly ProcessEnding[]> {
     const targets = records.map(t => new ProcessEnding(t, table.listGroup(t.processId).map(u => u.processId)));
-    const killed = targets.filter(t => t.forced.length > 0).map(t => t.record.processId);
-    for (const processId of killed)
-      ProcessSignals.send(-processId, Resources.killSignal);
-    await ProcessSignals.waitAsync(() => killed.every(t => !ProcessSignals.isRunning(-t)), this.settings.endMilliseconds);
-    return targets.map(t => new ProcessEnding(t.record, t.forced, t.forced.filter(u => ProcessSignals.isRunning(u))));
+    const failures = PosixProcessEnder.signal(targets.filter(t => t.forced.length > 0).map(t => t.record), Resources.killSignal);
+    const killed = targets.filter(t => t.forced.length > 0 && !failures.some(u => u.record === t.record));
+    await ProcessSignals.waitAsync(() => killed.every(t => !ProcessSignals.isRunning(-t.record.processId)), this.settings.endMilliseconds);
+    return [
+      ...targets.filter(t => !failures.some(u => u.record === t.record)).map(t => new ProcessEnding(t.record, t.forced, t.forced.filter(u => ProcessSignals.isRunning(u)))),
+      ...failures
+    ];
   }
 }

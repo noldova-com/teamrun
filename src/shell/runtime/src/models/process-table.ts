@@ -8,9 +8,8 @@
 
 import "@noldova/teamrun-foundation-core";
 
-import { Resources } from "../resources.js";
 import type { ProcessRecord } from "./process-record.js";
-import { ProcessTableEntry } from "./process-table-entry.js";
+import type { ProcessTableEntry } from "./process-table-entry.js";
 
 export class ProcessTable {
   public readonly entries: readonly ProcessTableEntry[];
@@ -29,16 +28,19 @@ export class ProcessTable {
   }
 
   public includes(member: ProcessTableEntry): boolean {
-    return this.entries.some(t => t.processId === member.processId && t.groupId === member.groupId && Math.abs(t.started - member.started) <= Resources.processStartTolerance);
+    return this.entries.some(t => t.processId === member.processId && t.groupId === member.groupId && t.earliest <= member.latest && member.earliest <= t.latest);
   }
 
   public listGroup(groupId: number): readonly ProcessTableEntry[] {
     return this.entries.filter(t => t.groupId === groupId);
   }
 
-  public findOrphans(record: ProcessRecord, until: number): readonly ProcessTableEntry[] {
+  public findOrphans(record: ProcessRecord, until: number, before: number = Number.POSITIVE_INFINITY): readonly ProcessTableEntry[] {
     const orphans: ProcessTableEntry[] = [];
-    this.collect(new ProcessTableEntry(record.processId, 0, null, record.earliestStart, null), until, orphans);
+    for (const child of this.entries.filter(t => t.parentId === record.processId && record.isAfterRequest(t) && t.earliest <= until && t.started < before)) {
+      orphans.push(child);
+      this.collect(child, Number.POSITIVE_INFINITY, orphans);
+    }
     return orphans;
   }
 
@@ -57,7 +59,7 @@ export class ProcessTable {
 
   private collect(parent: ProcessTableEntry, until: number, found: ProcessTableEntry[], known: readonly ProcessTableEntry[] = found): void {
     const children = this.entries.filter(t =>
-      t.parentId === parent.processId && t.started >= parent.started && t.started <= until &&
+      t.parentId === parent.processId && t.started >= parent.started && t.earliest <= until &&
       !found.some(u => u.processId === t.processId) && !known.some(u => u.processId === t.processId));
     for (const child of children) {
       found.push(child);

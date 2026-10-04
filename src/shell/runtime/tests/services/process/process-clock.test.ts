@@ -51,4 +51,33 @@ export class ProcessClockTests {
     Assert.isFalse(clock.isSameBoot(String(boot + 61)));
     Assert.isFalse(clock.isSameBoot(ProcessClockTests.BOOT_ID));
   }
+
+  @TestMethod
+  public async notesNoOffsetForAClockThatCountsFromBootOnLinux(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const file = path.join(folder.path, "boot_id");
+    await writeFile(file, ProcessClockTests.BOOT_ID);
+
+    const clock = ProcessClock.create("linux", file);
+
+    Assert.areEqual(0, clock.offset());
+    Assert.isFalse(clock.hasStepped(0));
+    Assert.isFalse(clock.hasStepped(1_500));
+    Assert.isTrue(clock.hasStepped(1_501));
+    Assert.isTrue(clock.hasStepped(-1_501));
+  }
+
+  @TestMethod
+  public notesHowFarTheWallClockIsFromTheTimeSinceBootElsewhere(): void {
+    const clock = ProcessClock.create("win32");
+
+    const expected = Date.now() - uptime() * 1000;
+    const offset = clock.offset();
+
+    Assert.areEqual(offset, Math.round(offset));
+    Assert.isTrue(Math.abs(offset - expected) <= 50, `${offset} ${expected}`);
+    Assert.isFalse(clock.hasStepped(offset));
+    Assert.isTrue(clock.hasStepped(offset + 5_000));
+    Assert.isTrue(clock.hasStepped(offset - 5_000));
+  }
 }

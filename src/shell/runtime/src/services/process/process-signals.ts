@@ -43,6 +43,16 @@ export class ProcessSignals {
     return true;
   }
 
+  public static async waitForAsync<T>(promise: Promise<T>, milliseconds: number): Promise<T | undefined> {
+    const timeout = new AbortController();
+    try {
+      return await Promise.race([promise, delay(milliseconds, undefined, { signal: timeout.signal })]);
+    }
+    finally {
+      timeout.abort();
+    }
+  }
+
   private static isMissing(error: unknown): boolean {
     return Object.isObject(error) && Resources.fileErrorCodeField in error && error[Resources.fileErrorCodeField] === Resources.missingProcessCode;
   }

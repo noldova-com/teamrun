@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Resources } from "../resources.js";
 import type { ProcessTableEntry } from "./process-table-entry.js";
 
 export class ProcessRecord {
@@ -19,8 +18,19 @@ export class ProcessRecord {
   public readonly requested: number;
   public readonly started: number;
   public readonly seen: number;
+  public readonly clockOffset: number;
 
-  public constructor(id: number, moduleId: string, processId: number, program: string, executable: string, boot: string, requested: number, started: number, seen: number) {
+  public constructor(
+    id: number,
+    moduleId: string,
+    processId: number,
+    program: string,
+    executable: string,
+    boot: string,
+    requested: number,
+    started: number,
+    seen: number,
+    clockOffset: number) {
     this.id = id;
     this.moduleId = moduleId;
     this.processId = processId;
@@ -30,17 +40,18 @@ export class ProcessRecord {
     this.requested = requested;
     this.started = started;
     this.seen = seen;
-  }
-
-  public get earliestStart(): number {
-    return this.requested - Resources.processStartTolerance;
+    this.clockOffset = clockOffset;
   }
 
   public isStartOf(entry: ProcessTableEntry): boolean {
-    return entry.processId === this.processId && entry.started >= this.earliestStart && entry.started <= this.started + Resources.processStartTolerance;
+    return entry.processId === this.processId && entry.latest >= this.requested && entry.earliest <= this.started;
   }
 
   public isSeenWith(entry: ProcessTableEntry): boolean {
-    return entry.started >= this.earliestStart && entry.started <= this.seen;
+    return entry.latest >= this.requested && entry.latest <= this.seen;
+  }
+
+  public isAfterRequest(entry: ProcessTableEntry): boolean {
+    return entry.latest >= this.requested;
   }
 }

@@ -5524,9 +5524,9 @@ export declare class WorkTracker {
  * runs in. On Linux the clock counts from boot, as the process table does
  * there, and the boot is the kernel's boot id; elsewhere the clock is the
  * wall clock, as the process table's start times are, and the boot is when
- * the system started, in seconds. Either way a later change of the wall
- * clock does not change how a recorded start compares with the process
- * table.
+ * the system started, in seconds. On Linux a change of the wall clock does
+ * not affect the clock; elsewhere a record notes the clock's offset, which
+ * shows a later change.
  */
 export declare class ProcessClock {
   /**
@@ -5585,6 +5585,40 @@ export declare class ProcessClock {
    * ```
    */
   public now(): number;
+
+  /**
+   * Reads how far the wall clock is from the time since boot.
+   *
+   * @returns The offset in milliseconds; always 0 for a clock that counts
+   * from boot.
+   * @example
+   * ```ts
+   * import type { ProcessClock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function noteOffset(clock: ProcessClock): number {
+   *   return clock.offset();
+   * }
+   * ```
+   */
+  public offset(): number;
+
+  /**
+   * Whether the wall clock was changed since a recorded offset, by more than
+   * 1.5 seconds against the time since boot.
+   *
+   * @param offset The recorded offset.
+   * @returns Whether the times recorded with the offset can no longer be
+   * compared with this clock's.
+   * @example
+   * ```ts
+   * import type { ProcessClock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isComparable(clock: ProcessClock, offset: number): boolean {
+   *   return !clock.hasStepped(offset);
+   * }
+   * ```
+   */
+  public hasStepped(offset: number): boolean;
 
   /**
    * Whether a recorded boot is this clock's.
@@ -5668,7 +5702,7 @@ export declare class ProcessSupervisor {
    * import { type OwnedProcess, ProcessRequest, type ProcessSupervisor } from "@noldova/teamrun-shell-runtime";
    *
    * export function startStatusAsync(processes: ProcessSupervisor, project: string): Promise<OwnedProcess> {
-   *   return processes.startAsync("git", new ProcessRequest("git", ["status"], project));
+   *   return processes.startAsync("notes", new ProcessRequest("git", ["status"], project));
    * }
    * ```
    */
@@ -5719,11 +5753,13 @@ export declare class ProcessSupervisor {
    * with its tree on Windows or its process group elsewhere; a process whose
    * id was reused since, as its start time or, on Windows, its executable
    * shows, is left alone. A record from another boot is removed without
-   * ending anything. When a recorded program is no longer running, its
-   * process group is ended while a process in it started between the
-   * program's start and the time it was last seen running; on Windows its
-   * children that started in that time are ended with their trees, and the
-   * time ends early at the start of a process that now holds its id.
+   * ending anything, and so is a record whose clock offset shows that the
+   * wall clock changed since, which the runtime's log notes. When a recorded
+   * program is no longer running, its process group is ended while a process
+   * in it certainly started between the request for the program and the time
+   * it was last seen running, given the process table's precision; on Windows
+   * its children that started in that time are ended with their trees, and
+   * only those that started before a process that now holds its id count.
    * Otherwise nothing is ended, and the runtime's log names the processes in
    * its group, or on Windows its children that started after that time.
    *

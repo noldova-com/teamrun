@@ -26,17 +26,25 @@ export class PosixProcessTableReader implements IProcessTableReader {
   }
 
   public async readAsync(): Promise<ProcessTable> {
-    const now = this.clock.now();
+    const before = this.clock.now();
     const output = await this.command.runAsync(Resources.processTableCommand, Resources.processTableArguments);
-    return new ProcessTable(output.split(Resources.lineBreakPattern).filter(t => !String.isNullOrWhitespace(t)).map(t => PosixProcessTableReader.parse(t, now)));
+    const after = this.clock.now();
+    return new ProcessTable(output.split(Resources.lineBreakPattern).filter(t => !String.isNullOrWhitespace(t)).map(t => PosixProcessTableReader.parse(t, before, after)));
   }
 
-  private static parse(row: string, now: number): ProcessTableEntry {
+  private static parse(row: string, before: number, after: number): ProcessTableEntry {
     const match = Resources.processTableRowPattern.exec(row);
     if (Object.isNull(match))
       throw new SystemCommandException(Resources.formatProcessTableRowUnreadable(row));
     const [, processId, parentId, groupId, days, hours, minutes, seconds] = match;
-    const elapsed = ((Number(days ?? 0) * 24 + Number(hours ?? 0)) * 60 + Number(minutes)) * 60 + Number(seconds);
-    return new ProcessTableEntry(Number(processId), Number(parentId), Number(groupId), now - elapsed * 1000, null);
+    const elapsed = (((Number(days ?? 0) * 24 + Number(hours ?? 0)) * 60 + Number(minutes)) * 60 + Number(seconds)) * 1000;
+    return new ProcessTableEntry(
+      Number(processId),
+      Number(parentId),
+      Number(groupId),
+      before - elapsed,
+      before - elapsed - Resources.posixStartMargin,
+      after - elapsed + Resources.posixStartMargin,
+      null);
   }
 }

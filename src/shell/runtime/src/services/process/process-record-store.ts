@@ -19,13 +19,16 @@ export class ProcessRecordStore {
     this.database = database;
   }
 
-  public add(moduleId: string, processId: number, program: string, executable: string, boot: string, requested: number, started: number): ProcessRecord {
-    const result = this.database.run(Resources.insertOwnedProcessStatement, moduleId, processId, program, executable, boot, requested, started, started);
-    return new ProcessRecord(Number(result.lastInsertRowid), moduleId, processId, program, executable, boot, requested, started, started);
+  public add(moduleId: string, processId: number, program: string, executable: string, boot: string, requested: number, started: number, clockOffset: number): ProcessRecord {
+    const result = this.database.run(Resources.insertOwnedProcessStatement, moduleId, processId, program, executable, boot, requested, started, started, clockOffset);
+    return new ProcessRecord(Number(result.lastInsertRowid), moduleId, processId, program, executable, boot, requested, started, started, clockOffset);
   }
 
-  public markSeen(record: ProcessRecord, seen: number): void {
-    this.database.run(Resources.updateOwnedProcessSeenStatement, seen, record.id);
+  public markSeen(records: readonly ProcessRecord[], seen: number, clockOffset: number): void {
+    this.database.transaction(() => {
+      for (const record of records)
+        this.database.run(Resources.updateOwnedProcessSeenStatement, seen, clockOffset, record.id);
+    });
   }
 
   public remove(record: ProcessRecord): void {
@@ -46,6 +49,7 @@ export class ProcessRecordStore {
       String(row[Resources.bootColumn]),
       Number(row[Resources.requestedColumn]),
       Number(row[Resources.startedColumn]),
-      Number(row[Resources.seenColumn]));
+      Number(row[Resources.seenColumn]),
+      Number(row[Resources.clockOffsetColumn]));
   }
 }

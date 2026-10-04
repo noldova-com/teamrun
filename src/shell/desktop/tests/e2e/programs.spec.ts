@@ -26,7 +26,7 @@ test.describe("the programs modules run", () => {
   };
 
   const readSeen = (dataDirectory: string): number => {
-    const database = new DatabaseSync(path.join(dataDirectory, "shell.sqlite"), { readOnly: true });
+    const database = new DatabaseSync(path.join(dataDirectory, "shell.sqlite"), { readOnly: true, timeout: 5_000 });
     try {
       return Number(database.prepare("SELECT max(seen) AS seen FROM owned_processes").get()?.["seen"]);
     }

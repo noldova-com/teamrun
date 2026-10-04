@@ -372,13 +372,13 @@ export class Resources {
   public static readonly ownedProcessesMigration: string = "owned-processes";
   public static readonly createOwnedProcessesStatement: string =
     "CREATE TABLE owned_processes (id INTEGER PRIMARY KEY, module TEXT NOT NULL, process_id INTEGER NOT NULL, program TEXT NOT NULL, executable TEXT NOT NULL, " +
-    "boot TEXT NOT NULL, requested INTEGER NOT NULL, started INTEGER NOT NULL, seen INTEGER NOT NULL) STRICT";
+    "boot TEXT NOT NULL, requested INTEGER NOT NULL, started INTEGER NOT NULL, seen INTEGER NOT NULL, clock_offset INTEGER NOT NULL) STRICT";
   public static readonly insertOwnedProcessStatement: string =
-    "INSERT INTO owned_processes (module, process_id, program, executable, boot, requested, started, seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-  public static readonly updateOwnedProcessSeenStatement: string = "UPDATE owned_processes SET seen = ? WHERE id = ?";
+    "INSERT INTO owned_processes (module, process_id, program, executable, boot, requested, started, seen, clock_offset) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  public static readonly updateOwnedProcessSeenStatement: string = "UPDATE owned_processes SET seen = ?, clock_offset = ? WHERE id = ?";
   public static readonly deleteOwnedProcessStatement: string = "DELETE FROM owned_processes WHERE id = ?";
   public static readonly readOwnedProcessesStatement: string =
-    "SELECT id, module, process_id, program, executable, boot, requested, started, seen FROM owned_processes ORDER BY id";
+    "SELECT id, module, process_id, program, executable, boot, requested, started, seen, clock_offset FROM owned_processes ORDER BY id";
   public static readonly moduleColumn: string = "module";
   public static readonly processIdColumn: string = "process_id";
   public static readonly programColumn: string = "program";
@@ -387,6 +387,7 @@ export class Resources {
   public static readonly requestedColumn: string = "requested";
   public static readonly startedColumn: string = "started";
   public static readonly seenColumn: string = "seen";
+  public static readonly clockOffsetColumn: string = "clock_offset";
   public static readonly programParameterName: string = "program";
   public static readonly workingFolderParameterName: string = "workingFolder";
   public static readonly environmentParameterName: string = "environment";
@@ -397,6 +398,8 @@ export class Resources {
   public static readonly seenMillisecondsParameterName: string = "seenMilliseconds";
   public static readonly workingFolderNotAbsolute: string = "The working folder must be an absolute path.";
   public static readonly processExitInvalid: string = "A process exit has either an exit code or a signal, not both.";
+  public static readonly clockStepped: string =
+    "The system clock changed by more than a second after it was last seen running, so what it started could not be told apart from other processes and was left running.";
   public static readonly environmentNamePattern: RegExp = /^[^=\0]+$/;
   public static readonly sharedEnvironmentNames: readonly string[] = ["PATH", "TEMP", "TMP", "TMPDIR"];
   public static readonly posixEnvironmentNames: readonly string[] = ["HOME", "LANG", "LC_ALL"];
@@ -426,17 +429,26 @@ export class Resources {
   public static readonly windowsShellSegments: readonly string[] = ["System32", "WindowsPowerShell", "v1.0", "powershell.exe"];
   public static readonly windowsShellArguments: readonly string[] = ["-NoProfile", "-NonInteractive", "-EncodedCommand"];
   public static readonly windowsProcessTableScript: string =
-    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; CimCmdlets\\Get-CimInstance -ClassName Win32_Process | Microsoft.PowerShell.Core\\Where-Object { $_.CreationDate } | " +
-    "Microsoft.PowerShell.Core\\ForEach-Object {\"{0}`t{1}`t{2}`t{3}\" -f $_.ProcessId, $_.ParentProcessId, ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds(), $_.ExecutablePath }";
+    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $starts = @{}; " +
+    "foreach ($p in [System.Diagnostics.Process]::GetProcesses()) { try { $starts[$p.Id] = [long][Math]::Floor($p.StartTime.ToFileTimeUtc() / 10000) - 11644473600000 } catch { } }; " +
+    "foreach ($w in CimCmdlets\\Get-CimInstance -ClassName Win32_Process) { $started = $starts[[int]$w.ProcessId]; " +
+    "if ($null -ne $started) { \"{0}`t{1}`t{2}`t{3}\" -f $w.ProcessId, $w.ParentProcessId, $started, $w.ExecutablePath } }";
   public static readonly windowsScriptEncoding: BufferEncoding = "utf16le";
   public static readonly base64Encoding: BufferEncoding = "base64";
   public static readonly windowsProcessTableRowPattern: RegExp = /^(\d+)\t(\d+)\t(\d+)\t(.*)$/;
+  public static readonly windowsKillRowPattern: RegExp = /^(\d+)\t([a-z]+)$/;
+  public static readonly killedState: string = "killed";
+  public static readonly replacedState: string = "other";
+  public static readonly runningState: string = "running";
+  public static readonly deniedState: string = "denied";
   public static readonly moduleSearchPathVariable: string = "PSModulePath";
   public static readonly processGraceMilliseconds: number = 3_000;
   public static readonly processEndMilliseconds: number = 5_000;
   public static readonly processSeenMilliseconds: number = 5_000;
   public static readonly processPollMilliseconds: number = 50;
-  public static readonly processStartTolerance: number = 2_000;
+  public static readonly windowsStartMargin: number = 50;
+  public static readonly posixStartMargin: number = 1_000;
+  public static readonly clockStepTolerance: number = 1_500;
   public static readonly bootIdFile: string = "/proc/sys/kernel/random/boot_id";
   public static readonly bootToleranceSeconds: number = 60;
   public static readonly terminateSignal: NodeJS.Signals = "SIGTERM";
@@ -776,6 +788,20 @@ export class Resources {
 
   public static formatProcessesLeft(processIds: readonly number[]): string {
     return `It was no longer running, and nothing showed that processes ${processIds.join(", ")} were what it started, so they were left running.`;
+  }
+
+  public static formatWindowsKillScript(targets: readonly number[], milliseconds: number, lists: boolean): string {
+    return `$targets = @(${targets.join(",")}); $deadline = [DateTime]::UtcNow.AddMilliseconds(${milliseconds}); ` +
+      "$held = [System.Collections.Generic.List[System.Diagnostics.Process]]::new(); " +
+      "for ($i = 0; $i -lt $targets.Length; $i += 2) { $id = $targets[$i]; " +
+      "try { $p = [System.Diagnostics.Process]::GetProcessById($id) } catch { \"$id`tgone\"; continue }; " +
+      "try { $null = $p.Handle; $started = [long][Math]::Floor($p.StartTime.ToFileTimeUtc() / 10000) - 11644473600000 } catch { \"$id`tdenied\"; continue }; " +
+      "if ($started -ne $targets[$i + 1]) { \"$id`tother\"; continue }; " +
+      "try { $p.Kill(); \"$id`tkilled\" } catch { \"$id`tfailed\" }; " +
+      "$held.Add($p) }; " +
+      (lists ? `${Resources.windowsProcessTableScript}; ` : "") +
+      "foreach ($p in $held) { $left = [int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds); " +
+      "if ($p.WaitForExit($left)) { \"$($p.Id)`tended\" } else { \"$($p.Id)`trunning\" } }";
   }
 
   public static formatModuleStopping(moduleId: string, program: string): string {

@@ -31,6 +31,14 @@ export class ProcessClock {
     return this.isBootRelative ? Math.round(uptime() * 1000) : Date.now();
   }
 
+  public offset(): number {
+    return this.isBootRelative ? 0 : Math.round(Date.now() - uptime() * 1000);
+  }
+
+  public hasStepped(offset: number): boolean {
+    return Math.abs(this.offset() - offset) > Resources.clockStepTolerance;
+  }
+
   public isSameBoot(boot: string): boolean {
     return this.isBootRelative
       ? boot === this.boot

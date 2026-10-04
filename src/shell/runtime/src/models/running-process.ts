@@ -12,9 +12,11 @@ import type { ProcessRecord } from "./process-record.js";
 export class RunningProcess {
   public readonly process: OwnedProcess;
   public readonly record: ProcessRecord;
+  public readonly exitTime: Promise<number>;
 
-  public constructor(process: OwnedProcess, record: ProcessRecord) {
+  public constructor(process: OwnedProcess, record: ProcessRecord, exitTime: Promise<number>) {
     this.process = process;
     this.record = record;
+    this.exitTime = exitTime;
   }
 }

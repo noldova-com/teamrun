@@ -13,11 +13,13 @@ export class ProcessEnding {
   public readonly forced: readonly number[];
   public readonly remaining: readonly number[];
   public readonly left: readonly number[];
+  public readonly failure: unknown;
 
-  public constructor(record: ProcessRecord, forced: readonly number[] = [], remaining: readonly number[] = [], left: readonly number[] = []) {
+  public constructor(record: ProcessRecord, forced: readonly number[] = [], remaining: readonly number[] = [], left: readonly number[] = [], failure?: unknown) {
     this.record = record;
     this.forced = [...forced];
     this.remaining = [...remaining];
     this.left = [...left];
+    this.failure = failure;
   }
 }

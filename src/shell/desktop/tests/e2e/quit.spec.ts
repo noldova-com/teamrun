@@ -33,7 +33,7 @@ test.describe("quitting while a module works", () => {
     return [started.processId, started.childProcessId];
   };
 
-  const readLogAsync =async (desktop: DesktopApplicationFixture, name: string): Promise<string | null> => {
+  const readLogAsync = async (desktop: DesktopApplicationFixture, name: string): Promise<string | null> => {
     const file = path.join(desktop.dataDirectory, "logs", name);
     return existsSync(file) ? await readFile(file, "utf8") : null;
   };
