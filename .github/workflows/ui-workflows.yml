@@ -48,7 +48,7 @@ jobs:
         run: npm run test:ui -- --list
 
       - name: Pack the builds
-        run: tar -cf ui-build.tar _build/archives _build/modules _build/packages _build/records _build/tests _build/variants _build/window _build/ui-builds.record node_modules/.package-lock.json node_modules/@noldova src/generated
+        run: tar -cf ui-build.tar _build/archives _build/modules _build/packages _build/product.json _build/records _build/tests _build/variants _build/window _build/ui-builds.record node_modules/.package-lock.json node_modules/@noldova src/generated
 
       - name: Keep the builds for the UI workflows
         id: keep
