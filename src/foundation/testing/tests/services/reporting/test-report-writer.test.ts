@@ -18,7 +18,8 @@ import {
   TestMethodResultOptions,
   TestOutcome,
   TestReportWriter,
-  TestRunResult
+  TestRunResult,
+  TestSelection
 } from "@noldova/teamrun-foundation-testing";
 
 import { ConsoleCapture } from "../../fixtures/reporting/console-capture.fixture.js";
@@ -136,6 +137,21 @@ export class TestReportWriterTests {
     Assert.isTrue(mixed.some(t => t.includes("Skipped: 1")));
     Assert.isTrue(allPassing.every(t => !t.includes("Failed:")));
     Assert.isTrue(allPassing.every(t => !t.includes("Skipped:")));
+  }
+
+  @TestMethod
+  public namesTheFiltersAndTheCountsOfAFilteredRunOnly(): void {
+    const classResults = [new TestClassResult("TestPackage", "SampleTests", "sample.test.js", [
+      new TestMethodResult("TestPackage", "SampleTests", "passes", TestOutcome.Passed, 1)
+    ])];
+    const filtered = new TestReportWriter().formatLines(new TestRunResult(classResults, new TestSelection(["Sample", "category:fast"], 9, 1)), true);
+    const unfiltered = new TestReportWriter().formatLines(new TestRunResult(classResults), true);
+
+    Assert.isTrue(filtered.some(t => t.includes("Filters:") && t.includes("Sample, category:fast")));
+    Assert.isTrue(filtered.some(t => t.includes("Discovered: 9")));
+    Assert.isTrue(filtered.some(t => t.includes("Selected:   1")));
+    Assert.isTrue(filtered.some(t => t.includes("Unselected: 8")));
+    Assert.isTrue(unfiltered.every(t => !t.includes("Discovered:")));
   }
 
   @TestMethod

@@ -39,6 +39,7 @@ export { TestClassResult } from "../models/results/test-class-result.js";
 export { TestMethodResult } from "../models/results/test-method-result.js";
 export { TestMethodResultOptions } from "../models/results/test-method-result-options.js";
 export { TestRunResult } from "../models/results/test-run-result.js";
+export { TestSelection } from "../models/results/test-selection.js";
 export { Assert } from "../services/assertions/assert.js";
 export { CoverageAnalyzer } from "../services/coverage/coverage-analyzer.js";
 export { CoverageEnvironment } from "../services/coverage/coverage-environment.js";

@@ -13,6 +13,7 @@ export class Resources {
   public static readonly testShutdownGraceMilliseconds: number = 1000;
   public static readonly gitHubSummaryVariable: string = "GITHUB_STEP_SUMMARY";
   public static readonly filtersVariable: string = "TEAMRUN_TEST_FILTERS";
+  public static readonly selectionFileVariable: string = "TEAMRUN_TEST_SELECTION_FILE";
   public static readonly skipTestDetailsVariable: string = "TEAMRUN_SKIP_TEST_DETAILS";
   public static readonly timeoutVariable: string = "TEAMRUN_TEST_TIMEOUT_MILLISECONDS";
   public static readonly temporaryRootVariable: string = "TEAMRUN_TEMPORARY_ROOT";
@@ -69,6 +70,11 @@ export class Resources {
   public static readonly failedLabel: string = "Failed:";
   public static readonly skippedLabel: string = "Skipped:";
   public static readonly unreachedLabel: string = "Unreached:";
+  public static readonly filtersLabel: string = "Filters:";
+  public static readonly discoveredLabel: string = "Discovered:";
+  public static readonly selectedLabel: string = "Selected:";
+  public static readonly unselectedLabel: string = "Unselected:";
+  public static readonly noTestMatchedFilters: string = "No test matched the filters; a filter that selects nothing fails the run.\n";
   public static readonly passedMark: string = "✓";
   public static readonly failedMark: string = "✘";
   public static readonly skippedMark: string = "○";

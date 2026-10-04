@@ -52,14 +52,10 @@ export class WindowBoundsKeeper {
     const saved = await store.readAsync();
     if (Object.isNull(saved))
       return;
-    const areas = this.displays.getAllDisplays().map(t => new ScreenArea(t.workArea.x, t.workArea.y, t.workArea.width, t.workArea.height));
-    const state = WindowState.fromJson(saved).placeOn(areas);
-    if (Object.isNull(state.x) || Object.isNull(state.y)) {
-      this.window.setBounds({ width: state.width, height: state.height });
-      this.window.center();
-    }
-    else
-      this.window.setBounds({ x: state.x, y: state.y, width: state.width, height: state.height });
+    const areas = this.displays.getAllDisplays().map(t => ScreenArea.of(t.workArea));
+    const state = WindowState.fromJson(saved);
+    const bounds = state.placeOn(areas, ScreenArea.of(this.displays.getPrimaryDisplay().workArea));
+    this.window.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
     if (state.isMaximized)
       this.window.maximize();
   }

@@ -9,6 +9,7 @@
 import { TestOutcome } from "../../enums/test-outcome.js";
 import { TestTimeoutException } from "../../exceptions/test-timeout.exception.js";
 import type { TestClassResult } from "./test-class-result.js";
+import { TestSelection } from "./test-selection.js";
 
 export class TestRunResult {
   public readonly classResults: readonly TestClassResult[];
@@ -20,8 +21,9 @@ export class TestRunResult {
   public readonly isInterrupted: boolean;
   public readonly executed: number;
   public readonly total: number;
+  public readonly selection: TestSelection;
 
-  public constructor(classResults: readonly TestClassResult[]) {
+  public constructor(classResults: readonly TestClassResult[], selection: TestSelection | null = null) {
     let durationMilliseconds = 0;
     let passed = 0;
     let failed = 0;
@@ -53,5 +55,6 @@ export class TestRunResult {
     this.isInterrupted = isInterrupted;
     this.executed = this.passed + this.failed;
     this.total = this.executed + this.skipped + this.unreached;
+    this.selection = Object.isNull(selection) ? new TestSelection([], this.total, this.total) : selection;
   }
 }
