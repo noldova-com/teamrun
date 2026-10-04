@@ -30,7 +30,7 @@ describe("MenuBarService", () => {
     TestBed.configureTestingModule({
       providers: [{
         provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
-          places: [{ name: "notes.tools", title: "Notes", menuBar: true }, { name: "notes.templates", title: "New from template", menuBar: false }],
+          places: [{ name: "notes.tools", title: "Notes", shows: "menuBar" }, { name: "notes.templates", title: "New from template", shows: "menu" }],
           groups: [
             { name: "notes.create", place: "shell.file", exclusive: false, items: [{ command: "notes.newNote", arguments: {} }] },
             { name: "notes.sorting", place: "notes.tools", exclusive: true, items: [{ command: "notes.sortBy", arguments: { by: "title" } }, { command: "notes.sortBy", arguments: { by: "week" } }] },

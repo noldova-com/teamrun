@@ -78,6 +78,7 @@ export default class ModuleCatalog {
       declaration.menus.checkReferences(
         declaration.id,
         new Set([...ModuleMenus.SHELL_PLACES, ...reachable.flatMap(t => t.menus.places.map(u => u.name))]),
+        new Set(reachable.flatMap(t => t.menus.places.filter(u => u.toolbar !== null).map(u => u.name))),
         new Set(reachable.flatMap(t => t.contributions.get(ModuleCatalog.COMMANDS_KIND) ?? [])));
     }
   }

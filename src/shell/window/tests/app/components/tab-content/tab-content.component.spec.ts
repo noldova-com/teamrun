@@ -91,6 +91,8 @@ describe("TabContentComponent", () => {
     writeSettingAsync: () => Promise.resolve(),
     resetSettingAsync: () => Promise.resolve(),
     onSettingChanged: () => () => undefined,
+    declaresDynamicMenuGroup: () => false,
+    provideMenuGroup: () => () => undefined,
     setViewBadge: () => undefined,
     refresh: () => undefined
   });

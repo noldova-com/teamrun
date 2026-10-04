@@ -146,6 +146,23 @@ describe("CommandService", () => {
     expect(errors.map(t => (t as Error).message)).toEqual(["The arguments name no note.", "The arguments name no note."]);
   });
 
+  it("asks a command whether it is checked, counts one with no check or whose check throws as unchecked and reports the failure", () => {
+    const service = start("win32");
+    service.setCommands([
+      new CommandContribution("notes.wrapLines", "Wrap lines", null, null, () => Promise.resolve(null), () => true, t => t !== null),
+      new CommandContribution("notes.newNote", "New note", null, null, () => Promise.resolve(null)),
+      new CommandContribution("notes.sorting", "Sorting", null, null, () => Promise.resolve(null), () => true, () => {
+        throw new Error("No sorting.");
+      })
+    ]);
+
+    expect([service.isChecked("notes.wrapLines"), service.isChecked("notes.wrapLines", { on: true }), service.isChecked("notes.newNote"), service.isChecked("notes.sorting")])
+      .toEqual([false, true, false, false]);
+    expect(errors.map(t => (t as Error).message)).toEqual(["No sorting."]);
+    expect(service.isChecked("notes.gone")).toBe(false);
+    expect(errors.map(t => t instanceof CommandNotFoundException)).toEqual([false, true]);
+  });
+
   it("labels a command's key for the platform, and has none for a command without one", () => {
     const service = start("darwin");
     service.setCommands([command("notes.newNote", "Mod+Alt+N"), command("notes.sync", null)]);

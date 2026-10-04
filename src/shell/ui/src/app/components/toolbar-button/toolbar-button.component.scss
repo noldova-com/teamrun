@@ -1,0 +1,54 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  box-sizing: border-box;
+  gap: 0.125rem;
+  min-width: var(--tr-toolbar-button);
+  height: var(--tr-toolbar-button);
+  padding: 0 var(--tr-toolbar-button-padding);
+  border: 0;
+  border-radius: var(--tr-radius-small);
+  background: none;
+  color: var(--tr-icon-color);
+  font: inherit;
+  white-space: nowrap;
+  outline: none;
+}
+
+:host(.tr-toolbar-button-icon-only) {
+  padding: 0;
+}
+
+:host(:not([aria-disabled="true"]):hover),
+:host([aria-pressed="true"]) {
+  background-color: var(--tr-toolbar-hover);
+}
+
+:host(:focus-visible) {
+  outline: var(--tr-border-width) solid var(--tr-accent);
+  outline-offset: calc(var(--tr-border-width) * -1);
+}
+
+:host([aria-disabled="true"]) {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tr-toolbar-button-glyph,
+.tr-toolbar-button-chevron {
+  font-size: var(--tr-icon);
+}
+
+.tr-toolbar-button-label {
+  color: var(--tr-text);
+}
