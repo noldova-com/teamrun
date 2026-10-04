@@ -143,7 +143,7 @@ export class RuntimeHost implements IIdleParticipant {
       this.registerShellFacilities(database);
     else {
       this.server.refuse(new Refusal(
-        new Failure(FailureCode.PreShellData, Resources.formatPreShellData(ProductInfo.current.name), new PreShellData(lock.dataDirectory.root).toJson()),
+        new Failure(FailureCode.PreShellData, Resources.formatPreShellDataFailure(ProductInfo.current.name), new PreShellData(lock.dataDirectory.root).toJson()),
         ShellMethods.moveAside));
       this.methods.register(ShellMethods.moveAside, new MoveAsideMethod(() => this.moveAsideAsync()));
     }

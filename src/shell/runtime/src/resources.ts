@@ -273,7 +273,7 @@ export class Resources {
   public static readonly defaultKeyParameterName: string = "defaultKey";
   public static readonly isCheckedParameterName: string = "isChecked";
   public static readonly developmentDataFolder: readonly string[] = ["_build", "data"];
-  public static formatPreShellData(productName: string): string {
+  public static formatPreShellDataFailure(productName: string): string {
     return `This data directory holds data from a ${productName} release that predates the shell; move it aside to continue.`;
   }
 
