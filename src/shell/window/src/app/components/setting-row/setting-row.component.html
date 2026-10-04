@@ -21,7 +21,11 @@
       </tr-checkbox>
     }
     @case (kinds.Choice) {
-      <tr-select [label]="definition().title" [options]="options()" [value]="asString(current())" (valueChange)="choose($event)" />
+      @if (isFew()) {
+        <tr-choice-pills [label]="definition().title" [options]="options()" [value]="asString(current())" (valueChange)="choose($event)" />
+      } @else {
+        <tr-select [label]="definition().title" [options]="options()" [value]="asString(current())" (valueChange)="choose($event)" />
+      }
     }
     @case (kinds.Number) {
       <input tr-text-field type="number" class="tr-setting-row-number" [attr.aria-label]="definition().title" [min]="definition().type.minimum" [max]="definition().type.maximum"
