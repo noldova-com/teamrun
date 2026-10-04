@@ -58,10 +58,6 @@ export class ModulesComponent {
   protected readonly version: WritableSignal<string | null> = signal(null);
   protected readonly overview: Signal<ModuleOverview> = computed(() => new ModuleOverview(this.modules()));
   protected readonly current: Signal<ModuleStatus | null> = computed(() => this.overview().select(this.selection.selected()));
-  protected readonly dependencies: Signal<readonly ModuleStatus[]> = computed(() => this.listOf(t => this.overview().listDependencies(t)));
-  protected readonly blockers: Signal<readonly ModuleStatus[]> = computed(() => this.dependencies().filter(t => t.id === this.current()?.blockedBy));
-  protected readonly dependents: Signal<readonly ModuleStatus[]> = computed(() => this.listOf(t => this.overview().listDependents(t)));
-  protected readonly contributions: Signal<readonly ContributionGroup[]> = computed(() => this.listOf(t => ModuleOverview.listContributions(t, (kind, name) => this.titleOf(kind, name))));
 
   public constructor() {
     const errors = inject(ErrorHandler);
@@ -84,9 +80,12 @@ export class ModulesComponent {
       { injector: this.injector });
   }
 
-  private listOf<T>(list: (module: ModuleStatus) => readonly T[]): readonly T[] {
-    const module = this.current();
-    return Object.isNull(module) ? [] : list(module);
+  protected blockersOf(module: ModuleStatus): readonly ModuleStatus[] {
+    return this.overview().listDependencies(module).filter(t => t.id === module.blockedBy);
+  }
+
+  protected contributionsOf(module: ModuleStatus): readonly ContributionGroup[] {
+    return ModuleOverview.listContributions(module, (kind, name) => this.titleOf(kind, name));
   }
 
   private titleOf(kind: string, name: string): string | null {

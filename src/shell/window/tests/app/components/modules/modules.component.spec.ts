@@ -26,7 +26,7 @@ import { SettingsFixture } from "../../../fixtures/settings.fixture";
 
 describe("ModulesComponent", () => {
   const clock = new ModuleStatus("clock", "Clock", "Tells the time.", [], new Map([
-    ["commands", ["clock.tick", "clock.gone"]], ["settings", ["clock.tickStep"]], ["views", ["clock.face"]], ["methods", ["clock.time"]]
+    ["commands", ["clock.tick", "clock.gone"]], ["settings", ["clock.tickStep", "clock.oldStep"]], ["views", ["clock.face"]], ["methods", ["clock.time"]]
   ]), ModuleState.Active, null);
   const notes = new ModuleStatus("notes", "Notes", "Keeps notes.", [], new Map([["menus", ["notes.tools"]], ["notifications", ["notes.saved"]]]),
     ModuleState.Failed, "Its runtime part could not be loaded.");
@@ -102,7 +102,7 @@ describe("ModulesComponent", () => {
     expect(texts(".tr-modules-facts:first-of-type dt")).toEqual(["State", "Depends on", "Needed by"]);
     expect([texts(".tr-modules-fact-state"), texts(".tr-modules-fact-dependencies"), texts(".tr-modules-fact-dependents")]).toEqual([["Active"], ["None"], ["Alarm"]]);
     expect([...element().querySelectorAll(".tr-modules-contributions")].map(t => t.getAttribute("data-kind"))).toEqual(["commands", "settings", "views"]);
-    expect(parts(".tr-modules-contribution")).toEqual([["Tick the clock", "clock.tick"], ["clock.gone"], ["Tick step", "clock.tickStep"], ["clock.face"]]);
+    expect(parts(".tr-modules-contribution")).toEqual([["Tick the clock", "clock.tick"], ["clock.gone"], ["Tick step", "clock.tickStep"], ["clock.oldStep"], ["clock.face"]]);
     expect(errors).toEqual([]);
   });
 

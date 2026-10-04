@@ -30,6 +30,7 @@ LICENSE file in the root directory of this source tree.
     }
   </nav>
   @if (current(); as module) {
+    @let contributions = contributionsOf(module);
     <section class="tr-modules-detail" [attr.aria-labelledby]="'tr-modules-detail-' + module.id">
       <h2 class="tr-modules-detail-title" [id]="'tr-modules-detail-' + module.id">{{ module.displayName }}</h2>
       <p class="tr-modules-detail-id">{{ module.id }}</p>
@@ -42,22 +43,22 @@ LICENSE file in the root directory of this source tree.
             <span class="tr-modules-cause">{{ cause }}</span>
           }
         </dd>
-        @for (blocker of blockers(); track blocker.id) {
+        @for (blocker of blockersOf(module); track blocker.id) {
           <dt>{{ resources.blockedByTitle }}</dt>
           <dd class="tr-modules-fact-blocker"><ng-container [ngTemplateOutlet]="links" [ngTemplateOutletContext]="{ $implicit: [blocker] }" /></dd>
         }
         <dt>{{ resources.dependenciesTitle }}</dt>
-        <dd class="tr-modules-fact-dependencies"><ng-container [ngTemplateOutlet]="links" [ngTemplateOutletContext]="{ $implicit: dependencies() }" /></dd>
+        <dd class="tr-modules-fact-dependencies"><ng-container [ngTemplateOutlet]="links" [ngTemplateOutletContext]="{ $implicit: overview().listDependencies(module) }" /></dd>
         <dt>{{ resources.dependentsTitle }}</dt>
-        <dd class="tr-modules-fact-dependents"><ng-container [ngTemplateOutlet]="links" [ngTemplateOutletContext]="{ $implicit: dependents() }" /></dd>
+        <dd class="tr-modules-fact-dependents"><ng-container [ngTemplateOutlet]="links" [ngTemplateOutletContext]="{ $implicit: overview().listDependents(module) }" /></dd>
       </dl>
       @if (module.state !== active) {
         <tr-module-actions [module]="module" />
       }
       <h3 class="tr-modules-section-title">{{ resources.contributionsTitle }}</h3>
-      @if (contributions().length > 0) {
+      @if (contributions.length > 0) {
         <dl class="tr-modules-facts">
-          @for (group of contributions(); track group.kind) {
+          @for (group of contributions; track group.kind) {
             <dt>{{ group.title }}</dt>
             <dd>
               <ul class="tr-modules-contributions" [attr.data-kind]="group.kind">
