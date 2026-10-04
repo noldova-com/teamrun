@@ -7,11 +7,12 @@
  */
 
 import assert from "node:assert/strict";
-import { rm } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
 import PackageCheck from "../../checks/package-check.ts";
+import BuildVariant from "../../modules/build-variant.ts";
 import PackageBuild from "../../packages/package-build.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
 import PackageTreeFixture from "../fixtures/package-tree.fixture.ts";
@@ -46,6 +47,24 @@ class PackageCheckTests {
         "Packages built and installed: 1.",
         ""
       ].join("\n"));
+    });
+
+    test("a source change the check rebuilds gives the build's product file the new fingerprint", { timeout: PackageCheckTests.BUILD_TIMEOUT }, async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await PackageTreeFixture.writeRootAsync(repository);
+      await PackageTreeFixture.writePackageAsync(repository, "foundation-alpha", [], false);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const readBuildAsync = async (): Promise<unknown> => JSON.parse(await readFile(path.join(repository.directory, "_build", "product.json"), "utf8")).build;
+
+      assert.equal(await PackageCheckTests.create(repository.directory).runAsync(new TextOutputFixture()), true);
+      const first = await readBuildAsync();
+      assert.equal(first, await build.hashFingerprintAsync(BuildVariant.REGULAR));
+      await repository.writeAsync({ "src/foundation/alpha/src/resources.ts": "export default class Resources {\n  public static readonly version: string = \"changed\";\n  public static readonly protocol: string = \"\";\n}\n" });
+      assert.equal(await PackageCheckTests.create(repository.directory).runAsync(new TextOutputFixture()), true);
+
+      assert.notEqual(await readBuildAsync(), first);
+      assert.equal(await readBuildAsync(), await build.hashFingerprintAsync(BuildVariant.REGULAR));
     });
 
     test("a package that cannot be built fails the check, and other errors are not hidden", async t => {
