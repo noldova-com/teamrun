@@ -106,6 +106,19 @@ describe("DocumentOpenerService", () => {
     expect(layout.layout().documents.active).toEqual(first);
   });
 
+  it("restores a saved document that is open as restore does, and leaves out one that is not", () => {
+    const first = new DocumentTab("notes.note", "1");
+    opener.open("notes", "notes.note", "1", "Note 1", true);
+    opener.open("notes", "notes.note", "2", "Note 2", false);
+
+    opener.restoreSaved("notes", "notes.note", "1", "First note", false);
+    opener.restoreSaved("notes", "notes.note", "3", "Note 3", false);
+
+    expect(layout.layout().documents.tabs).toEqual([first, new DocumentTab("notes.note", "2")]);
+    expect([layout.layout().documents.active, layout.layout().documents.preview, labels.of(first).title]).toEqual([new DocumentTab("notes.note", "2"), null, "First note"]);
+    expect(() => opener.restoreSaved("clock", "notes.note", "3", "Note 3", false)).toThrow(ArgumentException);
+  });
+
   it("refuses another module's document, an unregistered one and an empty title", () => {
     expect(() => opener.open("clock", "notes.note", "1", "Note 1", false)).toThrow(ArgumentException);
     expect(() => opener.open("note", "notes.note", "1", "Note 1", false)).toThrow(ArgumentException);

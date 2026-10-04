@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { Component } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { userEvent } from "vitest/browser";
@@ -63,6 +64,17 @@ describe("kit styles", () => {
     const symbols = await document.fonts.load("16px \"Material Symbols Rounded\"", "close");
 
     expect([sans.length, sansItalic.length, mono.length, symbols.length].every(t => t > 0)).toBe(true);
+  });
+
+  it("hide the live announcer's region from sight before any dialog has opened, so a long announcement neither shows nor makes the page scroll", async () => {
+    const text = "A notification with a title and a text long enough to wrap onto several lines if it were laid out. ".repeat(20);
+    void TestBed.inject(LiveAnnouncer).announce(text);
+    await vi.waitFor(() => expect(document.querySelector(".cdk-live-announcer-element")?.textContent).toBe(text));
+    const region = document.querySelector(".cdk-live-announcer-element") as HTMLElement;
+    const box = region.getBoundingClientRect();
+
+    expect([box.width, box.height, getComputedStyle(region).position, getComputedStyle(region).overflow]).toEqual([1, 1, "absolute", "hidden"]);
+    expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(window.innerHeight);
   });
 
   it("give headings a line height that cannot overlap when they wrap", () => {

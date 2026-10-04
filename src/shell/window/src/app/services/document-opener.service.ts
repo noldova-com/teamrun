@@ -28,6 +28,12 @@ export class DocumentOpenerService {
     this.layout.restoreDocument(this.titled(moduleId, name, instance, title), isPreview);
   }
 
+  public restoreSaved(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
+    const tab = this.titled(moduleId, name, instance, title);
+    if (this.layout.layout().isOpen(tab))
+      this.layout.restoreDocument(tab, isPreview);
+  }
+
   public keep(moduleId: string, name: string, instance: string): void {
     this.requireOwnDocument(moduleId, name);
     this.layout.keep(new DocumentTab(name, instance));

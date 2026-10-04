@@ -266,6 +266,7 @@ export class Resources {
   public static readonly scrollEvent: string = "scroll";
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
+  public static readonly programFocusOrigin: FocusOrigin = "program";
   public static readonly menuPaneClass: string = "tr-menu-pane";
   public static readonly popoverClass: string = "tr-popover";
   public static readonly popoverPaneClass: string = "tr-popover-pane";
@@ -276,6 +277,9 @@ export class Resources {
   public static readonly dialogCloseLabel: string = "Close";
   public static readonly dialogCloseSelector: string = ".tr-dialog-close";
   public static readonly noLimit: string = "none";
+  public static readonly inertAttribute: string = "inert";
+  public static readonly ariaLiveAttribute: string = "aria-live";
+  public static readonly popoverAttribute: string = "popover";
   public static readonly dropdownPaneClass: string = "tr-dropdown-pane";
   public static readonly listboxSelector: string = "[role=listbox]";
   public static readonly tabKey: string = "Tab";

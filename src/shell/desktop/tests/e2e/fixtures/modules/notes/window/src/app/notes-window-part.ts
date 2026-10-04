@@ -52,6 +52,8 @@ export class NotesWindowPart implements IWindowPart {
     "Help", "FAQ", "Website", "Logo", "Ship it"
   ];
 
+  private static readonly LONG_COUNT: string = "2 notes, neither pinned nor archived, both last changed today by the person who wrote them, and both waiting for review";
+
   public readonly moduleId: string = "notes";
 
   public async activateAsync(context: IWindowPartContext): Promise<void> {
@@ -96,7 +98,10 @@ export class NotesWindowPart implements IWindowPart {
     await context.postNotificationAsync(new NotificationPost(
       QualifiedName.parse("notes.saveFailed"), null, "Note 2 couldn't be saved", "The disk is full.", NotificationSeverity.Error, null,
       [new NotificationAction("New note", new CommandRun(QualifiedName.parse("notes.newNote"), null))], null));
-    if (!JsonReader.fromValue(await context.requestAsync("notes.manyTabs", null)).readBoolean("isMany"))
+    const options = JsonReader.fromValue(await context.requestAsync("notes.options", null));
+    if (options.readBoolean("isLongCount"))
+      counter.update(new StatusBarItemState(NotesWindowPart.LONG_COUNT, { command: "notes.newNote" }));
+    if (!options.readBoolean("isMany"))
       return;
     for (const [name, title, icon, side] of NotesWindowPart.MANY_VIEWS)
       context.registerView(new ViewContribution(name, title, icon, side, true,

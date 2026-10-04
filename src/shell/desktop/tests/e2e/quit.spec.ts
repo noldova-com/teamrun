@@ -68,6 +68,35 @@ test.describe("quitting while a module works", () => {
     expect(existsSync(path.join(desktop.dataDirectory, "work", "clock", "stopped"))).toBe(false);
   });
 
+  test("keeps the focus in the question on F10 or a lone Alt with the window behind it inert, and F10 reaches the menus again once the person cancels", async ({ desktop }) => {
+    const window = desktop.window;
+    const content = window.locator("tr-window");
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]")).toBeVisible();
+    await beginWorkAsync(desktop);
+    const asking = window.getByRole("dialog", { name: "Work is still running" });
+    const wait = asking.getByRole("button", { name: "Wait, then quit" });
+
+    await closeWindowAsync(desktop);
+    await expect(wait).toBeFocused();
+    await window.keyboard.press("F10");
+    await expect(wait).toBeFocused();
+    await window.keyboard.press("Alt");
+    await expect(wait).toBeFocused();
+    expect(await content.evaluate(t => [(t as HTMLElement).inert, t.getAttribute("aria-hidden")])).toEqual([true, "true"]);
+    await window.keyboard.press("Tab");
+    expect(await asking.evaluate(t => t.contains(document.activeElement) && document.activeElement !== t)).toBe(true);
+    await window.keyboard.press("Escape");
+    await expect(asking).toHaveCount(0);
+
+    expect(await content.evaluate(t => [(t as HTMLElement).inert, t.getAttribute("aria-hidden")])).toEqual([false, null]);
+    if (process.platform !== "darwin") {
+      await window.keyboard.press("F10");
+      await expect(window.locator("tr-menu-bar").getByRole("menuitem").first()).toBeFocused();
+    }
+    await runCommandAsync(desktop.dataDirectory, "clock.finishWork");
+    await expect.poll(() => readWorkAsync(desktop.dataDirectory), { timeout: 20_000, intervals: [500] }).toEqual([]);
+  });
+
   test("paints the question's body in the dialog's text color at full opacity as it opens, without a pointer move, in light and in dark mode", async ({ desktop }) => {
     const window = desktop.window;
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]")).toBeVisible();
