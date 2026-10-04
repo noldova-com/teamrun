@@ -185,6 +185,7 @@ describe("DockingGuidesComponent", () => {
   });
 
   it("shows neither a plate nor a preview over a group's tab row, where the tab takes a place in the row", () => {
+    layout.openDocument(LayoutFixture.todo);
     start(LayoutFixture.plan);
     moveOver(".group[data-drop-group=\"0\"]");
     expect(find("tr-docking-plate")).not.toBeNull();
