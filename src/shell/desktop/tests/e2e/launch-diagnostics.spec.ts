@@ -47,8 +47,12 @@ test("a launch that fails on an unreadable discovery file, whose cleanup then fa
   const failure = await DesktopApplicationFixture.launchAsync(testInfo, {}, { "discovery/runtime.json": "This is not a discovery file." })
     .then(() => null, (error: unknown) => error);
   const kept = (await listRoots()).filter(t => !rootsBefore.includes(t));
-  const running = await Promise.all(kept.map(t => ProcessListFixture.describeNamingAsync(path.join(os.tmpdir(), t))));
-  await Promise.all(kept.map(t => rm(path.join(os.tmpdir(), t), { recursive: true, force: true, maxRetries: 10 })));
+  try {
+    await expect.poll(() => Promise.all(kept.map(t => ProcessListFixture.describeNamingAsync(path.join(os.tmpdir(), t)))), { timeout: 10_000 }).toEqual(kept.map(() => "none"));
+  }
+  finally {
+    await Promise.all(kept.map(t => rm(path.join(os.tmpdir(), t), { recursive: true, force: true, maxRetries: 10 })));
+  }
 
   expect(failure).toBeInstanceOf(Error);
   expect((failure as Error).message).toMatch(/runtime\.json is not valid: /);
@@ -58,5 +62,4 @@ test("a launch that fails on an unreadable discovery file, whose cleanup then fa
   expect(cleanup).toHaveLength(1);
   expect(String(cleanup[0]?.body)).toMatch(/runtime\.json is not valid: .*disposeAsync/s);
   expect(kept).toHaveLength(1);
-  expect(running).toEqual(["none"]);
 });
