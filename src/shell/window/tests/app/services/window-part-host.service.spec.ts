@@ -10,7 +10,7 @@ import { Component, ErrorHandler, type Type } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
-import { ModuleState, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+import { ModuleState, type ModuleStatus, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { ModulesComponent } from "../../../src/app/components/modules/modules.component";
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
@@ -550,6 +550,25 @@ describe("WindowPartHostService", () => {
     expect(loads.length).toBe(1);
     expect(errors.map(t => (t as Error).message)).toEqual(["tasks did not stop"]);
     expect(host.findContribution(new ViewTab("notes.list"))?.context?.moduleId).toBe("notes");
+  });
+
+  it("keeps the modules it reported until the runtime reports them again", async () => {
+    const seen: string[][] = [];
+    let reported: () => readonly ModuleStatus[] = () => [];
+    const tasks = new FakeWindowPart("tasks", log, () => {
+      seen.push(reported().map(t => t.id));
+    });
+    const { host } = start([source("tasks", tasks)], [status("tasks")]);
+    reported = () => host.modules();
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(seen).toEqual([[], ["tasks"]]);
+    expect(host.modules().map(t => t.id)).toEqual(["tasks"]);
   });
 
   it("shows the badge a window part sets on its view, set again when the part reactivates", async () => {

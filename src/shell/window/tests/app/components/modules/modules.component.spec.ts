@@ -121,6 +121,16 @@ describe("ModulesComponent", () => {
     expect([texts(".tr-modules-contributions"), texts(".tr-modules-none")]).toEqual([[], ["None", "No commands, settings, menus, views or notification kinds."]]);
   });
 
+  it("names a dependency or blocker the list lacks by its id, without a link", async () => {
+    modules.set([clock, alarm]);
+    TestBed.inject(ModuleSelectionService).select("alarm");
+
+    await renderAsync();
+
+    expect([texts(".tr-modules-fact-blocker"), texts(".tr-modules-fact-dependencies")]).toEqual([["notes"], ["Clock, notes"]]);
+    expect([texts(".tr-modules-fact-dependencies .tr-modules-link"), texts(".tr-modules-unknown")]).toEqual([["Clock"], ["notes", "notes"]]);
+  });
+
   it("follows a link to its module, selecting it and moving the focus to its row", async () => {
     await renderAsync();
     click(row("alarm"));
@@ -193,5 +203,27 @@ describe("ModulesComponent", () => {
       expect(getComputedStyle(link("dependents", "Alarm")).color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "textLink.foreground"));
       fixture.destroy();
     }
+  });
+
+  it("truncates a row's name and id on one line and keeps its description to two lines", async () => {
+    modules.set([new ModuleStatus("long", "A module whose name is far too long for the list", "Tells the time. ".repeat(20), [], new Map(), ModuleState.Active, null), clock]);
+    await renderAsync();
+    const long = row("long");
+
+    const truncating = [".tr-modules-name", ".tr-modules-id"].map(t => long.querySelector(t)?.hasAttribute("data-truncates"));
+    const description = getComputedStyle(long.querySelector(".tr-modules-description") as Element);
+
+    expect(truncating).toEqual([true, true]);
+    expect([description.webkitLineClamp, description.overflow]).toEqual(["2", "hidden"]);
+    expect(long.querySelector(".tr-modules-description")?.textContent).toBe("Tells the time. ".repeat(20));
+  });
+
+  it("makes the module's name the largest text in its details and shows its state at panel size there, smaller in the list", async () => {
+    const host = await renderAsync();
+    const size = (selector: string): number => Number.parseFloat(getComputedStyle(host.querySelector(selector) as Element).fontSize);
+
+    expect(size(".tr-modules-detail-title")).toBeGreaterThan(size(".tr-modules-detail-description"));
+    expect(size(".tr-modules-fact-state .tr-modules-state")).toBe(size(".tr-modules-fact-dependencies"));
+    expect(size(".tr-modules-row .tr-modules-state")).toBeLessThan(size(".tr-modules-fact-state .tr-modules-state"));
   });
 });

@@ -634,15 +634,15 @@ export class Resources {
   public static readonly noModulesNamed: string = "None";
   public static readonly contributionsTitle: string = "Contributes";
   public static readonly noContributions: string = "No commands, settings, menus, views or notification kinds.";
+  public static readonly commandsKind: string = "commands";
+  public static readonly settingsKind: string = "settings";
   public static readonly moduleContributionKinds: readonly (readonly [string, string])[] = [
-    ["commands", "Commands"],
-    ["settings", "Settings"],
+    [Resources.commandsKind, "Commands"],
+    [Resources.settingsKind, "Settings"],
     ["menus", "Menus"],
     ["views", "Views"],
     ["notifications", "Notification kinds"]
   ];
-  public static readonly commandsKind: string = "commands";
-  public static readonly settingsKind: string = "settings";
   public static readonly moduleSelector: string = "[data-module]";
   public static readonly moduleData: string = "module";
   public static readonly bridgeName: string = "teamrun";

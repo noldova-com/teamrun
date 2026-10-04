@@ -220,7 +220,6 @@ export class WindowPartHostService implements IWindowPartHost {
   private async reloadAsync(): Promise<void> {
     await this.deactivateAsync();
     this.isActivating = true;
-    this.modulesValue.set([]);
     this.failuresValue.set([]);
     this.moduleOrder = [];
     this.runtimeCommands = [];

@@ -31,9 +31,19 @@ describe("ModuleOverview", () => {
   it("lists a module's dependencies in its declared order and its dependents in module order", () => {
     const overview = new ModuleOverview([tasks, clock, notes, alarm]);
 
-    expect(overview.listDependencies(notes).map(t => t.id)).toEqual(["clock", "tasks"]);
-    expect(overview.listDependents(clock).map(t => t.id)).toEqual(["notes", "alarm"]);
+    expect(overview.listDependencies(notes).map(t => [t.id, t.module])).toEqual([["clock", clock], ["tasks", tasks]]);
+    expect(overview.listDependents(clock).map(t => [t.id, t.module])).toEqual([["notes", notes], ["alarm", alarm]]);
     expect([overview.listDependencies(tasks), overview.listDependents(alarm)]).toEqual([[], []]);
+  });
+
+  it("refers to a dependency or blocker the list lacks by its id alone", () => {
+    const blocked = new ModuleStatus("alarm", "Alarm", "Used by the tests.", ["clock"], new Map(), ModuleState.Blocked, "It depends on clock, which is not active.", "clock");
+    const overview = new ModuleOverview([tasks, blocked]);
+
+    expect(overview.listDependencies(blocked).map(t => [t.id, t.module])).toEqual([["clock", null]]);
+    expect([overview.findBlocker(blocked)?.id, overview.findBlocker(blocked)?.module]).toEqual(["clock", null]);
+    expect(overview.findBlocker(tasks)).toBeNull();
+    expect(new ModuleOverview([tasks, clock, blocked]).findBlocker(blocked)?.module).toBe(clock);
   });
 
   it("groups the contributions a person sees by kind, in a fixed order, with the titles it is given, leaving out other and empty kinds", () => {

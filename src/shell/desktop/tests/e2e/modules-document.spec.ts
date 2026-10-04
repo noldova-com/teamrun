@@ -95,6 +95,7 @@ test.describe("the Modules document", () => {
     await expect(window.locator("[data-fixture-content=clock-face]")).toBeVisible();
     await openFromCommandSearchAsync(window);
     await row(window, "alarm").click();
+    await expect(row(window, "alarm")).toBeFocused();
 
     const folder = path.join(desktop.dataDirectory, "modules", "clock");
     await mkdir(folder, { recursive: true });
@@ -103,11 +104,16 @@ test.describe("the Modules document", () => {
 
     await expect(window.locator(".tr-modules-row .tr-modules-state")).toHaveText([/Failed/, "Active", /Blocked/]);
     await expect(row(window, "alarm")).toHaveAttribute("aria-current", "true");
+    await expect(window.locator(".tr-modules-detail-title")).toHaveText("Alarm");
     await expect(fact(window, "state")).toHaveText(/Blocked\s*It depends on clock, which is not active\./);
     await expect(fact(window, "blocker")).toHaveText("Clock");
     const icon = await row(window, "alarm").locator(".tr-modules-state-icon").evaluate(t => [t.textContent, getComputedStyle(t).color]);
     const isDark = await window.evaluate(() => matchMedia("(prefers-color-scheme: dark)").matches);
     expect(icon).toEqual(["error", (isDark ? colors.Dark : colors.Light).error]);
+    const heads = await window.locator(".tr-modules-row-head").evaluateAll(t => t.map(u => u.getBoundingClientRect().height));
+    expect(Math.max(...heads) - Math.min(...heads)).toBeLessThanOrEqual(1);
+    const [label = 0, cause = 0] = await fact(window, "state").evaluate(t => [".tr-modules-state-label", ".tr-modules-cause"].map(u => (t.querySelector(u) as Element).getBoundingClientRect().bottom));
+    expect(Math.abs(label - cause)).toBeLessThanOrEqual(1);
 
     await fact(window, "blocker").getByRole("button", { name: "Clock" }).click();
 

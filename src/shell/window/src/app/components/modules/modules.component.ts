@@ -24,6 +24,7 @@ import {
 
 import "@noldova/teamrun-foundation-core";
 import { ModuleState, type ModuleStatus } from "@noldova/teamrun-shell-protocol";
+import { TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import type { ContributionGroup } from "../../models/modules/contribution-group";
 import { ModuleOverview } from "../../models/modules/module-overview";
@@ -37,7 +38,7 @@ import { ModuleActionsComponent } from "../module-actions/module-actions.compone
 
 @Component({
   selector: "tr-modules",
-  imports: [ModuleActionsComponent, NgTemplateOutlet],
+  imports: [ModuleActionsComponent, NgTemplateOutlet, TooltipDirective],
   templateUrl: "./modules.component.html",
   styleUrl: "./modules.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -78,10 +79,6 @@ export class ModulesComponent {
     this.selection.select(id);
     afterNextRender(() => [...this.element.querySelectorAll<HTMLElement>(Resources.moduleSelector)].find(t => t.dataset[Resources.moduleData] === id)?.focus(),
       { injector: this.injector });
-  }
-
-  protected blockersOf(module: ModuleStatus): readonly ModuleStatus[] {
-    return this.overview().listDependencies(module).filter(t => t.id === module.blockedBy);
   }
 
   protected contributionsOf(module: ModuleStatus): readonly ContributionGroup[] {
