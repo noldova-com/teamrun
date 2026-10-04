@@ -89,4 +89,25 @@ test.describe("gallery", () => {
       await window.mouse.move(0, 0);
     }
   });
+
+  test("a button's label too long for it starts at its start padding, ends with an ellipsis and shows in full in its tooltip, in light and in dark", async ({ desktop }) => {
+    const window = desktop.window;
+    await openGalleryAsync(window);
+
+    for (const mode of ["Light", "Dark"] as const) {
+      const button = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Button\"] button.tr-gallery-narrow");
+      await button.scrollIntoViewIfNeeded();
+      const start = await button.evaluate(t => {
+        const style = getComputedStyle(t);
+        const label = t.querySelector("[data-truncates]") as HTMLElement;
+        return Math.round(label.getBoundingClientRect().left - t.getBoundingClientRect().left - Number.parseFloat(style.borderLeftWidth) - Number.parseFloat(style.paddingLeft));
+      });
+      expect(start).toBe(0);
+      expect(await truncationAsync(button)).toEqual({ isInside: true, isCut: true, overflow: "ellipsis" });
+      await button.hover();
+      await expect(scope(window, mode).locator(".cdk-overlay-container tr-tooltip")).toHaveText(await button.innerText());
+      await desktop.checkpointAsync(`button-long-label-${mode.toLowerCase()}`);
+      await window.mouse.move(0, 0);
+    }
+  });
 });
