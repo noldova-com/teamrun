@@ -170,19 +170,25 @@ describe("ShortcutsComponent", () => {
     expect(document.activeElement).toBe(keyOf("clock.tick"));
   });
 
-  it("leaves a command that has another default key with that key when Use it here takes one of them", async () => {
-    await renderAsync();
+  for (const [platform, taken, stroke, kept, binding] of [
+    ["linux", "Ctrl+PageDown", { key: "PageDown", code: "PageDown", ctrlKey: true }, "Ctrl+Tab", "Mod+PageDown"],
+    ["darwin", "⌃⇥", { key: "Tab", code: "Tab", ctrlKey: true }, "⌥⌘→", "Ctrl+Tab"]
+  ] as const) {
+    it(`leaves Show the next tab only its other default key ${kept}, wherever its key shows, when Use it here takes ${taken} on ${platform}`, async () => {
+      await renderAsync(platform);
 
-    await recordAsync("clock.tick");
-    await pressAsync("clock.tick", { key: "PageDown", code: "PageDown", ctrlKey: true });
-    const used = notice("clock.tick");
-    await page.getByRole("button", { name: "Use it here" }).click();
-    await settleAsync();
+      await recordAsync("clock.tick");
+      await pressAsync("clock.tick", stroke);
+      const used = notice("clock.tick");
+      await page.getByRole("button", { name: "Use it here" }).click();
+      await settleAsync();
 
-    expect(used).toBe("Ctrl+PageDown is used by Show the next tab");
-    expect(settings.calls).toEqual(["set shell.keyBindings {\"clock.tick\":\"Mod+PageDown\"}"]);
-    expect(cells("shell.nextTab").slice(2)).toEqual(["Ctrl+TabCtrl+PageDown is taken by Tick the clock", "Remove"]);
-  });
+      expect(used).toBe(`${taken} is used by Show the next tab`);
+      expect(settings.calls).toEqual([`set shell.keyBindings {"clock.tick":"${binding}"}`]);
+      expect(cells("shell.nextTab").slice(2)).toEqual([`${kept}${taken} is taken by Tick the clock`, "Remove"]);
+      expect(TestBed.inject(CommandService).keyLabel("shell.nextTab")).toBe(kept);
+    });
+  }
 
   it("keeps both keys when the person cancels a collision", async () => {
     await renderAsync();
