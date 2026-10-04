@@ -42,6 +42,8 @@ export class DesktopApiTests {
         "UtilityProcessStarter",
         "WindowAppearance",
         "WindowBoundsKeeper",
+        "WindowErrorAdmission",
+        "WindowErrorLimit",
         "WindowRecovery",
         "WindowState",
         "WindowStateException",

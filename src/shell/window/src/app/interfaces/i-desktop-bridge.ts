@@ -34,4 +34,5 @@ export interface IDesktopBridge {
   onQuitQuestion(listener: (question: unknown) => void): () => void;
   answerQuit(choice: string): Promise<boolean>;
   logModule(moduleId: string, message: string): void;
+  logError(moduleId: string | null, text: string): void;
 }
