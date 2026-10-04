@@ -18,6 +18,7 @@ import { TabComponent } from "../tab/tab.component";
 import { ToolbarButtonComponent } from "../toolbar-button/toolbar-button.component";
 import { ToolbarItemDirective } from "../toolbar/toolbar-item.directive";
 import { ToolbarDirective } from "../toolbar/toolbar.directive";
+import { TooltipDirective } from "../tooltip/tooltip.directive";
 import { ViewBadgeComponent } from "../view-badge/view-badge.component";
 import { GalleryResources } from "./gallery-resources";
 import { GalleryCellComponent } from "./gallery-cell.component";
@@ -26,7 +27,7 @@ import { GallerySpecimenComponent } from "./gallery-specimen.component";
 
 @Component({
   selector: "tr-gallery-navigation",
-  imports: [GalleryCellComponent, GalleryHoverDirective, GallerySpecimenComponent, IconButtonComponent, PanelCardComponent, SashComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, ViewBadgeComponent],
+  imports: [GalleryCellComponent, GalleryHoverDirective, GallerySpecimenComponent, IconButtonComponent, PanelCardComponent, SashComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, ViewBadgeComponent],
   templateUrl: "./gallery-navigation.component.html",
   styleUrl: "./gallery-navigation.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush

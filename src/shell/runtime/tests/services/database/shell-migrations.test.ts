@@ -51,7 +51,7 @@ export class ShellMigrationsTests {
     const tables = database.readAll("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'quiet_devices'");
     database.close();
 
-    Assert.areEqual(moved, ShellMigrations.all.length - 1);
+    Assert.areEqual("owned-processes", ShellMigrations.all[moved + 1]?.id);
     Assert.areEqual(JSON.stringify([
       { name: "shell.doNotDisturb", device: "d1", value: "true" },
       { name: "shell.doNotDisturb", device: "d3", value: "true" },

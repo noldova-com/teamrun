@@ -11,6 +11,7 @@ import type { Locator, Page } from "@playwright/test";
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 
 function dialog(window: Page): Locator {
   return window.getByRole("dialog");
@@ -20,12 +21,6 @@ async function showAsync(window: Page, title: string): Promise<void> {
   await CommandSearchFixture.searchAsync(window, title);
   await window.keyboard.press("Enter");
   await expect(dialog(window)).toBeVisible();
-}
-
-async function setModeAsync(window: Page, mode: string): Promise<void> {
-  await window.evaluate(value => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
-    .request("shell.setSetting", { name: "shell.mode", value }), mode);
-  await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(mode.toLowerCase());
 }
 
 async function zoomAsync(desktop: DesktopApplicationFixture, factor: number, width: number): Promise<void> {
@@ -77,9 +72,9 @@ test.describe("view dialog", () => {
     await expect(other).toHaveAttribute("aria-selected", "false");
     await expect(window.locator("[data-fixture-content=notes-list]")).toBeAttached();
     await desktop.checkpointAsync("view-dialog-note-light");
-    await setModeAsync(window, "Dark");
+    await WindowModeFixture.setAsync(window, "Dark");
     await desktop.checkpointAsync("view-dialog-note-dark");
-    await setModeAsync(window, "Light");
+    await WindowModeFixture.setAsync(window, "Light");
 
     await summary.focus();
     await window.keyboard.press("Escape");

@@ -6,7 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export default class PullRequestFinding {
+import type IPullRequestComment from "./interfaces/pull-request-comment.ts";
+
+export default class PullRequestFinding implements IPullRequestComment {
   public static readonly NO_BUILD: string = "no-build";
   public static readonly CONFLICT: string = "conflict";
   public static readonly FAILED: string = "failed";
