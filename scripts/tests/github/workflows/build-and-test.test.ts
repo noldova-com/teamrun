@@ -195,14 +195,18 @@ class BuildAndTestTests {
       const text = workflow.text;
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      doubles.respond("tar", `-cf ui-build.tar ${BuildAndTestTests.PACKED}`, "");
-      doubles.respond("tar", "-xf ui-build.tar", "");
+      const paths = BuildAndTestTests.PACKED.split(" ");
+      const listing = `for path in ${BuildAndTestTests.PACKED}; do if [ -d "$path" ]; then cat "$path/content"; else cat "$path"; fi; done\n`;
+      await doubles.runAsync(paths.map(t => t.includes(".") ? `mkdir -p "$(dirname ${t})" && echo ${t} > ${t}\n` : `mkdir -p ${t} && echo ${t} > ${t}/content\n`).join(""));
 
       const packed = await doubles.runAsync(workflow.readStepScript("Pack the builds"));
+      await doubles.runAsync(`rm -rf ${BuildAndTestTests.PACKED}\n`);
+      const removed = await doubles.runAsync(listing);
       const unpacked = await doubles.runAsync(workflow.readStepScript("Unpack the builds"));
+      const restored = await doubles.runAsync(listing);
 
-      assert.deepEqual([packed.status, unpacked.status], [0, 0], packed.stderr + unpacked.stderr);
-      assert.deepEqual(await doubles.readCallsAsync(), [`tar -cf ui-build.tar ${BuildAndTestTests.PACKED}`, "tar -xf ui-build.tar"]);
+      assert.deepEqual([packed.status, removed.status, unpacked.status, restored.status], [0, 1, 0, 0], packed.stderr + unpacked.stderr + restored.stderr);
+      assert.equal(restored.stdout, paths.map(t => `${t}\n`).join(""));
       assert.equal(workflow.readStepScript("Build the test build and its variants"), "npm run test:ui -- --list\n");
       assert.ok(text.includes("  ui-build:\n    name: Build for the UI workflows (${{ matrix.target }})\n    needs: changes\n" +
         "    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' }}\n" +
