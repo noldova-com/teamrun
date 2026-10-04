@@ -14,6 +14,7 @@ import { Layout } from "../../../src/app/models/layout/layout";
 import { SideDropTarget } from "../../../src/app/models/layout/side-drop-target";
 import { SplitDropTarget } from "../../../src/app/models/layout/split-drop-target";
 import type { Tab } from "../../../src/app/models/layout/tab";
+import { GroupDropTarget } from "../../../src/app/models/layout/group-drop-target";
 import { TabDropTarget } from "../../../src/app/models/layout/tab-drop-target";
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../src/app/services/layout.service";
@@ -133,7 +134,7 @@ describe("TabDragService", () => {
     expect(drag.target()).toEqual(new SplitDropTarget(2, PanelEdge.Top));
     expect(drag.hoveredGroup()).toBe(2);
     moveOver("center");
-    expect(drag.target()).toEqual(new TabDropTarget(2, 1));
+    expect(drag.target()).toEqual(new GroupDropTarget(2));
     moveOver("gap");
     expect(drag.target()).toBeNull();
     moveOver("stale");
@@ -142,6 +143,7 @@ describe("TabDragService", () => {
     moveOver("search", 10);
     expect(drag.target()).toEqual(new TabDropTarget(1, 1));
     expect(drag.isDropBefore(1, 1)).toBe(true);
+    expect(drag.hoveredGroup()).toBeNull();
     moveOver("search", 90);
     expect(drag.target()).toEqual(new TabDropTarget(1, 2));
     moveOver("rest");
@@ -150,10 +152,28 @@ describe("TabDragService", () => {
     expect(drag.target()).toEqual(new TabDropTarget(0, 2));
     moveOver("body");
     expect(drag.target()).toBeNull();
+    expect(drag.hoveredGroup()).toBe(1);
     moveOver("outside");
     expect(drag.target()).toBeNull();
+    moveOver("search", 10);
     moveOver(null);
-    expect(drag.target()).toBeNull();
+    expect([drag.target(), drag.hoveredGroup(), drag.dragging()]).toEqual([null, null, LayoutFixture.files]);
+  });
+
+  it("takes the after half of a tab or a horizontal strip icon from the left in a right-to-left row", () => {
+    root.dir = "rtl";
+    start(LayoutFixture.files);
+    const targets: unknown[] = [];
+    for (const [name, x] of [["files", 10], ["files", 90], ["search", 10], ["search", 90]] as const) {
+      moveOver(name, x);
+      targets.push(drag.target());
+    }
+    for (const x of [30, 70]) {
+      moveWithin("horizontal", x, 5);
+      targets.push(drag.target());
+    }
+
+    expect(targets).toEqual([new TabDropTarget(1, 1), new TabDropTarget(1, 0), new TabDropTarget(1, 2), new TabDropTarget(1, 1), new TabDropTarget(2, 1), new TabDropTarget(2, 0)]);
   });
 
   it("targets the place before or after a strip icon along the strip's axis, for a group that takes the tab", () => {
@@ -188,6 +208,14 @@ describe("TabDragService", () => {
     start(LayoutFixture.search);
     document.dispatchEvent(new PointerEvent("pointerup"));
     expect(layout.layout()).toBe(before);
+  });
+
+  it("moves a tab into another group's row at the place before the tab under the pointer", () => {
+    start(LayoutFixture.files);
+    moveOver("changes", 10);
+    document.dispatchEvent(new PointerEvent("pointerup"));
+
+    expect(layout.layout().group(2)?.tabs).toEqual([LayoutFixture.files, LayoutFixture.changes]);
   });
 
   it("cancels on Escape, a cancelled pointer and a lost window focus, and ignores other keys", () => {
@@ -229,7 +257,7 @@ describe("TabDragService", () => {
     moveOver("documents-arrow");
     expect(drag.target()).toEqual(new SplitDropTarget(0, PanelEdge.Left));
     moveOver("documents-center");
-    expect(drag.target()).toEqual(new TabDropTarget(0, 2));
+    expect(drag.target()).toEqual(new GroupDropTarget(0));
     moveOver("todo", 90);
     expect(drag.target()).toEqual(new TabDropTarget(0, 2));
     document.dispatchEvent(new PointerEvent("pointerup"));

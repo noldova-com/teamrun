@@ -16,6 +16,7 @@ import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
 import { PanelEdge } from "../enums/panel-edge";
 import type { DropTarget } from "../models/layout/drop-target";
+import { GroupDropTarget } from "../models/layout/group-drop-target";
 import { SideDropTarget } from "../models/layout/side-drop-target";
 import { SplitDropTarget } from "../models/layout/split-drop-target";
 import type { Tab } from "../models/layout/tab";
@@ -78,7 +79,8 @@ export class TabDragService {
     this.pointerXState.set(event.clientX);
     this.pointerYState.set(event.clientY);
     const element = this.document.elementFromPoint(event.clientX, event.clientY);
-    this.hoveredState.set(this.groupAt(element)?.id ?? null);
+    const isOverTabs = !Object.isNull(element?.closest(Resources.dropTabsSelector) ?? null);
+    this.hoveredState.set(isOverTabs ? null : this.groupAt(element)?.id ?? null);
     const target = this.targetAt(tab, element, event.clientX, event.clientY);
     if (!(target?.equals(this.targetState()) ?? Object.isNull(this.targetState())))
       this.targetState.set(target);
@@ -129,7 +131,7 @@ export class TabDragService {
 
   private iconTargetAt(tab: Tab, icon: HTMLElement, x: number, y: number): DropTarget | null {
     const bounds = icon.getBoundingClientRect();
-    const isBefore = icon.dataset[Resources.dropAxisData] === Resources.verticalOrientation ? y < bounds.top + bounds.height / 2 : x < bounds.left + bounds.width / 2;
+    const isBefore = icon.dataset[Resources.dropAxisData] === Resources.verticalOrientation ? y < bounds.top + bounds.height / 2 : !this.isAfter(icon, x);
     const encoded = String(icon.dataset[isBefore ? Resources.dropBeforeData : Resources.dropAfterData]);
     const separator = encoded.indexOf(Resources.dropTargetSeparator);
     const group = this.layout.layout().group(Number(encoded.slice(0, separator)));
@@ -146,7 +148,7 @@ export class TabDragService {
     if (Object.isNull(plate) || Object.isNull(guide) || Object.isNull(group) || !group.accepts(tab))
       return null;
     const edge = Object.values(PanelEdge).find(t => t === guide.dataset[Resources.directionData]);
-    return Object.isUndefined(edge) ? new TabDropTarget(group.id, group.tabs.length) : new SplitDropTarget(group.id, edge);
+    return Object.isUndefined(edge) ? new GroupDropTarget(group.id) : new SplitDropTarget(group.id, edge);
   }
 
   private stripTargetAt(tab: Tab, element: Element, group: TabGroup, x: number): DropTarget | null {
@@ -155,7 +157,12 @@ export class TabDragService {
     const marker = element.closest<HTMLElement>(Resources.tabIndexSelector);
     if (Object.isNull(marker))
       return new TabDropTarget(group.id, group.tabs.length);
+    return new TabDropTarget(group.id, Number(marker.dataset[Resources.tabIndexData]) + (this.isAfter(marker, x) ? 1 : 0));
+  }
+
+  private isAfter(marker: HTMLElement, x: number): boolean {
     const bounds = marker.getBoundingClientRect();
-    return new TabDropTarget(group.id, Number(marker.dataset[Resources.tabIndexData]) + (x > bounds.left + bounds.width / 2 ? 1 : 0));
+    const isRight = x > bounds.left + bounds.width / 2;
+    return getComputedStyle(marker).direction === Resources.rightToLeft ? !isRight : isRight;
   }
 }

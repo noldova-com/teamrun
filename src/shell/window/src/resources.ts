@@ -75,6 +75,7 @@ export class Resources {
   public static readonly directionSelector: string = "[data-direction]";
   public static readonly directionData: string = "direction";
   public static readonly tabIndexSelector: string = "[data-tab-index]";
+  public static readonly rightToLeft: string = "rtl";
   public static readonly tabIndexData: string = "tabIndex";
   public static readonly dropBeforeSelector: string = "[data-drop-before]";
   public static readonly dropBeforeData: string = "dropBefore";
