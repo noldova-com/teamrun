@@ -15,13 +15,14 @@ import { SystemCommandException } from "../../exceptions/system-command.exceptio
 import { Resources } from "../../resources.js";
 
 export class SystemCommand {
-  public runAsync(file: string, commandArguments: readonly string[]): Promise<string> {
+  public runAsync(file: string, commandArguments: readonly string[], environment: NodeJS.ProcessEnv = process.env): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       execFile(
         file,
         [...commandArguments],
         {
           encoding: Resources.utf8Encoding,
+          env: environment,
           maxBuffer: Resources.commandOutputLimit,
           shell: false,
           timeout: Resources.commandTimeoutMilliseconds,
