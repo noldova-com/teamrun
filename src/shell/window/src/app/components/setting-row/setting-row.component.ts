@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, type Signal, type WritableSignal, computed, input, output, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, type Signal, type WritableSignal, computed, input, linkedSignal, output } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
@@ -34,7 +34,6 @@ export class SettingRowComponent {
   protected readonly errorId: string = `${Resources.settingErrorIdPrefix}${SettingRowComponent.count++}`;
   protected readonly kinds: typeof SettingKind = SettingKind;
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
-  protected readonly error: WritableSignal<string | null> = signal(null);
 
   public readonly definition = input.required<SettingDefinition>();
   public readonly value = input<JsonValue | undefined>(undefined);
@@ -46,6 +45,7 @@ export class SettingRowComponent {
   public readonly reset = output<void>();
 
   protected readonly current: Signal<JsonValue> = computed(() => this.value() ?? this.definition().defaultValue);
+  protected readonly error: WritableSignal<string | null> = linkedSignal<JsonValue, string | null>({ source: this.current, computation: () => null });
   protected readonly options: Signal<readonly SelectOption[]> = computed(() => this.definition().type.options.map(t => new SelectOption(t.value, t.title)));
   protected readonly isFew: Signal<boolean> = computed(() => this.options().length >= Resources.choicePillMinimum && this.options().length <= Resources.choicePillLimit);
   protected readonly chosenModules: Signal<ReadonlySet<string>> = computed(() => {

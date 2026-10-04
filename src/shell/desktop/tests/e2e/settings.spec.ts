@@ -45,6 +45,10 @@ async function chooseAsync(window: Page, name: string, option: string): Promise<
   await row(window, name).getByRole("radio", { name: option, exact: true }).click();
 }
 
+async function rootFontSizeAsync(window: Page): Promise<string> {
+  return await window.evaluate(() => getComputedStyle(document.documentElement).fontSize);
+}
+
 async function nativeBackgroundAsync(desktop: DesktopApplicationFixture): Promise<string> {
   return await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getBackgroundColor() ?? "");
 }
@@ -135,14 +139,14 @@ test.describe("settings", () => {
 
     await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(windowColors[mode]);
     await expect.poll(() => nativeBackgroundAsync(desktop)).toBe(mode === "Dark" ? "#181818" : "#F8F8F8");
-    await expect.poll(() => window.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(16 * 15 / 13, 2);
+    await expect.poll(async () => parseFloat(await rootFontSizeAsync(window))).toBeCloseTo(16 * 15 / 13, 2);
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).not.toBe(before.font);
     await expect(window.locator("tr-setting-row .tr-setting-row-marker")).toHaveCount(3);
     await desktop.checkpointAsync("settings-changed");
     for (const name of ["shell.mode", "shell.interfaceFont", "shell.panelSize"])
       await row(window, name).getByRole("button", { name: /^Reset / }).click();
     await expect(window.locator("tr-setting-row .tr-setting-row-marker")).toHaveCount(0);
-    await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe(before.size);
+    await expect.poll(() => rootFontSizeAsync(window)).toBe(before.size);
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).toBe(before.font);
   });
 
@@ -151,8 +155,7 @@ test.describe("settings", () => {
     await openSettingsAsync(window);
     const field = row(window, "shell.panelSize").locator("input");
     const alert = row(window, "shell.panelSize").getByRole("alert");
-    const size = (): Promise<string> => window.evaluate(() => getComputedStyle(document.documentElement).fontSize);
-    const before = await size();
+    const before = await rootFontSizeAsync(window);
 
     await field.fill("30");
     await field.press("Tab");
@@ -162,20 +165,20 @@ test.describe("settings", () => {
     await expect(field).toHaveAttribute("aria-invalid", "true");
     await expect(alert).toHaveText("Enter a whole number from 12 to 18.");
     await expect(row(window, "shell.panelSize").locator(".tr-setting-row-marker")).toHaveCount(0);
-    expect(await size()).toBe(before);
+    expect(await rootFontSizeAsync(window)).toBe(before);
     await desktop.checkpointAsync("settings-number-error");
     await field.fill("15");
     await field.press("Enter");
     await expect(alert).toHaveCount(0);
     await expect(field).not.toHaveAttribute("aria-invalid");
-    await expect.poll(async () => parseFloat(await size())).toBeCloseTo(16 * 15 / 13, 2);
+    await expect.poll(async () => parseFloat(await rootFontSizeAsync(window))).toBeCloseTo(16 * 15 / 13, 2);
     await field.fill("40");
     await field.press("Enter");
     await expect(alert).toBeVisible();
     await field.press("Escape");
     await expect(field).toHaveValue("15");
     await expect(alert).toHaveCount(0);
-    await expect(window.locator("tr-settings")).toBeVisible();
+    await expect(field).toBeFocused();
   });
 
   test("the Mode pills are one radio group: the checked pill is the tab stop and the arrow keys move the choice", async ({ desktop }) => {

@@ -134,21 +134,43 @@ describe("SettingRowComponent", () => {
     const passed: string[] = [];
     const listen = (event: KeyboardEvent): number => passed.push(event.key);
     document.addEventListener("keydown", listen);
+    let reverted: unknown[] = [];
 
-    field.focus();
-    await userEvent.keyboard("{Escape}");
-    field.value = "20";
-    field.dispatchEvent(new Event("change"));
-    fixture.detectChanges();
-    await userEvent.keyboard("{Escape}");
-    fixture.detectChanges();
-    const reverted = [field.value, row.querySelector("[role=alert]"), field.getAttribute("aria-invalid")];
-    field.value = "17";
-    await userEvent.keyboard("{Escape}");
-    document.removeEventListener("keydown", listen);
+    try {
+      field.focus();
+      await userEvent.keyboard("{Escape}");
+      field.value = "20";
+      field.dispatchEvent(new Event("change"));
+      fixture.detectChanges();
+      await userEvent.keyboard("{Escape}");
+      fixture.detectChanges();
+      reverted = [field.value, row.querySelector("[role=alert]"), field.getAttribute("aria-invalid")];
+      field.value = "17";
+      await userEvent.keyboard("{Escape}");
+    } finally {
+      document.removeEventListener("keydown", listen);
+    }
 
     expect(reverted).toEqual(["14", null, null]);
     expect([field.value, passed, changes]).toEqual(["14", ["Escape"], []]);
+  });
+
+  it("drops a rejected entry and its error when the stored number changes, by Reset or from elsewhere", () => {
+    const row = render(SettingsFixture.panelSize, 14, true);
+    const field = row.querySelector("input") as HTMLInputElement;
+    const shown: string[][] = [];
+
+    for (const value of [undefined, 16]) {
+      field.value = "20";
+      field.dispatchEvent(new Event("change"));
+      fixture.detectChanges();
+      fixture.componentRef.setInput("value", value);
+      fixture.detectChanges();
+      shown.push([field.value, String(row.querySelector("[role=alert]")), String(field.getAttribute("aria-invalid"))]);
+    }
+
+    expect(shown).toEqual([["13", "null", "null"], ["16", "null", "null"]]);
+    expect(changes).toEqual([]);
   });
 
   it("explains a range with another step in its words", () => {
