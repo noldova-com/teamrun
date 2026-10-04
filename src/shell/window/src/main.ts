@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { type ApplicationRef, ErrorHandler } from "@angular/core";
+import { type ApplicationRef, ErrorHandler, provideBrowserGlobalErrorListeners } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
 
 import { gallery } from "../../../generated/gallery";
@@ -20,6 +20,7 @@ import { Resources } from "./resources";
 document.title = Resources.productName;
 export const application: ApplicationRef = await bootstrapApplication(WindowComponent, {
   providers: [
+    provideBrowserGlobalErrorListeners(),
     { provide: ErrorHandler, useClass: WindowErrorHandler },
     { provide: WindowPartTokens.sources, useValue: windowPartSources },
     { provide: WindowPartTokens.menus, useValue: moduleMenus },

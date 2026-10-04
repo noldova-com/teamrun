@@ -26,7 +26,6 @@ describe("WindowErrorHandler", () => {
 
   afterEach(() => {
     DesktopBridgeFixture.remove();
-    vi.useRealTimers();
   });
 
   it("writes each error to the console and sends it with its stack and causes to the desktop, under the module's id for a window part's failure", () => {
@@ -47,18 +46,12 @@ describe("WindowErrorHandler", () => {
     ]);
   });
 
-  it("sends ten errors a minute, then says more were left out, and sends again once the minute has passed", () => {
-    vi.useFakeTimers();
+  it("sends every error, cutting one longer than the log takes to its first 65536 characters", () => {
     for (let index = 0; index < 12; index++)
       handler.handleError(`Error ${index}`);
-    vi.advanceTimersByTime(60000);
-    handler.handleError("Error 12");
+    handler.handleError(`${"x".repeat(65536)}left out`);
 
-    expect(bridge.errorsLogged.map(t => t[1])).toEqual([
-      ...Array.from({ length: 10 }, (_, index) => `Error ${index}`),
-      "More errors followed within a minute; they are left out of the log until the minute has passed.",
-      "Error 12"
-    ]);
+    expect(bridge.errorsLogged.map(t => t[1])).toEqual([...Array.from({ length: 12 }, (_, index) => `Error ${index}`), "x".repeat(65536)]);
     expect(written).toHaveBeenCalledTimes(13);
   });
 });

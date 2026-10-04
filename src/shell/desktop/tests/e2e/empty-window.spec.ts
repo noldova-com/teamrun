@@ -6,6 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
@@ -40,6 +43,21 @@ test.describe("the empty window", () => {
       "actOnStartup", "answerClose", "answerQuit", "appearance", "copyText", "edit", "keepAppearance", "logError", "logModule", "notifyAppearance", "notifyReady", "onCloseRequest", "onEvent",
       "onMenuCommand", "onNotificationOpened", "onQuitQuestion", "onStartup", "openLogFolder", "platform", "readBuild", "readLayout", "readStartup", "request", "setMenuBar", "writeLayout"
     ] });
+  });
+
+  test("an error the window throws and a rejection it leaves unhandled both go to the desktop's log", async ({ desktop }) => {
+    const log = (): Promise<string> => readFile(path.join(desktop.dataDirectory, "logs", "desktop.log"), "utf8");
+
+    await desktop.window.evaluate(() => {
+      setTimeout(() => {
+        throw new Error("An error the window threw.");
+      });
+      void Promise.reject(new Error("A rejection the window left unhandled."));
+    });
+
+    await expect.poll(log).toMatch(/Window error: Error: An error the window threw\./);
+    await expect.poll(log).toMatch(/Window error: Error: A rejection the window left unhandled\./);
+    expect(desktop.acceptFailures(/the window threw\.|the window left unhandled\.|Window error: /).length).toBeGreaterThan(0);
   });
 
   test("the window row, status bar and panel card follow the default theme", async ({ desktop }) => {

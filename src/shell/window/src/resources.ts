@@ -589,9 +589,7 @@ export class Resources {
   public static readonly invalidModuleId: string = "A module id is lowercase kebab-case.";
   public static readonly windowPartLoadFailed: string = "Its window part could not be loaded.";
   public static readonly windowPartActivationFailed: string = "Its window part failed to activate.";
-  public static readonly windowErrorBurst: number = 10;
-  public static readonly windowErrorPeriod: number = 60000;
-  public static readonly windowErrorsHeldBack: string = "More errors followed within a minute; they are left out of the log until the minute has passed.";
+  public static readonly windowLogLimit: number = 65536;
   public static readonly causeSeparator: string = "\nCaused by: ";
   public static readonly invalidInstance: string = "An instance is a string that is not blank.";
   public static readonly invalidBounds: string = "Bounds need finite coordinates and a width and height that are not negative.";

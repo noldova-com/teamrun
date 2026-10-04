@@ -17,19 +17,11 @@ import { DesktopBridgeService } from "./desktop-bridge.service";
 @Injectable()
 export class WindowErrorHandler extends ErrorHandler {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
-  private recent: readonly number[] = [];
 
   public override handleError(error: unknown): void {
     super.handleError(error);
-    const now = Date.now();
-    this.recent = this.recent.filter(t => now - t < Resources.windowErrorPeriod);
-    if (this.recent.length > Resources.windowErrorBurst)
-      return;
-    this.recent = [...this.recent, now];
-    if (this.recent.length > Resources.windowErrorBurst)
-      this.bridge.logError(null, Resources.windowErrorsHeldBack);
-    else
-      this.bridge.logError(error instanceof WindowPartFailureException ? error.moduleId : null, WindowErrorHandler.describe(error));
+    const moduleId = error instanceof WindowPartFailureException ? error.moduleId : null;
+    this.bridge.logError(moduleId, WindowErrorHandler.describe(error).slice(0, Resources.windowLogLimit));
   }
 
   private static describe(error: unknown): string {
