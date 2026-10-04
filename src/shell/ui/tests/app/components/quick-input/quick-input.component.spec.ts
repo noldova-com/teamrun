@@ -11,6 +11,7 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { userEvent } from "vitest/browser";
 
 import { QuickInputComponent } from "../../../../src/app/components/quick-input/quick-input.component";
+import { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import { QuickInputItem } from "../../../../src/app/models/quick-input-item";
 import { DefaultTheme } from "../../../../src/app/themes/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
@@ -154,16 +155,18 @@ describe("QuickInputComponent", () => {
     expect(status.textContent?.trim()).toBe("1 result");
   });
 
-  it("shows an option's icon, its title with the matched characters marked, its detail and its key", async () => {
-    host.items.set([new QuickInputItem("shell.closeTab", "Close the tab", "close", "TeamRun", "Ctrl+W", [0, 1]), new QuickInputItem("notes.sync", "Sync", null, null, null)]);
+  it("shows an option's icon, its title and detail with the matched characters marked in the list highlight and no added space, and its key", async () => {
+    host.items.set([new QuickInputItem("shell.closeTab", "Close the tab", "close", "TeamRun", "Ctrl+W", [6, 7, 8], [4, 5, 6]), new QuickInputItem("notes.sync", "Sync", null, null, null)]);
     fixture.detectChanges();
     await fixture.whenStable();
     const [full, bare] = options();
 
     expect(full?.querySelector(".tr-quick-input-icon")?.textContent).toBe("close");
-    expect([...full?.querySelectorAll("mark") ?? []].map(t => t.textContent)).toEqual(["Cl"]);
-    expect(full?.querySelector(".tr-quick-input-title")?.textContent?.replace(/\s+/gu, " ").trim()).toBe("Cl ose the tab");
-    expect([full?.querySelector(".tr-quick-input-detail")?.textContent, full?.querySelector(".tr-quick-input-key")?.textContent]).toEqual(["TeamRun", "Ctrl+W"]);
+    const mark = getComputedStyle(full?.querySelector("mark") as Element);
+    expect([...full?.querySelectorAll("mark") ?? []].map(t => t.textContent)).toEqual(["the", "Run"]);
+    expect([mark.color, mark.fontWeight, mark.backgroundColor]).toEqual([AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "list.highlightForeground"), "600", "rgba(0, 0, 0, 0)"]);
+    expect([full?.querySelector(".tr-quick-input-title")?.textContent, full?.querySelector(".tr-quick-input-detail")?.textContent, full?.querySelector(".tr-quick-input-key")?.textContent])
+      .toEqual(["Close the tab", "TeamRun", "Ctrl+W"]);
     expect([bare?.querySelector(".tr-quick-input-icon")?.textContent, bare?.querySelector(".tr-quick-input-detail"), bare?.querySelector(".tr-quick-input-key")]).toEqual(["", null, null]);
     expect(bare?.querySelector(".tr-quick-input-icon")?.getBoundingClientRect().width).toBe(full?.querySelector(".tr-quick-input-icon")?.getBoundingClientRect().width);
     expect(bare?.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left).toBe(full?.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left);

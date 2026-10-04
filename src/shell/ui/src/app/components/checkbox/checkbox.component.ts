@@ -8,8 +8,6 @@
 
 import { ChangeDetectionStrategy, Component, input, output } from "@angular/core";
 
-import { Resources } from "../../../resources";
-
 @Component({
   selector: "tr-checkbox",
   templateUrl: "./checkbox.component.html",
@@ -20,8 +18,6 @@ import { Resources } from "../../../resources";
   }
 })
 export class CheckboxComponent {
-  protected readonly resources: typeof Resources = Resources;
-
   public readonly checked = input<boolean>(false);
   public readonly disabled = input<boolean>(false);
   public readonly checkedChange = output<boolean>();

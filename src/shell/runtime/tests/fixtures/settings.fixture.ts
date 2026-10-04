@@ -7,7 +7,9 @@
  */
 
 import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
-import { DataDirectory, OwnershipLock, SettingsService, ShellDatabase, ShellMigrations } from "@noldova/teamrun-shell-runtime";
+import {
+  DataDirectory, OwnershipLock, ProcessSettings, ProcessSupervisor, SettingsService, ShellDatabase, ShellMigrations, SystemCommand
+} from "@noldova/teamrun-shell-runtime";
 
 import { TemporaryFolderFixture } from "./temporary-folder.fixture.js";
 import { TextOutputFixture } from "./text-output.fixture.js";
@@ -16,6 +18,7 @@ export class SettingsFixture implements AsyncDisposable {
   public readonly service: SettingsService;
   public readonly database: ShellDatabase;
   public readonly diagnostics: TextOutputFixture;
+  public readonly processes: ProcessSupervisor;
   private readonly folder: TemporaryFolderFixture;
   private readonly lock: OwnershipLock;
 
@@ -25,6 +28,7 @@ export class SettingsFixture implements AsyncDisposable {
     this.database = database;
     this.diagnostics = diagnostics;
     this.service = new SettingsService(database, definitions, diagnostics);
+    this.processes = new ProcessSupervisor(database, process.platform, process.env, new SystemCommand(), diagnostics, new ProcessSettings(1_000, 1_000));
   }
 
   public static async createAsync(definitions: readonly SettingDefinition[] = []): Promise<SettingsFixture> {

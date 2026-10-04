@@ -81,6 +81,10 @@ export class TabGroup extends LayoutNode {
     return this.copy([...others.slice(0, at), tab, ...others.slice(at)], tab, tab.equals(this.preview) ? null : this.preview);
   }
 
+  public append(tab: Tab, isPreview: boolean): TabGroup {
+    return this.copy([...this.tabs, tab], this.active ?? tab, isPreview && Object.isNull(this.preview) ? tab : this.preview);
+  }
+
   public openPreview(tab: Tab): TabGroup {
     if (this.has(tab))
       return this.activate(tab);
