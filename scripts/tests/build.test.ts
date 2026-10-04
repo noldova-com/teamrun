@@ -89,7 +89,9 @@ class BuildTests {
       assert.equal(products[0]?.["name"], ProductIdentityFixture.json["name"]);
       assert.deepEqual(products[0]?.["deviceFolders"], ProductIdentityFixture.json["deviceFolders"]);
       assert.equal(products[0]?.["version"], "0.0.7");
-      assert.deepEqual(products.map(t => ({ ...t, build: null })), products.map(() => ({ ...products[0], build: null })));
+      const withoutBuild = (product: Record<string, unknown> | undefined): Record<string, unknown> => Object.fromEntries(Object.entries(product ?? {}).filter(([key]) => key !== "build"));
+      for (const product of products)
+        assert.deepEqual(withoutBuild(product), withoutBuild(products[0]));
     });
 
     test("a test build adds the fixture modules, leaves out the named ones and writes the module artifacts", async t => {

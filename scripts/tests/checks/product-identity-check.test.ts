@@ -20,7 +20,7 @@ import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
 class ProductIdentityCheckTests {
-  private static readonly RULE: string = "; the shell takes the product's identity from its stamped resources.";
+  private static readonly RULE: string = "; the shell takes the product's identity from the build's product file through ProductInfo.";
 
   public static register(): void {
     test("shell source that takes the identity from the build's product file passes, and the shell's namespaces, comments, tests and foundation may spell it", async t => {
