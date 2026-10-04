@@ -14,6 +14,7 @@ import path from "node:path";
 import { test, type TestContext } from "node:test";
 
 import Test from "../test.ts";
+import TestOptions from "../test-options.ts";
 import AngularReportRunnerFixture from "./fixtures/angular-report-runner.fixture.ts";
 import ProcessRunnerFixture from "./fixtures/process-runner.fixture.ts";
 import ProductIdentityFixture from "./fixtures/product-identity.fixture.ts";
@@ -203,6 +204,17 @@ class TestTests {
         assert.equal(await new Test("unused", new ProcessRunnerFixture(), output, {}).runAsync(selection), 2);
         assert.equal(output.text, `${reason}Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>]]\n`);
       }
+    });
+
+    test("a failure other than a refused option reaches the caller instead of the usage", async t => {
+      const failure = new RangeError("The options could not be read.");
+      t.mock.method(TestOptions, "parse", () => {
+        throw failure;
+      });
+      const output = new TextOutputFixture();
+
+      await assert.rejects(new Test("unused", new ProcessRunnerFixture(), output, {}).runAsync([]), failure);
+      assert.equal(output.text, "");
     });
 
     test("the documents selection runs in a checkout without installed packages", async t => {
