@@ -41,6 +41,10 @@ Follow the [coding standards](../docs/CODING-STANDARDS.md), [UI standards](../do
 
 Propose and review dependency updates manually through this workflow, checking compatibility, installation and verification under the coding standards.
 
+### Module versions
+
+Each module's version is the `version` in its `module.json` ([architecture](../docs/ARCHITECTURE.md#modules-and-versions)). Every module starts at 0.0.1 and keeps it until the maintainer decides to raise it. Raise a version only in a change the maintainer approved, by editing that field; the build carries it to the module's packages, its declarations and its status, so nothing else changes with it.
+
 ## Pull requests
 
 Use a focused fork or authorized repository branch; target `main`. Work inside one follows [AGENTS.md](../AGENTS.md).

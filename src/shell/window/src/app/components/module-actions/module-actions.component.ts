@@ -69,7 +69,7 @@ export class ModuleActionsComponent {
     const module = this.module();
     const lines = [
       Resources.formatBuildDetails(build.productVersion, build.fingerprint),
-      Resources.formatModuleDetails(module.id, module.state, module.cause)
+      Resources.formatModuleDetails(module.id, module.version, module.state, module.cause)
     ];
     if (!await this.bridge.copyTextAsync(lines.join(Resources.detailsSeparator)))
       return;

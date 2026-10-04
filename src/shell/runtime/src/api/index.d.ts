@@ -2996,6 +2996,11 @@ export declare class ModuleDeclaration {
   public readonly id: string;
 
   /**
+   * The module's own version, `<major>.<minor>.<patch>`.
+   */
+  public readonly version: string;
+
+  /**
    * The name people see.
    */
   public readonly displayName: string;
@@ -3029,6 +3034,8 @@ export declare class ModuleDeclaration {
    * Creates the declaration.
    *
    * @param id The module's id: lowercase kebab-case and not `shell`.
+   * @param version Its own version, `<major>.<minor>.<patch>` without leading
+   * zeros, such as `0.0.1`.
    * @param displayName The name people see; not whitespace only.
    * @param description What the module does; not whitespace only.
    * @param dependencies The ids of the modules it depends on.
@@ -3036,18 +3043,19 @@ export declare class ModuleDeclaration {
    * @param contributions The names it contributes, by kind.
    * @param settings The definitions of its settings, each its own; none by
    * default.
-   * @throws {ArgumentException} When the id, the display name or the
-   * description is not valid, or a setting belongs to another owner or is of
+   * @throws {ArgumentException} When the id, the version, the display name or
+   * the description is not valid, or a setting belongs to another owner or is of
    * the shell's own kind `KeyBindings`.
    * @example
    * ```ts
    * import { ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
    *
-   * export const notes: ModuleDeclaration = new ModuleDeclaration("notes", "Notes", "Keeps notes.", [], "@noldova/teamrun-modules-notes-runtime", new Map([["methods", ["notes.list"]]]));
+   * export const notes: ModuleDeclaration = new ModuleDeclaration("notes", "0.0.1", "Notes", "Keeps notes.", [], "@noldova/teamrun-modules-notes-runtime", new Map([["methods", ["notes.list"]]]));
    * ```
    */
   public constructor(
     id: string,
+    version: string,
     displayName: string,
     description: string,
     dependencies: readonly string[],
@@ -3066,7 +3074,7 @@ export declare class ModuleDeclaration {
    * ```ts
    * import { ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
    *
-   * export const notes: ModuleDeclaration = ModuleDeclaration.fromJson({ id: "notes", displayName: "Notes", description: "Keeps notes.", dependencies: [], runtimePackage: null, contributes: {} });
+   * export const notes: ModuleDeclaration = ModuleDeclaration.fromJson({ id: "notes", version: "0.0.1", displayName: "Notes", description: "Keeps notes.", dependencies: [], runtimePackage: null, contributes: {} });
    * ```
    */
   public static fromJson(value: unknown): ModuleDeclaration;
@@ -4226,7 +4234,7 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * } from "@noldova/teamrun-shell-runtime";
    *
    * export function createContext(events: EventRegistry, settings: SettingsService, processes: ProcessSupervisor): ModuleContext {
-   *   const notes = new ModuleDeclaration("notes", "Notes", "Keeps notes.", [], null, new Map());
+   *   const notes = new ModuleDeclaration("notes", "0.0.1", "Notes", "Keeps notes.", [], null, new Map());
    *   return new ModuleContext(
    *     notes, new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(),
    *     new NotificationCenter(() => undefined, () => new Date()), new NotificationPolicy([notes], () => true), new ServiceRegistry(), settings,

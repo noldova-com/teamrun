@@ -7,6 +7,7 @@
  */
 
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { appendFile, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
@@ -185,7 +186,7 @@ class PackageBuildTests {
       await PackageTreeFixture.writePackageAsync(repository, "shell-gamma", [], false, false);
       await PackageTreeFixture.writePackageAsync(repository, "fixture-notes-runtime", [], false, true, `${ModuleCatalog.FIXTURE_FOLDER}/notes/runtime`);
       const root = JSON.parse(await readFile(path.join(repository.directory, "package.json"), "utf8"));
-      const declare = (id: string, displayName: string): string => JSON.stringify({ id, displayName, description: "Used by the tests.", parts: [], dependencies: [], contributes: {} });
+      const declare = (id: string, displayName: string): string => JSON.stringify({ id, version: "0.0.1", displayName, description: "Used by the tests.", parts: [], dependencies: [], contributes: {} });
       await repository.writeAsync({
         "package.json": `${JSON.stringify({ ...root, teamrun: { ...root.teamrun, modules: ["tasks"] } }, null, 2)}\n`,
         "src/modules/tasks/module.json": declare("tasks", "Tasks"),
@@ -205,6 +206,36 @@ class PackageBuildTests {
       const renamed = await stamped(BuildVariant.REGULAR);
 
       assert.equal(new Set([regular, tested, renamed]).size, 3);
+    });
+
+    test("a module's part package is packed and installed at the module's version, and raising it rebuilds that package and recompiles the tests",{ timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
+      const repository = await PackageBuildTests.createAsync(t);
+      const tasks = "@noldova/teamrun-modules-tasks-runtime";
+      await PackageTreeFixture.writePackageAsync(repository, "modules-tasks-runtime", ["shell-beta"], false, false, "src/modules/tasks/runtime");
+      const declare = (version: string): Record<string, string> => ({
+        "src/modules/tasks/module.json": JSON.stringify({ id: "tasks", version, displayName: "Tasks", description: "Used by the tests.", parts: ["runtime"], dependencies: [], contributes: {} })
+      });
+      await repository.writeAsync(declare("0.3.0"));
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const installed = async (): Promise<Readonly<Record<string, unknown>>> =>
+        JSON.parse(await readFile(path.join(repository.directory, "node_modules", "@noldova", "teamrun-modules-tasks-runtime", "package.json"), "utf8")) as Readonly<Record<string, unknown>>;
+      await PackageBuildTests.buildAsync(build);
+      const first = await installed();
+
+      await repository.writeAsync(declare("0.4.0"));
+      const raised = await PackageBuildTests.buildAsync(build);
+      await build.requireCurrentAsync(BuildVariant.REGULAR);
+
+      assert.deepEqual([first["version"], first["dependencies"]], ["0.3.0", { [PackageBuildTests.BETA]: "0.0.7" }]);
+      assert.equal((await installed())["version"], "0.4.0");
+      assert.ok(existsSync(path.join(repository.directory, "_build", "archives", "noldova-teamrun-modules-tasks-runtime-0.4.0.tgz")));
+      assert.deepEqual(raised, [
+        `${PackageBuildTests.ALPHA}: reused`,
+        `${PackageBuildTests.BETA}: reused`,
+        `${tasks}: built`,
+        `${PackageBuildTests.ALPHA} tests: compiled`,
+        `${PackageBuildTests.BETA} tests: compiled`
+      ]);
     });
 
     test("a regular build type-checks the fixture packages it does not build, and refuses one with a type error", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {

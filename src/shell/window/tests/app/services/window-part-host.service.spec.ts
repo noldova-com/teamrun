@@ -79,7 +79,7 @@ class FakeWindowPart implements IWindowPart {
 describe("WindowPartHostService", () => {
   const load = (): Promise<Type<unknown>> => Promise.resolve(ContentComponent);
   const status = (id: string, state: ModuleState = ModuleState.Active, cause: string | null = null, dependencies: readonly string[] = []): object => ({
-    id, displayName: `${id[0]?.toUpperCase()}${id.slice(1)}`, description: "Used by the tests.", dependencies, contributes: {}, state, ...(cause === null ? {} : { cause })
+    id, version: "0.0.1", displayName: `${id[0]?.toUpperCase()}${id.slice(1)}`, description: "Used by the tests.", dependencies, contributes: {}, state, ...(cause === null ? {} : { cause })
   });
   const source = (
     moduleId: string,

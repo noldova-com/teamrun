@@ -18,8 +18,8 @@ import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 const colors = {
-  Light: { link: "rgb(0, 95, 184)", error: "rgb(161, 38, 13)", selected: "rgb(228, 230, 241)" },
-  Dark: { link: "rgb(77, 170, 252)", error: "rgb(244, 135, 113)", selected: "rgb(55, 55, 61)" }
+  Light: { link: "rgb(0, 95, 184)", error: "rgb(161, 38, 13)", selected: "rgb(228, 230, 241)", muted: "rgb(97, 97, 97)" },
+  Dark: { link: "rgb(77, 170, 252)", error: "rgb(244, 135, 113)", selected: "rgb(55, 55, 61)", muted: "rgb(157, 157, 157)" }
 };
 
 function modulesTab(window: Page): Locator {
@@ -60,10 +60,12 @@ test.describe("the Modules document", () => {
     await expect(window.locator(".tr-modules-version")).toHaveText(`TeamRun ${RuntimeBuild.identity.productVersion}`);
     await expect(window.locator(".tr-modules-row .tr-modules-name")).toHaveText(["Clock", "Notes", "Alarm"]);
     await expect(window.locator(".tr-modules-row .tr-modules-id")).toHaveText(["clock", "notes", "alarm"]);
+    await expect(window.locator(".tr-modules-row .tr-modules-row-version")).toHaveText(["0.0.1", "0.0.1", "0.0.1"]);
     await expect(window.locator(".tr-modules-row .tr-modules-state")).toHaveText(["Active", "Active", "Active"]);
     await expect(row(window, "alarm").locator(".tr-modules-description")).toHaveText("Depends on the clock, so it is blocked whenever the clock fails, for the UI workflows.");
     await expect(row(window, "clock")).toHaveAttribute("aria-current", "true");
     await expect(window.locator(".tr-modules-detail-title")).toHaveText("Clock");
+    await expect(fact(window, "version")).toHaveText("0.0.1");
     await expect(fact(window, "dependencies")).toHaveText("None");
     await expect(fact(window, "dependents")).toHaveText("Alarm");
     await expect(window.locator(".tr-modules-contributions")).toHaveCount(5);
@@ -83,9 +85,11 @@ test.describe("the Modules document", () => {
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(mode.toLowerCase());
       const look = await window.evaluate(() => {
         const style = (selector: string): CSSStyleDeclaration => getComputedStyle(document.querySelector(selector) as Element);
-        return [style(".tr-modules-link").color, style(".tr-modules-row-current").backgroundColor];
+        const top = (selector: string): number => (document.querySelector(selector) as Element).getBoundingClientRect().top;
+        const version = ".tr-modules-row-current .tr-modules-row-version";
+        return [style(".tr-modules-link").color, style(".tr-modules-row-current").backgroundColor, style(version).color, top(version) === top(".tr-modules-row-current .tr-modules-id")];
       });
-      expect(look).toEqual([colors[mode].link, colors[mode].selected]);
+      expect(look).toEqual([colors[mode].link, colors[mode].selected, colors[mode].muted, true]);
       await desktop.checkpointAsync(`modules-document-${mode.toLowerCase()}`);
     }
   });

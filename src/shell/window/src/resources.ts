@@ -633,6 +633,7 @@ export class Resources {
     [ModuleState.Failed]: "Failed",
     [ModuleState.Blocked]: "Blocked"
   };
+  public static readonly moduleVersionTitle: string = "Version";
   public static readonly moduleStateTitle: string = "State";
   public static readonly blockedByTitle: string = "Blocked by";
   public static readonly dependenciesTitle: string = "Depends on";
@@ -720,8 +721,8 @@ export class Resources {
     return `${Resources.productName} ${productVersion}, build ${fingerprint}`;
   }
 
-  public static formatModuleDetails(moduleId: string, state: string, cause: string | null): string {
-    return Object.isNull(cause) ? `${moduleId}: ${state}` : `${moduleId}: ${state}: ${cause}`;
+  public static formatModuleDetails(moduleId: string, version: string, state: string, cause: string | null): string {
+    return Object.isNull(cause) ? `${moduleId} ${version}: ${state}` : `${moduleId} ${version}: ${state}: ${cause}`;
   }
 
   public static formatModuleBlocked(dependency: string): string {

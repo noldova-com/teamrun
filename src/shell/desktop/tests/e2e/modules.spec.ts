@@ -115,7 +115,7 @@ test.describe("modules", () => {
     await detail.getByRole("button", { name: "Copy details" }).click();
     await expect(detail.getByRole("button", { name: "Copied" })).toBeVisible();
     expect(await desktop.application.evaluate(({ clipboard }) => clipboard.readText())).toBe(
-      `TeamRun ${RuntimeBuild.identity.productVersion}, build ${RuntimeBuild.identity.fingerprint}\nclock: Failed: Its runtime part failed to activate.`);
+      `TeamRun ${RuntimeBuild.identity.productVersion}, build ${RuntimeBuild.identity.fingerprint}\nclock 0.0.1: Failed: Its runtime part failed to activate.`);
 
     await desktop.application.evaluate(({ shell }) => {
       shell.openPath = (folder: string): Promise<string> => Promise.resolve(folder.endsWith("logs") ? "" : "unexpected folder");
