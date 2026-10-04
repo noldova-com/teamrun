@@ -10,14 +10,14 @@ import { ChangeDetectionStrategy, Component, type Signal, type WritableSignal, c
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { type SettingDefinition, SettingKind } from "@noldova/teamrun-shell-protocol";
-import { ButtonComponent, ButtonVariant, CheckboxComponent, SelectComponent, SelectOption, TextFieldComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
+import { ButtonComponent, ButtonVariant, CheckboxComponent, ChoicePillsComponent, SelectComponent, SelectOption, TextFieldComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
 import { HighlightedTextComponent } from "../highlighted-text/highlighted-text.component";
 
 @Component({
   selector: "tr-setting-row",
-  imports: [ButtonComponent, CheckboxComponent, HighlightedTextComponent, SelectComponent, TextFieldComponent, TooltipDirective],
+  imports: [ButtonComponent, CheckboxComponent, ChoicePillsComponent, HighlightedTextComponent, SelectComponent, TextFieldComponent, TooltipDirective],
   templateUrl: "./setting-row.component.html",
   styleUrl: "./setting-row.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -44,6 +44,7 @@ export class SettingRowComponent {
 
   protected readonly current: Signal<JsonValue> = computed(() => this.value() ?? this.definition().defaultValue);
   protected readonly options: Signal<readonly SelectOption[]> = computed(() => this.definition().type.options.map(t => new SelectOption(t.value, t.title)));
+  protected readonly isFew: Signal<boolean> = computed(() => this.options().length >= Resources.choicePillMinimum && this.options().length <= Resources.choicePillLimit);
   protected readonly chosenModules: Signal<ReadonlySet<string>> = computed(() => {
     const value = this.current();
     return new Set(Array.isArray(value) ? value.filter((t): t is string => typeof t === "string") : []);

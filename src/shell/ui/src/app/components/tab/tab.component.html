@@ -1,3 +1,11 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
 <span class="tr-tab-pill">
   @if (icon(); as glyph) {
     <span class="tr-tab-icon material-symbols-rounded" aria-hidden="true">{{ glyph }}</span>
@@ -9,7 +17,7 @@
   @if (closable() || working()) {
     <span class="tr-tab-action">
       @if (working()) {
-        <span class="tr-tab-spinner" aria-hidden="true"></span>
+        <tr-spinner class="tr-tab-spinner" aria-hidden="true" />
       }
       @if (closable()) {
         <button type="button" class="tr-tab-close" tabindex="-1" [attr.aria-label]="closeLabel()" (click)="onCloseClick($event)">

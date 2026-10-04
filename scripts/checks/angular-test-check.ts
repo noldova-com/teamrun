@@ -10,9 +10,11 @@ import type { Writable } from "node:stream";
 
 import AngularProject from "../angular/angular-project.ts";
 import ProcessException from "../processes/process.exception.ts";
-import type ICheck from "./interfaces/check.ts";
+import CheckSelection from "./check-selection.ts";
+import type ISelectableCheck from "./interfaces/selectable-check.ts";
 
-export default class AngularTestCheck implements ICheck {
+export default class AngularTestCheck implements ISelectableCheck {
+  private static readonly UNIT: string = "spec files";
   private static readonly NO_REPORT: string = "The Angular tests passed but wrote no report of the spec files they ran.\n";
   private static readonly LOG_HINT: string = `The Angular tests' full output is in ${AngularProject.LOG_FILE}.\n`;
 
@@ -31,9 +33,28 @@ export default class AngularTestCheck implements ICheck {
     return isPassing;
   }
 
-  private async checkAsync(output: Writable): Promise<boolean> {
+  public async runSelectedAsync(filters: readonly string[], output: Writable): Promise<CheckSelection> {
     try {
-      const run = await this.project.testAsync();
+      const specs = await this.project.specFilesAsync();
+      const selected = specs.filter(t => filters.some(u => t.includes(u)));
+      if (selected.length === 0)
+        return new CheckSelection(true, AngularTestCheck.UNIT, specs.length, 0);
+      const isPassing = await this.checkAsync(output, selected);
+      if (!isPassing)
+        output.write(AngularTestCheck.LOG_HINT);
+      return new CheckSelection(isPassing, AngularTestCheck.UNIT, specs.length, selected.length);
+    }
+    catch (error) {
+      if (!(error instanceof ProcessException))
+        throw error;
+      output.write(`${error.message}\n${AngularTestCheck.LOG_HINT}`);
+      return new CheckSelection(false, AngularTestCheck.UNIT, 0, 0);
+    }
+  }
+
+  private async checkAsync(output: Writable, include: readonly string[] = []): Promise<boolean> {
+    try {
+      const run = await this.project.testAsync(include);
       if (!run.isSuccessful)
         return false;
       if (run.collected === null) {
@@ -41,7 +62,7 @@ export default class AngularTestCheck implements ICheck {
         return false;
       }
       const collected = new Set(run.collected);
-      const missing = (await this.project.specFilesAsync()).filter(t => !collected.has(t));
+      const missing = (include.length === 0 ? await this.project.specFilesAsync() : include).filter(t => !collected.has(t));
       if (missing.length === 0)
         return true;
       output.write(`The Angular tests did not run ${missing.length} of the spec files under src/:\n${missing.map(t => `  ${t}\n`).join("")}`);

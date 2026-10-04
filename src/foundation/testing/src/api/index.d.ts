@@ -491,6 +491,38 @@ export declare class Assert {
 }
 
 /**
+ * The bounded wait tests use instead of a fixed pause: it checks a condition
+ * until it holds or a limit passes, pausing briefly between checks. The
+ * caller reports what it waited for, so a failure says what it saw.
+ */
+export declare class Wait {
+  /**
+   * Checks a condition until it holds or the limit passes. The first check
+   * runs at once, and the last runs at or after the limit.
+   *
+   * @param condition The condition to check; it may act between checks,
+   * such as reading a process list.
+   * @param limitMilliseconds How long to keep checking, in milliseconds; a
+   * non-negative integer, where 0 checks once.
+   * @param intervalMilliseconds The pause between checks, in milliseconds;
+   * a positive integer, 25 when omitted.
+   * @returns A promise of whether the condition held within the limit; it
+   * rejects with the condition's own failure.
+   * @throws ArgumentOutOfRangeException synchronously when the limit is not a
+   * non-negative integer or the interval is not a positive integer.
+   * @example
+   * ```ts
+   * import { Assert, Wait } from "@noldova/teamrun-foundation-testing";
+   *
+   * export async function requireFileAsync(exists: () => boolean): Promise<void> {
+   *   Assert.isTrue(await Wait.untilAsync(exists, 5_000), "The file did not appear within 5 s.");
+   * }
+   * ```
+   */
+  public static untilAsync(condition: () => boolean | Promise<boolean>, limitMilliseconds: number, intervalMilliseconds?: number): Promise<boolean>;
+}
+
+/**
  * The outcome of one test.
  */
 export declare enum TestOutcome {
@@ -819,7 +851,7 @@ export declare class TestRunResult {
    * export const total: number = result.total;
    * ```
    */
-  public constructor(classResults: readonly TestClassResult[], selection?: TestSelection | null);
+  public constructor(classResults: readonly TestClassResult[], selection?: TestSelection);
 }
 
 /**

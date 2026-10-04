@@ -1,0 +1,53 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: inline-block;
+  position: relative;
+  box-sizing: border-box;
+  width: var(--tr-spinner);
+  height: var(--tr-spinner);
+  flex: none;
+}
+
+:host(.tr-reveal-pending) {
+  visibility: hidden;
+}
+
+.tr-spinner-ring {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: calc(var(--tr-border-width) * 2) solid color-mix(in srgb, var(--tr-progress) 25%, transparent);
+  border-top-color: var(--tr-progress);
+  border-radius: 50%;
+  animation: tr-spinner-turn 0.8s linear infinite;
+}
+
+.tr-spinner-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tr-spinner-ring {
+    animation: none;
+    border-inline-end-color: var(--tr-progress);
+  }
+}
+
+@keyframes tr-spinner-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}

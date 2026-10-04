@@ -12,21 +12,18 @@ import type PullRequestSnapshot from "./pull-request-snapshot.ts";
 import type WatchedRepository from "./watched-repository.ts";
 
 export default class PullRequestEvaluator {
-  private static readonly CONFLICTED: string = "dirty";
-
   public evaluate(repository: WatchedRepository, pull: PullRequestSnapshot): readonly PullRequestFinding[] {
     const findings: PullRequestFinding[] = [];
-    const isConflicted = pull.mergeState === PullRequestEvaluator.CONFLICTED;
     const required = PullRequestEvaluator.selectLatest(pull.checks, repository.requiredChecks);
     const failed = required.filter(t => t.hasFailed);
     const hasPassed = required.length === repository.requiredChecks.length && required.length > 0 && required.every(t => t.hasPassed);
     if (pull.buildRuns === 0)
       findings.push(PullRequestFinding.noBuild(pull.pushedAt, pull.head));
-    if (isConflicted)
+    if (pull.isConflicted)
       findings.push(PullRequestFinding.conflict(new Date(Math.max(pull.pushedAt.getTime(), repository.baseChangedAt.getTime())), repository.defaultBranch));
     if (failed.length > 0)
       findings.push(PullRequestFinding.failed(PullRequestEvaluator.finishedAt(failed), failed.map(t => t.name)));
-    if (hasPassed && !isConflicted && !pull.hasAutoMerge && (pull.isApproved || pull.hadAutoMerge))
+    if (hasPassed && !pull.isConflicted && !pull.hasAutoMerge && (pull.isApproved || pull.hadAutoMerge))
       findings.push(PullRequestFinding.notMerging(PullRequestEvaluator.finishedAt(required)));
     return findings;
   }

@@ -11,6 +11,8 @@ import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal,
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { KeyChord } from "@noldova/teamrun-shell-protocol";
+import { DialogService } from "@noldova/teamrun-shell-ui";
 
 import { CommandNotFoundException } from "../exceptions/command-not-found.exception";
 import type { CommandContribution } from "../models/command-contribution";
@@ -21,11 +23,14 @@ import { Resources } from "../../resources";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { SettingsService } from "./settings.service";
 import { ShellCommandsService } from "./shell-commands.service";
+import { ViewDialogService } from "./view-dialog.service";
 
 @Injectable({ providedIn: "root" })
 export class CommandService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
+  private readonly dialogs: DialogService = inject(DialogService);
+  private readonly viewDialogs: ViewDialogService = inject(ViewDialogService);
   private readonly shell: ShellCommandsService = inject(ShellCommandsService);
   private readonly shellCommands: readonly CommandContribution[] = this.shell.commands;
   private readonly moduleCommands: WritableSignal<readonly CommandContribution[]> = signal([]);
@@ -82,8 +87,17 @@ export class CommandService {
     return this.ownerNames.get(owner) ?? owner;
   }
 
+  public defaultKeysOf(name: string): readonly KeyChord[] {
+    const command = this.find(name);
+    return [...this.shell.keys(this.bridge.platform).filter(t => t[1] === command.name).map(t => t[0]), ...Object.isNull(command.defaultKey) ? [] : [command.defaultKey]];
+  }
+
   public keyLabel(name: string): string | null {
     return this.shortcuts().keyOf(this.find(name).name)?.label(this.bridge.platform) ?? null;
+  }
+
+  public isHeldByDialog(name: string): boolean {
+    return this.dialogs.isOpen && !Resources.modalCommands.includes(name) && !this.viewDialogs.ownsCommand(name);
   }
 
   public dispatch(event: KeyboardEvent): boolean {
@@ -91,7 +105,7 @@ export class CommandService {
       return false;
     const name = this.shortcuts().find(event);
     const command = this.commands().find(t => t.name === name);
-    if (Object.isUndefined(command) || !this.canRun(command, null))
+    if (Object.isUndefined(command) || this.isHeldByDialog(command.name) || !this.canRun(command, null))
       return false;
 
     event.preventDefault();

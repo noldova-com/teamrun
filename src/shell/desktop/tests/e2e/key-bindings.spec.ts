@@ -10,10 +10,9 @@ import type { Locator, Page } from "@playwright/test";
 
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 
 const isMac = process.platform === "darwin";
-const windowColors = { Light: "rgb(248, 248, 248)", Dark: "rgb(24, 24, 24)" };
-
 function label(standard: string, mac: string): string {
   return isMac ? mac : standard;
 }
@@ -101,10 +100,8 @@ test.describe("key bindings", () => {
     await recordAsync(window, "notes.newNote", "ControlOrMeta+Alt+KeyT");
     await expect(shortcut(window, "notes.newNote").getByRole("alert")).toContainText(label("Ctrl+Alt+T is used by Tick", "⌥⌘T is used by Tick"));
     expect((await keyOf(window, "clock.tick").boundingBox())?.x).toBe(keyColumn);
-    for (const mode of ["Light", "Dark"] as const) {
-      await window.evaluate(value => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
-        .request("shell.setSetting", { name: "shell.mode", value }), mode);
-      await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(windowColors[mode]);
+    for (const mode of WindowModeFixture.modes) {
+      await WindowModeFixture.setAsync(window, mode);
       await desktop.checkpointAsync(`key-bindings-collision-${mode.toLowerCase()}`);
     }
     await shortcut(window, "notes.newNote").getByRole("button", { name: "Use it here" }).click();
@@ -123,6 +120,16 @@ test.describe("key bindings", () => {
     await expect(keyOf(window, "clock.tick")).toHaveText("No key");
     await expect(shortcut(window, "clock.tick").locator(".tr-shortcut-collision")).toHaveText(label("Ctrl+Alt+T is taken by New note", "⌥⌘T is taken by New note"));
     await expect(ticks).toHaveText("No ticks");
+    await recordAsync(window, "clock.tick", label("Control+PageDown", "Control+Tab"));
+    await expect(shortcut(window, "clock.tick").getByRole("alert")).toContainText("is used by Show the next tab");
+    await shortcut(window, "clock.tick").getByRole("button", { name: "Use it here" }).click();
+    await expect(keyOf(window, "shell.nextTab")).toHaveText(label("Ctrl+Tab", "⌥⌘→"));
+    await expect(shortcut(window, "shell.nextTab").locator(".tr-shortcut-collision")).toContainText(label("Ctrl+PageDown is taken by Tick", "⌃⇥ is taken by Tick"));
+    await CommandSearchFixture.searchAsync(window, "Show the next tab");
+    await expect(window.locator(".tr-command-search-pane [data-item=\"shell.nextTab\"] .tr-quick-input-key")).toHaveText(label("Ctrl+Tab", "⌥⌘→"));
+    await window.keyboard.press("Escape");
+    await window.keyboard.press(label("Control+PageDown", "Control+Tab"));
+    await expect(ticks).toHaveText("Ticks: 1");
     await window.getByRole("button", { name: "Reset all shortcuts" }).click();
     await expect(keyOf(window, "notes.newNote")).toHaveText(label("Ctrl+Alt+N", "⌥⌘N"));
     await expect(keyOf(window, "clock.tick")).toHaveText(label("Ctrl+Alt+T", "⌥⌘T"));

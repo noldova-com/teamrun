@@ -6,8 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export enum MatchKind {
-  Prefix,
-  WordStarts,
-  Subsequence
+export interface IViewDialogOptions {
+  readonly instance?: string;
+  readonly title?: string;
 }

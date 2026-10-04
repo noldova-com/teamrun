@@ -19,9 +19,9 @@ export abstract class Tab {
   public readonly key: string;
 
   protected constructor(kind: string, name: string, instance?: string) {
-    if (!Resources.contributionNamePattern.test(name))
+    if (!Tab.isName(name))
       throw new ArgumentException(Resources.invalidContributionName, "name");
-    if (!Object.isUndefined(instance) && String.isNullOrWhitespace(instance))
+    if (!Tab.isInstance(instance))
       throw new ArgumentException(Resources.invalidInstance, "instance");
 
     this.name = name;
@@ -31,6 +31,14 @@ export abstract class Tab {
   }
 
   public abstract get isMovable(): boolean;
+
+  public static isName(name: string): boolean {
+    return Resources.contributionNamePattern.test(name);
+  }
+
+  public static isInstance(instance: string | undefined): boolean {
+    return Object.isUndefined(instance) || !String.isNullOrWhitespace(instance);
+  }
 
   public equals(other: Tab | null): boolean {
     return other?.key === this.key;

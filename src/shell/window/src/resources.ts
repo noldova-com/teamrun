@@ -23,6 +23,7 @@ import { productName } from "../../../generated/product";
 export class Resources {
   public static readonly contributionNamePattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.[A-Za-z0-9][A-Za-z0-9._-]*$/;
   public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+  public static readonly regExpSpecialPattern: RegExp = /[.*+?^${}()|[\]\\]/gu;
   public static readonly windowPartContextToken: string = "The window part's context";
   public static readonly windowPartSourcesToken: string = "The build's window parts";
   public static readonly documentsGroupId: number = 0;
@@ -58,7 +59,6 @@ export class Resources {
   public static readonly primaryButton: number = 0;
   public static readonly dragThreshold: number = 4;
   public static readonly escapeKey: string = "Escape";
-  public static readonly popoverPaneClass: string = "tr-popover-pane";
   public static readonly pointerMoveEvent: "pointermove" = "pointermove";
   public static readonly pointerUpEvent: "pointerup" = "pointerup";
   public static readonly pointerCancelEvent: "pointercancel" = "pointercancel";
@@ -193,6 +193,10 @@ export class Resources {
   public static readonly previousTabCommand: string = "shell.previousTab";
   public static readonly openSettingsCommand: string = "shell.openSettings";
   public static readonly openSettingsTitle: string = "Settings…";
+  public static readonly showInDialogCommand: string = "shell.showInDialog";
+  public static readonly showInDialogTitle: string = "Show in a dialog";
+  public static readonly showInDialogGlyph: string = "open_in_full";
+  public static readonly dialogAlreadyOpen: string = "A dialog is already open.";
   public static readonly settingsDocument: string = "shell.settings";
   public static readonly settingsTitle: string = "Settings";
   public static readonly settingsGlyph: string = "settings";
@@ -224,6 +228,8 @@ export class Resources {
   public static readonly keyColumn: string = "Key";
   public static readonly actionsColumn: string = "Actions";
   public static readonly noKey: string = "No key";
+  public static readonly choicePillMinimum: number = 2;
+  public static readonly choicePillLimit: number = 4;
   public static readonly shortcutsExplanation: string = "The keys that run commands. Choose a key to record a new one; your keys apply on every device.";
   public static readonly resetAllShortcutsLabel: string = "Reset all shortcuts";
   public static readonly removeKeyLabel: string = "Remove";
@@ -303,7 +309,7 @@ export class Resources {
   public static readonly commandSearchLabel: string = "Search commands";
   public static readonly commandSearchPaneClass: string = "tr-command-search-pane";
   public static readonly windowRowSelector: string = "tr-window-row";
-  public static readonly wordSeparatorPattern: RegExp = /[\s\-_./:,]/u;
+  public static readonly detailSeparator: string = " ";
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
   public static readonly hideDockLabels: Readonly<Record<DockSide, string>> = {
@@ -444,6 +450,7 @@ export class Resources {
     [EditAction.Paste]: "shell.paste",
     [EditAction.SelectAll]: "shell.selectAll"
   };
+  public static readonly modalCommands: readonly string[] = Object.values(Resources.editCommands);
   public static readonly editTitles: Readonly<Record<EditAction, string>> = {
     [EditAction.Undo]: "Undo",
     [EditAction.Redo]: "Redo",
@@ -707,7 +714,6 @@ export class Resources {
   public static readonly doNotDisturbLabel: string = "Do not disturb";
   public static readonly noNotifications: string = "No notifications";
   public static readonly dismissLabel: string = "Dismiss";
-  public static readonly checkGlyph: string = "check";
   public static readonly unreadLimit: number = 9;
   public static readonly toastLimit: number = 3;
   public static readonly hoverSelector: string = ":hover";

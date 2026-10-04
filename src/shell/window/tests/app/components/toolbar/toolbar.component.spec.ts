@@ -130,6 +130,22 @@ describe("ToolbarComponent", () => {
     expect(errors.map(t => String(t))).toEqual(["Error: No wrap."]);
   });
 
+  it("lays its items out as wide as it measured them, dropdowns included, so its last item is not clipped", async () => {
+    const tokens = document.createElement("style");
+    tokens.textContent = "tr-toolbar { --tr-border-width: 1px; }";
+    document.head.append(tokens);
+    await showAsync(1000);
+    const edges = (container: string, selector: string): number[] => {
+      const origin = (element.querySelector(container) as HTMLElement).getBoundingClientRect().left;
+      return [...element.querySelectorAll(selector)].map(t => t.getBoundingClientRect().right - origin);
+    };
+    const shown = edges(".tr-toolbar-content", ".tr-toolbar-section");
+    const measured = edges(".tr-toolbar-ghost", ".tr-toolbar-ghost-section");
+    tokens.remove();
+
+    expect(shown).toEqual(measured);
+  });
+
   it("opens the place of a submenu item as a dropdown", async () => {
     await showAsync(1000);
 
@@ -137,6 +153,20 @@ describe("ToolbarComponent", () => {
     fixture.detectChanges();
 
     expect(document.querySelector("tr-menu[data-place='notes.templates'] button[tr-menu-item]")).not.toBeNull();
+  });
+
+  it("shows a submenu item's full title below it while its label is cut short", async () => {
+    await showAsync(1000);
+    const submenu = items()[3] as HTMLButtonElement;
+    submenu.style.display = "inline-flex";
+    const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === "Templates");
+
+    submenu.dispatchEvent(new PointerEvent("pointerenter"));
+    await vi.waitFor(() => expect(tooltip()).toBeDefined());
+
+    expect(tooltip()?.getBoundingClientRect().top).toBeGreaterThanOrEqual(submenu.getBoundingClientRect().bottom);
+    submenu.dispatchEvent(new PointerEvent("pointerleave"));
+    await vi.waitFor(() => expect(tooltip()).toBeUndefined());
   });
 
   it("moves the sections that do not fit into a menu behind a More actions item", async () => {

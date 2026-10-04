@@ -13,11 +13,18 @@ import type { Locator, Page } from "@playwright/test";
 
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
+import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 
-const windowColors = { Light: "rgb(248, 248, 248)", Dark: "rgb(24, 24, 24)" };
+const settingsKey = "document/shell.settings";
 
 function settingsTab(window: Page): Locator {
-  return window.locator("tr-tab[data-tab-key=\"document/shell.settings\"]");
+  return TabDragFixture.tab(window, settingsKey);
+}
+
+async function expectSamePageAsync(window: Page, top: number): Promise<void> {
+  await expect(window.locator(".tr-settings-page[aria-current=page]")).toHaveText("Keyboard shortcuts");
+  await expect.poll(() => window.locator(".tr-settings-content").evaluate(t => t.scrollTop)).toBe(top);
 }
 
 function row(window: Page, name: string): Locator {
@@ -35,8 +42,7 @@ async function otherModeAsync(window: Page): Promise<"Light" | "Dark"> {
 }
 
 async function chooseAsync(window: Page, name: string, option: string): Promise<void> {
-  await row(window, name).locator(".tr-select-button").click();
-  await window.getByRole("option", { name: option, exact: true }).click();
+  await row(window, name).getByRole("radio", { name: option, exact: true }).click();
 }
 
 async function nativeBackgroundAsync(desktop: DesktopApplicationFixture): Promise<string> {
@@ -112,6 +118,31 @@ test.describe("settings", () => {
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
   });
 
+  test("Settings keeps its page and scroll position when its tab becomes active again and when it moves to another group", async ({ desktop }) => {
+    const window = desktop.window;
+    const note = "document/notes.note/2";
+    await openSettingsAsync(window);
+    await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
+    const top = await window.locator(".tr-settings-content").evaluate(async t => {
+      t.scrollTop = 120;
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      return t.scrollTop;
+    });
+    expect(top).toBeGreaterThan(0);
+
+    await TabDragFixture.tab(window, note).click();
+    await expect(window.locator("tr-settings")).toHaveCount(0);
+    await settingsTab(window).click();
+    await expectSamePageAsync(window, top);
+
+    await TabDragFixture.dragOntoPlateAsync(window, settingsKey, note, "Right");
+    await window.mouse.up();
+
+    await expect(window.locator("tr-tab-group").filter({ has: window.locator("tr-tab[data-tab-key^='document/']") })).toHaveCount(2);
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, settingsKey))).toEqual([settingsKey]);
+    await expectSamePageAsync(window, top);
+  });
+
   test("changing the mode, a font and a size repaints the window at once, marks them modified, and Reset returns each", async ({ desktop }) => {
     const window = desktop.window;
     await openSettingsAsync(window);
@@ -123,7 +154,7 @@ test.describe("settings", () => {
     await row(window, "shell.panelSize").locator("input").fill("15");
     await row(window, "shell.panelSize").locator("input").press("Enter");
 
-    await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(windowColors[mode]);
+    await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(WindowModeFixture.backgrounds[mode]);
     await expect.poll(() => nativeBackgroundAsync(desktop)).toBe(mode === "Dark" ? "#181818" : "#F8F8F8");
     await expect.poll(() => window.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(16 * 15 / 13, 2);
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).not.toBe(before.font);
@@ -134,6 +165,95 @@ test.describe("settings", () => {
     await expect(window.locator("tr-setting-row .tr-setting-row-marker")).toHaveCount(0);
     await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe(before.size);
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).toBe(before.font);
+  });
+
+  test("a checked checkbox centres its drawn tick in its box and has the hover radius, also at the largest panel size", async ({ desktop }) => {
+    const window = desktop.window;
+    await openSettingsAsync(window);
+    const measureAsync = async (): Promise<readonly [number, number, string, string]> => {
+      await window.getByRole("button", { name: "Notifications", exact: true }).click();
+      const control = row(window, "shell.mutedModules").locator(".tr-checkbox-control").first();
+      await expect(control.locator("input")).toBeChecked();
+      return await control.evaluate(t => {
+        const box = (t.querySelector("input") as HTMLInputElement).getBoundingClientRect();
+        const tick = (t.querySelector(".tr-checkbox-mark path") as SVGPathElement).getBoundingClientRect();
+        const probe = document.createElement("div");
+        probe.style.borderTopLeftRadius = "var(--tr-radius-hover)";
+        document.body.append(probe);
+        const hover = getComputedStyle(probe).borderTopLeftRadius;
+        probe.remove();
+        return [
+          Math.abs(tick.left + tick.right - box.left - box.right) / 2,
+          Math.abs(tick.top + tick.bottom - box.top - box.bottom) / 2,
+          getComputedStyle(t.querySelector("input") as HTMLInputElement).borderTopLeftRadius,
+          hover
+        ] as const;
+      });
+    };
+
+    const regular = await measureAsync();
+    await window.getByRole("button", { name: "Appearance", exact: true }).click();
+    await row(window, "shell.panelSize").locator("input").fill("18");
+    await row(window, "shell.panelSize").locator("input").press("Enter");
+    await expect.poll(() => window.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(16 * 18 / 13, 2);
+    const largest = await measureAsync();
+
+    for (const [horizontal, vertical, radius, hover] of [regular, largest]) {
+      expect(horizontal).toBeLessThanOrEqual(0.5);
+      expect(vertical).toBeLessThanOrEqual(0.5);
+      expect(radius).toBe(hover);
+    }
+    await desktop.checkpointAsync("settings-checkbox");
+  });
+
+  test("a checked checkbox keeps its tick in the forced text color in forced colors", async ({ desktop }) => {
+    const window = desktop.window;
+    await openSettingsAsync(window);
+    await window.getByRole("button", { name: "Notifications", exact: true }).click();
+    const control = row(window, "shell.mutedModules").locator(".tr-checkbox-control").first();
+    await expect(control.locator("input")).toBeChecked();
+    const readAsync = (): Promise<readonly [boolean, string, string, string]> => control.evaluate(t => {
+      const mark = getComputedStyle(t.querySelector(".tr-checkbox-mark") as Element);
+      const probe = document.createElement("span");
+      probe.style.color = "CanvasText";
+      document.body.append(probe);
+      const forced = getComputedStyle(probe).color;
+      probe.remove();
+      return [matchMedia("(forced-colors: active)").matches, mark.stroke, forced, getComputedStyle(t.querySelector("input") as Element).backgroundColor] as const;
+    });
+
+    await window.emulateMedia({ forcedColors: "active" });
+    const [isForced, stroke, text, background] = await readAsync();
+
+    expect(isForced).toBe(true);
+    expect(stroke).toBe(text);
+    expect(stroke).not.toBe(background);
+    await desktop.checkpointAsync("settings-checkbox-forced-colors");
+  });
+
+  test("the Mode pills are one radio group: the checked pill is the tab stop and the arrow keys move the choice", async ({ desktop }) => {
+    const window = desktop.window;
+    await openSettingsAsync(window);
+    const pill = (name: string): Locator => row(window, "shell.mode").getByRole("radiogroup", { name: "Mode" }).getByRole("radio", { name, exact: true });
+    const backgroundAsync = (): Promise<string> => window.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+    await pill("Light").click();
+    await expect.poll(backgroundAsync).toBe(WindowModeFixture.backgrounds.Light);
+    await window.keyboard.press("ArrowRight");
+    await expect(pill("Dark")).toBeChecked();
+    await expect(pill("Dark")).toBeFocused();
+    await expect.poll(backgroundAsync).toBe(WindowModeFixture.backgrounds.Dark);
+    await window.keyboard.press("ArrowRight");
+    await expect(pill("System")).toBeChecked();
+    await window.keyboard.press("ArrowRight");
+    await expect(pill("Light")).toBeChecked();
+    await window.keyboard.press("End");
+    await expect(pill("System")).toBeChecked();
+    await window.keyboard.press("ArrowLeft");
+    await expect(pill("Dark")).toBeChecked();
+    await expect(pill("Light")).toHaveAttribute("tabindex", "-1");
+    await expect(pill("Dark")).toHaveAttribute("tabindex", "0");
+    await desktop.checkpointAsync("settings-mode-pills");
   });
 
   test("choosing a setting's default by hand removes its Modified marker and Reset, also after a restart", async ({ desktop }) => {
@@ -151,7 +271,7 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-default-by-hand");
     await desktop.restartAsync();
     await openSettingsAsync(desktop.window);
-    await expect(row(desktop.window, "shell.mode").locator(".tr-select-button")).toContainText("System");
+    await expect(row(desktop.window, "shell.mode").getByRole("radio", { name: "System" })).toBeChecked();
     await expect(row(desktop.window, "shell.mode").locator(".tr-setting-row-marker")).toHaveCount(0);
     await expect(row(desktop.window, "shell.mode").getByRole("button", { name: /^Reset / })).toHaveCount(0);
   });
@@ -161,7 +281,7 @@ test.describe("settings", () => {
     await openSettingsAsync(window);
     const mode = await otherModeAsync(window);
     await chooseAsync(window, "shell.mode", mode);
-    await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(windowColors[mode]);
+    await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(WindowModeFixture.backgrounds[mode]);
 
     await desktop.restartAsync(async () => {
       for (const file of ["shell.sqlite", "shell.sqlite-wal", "shell.sqlite-shm"])
@@ -172,7 +292,7 @@ test.describe("settings", () => {
     await expect(desktop.window.getByRole("heading", { name: "Data from an earlier TeamRun" })).toBeVisible();
     await expect(desktop.window.locator("tr-workspace")).toHaveCount(0);
     expect(await desktop.window.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.documentElement).colorScheme]))
-      .toEqual([windowColors[mode], mode.toLowerCase()]);
+      .toEqual([WindowModeFixture.backgrounds[mode], mode.toLowerCase()]);
     expect(await nativeBackgroundAsync(desktop)).toBe(mode === "Dark" ? "#181818" : "#F8F8F8");
     await desktop.checkpointAsync("settings-first-frame");
   });

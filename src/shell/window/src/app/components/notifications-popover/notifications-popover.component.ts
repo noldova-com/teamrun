@@ -7,12 +7,12 @@
  */
 
 import {
-  ChangeDetectionStrategy, Component, ElementRef, ErrorHandler, type OutputEmitterRef, type Signal, afterNextRender, computed, inject, output
+  ChangeDetectionStrategy, Component, ErrorHandler, type OutputEmitterRef, type Signal, computed, inject, output
 } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import { type CommandRun, type Notification, NotificationPost, NotificationSeverity } from "@noldova/teamrun-shell-protocol";
-import { ButtonComponent, ButtonVariant, CheckboxComponent, IconButtonComponent, ProgressComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
+import { ButtonComponent, ButtonVariant, CheckboxComponent, IconButtonComponent, PopoverDirective, ProgressComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { WindowPartTokens } from "../../models/window-part-tokens";
 import type { WindowPartSource } from "../../models/window-part-source";
@@ -25,11 +25,9 @@ import { Resources } from "../../../resources";
   templateUrl: "./notifications-popover.component.html",
   styleUrl: "./notifications-popover.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
+  hostDirectives: [{ directive: PopoverDirective, inputs: ["label"] }],
   host: {
-    "class": "tr-notifications-popover",
-    "role": "dialog",
-    "tabindex": "-1",
-    "[attr.aria-label]": "resources.notificationsTitle"
+    "class": "tr-notifications-popover"
   }
 })
 export class NotificationsPopoverComponent {
@@ -45,11 +43,6 @@ export class NotificationsPopoverComponent {
   protected readonly hasFinished: Signal<boolean> = computed(() => this.notifications().some(t => !NotificationsPopoverComponent.isInProgress(t)));
 
   public readonly closed: OutputEmitterRef<void> = output<void>();
-
-  public constructor() {
-    const host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-    afterNextRender(() => host.focus());
-  }
 
   protected glyph(severity: NotificationSeverity): string {
     return Resources.severityGlyphs[severity];

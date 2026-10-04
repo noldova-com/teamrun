@@ -14,6 +14,7 @@ import GitHubJson from "./github-json.ts";
 export default class GitHubApi {
   private static readonly NAME: string = "gh";
   private static readonly TIMEOUT: number = 60_000;
+  private static readonly STATUS_PATTERN: RegExp = /\(HTTP (\d{3})\)/u;
 
   private readonly repository: string;
   private readonly runner: ProcessRunner;
@@ -40,6 +41,10 @@ export default class GitHubApi {
     await this.captureAsync(["api", "--method", method, this.locate(resource), "--raw-field", `body=${body}`]);
   }
 
+  public async postAsync(resource: string): Promise<void> {
+    await this.captureAsync(["api", "--method", "POST", this.locate(resource)]);
+  }
+
   private locate(resource: string): string {
     return `repos/${this.repository}${resource}`;
   }
@@ -55,8 +60,11 @@ export default class GitHubApi {
 
   private async captureAsync(gitHubArguments: readonly string[]): Promise<string> {
     const result = await this.runner.captureAsync(this.executable, gitHubArguments, this.directory, GitHubApi.TIMEOUT);
-    if (!result.isSuccessful)
-      throw new GitHubException(`"gh ${gitHubArguments.join(" ")}" failed with exit code ${result.exitCode}: ${result.errorOutput.trim()}`);
+    if (!result.isSuccessful) {
+      const status = GitHubApi.STATUS_PATTERN.exec(result.errorOutput);
+      throw new GitHubException(`"gh ${gitHubArguments.join(" ")}" failed with exit code ${result.exitCode}: ${result.errorOutput.trim()}`, undefined,
+        status === null ? null : Number(status[1]));
+    }
     return result.output;
   }
 }

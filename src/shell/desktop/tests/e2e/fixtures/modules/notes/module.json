@@ -5,7 +5,7 @@
   "dependencies": [],
   "contributes": {
     "methods": ["notes.manyTabs"],
-    "commands": ["notes.newNote", "notes.openNote", "notes.sortByTitle", "notes.sortByWeek", "notes.wrapLines"],
+    "commands": ["notes.newNote", "notes.openNote", "notes.sortByTitle", "notes.sortByWeek", "notes.wrapLines", "notes.showListInDialog", "notes.showNoteInDialog", "notes.showSettingsInDialog"],
     "notifications": ["notes.saveFailed"],
     "views": [
       "notes.list", "notes.outline", "notes.search", "notes.changes", "notes.tasks", "notes.bookmarks", "notes.teammates", "notes.conversation",

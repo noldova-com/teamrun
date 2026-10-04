@@ -23,7 +23,7 @@ LICENSE file in the root directory of this source tree.
         @if (row.isSubmenu) {
           <tr-place-menu #nested [place]="row.place" />
           <button tr-toolbar-button trToolbarItem class="tr-toolbar-item" [attr.data-submenu]="row.place" [label]="row.title" [icon]="row.icon" [isShowingLabel]="true"
-            [hasMenu]="true" [trMenuTriggerFor]="nested.menu()"></button>
+            [hasMenu]="true" [trMenuTriggerFor]="nested.menu()" [trTooltip]="row.title" [trTooltipTruncated]="true" [trTooltipSide]="below"></button>
         } @else {
           <button tr-toolbar-button trToolbarItem class="tr-toolbar-item" [attr.data-command]="row.command" [label]="row.title" [icon]="row.icon"
             [pressed]="row.check === menuCheck.None ? undefined : row.isChecked" [isUnavailable]="!row.isEnabled" [trTooltip]="tooltipOf(row)"
