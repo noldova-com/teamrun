@@ -34,6 +34,7 @@ export { ToolbarItemDirective } from "../app/components/toolbar/toolbar-item.dir
 export { ToolbarDirective } from "../app/components/toolbar/toolbar.directive";
 export { TooltipDirective } from "../app/components/tooltip/tooltip.directive";
 export { ButtonVariant } from "../app/enums/button-variant";
+export { DialogSize } from "../app/enums/dialog-size";
 export { DockingDirection } from "../app/enums/docking-direction";
 export { FontChoice } from "../app/enums/font-choice";
 export { ModePreference } from "../app/enums/mode-preference";

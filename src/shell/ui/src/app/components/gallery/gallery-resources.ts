@@ -93,6 +93,8 @@ export class GalleryResources {
     dialogBody: "The note and its history are removed from this device.",
     dialogCancel: "Cancel",
     dialogConfirm: "Delete",
+    largeDialogTitle: "Notes",
+    largeDialogBody: "A view or document shown large keeps its own layout inside the dialog's body.",
     quickInput: "Quick input",
     quickInputLabel: "Search the gallery",
     quickInputQuery: "o",

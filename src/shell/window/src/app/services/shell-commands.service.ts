@@ -20,10 +20,12 @@ import { PanelEdge } from "../enums/panel-edge";
 import { ToolbarMove } from "../enums/toolbar-move";
 import { CommandContribution } from "../models/command-contribution";
 import { SideDropTarget } from "../models/layout/side-drop-target";
+import { DocumentTab } from "../models/layout/document-tab";
 import { SplitDropTarget } from "../models/layout/split-drop-target";
 import type { Tab } from "../models/layout/tab";
 import type { TabGroup } from "../models/layout/tab-group";
 import { TabDropTarget } from "../models/layout/tab-drop-target";
+import { ViewTab } from "../models/layout/view-tab";
 import { ShellDocuments } from "../models/shell-documents";
 import { TabTarget } from "../models/tab-target";
 import { Resources } from "../../resources";
@@ -33,6 +35,7 @@ import { EditTargetService } from "./edit-target.service";
 import { LayoutService } from "./layout.service";
 import { ToolbarService } from "./toolbar.service";
 import { TabStripService } from "./tab-strip.service";
+import { ViewDialogService } from "./view-dialog.service";
 
 @Injectable({ providedIn: "root" })
 export class ShellCommandsService {
@@ -41,6 +44,7 @@ export class ShellCommandsService {
   private readonly search: CommandSearchService = inject(CommandSearchService);
   private readonly edits: EditTargetService = inject(EditTargetService);
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
+  private readonly viewDialogs: ViewDialogService = inject(ViewDialogService);
   private readonly document: Document = inject(DOCUMENT);
   private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
 
@@ -90,6 +94,9 @@ export class ShellCommandsService {
     new CommandContribution(Resources.openSettingsCommand, Resources.openSettingsTitle, Resources.settingsGlyph, null,
       () => this.done(() => this.layout.openDocument(ShellDocuments.settingsTab)),
       () => this.layout.registry().hasDocument(ShellDocuments.settings.name)),
+    new CommandContribution(Resources.showInDialogCommand, Resources.showInDialogTitle, Resources.showInDialogGlyph, null,
+      commandArguments => this.showInDialogAsync(commandArguments),
+      commandArguments => !Object.isNull(this.shownTabOf(commandArguments))),
     new CommandContribution(Resources.toggleToolbarCommand, Resources.toggleToolbarTitle, Resources.focusToolbarsGlyph, null,
       commandArguments => this.done(() => {
         const name = this.toolbarOf(commandArguments);
@@ -179,6 +186,22 @@ export class ShellCommandsService {
     const tab = Object.isUndefined(key) ? this.layout.currentGroup().active : layout.groups.flatMap(t => t.tabs).find(t => t.key === key) ?? null;
     const group = Object.isNull(tab) ? null : layout.groupOf(tab);
     return Object.isNull(tab) || Object.isNull(group) ? null : new TabTarget(tab, group, layout.canSplit(tab, group.id));
+  }
+
+  private shownTabOf(commandArguments: JsonValue): Tab | null {
+    const [kind, name = String.empty, ...rest] = this.tabKeyOf(commandArguments)?.split(Resources.keySeparator) ?? [];
+    const instance = rest.length === 0 ? undefined : rest.join(Resources.keySeparator);
+    if (!Resources.contributionNamePattern.test(name) || (!Object.isUndefined(instance) && String.isNullOrWhitespace(instance)))
+      return null;
+    const tab = kind === Resources.viewField ? new ViewTab(name, instance) : kind === Resources.documentField ? new DocumentTab(name, instance) : null;
+    return !Object.isNull(tab) && this.viewDialogs.canShow(tab) ? tab : null;
+  }
+
+  private async showInDialogAsync(commandArguments: JsonValue): Promise<JsonValue> {
+    const tab = this.shownTabOf(commandArguments);
+    if (!Object.isNull(tab))
+      await this.viewDialogs.showAsync(tab);
+    return null;
   }
 
   private toolbarOf(commandArguments: JsonValue): string | null {

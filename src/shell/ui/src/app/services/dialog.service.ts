@@ -19,6 +19,10 @@ export class DialogService {
 
   private readonly dialog: Dialog = inject(Dialog);
 
+  public get isOpen(): boolean {
+    return this.dialog.openDialogs.length > 0;
+  }
+
   public open<T>(component: ComponentType<T>, initialFocus: string): DialogRef<unknown, T> {
     const titleId = `${Resources.dialogTitleIdPrefix}${DialogService.count++}`;
     return this.dialog.open<unknown, unknown, T>(component, {

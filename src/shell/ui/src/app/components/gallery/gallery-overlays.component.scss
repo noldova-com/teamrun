@@ -19,6 +19,16 @@
   max-width: 12rem;
 }
 
+.tr-gallery-large-dialog {
+  width: 36rem;
+  height: 14rem;
+}
+
+.tr-gallery-large-dialog-body {
+  margin: 0;
+  padding: var(--tr-space-3) var(--tr-space-4);
+}
+
 .tr-gallery-context {
   padding: var(--tr-space-2) var(--tr-space-3);
   border: var(--tr-border-width) dashed var(--tr-border);

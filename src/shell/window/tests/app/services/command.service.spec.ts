@@ -10,6 +10,7 @@ import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { KeyChord } from "@noldova/teamrun-shell-protocol";
+import { DialogService } from "@noldova/teamrun-shell-ui";
 
 import { CommandNotFoundException } from "../../../src/app/exceptions/command-not-found.exception";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
@@ -30,9 +31,11 @@ describe("CommandService", () => {
       return name;
     });
 
-  function start(platform: string): CommandService {
+  function start(platform: string, isDialogOpen: boolean = false): CommandService {
     DesktopBridgeFixture.install(platform);
-    TestBed.configureTestingModule({ providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }] });
+    TestBed.configureTestingModule({
+      providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }, { provide: DialogService, useValue: { isOpen: isDialogOpen } }]
+    });
     return TestBed.inject(CommandService);
   }
 
@@ -82,6 +85,25 @@ describe("CommandService", () => {
     press({ key: "n", code: "KeyN", metaKey: true, altKey: true });
 
     await vi.waitFor(() => expect(runs).toEqual(["notes.newNote null"]));
+  });
+
+  it("runs only the edit commands' keys while a modal dialog is open, leaving the rest to the page", async () => {
+    const service = start("win32", true);
+    service.setCommands([command("notes.newNote", "Mod+Alt+N")]);
+    service.setBindings([new ShortcutBinding("shell.selectAll", KeyChord.parse("F7"))]);
+    const input = document.createElement("input");
+    input.value = "draft";
+    document.body.append(input);
+    input.focus();
+
+    const module = press({ key: "n", code: "KeyN", ctrlKey: true, altKey: true });
+    const shell = press({ key: ",", code: "Comma", ctrlKey: true });
+    const edit = new KeyboardEvent("keydown", { key: "F7", code: "F7", bubbles: true, cancelable: true });
+    input.dispatchEvent(edit);
+    input.remove();
+
+    expect(runs).toEqual([]);
+    expect([module.defaultPrevented, shell.defaultPrevented, edit.defaultPrevented]).toEqual([false, false, true]);
   });
 
   it("leaves keys an input or editor handled, composed text and repeats alone", () => {

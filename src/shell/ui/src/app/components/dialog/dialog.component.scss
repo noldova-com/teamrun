@@ -22,14 +22,44 @@
   line-height: var(--tr-line-panel);
 }
 
-.tr-dialog-title {
+:host(.tr-dialog-large) {
+  width: min(max(var(--tr-dialog-large-width), var(--tr-dialog-large-min-width)), calc(100vw - var(--tr-space-2) * 2));
+  height: min(max(var(--tr-dialog-large-height), var(--tr-dialog-large-min-height)), calc(100vh - var(--tr-window-row-height) - var(--tr-status-bar-height) - var(--tr-space-2) * 2));
+  overflow: hidden;
+}
+
+.tr-dialog-header {
+  display: flex;
   flex: none;
+  align-items: center;
+  gap: var(--tr-space-2);
+}
+
+:host(.tr-dialog-large) .tr-dialog-header {
+  padding: var(--tr-dialog-large-header-padding);
+  border-bottom: var(--tr-border-width) solid var(--tr-widget-border);
+}
+
+.tr-dialog-title {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   padding: var(--tr-dialog-title-padding);
   font-size: inherit;
   font-weight: var(--tr-weight-emphasis);
   line-height: inherit;
   overflow-wrap: anywhere;
+}
+
+:host(.tr-dialog-large) .tr-dialog-title {
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-dialog-close {
+  flex: none;
 }
 
 .tr-dialog-body {
@@ -39,6 +69,13 @@
   overflow-x: hidden;
   overflow-y: auto;
   overflow-wrap: anywhere;
+}
+
+:host(.tr-dialog-large) .tr-dialog-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
 }
 
 .tr-dialog-text {
@@ -52,4 +89,8 @@
   justify-content: flex-end;
   gap: var(--tr-space-2);
   padding: var(--tr-dialog-actions-padding);
+}
+
+.tr-dialog-actions:empty {
+  display: none;
 }

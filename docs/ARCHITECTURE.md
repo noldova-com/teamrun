@@ -65,8 +65,8 @@ The window and its parts never import runtime code. Clients share connection fac
 | Host | A process that runs parts: the runtime, the window or the CLI |
 | Part | The code of a module that runs in one host: a runtime part, a window part or a CLI part |
 | Contribution | An entry a module adds to a shell mechanism, such as a view, a command or a protocol method |
-| View | Contributed content for a panel, in a dock or in the middle |
-| Document | Contributed content for a tab in the middle of the window |
+| View | Contributed content for a panel, in a dock or in the middle, or for a dialog |
+| Document | Contributed content for a tab in the middle of the window, or for a dialog |
 | Setting scope | A level at which a setting can have its own value, such as the application or one object a module owns |
 | Theme | An appearance the person chooses: colors for the light and dark modes and a look, defined by the [UI standards](UI-STANDARDS.md#2-themes-and-color) |
 | Published API | What a module offers to the modules that depend on it |
@@ -154,6 +154,12 @@ The shell owns registration, collisions, user overrides, persistence and removal
 
 When two default shortcuts collide, the one registered first keeps the key, Settings shows the collision, and the person's binding decides. A saved layout keeps the place of a view or document whose module is absent and shows it again when the module returns.
 
+### Views in a dialog
+
+Besides docks and tabs, a view or document can show in a large modal dialog. A window part asks with `showInDialogAsync(name, { instance, title })` for its own views and documents, its dependencies' and the shell's, and the promise settles when the dialog closes; the shell runs `shell.showInDialog` with the `tab` argument. The person has no way of their own to open one. One dialog shows at a time, and asking while one shows is refused.
+
+A view or document already open in a tab moves into the dialog: its tab stays where it is with an empty panel, and its content returns there when the dialog closes, so the saved layout never changes. One that was not open closes with the dialog. Its component is created again in each place, as when a tab moves between groups, so what the view keeps in its module carries over and what it keeps only in the component does not.
+
 ### Commands and shortcuts
 
 A module declares each command's name in `contributes.commands`; a part registers it with its title, icon, default key and handler, and a name the declaration lacks is refused. A window part's command runs in the window. A runtime part's command runs in the runtime: the window lists them with `shell.commands` after `shell.modules` and runs one with `shell.runCommand`, passing its arguments to the handler. Both kinds are withdrawn when their module deactivates.
@@ -170,9 +176,9 @@ The shell's own default keys may also take Mod+W and Mod+Comma, which the shell 
 
 Menus show a key by the platform's convention: macOS symbols in the order ⌃⌥⇧⌘ before the key, and elsewhere names such as `Ctrl+Alt+Shift+K`.
 
-The shell's own actions are commands too, named `shell.*`: closing, keeping and moving tabs, showing the next or previous tab of a group, wrapping at its ends, splitting and docking tabs, showing and hiding docks, spanning the bottom dock across the window or keeping it between the side docks, resetting the layout, showing all of a group's tabs and showing all commands, whose search lists every enabled command and those main-menu rows, and runs the chosen one. The shell's most-used commands have default keys, which UI-STANDARDS lists. A shell command may have several, chosen per platform, while a module's command has at most one, the same everywhere; menus and command search show the first. A tab command acts on the tab its `tab` argument names, or else on the current tab, the active tab of the group that last held focus or had a tab activated; the shell's menus run the same commands. A command may say whether it is enabled for given arguments.
+The shell's own actions are commands too, named `shell.*`: closing, keeping and moving tabs, showing the next or previous tab of a group, wrapping at its ends, splitting and docking tabs, showing and hiding docks, spanning the bottom dock across the window or keeping it between the side docks, resetting the layout, showing all of a group's tabs, showing a view or document in a dialog and showing all commands, whose search lists every enabled command and those main-menu rows, and runs the chosen one. The shell's most-used commands have default keys, which UI-STANDARDS lists. A shell command may have several, chosen per platform, while a module's command has at most one, the same everywhere; menus and command search show the first. A tab command acts on the tab its `tab` argument names, or else on the current tab, the active tab of the group that last held focus or had a tab activated; the shell's menus run the same commands. A command may say whether it is enabled for given arguments.
 
-The window keeps one keyboard listener on the document, after every element's own. A key an input, editor or terminal handled, a key during text composition, a repeated key and the key of a command that is not enabled are left alone; a key bound to an enabled command runs it and goes no further. Keys go to commands in this order: the person's bindings first, then the shell's default keys, then default keys in module order, as `shell.modules` reports it, with a module's runtime commands before its window commands. The first holder keeps a key and each refused command is recorded as a collision. The person's bindings are applied as described, but until Settings exists none are stored and the collisions are not shown.
+The window keeps one keyboard listener on the document, after every element's own. A key an input, editor or terminal handled, a key during text composition, a repeated key and the key of a command that is not enabled are left alone; a key bound to an enabled command runs it and goes no further. While a modal dialog is open, only the Edit commands' keys run, so the window behind does not change. Keys go to commands in this order: the person's bindings first, then the shell's default keys, then default keys in module order, as `shell.modules` reports it, with a module's runtime commands before its window commands. The first holder keeps a key and each refused command is recorded as a collision. The person's bindings are applied as described, but until Settings exists none are stored and the collisions are not shown.
 
 ### Menus
 

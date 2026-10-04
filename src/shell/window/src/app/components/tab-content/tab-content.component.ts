@@ -7,7 +7,7 @@
  */
 
 import { NgComponentOutlet } from "@angular/common";
-import { ChangeDetectionStrategy, Component, Injector, type InputSignal, type ResourceRef, inject, input, resource } from "@angular/core";
+import { ChangeDetectionStrategy, Component, Injector, type InputSignal, type ResourceRef, type Signal, computed, inject, input, resource } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 
@@ -40,6 +40,8 @@ export class TabContentComponent {
     params: () => ({ tab: this.tab(), generation: this.host.generation() }),
     loader: ({ params }) => this.loadAsync(params.tab)
   });
+
+  public readonly isLoaded: Signal<boolean> = computed(() => this.content.hasValue());
 
   private async loadAsync(tab: Tab): Promise<TabContent | null> {
     const match = this.host.findContribution(tab);

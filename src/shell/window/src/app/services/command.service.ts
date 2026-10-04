@@ -11,6 +11,7 @@ import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal,
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { DialogService } from "@noldova/teamrun-shell-ui";
 
 import { CommandNotFoundException } from "../exceptions/command-not-found.exception";
 import type { CommandContribution } from "../models/command-contribution";
@@ -24,6 +25,7 @@ import { ShellCommandsService } from "./shell-commands.service";
 export class CommandService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
+  private readonly dialogs: DialogService = inject(DialogService);
   private readonly shell: ShellCommandsService = inject(ShellCommandsService);
   private readonly shellCommands: readonly CommandContribution[] = this.shell.commands;
   private readonly moduleCommands: WritableSignal<readonly CommandContribution[]> = signal([]);
@@ -81,6 +83,8 @@ export class CommandService {
     if (event.defaultPrevented || event.isComposing || event.repeat)
       return false;
     const name = this.shortcuts().find(event);
+    if (this.dialogs.isOpen && !Resources.modalCommands.some(t => t === name))
+      return false;
     const command = this.commands().find(t => t.name === name);
     if (Object.isUndefined(command) || !this.canRun(command, null))
       return false;

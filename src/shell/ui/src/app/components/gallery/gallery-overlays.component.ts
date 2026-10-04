@@ -10,6 +10,7 @@ import { NgTemplateOutlet } from "@angular/common";
 import { ChangeDetectionStrategy, Component, Injector, type WritableSignal, inject, signal } from "@angular/core";
 
 import { ButtonVariant } from "../../enums/button-variant";
+import { DialogSize } from "../../enums/dialog-size";
 import { DockingDirection } from "../../enums/docking-direction";
 import { DialogTokens } from "../../models/dialog-tokens";
 import { OverlaySide } from "../../models/overlay-side";
@@ -44,11 +45,12 @@ import { GallerySpecimenComponent } from "./gallery-specimen.component";
 export class GalleryOverlaysComponent {
   private static count: number = 0;
 
+  private readonly injector: Injector = inject(Injector);
+
   protected readonly text: typeof GalleryResources.text = GalleryResources.text;
-  protected readonly dialogInjector: Injector = Injector.create({
-    providers: [{ provide: DialogTokens.titleId, useValue: `${GalleryResources.dialogTitleIdPrefix}${GalleryOverlaysComponent.count++}` }],
-    parent: inject(Injector)
-  });
+  protected readonly dialogInjector: Injector = this.createDialogInjector();
+  protected readonly largeDialogInjector: Injector = this.createDialogInjector();
+  protected readonly sizes: typeof DialogSize = DialogSize;
   protected readonly variants: typeof ButtonVariant = ButtonVariant;
   protected readonly directions: typeof DockingDirection = DockingDirection;
   protected readonly below: OverlaySide = OverlaySide.below;
@@ -58,4 +60,11 @@ export class GalleryOverlaysComponent {
     new QuickInputItem("two", GalleryResources.text.quickInputTwo, null, null, null, [1]),
     new QuickInputItem("three", GalleryResources.text.quickInputLong, GalleryResources.text.glyphSave, GalleryResources.text.quickInputDetail, null, [0])
   ];
+
+  private createDialogInjector(): Injector {
+    return Injector.create({
+      providers: [{ provide: DialogTokens.titleId, useValue: `${GalleryResources.dialogTitleIdPrefix}${GalleryOverlaysComponent.count++}` }],
+      parent: this.injector
+    });
+  }
 }
