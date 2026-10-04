@@ -291,6 +291,10 @@ export class Resources {
     return `The runtime starter could not start the runtime: ${failure}`;
   }
 
+  public static formatRuntimeNotStarted(reason: string): string {
+    return `The runtime could not be started or reached, so the window offers to try again: ${reason}`;
+  }
+
   public static formatAppearanceUnread(reason: string): string {
     return `The device's last appearance could not be read, so the window starts in the default appearance: ${reason}`;
   }
