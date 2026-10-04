@@ -119,8 +119,8 @@ export class ToolbarComponent {
     const origin = ghost.getBoundingClientRect().left;
     const edges = [...ghost.querySelectorAll<HTMLElement>(Resources.toolbarSectionSelector)].map(t => t.getBoundingClientRect().right - origin);
     this.edges.set(edges);
-    const overflowRight = [...ghost.querySelectorAll<HTMLElement>(Resources.toolbarOverflowSelector)].reduce((_, t) => t.getBoundingClientRect().right, origin);
-    this.overflowSpace.set(overflowRight - origin - edges.reduce((_, t) => t, 0));
+    const overflowRight = Math.max(origin, ...[...ghost.querySelectorAll<HTMLElement>(Resources.toolbarOverflowSelector)].map(t => t.getBoundingClientRect().right));
+    this.overflowSpace.set(overflowRight - origin - Math.max(0, ...edges));
     this.available.set(this.content().nativeElement.getBoundingClientRect().width);
     this.gripWidth.set(this.content().nativeElement.getBoundingClientRect().left - this.grip().nativeElement.getBoundingClientRect().left);
   }

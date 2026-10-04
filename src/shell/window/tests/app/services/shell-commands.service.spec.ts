@@ -301,15 +301,40 @@ describe("ShellCommandsService", () => {
     expect(canMove).toHaveBeenCalled();
   });
 
+  it("moves the focus to the next toolbar's grip, else the previous one's, else Search commands, after hiding a toolbar", async () => {
+    const toolbars = TestBed.inject(ToolbarService);
+    vi.spyOn(toolbars, "isKnown").mockReturnValue(true);
+    const frames = ["notes.first", "notes.second"].map(name => {
+      const frame = document.createElement("div");
+      frame.className = "tr-toolbar";
+      frame.dataset["toolbar"] = name;
+      const grip = document.createElement("button");
+      grip.className = "tr-toolbar-grip";
+      frame.append(grip);
+      document.body.append(frame);
+      return frame;
+    });
+    const search = document.createElement("button");
+    search.className = "tr-window-row-search";
+    document.body.append(search);
+    vi.spyOn(toolbars, "setShown").mockImplementation(name => frames.find(t => t.dataset["toolbar"] === name)?.remove());
+
+    await runAsync("shell.hideToolbar", { toolbar: "notes.first" });
+    await vi.waitFor(() => expect(document.activeElement).toBe(frames[1]?.querySelector("button")));
+    await runAsync("shell.hideToolbar", { toolbar: "notes.second" });
+    await vi.waitFor(() => expect(document.activeElement).toBe(search));
+    search.remove();
+  });
+
   it("focuses the first toolbar item, and is enabled only while a toolbar is shown", async () => {
-    const rows = vi.spyOn(TestBed.inject(ToolbarService), "rows");
+    const hasContent = vi.spyOn(TestBed.inject(ToolbarService), "hasContent");
     const item = document.createElement("button");
     item.className = "tr-toolbar-item";
     item.tabIndex = 0;
     document.body.append(item);
 
     expect(enabled("shell.focusToolbars")).toBe(false);
-    rows.mockReturnValue([[]]);
+    hasContent.mockReturnValue(true);
     expect(enabled("shell.focusToolbars")).toBe(true);
     await runAsync("shell.focusToolbars");
     expect(document.activeElement).toBe(item);

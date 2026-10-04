@@ -24,8 +24,10 @@ export class ToolbarService {
   private readonly menus: MenuService = inject(MenuService);
 
   public readonly places: Signal<readonly MenuPlace[]> = computed(() => this.menus.active().flatMap(t => t.places).filter(t => !Object.isNull(t.toolbar)));
-  public readonly shown: Signal<readonly string[]> = computed(() => this.layout.layout().toolbars.shownRows(this.places()).flat());
-  public readonly rows: Signal<readonly (readonly Toolbar[])[]> = computed(() => this.layout.layout().toolbars.shownRows(this.places()).map(row => row.flatMap(name => this.toolbarsOf(name))));
+  private readonly arrangement: Signal<readonly (readonly string[])[]> = computed(() => this.layout.layout().toolbars.shownRows(this.places()));
+
+  public readonly shown: Signal<readonly string[]> = computed(() => this.arrangement().flat());
+  public readonly rows: Signal<readonly (readonly Toolbar[])[]> = computed(() => this.arrangement().map(row => row.flatMap(name => this.toolbarsOf(name))));
   public readonly hasContent: Signal<boolean> = computed(() => this.rows().some(row => row.some(t => t.sections.length > 0)));
 
   public constructor() {
@@ -68,7 +70,7 @@ export class ToolbarService {
   }
 
   private destination(name: string, move: ToolbarMove): { readonly row: number; readonly index: number; readonly isNewRow: boolean } | null {
-    const rows = this.layout.layout().toolbars.shownRows(this.places());
+    const rows = this.arrangement();
     const row = rows.findIndex(t => t.includes(name));
     const current = rows[row] ?? [];
     const index = current.indexOf(name);

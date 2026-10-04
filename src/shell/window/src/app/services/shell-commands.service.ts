@@ -109,12 +109,15 @@ export class ShellCommandsService {
     new CommandContribution(Resources.hideToolbarCommand, Resources.hideToolbarTitle, Resources.hideToolbarGlyph, null,
       commandArguments => this.done(() => {
         const name = this.toolbarOf(commandArguments);
-        if (!Object.isNull(name))
+        if (!Object.isNull(name)) {
+          const index = this.gripsOf().findIndex(t => t.closest<HTMLElement>(Resources.toolbarSelector)?.dataset[Resources.toolbarData] === name);
           this.toolbars.setShown(name, false);
+          this.focusAfterHide(index);
+        }
       }),
       commandArguments => !Object.isNull(this.toolbarOf(commandArguments))),
     new CommandContribution(Resources.focusToolbarsCommand, Resources.focusToolbarsTitle, Resources.focusToolbarsGlyph, null,
-      () => this.done(() => this.focusToolbars()), () => this.toolbars.rows().length > 0),
+      () => this.done(() => this.focusToolbars()), () => this.toolbars.hasContent()),
     new CommandContribution(Resources.resetLayoutCommand, Resources.resetLayoutLabel, Resources.resetLayoutGlyph, null, () => this.done(() => this.layout.reset())),
     ...Object.values(BottomDockSpan).map(span => new CommandContribution(Resources.bottomSpanCommands[span], Resources.bottomSpanLabels[span], Resources.bottomSpanGlyphs[span], null,
       () => this.done(() => this.layout.setBottomSpan(span)), () => true, () => this.layout.layout().bottomSpan === span)),
@@ -179,6 +182,17 @@ export class ShellCommandsService {
   private focusGrip(name: string): void {
     afterNextRender(() => [...this.document.querySelectorAll<HTMLElement>(Resources.toolbarSelector)]
       .find(t => t.dataset[Resources.toolbarData] === name)?.querySelector<HTMLElement>(Resources.toolbarGripSelector)?.focus(), { injector: this.environment });
+  }
+
+  private gripsOf(): readonly HTMLElement[] {
+    return [...this.document.querySelectorAll<HTMLElement>(Resources.toolbarGripSelector)];
+  }
+
+  private focusAfterHide(index: number): void {
+    afterNextRender(() => {
+      const grips = this.gripsOf();
+      (grips[index] ?? grips.at(-1) ?? this.document.querySelector<HTMLElement>(Resources.commandSearchButtonSelector))?.focus();
+    }, { injector: this.environment });
   }
 
   private focusToolbars(): void {

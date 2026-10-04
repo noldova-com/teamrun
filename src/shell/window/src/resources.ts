@@ -527,6 +527,8 @@ export class Resources {
   public static readonly hideToolbarTitle: string = "Hide the toolbar";
   public static readonly hideToolbarLabel: string = "Hide toolbar";
   public static readonly toolbarGripSelector: string = ".tr-toolbar-grip";
+  public static readonly commandSearchButtonSelector: string = ".tr-window-row-search";
+  public static readonly toolbarsSubmenuGroup: string = "shell.toolbarsSubmenu";
   public static readonly toolbarContentSectionSelector: string = ".tr-toolbar-section";
   public static readonly toolbarOverflowItemSelector: string = ".tr-toolbar-overflow";
   public static readonly toolbarGroupData: string = "group";

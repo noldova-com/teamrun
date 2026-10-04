@@ -45,6 +45,7 @@ export class ShellMenus {
     new MenuGroup(Resources.toolbarMoveGroup, Resources.toolbarMenu, false,
       Object.values(ToolbarMove).map(t => MenuItem.ofCommand(Resources.moveToolbarCommands[t], {}, Resources.moveToolbarLabels[t]))),
     new MenuGroup(Resources.toolbarHideGroup, Resources.toolbarMenu, false, [MenuItem.ofCommand(Resources.hideToolbarCommand, {}, Resources.hideToolbarLabel)]),
+    new MenuGroup(Resources.toolbarsSubmenuGroup, Resources.toolbarMenu, false, [MenuItem.ofSubmenu(Resources.toolbarsMenu)]),
     new MenuGroup(Resources.layoutGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.resetLayoutCommand)]),
     new MenuGroup(Resources.tabArrangeGroup, Resources.tabMenu, false, [
       MenuItem.ofCommand(Resources.keepTabCommand, {}, Resources.keepLabel),

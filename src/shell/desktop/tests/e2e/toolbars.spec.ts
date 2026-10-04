@@ -138,7 +138,7 @@ test.describe("toolbars", () => {
       };
     });
     expect(dots.sizes).toEqual([[dots.rem * 0.125, dots.rem * 0.125], [dots.rem * 0.125, dots.rem * 0.125], [dots.rem * 0.125, dots.rem * 0.125]]);
-    expect(dots.gaps).toEqual([dots.rem * 0.3125, dots.rem * 0.3125]);
+    expect(dots.gaps).toEqual([dots.rem * 0.125, dots.rem * 0.125]);
     expect(Math.abs(dots.above - dots.below)).toBeLessThan(0.5);
     expect(Math.abs(dots.left - dots.right)).toBeLessThan(0.5);
     await desktop.checkpointAsync("toolbars");
@@ -245,7 +245,7 @@ test.describe("toolbars", () => {
     await toolbar(window, "notes.second").locator(".tr-toolbar-item").first().focus();
     await window.keyboard.press("ContextMenu");
     const menu = place(window, "shell.toolbar");
-    await expect(menu.getByRole("menuitem")).toHaveText([/Move left/, /Move right/, /Move to the row above/, /Move to the row below/, /Hide toolbar/]);
+    await expect(menu.getByRole("menuitem")).toHaveText([/Move left/, /Move right/, /Move to the row above/, /Move to the row below/, /Hide toolbar/, /Toolbars/]);
     await expect(menu.getByRole("menuitem", { name: "Move left" })).toHaveAttribute("aria-disabled", "true");
     await expect(menu.getByRole("menuitem", { name: "Move to the row below" })).toHaveAttribute("aria-disabled", "true");
     await window.keyboard.press("Escape");
@@ -258,8 +258,16 @@ test.describe("toolbars", () => {
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.main", "notes.second"]]);
     await moveViaMenuAsync(window, "notes.second", "Move to the row below");
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.main"], ["notes.second"]]);
+    await toolbar(window, "notes.second").locator(".tr-toolbar-item").first().focus();
+    await window.keyboard.press("ContextMenu");
+    await place(window, "shell.toolbar").getByRole("menuitem", { name: "Toolbars" }).click();
+    await expect(place(window, "shell.toolbars").getByRole("menuitemcheckbox", { name: "Spare" })).toBeVisible();
+    await window.keyboard.press("Escape");
+    await window.keyboard.press("Escape");
+    await expect(window.locator(".cdk-overlay-container tr-menu")).toHaveCount(0);
     await moveViaMenuAsync(window, "notes.second", "Hide toolbar");
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.main"]]);
+    await expect(toolbar(window, "notes.main").locator(".tr-toolbar-grip")).toBeFocused();
   });
 
   test("a toolbar dragged by its grip moves within its row, to another row and to a new row, and Escape cancels", async ({ desktop }) => {
