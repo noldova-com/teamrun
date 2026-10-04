@@ -93,6 +93,22 @@ export class TestRunEntryTests {
   }
 
   @TestMethod
+  @TestData("[\"finishesCleanly\"]", 1, 8)
+  @TestData("[\"finishesCleanly\",\"keepsTheCoverageFolderOutOfItsEnvironment\"]", 2, 8)
+  public async writesWhatItDiscoveredAndSelectedToTheSelectionFile(filters: string, selected: number, discovered: number): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const testsDirectory = join(directory.path, "tests");
+    await mkdir(testsDirectory);
+    const fixture = new URL("../../fixtures/execution/entry-lifetime.fixture.js", import.meta.url).href;
+    await writeFile(join(testsDirectory, "lifetime.test.js"), `export { EntryLifetimeFixture as EntryLifetimeTests } from ${JSON.stringify(fixture)};\n`);
+    const selectionPath = join(directory.path, "selection.json");
+
+    await this.runEntryArgumentsAsync(["TestPackage", testsDirectory], filters, undefined, { TEAMRUN_TEST_SELECTION_FILE: selectionPath });
+
+    Assert.areEqual(JSON.stringify({ discovered, selected }), await readFile(selectionPath, "utf8"));
+  }
+
+  @TestMethod
   public async endsTheRunAfterATestExceedsItsTimeLimit(): Promise<void> {
     using directory = new TemporaryDirectory();
     const testsDirectory = join(directory.path, "tests");
