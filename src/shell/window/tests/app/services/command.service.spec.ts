@@ -11,10 +11,12 @@ import { TestBed } from "@angular/core/testing";
 
 import { DialogService } from "@noldova/teamrun-shell-ui";
 
+import { EditAction } from "../../../src/app/enums/edit-action";
 import { CommandNotFoundException } from "../../../src/app/exceptions/command-not-found.exception";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { CommandService } from "../../../src/app/services/command.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
+import { StartupService } from "../../../src/app/services/startup.service";
 import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 import { ModuleStatusFixture } from "../../fixtures/module-status.fixture";
@@ -82,6 +84,42 @@ describe("CommandService", () => {
     await vi.waitFor(() => expect(runs).toEqual(["notes.newNote null"]));
     expect(pressed.defaultPrevented).toBe(true);
     expect(other.defaultPrevented).toBe(false);
+  });
+
+  it("offers no command and runs none for a key while the runtime starts again", async () => {
+    const service = start("win32");
+    service.setCommands([command("notes.newNote", "Mod+Alt+N")]);
+    await vi.waitFor(() => expect(TestBed.inject(StartupService).hasStarted()).toBe(true));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    const whileStarting = [service.isEnabled("notes.newNote"), press({ key: "n", code: "KeyN", ctrlKey: true, altKey: true }).defaultPrevented];
+    bridge.publishStartup({ kind: "Ready", details: [] });
+
+    expect(whileStarting).toEqual([false, false]);
+    expect(service.isEnabled("notes.newNote")).toBe(true);
+    expect(runs).toEqual([]);
+  });
+
+  it("runs no command from anywhere while the runtime starts again, but keeps the edit commands", async () => {
+    const service = start("win32");
+    service.setCommands([command("notes.newNote", null)]);
+    await vi.waitFor(() => expect(TestBed.inject(StartupService).hasStarted()).toBe(true));
+    const input = document.createElement("input");
+    input.value = "draft";
+    document.body.append(input);
+    input.focus();
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    const ran = await service.runAsync("notes.newNote");
+    service.run("notes.newNote");
+    const whileStarting = [service.isAvailable("notes.newNote"), service.isAvailable(Resources.editCommands[EditAction.SelectAll])];
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    input.remove();
+
+    expect(ran).toBeNull();
+    expect(whileStarting).toEqual([false, true]);
+    expect([service.isAvailable("notes.newNote"), service.isAvailable("clock.tick")]).toEqual([true, false]);
+    expect(runs).toEqual([]);
   });
 
   it("uses Cmd for Mod on macOS", async () => {

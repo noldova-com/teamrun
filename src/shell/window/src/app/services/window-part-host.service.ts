@@ -90,8 +90,8 @@ export class WindowPartHostService implements IWindowPartHost {
   }
 
   public findContribution(tab: Tab): ContributionMatch | null {
-    const shellDocument = tab instanceof DocumentTab ? ShellDocuments.all.find(t => t.name === tab.name) : undefined;
-    if (!Object.isUndefined(shellDocument))
+    const shellDocument = ShellDocuments.find(tab);
+    if (!Object.isNull(shellDocument))
       return new ContributionMatch(shellDocument.loadComponent, null);
     for (const activation of this.activations) {
       const contributions = tab instanceof DocumentTab ? activation.context.documents : activation.context.views;

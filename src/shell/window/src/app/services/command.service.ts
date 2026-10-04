@@ -23,6 +23,7 @@ import { DesktopBridgeService } from "./desktop-bridge.service";
 import { ModuleStatusService } from "./module-status.service";
 import { SettingsService } from "./settings.service";
 import { ShellCommandsService } from "./shell-commands.service";
+import { StartupService } from "./startup.service";
 import { ViewDialogService } from "./view-dialog.service";
 
 @Injectable({ providedIn: "root" })
@@ -32,6 +33,7 @@ export class CommandService {
   private readonly dialogs: DialogService = inject(DialogService);
   private readonly viewDialogs: ViewDialogService = inject(ViewDialogService);
   private readonly shell: ShellCommandsService = inject(ShellCommandsService);
+  private readonly startup: StartupService = inject(StartupService);
   private readonly shellCommands: readonly CommandContribution[] = this.shell.commands;
   private readonly moduleCommands: WritableSignal<readonly CommandContribution[]> = signal([]);
   private readonly settingValues: Signal<ReadonlyMap<string, JsonValue>> = inject(SettingsService).values;
@@ -56,7 +58,8 @@ export class CommandService {
   }
 
   public async runAsync(name: string, commandArguments: JsonValue = null): Promise<JsonValue> {
-    return this.find(name).runAsync(commandArguments);
+    const command = this.find(name);
+    return this.isHeldByReconnect(command.name) ? null : command.runAsync(commandArguments);
   }
 
   public run(name: string, commandArguments: JsonValue = null): void {
@@ -65,6 +68,11 @@ export class CommandService {
 
   public isEnabled(name: string, commandArguments: JsonValue = null): boolean {
     return this.canRun(this.find(name), commandArguments);
+  }
+
+  public isAvailable(name: string, commandArguments: JsonValue = null): boolean {
+    const command = this.commands().find(t => t.name === name);
+    return !Object.isUndefined(command) && this.canRun(command, commandArguments);
   }
 
   public isChecked(name: string, commandArguments: JsonValue = null): boolean {
@@ -111,7 +119,11 @@ export class CommandService {
   }
 
   private canRun(command: CommandContribution, commandArguments: JsonValue): boolean {
-    return this.ask(() => command.isEnabled(commandArguments));
+    return !this.isHeldByReconnect(command.name) && this.ask(() => command.isEnabled(commandArguments));
+  }
+
+  private isHeldByReconnect(name: string): boolean {
+    return this.startup.isReconnecting() && !Resources.modalCommands.includes(name);
   }
 
   private ask(question: () => boolean): boolean {

@@ -9,6 +9,7 @@
 import { Resources } from "../../resources";
 import { DocumentContribution } from "./document-contribution";
 import { DocumentTab } from "./layout/document-tab";
+import type { Tab } from "./layout/tab";
 import { TabLabel } from "./layout/tab-label";
 
 export class ShellDocuments {
@@ -23,4 +24,8 @@ export class ShellDocuments {
   public static readonly modulesTab: DocumentTab = new DocumentTab(Resources.modulesDocument);
   public static readonly modulesLabel: TabLabel = new TabLabel(Resources.modulesTitle, Resources.modulesGlyph);
   public static readonly all: readonly DocumentContribution[] = [ShellDocuments.settings, ShellDocuments.modules];
+
+  public static find(tab: Tab): DocumentContribution | null {
+    return tab instanceof DocumentTab ? ShellDocuments.all.find(t => t.name === tab.name) ?? null : null;
+  }
 }

@@ -13,6 +13,7 @@ import "@noldova/teamrun-foundation-core";
 
 import { DocumentTab } from "../../models/layout/document-tab";
 import type { Tab } from "../../models/layout/tab";
+import { ShellDocuments } from "../../models/shell-documents";
 import { TabContent } from "../../models/tab-content";
 import { WindowPartTokens } from "../../models/window-part-tokens";
 import { TabLabelService } from "../../services/tab-label.service";
@@ -38,7 +39,10 @@ export class TabContentComponent {
   public readonly tab: InputSignal<Tab> = input.required<Tab>();
 
   protected readonly content: ResourceRef<TabContent | null | undefined> = resource({
-    params: () => ({ tab: this.tab(), generation: this.host.generation() }),
+    params: () => {
+      const tab = this.tab();
+      return { tab, generation: Object.isNull(ShellDocuments.find(tab)) ? this.host.generation() : 0 };
+    },
     loader: ({ params }) => this.loadAsync(params.tab)
   });
 
