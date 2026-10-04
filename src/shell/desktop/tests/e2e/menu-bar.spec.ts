@@ -145,7 +145,7 @@ test.describe("the window row's menus on Windows and Linux", () => {
     await window.keyboard.press("F10");
     await expect(tag).toBeFocused();
     await CommandSearchFixture.searchAsync(window, "new n");
-    await expect(window.locator(".cdk-overlay-container .tr-command-search-pane [role=option][data-item=\"notes.newNote\"]")).toBeVisible();
+    await expect(window.locator(".cdk-overlay-container .tr-command-search-pane [role=option][data-item=\"notes.newNote\"] mark")).toHaveText(["New n"]);
     await desktop.checkpointAsync("menu-bar-hidden");
     await window.keyboard.press("Escape");
 

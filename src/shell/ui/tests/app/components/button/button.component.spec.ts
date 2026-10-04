@@ -21,6 +21,9 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   template: `
     <button type="button" class="primary" tr-button [disabled]="disabled()" (click)="presses = presses + 1">Move aside</button>
     <button type="button" class="secondary" tr-button [variant]="secondary">Wait for it</button>
+    <div style="width: 6rem"><button type="button" class="long" tr-button>A label far too long to fit the width its button is given</button></div>
+    <div style="width: 6rem"><button type="button" class="unavailable" tr-button disabled>A label far too long to fit the width its button is given</button></div>
+    <div style="width: 6rem"><button type="button" class="icon" tr-button><span trButtonIcon class="glyph" style="width: 1rem">+</span>A label far too long to fit the width its button is given</button></div>
   `
 })
 class ButtonHostComponent {
@@ -62,6 +65,46 @@ describe("ButtonComponent", () => {
     expect(button("secondary").classList.contains("tr-button-secondary")).toBe(true);
     expect(getComputedStyle(button("primary")).opacity).toBe("0.5");
     expect(getComputedStyle(button("primary")).cursor).toBe("default");
+  });
+
+  it("starts a label too long for its width at its start padding and ends it with an ellipsis, inside the width its parent gives it", () => {
+    render();
+    const long = button("long");
+    const label = long.querySelector("[data-truncates]") as HTMLElement;
+    const style = getComputedStyle(long);
+
+    expect(label.classList.contains("tr-button-label")).toBe(true);
+    expect(long.getBoundingClientRect().width).toBeCloseTo((long.parentElement as HTMLElement).getBoundingClientRect().width, 1);
+    AppearanceFixture.expectPixels(label.getBoundingClientRect().left - long.getBoundingClientRect().left, parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft));
+    AppearanceFixture.expectPixels(long.getBoundingClientRect().right - label.getBoundingClientRect().right, parseFloat(style.borderRightWidth) + parseFloat(style.paddingRight));
+    expect([label.scrollWidth > label.clientWidth, getComputedStyle(label).textOverflow, getComputedStyle(label).whiteSpace]).toEqual([true, "ellipsis", "nowrap"]);
+    expect(button("primary").querySelector("[data-truncates]")?.scrollWidth).toBe(button("primary").querySelector("[data-truncates]")?.clientWidth);
+  });
+
+  it("keeps a disabled button's long label cut with an ellipsis inside the width its parent gives it", () => {
+    render();
+    const unavailable = button("unavailable");
+    const label = unavailable.querySelector("[data-truncates]") as HTMLElement;
+
+    expect(unavailable.disabled).toBe(true);
+    expect(unavailable.getBoundingClientRect().width).toBeCloseTo((unavailable.parentElement as HTMLElement).getBoundingClientRect().width, 1);
+    expect(label.getBoundingClientRect().right).toBeLessThanOrEqual(unavailable.getBoundingClientRect().right);
+    expect([label.scrollWidth > label.clientWidth, getComputedStyle(label).textOverflow]).toEqual([true, "ellipsis"]);
+  });
+
+  it("puts an icon before its label, outside it, at its start padding and whole while the label is cut", () => {
+    render();
+    const icon = button("icon");
+    const glyph = icon.querySelector(".glyph") as HTMLElement;
+    const label = icon.querySelector("[data-truncates]") as HTMLElement;
+    const style = getComputedStyle(icon);
+
+    expect(label.contains(glyph)).toBe(false);
+    AppearanceFixture.expectPixels(glyph.getBoundingClientRect().left - icon.getBoundingClientRect().left, parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft));
+    AppearanceFixture.expectPixels(glyph.getBoundingClientRect().width, AppearanceFixture.toPixels(1));
+    AppearanceFixture.expectPixels(label.getBoundingClientRect().left - glyph.getBoundingClientRect().right, AppearanceFixture.toPixels(0.25));
+    expect(label.scrollWidth > label.clientWidth).toBe(true);
+    expect(button("primary").querySelector(".tr-button-icon")?.getBoundingClientRect().width).toBe(0);
   });
 
   for (const mode of AppearanceFixture.modes)
