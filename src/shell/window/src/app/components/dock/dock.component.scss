@@ -22,6 +22,12 @@
   flex-direction: column;
 }
 
+.tr-dock-strip-badge {
+  grid-area: 1 / 1;
+  align-self: start;
+  justify-self: end;
+}
+
 .tr-dock-strip-separator {
   flex: none;
   align-self: stretch;

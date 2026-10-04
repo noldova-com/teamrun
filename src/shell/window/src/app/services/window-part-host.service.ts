@@ -30,6 +30,7 @@ import { ShellDocuments } from "../models/shell-documents";
 import { ModuleFailure } from "../models/module-failure";
 import { PendingDocument } from "../models/pending-document";
 import type { StartupState } from "../models/startup-state";
+import type { ViewBadge } from "../models/view-badge";
 import { WindowPartActivation } from "../models/window-part-activation";
 import { WindowPartContext } from "../models/window-part-context";
 import type { WindowPartSource } from "../models/window-part-source";
@@ -163,6 +164,10 @@ export class WindowPartHostService implements IWindowPartHost {
 
   public dismissNotification(id: number): void {
     this.bridge.requestAsync(ShellMethods.dismissNotification.text, new NotificationReference(id).toJson()).catch((error: unknown) => this.errors.handleError(error));
+  }
+
+  public setViewBadge(view: string, badge: ViewBadge | null): void {
+    this.labels.setBadge(view, badge);
   }
 
   public refresh(): void {

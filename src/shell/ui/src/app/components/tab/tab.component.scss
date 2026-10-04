@@ -66,6 +66,11 @@
   white-space: nowrap;
 }
 
+.tr-tab-badge {
+  flex: none;
+  margin-inline-start: var(--tr-space-1);
+}
+
 .tr-tab.tr-tab-preview .tr-tab-label {
   font-style: italic;
 }

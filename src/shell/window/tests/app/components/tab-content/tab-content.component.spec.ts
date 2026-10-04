@@ -91,6 +91,7 @@ describe("TabContentComponent", () => {
     writeSettingAsync: () => Promise.resolve(),
     resetSettingAsync: () => Promise.resolve(),
     onSettingChanged: () => () => undefined,
+    setViewBadge: () => undefined,
     refresh: () => undefined
   });
   let host: StubWindowPartHost;

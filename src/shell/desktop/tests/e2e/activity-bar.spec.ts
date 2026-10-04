@@ -56,6 +56,24 @@ test.describe("activity bar", () => {
     await expect(group.locator("[role=tablist]")).toBeVisible();
   });
 
+  test("a view's badge shows after its tab's title, then on its icon, and joins its accessible name", async ({ desktop }) => {
+    const window = desktop.window;
+    const clockTab = window.locator("tr-tab[data-tab-key=\"view/clock.face\"]");
+    const clockIcon = window.locator("tr-dock[data-side=Right] .tr-dock-strip-view[data-view=\"view/clock.face\"]");
+    await expect(clockTab).toHaveAccessibleName("Clock");
+    await expect(clockTab.locator("tr-view-badge")).toHaveCount(0);
+
+    await window.locator("[data-fixture-content=notes-list]").click();
+    await window.keyboard.press("ControlOrMeta+Alt+KeyT");
+    await expect(clockTab.locator("tr-view-badge")).toHaveText("1");
+    await expect(clockTab).toHaveAccessibleName("Clock, 1 ticks");
+    await setDockStyleAsync(window, "shell.rightDockStyle", "Icons");
+
+    await expect(clockIcon.locator("tr-view-badge")).toHaveText("1");
+    await expect(clockIcon).toHaveAccessibleName("Clock, 1 ticks");
+    await desktop.checkpointAsync("view-badge");
+  });
+
   test("the strip is one tab stop driven by the arrow keys, and every group shows a header instead of a tab bar", async ({ desktop }) => {
     const window = desktop.window;
     await setDockStyleAsync(window, "shell.leftDockStyle", "Icons");
