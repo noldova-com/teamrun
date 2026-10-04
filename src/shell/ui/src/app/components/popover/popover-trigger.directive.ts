@@ -55,9 +55,12 @@ export class PopoverTriggerDirective {
   }
 
   public close(): void {
+    const hadFocus = this.overlay?.element.contains(document.activeElement) ?? false;
     this.open.set(false);
     this.overlay?.dispose();
     this.overlay = null;
+    if (hadFocus)
+      this.host.focus();
   }
 
   private show(): void {
@@ -76,7 +79,7 @@ export class PopoverTriggerDirective {
   }
 
   private closeFromKeyboard(event: KeyboardEvent): void {
-    if (event.key !== Resources.escapeKey)
+    if (event.key !== Resources.escapeKey || event.defaultPrevented)
       return;
     event.preventDefault();
     this.close();

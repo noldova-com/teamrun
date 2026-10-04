@@ -108,6 +108,7 @@ describe("PopoverTriggerDirective and PopoverDirective", () => {
   it("closes on Escape and returns focus to the trigger, but not on other keys", async () => {
     await renderAsync();
     const popover = await openAsync();
+    await vi.waitFor(() => expect(document.activeElement).toBe(popover));
 
     popover.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
     await fixture.whenStable();
@@ -116,6 +117,21 @@ describe("PopoverTriggerDirective and PopoverDirective", () => {
     await fixture.whenStable();
 
     expect([isOpenAfterTab, surface(), document.activeElement]).toEqual([true, null, trigger()]);
+  });
+
+  it("keeps an Escape that something inside it already handled, and returns focus to the trigger when it is closed from inside", async () => {
+    await renderAsync();
+    const popover = await openAsync();
+    await vi.waitFor(() => expect(document.activeElement).toBe(popover));
+
+    const handled = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    handled.preventDefault();
+    (popover.querySelector(".inside") as HTMLElement).dispatchEvent(handled);
+    await fixture.whenStable();
+    const isOpenAfterHandled = surface() !== null;
+    fixture.componentInstance.trigger()?.close();
+
+    expect([isOpenAfterHandled, surface(), document.activeElement]).toEqual([true, null, trigger()]);
   });
 
   it("closes when something around the trigger scrolls", async () => {
@@ -146,10 +162,9 @@ describe("PopoverTriggerDirective and PopoverDirective", () => {
   it("places its popover above the trigger, a gap away and end-aligned, and below it on the other side", async () => {
     await renderAsync();
     const popover = await openAsync();
-    await new Promise(resolve => requestAnimationFrame(resolve));
     const gap = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) * 0.5;
 
-    expect(trigger().getBoundingClientRect().top - popover.getBoundingClientRect().bottom).toBeCloseTo(gap, 1);
+    await vi.waitFor(() => expect(trigger().getBoundingClientRect().top - popover.getBoundingClientRect().bottom).toBeCloseTo(gap, 1));
     expect(popover.getBoundingClientRect().right).toBeCloseTo(trigger().getBoundingClientRect().right, 1);
     fixture.destroy();
 
@@ -158,9 +173,8 @@ describe("PopoverTriggerDirective and PopoverDirective", () => {
     anchor.style.cssText = "position: fixed; left: 4rem; top: 0.25rem";
     anchor.setAttribute("data-tr-chrome", "top");
     const below = await openAsync();
-    await new Promise(resolve => requestAnimationFrame(resolve));
 
-    expect(below.getBoundingClientRect().top - trigger().getBoundingClientRect().bottom).toBeCloseTo(gap, 1);
+    await vi.waitFor(() => expect(below.getBoundingClientRect().top - trigger().getBoundingClientRect().bottom).toBeCloseTo(gap, 1));
     expect(below.getBoundingClientRect().left).toBeCloseTo(trigger().getBoundingClientRect().left, 1);
   });
 
