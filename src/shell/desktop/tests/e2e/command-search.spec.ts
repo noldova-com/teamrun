@@ -25,7 +25,7 @@ function options(window: Page): Locator {
 }
 
 test.describe("command search", () => {
-  test("opens from its key centred under the window row, runs a module's command from the keyboard and lists it first next time", async ({ desktop }) => {
+  test("opens from its key centred under the window row, runs a module's command from the keyboard and lists it first next time @smoke", async ({ desktop }) => {
     const window = desktop.window;
     const tab = window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]");
     await expect(tab).toBeVisible();

@@ -50,7 +50,7 @@ async function nativeBackgroundAsync(desktop: DesktopApplicationFixture): Promis
 }
 
 test.describe("settings", () => {
-  test("a module's window part changes its setting, its runtime part uses the new value, and the value outlives reopening the window", async ({ desktop }) => {
+  test("a module's window part changes its setting, its runtime part uses the new value, and the value outlives reopening the window @smoke", async ({ desktop }) => {
     const step = (): Locator => desktop.window.locator("[data-fixture-content=clock-step]");
     await expect(step()).toHaveText("Step: 1");
 
@@ -65,7 +65,7 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-module-step");
   });
 
-  test("Settings opens by its key as one document, lists its pages and shows the shell's keys", async ({ desktop }) => {
+  test("Settings opens by its key as one document, lists its pages and shows the shell's keys @smoke", async ({ desktop }) => {
     const window = desktop.window;
 
     await openSettingsAsync(window);
@@ -280,7 +280,7 @@ test.describe("settings", () => {
 test.describe("settings on macOS", () => {
   test.skip(process.platform !== "darwin", "Windows and Linux open Settings by its key and command search.");
 
-  test("Settings… in the application menu shows its key and opens Settings", async ({ desktop }) => {
+  test("Settings… in the application menu shows its key and opens Settings @smoke", async ({ desktop }) => {
     const item = (): Promise<readonly [string, boolean, string] | null> => desktop.application.evaluate(({ Menu }) => {
       const found = Menu.getApplicationMenu()?.getMenuItemById("shell.app/shell.settings/0");
       return found ? [found.label, found.enabled, String(found.accelerator)] as const : null;

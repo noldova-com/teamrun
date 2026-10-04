@@ -77,7 +77,7 @@ test.describe("document groups", () => {
     });
   }
 
-  test("a document dropped on another document group's center joins it, and the emptied group closes", async ({ desktop }) => {
+  test("a document dropped on another document group's center joins it, and the emptied group closes @smoke", async ({ desktop }) => {
     const window = desktop.window;
     await splitFirstNoteAsync(window);
 

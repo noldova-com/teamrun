@@ -59,7 +59,7 @@ test.describe("docking", () => {
     await expect(TabDragFixture.tab(desktop.window, secondNote)).toBeVisible();
   });
 
-  test("dragging a view's tab onto a group's center adds it to that group", async ({ desktop }) => {
+  test("dragging a view's tab onto a group's center adds it to that group @smoke", async ({ desktop }) => {
     const window = desktop.window;
     await TabDragFixture.dragOntoPlateAsync(window, notes, clock, "Center");
 
@@ -88,7 +88,7 @@ test.describe("docking", () => {
     });
   }
 
-  test("a side guide docks the tab along that whole side, centered in its landing area", async ({ desktop }) => {
+  test("a side guide docks the tab along that whole side, centered in its landing area @smoke", async ({ desktop }) => {
     const window = desktop.window;
     await TabDragFixture.startAsync(window, notes);
     await TabDragFixture.moveOverAsync(window, window.locator("[data-drop-side=Bottom][data-drop-span=Between]"));
@@ -338,7 +338,7 @@ test.describe("docking", () => {
   });
 
   for (const reopen of [true, false])
-    test(`the layout, its splits and sizes return ${reopen ? "after reopening on the running runtime" : "after a restart that stops the runtime"}`, async ({ desktop }) => {
+    test(`the layout, its splits and sizes return ${reopen ? "after reopening on the running runtime" : "after a restart that stops the runtime"} @smoke`, async ({ desktop }) => {
       await TabDragFixture.dragOntoPlateAsync(desktop.window, outline, notes, "Bottom");
       await desktop.window.mouse.up();
       const sash = desktop.window.getByRole("separator", { name: "Resize the right dock" });
