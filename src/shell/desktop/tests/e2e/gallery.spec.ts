@@ -54,4 +54,33 @@ test.describe("gallery", () => {
     const colors = await window.locator("tr-gallery .tr-gallery-scope-frame").evaluateAll(frames => frames.map(t => getComputedStyle(t).color));
     expect(new Set(colors).size).toBe(2);
   });
+
+  test("toolbar buttons never overlap, and a label too long for its button ends with an ellipsis inside it and shows in full in its tooltip, in light and in dark", async ({ desktop }) => {
+    const window = desktop.window;
+    await openGalleryAsync(window);
+
+    for (const mode of ["Light", "Dark"] as const) {
+      const specimen = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Toolbar button\"]");
+      await specimen.scrollIntoViewIfNeeded();
+      const shape = await specimen.evaluate(t => {
+        const boxes = [...t.querySelectorAll(".tr-toolbar-button")].map(u => u.getBoundingClientRect());
+        const overlaps = boxes.flatMap((box, i) => boxes.slice(i + 1).filter(other => Math.min(box.right, other.right) - Math.max(box.left, other.left) > 0.5 &&
+          Math.min(box.bottom, other.bottom) - Math.max(box.top, other.top) > 0.5).map(() => i));
+        const long = t.querySelector(".tr-toolbar-button.tr-gallery-narrow") as HTMLElement;
+        const label = long.querySelector("[data-truncates]") as HTMLElement;
+        return {
+          overlaps,
+          isInside: label.getBoundingClientRect().right <= long.getBoundingClientRect().right + 0.5 && label.getBoundingClientRect().left >= long.getBoundingClientRect().left - 0.5,
+          isCut: label.scrollWidth > label.clientWidth,
+          overflow: getComputedStyle(label).textOverflow
+        };
+      });
+      expect(shape).toEqual({ overlaps: [], isInside: true, isCut: true, overflow: "ellipsis" });
+      const long = specimen.locator(".tr-toolbar-button.tr-gallery-narrow");
+      await long.hover();
+      await expect(scope(window, mode).locator(".cdk-overlay-container tr-tooltip")).toHaveText((await long.getAttribute("aria-label")) ?? "");
+      await desktop.checkpointAsync(`toolbar-button-long-label-${mode.toLowerCase()}`);
+      await window.mouse.move(0, 0);
+    }
+  });
 });

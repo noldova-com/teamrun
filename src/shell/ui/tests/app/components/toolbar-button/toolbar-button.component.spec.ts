@@ -18,6 +18,10 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   template: `
     <button type="button" tr-toolbar-button [label]="label()" [icon]="icon()" [isShowingLabel]="isShowingLabel()" [hasMenu]="hasMenu()" [pressed]="pressed()"
       [isUnavailable]="isUnavailable()"></button>
+    <div class="row" style="display: flex; width: 8rem">
+      <button type="button" tr-toolbar-button class="long" icon="save" [isShowingLabel]="true" label="A label far too long to fit the row its toolbar is given"></button>
+      <button type="button" tr-toolbar-button class="after" icon="add" label="Add"></button>
+    </div>
   `
 })
 class ToolbarButtonHostComponent {
@@ -43,8 +47,8 @@ describe("ToolbarButtonComponent", () => {
     AppearanceFixture.reset();
   });
 
-  function button(): HTMLButtonElement {
-    return fixture.nativeElement.querySelector("button");
+  function button(selector: string = "button"): HTMLButtonElement {
+    return fixture.nativeElement.querySelector(selector);
   }
 
   function set(update: (host: ToolbarButtonHostComponent) => void): void {
@@ -52,7 +56,20 @@ describe("ToolbarButtonComponent", () => {
     fixture.detectChanges();
   }
 
-  it("shows only its glyph, named by its label, and the glyph is hidden from assistive technology", () => {
+  it("keeps a label too long for its row inside its own box, ending it with an ellipsis, so it never draws over the next button", () => {
+    const long = button(".long");
+    const label = long.querySelector("[data-truncates]") as HTMLElement;
+    const row = (fixture.nativeElement.querySelector(".row") as HTMLElement).getBoundingClientRect();
+
+    expect(label.classList.contains("tr-toolbar-button-label")).toBe(true);
+    expect(long.getBoundingClientRect().right).toBeLessThanOrEqual(button(".after").getBoundingClientRect().left);
+    expect(button(".after").getBoundingClientRect().right).toBeGreaterThan(row.right);
+    expect(long.getBoundingClientRect().width).toBeLessThanOrEqual(row.width);
+    expect(label.getBoundingClientRect().right).toBeLessThanOrEqual(long.getBoundingClientRect().right);
+    expect([label.scrollWidth > label.clientWidth, getComputedStyle(label).textOverflow]).toEqual([true, "ellipsis"]);
+  });
+
+    it("shows only its glyph, named by its label, and the glyph is hidden from assistive technology", () => {
     expect(button().getAttribute("aria-label")).toBe("Bold");
     expect(button().classList.contains("tr-toolbar-button-icon-only")).toBe(true);
     expect(button().querySelector(".tr-toolbar-button-glyph")?.textContent).toBe("format_bold");
