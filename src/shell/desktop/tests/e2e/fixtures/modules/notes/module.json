@@ -1,6 +1,7 @@
 {
   "id": "notes",
   "displayName": "Notes",
+  "description": "Keeps notes in documents and views, for the UI workflows.",
   "parts": ["runtime", "window"],
   "dependencies": [],
   "contributes": {

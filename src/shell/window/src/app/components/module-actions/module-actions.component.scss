@@ -1,0 +1,27 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-2);
+}
+
+.tr-module-actions-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tr-space-2);
+}
+
+.tr-module-actions-glyph {
+  font-size: var(--tr-icon);
+}
+
+.tr-module-actions-notice {
+  margin: 0;
+}

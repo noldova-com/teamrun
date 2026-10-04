@@ -31,7 +31,7 @@ export class RuntimeBuildFixture implements AsyncDisposable {
     await mkdir(packageFolder, { recursive: true });
     await writeFile(path.join(packageFolder, "package.json"), JSON.stringify({ name: runtimePackage, version: productVersion, type: "module", main: "index.js" }));
     await writeFile(path.join(packageFolder, "index.js"), runtimePart);
-    const declaration = { id: moduleId, displayName: moduleId, dependencies: [], runtimePackage, contributes: { methods: [method] } };
+    const declaration = { id: moduleId, displayName: moduleId, description: moduleId, dependencies: [], runtimePackage, contributes: { methods: [method] } };
     await writeFile(path.join(build.folder, "_build", "modules", "declarations.json"), JSON.stringify({ formatVersion: 1, modules: [declaration] }));
     return build;
   }

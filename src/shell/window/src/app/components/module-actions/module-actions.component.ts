@@ -19,24 +19,23 @@ import {
 } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import { ButtonComponent, ButtonVariant, PopoverDirective } from "@noldova/teamrun-shell-ui";
+import type { ModuleStatus } from "@noldova/teamrun-shell-protocol";
+import { ButtonComponent, ButtonVariant } from "@noldova/teamrun-shell-ui";
 
-import type { ModuleFailure } from "../../models/module-failure";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { Resources } from "../../../resources";
 
 @Component({
-  selector: "tr-module-failures-popover",
+  selector: "tr-module-actions",
   imports: [ButtonComponent],
-  templateUrl: "./module-failures-popover.component.html",
-  styleUrl: "./module-failures-popover.component.scss",
+  templateUrl: "./module-actions.component.html",
+  styleUrl: "./module-actions.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
-  hostDirectives: [{ directive: PopoverDirective, inputs: ["label"] }],
   host: {
-    "class": "tr-module-failures-popover"
+    "class": "tr-module-actions"
   }
 })
-export class ModuleFailuresPopoverComponent {
+export class ModuleActionsComponent {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private copiedTimer: ReturnType<typeof setTimeout> | null = null;
@@ -46,7 +45,7 @@ export class ModuleFailuresPopoverComponent {
   protected readonly isCopied: WritableSignal<boolean> = signal(false);
   protected readonly isLogFolderFailed: WritableSignal<boolean> = signal(false);
 
-  public readonly failures: InputSignal<readonly ModuleFailure[]> = input.required<readonly ModuleFailure[]>();
+  public readonly module: InputSignal<ModuleStatus> = input.required<ModuleStatus>();
 
   public constructor() {
     inject(DestroyRef).onDestroy(() => this.clearCopiedTimer());
@@ -67,9 +66,10 @@ export class ModuleFailuresPopoverComponent {
 
   private async copyAsync(): Promise<void> {
     const build = await this.bridge.readBuildAsync();
+    const module = this.module();
     const lines = [
       Resources.formatBuildDetails(build.productVersion, build.fingerprint),
-      ...this.failures().map(t => Resources.formatModuleDetails(t.moduleId, t.state, t.cause))
+      Resources.formatModuleDetails(module.id, module.state, module.cause)
     ];
     if (!await this.bridge.copyTextAsync(lines.join(Resources.detailsSeparator)))
       return;

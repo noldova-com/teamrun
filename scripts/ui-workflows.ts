@@ -31,8 +31,8 @@ export default class UiWorkflows {
     ["_build", "variants", "without-clock"]
   ];
   private static readonly BUILDS: readonly (readonly string[])[] = [
-    ["--test", "--without", "notes", "--without", "clock", "--output", "_build/variants/no-modules"],
-    ["--test", "--without", "clock", "--output", "_build/variants/without-clock"],
+    ["--test", "--without", "notes", "--without", "alarm", "--without", "clock", "--output", "_build/variants/no-modules"],
+    ["--test", "--without", "alarm", "--without", "clock", "--output", "_build/variants/without-clock"],
     ["--test"]
   ];
   private static readonly CURRENT: string = "The builds of the UI workflows are current.\n";

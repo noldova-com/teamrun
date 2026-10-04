@@ -90,7 +90,7 @@ class ModuleImportCheckTests {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
-        "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", parts: ["window"], dependencies: ["tasks"], contributes: {} }),
+        "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", description: "Used by the tests.", parts: ["window"], dependencies: ["tasks"], contributes: {} }),
         "src/modules/notes/window/package.json": "{}\n",
         "src/modules/notes/window/src/view.ts": [
           "import { Task } from \"@noldova/teamrun-modules-tasks-protocol\";",
