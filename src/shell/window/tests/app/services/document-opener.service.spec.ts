@@ -61,7 +61,9 @@ describe("DocumentOpenerService", () => {
   });
 
   it("restores an open document with its title and keeps it without activating it, and opens one that is not open", () => {
-    const [first, second, third] = ["1", "2", "3"].map(t => new DocumentTab("notes.note", t));
+    const first = new DocumentTab("notes.note", "1");
+    const second = new DocumentTab("notes.note", "2");
+    const third = new DocumentTab("notes.note", "3");
     opener.open("notes", "notes.note", "1", "Note 1", false);
     opener.open("notes", "notes.note", "2", "Note 2", true);
     opener.open("notes", "notes.note", "1", "Note 1", false);
