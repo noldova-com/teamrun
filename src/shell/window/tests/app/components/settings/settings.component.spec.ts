@@ -128,6 +128,12 @@ describe("SettingsComponent", () => {
     expect(markers).toEqual([true, false]);
   });
 
+  it("reveals the scrollbars of its page list and its content while they are hovered", () => {
+    render();
+
+    expect([".tr-settings-pages", ".tr-settings-content"].map(t => element().querySelector(t)?.classList.contains("tr-scroll-reveal"))).toEqual([true, true]);
+  });
+
   it("shows the Gallery as the last page when the build has one, and leaves it out of a search", async () => {
     gallery = FakeGalleryComponent;
     render();

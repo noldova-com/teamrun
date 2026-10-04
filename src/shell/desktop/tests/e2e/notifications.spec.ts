@@ -10,6 +10,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import SettingsFixture from "./fixtures/settings.fixture.ts";
 
 const colors = {
   light: { error: "rgb(161, 38, 13)", menu: "rgb(255, 255, 255)", menuBorder: "rgb(206, 206, 206)" },
@@ -43,9 +44,7 @@ async function tickWithFocusAsync(desktop: DesktopApplicationFixture): Promise<v
 }
 
 async function openNotificationsPageAsync(window: Page): Promise<void> {
-  await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
-  await window.keyboard.press("ControlOrMeta+Comma");
-  await window.locator("tr-settings").getByRole("button", { name: "Notifications", exact: true }).click();
+  await SettingsFixture.openPageAsync(window, "Notifications");
   await expect(window.locator("tr-setting-row[data-setting=\"shell.mutedModules\"]")).toBeVisible();
 }
 
