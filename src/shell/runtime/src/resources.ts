@@ -137,6 +137,8 @@ export class Resources {
   public static readonly missingFileCode: string = "ENOENT";
   public static readonly lineSeparator: string = "\n";
   public static readonly lineBreakPattern: RegExp = /\r?\n/;
+  public static readonly logLineBreakPattern: RegExp = /\r\n|[\n\v\f\r\u0085\u2028\u2029]/u;
+  public static readonly logControlPattern: RegExp = /[^\P{Cc}\t]/gu;
   public static readonly windowsPlatform: string = "win32";
   public static readonly systemRootVariable: string = "SystemRoot";
   public static readonly systemFolderName: string = "System32";
@@ -437,7 +439,7 @@ export class Resources {
   public static readonly windowsProcessTableScript: string =
     "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $starts = @{}; " +
     "foreach ($p in [System.Diagnostics.Process]::GetProcesses()) { try { $starts[$p.Id] = [long][Math]::Floor($p.StartTime.ToFileTimeUtc() / 10000) - 11644473600000 } catch { } }; " +
-    "foreach ($w in Microsoft.PowerShell.Management\\Get-WmiObject -Query 'SELECT ProcessId, ParentProcessId, ExecutablePath FROM Win32_Process') { $started = $starts[[int]$w.ProcessId]; " +
+    "foreach ($w in Microsoft.PowerShell.Management\\Get-WmiObject -Query 'SELECT ProcessId, ParentProcessId, ExecutablePath FROM Win32_Process' -ErrorAction Stop) { $started = $starts[[int]$w.ProcessId]; " +
     "if ($null -ne $started) { \"{0}`t{1}`t{2}`t{3}\" -f $w.ProcessId, $w.ParentProcessId, $started, $w.ExecutablePath } }";
   public static readonly windowsScriptEncoding: BufferEncoding = "utf16le";
   public static readonly base64Encoding: BufferEncoding = "base64";

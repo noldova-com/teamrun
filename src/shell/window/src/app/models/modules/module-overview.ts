@@ -36,13 +36,13 @@ export class ModuleOverview {
     return Object.isNull(module.blockedBy) ? null : this.refer(module.blockedBy);
   }
 
-  private refer(id: string): ModuleReference {
-    return new ModuleReference(id, this.modules.find(t => t.id === id) ?? null);
-  }
-
   public static listContributions(module: ModuleStatus, titleOf: (kind: string, name: string) => string | null): readonly ContributionGroup[] {
     return Resources.moduleContributionKinds
       .map(([kind, title]) => new ContributionGroup(kind, title, module.listContributions(kind).map(t => new ContributionRow(t, titleOf(kind, t)))))
       .filter(t => t.rows.length > 0);
+  }
+
+  private refer(id: string): ModuleReference {
+    return new ModuleReference(id, this.modules.find(t => t.id === id) ?? null);
   }
 }

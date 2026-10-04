@@ -10,7 +10,7 @@ import { NgTemplateOutlet } from "@angular/common";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, signal, viewChild } from "@angular/core";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { AppearanceService, IconButtonComponent, MenuBarComponent, MenuBarItemComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OverlaySide, TooltipDirective } from "@noldova/teamrun-shell-ui";
+import { AppearanceService, DialogService, IconButtonComponent, MenuBarComponent, MenuBarItemComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OverlaySide, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
 import { MenuBarStyle } from "../../enums/menu-bar-style";
@@ -39,6 +39,7 @@ import { PlaceMenuComponent } from "../place-menu/place-menu.component";
 export class WindowRowComponent {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly commands: CommandService = inject(CommandService);
+  private readonly dialogs: DialogService = inject(DialogService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly settings: SettingsService = inject(SettingsService);
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
@@ -110,8 +111,8 @@ export class WindowRowComponent {
       this.focusMenu(event);
   }
 
-  protected isAvailable(command: string): boolean {
-    return this.commands.commands().some(t => t.name === command);
+  protected isAvailable(command: string, commandArguments: JsonValue): boolean {
+    return this.commands.isAvailable(command, commandArguments);
   }
 
   protected run(command: string, commandArguments: JsonValue): void {
@@ -122,7 +123,7 @@ export class WindowRowComponent {
     const target = this.isFolded() || this.style() !== MenuBarStyle.Inline
       ? this.menuButton()?.nativeElement
       : this.bar()?.nativeElement.querySelector<HTMLElement>(Resources.menuBarItemSelector);
-    if (Object.isUndefined(target) || Object.isNull(target) || this.isMac)
+    if (Object.isUndefined(target) || Object.isNull(target) || this.isMac || this.dialogs.isOpen)
       return;
 
     event.preventDefault();

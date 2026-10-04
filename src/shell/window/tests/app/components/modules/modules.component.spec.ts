@@ -226,4 +226,14 @@ describe("ModulesComponent", () => {
     expect(size(".tr-modules-fact-state .tr-modules-state")).toBe(size(".tr-modules-fact-dependencies"));
     expect(size(".tr-modules-row .tr-modules-state")).toBeLessThan(size(".tr-modules-fact-state .tr-modules-state"));
   });
+
+  it("sizes the module's name in its details from the panel size, even when the message size is smaller", async () => {
+    const host = await renderAsync();
+    AppearanceFixture.apply(DefaultTheme.theme, ThemeMode.Light, 16);
+    document.documentElement.style.setProperty("--tr-text-message", "12px");
+    const size = (selector: string): number => Number.parseFloat(getComputedStyle(host.querySelector(selector) as Element).fontSize);
+
+    expect(size(".tr-modules-detail-title")).toBeGreaterThan(size(".tr-modules-detail-description"));
+    AppearanceFixture.expectRem(getComputedStyle(host.querySelector(".tr-modules-detail-title") as Element).fontSize, 0.8125 + 0.125, 16);
+  });
 });

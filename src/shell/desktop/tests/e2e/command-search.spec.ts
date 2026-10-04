@@ -91,6 +91,7 @@ test.describe("command search", () => {
 
     await window.keyboard.type("new note");
 
+    await expect(options(window).last().locator("mark")).toHaveText(["New note"]);
     await expect(options(window)).toHaveCount(2);
     await expect(options(window).last()).toHaveAttribute("data-item", "notes.newNote");
     await expect(options(window).first().locator(".tr-quick-input-detail")).toHaveText("File › New from template");
@@ -100,6 +101,15 @@ test.describe("command search", () => {
 
     await expect(pane(window)).toHaveCount(0);
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"] .tr-tab-label")).toHaveText("Note 3");
+  });
+
+  test("lists each focus command once, leaving out the View menu items that run them without arguments", async ({ desktop }) => {
+    const window = desktop.window;
+    await CommandSearchFixture.searchAsync(window, "focus");
+
+    await expect(options(window).and(window.locator("[data-item=\"shell.focusNextGroup\"]"))).toHaveCount(1);
+    await expect(options(window).and(window.locator("[data-item=\"shell.focusPreviousGroup\"]"))).toHaveCount(1);
+    await expect(options(window).and(window.locator("[data-item^=\"shell.view/\"]"))).toHaveCount(0);
   });
 
   test("a query keeps the rows that contain it as one run, in the same order, and marks the run in the title without changing its text", async ({ desktop }) => {
@@ -114,15 +124,14 @@ test.describe("command search", () => {
     await CommandSearchFixture.searchAsync(window, String());
     await expect(options(window).first()).toBeVisible();
     const all = await rows();
+    const expected = all.filter(t => `${t[1]} ${t[2]}`.toLowerCase().includes("tab")).map(t => t[0]);
 
     await window.keyboard.type("tab");
-    await expect.poll(async () => (await rows()).length).toBeLessThan(all.length);
+    await expect.poll(async () => (await rows()).map(t => [t[0], t[3].map(u => u.toLowerCase())])).toEqual(expected.map(t => [t, ["tab"]]));
     const found = await rows();
 
     expect(found.length).toBeGreaterThan(0);
-    expect(found.map(t => t[0])).toEqual(all.filter(t => `${t[1]} ${t[2]}`.toLowerCase().includes("tab")).map(t => t[0]));
     expect(found.map(t => [t[1], t[2]])).toEqual(found.map(t => all.find(u => u[0] === t[0])).map(t => [t?.[1], t?.[2]]));
-    expect(found.every(t => t[3].length === 1 && t[3][0]?.toLowerCase() === "tab")).toBe(true);
     for (const mode of WindowModeFixture.modes) {
       await WindowModeFixture.setAsync(window, mode);
       await desktop.checkpointAsync(`command-search-match-${mode.toLowerCase()}`);

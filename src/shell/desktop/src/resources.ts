@@ -42,6 +42,7 @@ export class Resources {
   public static readonly quitQuestionChannel: string = "teamrun:quitQuestion";
   public static readonly quitAnswerChannel: string = "teamrun:quitAnswer";
   public static readonly moduleLogChannel: string = "teamrun:moduleLog";
+  public static readonly windowErrorChannel: string = "teamrun:windowError";
   public static readonly copyTextLimit: number = 65536;
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
@@ -140,7 +141,6 @@ export class Resources {
   public static readonly connectingShowLimit: number = 2_000;
   public static readonly paintShowLimit: number = 10_000;
   public static readonly logLineSeparator: string = "\n";
-  public static readonly lineBreakPattern: RegExp = /\r?\n/;
   public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   public static readonly reloadCrashLimit: number = 10_000;
   public static readonly rendererEndLimit: number = 5_000;
@@ -174,7 +174,10 @@ export class Resources {
   public static readonly windowAreaShare: number = 0.9;
   public static readonly closeAnswerTimeout: number = 5000;
   public static readonly workQueryTimeout: number = 2000;
-  public static readonly moduleLogLimit: number = 65536;
+  public static readonly windowLogLimit: number = 65536;
+  public static readonly windowErrorBurst: number = 10;
+  public static readonly windowErrorPeriod: number = 60000;
+  public static readonly windowErrorsLeftOut: string = "The window reported more than ten errors within a minute; the rest of that minute's errors are left out of the log.";
   public static readonly executableField: string = "executable";
   public static readonly argumentsField: string = "arguments";
   public static readonly errorFileField: string = "errorFile";
@@ -256,6 +259,10 @@ export class Resources {
 
   public static formatModuleLogLine(moduleId: string, line: string): string {
     return `${moduleId}: ${line}`;
+  }
+
+  public static formatWindowErrorLine(moduleId: string | null, line: string): string {
+    return Object.isNull(moduleId) ? `Window error: ${line}` : `Window error in ${moduleId}: ${line}`;
   }
 
   public static formatBoundsUnsaved(reason: string): string {

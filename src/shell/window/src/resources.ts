@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { FocusOrigin } from "@angular/cdk/a11y";
+import type { AriaLivePoliteness, FocusOrigin } from "@angular/cdk/a11y";
 
 import "@noldova/teamrun-foundation-core";
 import { ModuleState, NotificationSeverity } from "@noldova/teamrun-shell-protocol";
@@ -83,6 +83,8 @@ export class Resources {
   public static readonly dropTargetSeparator: string = ":";
   public static readonly tabKeySelector: string = "[data-tab-key]";
   public static readonly tabKeyData: string = "tabKey";
+  public static readonly tabGroupSelector: string = "tr-tab-group";
+  public static readonly tabGroupData: string = "group";
   public static readonly tabCloseSelector: string = ".tr-tab-close";
   public static readonly selectedTabSelector: string = ".tr-tab-selected";
   public static readonly revealOptions: ScrollIntoViewOptions = { block: "nearest", inline: "nearest" };
@@ -197,6 +199,7 @@ export class Resources {
   public static readonly showInDialogTitle: string = "Show in a dialog";
   public static readonly showInDialogGlyph: string = "open_in_full";
   public static readonly dialogAlreadyOpen: string = "A dialog is already open.";
+  public static readonly dialogWhileReconnecting: string = "A dialog can't open while the window reconnects to the runtime.";
   public static readonly settingsDocument: string = "shell.settings";
   public static readonly settingsTitle: string = "Settings";
   public static readonly settingsGlyph: string = "settings";
@@ -327,6 +330,7 @@ export class Resources {
   public static readonly regionRole: string = "region";
   public static readonly tabPanelRole: string = "tabpanel";
   public static readonly verticalOrientation: string = "vertical";
+  public static readonly rightToLeft: string = "rtl";
   public static readonly previewTabsSetting: string = "shell.previewTabs";
   public static readonly dockStyleSettings: ReadonlyMap<DockSide, string> = new Map([[DockSide.Left, "shell.leftDockStyle"], [DockSide.Right, "shell.rightDockStyle"]]);
   public static readonly dockStripLabels: Readonly<Record<DockSide, string>> = {
@@ -595,6 +599,8 @@ export class Resources {
   public static readonly invalidModuleId: string = "A module id is lowercase kebab-case.";
   public static readonly windowPartLoadFailed: string = "Its window part could not be loaded.";
   public static readonly windowPartActivationFailed: string = "Its window part failed to activate.";
+  public static readonly windowLogLimit: number = 65536;
+  public static readonly causeSeparator: string = "\nCaused by: ";
   public static readonly invalidInstance: string = "An instance is a string that is not blank.";
   public static readonly invalidBounds: string = "Bounds need finite coordinates and a width and height that are not negative.";
   public static readonly invalidSize: string = "A size is a finite number of rem.";
@@ -743,6 +749,9 @@ export class Resources {
   public static readonly dismissLabel: string = "Dismiss";
   public static readonly unreadLimit: number = 9;
   public static readonly toastLimit: number = 3;
+  public static readonly politeAnnouncement: AriaLivePoliteness = "polite";
+  public static readonly assertiveAnnouncement: AriaLivePoliteness = "assertive";
+  public static readonly announcementSeparator: string = ". ";
   public static readonly hoverSelector: string = ":hover";
   public static readonly toastDuration: number = 8000;
   public static readonly toastKindInterval: number = 5000;

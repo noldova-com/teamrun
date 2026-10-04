@@ -6,11 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ErrorHandler, signal } from "@angular/core";
+import { Component, ErrorHandler, signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
-import { AppearanceService, DefaultTheme, ModePreference, type Theme, ThemeMode } from "@noldova/teamrun-shell-ui";
+import { AppearanceService, DefaultTheme, DialogService, ModePreference, type Theme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
 import { WindowRowComponent } from "../../../../src/app/components/window-row/window-row.component";
 import { TopBarSide } from "../../../../src/app/enums/top-bar-side";
@@ -28,6 +28,12 @@ import { SettingsService } from "../../../../src/app/services/settings.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { FixtureTheme } from "../../../../../ui/tests/fixtures/fixture-theme";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
+
+@Component({
+  template: `<button type="button" class="inside">Keep working</button>`
+})
+class OpenDialogComponent {
+}
 
 describe("WindowRowComponent", () => {
   afterEach(() => {
@@ -360,6 +366,30 @@ describe("WindowRowComponent", () => {
 
     expect(focused).toEqual([field, first, field, first, first]);
     field.remove();
+  });
+
+  it("leaves the focus in an open dialog on F10 or a lone Alt, and focuses the first menu again once the dialog closes", async () => {
+    DesktopBridgeFixture.install("win32");
+    useNotesMenus([]);
+    apply();
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    fixture.detectChanges();
+    await settle(fixture);
+    const first = fixture.nativeElement.querySelector("button.tr-window-row-menu-bar-item") as HTMLElement;
+    const dialog = TestBed.inject(DialogService).open(OpenDialogComponent, ".inside");
+    await vi.waitFor(() => expect(document.activeElement?.classList.contains("inside")).toBe(true));
+    const inside = document.activeElement as HTMLElement;
+
+    press(inside, "F10");
+    press(inside, "Alt");
+    press(inside, "Alt", "keyup");
+    const whileOpen = document.activeElement;
+    dialog.close();
+    await settle(fixture);
+    press(document.body, "F10");
+
+    expect(whileOpen).toBe(inside);
+    expect(document.activeElement).toBe(first);
   });
 
   it("focuses the menu button instead when the menus are a button, and keeps Escape for an open menu", async () => {

@@ -142,8 +142,9 @@
 
 .tr-modules-detail-title {
   margin: 0;
-  font-size: var(--tr-text-message);
+  font-size: var(--tr-text-title);
   font-weight: var(--tr-weight-emphasis);
+  line-height: var(--tr-line-title);
   overflow-wrap: anywhere;
 }
 
@@ -178,6 +179,10 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0 var(--tr-space-2);
+}
+
+.tr-modules-cause {
+  color: var(--tr-text-muted);
 }
 
 .tr-module-actions {

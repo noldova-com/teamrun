@@ -400,6 +400,27 @@ export class RuntimeHostTests {
   }
 
   @TestMethod
+  public removesTheDiscoveryAnEarlierOwnerLeftBeforeItActivatesItsModulesAndListens(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      await mkdir(fixture.dataDirectory.discoveryFolder, { recursive: true });
+      await writeFile(fixture.dataDirectory.discoveryFile, "{\"token\":\"earlier-token\"}");
+      const probed = process.platform === "win32"
+        ? [fixture.dataDirectory.discoveryFile]
+        : [fixture.dataDirectory.discoveryFile, path.join(fixture.dataDirectory.discoveryFolder, "runtime.sock")];
+
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["notes", RuntimeHostTests.createDiscoveryProbePart(probed)]]));
+      const discovery = await fixture.readDiscoveryAsync();
+      host.requestStop("test");
+      await host.waitForStopAsync();
+
+      Assert.areEqual(probed.map(() => "absent").join(","), await readFile(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "probe"), "utf8"));
+      Assert.areNotEqual("earlier-token", discovery.token);
+      if (process.platform !== "win32")
+        Assert.areEqual(probed[1], discovery.endpoint);
+    });
+  }
+
+  @TestMethod
   public listsTheProgramsItsModulesRunAndEndsThemWhenItStops(): Promise<void> {
     return RuntimeHostTests.runAsync(async fixture => {
       const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["clock", RuntimeHostTests.createProgramPart()]]));
@@ -753,6 +774,25 @@ export class RuntimeHostTests {
       "export class RuntimePart {",
       "  async activateAsync(context) {",
       `    await context.startProcessAsync(new ProcessRequest(${JSON.stringify(process.execPath)}, [${JSON.stringify(ProgramFixture.file)}, "wait"], ${JSON.stringify(path.dirname(ProgramFixture.file))}));`,
+      "  }",
+      "",
+      "  async deactivateAsync() {",
+      "  }",
+      "}",
+      ""
+    ].join("\n");
+  }
+
+  private static createDiscoveryProbePart(files: readonly string[]): string {
+    return [
+      "import { existsSync } from \"node:fs\";",
+      "import { mkdir, writeFile } from \"node:fs/promises\";",
+      "import path from \"node:path\";",
+      "",
+      "export class RuntimePart {",
+      "  async activateAsync(context) {",
+      "    await mkdir(context.moduleFolder, { recursive: true });",
+      `    await writeFile(path.join(context.moduleFolder, "probe"), ${JSON.stringify(files)}.map(t => existsSync(t) ? "present" : "absent").join(","));`,
       "  }",
       "",
       "  async deactivateAsync() {",
