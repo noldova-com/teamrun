@@ -17,9 +17,9 @@ export default class GitHubConfigurationCheck implements ICheck {
   private static readonly CONFIGURATION_FILE: RegExp = /^\.github\/.+\.ya?ml$/;
   private static readonly USES_LINE: RegExp = /^\s*(?:-\s+)?uses:\s*["']?([^\s"'#]+)["']?(.*)$/;
   private static readonly PINNED_ACTION: RegExp = /^[^@\s]+@[0-9a-f]{40}$/;
-  private static readonly RELEASE_COMMENT: RegExp = /^\s+#\s*\S/;
+  private static readonly RELEASE_COMMENT: RegExp = /^\s+#\s*v?\d/;
   private static readonly LOCAL_PREFIX: string = "./";
-  private static readonly LINE_SEPARATOR: string = "\n";
+  private static readonly LINE_SEPARATOR: RegExp = /\r?\n/;
 
   private readonly root: string;
   private readonly files: RepositoryFiles;
@@ -59,7 +59,7 @@ export default class GitHubConfigurationCheck implements ICheck {
     if (!GitHubConfigurationCheck.PINNED_ACTION.test(action))
       return `the action "${action}" is not pinned to a full commit SHA; CODING-STANDARDS.md section 11 requires one.`;
     if (!GitHubConfigurationCheck.RELEASE_COMMENT.test(rest))
-      return `the action "${action}" does not record its release version in a comment after the SHA; CODING-STANDARDS.md section 11 requires one.`;
+      return `the action "${action}" does not record its release version, such as # v6.1.0, in a comment after the SHA; CODING-STANDARDS.md section 11 requires one.`;
     return null;
   }
 }

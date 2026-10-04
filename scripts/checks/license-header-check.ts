@@ -11,23 +11,18 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 
 import type RepositoryFiles from "../repository/repository-files.ts";
+import LicenseHeader from "../structure/license-header.ts";
+import SourceFile from "../structure/source-file.ts";
 import type ICheck from "./interfaces/check.ts";
 
 export default class LicenseHeaderCheck implements ICheck {
-  private static readonly NOTICE: readonly string[] = [
-    "@license",
-    "Copyright (c) Noldova.",
-    "",
-    "This source code is licensed under the license found in the",
-    "LICENSE file in the root directory of this source tree."
-  ];
-  private static readonly BLOCK_HEADER: string = ["/**", ...LicenseHeaderCheck.NOTICE.map(t => ` *${t === "" ? "" : ` ${t}`}`), " */", ""].join("\n");
-  private static readonly MARKUP_HEADER: string = ["<!--", ...LicenseHeaderCheck.NOTICE, "-->", ""].join("\n");
-  private static readonly HASH_HEADER: string = [...LicenseHeaderCheck.NOTICE.map(t => `#${t === "" ? "" : ` ${t}`}`), ""].join("\n");
+  private static readonly BYTE_ORDER_MARK: string = "\uFEFF";
+  private static readonly CRLF: RegExp = /\r\n/g;
+  private static readonly LF: string = "\n";
   private static readonly HEADERS: ReadonlyMap<string, string> = new Map([
-    ...[".ts", ".mts", ".cts", ".js", ".mjs", ".cjs", ".css", ".scss"].map(t => [t, LicenseHeaderCheck.BLOCK_HEADER] as const),
-    [".html", LicenseHeaderCheck.MARKUP_HEADER],
-    ...[".yml", ".yaml"].map(t => [t, LicenseHeaderCheck.HASH_HEADER] as const)
+    ...[...SourceFile.SCRIPT_EXTENSIONS, ...SourceFile.STYLE_EXTENSIONS].map(t => [t, LicenseHeader.BLOCK] as const),
+    [".html", LicenseHeader.MARKUP],
+    ...[".yml", ".yaml"].map(t => [t, LicenseHeader.HASH] as const)
   ]);
 
   private readonly root: string;
@@ -48,7 +43,8 @@ export default class LicenseHeaderCheck implements ICheck {
       if (header === undefined)
         continue;
       checked++;
-      if ((await readFile(path.join(this.root, file), "utf8")).startsWith(header))
+      const text = await readFile(path.join(this.root, file), "utf8");
+      if (text.replace(LicenseHeaderCheck.CRLF, LicenseHeaderCheck.LF).startsWith(header, Number(text.startsWith(LicenseHeaderCheck.BYTE_ORDER_MARK))))
         continue;
       output.write(`${file}: does not start with the license header that CODING-STANDARDS.md section 12 gives for its format.\n`);
       failures++;

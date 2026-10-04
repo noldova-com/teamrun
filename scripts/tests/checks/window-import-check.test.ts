@@ -41,7 +41,7 @@ class WindowImportCheckTests {
       assert.equal(check.title, "Window imports");
     });
 
-    test("a runtime, desktop or command-line package or path imported from the window side fails with its file and line", async t => {
+    test("a runtime, desktop or command-line package or path, Electron or a Node.js module imported from the window side fails with its file and line", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
@@ -52,6 +52,7 @@ class WindowImportCheckTests {
           "import { Cli } from \"@noldova/teamrun-shell-cli\";",
           "import { ipcRenderer } from \"electron\";",
           "import \"../../../runtime/src/host.ts\";",
+          "import { readFile } from \"node:fs/promises\";",
           ""
         ].join("\n"),
         "src/shell/ui/src/app/button.ts": "import \"../../../desktop/src/preload.ts\";\n",
@@ -61,7 +62,7 @@ class WindowImportCheckTests {
       const output = new TextOutputFixture();
 
       assert.equal(await WindowImportCheckTests.createCheck(repository).runAsync(output), false);
-      const rule = "; the window, the kit and modules' window parts import no runtime, desktop or command-line package.";
+      const rule = "; ARCHITECTURE.md section 2 keeps the window, the kit and modules' window parts browser-safe, so they import no runtime, desktop or command-line package, Electron or Node.js module, and reach the runtime through @noldova/teamrun-shell-protocol and the preload bridge.";
       const fixture = "src/shell/desktop/tests/e2e/fixtures/modules/clock/window/src/face.ts";
       assert.equal(output.text, [
         `src/modules/notes/window/src/view.ts:1: imports "@noldova/teamrun-modules-notes-runtime"${rule}`,
@@ -75,6 +76,7 @@ class WindowImportCheckTests {
         `src/shell/window/src/app/app.ts:4: imports "@noldova/teamrun-shell-cli"${rule}`,
         `src/shell/window/src/app/app.ts:5: imports "electron"${rule}`,
         `src/shell/window/src/app/app.ts:6: imports "../../../runtime/src/host.ts"${rule}`,
+        `src/shell/window/src/app/app.ts:7: imports "node:fs/promises"${rule}`,
         "Checked the imports of 4 script files of the window, the kit and modules' window parts.",
         ""
       ].join("\n"));

@@ -31,11 +31,12 @@ class LicenseHeaderCheckTests {
     "# This source code is licensed under the license found in the", "# LICENSE file in the root directory of this source tree.", ""].join("\n");
 
   public static register(): void {
-    test("every format that supports comments starts with its form of the header, and other formats are not checked", async t => {
+    test("every format that supports comments starts with its form of the header, also after a byte order mark and with Windows line ends, and other formats are not checked", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
         "scripts/build.ts": `${LicenseHeaderCheckTests.BLOCK}\nexport {};\n`,
+        "scripts/windows.ts": `\uFEFF${LicenseHeaderCheckTests.BLOCK.replaceAll("\n", "\r\n")}export {};\r\n`,
         "src/shell/ui/src/styles/theme.scss": `${LicenseHeaderCheckTests.BLOCK}\n:root {}\n`,
         "src/shell/ui/src/app/button.component.html": `${LicenseHeaderCheckTests.MARKUP}\n<button></button>\n`,
         ".github/workflows/build.yml": `${LicenseHeaderCheckTests.HASH}\nname: Build\n`,
@@ -47,7 +48,7 @@ class LicenseHeaderCheckTests {
       const check = LicenseHeaderCheckTests.createCheck(repository);
 
       assert.equal(await check.runAsync(output), true);
-      assert.equal(output.text, "Checked the license headers of 4 files.\n");
+      assert.equal(output.text, "Checked the license headers of 5 files.\n");
       assert.equal(check.title, "License headers");
     });
 

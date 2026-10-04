@@ -22,7 +22,7 @@ export default class WindowImportCheck implements ICheck {
   ];
   private static readonly WINDOW_PARTS: ReadonlySet<string> = new Set(["window", "ui"]);
   private static readonly FORBIDDEN_PARTS: ReadonlySet<string> = new Set(["runtime", "desktop", "cli"]);
-  private static readonly FORBIDDEN_PACKAGE: RegExp = /^(?:@noldova\/teamrun-(?:shell-(?:runtime|desktop|cli)|(?:modules|fixture)-.+-(?:runtime|cli))|electron)(?:\/|$)/;
+  private static readonly FORBIDDEN_PACKAGE: RegExp = /^(?:(?:@noldova\/teamrun-(?:shell-(?:runtime|desktop|cli)|(?:modules|fixture)-.+-(?:runtime|cli))|electron)(?:\/|$)|node:)/;
   private static readonly RELATIVE_PREFIX: string = ".";
 
   private readonly tree: SourceTree;
@@ -39,7 +39,7 @@ export default class WindowImportCheck implements ICheck {
     for (const file of files)
       for (const literal of new SourceScanner(file.text).scan().imports)
         if (WindowImportCheck.isForbidden(file, literal.value))
-          findings.push(`${file.formatLocation(literal.line)}: imports "${literal.value}"; the window, the kit and modules' window parts import no runtime, desktop or command-line package.`);
+          findings.push(`${file.formatLocation(literal.line)}: imports "${literal.value}"; ARCHITECTURE.md section 2 keeps the window, the kit and modules' window parts browser-safe, so they import no runtime, desktop or command-line package, Electron or Node.js module, and reach the runtime through @noldova/teamrun-shell-protocol and the preload bridge.`);
 
     for (const finding of findings)
       output.write(`${finding}\n`);
