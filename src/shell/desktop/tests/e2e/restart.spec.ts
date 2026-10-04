@@ -14,7 +14,7 @@ test.use({ desktopVariant: BuildVariantFixture.noModules });
 test.describe("restarting", () => {
   test.use({ desktopEnvironment: { TEAMRUN_UI_PROBE: "restart" } });
 
-  test("TeamRun opens again on the same profile and environment after a clean close", async ({ desktop }) => {
+  test("TeamRun opens again on the same profile and environment after a clean close @smoke", async ({ desktop }) => {
     const readLaunch = (): Promise<readonly string[]> => desktop.application.evaluate(({ app }) => [app.getPath("userData"), process.env["TEAMRUN_UI_PROBE"] ?? ""]);
     const before = await readLaunch();
 
@@ -26,7 +26,7 @@ test.describe("restarting", () => {
     await desktop.checkpointAsync("restart-reopened");
   });
 
-  test("TeamRun reopened within the runtime's idle grace attaches to the runtime still running", async ({ desktop }) => {
+  test("TeamRun reopened within the runtime's idle grace attaches to the runtime still running @smoke", async ({ desktop }) => {
     const runtime = await desktop.readRuntimeProcessIdAsync();
 
     await desktop.reopenAsync();

@@ -111,8 +111,8 @@ export class WindowRowComponent {
       this.focusMenu(event);
   }
 
-  protected isAvailable(command: string): boolean {
-    return this.commands.commands().some(t => t.name === command);
+  protected isAvailable(command: string, commandArguments: JsonValue): boolean {
+    return this.commands.isAvailable(command, commandArguments);
   }
 
   protected run(command: string, commandArguments: JsonValue): void {
