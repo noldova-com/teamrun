@@ -27,7 +27,7 @@ export default class ScrollAreaFixture {
 
   public static async revealThumbColorAsync(window: Page, area: Locator): Promise<void> {
     await ScrollAreaFixture.restAsync(window, area);
-    await ScrollAreaFixture.hoverAsync(window, area);
+    await ScrollAreaFixture.hoverAsync(area);
   }
 
   public static async thumbChangesOnHoverAsync(window: Page, area: Locator, axis: "vertical" | "horizontal"): Promise<boolean> {
@@ -42,7 +42,7 @@ export default class ScrollAreaFixture {
     }, axis);
     await ScrollAreaFixture.restAsync(window, area);
     const rest = await window.screenshot({ clip });
-    await ScrollAreaFixture.hoverAsync(window, area);
+    await ScrollAreaFixture.hoverAsync(area);
     return !rest.equals(await window.screenshot({ clip }));
   }
 
@@ -78,9 +78,9 @@ export default class ScrollAreaFixture {
     await expect.poll(() => ScrollAreaFixture.thumbColorAsync(area)).toBe(ScrollAreaFixture.HIDDEN);
   }
 
-  private static async hoverAsync(window: Page, area: Locator): Promise<void> {
-    const shown = await window.evaluate(() => {
-      const probe = document.body.appendChild(document.createElement("div"));
+  private static async hoverAsync(area: Locator): Promise<void> {
+    const shown = await area.evaluate(t => {
+      const probe = (t.parentElement ?? document.body).appendChild(document.createElement("div"));
       probe.style.color = "var(--tr-scrollbar)";
       const color = getComputedStyle(probe).color;
       probe.remove();

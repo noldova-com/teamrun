@@ -30,7 +30,7 @@ test.describe("window state", () => {
     test.use({ desktopWindowPlacement: true });
 
     for (const [name, openAgainAsync] of openings)
-      test(`TeamRun ${name} opens its window where the person left it`, async ({ desktop }) => {
+      test(`TeamRun ${name} opens its window where the person left it @smoke`, async ({ desktop }) => {
         await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
         await desktop.application.evaluate(({ BrowserWindow }, bounds) => BrowserWindow.getAllWindows()[0]?.setBounds(bounds), moved);
         await expect.poll(() => readBounds(desktop)).toEqual(moved);

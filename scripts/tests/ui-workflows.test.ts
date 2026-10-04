@@ -22,7 +22,7 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 
 class UiWorkflowsTests {
   private static readonly BUILD_ARGUMENTS: readonly (readonly string[])[] = [
-    ["--test", "--without", "notes", "--without", "alarm", "--without", "clock", "--output", "_build/variants/no-modules"],
+    ["--test", "--without", "notes", "--without", "alarm", "--without", "clock", "--without", "reminder", "--output", "_build/variants/no-modules"],
     ["--test", "--without", "alarm", "--without", "clock", "--output", "_build/variants/without-clock"],
     ["--test"]
   ];
@@ -55,6 +55,25 @@ class UiWorkflowsTests {
       assert.equal(exitCode, 0);
       assert.deepEqual(UiWorkflowsTests.describeRuns(runner, repository.directory).map(t => t.split(" ")[0]), ["node_modules/typescript/bin/tsc", "node_modules/playwright/cli.js"]);
       assert.equal(output.text, "The builds of the UI workflows are current.\nprepared\n");
+    });
+
+    test("--require-current runs current builds without passing the option on, and fails without building or running when they are not current", async t => {
+      const repository = await UiWorkflowsTests.createRepositoryAsync(t);
+      const stale = new ProcessRunnerFixture();
+      const staleOutput = new TextOutputFixture();
+
+      const staleExitCode = await new UiWorkflows(repository.directory, stale, staleOutput, new PreparedBinaryFixture()).runAsync(["--require-current", "--shard", "1/2"]);
+      await new UiWorkflows(repository.directory, new ProcessRunnerFixture(), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
+      const current = new ProcessRunnerFixture();
+      const currentOutput = new TextOutputFixture();
+      const currentExitCode = await new UiWorkflows(repository.directory, current, currentOutput, new PreparedBinaryFixture()).runAsync(["--require-current", "--shard", "1/2"]);
+
+      assert.deepEqual([staleExitCode, stale.runs.length], [1, 0]);
+      assert.equal(staleOutput.text, "The builds of the UI workflows are not current, and --require-current forbids building them here, so nothing ran.\n");
+      assert.equal(currentExitCode, 0);
+      assert.equal(UiWorkflowsTests.describeRuns(current, repository.directory).at(-1),
+        "node_modules/playwright/cli.js test --config src/shell/desktop/tests/e2e/playwright.config.ts --shard 1/2");
+      assert.equal(currentOutput.text, "The builds of the UI workflows are current.\nprepared\n");
     });
 
     test("a changed source file or a missing or changed output rebuilds all three", async t => {

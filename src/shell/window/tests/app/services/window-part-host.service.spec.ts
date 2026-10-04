@@ -41,6 +41,7 @@ import { CommandService } from "../../../src/app/services/command.service";
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../src/app/services/layout.service";
 import { MenuService } from "../../../src/app/services/menu.service";
+import { ModuleStatusService } from "../../../src/app/services/module-status.service";
 import { TabLabelService } from "../../../src/app/services/tab-label.service";
 import { ViewDialogService } from "../../../src/app/services/view-dialog.service";
 import { SettingsService } from "../../../src/app/services/settings.service";
@@ -91,7 +92,7 @@ describe("WindowPartHostService", () => {
     topBarActions: readonly string[] = [],
     notifications: readonly string[] = [],
     documents: readonly string[] = [`${moduleId}.note`]): WindowPartSource =>
-    new WindowPartSource(moduleId, `${moduleId[0]?.toUpperCase()}${moduleId.slice(1)}`, dependencies, views, documents, commands, statusBarItems, topBarActions, notifications,
+    new WindowPartSource(moduleId, dependencies, views, documents, commands, statusBarItems, topBarActions, notifications,
       () => part instanceof Error ? Promise.reject(part) : Promise.resolve(part));
   const notesPart = (log: string[]): FakeWindowPart => new FakeWindowPart("notes", log, t => {
     t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load));
@@ -134,7 +135,7 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(loads).toEqual([""]));
 
     expect(bridge.requests).toEqual([["shell.settings", {}], ["shell.modules", null], ["shell.commands", null]]);
-    expect([host.modules(), host.failures()]).toEqual([[], []]);
+    expect([TestBed.inject(ModuleStatusService).modules(), host.failures()]).toEqual([[], []]);
     expect(host.generation()).toBe(1);
     expect(layout.layout().documents.tabs).toEqual([]);
     expect(errors).toEqual([]);
@@ -228,7 +229,7 @@ describe("WindowPartHostService", () => {
 
     await vi.waitFor(() => expect(host.failures().length).toBe(4));
 
-    expect(host.modules().map(t => [t.id, t.state, t.blockedBy, t.description])).toEqual([
+    expect(TestBed.inject(ModuleStatusService).modules().map(t => [t.id, t.state, t.blockedBy, t.description])).toEqual([
       ["tasks", ModuleState.Failed, null, "Used by the tests."],
       ["clock", ModuleState.Failed, null, "Used by the tests."],
       ["notes", ModuleState.Blocked, "clock", "Used by the tests."],
@@ -588,7 +589,7 @@ describe("WindowPartHostService", () => {
       seen.push(reported().map(t => t.id));
     });
     const { host } = start([source("tasks", tasks)], [status("tasks")]);
-    reported = () => host.modules();
+    reported = () => TestBed.inject(ModuleStatusService).modules();
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
     bridge.publishStartup({ kind: "Ready", details: [] });
@@ -597,7 +598,7 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(host.generation()).toBe(2));
 
     expect(seen).toEqual([[], ["tasks"]]);
-    expect(host.modules().map(t => t.id)).toEqual(["tasks"]);
+    expect(TestBed.inject(ModuleStatusService).modules().map(t => t.id)).toEqual(["tasks"]);
   });
 
   it("shows the badge a window part sets on its view, set again when the part reactivates", async () => {

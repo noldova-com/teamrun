@@ -41,12 +41,16 @@ async function chooseAsync(window: Page, name: string, option: string): Promise<
   await row(window, name).getByRole("radio", { name: option, exact: true }).click();
 }
 
+async function rootFontSizeAsync(window: Page): Promise<string> {
+  return await window.evaluate(() => getComputedStyle(document.documentElement).fontSize);
+}
+
 async function nativeBackgroundAsync(desktop: DesktopApplicationFixture): Promise<string> {
   return await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getBackgroundColor() ?? "");
 }
 
 test.describe("settings", () => {
-  test("a module's window part changes its setting, its runtime part uses the new value, and the value outlives reopening the window", async ({ desktop }) => {
+  test("a module's window part changes its setting, its runtime part uses the new value, and the value outlives reopening the window @smoke", async ({ desktop }) => {
     const step = (): Locator => desktop.window.locator("[data-fixture-content=clock-step]");
     await expect(step()).toHaveText("Step: 1");
 
@@ -61,7 +65,7 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-module-step");
   });
 
-  test("Settings opens by its key as one document, lists its pages and shows the shell's keys", async ({ desktop }) => {
+  test("Settings opens by its key as one document, lists its pages and shows the shell's keys @smoke", async ({ desktop }) => {
     const window = desktop.window;
 
     await SettingsFixture.openAsync(window);
@@ -146,15 +150,48 @@ test.describe("settings", () => {
 
     await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(WindowModeFixture.backgrounds[mode]);
     await expect.poll(() => nativeBackgroundAsync(desktop)).toBe(mode === "Dark" ? "#181818" : "#F8F8F8");
-    await expect.poll(() => window.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(16 * 15 / 13, 2);
+    await expect.poll(async () => parseFloat(await rootFontSizeAsync(window))).toBeCloseTo(16 * 15 / 13, 2);
+    for (const field of [row(window, "shell.panelSize").locator("input"), window.getByRole("searchbox", { name: "Search settings" })])
+      expect(await field.evaluate(t => parseFloat(getComputedStyle(t).fontSize))).toBeCloseTo(15, 2);
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).not.toBe(before.font);
     await expect(window.locator("tr-setting-row .tr-setting-row-marker")).toHaveCount(3);
     await desktop.checkpointAsync("settings-changed");
     for (const name of ["shell.mode", "shell.interfaceFont", "shell.panelSize"])
       await row(window, name).getByRole("button", { name: /^Reset / }).click();
     await expect(window.locator("tr-setting-row .tr-setting-row-marker")).toHaveCount(0);
-    await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe(before.size);
+    await expect.poll(() => rootFontSizeAsync(window)).toBe(before.size);
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).toBe(before.font);
+  });
+
+  test("a size outside its range stays as typed with its error after focus leaves, applies once corrected, and Escape puts the stored size back", async ({ desktop }) => {
+    const window = desktop.window;
+    await SettingsFixture.openAsync(window);
+    const field = row(window, "shell.panelSize").locator("input");
+    const alert = row(window, "shell.panelSize").getByRole("alert");
+    const before = await rootFontSizeAsync(window);
+
+    await field.fill("30");
+    await field.press("Tab");
+
+    await expect(field).not.toBeFocused();
+    await expect(field).toHaveValue("30");
+    await expect(field).toHaveAttribute("aria-invalid", "true");
+    await expect(alert).toHaveText("Enter a whole number from 12 to 18.");
+    await expect(row(window, "shell.panelSize").locator(".tr-setting-row-marker")).toHaveCount(0);
+    expect(await rootFontSizeAsync(window)).toBe(before);
+    await desktop.checkpointAsync("settings-number-error");
+    await field.fill("15");
+    await field.press("Enter");
+    await expect(alert).toHaveCount(0);
+    await expect(field).not.toHaveAttribute("aria-invalid");
+    await expect.poll(async () => parseFloat(await rootFontSizeAsync(window))).toBeCloseTo(16 * 15 / 13, 2);
+    await field.fill("40");
+    await field.press("Enter");
+    await expect(alert).toBeVisible();
+    await field.press("Escape");
+    await expect(field).toHaveValue("15");
+    await expect(alert).toHaveCount(0);
+    await expect(field).toBeFocused();
   });
 
   test("a checked checkbox centres its drawn tick in its box and has the hover radius, also at the largest panel size", async ({ desktop }) => {
@@ -185,7 +222,7 @@ test.describe("settings", () => {
     await window.getByRole("button", { name: "Appearance", exact: true }).click();
     await row(window, "shell.panelSize").locator("input").fill("18");
     await row(window, "shell.panelSize").locator("input").press("Enter");
-    await expect.poll(() => window.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(16 * 18 / 13, 2);
+    await expect.poll(async () => parseFloat(await rootFontSizeAsync(window))).toBeCloseTo(16 * 18 / 13, 2);
     const largest = await measureAsync();
 
     for (const [horizontal, vertical, radius, hover] of [regular, largest]) {
@@ -291,7 +328,7 @@ test.describe("settings", () => {
 test.describe("settings on macOS", () => {
   test.skip(process.platform !== "darwin", "Windows and Linux open Settings by its key and command search.");
 
-  test("Settings… in the application menu shows its key and opens Settings", async ({ desktop }) => {
+  test("Settings… in the application menu shows its key and opens Settings @smoke", async ({ desktop }) => {
     const item = (): Promise<readonly [string, boolean, string] | null> => desktop.application.evaluate(({ Menu }) => {
       const found = Menu.getApplicationMenu()?.getMenuItemById("shell.app/shell.settings/0");
       return found ? [found.label, found.enabled, String(found.accelerator)] as const : null;

@@ -1,0 +1,13 @@
+{
+  "name": "@noldova/teamrun-fixture-reminder-runtime",
+  "version": "__VERSION__",
+  "private": true,
+  "type": "module",
+  "main": "api/index.js",
+  "types": "api/index.d.ts",
+  "license": "MIT",
+  "dependencies": {
+    "@noldova/teamrun-shell-protocol": "__VERSION__",
+    "@noldova/teamrun-shell-runtime": "__VERSION__"
+  }
+}

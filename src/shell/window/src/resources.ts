@@ -238,6 +238,7 @@ export class Resources {
   public static readonly noKey: string = "No key";
   public static readonly choicePillMinimum: number = 2;
   public static readonly choicePillLimit: number = 4;
+  public static readonly settingErrorIdPrefix: string = "tr-setting-error-";
   public static readonly shortcutsExplanation: string = "The keys that run commands. Choose a key to record a new one; your keys apply on every device.";
   public static readonly resetAllShortcutsLabel: string = "Reset all shortcuts";
   public static readonly removeKeyLabel: string = "Remove";
@@ -480,7 +481,7 @@ export class Resources {
   public static readonly menuBarLabel: string = "Menus";
   public static readonly menuBarSetting: string = "shell.menuBar";
   public static readonly menuBarItemSelector: string = "[tr-menu-bar-item]";
-  public static readonly windowRowMinimumDragWidth: number = 96;
+  public static readonly windowRowMinimumDragRem: number = 6;
   public static readonly altKey: string = "Alt";
   public static readonly functionKey: string = "F10";
   public static readonly ariaExpandedAttribute: string = "aria-expanded";
@@ -643,12 +644,13 @@ export class Resources {
   public static readonly noContributions: string = "No commands, settings, menus, views or notification kinds.";
   public static readonly commandsKind: string = "commands";
   public static readonly settingsKind: string = "settings";
+  public static readonly notificationsKind: string = "notifications";
   public static readonly moduleContributionKinds: readonly (readonly [string, string])[] = [
     [Resources.commandsKind, "Commands"],
     [Resources.settingsKind, "Settings"],
     ["menus", "Menus"],
     ["views", "Views"],
-    ["notifications", "Notification kinds"]
+    [Resources.notificationsKind, "Notification kinds"]
   ];
   public static readonly moduleSelector: string = "[data-module]";
   public static readonly moduleData: string = "module";

@@ -242,7 +242,7 @@ describe("ToastService with the window parts", () => {
       },
       deactivateAsync: () => Promise.resolve()
     };
-    const source = new WindowPartSource("notes", "Notes", [], [], [], [], [], [], ["notes.saved"], () => Promise.resolve(part));
+    const source = new WindowPartSource("notes", [], [], [], [], [], [], ["notes.saved"], () => Promise.resolve(part));
     TestBed.configureTestingModule({
       providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }, { provide: WindowPartTokens.sources, useValue: [source] }]
     });

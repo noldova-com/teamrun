@@ -35,7 +35,7 @@ const failClockAsync = async (desktop: DesktopApplicationFixture): Promise<void>
 };
 
 test.describe("modules", () => {
-  test("the fixture modules' views and documents take their places and show their content", async ({ desktop }) => {
+  test("the fixture modules' views and documents take their places and show their content @smoke", async ({ desktop }) => {
     const window = desktop.window;
 
     await expect(window.locator("tr-tab-group[data-side=Left] .tr-tab-label")).toHaveText(["Notes", "Outline"]);

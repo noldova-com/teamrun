@@ -58,10 +58,10 @@ test.describe("the Modules document", () => {
     await expect(modulesTab(window)).toHaveAttribute("aria-selected", "true");
     await expect(modulesTab(window).locator(".tr-tab-label")).toHaveText("Modules");
     await expect(window.locator(".tr-modules-version")).toHaveText(`TeamRun ${RuntimeBuild.identity.productVersion}`);
-    await expect(window.locator(".tr-modules-row .tr-modules-name")).toHaveText(["Clock", "Notes", "Alarm"]);
-    await expect(window.locator(".tr-modules-row .tr-modules-id")).toHaveText(["clock", "notes", "alarm"]);
-    await expect(window.locator(".tr-modules-row .tr-modules-row-version")).toHaveText(["0.0.1", "0.0.1", "0.0.1"]);
-    await expect(window.locator(".tr-modules-row .tr-modules-state")).toHaveText(["Active", "Active", "Active"]);
+    await expect(window.locator(".tr-modules-row .tr-modules-name")).toHaveText(["Clock", "Notes", "Reminder", "Alarm"]);
+    await expect(window.locator(".tr-modules-row .tr-modules-id")).toHaveText(["clock", "notes", "reminder", "alarm"]);
+    await expect(window.locator(".tr-modules-row .tr-modules-row-version")).toHaveText(["0.0.1", "0.0.1", "0.0.1", "0.0.1"]);
+    await expect(window.locator(".tr-modules-row .tr-modules-state")).toHaveText(["Active", "Active", "Active", "Active"]);
     await expect(row(window, "alarm").locator(".tr-modules-description")).toHaveText("Depends on the clock, so it is blocked whenever the clock fails, for the UI workflows.");
     await expect(row(window, "clock")).toHaveAttribute("aria-current", "true");
     await expect(window.locator(".tr-modules-detail-title")).toHaveText("Clock");
@@ -106,7 +106,7 @@ test.describe("the Modules document", () => {
     await writeFile(path.join(folder, "fail-activation"), "");
     await DesktopApplicationFixture.stopRuntimeAsync(desktop.dataDirectory);
 
-    await expect(window.locator(".tr-modules-row .tr-modules-state")).toHaveText([/Failed/, "Active", /Blocked/]);
+    await expect(window.locator(".tr-modules-row .tr-modules-state")).toHaveText([/Failed/, "Active", "Active", /Blocked/]);
     await expect(row(window, "alarm")).toHaveAttribute("aria-current", "true");
     await expect(window.locator(".tr-modules-detail-title")).toHaveText("Alarm");
     await expect(fact(window, "state")).toHaveText(/Blocked\s*It depends on clock, which is not active\./);
