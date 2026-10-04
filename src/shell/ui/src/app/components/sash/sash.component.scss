@@ -39,9 +39,29 @@
   outline: var(--tr-border-width) solid var(--tr-accent);
 }
 
+.tr-sash-bar {
+  position: absolute;
+  inset: 0;
+  background-color: var(--tr-sash-active);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms linear;
+}
+
+:host(.tr-sash-active) .tr-sash-bar,
+:host(:focus-visible) .tr-sash-bar {
+  opacity: 1;
+}
+
 .tr-sash-grip {
   display: flex;
   gap: var(--tr-sash-grip-spacing);
+  transition: opacity 150ms linear;
+}
+
+:host(.tr-sash-active) .tr-sash-grip,
+:host(:focus-visible) .tr-sash-grip {
+  opacity: 0;
 }
 
 :host(.tr-sash-vertical) .tr-sash-grip {
@@ -55,6 +75,9 @@
   background-color: color-mix(in srgb, var(--tr-text) 30%, transparent);
 }
 
-:host(.tr-sash-active) .tr-sash-dot {
-  background-color: var(--tr-accent);
+@media (prefers-reduced-motion: reduce) {
+  .tr-sash-bar,
+  .tr-sash-grip {
+    transition: none;
+  }
 }

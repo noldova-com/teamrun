@@ -222,6 +222,51 @@ test.describe("docking", () => {
     await expect(sash).toHaveAttribute("aria-valuenow", String(Math.round(width + 72)));
   });
 
+  test("a sash in use shows a bar as wide as its gap and as long as itself in the sash color, in light and in dark, and shows none otherwise", async ({ desktop }) => {
+    const window = desktop.window;
+    const sash = window.getByRole("separator", { name: "Resize the left dock" });
+    const bar = sash.locator(".tr-sash-bar");
+    const colorOf = (variable: string): Promise<string> => window.evaluate(name => {
+      const probe = document.createElement("div");
+      probe.style.backgroundColor = `var(${name})`;
+      document.body.append(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    }, variable);
+
+    for (const scheme of ["light", "dark"] as const) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await expect(bar).toHaveCSS("opacity", "0");
+      const grip = await centerOf(sash);
+
+      await window.mouse.move(grip.x, grip.y);
+      await window.mouse.down();
+      await window.mouse.move(grip.x + 24, grip.y, { steps: 4 });
+      await expect(bar).toHaveCSS("opacity", "1");
+
+      const outer = await sash.boundingBox();
+      const inner = await bar.boundingBox();
+      expect(inner).toEqual(outer);
+      expect(inner?.width).toBe(4);
+      await expect(bar).toHaveCSS("background-color", await colorOf("--tr-sash-active"));
+      expect(await colorOf("--tr-sash-active")).toBe(await colorOf("--tr-accent"));
+      await desktop.checkpointAsync(`sash-in-use-${scheme}`);
+      await window.mouse.up();
+      await window.mouse.move(grip.x + 600, grip.y + 300);
+      await expect(bar).toHaveCSS("opacity", "0");
+    }
+
+    await sash.focus();
+    await expect(bar).toHaveCSS("opacity", "1");
+    await sash.blur();
+    await expect(bar).toHaveCSS("opacity", "0");
+    await expect(bar).toHaveCSS("transition-duration", "0.15s");
+    await window.emulateMedia({ reducedMotion: "reduce" });
+    await expect(bar).toHaveCSS("transition-duration", "0s");
+  });
+
   test("the tab menu docks a view and reorders a document from the keyboard", async ({ desktop }) => {
     const window = desktop.window;
     await tab(window, notes).focus();
