@@ -114,6 +114,7 @@ export class Resources {
   public static readonly fileErrorCodeField: "code" = "code";
   public static readonly busyFileErrorCodes: readonly string[] = ["EPERM", "EACCES", "EBUSY"];
   public static readonly replaceAttempts: number = 40;
+  public static readonly refusedTokenRetries: number = 3;
   public static readonly replaceRetryDelay: number = 50;
   public static readonly ownershipWaitMilliseconds: number = 250;
   public static readonly backupWakeMilliseconds: number = 25;
