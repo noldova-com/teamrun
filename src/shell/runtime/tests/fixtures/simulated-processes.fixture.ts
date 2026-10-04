@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { Wait } from "@noldova/teamrun-foundation-testing";
+
 import { ProcessKillFixture } from "./process-kill.fixture.js";
 
 export class SimulatedProcessesFixture implements Disposable {
@@ -73,8 +75,7 @@ export class SimulatedProcessesFixture implements Disposable {
     if (script.includes("Get-CimInstance"))
       lines.push(table);
     for (const processId of held) {
-      while (this.isRunning(processId, 0) && Date.now() < deadline)
-        await new Promise(t => setTimeout(t, 10));
+      await Wait.untilAsync(() => !this.isRunning(processId, 0), Math.max(0, deadline - Date.now()), 10);
       lines.push(`${processId}\t${this.isRunning(processId, 0) ? "running" : "ended"}`);
     }
     return lines.join("\r\n");

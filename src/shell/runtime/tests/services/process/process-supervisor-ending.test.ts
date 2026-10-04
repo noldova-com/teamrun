@@ -11,7 +11,7 @@ import { once } from "node:events";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
-import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import { Assert, TestClass, TestMethod, Wait } from "@noldova/teamrun-foundation-testing";
 import { type OwnedProcess, ProcessClock, ProcessSettings, ProcessStartException, ProcessSupervisor, SystemCommand } from "@noldova/teamrun-shell-runtime";
 
 import { PlatformFixture } from "../../fixtures/platform.fixture.js";
@@ -1073,12 +1073,7 @@ export class ProcessSupervisorEndingTests {
   }
 
   private static async waitForAsync(condition: () => boolean): Promise<void> {
-    const deadline = Date.now() + 5_000;
-    while (!condition()) {
-      if (Date.now() >= deadline)
-        throw new Error("The condition did not hold within 5 seconds.");
-      await new Promise(t => setTimeout(t, 25));
-    }
+    Assert.isTrue(await Wait.untilAsync(condition, 5_000), "The condition did not hold within 5 seconds.");
   }
 
   private static async spawnAsync(): Promise<ChildProcess> {

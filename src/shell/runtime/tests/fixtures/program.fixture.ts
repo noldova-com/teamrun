@@ -12,6 +12,7 @@ import { symlink } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { Wait } from "@noldova/teamrun-foundation-testing";
 import { type OwnedProcess, ProcessRequest } from "@noldova/teamrun-shell-runtime";
 
 export class ProgramFixture {
@@ -25,7 +26,6 @@ export class ProgramFixture {
   public static readonly READY: string = "ready";
 
   private static readonly KEPT_PREFIX: string = "TEAMRUN_";
-  private static readonly POLL_INTERVAL: number = 25;
 
   public static readonly file: string = fileURLToPath(import.meta.url);
 
@@ -74,13 +74,7 @@ export class ProgramFixture {
   }
 
   public static async waitForEndAsync(processId: number, milliseconds: number): Promise<boolean> {
-    const deadline = Date.now() + milliseconds;
-    while (ProgramFixture.isRunning(processId)) {
-      if (Date.now() >= deadline)
-        return false;
-      await new Promise(t => setTimeout(t, ProgramFixture.POLL_INTERVAL));
-    }
-    return true;
+    return await Wait.untilAsync(() => !ProgramFixture.isRunning(processId), milliseconds);
   }
 
   public static run(behavior: string, launchArguments: readonly string[]): void {
