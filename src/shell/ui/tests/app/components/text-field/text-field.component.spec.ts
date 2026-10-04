@@ -47,6 +47,17 @@ describe("TextFieldComponent", () => {
     expect([getComputedStyle(field("size")).opacity, getComputedStyle(field("size")).cursor]).toEqual(["0.5", "default"]);
   });
 
+  for (const panelSize of AppearanceFixture.panelSizes)
+    it(`writes its text in the panel text role at panel size ${panelSize}`, () => {
+      AppearanceFixture.apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
+      fixture = TestBed.createComponent(TextFieldHostComponent);
+      fixture.detectChanges();
+      const style = getComputedStyle(field("search"));
+
+      AppearanceFixture.expectRem(style.fontSize, 0.8125, panelSize);
+      AppearanceFixture.expectRem(style.lineHeight, 1.125, panelSize);
+    });
+
   it("keeps the error border while invalid, focused or not", () => {
     render();
     const error = AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "errorForeground");
