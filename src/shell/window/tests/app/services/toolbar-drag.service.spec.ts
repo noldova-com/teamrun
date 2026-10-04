@@ -25,11 +25,11 @@ describe("ToolbarDragService", () => {
     root = document.createElement("div");
     root.innerHTML = [
       "<div class=\"tr-toolbar-band\" style=\"position:fixed;left:0;top:0;width:400px\">",
-      "<div class=\"tr-toolbar-row\" data-toolbar-row=\"0\" style=\"height:40px\">",
-      "<div class=\"tr-toolbar\" data-toolbar=\"a\" data-toolbar-index=\"0\" style=\"display:inline-block;width:100px\"></div>",
-      "<div class=\"tr-toolbar\" data-toolbar=\"b\" data-toolbar-index=\"1\" style=\"display:inline-block;width:100px\"></div></div>",
-      "<div class=\"tr-toolbar-row\" data-toolbar-row=\"1\" style=\"height:40px\">",
-      "<div class=\"tr-toolbar\" data-toolbar=\"c\" data-toolbar-index=\"0\" style=\"display:inline-block;width:100px\"></div></div></div>"
+      "<div class=\"tr-toolbar-row\" data-toolbar-row=\"0\" style=\"display:flex;align-items:center;height:40px\">",
+      "<div class=\"tr-toolbar\" data-toolbar=\"a\" data-toolbar-index=\"0\" style=\"flex:none;width:100px;height:24px\"></div>",
+      "<div class=\"tr-toolbar\" data-toolbar=\"b\" data-toolbar-index=\"1\" style=\"flex:none;width:100px;height:24px\"></div></div>",
+      "<div class=\"tr-toolbar-row\" data-toolbar-row=\"1\" style=\"display:flex;align-items:center;height:40px\">",
+      "<div class=\"tr-toolbar\" data-toolbar=\"c\" data-toolbar-index=\"0\" style=\"flex:none;width:100px;height:24px\"></div></div></div>"
     ].join("");
     document.body.append(root);
   });
@@ -63,20 +63,20 @@ describe("ToolbarDragService", () => {
   it("targets a position in a row, counting the others without the dragged toolbar", () => {
     start("a");
     moveTo(120, 20);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 0, false, 100, 0, 40));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 0, false, 100, 8, 24));
     moveTo(150, 20);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 1, false, 200, 0, 40));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 1, false, 200, 8, 24));
     moveTo(151, 20);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 1, false, 200, 0, 40));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 1, false, 200, 8, 24));
 
     start("c");
     moveTo(10, 60);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(1, 0, false, 0, 40, 40));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(1, 0, false, 0, 48, 24));
     start("c");
     moveTo(20, 20);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 0, false, 0, 0, 40));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 0, false, 0, 8, 24));
     moveTo(190, 20);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 2, false, 200, 0, 40));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 2, false, 200, 8, 24));
   });
 
   it("targets a new row at the top and bottom quarter of a row", () => {

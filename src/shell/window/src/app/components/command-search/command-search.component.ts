@@ -14,7 +14,6 @@ import { QuickInputComponent, QuickInputItem } from "@noldova/teamrun-shell-ui";
 import type { CommandContribution } from "../../models/command-contribution";
 import { CommandMatcher } from "../../models/command-matcher";
 import { CommandSearchEntry } from "../../models/command-search-entry";
-import { WindowPartTokens } from "../../models/window-part-tokens";
 import { CommandSearchService } from "../../services/command-search.service";
 import { CommandService } from "../../services/command.service";
 import { MenuBarService } from "../../services/menu-bar.service";
@@ -29,10 +28,6 @@ import { Resources } from "../../../resources";
 export class CommandSearchComponent {
   private readonly commands: CommandService = inject(CommandService);
   private readonly menuBar: MenuBarService = inject(MenuBarService);
-  private readonly ownerNames: ReadonlyMap<string, string> = new Map([
-    [Resources.shellOwner, Resources.productName],
-    ...inject(WindowPartTokens.sources).map(t => [t.moduleId, t.displayName] as const)
-  ]);
 
   private readonly entries: Signal<readonly CommandSearchEntry[]> = computed(() => [
     ...this.commands.commands().filter(t => this.commands.isEnabled(t.name)).map(t => new CommandSearchEntry(this.itemOf(t), () => this.commands.run(t.name))),
@@ -74,7 +69,6 @@ export class CommandSearchComponent {
   }
 
   private itemOf(command: CommandContribution): QuickInputItem {
-    const owner = command.name.slice(0, command.name.indexOf(Resources.contributionSeparator));
-    return new QuickInputItem(command.name, command.title, command.icon, this.ownerNames.get(owner) ?? owner, this.commands.keyLabel(command.name));
+    return new QuickInputItem(command.name, command.title, command.icon, this.commands.ownerOf(command.name), this.commands.keyLabel(command.name));
   }
 }

@@ -22,6 +22,7 @@ import { Resources } from "../../../resources";
   selector: "tr-place-menu",
   imports: [MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective],
   templateUrl: "./place-menu.component.html",
+  styleUrl: "./place-menu.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PlaceMenuComponent {

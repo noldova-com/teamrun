@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 
 import { Resources } from "../resources.js";
@@ -29,11 +30,17 @@ export class QualifiedName {
   }
 
   public static parse(text: string, parameterName: string = Resources.textParameterName): QualifiedName {
-    const separatorIndex = text.indexOf(Resources.nameSeparator);
-    if (separatorIndex < 0)
+    const name = QualifiedName.find(text);
+    if (Object.isNull(name))
       throw new ArgumentException(Resources.nameInvalid, parameterName);
+    return name;
+  }
 
-    return new QualifiedName(text.slice(0, separatorIndex), text.slice(separatorIndex + 1), parameterName);
+  public static find(text: string): QualifiedName | null {
+    const separatorIndex = text.indexOf(Resources.nameSeparator);
+    const owner = text.slice(0, separatorIndex);
+    const member = text.slice(separatorIndex + 1);
+    return separatorIndex >= 0 && Resources.ownerPattern.test(owner) && Resources.memberPattern.test(member) ? new QualifiedName(owner, member) : null;
   }
 
   public equals(other: QualifiedName): boolean {
