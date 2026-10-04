@@ -43,7 +43,7 @@ test.describe("modules", () => {
     await expect(tab(desktop, "document/notes.note/1").locator(".tr-tab-label")).toHaveText("Note 1");
     await expect(tab(desktop, "document/notes.note/2").locator(".tr-tab-label")).toHaveText("Note 2");
     await expect(window.locator("[data-fixture-content=notes-list]")).toBeVisible();
-    await expect(window.locator("[data-fixture-content=notes-note-1]")).toHaveText("Note 1");
+    await expect(window.locator("[data-fixture-content=notes-note-2]")).toHaveText("Note 2");
     await expect(window.locator("tr-empty-window")).toHaveCount(0);
     await expect(window.locator("tr-module-failures button")).toHaveCount(0);
 

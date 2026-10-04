@@ -78,12 +78,14 @@ export class LayoutService {
     this.height.set(height);
   }
 
-  public async loadAsync(): Promise<void> {
+  public async loadAsync(): Promise<boolean> {
     const saved = await this.store.readAsync();
-    const layout = Object.isNull(saved) ? Layout.createDefault(this.registryState()) : this.read(saved);
+    const read = Object.isNull(saved) ? null : this.read(saved);
+    const layout = read ?? Layout.createDefault(this.registryState());
     this.clearSaveTimer();
     this.layoutState.set(layout);
     this.saved = layout;
+    return !Object.isNull(read);
   }
 
   public saveAsync(): Promise<void> {
@@ -161,14 +163,14 @@ export class LayoutService {
       this.saved = layout;
   }
 
-  private read(saved: unknown): Layout {
+  private read(saved: unknown): Layout | null {
     try {
       return LayoutReader.read(saved);
     }
     catch (error) {
       if (!(error instanceof JsonException))
         throw error;
-      return Layout.createDefault(this.registryState());
+      return null;
     }
   }
 

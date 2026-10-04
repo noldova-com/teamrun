@@ -116,7 +116,7 @@ describe("WindowPartHostService", () => {
     const loadAsync = layout.loadAsync.bind(layout);
     vi.spyOn(layout, "loadAsync").mockImplementation(async () => {
       loads.push(layout.registry().views.map(t => t.name).join(","));
-      await loadAsync();
+      return loadAsync();
     });
     return { host: TestBed.inject(WindowPartHostService), layout, loads };
   }
@@ -460,7 +460,8 @@ describe("WindowPartHostService", () => {
     });
     const { host, layout } = start([source("notes", part)], [status("notes")]);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
-    expect(layout.layout().documents.active).toEqual(note("1"));
+    expect(layout.layout().documents.active).toEqual(note("2"));
+    layout.activate(note("1"));
 
     bridge.publishStartup({ kind: "Connecting", details: [] });
     bridge.publishStartup({ kind: "Ready", details: [] });

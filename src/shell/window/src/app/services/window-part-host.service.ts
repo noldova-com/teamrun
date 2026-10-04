@@ -68,7 +68,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly generationValue: WritableSignal<number> = signal(0);
   private isReady: boolean = false;
   private isLayoutLoaded: boolean = false;
-  private isRestoring: boolean = true;
+  private isActivating: boolean = true;
   private reloading: Promise<void> = Promise.resolve();
 
   public readonly failures: Signal<readonly ModuleFailure[]> = this.failuresValue.asReadonly();
@@ -124,7 +124,7 @@ export class WindowPartHostService implements IWindowPartHost {
   }
 
   public openDocument(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
-    if (this.isRestoring)
+    if (this.isActivating)
       this.pendingOpens.push(new PendingDocument(moduleId, name, instance, title, isPreview));
     else
       this.opener.open(moduleId, name, instance, title, isPreview);
@@ -209,7 +209,7 @@ export class WindowPartHostService implements IWindowPartHost {
 
   private async reloadAsync(): Promise<void> {
     await this.deactivateAsync();
-    this.isRestoring = true;
+    this.isActivating = true;
     this.failuresValue.set([]);
     this.moduleOrder = [];
     this.runtimeCommands = [];
@@ -219,15 +219,17 @@ export class WindowPartHostService implements IWindowPartHost {
     catch (error) {
       this.errors.handleError(error);
     }
+    const isReconnect = this.isLayoutLoaded;
+    let isRestored = isReconnect;
     try {
       await Promise.allSettled(this.posting);
       this.refresh();
       this.generationValue.update(t => t + 1);
-      if (!this.isLayoutLoaded)
-        await this.loadLayoutAsync();
+      if (!isReconnect)
+        isRestored = await this.loadLayoutAsync();
     }
     finally {
-      this.restorePending();
+      this.replayPending(isRestored);
     }
   }
 
@@ -249,24 +251,27 @@ export class WindowPartHostService implements IWindowPartHost {
     this.failuresValue.set(statuses.filter(t => t.state !== ModuleState.Active).map(t => this.describeFailure(t)));
   }
 
-  private async loadLayoutAsync(): Promise<void> {
+  private async loadLayoutAsync(): Promise<boolean> {
     try {
-      await this.layout.loadAsync();
+      return await this.layout.loadAsync();
     }
     finally {
       this.isLayoutLoaded = true;
     }
   }
 
-  private restorePending(): void {
-    this.isRestoring = false;
+  private replayPending(isRestored: boolean): void {
+    this.isActivating = false;
     for (const pending of this.pendingOpens.splice(0))
-      this.restore(pending);
+      this.replay(pending, isRestored);
   }
 
-  private restore(pending: PendingDocument): void {
+  private replay(pending: PendingDocument, isRestored: boolean): void {
     try {
-      this.opener.restore(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
+      if (isRestored)
+        this.opener.restore(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
+      else
+        this.opener.open(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
     }
     catch (error) {
       this.errors.handleError(error);
