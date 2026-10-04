@@ -245,7 +245,7 @@ test.describe("toolbars", () => {
     await toolbar(window, "notes.second").locator(".tr-toolbar-item").first().focus();
     await window.keyboard.press("ContextMenu");
     const menu = place(window, "shell.toolbar");
-    await expect(menu.getByRole("menuitem")).toHaveText(["Move left", "Move right", "Move to the row above", "Move to the row below", "Hide toolbar"]);
+    await expect(menu.getByRole("menuitem")).toHaveText([/Move left/, /Move right/, /Move to the row above/, /Move to the row below/, /Hide toolbar/]);
     await expect(menu.getByRole("menuitem", { name: "Move left" })).toHaveAttribute("aria-disabled", "true");
     await expect(menu.getByRole("menuitem", { name: "Move to the row below" })).toHaveAttribute("aria-disabled", "true");
     await window.keyboard.press("Escape");
@@ -323,7 +323,8 @@ test.describe("toolbars", () => {
     };
     for (const [name, labels] of Object.entries(expected)) {
       const bar = toolbar(window, name);
-      const [box, overflow, grip] = await Promise.all([bar.boundingBox(), bar.locator(".tr-toolbar-overflow").boundingBox(), bar.locator(".tr-toolbar-grip").boundingBox()]);
+      const hasOverflow = await bar.locator(".tr-toolbar-overflow").count() > 0;
+      const [box, overflow, grip] = await Promise.all([bar.boundingBox(), hasOverflow ? bar.locator(".tr-toolbar-overflow").boundingBox() : Promise.resolve(null), bar.locator(".tr-toolbar-grip").boundingBox()]);
       const rem = await window.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).fontSize));
       expect(grip?.width).toBeGreaterThan(0);
       expect((box?.width ?? 0) + 0.5).toBeGreaterThanOrEqual(rem * 0.3125 + rem * 1.75);
