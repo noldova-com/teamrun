@@ -62,6 +62,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
   private readonly activations: WindowPartActivation[] = [];
   private readonly posting: Set<Promise<JsonValue>> = new Set();
+  private startOpens: PendingDocument[] = [];
   private pendingOpens: PendingDocument[] = [];
   private moduleOrder: readonly string[] = [];
   private runtimeCommands: readonly CommandContribution[] = [];
@@ -137,6 +138,7 @@ export class WindowPartHostService implements IWindowPartHost {
   }
 
   public keepDocument(moduleId: string, name: string, instance: string): void {
+    this.startOpens = this.startOpens.map(t => t.kept(moduleId, name, instance));
     this.pendingOpens = this.pendingOpens.map(t => t.kept(moduleId, name, instance));
     if (this.isLayoutLoaded)
       this.opener.keep(moduleId, name, instance);
@@ -227,16 +229,17 @@ export class WindowPartHostService implements IWindowPartHost {
       this.errors.handleError(error);
     }
     const isReconnect = this.isLayoutLoaded;
-    let isRestored = isReconnect;
+    this.startOpens = this.pendingOpens.splice(0);
+    let openAtStart: DocumentOpenerService["open"] = isReconnect ? (...t) => this.opener.restore(...t) : (...t) => this.opener.open(...t);
     try {
       await Promise.allSettled(this.posting);
       this.refresh();
       this.generationValue.update(t => t + 1);
-      if (!isReconnect)
-        isRestored = await this.loadLayoutAsync();
+      if (!isReconnect && await this.loadLayoutAsync())
+        openAtStart = (...t) => this.opener.restoreSaved(...t);
     }
     finally {
-      this.replayPending(isRestored);
+      this.replayPending(openAtStart);
     }
   }
 
@@ -267,18 +270,17 @@ export class WindowPartHostService implements IWindowPartHost {
     }
   }
 
-  private replayPending(isRestored: boolean): void {
+  private replayPending(openAtStart: DocumentOpenerService["open"]): void {
     this.isActivating = false;
+    for (const pending of this.startOpens.splice(0))
+      this.replay(pending, openAtStart);
     for (const pending of this.pendingOpens.splice(0))
-      this.replay(pending, isRestored);
+      this.replay(pending, (...t) => this.opener.open(...t));
   }
 
-  private replay(pending: PendingDocument, isRestored: boolean): void {
+  private replay(pending: PendingDocument, open: DocumentOpenerService["open"]): void {
     try {
-      if (isRestored)
-        this.opener.restore(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
-      else
-        this.opener.open(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
+      open(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
     }
     catch (error) {
       this.errors.handleError(error);
