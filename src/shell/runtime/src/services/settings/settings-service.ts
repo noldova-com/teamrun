@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { isDeepStrictEqual } from "node:util";
 import type { Writable } from "node:stream";
 
 import "@noldova/teamrun-foundation-core";
@@ -75,6 +76,10 @@ export class SettingsService {
     if (!definition.type.accepts(write.value))
       throw new SettingException(Resources.formatSettingValueInvalid(key.name.text), FailureCode.InvalidParams);
 
+    if (isDeepStrictEqual(write.value, definition.defaultValue) && isDeepStrictEqual(this.resolve(definition, key, true)?.value ?? definition.defaultValue, write.value)) {
+      this.reset(key);
+      return;
+    }
     this.database.run(Resources.writeSettingStatement, ...SettingsService.columns(key), JSON.stringify(write.value));
     this.notify(new SettingChange(key, write.value, true));
   }
@@ -119,11 +124,11 @@ export class SettingsService {
     return key;
   }
 
-  private resolve(definition: SettingDefinition, key: SettingKey): { readonly value: JsonValue } | undefined {
+  private resolve(definition: SettingDefinition, key: SettingKey, inherited: boolean = false): { readonly value: JsonValue } | undefined {
     const device = definition.locality === SettingLocality.Device ? key.device : null;
     if (definition.locality === SettingLocality.Device && Object.isNull(device))
       return undefined;
-    for (const scope of this.chain(definition.locality === SettingLocality.Device ? null : key.scope)) {
+    for (const scope of this.chain(definition.locality === SettingLocality.Device ? null : key.scope).slice(inherited ? 1 : 0)) {
       if (!Object.isNull(scope) && !definition.isScopedBy(scope.name))
         continue;
       const columns = SettingsService.columns(new SettingKey(definition.name, scope, device));
