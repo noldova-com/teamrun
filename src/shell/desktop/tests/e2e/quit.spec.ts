@@ -12,6 +12,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
@@ -60,8 +61,7 @@ test.describe("quitting while a module works", () => {
 
   const beginWorkAsync = async (desktop: DesktopApplicationFixture): Promise<void> => {
     const window = desktop.window;
-    await window.keyboard.press("ControlOrMeta+Shift+KeyP");
-    await window.keyboard.type("Begin work");
+    await CommandSearchFixture.searchAsync(window, "Begin work");
     await expect(window.locator(".tr-command-search-pane [role=option]").first()).toHaveAttribute("data-item", "clock.beginWork");
     await window.keyboard.press("Enter");
     await waitForWorkAsync(desktop);
