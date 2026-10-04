@@ -400,6 +400,34 @@ export class RuntimeHostTests {
   }
 
   @TestMethod
+  public removesTheDiscoveryAnEarlierOwnerLeftBeforeItActivatesItsModulesAndListens(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      await mkdir(path.dirname(fixture.dataDirectory.discoveryFile), { recursive: true });
+      await writeFile(fixture.dataDirectory.discoveryFile, "{\"token\":\"earlier-token\"}");
+      const part = [
+        "import { existsSync } from \"node:fs\";",
+        "import { mkdir, writeFile } from \"node:fs/promises\";",
+        "import path from \"node:path\";",
+        "export class RuntimePart {",
+        "  async activateAsync(context) {",
+        "    await mkdir(context.moduleFolder, { recursive: true });",
+        `    await writeFile(path.join(context.moduleFolder, "discovery"), existsSync(${JSON.stringify(fixture.dataDirectory.discoveryFile)}) ? "present" : "absent");`,
+        "  }",
+        "  async deactivateAsync() {}",
+        "}"
+      ].join("\n");
+
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["notes", part]]));
+      const discovery = await fixture.readDiscoveryAsync();
+      host.requestStop("test");
+      await host.waitForStopAsync();
+
+      Assert.areEqual("absent", await readFile(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "discovery"), "utf8"));
+      Assert.areNotEqual("earlier-token", discovery.token);
+    });
+  }
+
+  @TestMethod
   public listsTheProgramsItsModulesRunAndEndsThemWhenItStops(): Promise<void> {
     return RuntimeHostTests.runAsync(async fixture => {
       const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["clock", RuntimeHostTests.createProgramPart()]]));
