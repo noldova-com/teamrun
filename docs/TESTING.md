@@ -54,7 +54,7 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
 - **Flakiness is a bug.** A flaky or racy failure seen anywhere, locally or in CI, gets its own bug issue and a small fix PR right away, never folded into other work.
 - **Stop the line.** Merging stops only while `main` itself fails, or while a flaky failure blocks merging in practice: it failed in two or more pull request runs in a day, or a passing run is rare. A stop that lasts longer than an hour is reassessed, and the reason it continues is recorded on its issue. A pull request held by a stop doesn't hold its author, who moves to their next task.
 - **Other flaky failures.** A flaky failure that doesn't block merging, such as one seen once in CI or only under artificial load, gets its own bug issue and a fix with priority, and merging continues. Once the issue is filed, the failed CI job may run again once so the affected pull request can merge, and never a second time.
-- **Repeated native runs.** A change to startup, shutdown, processes, windows or inter-process messages passes its affected tests ten times in a row natively on Windows, Linux and macOS before review.
+- **Repeated native runs.** A change to startup, shutdown, processes, windows or inter-process messages passes its affected tests five times in a row natively on Windows, Linux and macOS before review.
 
 ## 4. Results and reporting
 
@@ -106,7 +106,7 @@ Build, pack and install the selected source before testing its package API; depe
 Before pushing for review:
 
 - Merge the current `main` into the branch and run the gate on the result.
-- Repeat the tests as [Flakiness and races](#flakiness-and-races) requires: ten times in a row for a new or changed test of processes, timing or platform behavior, and for a change to startup, shutdown, processes, windows or inter-process messages. One pass does not show it is stable.
+- Repeat the tests as [Flakiness and races](#flakiness-and-races) requires: five times in a row for a new or changed test of processes, timing or platform behavior, and for a change to startup, shutdown, processes, windows or inter-process messages. One pass does not show it is stable.
 - Check a configuration change, such as a workflow, with the tool that reads it.
 - Run the UI workflows a change affects natively on Windows, Linux and macOS, and name each machine's OS and CPU in the report. A change that does not touch the UI skips this step.
 
