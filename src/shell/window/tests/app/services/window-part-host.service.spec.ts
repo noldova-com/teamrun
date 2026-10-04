@@ -10,6 +10,7 @@ import { Component, ErrorHandler, type Type } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { ModuleState, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
@@ -438,23 +439,46 @@ describe("WindowPartHostService", () => {
     expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1"), new DocumentTab("notes.note", "3")]);
   });
 
-  it("keeps the saved active document when a part opens the saved documents and a new one during activation", async () => {
+  it("restores the saved documents a part opens during activation with the saved active one, leaves out one the layout lacks, and opens it when asked later", async () => {
     const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
     const saved = Layout.createDefault(new ViewRegistry([], [])).openDocument(note("1")).openDocument(note("2")).openDocument(note("3")).activate(note("1"));
     const part = new FakeWindowPart("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
       ["1", "2", "3", "4"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
     });
-    const { layout } = start([source("notes", part)], [status("notes")]);
+    const { host, layout } = start([source("notes", part)], [status("notes")]);
     vi.spyOn(TestBed.inject(LayoutStoreService), "readAsync").mockResolvedValue(saved.toJson());
+    await vi.waitFor(() => expect(layout.layout().documents.tabs).toHaveLength(3));
+    const restored = [layout.layout().documents.tabs, layout.layout().documents.active];
 
-    await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([note("1"), note("2"), note("3"), note("4")]));
+    host.openDocument("notes", "notes.note", "4", "Note 4", false);
 
-    expect(layout.layout().documents.active).toEqual(note("1"));
+    expect(restored).toEqual([[note("1"), note("2"), note("3")], note("1")]);
     expect(TestBed.inject(TabLabelService).of(note("3")).title).toBe("Note 3");
+    expect([layout.layout().documents.tabs, layout.layout().documents.active]).toEqual([[note("1"), note("2"), note("3"), note("4")], note("4")]);
   });
 
-  it("keeps the active document when the runtime is ready again and the parts open their documents while reactivating", async () => {
+  it("opens a document asked for after activation but before the saved layout is read, and still leaves out a start open the layout lacks", async () => {
+    const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
+    const saved = Layout.createDefault(new ViewRegistry([], [])).openDocument(note("1")).openDocument(note("2"));
+    const part = new FakeWindowPart("notes", log, t => {
+      t.registerDocument(new DocumentContribution("notes.note", load));
+      ["1", "3"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
+    });
+    let read: (value: JsonValue) => void = () => undefined;
+    const { host, layout } = start([source("notes", part)], [status("notes")]);
+    vi.spyOn(TestBed.inject(LayoutStoreService), "readAsync").mockReturnValue(new Promise(resolve => read = resolve));
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    host.openDocument("notes", "notes.note", "4", "Note 4", false);
+    host.keepDocument("notes", "notes.note", "1");
+    read(saved.toJson());
+
+    await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([note("1"), note("2"), note("4")]));
+    expect(layout.layout().documents.active).toEqual(note("4"));
+  });
+
+  it("keeps the active document when the runtime is ready again, and adds a document the parts open while reactivating that is not open", async () => {
     const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
     const part = new FakeWindowPart("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
@@ -463,6 +487,7 @@ describe("WindowPartHostService", () => {
     const { host, layout } = start([source("notes", part)], [status("notes")]);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
     expect(layout.layout().documents.active).toEqual(note("2"));
+    layout.close(note("2"));
     layout.activate(note("1"));
 
     bridge.publishStartup({ kind: "Connecting", details: [] });

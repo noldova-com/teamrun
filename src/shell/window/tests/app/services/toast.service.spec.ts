@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { ErrorHandler, type WritableSignal, signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
@@ -69,15 +70,24 @@ describe("ToastService", () => {
   });
 
   it("toasts only what has a higher sequence than the first read and announces it, errors assertively", () => {
+    const announce = vi.spyOn(TestBed.inject(LiveAnnouncer), "announce").mockResolvedValue();
     const service = start(notification(1, "clock.alarm"));
 
     post(false, notification(2, "notes.saved", { text: "Plan.md" }), notification(1, "clock.alarm"));
-    const polite = service.politeAnnouncement();
     post(false, notification(3, "notes.failed", { severity: NotificationSeverity.Error, text: "The disk is full." }), notification(2, "notes.saved", { text: "Plan.md" }), notification(1, "clock.alarm"));
 
     expect(shown(service)).toEqual([2, 3]);
-    expect(polite).toBe("Title 2. Plan.md");
-    expect(service.assertiveAnnouncement()).toBe("Title 3. The disk is full.");
+    expect(announce.mock.calls).toEqual([["Title 2. Plan.md", "polite"], ["Title 3. The disk is full.", "assertive"]]);
+  });
+
+  it("announces the toasts one update shows in one announcement, assertively when any of them is an error", () => {
+    const announce = vi.spyOn(TestBed.inject(LiveAnnouncer), "announce").mockResolvedValue();
+    const service = start(notification(1, "clock.alarm"));
+
+    post(false, notification(3, "notes.saved"), notification(2, "notes.failed", { severity: NotificationSeverity.Error, text: "The disk is full" }), notification(1, "clock.alarm"));
+
+    expect(shown(service)).toEqual([2, 3]);
+    expect(announce.mock.calls).toEqual([["Title 2. The disk is full. Title 3", "assertive"]]);
   });
 
   it("waits for the first read, then toasts only what follows it, even when it saw newer state first", () => {
