@@ -63,7 +63,7 @@ test.describe("modules", () => {
     await expect(desktop.window.locator("tr-module-failures button")).toHaveText(/1 module didn't start/);
     await expect.poll(log).toMatch(/Window error in clock: \S*: Its window part failed to activate\./);
     expect(await log()).toMatch(/Window error in clock: Caused by: Error: The clock's window part was asked to fail\./);
-    expect(desktop.acceptFailures(/failed to activate|asked to fail/).length).toBeGreaterThan(0);
+    expect(desktop.acceptFailures(/Window error in clock: |failed to activate|asked to fail/).length).toBeGreaterThan(0);
   });
 
   test("the clock's window part asks its runtime part for the time", async ({ desktop }) => {
