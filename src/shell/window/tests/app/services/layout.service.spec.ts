@@ -186,6 +186,17 @@ describe("LayoutService", () => {
     expect([service.previewTabs(), service.layout().documents.preview, service.layout().isOpen(third), service.layout().isOpen(readme)]).toEqual([true, fourth, false, true]);
   });
 
+  it("keeps the preview of a layout loaded while Preview tabs is off", async () => {
+    const readme = new DocumentTab("notes.note", "readme");
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.previewTabs", value: false, isSet: true });
+    TestBed.tick();
+
+    await loadAsync(prepared().openDocument(readme, true));
+    TestBed.tick();
+
+    expect([service.layout().isOpen(readme), service.layout().documents.preview]).toEqual([true, null]);
+  });
+
   it("restores which documents group is active, so a document opens there", async () => {
     const readme = new DocumentTab("notes.note", "readme");
     const split = prepared().splitGroup(LayoutFixture.todo, 0, PanelEdge.Right);

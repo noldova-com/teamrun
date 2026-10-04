@@ -124,6 +124,15 @@ describe("Layout", () => {
     expect(kept.keepPreviews()).toBe(kept);
   });
 
+  it("keeps the preview of every document group when the middle holds two", () => {
+    const readme = new DocumentTab("notes.note", "readme");
+    const split = initial.openDocument(plan).openDocument(todo).splitGroup(todo, 0, PanelEdge.Right).openDocument(readme, true).focusDocuments(0).openDocument(settings, true);
+
+    expect(split.documentGroups.map(t => t.preview)).toEqual([settings, readme]);
+    expect(split.keepPreviews().documentGroups.map(t => t.preview)).toEqual([null, null]);
+    expect(split.keepPreviews().documentGroups.flatMap(t => t.tabs)).toEqual(split.documentGroups.flatMap(t => t.tabs));
+  });
+
   it("makes a moved, reordered, split or docked preview a normal tab, so a strip never holds two previews", () => {
     const previews = LayoutReader.read({
       version: 1,

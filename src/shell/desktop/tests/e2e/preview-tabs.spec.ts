@@ -24,8 +24,23 @@ function documentKeys(window: Page): Promise<readonly (string | null)[]> {
   return window.locator(`${documentsGroup} tr-tab`).evaluateAll(tabs => tabs.map(t => t.getAttribute("data-tab-key")));
 }
 
+function previewTabsRow(window: Page): Locator {
+  return window.locator("tr-setting-row[data-setting=\"shell.previewTabs\"]");
+}
+
 function previewTabsSetting(window: Page): Locator {
-  return window.locator("tr-setting-row[data-setting=\"shell.previewTabs\"]").getByRole("checkbox");
+  return previewTabsRow(window).getByRole("checkbox");
+}
+
+async function turnPreviewTabsOffAsync(window: Page): Promise<void> {
+  await previewTabsSetting(window).uncheck();
+  await expect(previewTabsRow(window).locator(".tr-setting-row-marker")).toHaveCount(1);
+}
+
+async function turnPreviewTabsOnAsync(window: Page): Promise<void> {
+  await previewTabsRow(window).getByRole("button", { name: /^Reset / }).click();
+  await expect(previewTabsRow(window).locator(".tr-setting-row-marker")).toHaveCount(0);
+  await expect(previewTabsSetting(window)).toBeChecked();
 }
 
 async function openSettingsAsync(window: Page): Promise<void> {
@@ -104,11 +119,13 @@ test.describe("preview tabs", () => {
     const window = desktop.window;
     await openSettingsAsync(window);
     await expect(previewTabsSetting(window)).toBeChecked();
-    await previewTabsSetting(window).uncheck();
+    await turnPreviewTabsOffAsync(window);
 
     await listItem(window, 1).click();
+    await expect(tab(window, 1)).toHaveAttribute("aria-selected", "true");
     await expectPreviewAsync(tab(window, 1), false);
     await listItem(window, 2).click();
+    await expect(tab(window, 2)).toHaveAttribute("aria-selected", "true");
 
     await expectPreviewAsync(tab(window, 1), false);
     await expectPreviewAsync(tab(window, 2), false);
@@ -122,9 +139,9 @@ test.describe("preview tabs", () => {
     await expectPreviewAsync(tab(window, 3), true);
 
     await openSettingsAsync(window);
-    await previewTabsSetting(window).uncheck();
+    await turnPreviewTabsOffAsync(window);
     await expectPreviewAsync(tab(window, 3), false);
-    await previewTabsSetting(window).check();
+    await turnPreviewTabsOnAsync(window);
     await listItem(window, 4).click();
     await expectPreviewAsync(tab(window, 4), true);
     await listItem(window, 5).click();
