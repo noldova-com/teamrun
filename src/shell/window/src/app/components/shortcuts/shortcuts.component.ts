@@ -6,13 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, ElementRef, ErrorHandler, type Signal, type WritableSignal, inject, input, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, ElementRef, ErrorHandler, type Signal, type WritableSignal, effect, inject, input, signal } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import { KeyChord, QualifiedName } from "@noldova/teamrun-shell-protocol";
 import { ButtonComponent, ButtonVariant, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
-import type { KeyBindings } from "../../models/key-bindings";
+import { KeyBindings } from "../../models/key-bindings";
 import { ShortcutNotice } from "../../models/settings/shortcut-notice";
 import type { ShortcutRow } from "../../models/settings/shortcut-row";
 import { Resources } from "../../../resources";
@@ -37,6 +37,7 @@ export class ShortcutsComponent {
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
   private readonly platform: string = inject(DesktopBridgeService).platform;
+  private pending: KeyBindings | null = null;
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly primary: ButtonVariant = ButtonVariant.Primary;
@@ -48,6 +49,10 @@ export class ShortcutsComponent {
 
   public readonly rows = input.required<readonly ShortcutRow[]>();
   public readonly query = input<string>("");
+
+  public constructor() {
+    effect(() => this.settle(this.commands.bindings()));
+  }
 
   protected record(row: ShortcutRow): void {
     this.notice.set(null);
@@ -80,20 +85,20 @@ export class ShortcutsComponent {
   }
 
   protected remove(row: ShortcutRow): void {
-    this.write(this.commands.bindings().with(row.name, null), row.name);
+    this.write(this.bindings.with(row.name, null), row.name);
   }
 
   protected reset(row: ShortcutRow): void {
-    this.write(this.commands.bindings().without(row.name), row.name);
+    this.write(this.bindings.without(row.name), row.name);
   }
 
   protected resetAll(): void {
     this.notice.set(null);
-    this.settings.resetAsync(Resources.keyBindingsSetting).catch((error: unknown) => this.errors.handleError(error));
+    this.track(KeyBindings.fromJson({}), this.settings.resetAsync(Resources.keyBindingsSetting));
   }
 
   protected useHere(notice: ShortcutNotice, holder: string): void {
-    this.write(this.commands.bindings().with(notice.command, notice.key).with(holder, null), notice.command);
+    this.write(this.bindings.with(notice.command, notice.key).with(holder, null), notice.command);
   }
 
   protected dismiss(notice: ShortcutNotice): void {
@@ -105,7 +110,14 @@ export class ShortcutsComponent {
     return isRecording ? Resources.formatRecordingLabel(row.title, this.hint()) : Resources.formatChangeKeyLabel(row.title, row.key);
   }
 
+  private get bindings(): KeyBindings {
+    return this.pending ?? this.commands.bindings();
+  }
+
   private choose(command: string, event: KeyboardEvent): void {
+    const shortcuts = this.commands.shortcuts();
+    if (shortcuts.find(event) === command)
+      return;
     const key = KeyChord.fromStroke(event, this.platform);
     if (Object.isNull(key)) {
       this.notice.set(new ShortcutNotice(command, this.unnamedKeyRefusal(event)));
@@ -116,12 +128,9 @@ export class ShortcutsComponent {
       this.notice.set(new ShortcutNotice(command, refusal));
       return;
     }
-    const shortcuts = this.commands.shortcuts();
-    if (shortcuts.keyOf(command)?.isSameOn(key, this.platform) === true)
-      return;
     const holder = shortcuts.holderOf(key);
     if (Object.isUndefined(holder) || holder === command)
-      this.write(this.commands.bindings().with(command, key), command);
+      this.write(this.bindings.with(command, key), command);
     else
       this.notice.set(new ShortcutNotice(command, Resources.formatKeyUsed(key.label(this.platform), this.commands.titleOf(holder)), key, holder));
   }
@@ -150,7 +159,21 @@ export class ShortcutsComponent {
   private write(bindings: KeyBindings, command: string): void {
     this.notice.set(null);
     this.focusKey(command);
-    this.settings.setAsync(Resources.keyBindingsSetting, bindings.toJson()).catch((error: unknown) => this.errors.handleError(error));
+    this.track(bindings, this.settings.setAsync(Resources.keyBindingsSetting, bindings.toJson()));
+  }
+
+  private track(bindings: KeyBindings, request: Promise<void>): void {
+    this.pending = bindings;
+    request.then(() => this.settle(this.commands.bindings()), (error: unknown) => {
+      if (this.pending === bindings)
+        this.pending = null;
+      this.errors.handleError(error);
+    });
+  }
+
+  private settle(bindings: KeyBindings): void {
+    if (this.pending?.isSameAs(bindings) === true)
+      this.pending = null;
   }
 
   private focusKey(command: string): void {

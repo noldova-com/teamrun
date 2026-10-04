@@ -25,11 +25,18 @@ export class KeyBindings {
 
   public static fromJson(value: JsonValue | undefined): KeyBindings {
     const entries = Object.isObject(value) && !Array.isArray(value) ? Object.entries(value) : [];
-    return new KeyBindings(new Map(entries.map(([command, key]) => [command, Object.isString(key) ? KeyChord.parseBinding(key, QualifiedName.parse(command)) : null])));
+    return new KeyBindings(new Map(entries.flatMap(([command, key]) => {
+      const binding = KeyBindings.read(command, key);
+      return Object.isUndefined(binding) ? [] : [[command, binding] as const];
+    })));
   }
 
   public has(command: string): boolean {
     return this.keys.has(command);
+  }
+
+  public isSameAs(other: KeyBindings): boolean {
+    return this.keys.size === other.keys.size && [...this.keys].every(([command, key]) => other.keys.has(command) && other.keys.get(command)?.text === key?.text);
   }
 
   public with(command: string, key: KeyChord | null): KeyBindings {
@@ -42,5 +49,15 @@ export class KeyBindings {
 
   public toJson(): JsonObject {
     return Object.fromEntries([...this.keys].map(([command, key]) => [command, key?.text ?? null]));
+  }
+
+  private static read(command: string, key: JsonValue | undefined): KeyChord | null | undefined {
+    const name = QualifiedName.find(command);
+    if (Object.isNull(name) || (!Object.isNull(key) && !Object.isString(key)))
+      return undefined;
+    if (Object.isNull(key))
+      return null;
+    const chord = KeyChord.find(key);
+    return chord?.canBind(name) === true ? chord : undefined;
   }
 }

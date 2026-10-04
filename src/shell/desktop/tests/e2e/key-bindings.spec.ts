@@ -58,14 +58,12 @@ test.describe("key bindings", () => {
     await expect(keyOf(window, "notes.newNote")).toHaveText(label("Ctrl+Shift+Y", "⇧⌘Y"));
     await expect(keyOf(window, "notes.newNote")).toBeFocused();
     await expect(shortcut(window, "notes.newNote").getByRole("img", { name: "Modified" })).toBeVisible();
-    await expect(note(window, 3)).toHaveCount(0);
     await desktop.checkpointAsync("key-bindings-recorded");
 
     await window.locator("[data-fixture-content=notes-list]").click();
     await window.keyboard.press("ControlOrMeta+Alt+KeyN");
     await window.keyboard.press("ControlOrMeta+Shift+KeyY");
     await expect(note(window, 3)).toBeVisible();
-    await expect(note(window, 4)).toHaveCount(0);
 
     await CommandSearchFixture.searchAsync(window, "New note");
     await expect(window.locator(".tr-command-search-pane [data-item=\"notes.newNote\"] .tr-quick-input-key")).toHaveText(label("Ctrl+Shift+Y", "⇧⌘Y"));
@@ -80,6 +78,7 @@ test.describe("key bindings", () => {
         .toHaveText("Ctrl+Shift+Y");
       await window.keyboard.press("Escape");
     }
+    await expect(window.locator("tr-tab[data-tab-key^=\"document/notes.note/\"]")).toHaveCount(3);
 
     await desktop.restartAsync();
     window = desktop.window;
@@ -117,13 +116,13 @@ test.describe("key bindings", () => {
     await window.locator("[data-fixture-content=notes-list]").click();
     await window.keyboard.press("ControlOrMeta+Alt+KeyT");
     await expect(note(window, 3)).toBeVisible();
-    await expect(ticks).toHaveText("No ticks");
 
     await window.locator("tr-tab[data-tab-key=\"document/shell.settings\"]").click();
     await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
     await shortcut(window, "clock.tick").getByRole("button", { name: "Reset Tick" }).click();
     await expect(keyOf(window, "clock.tick")).toHaveText("No key");
     await expect(shortcut(window, "clock.tick").locator(".tr-shortcut-collision")).toHaveText(label("Ctrl+Alt+T is taken by New note", "⌥⌘T is taken by New note"));
+    await expect(ticks).toHaveText("No ticks");
     await window.getByRole("button", { name: "Reset all shortcuts" }).click();
     await expect(keyOf(window, "notes.newNote")).toHaveText(label("Ctrl+Alt+N", "⌥⌘N"));
     await expect(keyOf(window, "clock.tick")).toHaveText(label("Ctrl+Alt+T", "⌥⌘T"));

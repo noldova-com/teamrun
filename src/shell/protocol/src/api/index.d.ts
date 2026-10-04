@@ -2504,28 +2504,6 @@ export declare class KeyChord {
   public static parseDefault(text: string, parameterName?: string): KeyChord;
 
   /**
-   * Reads a chord the person may bind to a command. A binding follows the
-   * rules of `parseDefault`, except that a shell command may also take
-   * Mod+W and Mod+Comma, which the shell handles itself.
-   *
-   * @param text The chord.
-   * @param command The command the chord is bound to.
-   * @param parameterName The parameter a failure names; `key` by default.
-   * @returns The chord.
-   * @throws ArgumentException synchronously when the text is not a chord,
-   * has no modifier that guards typing, or is reserved for the command; the
-   * message says which.
-   *
-   * @example
-   * ```ts
-   * import { KeyChord, QualifiedName } from "@noldova/teamrun-shell-protocol";
-   *
-   * export const chord: KeyChord = KeyChord.parseBinding("Mod+W", QualifiedName.parse("shell.closeTab"));
-   * ```
-   */
-  public static parseBinding(text: string, command: QualifiedName, parameterName?: string): KeyChord;
-
-  /**
    * Reads the chord a keyboard event presses on a platform, as the person
    * records a key. On Windows and Linux Ctrl reads as Mod; on macOS Cmd reads
    * as Mod and Control as Ctrl.
@@ -2565,12 +2543,13 @@ export declare class KeyChord {
   public findReservedOwner(command: QualifiedName | null): string | null;
 
   /**
-   * Tells whether the person may bind the chord to a command: it does not
-   * take typing and nothing reserves it for that command.
+   * Tells whether the person may bind the chord to a command. A binding
+   * follows the rules of `parseDefault`, except that a shell command may also
+   * take Mod+W and Mod+Comma, which the shell handles itself.
    *
    * @param command The command.
-   * @returns `true` when `parseBinding` would accept the chord's text for the
-   * command.
+   * @returns `true` when the chord does not take typing and nothing reserves
+   * it for the command.
    *
    * @example
    * ```ts

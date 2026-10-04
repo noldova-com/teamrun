@@ -22,8 +22,10 @@ describe("KeyBindings", () => {
     expect([KeyBindings.fromJson(undefined).list, KeyBindings.fromJson(["notes.newNote"]).list]).toEqual([[], []]);
   });
 
-  it("refuses a key the command may not have", () => {
-    expect(() => KeyBindings.fromJson({ "notes.newNote": "Mod+W" })).toThrowError(/reserved for macOS/u);
+  it("skips an entry it cannot read and keeps the rest", () => {
+    const bindings = KeyBindings.fromJson({ "notes.newNote": "Mod+W", "notes.open": "Shift+K", "notes": "F6", "clock.tick": "Mod+Plus", "clock.stop": 5, "shell.closeTab": "F7", "clock.pause": null });
+
+    expect(bindings.toJson()).toEqual({ "shell.closeTab": "F7", "clock.pause": null });
   });
 
   it("adds, replaces and removes a command's entry without changing the original, and writes the setting's value", () => {
@@ -32,5 +34,16 @@ describe("KeyBindings", () => {
     const moved = bound.with("notes.newNote", KeyChord.parse("Mod+Alt+K")).without("clock.tick");
 
     expect([empty.toJson(), bound.toJson(), moved.toJson()]).toEqual([{}, { "notes.newNote": "F6", "clock.tick": null }, { "notes.newNote": "Mod+Alt+K" }]);
+  });
+
+  it("is the same as bindings with the same keys in any order", () => {
+    const bindings = KeyBindings.fromJson({ "notes.newNote": "F6", "clock.tick": null });
+
+    expect([
+      bindings.isSameAs(KeyBindings.fromJson({ "clock.tick": null, "notes.newNote": "F6" })),
+      bindings.isSameAs(KeyBindings.fromJson({ "notes.newNote": "F6", "clock.stop": null })),
+      bindings.isSameAs(KeyBindings.fromJson({ "notes.newNote": "F7", "clock.tick": null })),
+      bindings.isSameAs(KeyBindings.fromJson({ "notes.newNote": "F6" }))
+    ]).toEqual([true, false, false, false]);
   });
 });

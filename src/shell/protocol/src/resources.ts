@@ -225,14 +225,6 @@ export class Resources {
     return `The key ${text} is reserved for ${owner} and cannot be a command's default.`;
   }
 
-  public static formatBindingNeedsModifier(text: string): string {
-    return `The key ${text} needs Mod, Ctrl or Alt, or a function key, so that typing is never taken.`;
-  }
-
-  public static formatBindingReserved(text: string, owner: string): string {
-    return `The key ${text} is reserved for ${owner} and cannot be bound to a command.`;
-  }
-
   public static formatFrameTooLarge(maximumFrameLength: number): string {
     return `A frame exceeds the maximum length of ${maximumFrameLength} characters.`;
   }

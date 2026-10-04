@@ -60,17 +60,6 @@ export class KeyChord {
     return chord;
   }
 
-  public static parseBinding(text: string, command: QualifiedName, parameterName: string = Resources.keyParameterName): KeyChord {
-    const chord = KeyChord.parse(text, parameterName);
-    if (chord.isTypingKey)
-      throw new ArgumentException(Resources.formatBindingNeedsModifier(chord.text), parameterName);
-
-    const owner = chord.findReservedOwner(command);
-    if (!Object.isNull(owner))
-      throw new ArgumentException(Resources.formatBindingReserved(chord.text, owner), parameterName);
-    return chord;
-  }
-
   public static fromStroke(stroke: IKeyStroke, platform: string): KeyChord | null {
     const isMac = platform === Resources.macPlatform;
     const key = KeyName.fromStroke(stroke);

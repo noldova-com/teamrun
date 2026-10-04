@@ -164,28 +164,14 @@ export class KeyChordTests {
     const module = QualifiedName.parse("notes.create");
     const shell = QualifiedName.parse("shell.openSettings");
 
-    for (const text of ["Mod+Alt+N", "Ctrl+W", "F5", "Alt+Escape"]) {
-      Assert.areEqual(KeyChord.parse(text).text, KeyChord.parseBinding(text, module).text, text);
+    for (const text of ["Mod+Alt+N", "Ctrl+W", "F5", "Alt+Escape"])
       Assert.isTrue(KeyChord.parse(text).canBind(module), text);
-    }
     for (const text of ["Mod+W", "Mod+Comma"]) {
-      Assert.areEqual(text, KeyChord.parseBinding(text, shell).text);
       Assert.isTrue(KeyChord.parse(text).canBind(shell), text);
       Assert.isFalse(KeyChord.parse(text).canBind(module), text);
     }
     Assert.isFalse(KeyChord.parse("Shift+K").canBind(shell));
     Assert.isFalse(KeyChord.parse("Mod+V").canBind(shell));
-  }
-
-  @TestMethod
-  public refusesABindingWithTheReason(): void {
-    const module = QualifiedName.parse("notes.create");
-    const typing = Assert.throws(() => KeyChord.parseBinding("Shift+K", module, "binding"), ArgumentException);
-    Assert.areEqual("The key Shift+K needs Mod, Ctrl or Alt, or a function key, so that typing is never taken. (Parameter 'binding')", typing.message);
-    Assert.areEqual(
-      "The key Mod+Comma is reserved for macOS and cannot be bound to a command. (Parameter 'key')",
-      Assert.throws(() => KeyChord.parseBinding("Mod+Comma", module), ArgumentException).message);
-    Assert.isTrue(Assert.throws(() => KeyChord.parseBinding("Mod+Plus", module), ArgumentException).message.startsWith("\"Mod+Plus\" is not a key."));
   }
 
   @TestMethod

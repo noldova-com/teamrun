@@ -24,7 +24,9 @@ class FakeSettingsService {
   public readonly values: WritableSignal<ReadonlyMap<string, JsonValue>> = signal(new Map());
   public readonly sets: WritableSignal<ReadonlySet<string>> = signal(new Set());
   public readonly calls: string[] = [];
+  public readonly late: (() => void)[] = [];
   public failure: Error | null = null;
+  public isLate: boolean = false;
 
   public isSet(name: string): Signal<boolean> {
     return computed(() => this.sets().has(name));
@@ -34,10 +36,21 @@ class FakeSettingsService {
     this.calls.push(`set ${name} ${JSON.stringify(value)}`);
     if (!Object.is(this.failure, null))
       return Promise.reject(this.failure);
-    const isSet = JSON.stringify(value) !== "{}";
-    this.values.update(t => new Map([...t, [name, value]]));
-    this.sets.update(t => new Set([...[...t].filter(u => u !== name), ...isSet ? [name] : []]));
+    const apply = (): void => {
+      const isSet = JSON.stringify(value) !== "{}";
+      this.values.update(t => new Map([...t, [name, value]]));
+      this.sets.update(t => new Set([...[...t].filter(u => u !== name), ...isSet ? [name] : []]));
+    };
+    if (this.isLate)
+      this.late.push(apply);
+    else
+      apply();
     return Promise.resolve();
+  }
+
+  public deliver(): void {
+    for (const apply of this.late.splice(0))
+      apply();
   }
 
   public resetAsync(name: string): Promise<void> {
@@ -198,7 +211,7 @@ describe("ShortcutsComponent", () => {
     expect(keyOf("clock.tick").textContent?.trim()).toBe("Ctrl+Alt+T");
   });
 
-  it("lets a shell command take the keys the shell handles itself, and another of its own default keys", async () => {
+  it("lets a shell command take the keys the shell handles itself", async () => {
     await renderAsync();
 
     await recordAsync("shell.toggleLeftDock");
@@ -206,13 +219,60 @@ describe("ShortcutsComponent", () => {
     const used = notice("shell.toggleLeftDock");
     await page.getByRole("button", { name: "Use it here" }).click();
     await settleAsync();
+
+    expect(used).toBe("Ctrl+W is used by Close the tab");
+    expect(settings.calls).toEqual(["set shell.keyBindings {\"shell.toggleLeftDock\":\"Mod+W\",\"shell.closeTab\":null}"]);
+  });
+
+  it("changes nothing for any key the command has, before refusing a key the rules would refuse elsewhere", async () => {
+    await renderAsync();
+
+    await recordAsync("shell.nextTab");
+    await pressAsync("shell.nextTab", { key: "Tab", code: "Tab", ctrlKey: true });
     await recordAsync("shell.nextTab");
     await pressAsync("shell.nextTab", { key: "PageDown", code: "PageDown", ctrlKey: true });
 
-    expect(used).toBe("Ctrl+W is used by Close the tab");
+    expect([settings.calls, notice("shell.nextTab"), cells("shell.nextTab")[2]]).toEqual([[], null, "Ctrl+Tab"]);
+  });
+
+  it("builds each change on the last one written until the setting reports it", async () => {
+    await renderAsync();
+    settings.isLate = true;
+
+    await page.getByRole("button", { name: "Remove the key of Tick the clock" }).click();
+    await page.getByRole("button", { name: "Remove the key of New note" }).click();
+    await settleAsync();
+    const before = cells("clock.tick")[2];
+    settings.deliver();
+    await settleAsync();
+    settings.isLate = false;
+    await page.getByRole("button", { name: "Reset Tick the clock" }).click();
+    await settleAsync();
+
+    expect(before).toBe("Ctrl+Alt+T");
     expect(settings.calls).toEqual([
-      "set shell.keyBindings {\"shell.toggleLeftDock\":\"Mod+W\",\"shell.closeTab\":null}",
-      "set shell.keyBindings {\"shell.toggleLeftDock\":\"Mod+W\",\"shell.closeTab\":null,\"shell.nextTab\":\"Mod+PageDown\"}"
+      "set shell.keyBindings {\"clock.tick\":null}",
+      "set shell.keyBindings {\"clock.tick\":null,\"notes.newNote\":null}",
+      "set shell.keyBindings {\"notes.newNote\":null}"
+    ]);
+    expect([cells("clock.tick")[2], cells("notes.newNote")[2]]).toEqual(["Ctrl+Alt+T", "No key"]);
+  });
+
+  it("builds on the setting again after the writes fail", async () => {
+    await renderAsync();
+    settings.failure = new Error("The runtime refused the value.");
+
+    keyOf("clock.tick").closest("tr")?.querySelector<HTMLButtonElement>(".tr-shortcut-actions button")?.click();
+    keyOf("notes.newNote").closest("tr")?.querySelector<HTMLButtonElement>(".tr-shortcut-actions button")?.click();
+    await expect.poll(() => errors.length).toBe(2);
+    settings.failure = null;
+    await page.getByRole("button", { name: "Remove the key of Tick the clock" }).click();
+    await settleAsync();
+
+    expect(settings.calls).toEqual([
+      "set shell.keyBindings {\"clock.tick\":null}",
+      "set shell.keyBindings {\"clock.tick\":null,\"notes.newNote\":null}",
+      "set shell.keyBindings {\"clock.tick\":null}"
     ]);
   });
 
