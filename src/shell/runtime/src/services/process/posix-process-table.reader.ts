@@ -14,16 +14,19 @@ import { ProcessTable } from "../../models/process-table.js";
 import { ProcessTableEntry } from "../../models/process-table-entry.js";
 import { Resources } from "../../resources.js";
 import type { SystemCommand } from "../commands/system-command.js";
+import type { ProcessClock } from "./process-clock.js";
 
 export class PosixProcessTableReader implements IProcessTableReader {
   private readonly command: SystemCommand;
+  private readonly clock: ProcessClock;
 
-  public constructor(command: SystemCommand) {
+  public constructor(command: SystemCommand, clock: ProcessClock) {
     this.command = command;
+    this.clock = clock;
   }
 
   public async readAsync(): Promise<ProcessTable> {
-    const now = Date.now();
+    const now = this.clock.now();
     const output = await this.command.runAsync(Resources.processTableCommand, Resources.processTableArguments);
     return new ProcessTable(output.split(Resources.lineBreakPattern).filter(t => !String.isNullOrWhitespace(t)).map(t => PosixProcessTableReader.parse(t, now)));
   }

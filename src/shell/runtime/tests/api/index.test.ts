@@ -69,6 +69,7 @@ export class RuntimeApiTests {
       "PosixFolderProtector",
       "PreShellDataException",
       "PreShellDataFoundException",
+      "ProcessClock",
       "ProcessExit",
       "ProcessLaunchCommand",
       "ProcessRequest",

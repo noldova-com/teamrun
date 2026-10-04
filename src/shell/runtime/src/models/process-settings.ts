@@ -13,12 +13,18 @@ import { Resources } from "../resources.js";
 export class ProcessSettings {
   public readonly graceMilliseconds: number;
   public readonly endMilliseconds: number;
+  public readonly seenMilliseconds: number;
 
-  public constructor(graceMilliseconds: number = Resources.processGraceMilliseconds, endMilliseconds: number = Resources.processEndMilliseconds) {
+  public constructor(
+    graceMilliseconds: number = Resources.processGraceMilliseconds,
+    endMilliseconds: number = Resources.processEndMilliseconds,
+    seenMilliseconds: number = Resources.processSeenMilliseconds) {
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(graceMilliseconds, Resources.graceMillisecondsParameterName);
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(endMilliseconds, Resources.endMillisecondsParameterName);
+    ArgumentOutOfRangeException.throwIfNotPositiveInteger(seenMilliseconds, Resources.seenMillisecondsParameterName);
 
     this.graceMilliseconds = graceMilliseconds;
     this.endMilliseconds = endMilliseconds;
+    this.seenMilliseconds = seenMilliseconds;
   }
 }

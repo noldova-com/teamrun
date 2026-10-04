@@ -74,7 +74,7 @@ export class ProcessSupervisorTests {
   }
 
   @TestMethod
-  public async findsAWindowsProgramByEachPathExtExtensionInOrderPastFoldersWithVariableNamesInAnyCase(): Promise<void> {
+  public async findsAWindowsProgramByEachRunnablePathExtExtensionInOrderPastFoldersWithVariableNamesInAnyCase(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
     await using folder = await TemporaryFolderFixture.createAsync();
     const first = path.join(folder.path, "first");
@@ -83,7 +83,7 @@ export class ProcessSupervisorTests {
     await mkdir(first);
     await mkdir(second);
     await mkdir(path.join(named, "tool.exe"), { recursive: true });
-    for (const file of [path.join(first, "tool.cmd"), path.join(first, "tool.exe"), path.join(first, "other.bat"), path.join(second, "tool.exe")])
+    for (const file of [path.join(first, "tool.cmd"), path.join(first, "tool.exe"), path.join(first, "tool.js"), path.join(first, "other.bat"), path.join(first, "script.js"), path.join(second, "tool.exe")])
       await writeFile(file, "");
     const runtime: NodeJS.ProcessEnv = { Path: first, SystemRoot: path.join(folder.path, "missing") };
     const locateAsync = async (environment: NodeJS.ProcessEnv, program: string, variables: Readonly<Record<string, string>> = {}): Promise<string> => {
@@ -99,6 +99,8 @@ export class ProcessSupervisorTests {
     Assert.areEqual(`${path.join(first, "tool.cmd")} could not be started.`, await locateAsync({ ...runtime, PATHEXT: ".EXE" }, "tool.cmd"));
     Assert.areEqual(`${path.join(second, "tool.exe")} could not be started.`, await locateAsync(runtime, "tool", { PATH: second }));
     Assert.areEqual(`${path.join(first, "tool.exe")} could not be started.`, await locateAsync({ ...runtime, Path: [named, first].join(";") }, "tool"));
+    Assert.areEqual(`${path.join(first, "tool.exe")} could not be started.`, await locateAsync({ ...runtime, PATHEXT: ".JS; .Exe " }, "tool"));
+    Assert.areEqual("script.js was not found, or it is not a program that can be run.", await locateAsync({ ...runtime, PATHEXT: ".JS;.EXE" }, "script.js"));
     Assert.areEqual(0, settings.database.readAll(ProcessSupervisorTests.RECORDS).length);
   }
 
@@ -134,6 +136,8 @@ export class ProcessSupervisorTests {
 
     Assert.areEqual("bin/tool is neither a program's name nor an absolute path.", await startAsync("linux", { PATH: folder.path }, "bin/tool"));
     Assert.areEqual("bin\\tool is neither a program's name nor an absolute path.", await startAsync("win32", { PATH: folder.path }, "bin\\tool"));
+    Assert.areEqual("\\tool is neither a program's name nor an absolute path.", await startAsync("win32", { PATH: folder.path }, "\\tool"));
+    Assert.areEqual("C:tool is neither a program's name nor an absolute path.", await startAsync("win32", { PATH: folder.path }, "C:tool"));
     Assert.areEqual("missing-tool was not found, or it is not a program that can be run.", await startAsync("linux", { PATH: `relative:${folder.path}` }, "missing-tool"));
     Assert.areEqual("missing-tool was not found, or it is not a program that can be run.", await startAsync("win32", {}, "missing-tool"));
     Assert.areEqual(`${missing} was not found, or it is not a program that can be run.`, await startAsync("linux", {}, missing));

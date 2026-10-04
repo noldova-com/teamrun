@@ -9,6 +9,7 @@
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
@@ -24,6 +25,16 @@ test.describe("the programs modules run", () => {
     return [started.processId, started.childProcessId];
   };
 
+  const readSeen = (dataDirectory: string): number => {
+    const database = new DatabaseSync(path.join(dataDirectory, "shell.sqlite"), { readOnly: true });
+    try {
+      return Number(database.prepare("SELECT max(seen) AS seen FROM owned_processes").get()?.["seen"]);
+    }
+    finally {
+      database.close();
+    }
+  };
+
   test("a runtime that ends abruptly leaves its programs running until the runtime that replaces it ends them", async ({ desktop }) => {
     const window = desktop.window;
     const note = window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]");
@@ -31,6 +42,8 @@ test.describe("the programs modules run", () => {
     const programs = await startProgramAsync(desktop.dataDirectory);
     const runtime = await desktop.readRuntimeProcessIdAsync() ?? 0;
     expect(programs.every(t => DesktopApplicationFixture.isAlive(t))).toBe(true);
+    const seen = readSeen(desktop.dataDirectory);
+    await expect.poll(() => readSeen(desktop.dataDirectory) > seen, { timeout: 15_000 }).toBe(true);
 
     process.kill(runtime, "SIGKILL");
     await expect.poll(() => DesktopApplicationFixture.isAlive(runtime)).toBe(false);
@@ -43,6 +56,6 @@ test.describe("the programs modules run", () => {
     await expect.poll(() => programs.filter(t => DesktopApplicationFixture.isAlive(t)), { timeout: 10_000 }).toEqual([]);
     await expect(note).toBeVisible();
     await desktop.checkpointAsync("programs-replacement-runtime");
-    expect(await readFile(path.join(desktop.dataDirectory, "logs", "runtime.log"), "utf8")).toContain("An earlier runtime left it running");
+    expect(await readFile(path.join(desktop.dataDirectory, "logs", "runtime.log"), "utf8")).toContain("An earlier runtime left processes");
   });
 });

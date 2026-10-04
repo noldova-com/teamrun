@@ -30,32 +30,61 @@ export class WindowsProcessEnder implements IProcessEnder {
     this.settings = settings;
   }
 
-  public async stopAsync(running: readonly RunningProcess[], leftovers: readonly ProcessRecord[]): Promise<readonly ProcessEnding[]> {
+  public async stopAsync(running: readonly RunningProcess[]): Promise<readonly ProcessEnding[]> {
+    const exited = new Map<RunningProcess, number>();
     for (const item of running.filter(t => !t.process.input.writableEnded))
       item.process.input.end();
-    await ProcessSignals.waitAsync(() => running.every(t => t.process.hasExited), this.settings.graceMilliseconds);
-    return await this.endTreesAsync([...running.map(t => t.record), ...leftovers], (table, record) => table.findTree(record));
-  }
-
-  public endAfterExitAsync(record: ProcessRecord): Promise<readonly ProcessEnding[] | null> {
-    return Promise.resolve([new ProcessEnding(record, [], [])]);
-  }
-
-  public endLeftoversAsync(records: readonly ProcessRecord[]): Promise<readonly ProcessEnding[]> {
-    return this.endTreesAsync(records, (table, record) => WindowsProcessEnder.isRunBy(table.find(record.processId), record) ? table.findTree(record) : []);
-  }
-
-  private static isRunBy(leader: ProcessTableEntry | undefined, record: ProcessRecord): boolean {
-    return Object.isUndefined(leader) || (!Object.isNull(leader.executable) && path.win32.normalize(leader.executable).toLowerCase() === path.win32.normalize(record.executable).toLowerCase());
-  }
-
-  private async endTreesAsync(records: readonly ProcessRecord[], find: (table: ProcessTable, record: ProcessRecord) => readonly ProcessTableEntry[]): Promise<readonly ProcessEnding[]> {
+    await ProcessSignals.waitAsync(() => {
+      for (const item of running.filter(t => t.process.hasExited && !exited.has(t)))
+        exited.set(item, Date.now());
+      return exited.size === running.length;
+    }, this.settings.graceMilliseconds);
     const table = await this.reader.readAsync();
-    const targets = records.map(t => new ProcessEnding(t, find(table, t).map(u => u.processId).reverse(), []));
-    const processIds = targets.flatMap(t => t.forced);
-    for (const processId of processIds)
-      ProcessSignals.send(processId, Resources.killSignal);
-    await ProcessSignals.waitAsync(() => processIds.every(t => !ProcessSignals.isRunning(t)), this.settings.endMilliseconds);
-    return targets.map(t => new ProcessEnding(t.record, t.forced, t.forced.filter(u => ProcessSignals.isRunning(u))));
+    return await this.killTreesAsync(running.map(t => [t.record, WindowsProcessEnder.findTree(table, t.record, exited.get(t)), []] as const));
+  }
+
+  public endAfterExitAsync(record: ProcessRecord): Promise<readonly ProcessEnding[]> {
+    return Promise.resolve([new ProcessEnding(record)]);
+  }
+
+  public async endLeftoversAsync(records: readonly ProcessRecord[]): Promise<readonly ProcessEnding[]> {
+    const table = await this.reader.readAsync();
+    return await this.killTreesAsync(records.map(t => WindowsProcessEnder.findLeftovers(table, t)));
+  }
+
+  private static findTree(table: ProcessTable, record: ProcessRecord, exited: number | undefined): readonly ProcessTableEntry[] {
+    const leader = Object.isUndefined(exited) ? table.findLeader(record) : undefined;
+    return Object.isUndefined(leader) ? table.findOrphans(record, exited ?? Date.now()) : table.findTree(leader);
+  }
+
+  private static findLeftovers(table: ProcessTable, record: ProcessRecord): readonly [ProcessRecord, readonly ProcessTableEntry[], readonly number[]] {
+    const holder = table.find(record.processId);
+    if (!Object.isUndefined(holder) && record.isStartOf(holder) && WindowsProcessEnder.isRunBy(holder, record))
+      return [record, table.findTree(holder), []];
+    const end = Object.isUndefined(holder) ? Number.POSITIVE_INFINITY : holder.started - 1;
+    const orphans = table.findOrphans(record, Math.min(record.seen, end));
+    return [record, orphans, table.findOrphans(record, end).filter(t => !orphans.includes(t)).map(t => t.processId)];
+  }
+
+  private static isRunBy(leader: ProcessTableEntry, record: ProcessRecord): boolean {
+    return !Object.isNull(leader.executable) && path.win32.normalize(leader.executable).toLowerCase() === path.win32.normalize(record.executable).toLowerCase();
+  }
+
+  private async killTreesAsync(trees: readonly (readonly [ProcessRecord, readonly ProcessTableEntry[], readonly number[]])[]): Promise<readonly ProcessEnding[]> {
+    const killed = trees.flatMap(([, t]) => t);
+    if (killed.length === 0)
+      return trees.map(([record, , left]) => new ProcessEnding(record, [], [], left));
+    for (const entry of killed)
+      ProcessSignals.send(entry.processId, Resources.killSignal);
+    const until = Date.now();
+    const after = await this.reader.readAsync();
+    const forced = trees.map(([record, tree, left]) => {
+      const late = after.findLateChildren(tree, until);
+      for (const entry of late)
+        ProcessSignals.send(entry.processId, Resources.killSignal);
+      return [record, [...tree, ...late].map(t => t.processId), left] as const;
+    });
+    await ProcessSignals.waitAsync(() => forced.every(([, t]) => t.every(u => !ProcessSignals.isRunning(u))), this.settings.endMilliseconds);
+    return forced.map(([record, processIds, left]) => new ProcessEnding(record, processIds, processIds.filter(t => ProcessSignals.isRunning(t)), left));
   }
 }

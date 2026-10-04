@@ -16,6 +16,7 @@ import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 import { ProcessStartException } from "../../exceptions/process-start.exception.js";
 import type { IProcessEnder } from "../../interfaces/process-ender.js";
+import { KeptProgram } from "../../models/kept-program.js";
 import { OwnedProcess } from "../../models/owned-process.js";
 import type { ProcessEnding } from "../../models/process-ending.js";
 import { ProcessExit } from "../../models/process-exit.js";
@@ -29,6 +30,7 @@ import { Resources } from "../../resources.js";
 import type { SystemCommand } from "../commands/system-command.js";
 import type { ShellDatabase } from "../database/shell-database.js";
 import { BatchCommandLine } from "./batch-command-line.js";
+import { ProcessClock } from "./process-clock.js";
 import { ProcessEnderFactory } from "./process-ender-factory.js";
 import { ProcessEnvironment } from "./process-environment.js";
 import { ProcessRecordStore } from "./process-record-store.js";
@@ -39,11 +41,16 @@ export class ProcessSupervisor {
   private readonly environment: NodeJS.ProcessEnv;
   private readonly records: ProcessRecordStore;
   private readonly locator: ProgramLocator;
+  private readonly clock: ProcessClock;
   private readonly ender: IProcessEnder;
   private readonly diagnostics: Writable;
+  private readonly seenMilliseconds: number;
   private readonly running: Map<OwnedProcess, ProcessRecord> = new Map();
-  private readonly leftovers: Set<ProcessRecord> = new Set();
+  private readonly kept: Map<KeptProgram, OwnedProcess> = new Map();
   private readonly pending: Map<Promise<void>, string> = new Map();
+  private readonly stopping: Set<string> = new Set();
+  private isStopping: boolean = false;
+  private seeing: NodeJS.Timeout | undefined;
 
   public constructor(
     database: ShellDatabase,
@@ -51,17 +58,23 @@ export class ProcessSupervisor {
     environment: NodeJS.ProcessEnv,
     command: SystemCommand,
     diagnostics: Writable,
-    settings: ProcessSettings = new ProcessSettings()) {
+    settings: ProcessSettings = new ProcessSettings(),
+    clock: ProcessClock = ProcessClock.create(process.platform)) {
     this.platform = platform;
     this.environment = environment;
     this.records = new ProcessRecordStore(database);
     this.locator = new ProgramLocator(platform);
-    this.ender = ProcessEnderFactory.create(platform, command, environment, settings);
+    this.clock = clock;
+    this.ender = ProcessEnderFactory.create(platform, command, environment, settings, clock);
     this.diagnostics = diagnostics;
+    this.seenMilliseconds = settings.seenMilliseconds;
   }
 
   public get programs(): readonly RunningProgram[] {
-    return [...this.running].map(([process, record]) => new RunningProgram(record.moduleId, record.program, record.processId, process.started));
+    return [
+      ...[...this.running].map(([process, record]) => new RunningProgram(record.moduleId, record.program, record.processId, process.started, false)),
+      ...[...this.kept].map(([kept, process]) => new RunningProgram(kept.record.moduleId, kept.record.program, kept.record.processId, process.started, true))
+    ];
   }
 
   public startAsync(moduleId: string, request: ProcessRequest): Promise<OwnedProcess> {
@@ -71,37 +84,44 @@ export class ProcessSupervisor {
   }
 
   public async stopOwnedByAsync(moduleId: string): Promise<void> {
+    this.stopping.add(moduleId);
     await Promise.all([...this.pending].filter(([, t]) => t === moduleId).map(([t]) => t));
-    const running = [...this.running].filter(([, t]) => t.moduleId === moduleId).map(([process, record]) => new RunningProcess(process, record));
-    const leftovers = [...this.leftovers].filter(t => t.moduleId === moduleId);
-    if (running.length > 0 || leftovers.length > 0)
-      await this.endAsync(running, leftovers);
+    await this.endAsync(
+      [...this.running].filter(([, t]) => t.moduleId === moduleId).map(([process, record]) => new RunningProcess(process, record)),
+      [...this.kept.keys()].filter(t => t.record.moduleId === moduleId));
+  }
+
+  public async stopAllAsync(): Promise<void> {
+    this.isStopping = true;
+    await Promise.all(this.pending.keys());
+    await this.endAsync([...this.running].map(([process, record]) => new RunningProcess(process, record)), [...this.kept.keys()]);
   }
 
   public async cleanUpAsync(): Promise<void> {
     const records = this.records.readAll();
-    if (records.length === 0)
+    for (const record of records.filter(t => !this.clock.isSameBoot(t.boot)))
+      this.records.remove(record);
+    const current = records.filter(t => this.clock.isSameBoot(t.boot));
+    if (current.length === 0)
       return;
     try {
-      for (const ending of await this.ender.endLeftoversAsync(records)) {
-        this.records.remove(ending.record);
-        if (ending.forced.length > 0)
-          this.write(ending.record, Resources.formatLeftoversEnded(ending.forced));
-        this.reportRemaining(ending);
-      }
+      for (const ending of await this.ender.endLeftoversAsync(current))
+        this.finish(ending, Resources.formatLeftoversEnded(ending.forced));
     }
     catch (error) {
-      for (const record of records)
+      for (const record of current)
         this.report(record, error);
     }
   }
 
   private async launchAsync(moduleId: string, request: ProcessRequest): Promise<OwnedProcess> {
+    if (this.isStopping || this.stopping.has(moduleId))
+      throw new ProcessStartException(Resources.formatModuleStopping(moduleId, request.program));
     request.signal?.throwIfAborted();
     const environment = ProcessEnvironment.create(this.platform, this.environment, request);
     const program = this.locator.locate(request.program, environment);
     const launch = this.locator.isBatch(program) ? BatchCommandLine.create(this.environment, program, request.arguments) : new ProcessLaunch(program, request.arguments, false);
-    const requested = Date.now();
+    const requested = this.clock.now();
     const child = this.spawn(program, launch, request.workingFolder, environment.values);
     const exited = new Promise<ProcessExit>(resolve => child.once(Resources.exitEvent, (code: number | null, signal: NodeJS.Signals | null) => resolve(new ProcessExit(code, signal))));
     try {
@@ -111,10 +131,12 @@ export class ProcessSupervisor {
       throw new ProcessStartException(Resources.formatProcessStartFailed(program), new ExceptionOptions(error));
     }
 
+    const started = new Date();
     const record = this.record(child, moduleId, program, launch.executable, requested);
-    const owned = new OwnedProcess(child, program, new Date(record.started), exited, t => this.stopAsync(t));
+    const owned = new OwnedProcess(child, program, started, exited, t => this.stopAsync(t));
     child.stdin.on(Resources.errorEvent, (error: Error) => this.report(record, error));
     this.running.set(owned, record);
+    this.watch();
     if (!Object.isUndefined(request.signal)) {
       const listener = addAbortListener(request.signal, () => void owned.stopAsync());
       void exited.then(() => listener[Symbol.dispose]());
@@ -141,7 +163,7 @@ export class ProcessSupervisor {
 
   private record(child: ChildProcessWithoutNullStreams, moduleId: string, program: string, executable: string, requested: number): ProcessRecord {
     try {
-      return this.records.add(moduleId, Number(child.pid), program, executable, requested, Date.now());
+      return this.records.add(moduleId, Number(child.pid), program, executable, this.clock.boot, requested, this.clock.now());
     }
     catch (error) {
       child.kill(Resources.killSignal);
@@ -161,45 +183,71 @@ export class ProcessSupervisor {
   private async handleExitAsync(owned: OwnedProcess, record: ProcessRecord, exit: ProcessExit): Promise<void> {
     if (!this.running.delete(owned))
       return;
+    this.watch();
     try {
-      const endings = await this.ender.endAfterExitAsync(record, exit);
-      if (Object.isNull(endings))
-        this.leftovers.add(record);
+      const ended = await this.ender.endAfterExitAsync(record, exit);
+      if (ended instanceof KeptProgram)
+        this.kept.set(ended, owned);
       else
-        this.finish(endings);
+        this.finishAll(ended);
     }
     catch (error) {
-      this.leftovers.add(record);
+      this.kept.set(new KeptProgram(record, []), owned);
       this.report(record, error);
     }
   }
 
-  private async endAsync(running: readonly RunningProcess[], leftovers: readonly ProcessRecord[]): Promise<void> {
+  private async endAsync(running: readonly RunningProcess[], kept: readonly KeptProgram[]): Promise<void> {
+    if (running.length === 0 && kept.length === 0)
+      return;
     for (const item of running)
       this.running.delete(item.process);
-    for (const record of leftovers)
-      this.leftovers.delete(record);
+    this.watch();
+    for (const item of kept)
+      this.kept.delete(item);
     try {
-      this.finish(await this.ender.stopAsync(running, leftovers));
+      this.finishAll(await this.ender.stopAsync(running, kept));
     }
     catch (error) {
-      for (const record of [...running.map(t => t.record), ...leftovers])
+      for (const record of [...running.map(t => t.record), ...kept.map(t => t.record)])
         this.report(record, error);
     }
   }
 
-  private finish(endings: readonly ProcessEnding[]): void {
-    for (const ending of endings) {
-      this.records.remove(ending.record);
-      if (ending.forced.length > 0)
-        this.write(ending.record, Resources.formatProcessesForced(ending.forced));
-      this.reportRemaining(ending);
+  private watch(): void {
+    if (this.running.size > 0) {
+      this.seeing ??= setInterval(() => this.markSeen(), this.seenMilliseconds).unref();
+      return;
+    }
+    clearInterval(this.seeing);
+    this.seeing = undefined;
+  }
+
+  private markSeen(): void {
+    const seen = this.clock.now();
+    for (const record of this.running.values()) {
+      try {
+        this.records.markSeen(record, seen);
+      }
+      catch (error) {
+        this.report(record, error);
+      }
     }
   }
 
-  private reportRemaining(ending: ProcessEnding): void {
+  private finishAll(endings: readonly ProcessEnding[]): void {
+    for (const ending of endings)
+      this.finish(ending, Resources.formatProcessesForced(ending.forced));
+  }
+
+  private finish(ending: ProcessEnding, forced: string): void {
+    this.records.remove(ending.record);
+    if (ending.forced.length > 0)
+      this.write(ending.record, forced);
     if (ending.remaining.length > 0)
       this.write(ending.record, Resources.formatProcessesRemaining(ending.remaining));
+    if (ending.left.length > 0)
+      this.write(ending.record, Resources.formatProcessesLeft(ending.left));
   }
 
   private report(record: ProcessRecord, error: unknown): void {

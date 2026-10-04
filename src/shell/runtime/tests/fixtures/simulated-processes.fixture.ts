@@ -33,6 +33,10 @@ export class SimulatedProcessesFixture implements Disposable {
       this.resistant.add(processId);
   }
 
+  public remove(processId: number): void {
+    this.groups.delete(processId);
+  }
+
   public fail(processId: number, signal: string | number, failure: unknown): void {
     this.failures.set(`${processId} ${signal}`, failure);
   }

@@ -2236,10 +2236,11 @@ export interface IRuntimePartContext {
 
   /**
    * Starts a program the runtime owns on the module's behalf. The program is
-   * found on the PATH unless it is an absolute path; on Windows each PATHEXT
-   * extension is tried, after the name itself when it has an extension, and
-   * a `.bat` or `.cmd` file runs through `cmd.exe` with its arguments
-   * escaped. The program gets only the system variables
+   * found on the PATH unless it is an absolute path that names its drive or
+   * share on Windows; on Windows each PATHEXT extension among `.com`, `.exe`,
+   * `.bat` and `.cmd` is tried, after the name itself when it has one of
+   * them, and a `.bat` or `.cmd` file runs through `cmd.exe` with its
+   * arguments escaped. The program gets only the system variables
    * {@link ProcessRequest} lists and the ones the request names. The runtime
    * records it, ends it
    * and what it started when the part deactivates or the runtime stops,
@@ -2251,8 +2252,8 @@ export interface IRuntimePartContext {
    * and abort signal.
    * @returns A promise of the running program, once it has started.
    * @throws {ProcessStartException} Rejected when the program is a relative
-   * path, is not found or cannot start, or when a batch file's argument holds
-   * a line break or a null character.
+   * path, is not found or cannot start, when a batch file's argument holds
+   * a line break or a null character, or once the part is deactivating.
    * @example
    * ```ts
    * import { type IRuntimePartContext, type OwnedProcess, ProcessRequest } from "@noldova/teamrun-shell-runtime";
@@ -3291,12 +3292,19 @@ export declare class ProcessSettings {
   public readonly endMilliseconds: number;
 
   /**
+   * How often the runtime records that its programs are still running.
+   */
+  public readonly seenMilliseconds: number;
+
+  /**
    * Creates the settings.
    *
    * @param graceMilliseconds How long a program asked to stop may take to
    * exit; 3 seconds by default.
    * @param endMilliseconds How long killed programs may take to end; 5
    * seconds by default.
+   * @param seenMilliseconds How often the runtime records that its programs
+   * are still running; 5 seconds by default.
    * @throws {ArgumentOutOfRangeException} When a time is not a positive
    * integer.
    * @example
@@ -3308,7 +3316,7 @@ export declare class ProcessSettings {
    * }
    * ```
    */
-  public constructor(graceMilliseconds?: number, endMilliseconds?: number);
+  public constructor(graceMilliseconds?: number, endMilliseconds?: number, seenMilliseconds?: number);
 }
 
 /**
@@ -3374,12 +3382,21 @@ export declare class RunningProgram {
   public readonly started: Date;
 
   /**
+   * Whether the program itself has exited cleanly on macOS or Linux while
+   * the process group it leads still runs; the process id then names that
+   * group.
+   */
+  public readonly hasExited: boolean;
+
+  /**
    * Creates the report.
    *
    * @param moduleId The module the program runs for.
    * @param program The program's path.
    * @param processId The program's process id.
    * @param started When the program started.
+   * @param hasExited Whether the program has exited while its process group
+   * still runs; `false` by default.
    * @example
    * ```ts
    * import { RunningProgram } from "@noldova/teamrun-shell-runtime";
@@ -3389,7 +3406,7 @@ export declare class RunningProgram {
    * }
    * ```
    */
-  public constructor(moduleId: string, program: string, processId: number, started: Date);
+  public constructor(moduleId: string, program: string, processId: number, started: Date, hasExited?: boolean);
 }
 
 /**
@@ -5503,10 +5520,96 @@ export declare class WorkTracker {
 }
 
 /**
+ * The clock the runtime times its programs' starts with, and the boot it
+ * runs in. On Linux the clock counts from boot, as the process table does
+ * there, and the boot is the kernel's boot id; elsewhere the clock is the
+ * wall clock, as the process table's start times are, and the boot is when
+ * the system started, in seconds. Either way a later change of the wall
+ * clock does not change how a recorded start compares with the process
+ * table.
+ */
+export declare class ProcessClock {
+  /**
+   * The boot the clock runs in.
+   */
+  public readonly boot: string;
+
+  /**
+   * Creates the clock.
+   *
+   * @param boot The boot the clock runs in.
+   * @param isBootRelative Whether the clock counts from boot, which makes
+   * the boot an exact id; otherwise it is a time in seconds compared within
+   * a minute.
+   * @example
+   * ```ts
+   * import { ProcessClock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createLinuxClock(bootId: string): ProcessClock {
+   *   return new ProcessClock(bootId, true);
+   * }
+   * ```
+   */
+  public constructor(boot: string, isBootRelative: boolean);
+
+  /**
+   * Creates the clock for a platform.
+   *
+   * @param platform The platform, as in `process.platform`.
+   * @param bootIdFile The file that holds the kernel's boot id on Linux;
+   * `/proc/sys/kernel/random/boot_id` by default.
+   * @returns The clock.
+   * @throws {Error} On Linux, when the boot id file cannot be read.
+   * @example
+   * ```ts
+   * import { ProcessClock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createClock(): ProcessClock {
+   *   return ProcessClock.create(process.platform);
+   * }
+   * ```
+   */
+  public static create(platform: string, bootIdFile?: string): ProcessClock;
+
+  /**
+   * Reads the clock.
+   *
+   * @returns The time in milliseconds.
+   * @example
+   * ```ts
+   * import type { ProcessClock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function elapsed(clock: ProcessClock, since: number): number {
+   *   return clock.now() - since;
+   * }
+   * ```
+   */
+  public now(): number;
+
+  /**
+   * Whether a recorded boot is this clock's.
+   *
+   * @param boot The recorded boot.
+   * @returns Whether it is the same boot.
+   * @example
+   * ```ts
+   * import type { ProcessClock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isCurrent(clock: ProcessClock, boot: string): boolean {
+   *   return clock.isSameBoot(boot);
+   * }
+   * ```
+   */
+  public isSameBoot(boot: string): boolean;
+}
+
+/**
  * Starts, records and ends the programs the runtime runs for its modules. On
  * Windows a program's tree is found in the process table; elsewhere each
  * program leads its own process group. Each program's record in the shell's
- * database lets the next runtime end what a crashed one left running.
+ * database lets the next runtime end what a crashed one left running; while
+ * the program runs, the record's time it was last seen running is renewed at
+ * the settings' interval.
  */
 export declare class ProcessSupervisor {
   /**
@@ -5519,6 +5622,9 @@ export declare class ProcessSupervisor {
    * @param diagnostics The runtime's log, which receives the programs that
    * had to be killed or could not be ended.
    * @param settings How long programs may take to end.
+   * @param clock The clock that times programs' starts and names the boot;
+   * {@link ProcessClock.create} for the platform this process runs on by
+   * default.
    * @example
    * ```ts
    * import { ProcessSettings, ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";
@@ -5528,10 +5634,19 @@ export declare class ProcessSupervisor {
    * }
    * ```
    */
-  public constructor(database: ShellDatabase, platform: string, environment: NodeJS.ProcessEnv, command: SystemCommand, diagnostics: Writable, settings?: ProcessSettings);
+  public constructor(
+    database: ShellDatabase,
+    platform: string,
+    environment: NodeJS.ProcessEnv,
+    command: SystemCommand,
+    diagnostics: Writable,
+    settings?: ProcessSettings,
+    clock?: ProcessClock);
 
   /**
-   * The programs running, in the order they started.
+   * The programs running, in the order they started, then the programs that
+   * exited cleanly while their process group still runs, in the order they
+   * exited.
    */
   public get programs(): readonly RunningProgram[];
 
@@ -5546,7 +5661,8 @@ export declare class ProcessSupervisor {
    * @param request The program to start.
    * @returns A promise of the running program, once it has started and is
    * recorded.
-   * @throws {ProcessStartException} Rejected when the program cannot start.
+   * @throws {ProcessStartException} Rejected when the program cannot start,
+   * or once the module's programs or all programs are being stopped.
    * @example
    * ```ts
    * import { type OwnedProcess, ProcessRequest, type ProcessSupervisor } from "@noldova/teamrun-shell-runtime";
@@ -5559,8 +5675,12 @@ export declare class ProcessSupervisor {
   public startAsync(moduleId: string, request: ProcessRequest): Promise<OwnedProcess>;
 
   /**
-   * Ends every program a module runs and what they left running, giving
-   * them the settings' grace period to exit before killing them.
+   * Refuses the module's further starts, then ends every program it runs and
+   * what they left running, giving them the settings' grace period to exit
+   * before killing them. A process group whose program has exited is ended
+   * only while a process listed in it when the program exited still runs in
+   * it; otherwise the runtime's log names the group's processes and they are
+   * left running.
    *
    * @param moduleId The module's id.
    * @returns A promise that resolves once they have ended or the runtime's
@@ -5577,9 +5697,35 @@ export declare class ProcessSupervisor {
   public stopOwnedByAsync(moduleId: string): Promise<void>;
 
   /**
+   * Refuses every further start, then ends every program still running, as
+   * {@link stopOwnedByAsync} does for one module.
+   *
+   * @returns A promise that resolves once they have ended or the runtime's
+   * log says which could not be.
+   * @example
+   * ```ts
+   * import type { ProcessSupervisor } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function stopEverythingAsync(processes: ProcessSupervisor): Promise<void> {
+   *   return processes.stopAllAsync();
+   * }
+   * ```
+   */
+  public stopAllAsync(): Promise<void>;
+
+  /**
    * Kills what the recorded programs of an earlier runtime left running and
-   * removes their records. A process whose id was reused since, as its start
-   * time or, on Windows, its executable shows, is left alone.
+   * removes their records. Only a recorded program still running is ended,
+   * with its tree on Windows or its process group elsewhere; a process whose
+   * id was reused since, as its start time or, on Windows, its executable
+   * shows, is left alone. A record from another boot is removed without
+   * ending anything. When a recorded program is no longer running, its
+   * process group is ended while a process in it started between the
+   * program's start and the time it was last seen running; on Windows its
+   * children that started in that time are ended with their trees, and the
+   * time ends early at the start of a process that now holds its id.
+   * Otherwise nothing is ended, and the runtime's log names the processes in
+   * its group, or on Windows its children that started after that time.
    *
    * @returns A promise that resolves once the leftovers have ended or the
    * runtime's log says which could not be.

@@ -11,11 +11,13 @@ export class RunningProgram {
   public readonly program: string;
   public readonly processId: number;
   public readonly started: Date;
+  public readonly hasExited: boolean;
 
-  public constructor(moduleId: string, program: string, processId: number, started: Date) {
+  public constructor(moduleId: string, program: string, processId: number, started: Date, hasExited: boolean = false) {
     this.moduleId = moduleId;
     this.program = program;
     this.processId = processId;
     this.started = started;
+    this.hasExited = hasExited;
   }
 }

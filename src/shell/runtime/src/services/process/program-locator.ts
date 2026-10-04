@@ -23,7 +23,7 @@ export class ProgramLocator {
   }
 
   public locate(program: string, environment: ProcessEnvironment): string {
-    const folders = path.isAbsolute(program) ? [path.dirname(program)] : this.listFolders(program, environment);
+    const folders = this.isAbsolute(program) ? [path.dirname(program)] : this.listFolders(program, environment);
     const candidates = this.listCandidates(path.basename(program), environment);
     for (const folder of folders) {
       const file = candidates.map(t => path.join(folder, t)).find(t => this.isProgram(t));
@@ -37,11 +37,15 @@ export class ProgramLocator {
     return this.isWindows && Resources.batchExtensions.includes(path.extname(file).toLowerCase());
   }
 
+  private isAbsolute(file: string): boolean {
+    return path.isAbsolute(file) && path.parse(path.resolve(file)).root.toLowerCase() === path.parse(path.normalize(file)).root.toLowerCase();
+  }
+
   private listFolders(program: string, environment: ProcessEnvironment): readonly string[] {
-    if (Resources.pathSeparatorPattern.test(program))
+    if ((this.isWindows ? Resources.windowsNamePattern : Resources.pathSeparatorPattern).test(program))
       throw new ProcessStartException(Resources.formatProgramPathRelative(program));
     const delimiter = this.isWindows ? Resources.windowsPathDelimiter : Resources.posixPathDelimiter;
-    return (environment.read(Resources.pathVariable) ?? String.empty).split(delimiter).filter(t => path.isAbsolute(t));
+    return (environment.read(Resources.pathVariable) ?? String.empty).split(delimiter).filter(t => this.isAbsolute(t));
   }
 
   private listCandidates(name: string, environment: ProcessEnvironment): readonly string[] {
@@ -50,9 +54,10 @@ export class ProgramLocator {
     const configured = environment.read(Resources.programExtensionsVariable);
     const named = (Object.isUndefined(configured) || String.isNullOrWhitespace(configured) ? Resources.defaultProgramExtensions : configured)
       .split(Resources.windowsPathDelimiter)
-      .filter(t => !String.isNullOrWhitespace(t))
-      .map(t => `${name}${t.toLowerCase()}`);
-    return path.extname(name) === String.empty ? named : [name, ...named];
+      .map(t => t.trim().toLowerCase())
+      .filter(t => Resources.programExtensions.includes(t))
+      .map(t => `${name}${t}`);
+    return Resources.programExtensions.includes(path.extname(name).toLowerCase()) ? [name, ...named] : named;
   }
 
   private isProgram(file: string): boolean {

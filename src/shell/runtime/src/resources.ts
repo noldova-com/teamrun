@@ -371,17 +371,22 @@ export class Resources {
   public static readonly usage: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>] [--start-log <start log name>]";
   public static readonly ownedProcessesMigration: string = "owned-processes";
   public static readonly createOwnedProcessesStatement: string =
-    "CREATE TABLE owned_processes (id INTEGER PRIMARY KEY, module TEXT NOT NULL, process_id INTEGER NOT NULL, program TEXT NOT NULL, executable TEXT NOT NULL, requested INTEGER NOT NULL, started INTEGER NOT NULL) STRICT";
+    "CREATE TABLE owned_processes (id INTEGER PRIMARY KEY, module TEXT NOT NULL, process_id INTEGER NOT NULL, program TEXT NOT NULL, executable TEXT NOT NULL, " +
+    "boot TEXT NOT NULL, requested INTEGER NOT NULL, started INTEGER NOT NULL, seen INTEGER NOT NULL) STRICT";
   public static readonly insertOwnedProcessStatement: string =
-    "INSERT INTO owned_processes (module, process_id, program, executable, requested, started) VALUES (?, ?, ?, ?, ?, ?)";
+    "INSERT INTO owned_processes (module, process_id, program, executable, boot, requested, started, seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+  public static readonly updateOwnedProcessSeenStatement: string = "UPDATE owned_processes SET seen = ? WHERE id = ?";
   public static readonly deleteOwnedProcessStatement: string = "DELETE FROM owned_processes WHERE id = ?";
-  public static readonly readOwnedProcessesStatement: string = "SELECT id, module, process_id, program, executable, requested, started FROM owned_processes ORDER BY id";
+  public static readonly readOwnedProcessesStatement: string =
+    "SELECT id, module, process_id, program, executable, boot, requested, started, seen FROM owned_processes ORDER BY id";
   public static readonly moduleColumn: string = "module";
   public static readonly processIdColumn: string = "process_id";
   public static readonly programColumn: string = "program";
   public static readonly executableColumn: string = "executable";
+  public static readonly bootColumn: string = "boot";
   public static readonly requestedColumn: string = "requested";
   public static readonly startedColumn: string = "started";
+  public static readonly seenColumn: string = "seen";
   public static readonly programParameterName: string = "program";
   public static readonly workingFolderParameterName: string = "workingFolder";
   public static readonly environmentParameterName: string = "environment";
@@ -389,6 +394,7 @@ export class Resources {
   public static readonly codeParameterName: string = "code";
   public static readonly graceMillisecondsParameterName: string = "graceMilliseconds";
   public static readonly endMillisecondsParameterName: string = "endMilliseconds";
+  public static readonly seenMillisecondsParameterName: string = "seenMilliseconds";
   public static readonly workingFolderNotAbsolute: string = "The working folder must be an absolute path.";
   public static readonly processExitInvalid: string = "A process exit has either an exit code or a signal, not both.";
   public static readonly environmentNamePattern: RegExp = /^[^=\0]+$/;
@@ -398,6 +404,8 @@ export class Resources {
   public static readonly pathVariable: string = "PATH";
   public static readonly programExtensionsVariable: string = "PATHEXT";
   public static readonly defaultProgramExtensions: string = ".COM;.EXE;.BAT;.CMD";
+  public static readonly programExtensions: readonly string[] = [".com", ".exe", ".bat", ".cmd"];
+  public static readonly windowsNamePattern: RegExp = /[\\/:]/;
   public static readonly windowsPathDelimiter: string = ";";
   public static readonly posixPathDelimiter: string = ":";
   public static readonly batchExtensions: readonly string[] = [".bat", ".cmd"];
@@ -426,8 +434,11 @@ export class Resources {
   public static readonly moduleSearchPathVariable: string = "PSModulePath";
   public static readonly processGraceMilliseconds: number = 3_000;
   public static readonly processEndMilliseconds: number = 5_000;
+  public static readonly processSeenMilliseconds: number = 5_000;
   public static readonly processPollMilliseconds: number = 50;
   public static readonly processStartTolerance: number = 2_000;
+  public static readonly bootIdFile: string = "/proc/sys/kernel/random/boot_id";
+  public static readonly bootToleranceSeconds: number = 60;
   public static readonly terminateSignal: NodeJS.Signals = "SIGTERM";
   public static readonly killSignal: NodeJS.Signals = "SIGKILL";
   public static readonly probeSignal: number = 0;
@@ -760,7 +771,15 @@ export class Resources {
   }
 
   public static formatLeftoversEnded(processIds: readonly number[]): string {
-    return `An earlier runtime left it running, so processes ${processIds.join(", ")} were ended.`;
+    return `An earlier runtime left processes ${processIds.join(", ")} running, so they were ended.`;
+  }
+
+  public static formatProcessesLeft(processIds: readonly number[]): string {
+    return `It was no longer running, and nothing showed that processes ${processIds.join(", ")} were what it started, so they were left running.`;
+  }
+
+  public static formatModuleStopping(moduleId: string, program: string): string {
+    return `${program} was not started, because the module ${moduleId} is stopping.`;
   }
 
   public static formatProcessDiagnostic(moduleId: string, program: string, processId: number, text: string): string {

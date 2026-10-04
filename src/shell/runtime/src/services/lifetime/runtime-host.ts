@@ -298,6 +298,7 @@ export class RuntimeHost implements IIdleParticipant {
         await this.modules.deactivateAsync();
       }
       finally {
+        await this.processes?.stopAllAsync();
         if (!Object.isNull(this.discovery))
           await this.publisher.withdrawAsync(this.discovery);
       }

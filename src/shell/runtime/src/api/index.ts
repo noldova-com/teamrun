@@ -103,6 +103,7 @@ export { NotificationPolicy } from "../services/notifications/notification-polic
 export { PackageRuntimePartLoader } from "../services/modules/package-runtime-part-loader.js";
 export { OwnershipLock } from "../services/ownership/ownership-lock.js";
 export { ChildProcessStarter } from "../services/process/child-process-starter.js";
+export { ProcessClock } from "../services/process/process-clock.js";
 export { ProcessSupervisor } from "../services/process/process-supervisor.js";
 export { CommandRegistry } from "../services/registry/command-registry.js";
 export { EventRegistry } from "../services/registry/event-registry.js";
