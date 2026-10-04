@@ -11,6 +11,7 @@ import { ThemeException } from "../../../src/app/exceptions/theme.exception";
 import { Theme } from "../../../src/app/models/theme";
 import { ThemePainter } from "../../../src/app/services/theme-painter";
 import { DefaultTheme } from "../../../src/app/themes/default-theme";
+import { Resources } from "../../../src/resources";
 import { FixtureTheme } from "../../fixtures/fixture-theme";
 
 describe("ThemePainter", () => {
@@ -52,6 +53,19 @@ describe("ThemePainter", () => {
 
     painter.paint(element, DefaultTheme.theme, ThemeMode.Dark);
     expect([variable("--tr-text"), variable("--tr-error"), variable("--tr-removed")]).toEqual(["#CCCCCC", "#F48771", "#F48771"]);
+  });
+
+  it("paints no color or look value of the fixture theme equal to the default theme's, in light or dark", () => {
+    const painter = new ThemePainter(DefaultTheme.theme);
+    const fixture = document.createElement("div");
+    const names = [...Resources.colorTokens.map(t => t.variable), ...Resources.lookTokens.map(t => Resources.formatLookVariable(t))];
+
+    for (const mode of [ThemeMode.Light, ThemeMode.Dark]) {
+      painter.paint(element, DefaultTheme.theme, mode);
+      painter.paint(fixture, FixtureTheme.theme, mode);
+
+      expect(names.filter(n => fixture.style.getPropertyValue(n) === variable(n))).toEqual([]);
+    }
   });
 
   it("completes a partial theme with its fallback keys, then with the default theme, and ignores a shape the kit does not have", () => {

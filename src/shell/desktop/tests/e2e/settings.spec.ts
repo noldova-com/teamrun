@@ -147,6 +147,8 @@ test.describe("settings", () => {
     await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(WindowModeFixture.backgrounds[mode]);
     await expect.poll(() => nativeBackgroundAsync(desktop)).toBe(mode === "Dark" ? "#181818" : "#F8F8F8");
     await expect.poll(() => window.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(16 * 15 / 13, 2);
+    for (const field of [row(window, "shell.panelSize").locator("input"), window.getByRole("searchbox", { name: "Search settings" })])
+      expect(await field.evaluate(t => parseFloat(getComputedStyle(t).fontSize))).toBeCloseTo(15, 2);
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).not.toBe(before.font);
     await expect(window.locator("tr-setting-row .tr-setting-row-marker")).toHaveCount(3);
     await desktop.checkpointAsync("settings-changed");

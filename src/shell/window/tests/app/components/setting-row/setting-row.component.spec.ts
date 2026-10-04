@@ -65,6 +65,7 @@ describe("SettingRowComponent", () => {
 
     expect([marker.getAttribute("role"), marker.getAttribute("aria-label"), marker.textContent]).toEqual(["img", "Modified", "circle"]);
     expect(getComputedStyle(marker).color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "focusBorder"));
+    expect(getComputedStyle(marker).fontVariationSettings).toBe("\"FILL\" 1");
     expect(getComputedStyle(row.querySelector(".tr-setting-row-title") as Element).fontWeight).toBe("600");
     expect(resets).toBe(1);
   });

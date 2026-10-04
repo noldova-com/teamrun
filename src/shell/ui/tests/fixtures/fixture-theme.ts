@@ -178,7 +178,7 @@ export class FixtureTheme {
     ["menu-item-height", "1.875rem"],
     ["menu-item-inset", "0.375rem"],
     ["menu-item-padding", "0.625rem"],
-    ["menu-trail-gap", "2rem"],
+    ["menu-trail-gap", "2.25rem"],
     ["toolbar-row", "2.25rem"],
     ["toolbar-button", "2rem"],
     ["toolbar-button-padding", "0.5rem"],

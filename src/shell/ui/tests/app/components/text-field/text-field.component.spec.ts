@@ -46,6 +46,17 @@ describe("TextFieldComponent", () => {
     expect([getComputedStyle(field("size")).opacity, getComputedStyle(field("size")).cursor]).toEqual(["0.5", "default"]);
   });
 
+  for (const panelSize of AppearanceFixture.panelSizes)
+    it(`writes its text in the panel text role at panel size ${panelSize}`, () => {
+      AppearanceFixture.apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
+      fixture = TestBed.createComponent(TextFieldHostComponent);
+      fixture.detectChanges();
+      const style = getComputedStyle(field("search"));
+
+      AppearanceFixture.expectRem(style.fontSize, 0.8125, panelSize);
+      AppearanceFixture.expectRem(style.lineHeight, 1.125, panelSize);
+    });
+
   for (const mode of AppearanceFixture.modes)
     for (const theme of AppearanceFixture.themes)
       it(`takes its colors and geometry from the ${theme.id} theme in ${mode} mode`, () => {
