@@ -20,7 +20,7 @@ class GitHubConfigurationCheckTests {
   private static readonly SHA: string = "3d3c42e5aac5ba805825da76410c181273ba90b1";
 
   public static register(): void {
-    test("actions pinned to a full commit SHA with their release version recorded pass, also with Windows line ends, and local actions need no pin", async t => {
+    test("actions pinned to a full commit SHA with their release version recorded pass, and local actions need no pin", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       const sha = GitHubConfigurationCheckTests.SHA;
@@ -34,7 +34,7 @@ class GitHubConfigurationCheckTests {
           "      - uses: ./.github/actions/prepare",
           "      - run: echo \"uses: nothing@main\"",
           ""
-        ].join("\r\n"),
+        ].join("\n"),
         ".github/ISSUE_TEMPLATE/bug.yaml": "name: Bug\n",
         "docs/workflow.yml": "uses: actions/checkout@main\n"
       });

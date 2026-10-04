@@ -23,7 +23,7 @@ class TestWaitCheckTests {
   private static readonly ATOMICS_WAIT: string = "Atomics.wait";
   private static readonly PAGE_WAIT: string = "page.waitForTimeout";
   private static readonly DELAY_IMPORT: string = `import { ${TestWaitCheckTests.TIMER} as delay } from "${TestWaitCheckTests.TIMERS}";\n`;
-  private static readonly RULE: string = ": pauses for a fixed time; wait for the condition with Wait.untilAsync from @noldova/teamrun-foundation-testing, or list the file with its reason in TESTING.md section 3.";
+  private static readonly RULE: string = ": pauses for a fixed time; wait for the event or the condition instead, with the wait that TESTING.md section 3 names for this kind of test, or list the file there with its reason.";
 
   public static register(): void {
     test("listed test files may pause, and deadlines, waits for conditions, strings and other files are not pauses", async t => {

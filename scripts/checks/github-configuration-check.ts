@@ -19,7 +19,7 @@ export default class GitHubConfigurationCheck implements ICheck {
   private static readonly PINNED_ACTION: RegExp = /^[^@\s]+@[0-9a-f]{40}$/;
   private static readonly RELEASE_COMMENT: RegExp = /^\s+#\s*v?\d/;
   private static readonly LOCAL_PREFIX: string = "./";
-  private static readonly LINE_SEPARATOR: RegExp = /\r?\n/;
+  private static readonly LINE_SEPARATOR: string = "\n";
 
   private readonly root: string;
   private readonly files: RepositoryFiles;

@@ -17,7 +17,7 @@ export default class LicenseHeader {
 
   public static readonly BLOCK: string = ["/**", ...LicenseHeader.NOTICE.map(t => ` *${LicenseHeader.indent(t)}`), " */", ""].join("\n");
   public static readonly MARKUP: string = ["<!--", ...LicenseHeader.NOTICE, "-->", ""].join("\n");
-  public static readonly HASH: string = [...LicenseHeader.NOTICE.map(t => `#${LicenseHeader.indent(t)}`), ""].join("\n");
+  public static readonly YAML: string = [...LicenseHeader.NOTICE.map(t => `#${LicenseHeader.indent(t)}`), ""].join("\n");
 
   private static indent(line: string): string {
     return line === "" ? "" : ` ${line}`;

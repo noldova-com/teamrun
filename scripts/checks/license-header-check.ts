@@ -16,13 +16,10 @@ import SourceFile from "../structure/source-file.ts";
 import type ICheck from "./interfaces/check.ts";
 
 export default class LicenseHeaderCheck implements ICheck {
-  private static readonly BYTE_ORDER_MARK: string = "\uFEFF";
-  private static readonly CRLF: RegExp = /\r\n/g;
-  private static readonly LF: string = "\n";
   private static readonly HEADERS: ReadonlyMap<string, string> = new Map([
     ...[...SourceFile.SCRIPT_EXTENSIONS, ...SourceFile.STYLE_EXTENSIONS].map(t => [t, LicenseHeader.BLOCK] as const),
     [".html", LicenseHeader.MARKUP],
-    ...[".yml", ".yaml"].map(t => [t, LicenseHeader.HASH] as const)
+    ...[".yml", ".yaml"].map(t => [t, LicenseHeader.YAML] as const)
   ]);
 
   private readonly root: string;
@@ -43,8 +40,7 @@ export default class LicenseHeaderCheck implements ICheck {
       if (header === undefined)
         continue;
       checked++;
-      const text = await readFile(path.join(this.root, file), "utf8");
-      if (text.replace(LicenseHeaderCheck.CRLF, LicenseHeaderCheck.LF).startsWith(header, Number(text.startsWith(LicenseHeaderCheck.BYTE_ORDER_MARK))))
+      if ((await readFile(path.join(this.root, file), "utf8")).startsWith(header))
         continue;
       output.write(`${file}: does not start with the license header that CODING-STANDARDS.md section 12 gives for its format.\n`);
       failures++;

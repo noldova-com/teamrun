@@ -56,7 +56,7 @@ export default class TestWaitCheck implements ICheck {
       if (lines.length > 0)
         pausing.add(file);
       if (!listed.has(file))
-        findings.push(...lines.map(t => `${file}:${t}: pauses for a fixed time; wait for the condition with Wait.untilAsync from @noldova/teamrun-foundation-testing, or list the file with its reason in TESTING.md section 3.`));
+        findings.push(...lines.map(t => `${file}:${t}: pauses for a fixed time; wait for the event or the condition instead, with the wait that TESTING.md section 3 names for this kind of test, or list the file there with its reason.`));
     }
     for (const [file, line] of listed)
       if (!pausing.has(file))
