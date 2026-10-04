@@ -26,6 +26,8 @@ import { MenuTriggerDirective } from "../menu/menu-trigger.directive";
 import { MenuComponent } from "../menu/menu.component";
 import { MenuBarItemComponent } from "../menu-bar/menu-bar-item.component";
 import { MenuBarComponent } from "../menu-bar/menu-bar.component";
+import { PopoverDirective } from "../popover/popover.directive";
+import { PopoverTriggerDirective } from "../popover/popover-trigger.directive";
 import { QuickInputComponent } from "../quick-input/quick-input.component";
 import { TooltipComponent } from "../tooltip/tooltip.component";
 import { TooltipDirective } from "../tooltip/tooltip.directive";
@@ -36,7 +38,7 @@ import { GallerySpecimenComponent } from "./gallery-specimen.component";
   selector: "tr-gallery-overlays",
   imports: [
     ButtonComponent, ContextMenuTriggerDirective, DialogComponent, DockingGuideComponent, DockingPlateComponent, GallerySpecimenComponent, MenuBarComponent, MenuBarItemComponent,
-    MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, QuickInputComponent, TooltipComponent, TooltipDirective
+    MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, PopoverDirective, PopoverTriggerDirective, QuickInputComponent, TooltipComponent, TooltipDirective
   ],
   templateUrl: "./gallery-overlays.component.html",
   styleUrl: "./gallery-overlays.component.scss",

@@ -6,30 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-:host {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tr-space-2);
-  box-sizing: border-box;
-  width: min(var(--tr-popover-width), calc(100vw - var(--tr-space-4)));
-  max-height: calc(100vh - var(--tr-space-6) * 2);
-  padding: var(--tr-space-3);
-  border: var(--tr-border-width) solid var(--tr-menu-border);
-  border-radius: var(--tr-radius-large);
-  background-color: var(--tr-menu);
-  box-shadow: var(--tr-shadow-large);
-  font-size: var(--tr-text-panel);
-  line-height: var(--tr-line-panel);
-}
-
-:host > * {
-  color: var(--tr-menu-text);
-}
-
-:host(:focus) {
-  outline: none;
-}
-
 .tr-notifications-header {
   display: flex;
   align-items: center;

@@ -1,9 +1,9 @@
-<button #item type="button" class="tr-notifications-item" aria-haspopup="dialog" [attr.aria-expanded]="isOpen()" [attr.aria-label]="label()" [trTooltip]="label()" [trTooltipSide]="above" (click)="toggle(item, popover)">
+<button #trigger="trPopoverTrigger" type="button" class="tr-notifications-item" [attr.aria-label]="label()" [trTooltip]="label()" [trTooltipSide]="above" [trPopoverTrigger]="popover" (opened)="markRead()">
   <span class="material-symbols-rounded tr-notifications-icon" aria-hidden="true">{{ isQuiet() ? resources.notificationsOffGlyph : resources.notificationsGlyph }}</span>
   @if (unread() > 0) {
     <span class="tr-notifications-count" aria-hidden="true">{{ resources.formatUnreadCount(unread()) }}</span>
   }
 </button>
 <ng-template #popover>
-  <tr-notifications-popover (closed)="close()" />
+  <tr-notifications-popover [label]="resources.notificationsTitle" (closed)="trigger.close()" />
 </ng-template>

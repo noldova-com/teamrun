@@ -38,6 +38,22 @@ LICENSE file in the root directory of this source tree.
   </ng-template>
 </tr-gallery-specimen>
 
+<tr-gallery-specimen [name]="text.popover">
+  <div trPopover class="tr-gallery-popover" [label]="text.popoverLabel">
+    <h2 class="tr-gallery-popover-title">{{ text.popoverTitle }}</h2>
+    <p class="tr-gallery-popover-text">{{ text.popoverBody }}</p>
+    <p class="tr-gallery-popover-text">{{ text.popoverLong }}</p>
+    <button type="button" tr-button [variant]="variants.Secondary">{{ text.popoverClose }}</button>
+  </div>
+  <button type="button" tr-button [variant]="variants.Secondary" [trPopoverTrigger]="popover">{{ text.popoverTrigger }}</button>
+  <ng-template #popover>
+    <div trPopover [label]="text.popoverLabel">
+      <h2 class="tr-gallery-popover-title">{{ text.popoverTitle }}</h2>
+      <p class="tr-gallery-popover-text">{{ text.popoverBody }}</p>
+    </div>
+  </ng-template>
+</tr-gallery-specimen>
+
 <tr-gallery-specimen [name]="text.tooltip">
   <button type="button" tr-button [variant]="variants.Secondary" [trTooltip]="text.tooltipText" [trTooltipSide]="below">{{ text.tooltipTrigger }}</button>
   <tr-tooltip [text]="text.tooltipText" />

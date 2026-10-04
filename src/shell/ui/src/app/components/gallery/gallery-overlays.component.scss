@@ -34,3 +34,15 @@
   border: var(--tr-border-width) dashed var(--tr-border);
   border-radius: var(--tr-radius-medium);
 }
+
+.tr-gallery-popover-title {
+  margin: 0;
+  font-size: inherit;
+  font-weight: var(--tr-weight-emphasis);
+  line-height: inherit;
+}
+
+.tr-gallery-popover-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
