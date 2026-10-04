@@ -28,8 +28,8 @@
   background-color: var(--tr-dropdown);
   color: var(--tr-input-text);
   font: inherit;
-  font-size: var(--tr-text-label);
-  line-height: var(--tr-line-label);
+  font-size: var(--tr-text-panel);
+  line-height: var(--tr-line-panel);
   text-align: start;
   cursor: pointer;
 }
@@ -70,7 +70,6 @@
   border-radius: var(--tr-radius-small);
   background-color: var(--tr-dropdown-list);
   box-shadow: 0 0.125rem 0.5rem var(--tr-widget-shadow);
-  color: var(--tr-input-text);
   font-family: var(--tr-font-sans);
   font-size: var(--tr-text-panel);
   line-height: var(--tr-line-panel);
@@ -84,6 +83,7 @@
   min-height: var(--tr-dropdown-row-height);
   padding: 0 var(--tr-dropdown-row-padding);
   border-radius: var(--tr-radius-small);
+  color: var(--tr-input-text);
   white-space: nowrap;
   cursor: pointer;
 }
