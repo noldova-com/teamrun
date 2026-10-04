@@ -14,11 +14,10 @@ import { DialogService } from "@noldova/teamrun-shell-ui";
 import { CommandRun, Notification, NotificationAction, NotificationPost, NotificationSeverity, NotificationState, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { ToastsComponent } from "../../../../src/app/components/toasts/toasts.component";
-import { WindowPartSource } from "../../../../src/app/models/window-part-source";
-import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { NotificationService } from "../../../../src/app/services/notification.service";
 import { ToastService } from "../../../../src/app/services/toast.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
+import { ModuleStatusFixture } from "../../../fixtures/module-status.fixture";
 
 class FakeNotificationService {
   public readonly calls: string[] = [];
@@ -87,10 +86,10 @@ describe("ToastsComponent", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: NotificationService, useValue: notifications },
-        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
     });
+    ModuleStatusFixture.report(ModuleStatusFixture.create("notes", "Notes"));
   });
 
   afterEach(() => {
@@ -133,7 +132,7 @@ describe("ToastsComponent", () => {
     expect([isWindowInert, isRegionLive, announced()?.getAttribute("aria-live")]).toEqual([true, true, "polite"]);
   });
 
-  it("names each toast's module, by its display name when it has a window part, and the time it was posted", async () => {
+  it("names each toast's module, by the display name the runtime reports for it, and the time it was posted", async () => {
     const clock = new Notification(2, 2, new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null),
       "2026-10-03T08:05:00.000Z", false);
     const fixture = await renderAsync(clock, toast(1));

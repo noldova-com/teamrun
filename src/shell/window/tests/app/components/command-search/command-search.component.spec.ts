@@ -13,7 +13,6 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { CommandSearchComponent } from "../../../../src/app/components/command-search/command-search.component";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { MenuDeclarations } from "../../../../src/app/models/menu-declarations";
-import { WindowPartSource } from "../../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { CommandSearchService } from "../../../../src/app/services/command-search.service";
 import { CommandService } from "../../../../src/app/services/command.service";
@@ -21,6 +20,7 @@ import { MenuBarService } from "../../../../src/app/services/menu-bar.service";
 import { MenuService } from "../../../../src/app/services/menu.service";
 import { Resources } from "../../../../src/resources";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
+import { ModuleStatusFixture } from "../../../fixtures/module-status.fixture";
 
 describe("CommandSearchComponent", () => {
   let fixture: ComponentFixture<CommandSearchComponent>;
@@ -43,7 +43,6 @@ describe("CommandSearchComponent", () => {
     DesktopBridgeFixture.install("win32");
     TestBed.configureTestingModule({
       providers: [
-        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], ["notes.newNote"], [], [], [], () => Promise.reject(new Error("Not loaded.")))] },
         {
           provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
             places: [{ name: "notes.templates", title: "New from template", menuBar: false }],
@@ -57,6 +56,7 @@ describe("CommandSearchComponent", () => {
         }
       ]
     });
+    ModuleStatusFixture.report(ModuleStatusFixture.create("notes", "Notes"));
     commands = TestBed.inject(CommandService);
     search = TestBed.inject(CommandSearchService);
     menuBar = TestBed.inject(MenuBarService);

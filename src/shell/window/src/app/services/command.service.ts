@@ -18,9 +18,9 @@ import { CommandNotFoundException } from "../exceptions/command-not-found.except
 import type { CommandContribution } from "../models/command-contribution";
 import { KeyBindings } from "../models/key-bindings";
 import { ShortcutMap } from "../models/shortcut-map";
-import { WindowPartTokens } from "../models/window-part-tokens";
 import { Resources } from "../../resources";
 import { DesktopBridgeService } from "./desktop-bridge.service";
+import { ModuleStatusService } from "./module-status.service";
 import { SettingsService } from "./settings.service";
 import { ShellCommandsService } from "./shell-commands.service";
 import { ViewDialogService } from "./view-dialog.service";
@@ -36,10 +36,7 @@ export class CommandService {
   private readonly moduleCommands: WritableSignal<readonly CommandContribution[]> = signal([]);
   private readonly settingValues: Signal<ReadonlyMap<string, JsonValue>> = inject(SettingsService).values;
   private readonly bindingsValue: Signal<JsonValue | undefined> = computed(() => this.settingValues().get(Resources.keyBindingsSetting));
-  private readonly ownerNames: ReadonlyMap<string, string> = new Map([
-    [Resources.shellOwner, Resources.productName],
-    ...inject(WindowPartTokens.sources).map(t => [t.moduleId, t.displayName] as const)
-  ]);
+  private readonly statuses: ModuleStatusService = inject(ModuleStatusService);
 
   public readonly commands: Signal<readonly CommandContribution[]> = computed(() => [...this.shellCommands, ...this.moduleCommands()]);
   public readonly bindings: Signal<KeyBindings> = computed(() => KeyBindings.fromJson(this.bindingsValue()));
@@ -84,7 +81,7 @@ export class CommandService {
 
   public ownerOf(name: string): string {
     const owner = name.slice(0, name.indexOf(Resources.contributionSeparator));
-    return this.ownerNames.get(owner) ?? owner;
+    return this.statuses.nameOf(owner);
   }
 
   public defaultKeysOf(name: string): readonly KeyChord[] {

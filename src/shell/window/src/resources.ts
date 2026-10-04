@@ -637,12 +637,13 @@ export class Resources {
   public static readonly noContributions: string = "No commands, settings, menus, views or notification kinds.";
   public static readonly commandsKind: string = "commands";
   public static readonly settingsKind: string = "settings";
+  public static readonly notificationsKind: string = "notifications";
   public static readonly moduleContributionKinds: readonly (readonly [string, string])[] = [
     [Resources.commandsKind, "Commands"],
     [Resources.settingsKind, "Settings"],
     ["menus", "Menus"],
     ["views", "Views"],
-    ["notifications", "Notification kinds"]
+    [Resources.notificationsKind, "Notification kinds"]
   ];
   public static readonly moduleSelector: string = "[data-module]";
   public static readonly moduleData: string = "module";

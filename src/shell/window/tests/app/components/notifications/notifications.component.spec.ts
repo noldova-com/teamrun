@@ -16,10 +16,9 @@ import {
 } from "@noldova/teamrun-shell-protocol";
 
 import { NotificationsComponent } from "../../../../src/app/components/notifications/notifications.component";
-import { WindowPartSource } from "../../../../src/app/models/window-part-source";
-import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { NotificationService } from "../../../../src/app/services/notification.service";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
+import { ModuleStatusFixture } from "../../../fixtures/module-status.fixture";
 
 class FakeNotificationService {
   public readonly calls: string[] = [];
@@ -85,10 +84,10 @@ describe("NotificationsComponent", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: NotificationService, useValue: service },
-        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
     });
+    ModuleStatusFixture.report(ModuleStatusFixture.create("notes", "Notes"));
   });
 
   afterEach(() => DesktopBridgeFixture.remove());

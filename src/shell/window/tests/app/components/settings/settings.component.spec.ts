@@ -18,8 +18,6 @@ import { SettingsComponent } from "../../../../src/app/components/settings/setti
 import { GalleryTokens } from "../../../../src/app/models/gallery-tokens";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { Layout } from "../../../../src/app/models/layout/layout";
-import { WindowPartSource } from "../../../../src/app/models/window-part-source";
-import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../../src/app/services/command.service";
 import type { LayoutService } from "../../../../src/app/services/layout.service";
 import { SettingsService } from "../../../../src/app/services/settings.service";
@@ -28,6 +26,7 @@ import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.f
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
+import { ModuleStatusFixture } from "../../../fixtures/module-status.fixture";
 import { SettingsFixture } from "../../../fixtures/settings.fixture";
 
 class FakeSettingsService {
@@ -90,15 +89,11 @@ describe("SettingsComponent", () => {
       providers: [
         { provide: GalleryTokens.component, useFactory: () => gallery },
         { provide: SettingsService, useValue: settings },
-        { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } },
-        {
-          provide: WindowPartTokens.sources, useValue: [
-            new WindowPartSource("clock", "Clock", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused"))),
-            new WindowPartSource("notes", "Notes", [], [], [], [], [], [], ["notes.saved"], () => Promise.reject(new Error("unused")))
-          ]
-        }
+        { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
     });
+    ModuleStatusFixture.report(
+      ModuleStatusFixture.create("clock", "Clock"), ModuleStatusFixture.create("notes", "Notes", ["notes.saved"]), ModuleStatusFixture.create("reminder", "Reminder", ["reminder.due"]));
     TestBed.inject(CommandService).setCommands([
       new CommandContribution("clock.tick", "Tick the clock", null, "Ctrl+Alt+T", () => Promise.resolve(null)),
       new CommandContribution("clock.stop", "Stop the clock", null, "Ctrl+Alt+T", () => Promise.resolve(null))
@@ -150,7 +145,7 @@ describe("SettingsComponent", () => {
     expect(element().querySelector(".fake-gallery")).toBeNull();
   });
 
-  it("lists only the modules that post notifications on Notifications, each checked while its notifications are on", async () => {
+  it("lists every module the runtime reports with notification kinds on Notifications, whatever its parts, each checked while its notifications are on", async () => {
     render();
     await page.getByRole("button", { name: "Notifications", exact: true }).click();
     fixture.detectChanges();
@@ -159,7 +154,7 @@ describe("SettingsComponent", () => {
 
     await page.getByRole("checkbox", { name: "Notes notifications" }).click();
 
-    expect(boxes).toEqual([["Notes notifications", true]]);
+    expect(boxes).toEqual([["Notes notifications", true], ["Reminder notifications", true]]);
     expect(settings.calls).toEqual(["set shell.mutedModules [\"notes\"]"]);
   });
 
