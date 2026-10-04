@@ -24,6 +24,16 @@ function documentKeys(window: Page): Promise<readonly (string | null)[]> {
   return window.locator(`${documentsGroup} tr-tab`).evaluateAll(tabs => tabs.map(t => t.getAttribute("data-tab-key")));
 }
 
+function previewTabsSetting(window: Page): Locator {
+  return window.locator("tr-setting-row[data-setting=\"shell.previewTabs\"]").getByRole("checkbox");
+}
+
+async function openSettingsAsync(window: Page): Promise<void> {
+  await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
+  await window.keyboard.press("ControlOrMeta+Comma");
+  await expect(window.locator("tr-settings")).toBeVisible();
+}
+
 async function expectPreviewAsync(locator: Locator, isPreview: boolean): Promise<void> {
   if (isPreview) {
     await expect(locator).toHaveClass(/tr-tab-preview/);
@@ -88,5 +98,39 @@ test.describe("preview tabs", () => {
     await expect.poll(() => documentKeys(desktop.window)).toEqual(before);
     await expectPreviewAsync(tab(desktop.window, 7), true);
     await expectPreviewAsync(tab(desktop.window, 6), false);
+  });
+
+  test("with Preview tabs off, a single click opens a kept tab and the next note opens a second tab", async ({ desktop }) => {
+    const window = desktop.window;
+    await openSettingsAsync(window);
+    await expect(previewTabsSetting(window)).toBeChecked();
+    await previewTabsSetting(window).uncheck();
+
+    await listItem(window, 1).click();
+    await expectPreviewAsync(tab(window, 1), false);
+    await listItem(window, 2).click();
+
+    await expectPreviewAsync(tab(window, 1), false);
+    await expectPreviewAsync(tab(window, 2), false);
+    await expect.poll(() => documentKeys(window)).toEqual(["document/notes.note/1", "document/notes.note/2", "document/shell.settings", "document/notes.note/week-1", "document/notes.note/week-2"]);
+    await desktop.checkpointAsync("preview-tabs-off");
+  });
+
+  test("turning Preview tabs off keeps the open preview, and turning it back on previews later opens again", async ({ desktop }) => {
+    const window = desktop.window;
+    await listItem(window, 3).click();
+    await expectPreviewAsync(tab(window, 3), true);
+
+    await openSettingsAsync(window);
+    await previewTabsSetting(window).uncheck();
+    await expectPreviewAsync(tab(window, 3), false);
+    await previewTabsSetting(window).check();
+    await listItem(window, 4).click();
+    await expectPreviewAsync(tab(window, 4), true);
+    await listItem(window, 5).click();
+
+    await expect(tab(window, 4)).toHaveCount(0);
+    await expectPreviewAsync(tab(window, 5), true);
+    await expectPreviewAsync(tab(window, 3), false);
   });
 });

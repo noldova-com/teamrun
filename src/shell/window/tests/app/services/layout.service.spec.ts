@@ -12,6 +12,7 @@ import { TestBed } from "@angular/core/testing";
 import { BottomDockSpan } from "../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { PanelEdge } from "../../../src/app/enums/panel-edge";
+import { DocumentTab } from "../../../src/app/models/layout/document-tab";
 import { Layout } from "../../../src/app/models/layout/layout";
 import { LayoutReader } from "../../../src/app/models/layout/layout.reader";
 import { ToolbarLayout } from "../../../src/app/models/layout/toolbar-layout";
@@ -159,6 +160,30 @@ describe("LayoutService", () => {
     service.resizeSplit(handle, handle.leadingLength + 4);
 
     expect(service.geometry().handles[0]?.leadingLength).toBeCloseTo(handle.leadingLength + 4);
+  });
+
+  it("opens a document as a preview only while Preview tabs is on, even when a module asks for one, and turning it off keeps the open preview", async () => {
+    const readme = new DocumentTab("notes.note", "readme");
+    const third = new DocumentTab("notes.note", "third");
+    const fourth = new DocumentTab("notes.note", "fourth");
+    const setPreviewTabs = (value: boolean): void => {
+      bridge.publishEvent("shell.settingsChanged", { name: "shell.previewTabs", value, isSet: true });
+      TestBed.tick();
+    };
+    await loadAsync(prepared());
+
+    service.openDocument(LayoutFixture.settings, true);
+    expect([service.previewTabs(), service.layout().documents.preview]).toEqual([true, LayoutFixture.settings]);
+    setPreviewTabs(false);
+    expect([service.previewTabs(), service.layout().documents.preview, service.layout().isOpen(LayoutFixture.settings)]).toEqual([false, null, true]);
+    service.openDocument(readme, true);
+    expect([service.layout().documents.preview, service.layout().documents.tabs.at(-1)]).toEqual([null, readme]);
+    service.openDocument(LayoutFixture.settings);
+    expect(service.layout().documents.preview).toBeNull();
+    setPreviewTabs(true);
+    service.openDocument(third, true);
+    service.openDocument(fourth, true);
+    expect([service.previewTabs(), service.layout().documents.preview, service.layout().isOpen(third), service.layout().isOpen(readme)]).toEqual([true, fourth, false, true]);
   });
 
   it("spans the bottom dock across the window or keeps it between the side docks", async () => {

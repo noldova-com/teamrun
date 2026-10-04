@@ -113,6 +113,10 @@ export class Layout {
     return this.withGroup(isPreview ? this.documents.openPreview(tab) : this.documents.insert(tab, this.documents.tabs.length));
   }
 
+  public keepPreviews(): Layout {
+    return this.groups.flatMap(t => Object.isNull(t.preview) ? [] : [t.preview]).reduce<Layout>((layout, t) => layout.keep(t), this);
+  }
+
   public keep(tab: Tab): Layout {
     const group = this.groupOf(tab);
     return Object.isNull(group) ? this : this.withGroup(group.keep(tab));
