@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { RuntimeBuild } from "@noldova/teamrun-shell-runtime";
@@ -53,6 +53,17 @@ test.describe("modules", () => {
     await expect(window.locator("[data-fixture-content=notes-outline]")).toBeVisible();
     await expect(window.locator("[data-fixture-content=notes-note-1]")).toHaveText("Note 1");
     await desktop.checkpointAsync("modules");
+  });
+
+  test("a window part that fails to activate writes the failure and its cause to the desktop's log under its module's id", async ({ desktop }) => {
+    await desktop.window.evaluate(() => localStorage.setItem("teamrun.fixture.clock.failWindowPart", "true"));
+    await desktop.reopenAsync();
+    const log = (): Promise<string> => readFile(path.join(desktop.dataDirectory, "logs", "desktop.log"), "utf8");
+
+    await expect(desktop.window.locator("tr-module-failures button")).toHaveText(/1 module didn't start/);
+    await expect.poll(log).toMatch(/Window error in clock: \S*: Its window part failed to activate\./);
+    expect(await log()).toMatch(/Window error in clock: Caused by: Error: The clock's window part was asked to fail\./);
+    expect(desktop.acceptFailures(/Window error in clock: |failed to activate|asked to fail/).length).toBeGreaterThan(0);
   });
 
   test("the clock's window part asks its runtime part for the time", async ({ desktop }) => {
