@@ -143,19 +143,49 @@ describe("QuickInputComponent", () => {
     expect(host.query()).toBe("clo");
   });
 
-  it("chooses from the options for the text just typed when Enter comes before they are shown", async () => {
+  async function filteringAsync(): Promise<ComponentFixture<FilteringHostComponent>> {
     const filtering = TestBed.createComponent(FilteringHostComponent);
     filtering.detectChanges();
     await filtering.whenStable();
+    return filtering;
+  }
+
+  function type(filtering: ComponentFixture<FilteringHostComponent>, text: string): void {
     const typed = filtering.nativeElement.querySelector(".tr-quick-input-field") as HTMLInputElement;
-    const press = (key: string): boolean => typed.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
-
-    press("ArrowDown");
-    typed.value = "Command 7";
+    typed.value = text;
     typed.dispatchEvent(new Event("input", { bubbles: true }));
-    press("Enter");
+  }
 
+  function press(filtering: ComponentFixture<FilteringHostComponent>, key: string): void {
+    filtering.nativeElement.querySelector(".tr-quick-input-field").dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+  }
+
+  it("chooses from the options for the text just typed when Enter comes before they are shown, once however often Enter is pressed", async () => {
+    const filtering = await filteringAsync();
+
+    press(filtering, "ArrowDown");
+    type(filtering, "Command 7");
+    press(filtering, "Enter");
+    press(filtering, "Enter");
+    const before = [...filtering.componentInstance.chosen];
+    filtering.detectChanges();
+    await filtering.whenStable();
+
+    expect(before).toEqual([]);
     expect(filtering.componentInstance.chosen).toEqual(["notes.command7"]);
+    filtering.destroy();
+  });
+
+  it("chooses at once when Enter comes after the options for its text are shown", async () => {
+    const filtering = await filteringAsync();
+
+    type(filtering, "Command 2");
+    filtering.detectChanges();
+    await filtering.whenStable();
+    press(filtering, "ArrowDown");
+    press(filtering, "Enter");
+
+    expect(filtering.componentInstance.chosen).toEqual(["notes.command20"]);
     filtering.destroy();
   });
 
