@@ -93,6 +93,13 @@ class ApiServerTests {
           t.message.endsWith(" ms it was running.") &&
           t.cause instanceof ApiException && t.cause.message === `The TypeScript API found no project in ${missing}.`);
     });
+
+    test("a failure carries the server's output, trimmed, and none when it wrote nothing", () => {
+      assert.equal(ApiServer.describeFailure("project.json", 33, false, "  slow start\n"),
+        "The TypeScript API server could not open project.json; after 33 ms it was running.\nslow start");
+      assert.equal(ApiServer.describeFailure("project.json", 5, false, " \n"), "The TypeScript API server could not open project.json; after 5 ms it was running.");
+      assert.equal(ApiServer.describeFailure("project.json", 5, true, ""), "The TypeScript API server could not open project.json; after 5 ms it had stopped.");
+    });
   }
 
   private static async useAsync<T>(
