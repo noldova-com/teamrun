@@ -438,23 +438,26 @@ describe("WindowPartHostService", () => {
     expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1"), new DocumentTab("notes.note", "3")]);
   });
 
-  it("keeps the saved active document when a part opens the saved documents and a new one during activation", async () => {
+  it("restores the saved documents a part opens during activation with the saved active one, leaves out one the layout lacks, and opens it when asked later", async () => {
     const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
     const saved = Layout.createDefault(new ViewRegistry([], [])).openDocument(note("1")).openDocument(note("2")).openDocument(note("3")).activate(note("1"));
     const part = new FakeWindowPart("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
       ["1", "2", "3", "4"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
     });
-    const { layout } = start([source("notes", part)], [status("notes")]);
+    const { host, layout } = start([source("notes", part)], [status("notes")]);
     vi.spyOn(TestBed.inject(LayoutStoreService), "readAsync").mockResolvedValue(saved.toJson());
+    await vi.waitFor(() => expect(layout.layout().documents.tabs).toHaveLength(3));
+    const restored = [layout.layout().documents.tabs, layout.layout().documents.active];
 
-    await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([note("1"), note("2"), note("3"), note("4")]));
+    host.openDocument("notes", "notes.note", "4", "Note 4", false);
 
-    expect(layout.layout().documents.active).toEqual(note("1"));
+    expect(restored).toEqual([[note("1"), note("2"), note("3")], note("1")]);
     expect(TestBed.inject(TabLabelService).of(note("3")).title).toBe("Note 3");
+    expect([layout.layout().documents.tabs, layout.layout().documents.active]).toEqual([[note("1"), note("2"), note("3"), note("4")], note("4")]);
   });
 
-  it("keeps the active document when the runtime is ready again and the parts open their documents while reactivating", async () => {
+  it("keeps the active document when the runtime is ready again, and adds a document the parts open while reactivating that is not open", async () => {
     const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
     const part = new FakeWindowPart("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
@@ -463,6 +466,7 @@ describe("WindowPartHostService", () => {
     const { host, layout } = start([source("notes", part)], [status("notes")]);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
     expect(layout.layout().documents.active).toEqual(note("2"));
+    layout.close(note("2"));
     layout.activate(note("1"));
 
     bridge.publishStartup({ kind: "Connecting", details: [] });

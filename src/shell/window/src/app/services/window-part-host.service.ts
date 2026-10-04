@@ -227,7 +227,7 @@ export class WindowPartHostService implements IWindowPartHost {
       this.errors.handleError(error);
     }
     const isReconnect = this.isLayoutLoaded;
-    let isRestored = isReconnect;
+    let isRestored = false;
     try {
       await Promise.allSettled(this.posting);
       this.refresh();
@@ -236,7 +236,7 @@ export class WindowPartHostService implements IWindowPartHost {
         isRestored = await this.loadLayoutAsync();
     }
     finally {
-      this.replayPending(isRestored);
+      this.replayPending(isReconnect, isRestored);
     }
   }
 
@@ -267,16 +267,18 @@ export class WindowPartHostService implements IWindowPartHost {
     }
   }
 
-  private replayPending(isRestored: boolean): void {
+  private replayPending(isReconnect: boolean, isRestored: boolean): void {
     this.isActivating = false;
     for (const pending of this.pendingOpens.splice(0))
-      this.replay(pending, isRestored);
+      this.replay(pending, isReconnect, isRestored);
   }
 
-  private replay(pending: PendingDocument, isRestored: boolean): void {
+  private replay(pending: PendingDocument, isReconnect: boolean, isRestored: boolean): void {
     try {
-      if (isRestored)
+      if (isReconnect)
         this.opener.restore(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
+      else if (isRestored)
+        this.opener.restoreSaved(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
       else
         this.opener.open(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
     }

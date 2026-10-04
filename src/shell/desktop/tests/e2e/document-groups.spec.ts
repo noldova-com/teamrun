@@ -234,6 +234,27 @@ test.describe("document groups", () => {
       await expect(tabOf(clock)).toHaveAttribute("aria-selected", "false");
     });
 
+  for (const reopen of [true, false])
+    test(`a document closed before ${reopen ? "reopening on the running runtime" : "a restart that stops the runtime"} stays closed, though its module opens it at start`, async ({ desktop }) => {
+      const window = desktop.window;
+      const thirdNote = "document/notes.note/3";
+      const tabOf = (key: string): Locator => TabDragFixture.tab(desktop.window, key);
+      await TabDragFixture.tab(window, firstNote).click();
+      await window.keyboard.press("ControlOrMeta+Alt+KeyN");
+      await expect(tabOf(thirdNote)).toHaveAttribute("aria-selected", "true");
+      await TabDragFixture.tab(window, firstNote).click();
+      await window.keyboard.press("ControlOrMeta+KeyW");
+      await expect(tabOf(firstNote)).toHaveCount(0);
+      await TabDragFixture.tab(window, secondNote).click();
+      await expect(tabOf(secondNote)).toHaveAttribute("aria-selected", "true");
+
+      await (reopen ? desktop.reopenAsync() : desktop.restartAsync());
+
+      await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(desktop.window, secondNote))).toEqual([secondNote, thirdNote]);
+      await expect(tabOf(secondNote)).toHaveAttribute("aria-selected", "true");
+      await expect(tabOf(firstNote)).toHaveCount(0);
+    });
+
   test("Reset the layout returns the documents to one group", async ({ desktop }) => {
     const window = desktop.window;
     await splitFirstNoteAsync(window);
