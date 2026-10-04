@@ -18,7 +18,7 @@ async function openGalleryAsync(window: Page): Promise<void> {
   await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
   await window.keyboard.press("ControlOrMeta+Comma");
   await expect(window.locator("tr-settings")).toBeVisible();
-  await window.getByRole("button", { name: "Gallery", exact: true }).click();
+  await window.getByRole("treeitem", { name: "Gallery", exact: true }).click();
   await expect(window.locator("tr-gallery")).toBeVisible();
 }
 
@@ -45,7 +45,7 @@ test.describe("gallery", () => {
     await openGalleryAsync(window);
     const dark = scope(window, "Dark");
 
-    for (const name of ["Button", "Icon button", "Checkbox", "Text field", "Select", "Tab", "Toolbar", "Toolbar button", "Menu"]) {
+    for (const name of ["Button", "Icon button", "Checkbox", "Text field", "Select", "Tab", "Tree", "Toolbar", "Toolbar button", "Menu"]) {
       await dark.getByRole("button", { name: `Show the keyboard focus on the ${name}`, exact: true }).focus();
       await window.keyboard.press("Enter");
       await expect(dark.locator(`.tr-gallery-specimen[aria-label="${name}"] :focus-visible`)).toHaveCount(1);
@@ -53,5 +53,38 @@ test.describe("gallery", () => {
     await desktop.checkpointAsync("gallery-focus");
     const colors = await window.locator("tr-gallery .tr-gallery-scope-frame").evaluateAll(frames => frames.map(t => getComputedStyle(t).color));
     expect(new Set(colors).size).toBe(2);
+  });
+
+  test("the tree is moved through, opened, closed and chosen from by keyboard alone", async ({ desktop }) => {
+    const window = desktop.window;
+    await openGalleryAsync(window);
+    const tree = scope(window, "Light").getByRole("tree", { name: "Gallery files" });
+    const item = (name: string): Locator => tree.getByRole("treeitem", { name, exact: true });
+    await scope(window, "Light").getByRole("button", { name: "Show the keyboard focus on the Tree", exact: true }).focus();
+    await window.keyboard.press("Enter");
+    await expect(item("Project")).toBeFocused();
+
+    await window.keyboard.press("ArrowRight");
+    await expect(item("Project")).toHaveAttribute("aria-expanded", "true");
+    await window.keyboard.press("ArrowRight");
+    await expect(item("Source")).toBeFocused();
+    await window.keyboard.press("ArrowRight");
+    await window.keyboard.press("ArrowDown");
+    await expect(item("App")).toBeFocused();
+    await expect(item("App")).toHaveAttribute("aria-level", "3");
+    await window.keyboard.press("End");
+    await expect(item("A file name that is far too long to fit the width of its tree")).toBeFocused();
+    await window.keyboard.press("Home");
+    await window.keyboard.press("r");
+    await expect(item("Readme")).toBeFocused();
+    await window.keyboard.press("Enter");
+    await expect(item("Readme")).toHaveAttribute("aria-selected", "true");
+    await expect(item("Notes")).toHaveAttribute("aria-selected", "false");
+    await desktop.checkpointAsync("gallery-tree");
+    await window.keyboard.press("ArrowLeft");
+    await expect(item("Project")).toBeFocused();
+    await window.keyboard.press("ArrowLeft");
+    await expect(item("Project")).toHaveAttribute("aria-expanded", "false");
+    await expect(tree.getByRole("treeitem")).toHaveCount(3);
   });
 });

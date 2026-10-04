@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { TreeNode } from "../../models/tree-node";
+
 export class GalleryResources {
   public static readonly scopeClass: string = "tr-theme-scope";
   public static readonly focusableSelector: string = "button:not(:disabled), input:not(:disabled), [tabindex=\"0\"], [role=\"tab\"][aria-selected=\"true\"]";
@@ -67,6 +69,9 @@ export class GalleryResources {
     sashVertical: "Resize the side",
     sashHorizontal: "Resize the bottom",
     panelCard: "Panel card",
+    tree: "Tree",
+    treeLabel: "Gallery files",
+    treeCurrent: "notes",
     panelShell: "On the shell surface",
     panelPanel: "On the panel surface",
     menu: "Menu",
@@ -119,6 +124,15 @@ export class GalleryResources {
   public static formatShowFocus(specimen: string): string {
     return `Show the keyboard focus on the ${specimen}`;
   }
+
+  public static readonly treeNodes: readonly TreeNode[] = [
+    new TreeNode("project", "Project", "folder", [
+      new TreeNode("source", "Source", "folder", [new TreeNode("app", "App", "description"), new TreeNode("styles", "Styles", "description")]),
+      new TreeNode("readme", "Readme", "description")
+    ]),
+    new TreeNode("notes", "Notes", "description"),
+    new TreeNode("long", "A file name that is far too long to fit the width of its tree", "description")
+  ];
 
   public static formatScope(themeName: string, mode: string): string {
     return `${themeName}, ${mode.toLowerCase()} mode`;

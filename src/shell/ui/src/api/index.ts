@@ -35,6 +35,7 @@ export { ToolbarButtonComponent } from "../app/components/toolbar-button/toolbar
 export { ToolbarItemDirective } from "../app/components/toolbar/toolbar-item.directive";
 export { ToolbarDirective } from "../app/components/toolbar/toolbar.directive";
 export { TooltipDirective } from "../app/components/tooltip/tooltip.directive";
+export { TreeComponent } from "../app/components/tree/tree.component";
 export { ButtonVariant } from "../app/enums/button-variant";
 export { DockingDirection } from "../app/enums/docking-direction";
 export { FontChoice } from "../app/enums/font-choice";
@@ -55,6 +56,7 @@ export { QuickInputItem } from "../app/models/quick-input-item";
 export { SelectOption } from "../app/models/select-option";
 export { Theme } from "../app/models/theme";
 export { TitleSegment } from "../app/models/title-segment";
+export { TreeNode } from "../app/models/tree-node";
 export { Typography } from "../app/models/typography";
 export { AnchoredOverlay } from "../app/services/anchored-overlay";
 export { AppearanceService } from "../app/services/appearance.service";

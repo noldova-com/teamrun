@@ -3,14 +3,7 @@
     [value]="query()" (input)="search($event)" />
 </div>
 <div class="tr-settings-body">
-  <nav class="tr-settings-pages" [attr.aria-label]="resources.settingsPagesLabel">
-    @for (page of pages(); track page.title) {
-      @let isCurrent = !isSearching() && page.title === currentPage()?.title;
-      <button type="button" class="tr-settings-page" [class.tr-settings-page-current]="isCurrent" [attr.aria-current]="isCurrent ? 'page' : null" (click)="select(page)">
-        {{ page.title }}
-      </button>
-    }
-  </nav>
+  <tr-tree class="tr-settings-pages" [nodes]="pageNodes()" [label]="resources.settingsPagesLabel" [current]="isSearching() ? null : currentPage()?.title ?? null" (activated)="select($event)" />
   <div class="tr-settings-content">
     @if (isSearching()) {
       @for (page of results(); track page.title) {

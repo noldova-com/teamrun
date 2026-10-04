@@ -12,7 +12,7 @@ import { ChangeDetectionStrategy, Component, ErrorHandler, type Signal, type Typ
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
-import { SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
+import { SelectOption, TextFieldComponent, TreeComponent, TreeNode } from "@noldova/teamrun-shell-ui";
 
 import { GalleryTokens } from "../../models/gallery-tokens";
 import { SettingsPage } from "../../models/settings/settings-page";
@@ -29,7 +29,7 @@ import { SettingRowComponent } from "../setting-row/setting-row.component";
 
 @Component({
   selector: "tr-settings",
-  imports: [HighlightedTextComponent, NgComponentOutlet, NgTemplateOutlet, SettingRowComponent, TextFieldComponent],
+  imports: [HighlightedTextComponent, NgComponentOutlet, NgTemplateOutlet, SettingRowComponent, TextFieldComponent, TreeComponent],
   templateUrl: "./settings.component.html",
   styleUrl: "./settings.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -63,6 +63,7 @@ export class SettingsComponent {
     ...Object.isNull(this.gallery) ? [] : [SettingsPage.galleryOf(Resources.galleryPage)]
   ]);
   protected readonly currentPage: Signal<SettingsPage | undefined> = computed(() => this.pages().find(t => t.title === this.selected()) ?? this.pages()[0]);
+  protected readonly pageNodes: Signal<readonly TreeNode[]> = computed(() => this.pages().map(t => new TreeNode(t.title, t.title)));
   protected readonly shortcuts: Signal<readonly ShortcutRow[]> = computed(() => {
     const map = this.commands.shortcuts();
     return this.commands.commands().map(command => {
@@ -86,9 +87,9 @@ export class SettingsComponent {
     this.query.set((event.target as HTMLInputElement).value);
   }
 
-  protected select(page: SettingsPage): void {
+  protected select(page: TreeNode): void {
     this.query.set("");
-    this.selected.set(page.title);
+    this.selected.set(page.id);
   }
 
   protected isMutedModules(definition: SettingDefinition): boolean {

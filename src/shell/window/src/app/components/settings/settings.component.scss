@@ -33,36 +33,9 @@
 }
 
 .tr-settings-pages {
-  display: flex;
   flex: none;
-  flex-direction: column;
-  gap: var(--tr-space-1);
   width: var(--tr-settings-pages-width);
   overflow-y: auto;
-}
-
-.tr-settings-page {
-  display: flex;
-  align-items: center;
-  box-sizing: border-box;
-  min-height: var(--tr-tree-row-height);
-  margin: 0;
-  padding: 0 var(--tr-space-2);
-  border: none;
-  border-radius: var(--tr-radius-small);
-  background-color: transparent;
-  color: var(--tr-text);
-  font: inherit;
-  text-align: start;
-}
-
-.tr-settings-page:hover {
-  background-color: var(--tr-hover);
-}
-
-.tr-settings-page-current,
-.tr-settings-page-current:hover {
-  background-color: var(--tr-selected);
 }
 
 .tr-settings-content {

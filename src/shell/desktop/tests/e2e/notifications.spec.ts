@@ -45,7 +45,7 @@ async function tickWithFocusAsync(desktop: DesktopApplicationFixture): Promise<v
 async function openNotificationsPageAsync(window: Page): Promise<void> {
   await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
   await window.keyboard.press("ControlOrMeta+Comma");
-  await window.locator("tr-settings").getByRole("button", { name: "Notifications", exact: true }).click();
+  await window.locator("tr-settings").getByRole("treeitem", { name: "Notifications", exact: true }).click();
   await expect(window.locator("tr-setting-row[data-setting=\"shell.mutedModules\"]")).toBeVisible();
 }
 

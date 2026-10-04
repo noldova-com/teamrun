@@ -106,27 +106,27 @@ describe("SettingsComponent", () => {
 
   it("lists the pages, shows Appearance first with its groups and rows, and shows another page when it is chosen", async () => {
     render();
-    const appearance = { pages: texts(".tr-settings-page"), current: texts("[aria-current=page]"), groups: texts(".tr-settings-group-title"), rows: texts(".tr-setting-row-title") };
+    const appearance = { pages: texts(".tr-tree-label"), current: texts("[aria-selected=true]"), groups: texts(".tr-settings-group-title"), rows: texts(".tr-setting-row-title") };
     const markers = ["shell.mode", "shell.panelSize"].map(t => element().querySelector(`[data-setting='${t}'] .tr-setting-row-marker`) !== null);
 
-    await page.getByRole("button", { name: "Clock" }).click();
+    await page.getByRole("treeitem", { name: "Clock" }).click();
     fixture.detectChanges();
 
     expect(appearance).toEqual({
       pages: ["Appearance", "Notifications", "Keyboard shortcuts", "Clock"], current: ["Appearance"], groups: ["Theme", "Text"], rows: ["Mode", "Interface text size"]
     });
-    expect([texts("[aria-current=page]"), texts(".tr-settings-group-title"), texts(".tr-setting-row-title")]).toEqual([["Clock"], ["Words", "Ticks"], ["Greeting", "Tick step"]]);
+    expect([texts("[aria-selected=true]"), texts(".tr-settings-group-title"), texts(".tr-setting-row-title")]).toEqual([["Clock"], ["Words", "Ticks"], ["Greeting", "Tick step"]]);
     expect(markers).toEqual([true, false]);
   });
 
   it("shows the Gallery as the last page when the build has one, and leaves it out of a search", async () => {
     gallery = FakeGalleryComponent;
     render();
-    const pages = texts(".tr-settings-page");
+    const pages = texts(".tr-tree-label");
 
-    await page.getByRole("button", { name: "Gallery", exact: true }).click();
+    await page.getByRole("treeitem", { name: "Gallery", exact: true }).click();
     fixture.detectChanges();
-    const shown = [texts(".fake-gallery"), texts("[aria-current=page]")];
+    const shown = [texts(".fake-gallery"), texts("[aria-selected=true]")];
     await searchAsync("tick");
 
     expect(pages).toEqual(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Gallery"]);
@@ -137,7 +137,7 @@ describe("SettingsComponent", () => {
 
   it("lists only the modules that post notifications on Notifications, each checked while its notifications are on", async () => {
     render();
-    await page.getByRole("button", { name: "Notifications", exact: true }).click();
+    await page.getByRole("treeitem", { name: "Notifications", exact: true }).click();
     fixture.detectChanges();
     const row = element().querySelector("[data-setting='shell.mutedModules']") as HTMLElement;
     const boxes = [...row.querySelectorAll<HTMLInputElement>("input[type=checkbox]")].map(t => [t.closest("tr-checkbox")?.querySelector(".tr-checkbox-text")?.textContent?.trim(), t.checked]);
@@ -150,19 +150,19 @@ describe("SettingsComponent", () => {
 
   it("returns to the first page when the chosen page goes away with its module", async () => {
     render();
-    await page.getByRole("button", { name: "Clock" }).click();
+    await page.getByRole("treeitem", { name: "Clock" }).click();
     fixture.detectChanges();
 
     settings.definitions.set(SettingsFixture.all.filter(t => t.name.owner !== "clock"));
     fixture.detectChanges();
 
-    expect([texts(".tr-settings-page"), texts(".tr-settings-group-title")]).toEqual([["Appearance", "Notifications", "Keyboard shortcuts"], ["Theme", "Text"]]);
+    expect([texts(".tr-tree-label"), texts(".tr-settings-group-title")]).toEqual([["Appearance", "Notifications", "Keyboard shortcuts"], ["Theme", "Text"]]);
   });
 
   it("shows every command's key on Keyboard shortcuts, and a key another command kept", async () => {
     render();
 
-    await page.getByRole("button", { name: "Keyboard shortcuts" }).click();
+    await page.getByRole("treeitem", { name: "Keyboard shortcuts" }).click();
     fixture.detectChanges();
     const rows = [...element().querySelectorAll("tbody tr")].map(t => [t.getAttribute("data-command"), ...[...t.querySelectorAll("td")].map(u => u.textContent?.trim())]);
 
@@ -182,8 +182,8 @@ describe("SettingsComponent", () => {
     await searchAsync("nothing like this");
     const empty = texts(".tr-settings-empty");
     await searchAsync("size");
-    const current = texts("[aria-current=page]");
-    await page.getByRole("button", { name: "Appearance" }).click();
+    const current = texts("[aria-selected=true]");
+    await page.getByRole("treeitem", { name: "Appearance" }).click();
     fixture.detectChanges();
 
     expect(hits).toEqual({ pages: ["Keyboard shortcuts", "Clock"], groups: ["Words", "Ticks"], rows: ["Greeting", "Tick step"], marks: 6 });
@@ -209,7 +209,7 @@ describe("SettingsComponent", () => {
 
   it("follows the component table for the page list and headings", () => {
     render();
-    const current = getComputedStyle(element().querySelector(".tr-settings-page-current") as Element);
+    const current = getComputedStyle(element().querySelector(".tr-tree-row-current") as Element);
     const heading = getComputedStyle(element().querySelector(".tr-settings-group-title") as Element);
 
     expect(current.backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "list.inactiveSelectionBackground"));

@@ -67,9 +67,14 @@ test.describe("settings", () => {
 
     await expect(settingsTab(window)).toHaveCount(1);
     await expect(settingsTab(window)).toHaveAttribute("aria-selected", "true");
-    await expect(window.locator(".tr-settings-page")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Gallery"]);
+    await expect(window.locator(".tr-settings-pages .tr-tree-label")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Gallery"]);
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Theme", "Text", "Layout"]);
-    await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
+    await window.getByRole("treeitem", { name: "Appearance", exact: true }).focus();
+    await window.keyboard.press("ArrowDown");
+    await window.keyboard.press("Enter");
+    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
+    await expect(window.getByRole("treeitem", { name: "Notifications", exact: true })).toHaveAttribute("aria-selected", "true");
+    await window.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true }).click();
     await expect(window.locator("[data-command=\"shell.openSettings\"] td").first()).toHaveText("Settings…");
     await desktop.checkpointAsync("settings-shortcuts");
   });
@@ -86,7 +91,7 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-search");
     await window.getByRole("searchbox", { name: "Search settings" }).fill("clock.tickStep");
     await expect(window.locator(".tr-settings-result-title")).toHaveText(["Clock"]);
-    await window.getByRole("button", { name: "Notifications", exact: true }).click();
+    await window.getByRole("treeitem", { name: "Notifications", exact: true }).click();
     await expect(window.getByRole("searchbox", { name: "Search settings" })).toHaveValue("");
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
   });
