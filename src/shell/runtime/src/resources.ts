@@ -137,6 +137,8 @@ export class Resources {
   public static readonly missingFileCode: string = "ENOENT";
   public static readonly lineSeparator: string = "\n";
   public static readonly lineBreakPattern: RegExp = /\r?\n/;
+  public static readonly logLineBreakPattern: RegExp = /\r\n|[\n\v\f\r\u0085\u2028\u2029]/u;
+  public static readonly logControlPattern: RegExp = /[^\P{Cc}\t]/gu;
   public static readonly windowsPlatform: string = "win32";
   public static readonly systemRootVariable: string = "SystemRoot";
   public static readonly systemFolderName: string = "System32";
