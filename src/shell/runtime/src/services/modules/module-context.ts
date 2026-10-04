@@ -23,6 +23,8 @@ import type { IRuntimePartContext } from "../../interfaces/runtime-part-context.
 import type { EventChannel } from "../../models/event-channel.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
 import { NotificationHandle } from "../../models/notification-handle.js";
+import type { OwnedProcess } from "../../models/owned-process.js";
+import type { ProcessRequest } from "../../models/process-request.js";
 import type { RuntimeCommand } from "../../models/runtime-command.js";
 import type { WorkItem } from "../../models/work-item.js";
 import { Resources } from "../../resources.js";
@@ -30,6 +32,7 @@ import type { DataDirectory } from "../data-directory/data-directory.js";
 import type { DiagnosticRedactor } from "../diagnostics/diagnostic-redactor.js";
 import type { NotificationCenter } from "../notifications/notification-center.js";
 import type { NotificationPolicy } from "../notifications/notification-policy.js";
+import type { ProcessSupervisor } from "../process/process-supervisor.js";
 import type { CommandRegistry } from "../registry/command-registry.js";
 import type { EventRegistry } from "../registry/event-registry.js";
 import type { MethodRegistry } from "../registry/method-registry.js";
@@ -48,6 +51,7 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
   private readonly notificationPolicy: NotificationPolicy;
   private readonly services: ServiceRegistry;
   private readonly work: WorkTracker;
+  private readonly processes: ProcessSupervisor;
   private readonly workFolder: string;
   private readonly registrations: Disposable[] = [];
   private readonly moduleDatabase?: IModuleDatabase;
@@ -67,6 +71,7 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     services: ServiceRegistry,
     settings: SettingsService,
     work: WorkTracker,
+    processes: ProcessSupervisor,
     diagnostics: Writable,
     redactor: DiagnosticRedactor,
     database?: IModuleDatabase) {
@@ -80,6 +85,7 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     this.notificationPolicy = notificationPolicy;
     this.services = services;
     this.work = work;
+    this.processes = processes;
     this.moduleFolder = dataDirectory.locateModuleFolder(declaration.id);
     this.workFolder = dataDirectory.locateWorkFolder(declaration.id);
     this.settings = new ModuleSettings(declaration, settings, this.registrations);
@@ -103,6 +109,10 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
 
   public beginWork(description: string): WorkItem {
     return this.work.begin(description, this.declaration.id);
+  }
+
+  public startProcessAsync(request: ProcessRequest): Promise<OwnedProcess> {
+    return this.processes.startAsync(this.declaration.id, request);
   }
 
   public registerMethod(name: string, handler: IMethodHandler): void {

@@ -10,6 +10,8 @@ import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
 
 import type { EventChannel } from "../models/event-channel.js";
 import type { NotificationHandle } from "../models/notification-handle.js";
+import type { OwnedProcess } from "../models/owned-process.js";
+import type { ProcessRequest } from "../models/process-request.js";
 import type { RuntimeCommand } from "../models/runtime-command.js";
 import type { WorkItem } from "../models/work-item.js";
 import type { IMethodHandler } from "./method-handler.js";
@@ -29,6 +31,8 @@ export interface IRuntimePartContext {
   getWorkFolderAsync(): Promise<string>;
 
   beginWork(description: string): WorkItem;
+
+  startProcessAsync(request: ProcessRequest): Promise<OwnedProcess>;
 
   registerMethod(name: string, handler: IMethodHandler): void;
 

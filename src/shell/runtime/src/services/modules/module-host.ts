@@ -22,6 +22,7 @@ import type { DataDirectory } from "../data-directory/data-directory.js";
 import type { DiagnosticRedactor } from "../diagnostics/diagnostic-redactor.js";
 import type { NotificationCenter } from "../notifications/notification-center.js";
 import { NotificationPolicy } from "../notifications/notification-policy.js";
+import type { ProcessSupervisor } from "../process/process-supervisor.js";
 import type { CommandRegistry } from "../registry/command-registry.js";
 import { ModuleDatabase } from "../database/module-database.js";
 import type { EventRegistry } from "../registry/event-registry.js";
@@ -80,9 +81,9 @@ export class ModuleHost {
     return this.declarations.flatMap(t => t.settings);
   }
 
-  public async activateAsync(settings: SettingsService): Promise<void> {
+  public async activateAsync(settings: SettingsService, processes: ProcessSupervisor): Promise<void> {
     for (const declaration of this.order())
-      this.statuses.set(declaration.id, await this.activateModuleAsync(declaration, settings));
+      this.statuses.set(declaration.id, await this.activateModuleAsync(declaration, settings, processes));
   }
 
   public async deactivateAsync(): Promise<void> {
@@ -96,6 +97,7 @@ export class ModuleHost {
         failures.push(error);
       }
       finally {
+        await activation.processes.stopOwnedByAsync(activation.context.moduleId);
         activation.context[Symbol.dispose]();
         activation.database?.close();
       }
@@ -117,7 +119,7 @@ export class ModuleHost {
     return ordered;
   }
 
-  private async activateModuleAsync(declaration: ModuleDeclaration, settings: SettingsService): Promise<ModuleStatus> {
+  private async activateModuleAsync(declaration: ModuleDeclaration, settings: SettingsService, processes: ProcessSupervisor): Promise<ModuleStatus> {
     const blocker = declaration.dependencies.find(t => this.statuses.get(t)?.state !== ModuleState.Active);
     if (!Object.isUndefined(blocker))
       return new ModuleStatus(declaration.id, ModuleState.Blocked, Resources.formatModuleBlocked(blocker));
@@ -146,17 +148,18 @@ export class ModuleHost {
 
     const context = new ModuleContext(
       declaration, this.dataDirectory, this.methods, this.events, this.commands, this.notifications, this.notificationPolicy, this.services, settings,
-      this.work, this.diagnostics, this.redactor, database);
+      this.work, processes, this.diagnostics, this.redactor, database);
     try {
       await part.activateAsync(context);
     }
     catch (error) {
+      await processes.stopOwnedByAsync(declaration.id);
       context[Symbol.dispose]();
       database?.close();
       this.writeDiagnostic(declaration.id, Resources.moduleActivationFailed, error);
       return new ModuleStatus(declaration.id, ModuleState.Failed, Resources.moduleActivationFailed);
     }
-    this.activations.push(new ModuleActivation(context, part, database));
+    this.activations.push(new ModuleActivation(context, part, processes, database));
     return new ModuleStatus(declaration.id, ModuleState.Active, null);
   }
 

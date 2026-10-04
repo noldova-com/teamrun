@@ -9,15 +9,18 @@
 import type { IRuntimePart } from "../interfaces/runtime-part.js";
 import type { ModuleDatabase } from "../services/database/module-database.js";
 import type { ModuleContext } from "../services/modules/module-context.js";
+import type { ProcessSupervisor } from "../services/process/process-supervisor.js";
 
 export class ModuleActivation {
   public readonly context: ModuleContext;
   public readonly part: IRuntimePart;
+  public readonly processes: ProcessSupervisor;
   public readonly database?: ModuleDatabase;
 
-  public constructor(context: ModuleContext, part: IRuntimePart, database?: ModuleDatabase) {
+  public constructor(context: ModuleContext, part: IRuntimePart, processes: ProcessSupervisor, database?: ModuleDatabase) {
     this.context = context;
     this.part = part;
+    this.processes = processes;
     if (!Object.isUndefined(database))
       this.database = database;
   }
