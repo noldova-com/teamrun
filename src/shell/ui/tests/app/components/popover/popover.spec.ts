@@ -220,6 +220,7 @@ describe("PopoverTriggerDirective and PopoverDirective", () => {
     await renderAsync();
     const popover = fixture.nativeElement.querySelector(".static") as HTMLElement;
     popover.style.setProperty("--tr-popover-width", "500vw");
+    await userEvent.keyboard("{Shift}");
     popover.focus();
 
     expect(popover.getBoundingClientRect().width).toBeLessThanOrEqual(window.innerWidth);

@@ -20,7 +20,12 @@ class GitHubExceptionTests {
       assert.equal(exception.name, "GitHubException");
       assert.equal(exception.message, "could not read");
       assert.equal(exception.cause, cause);
+      assert.equal(exception.status, null);
       assert.ok(exception instanceof Error);
+    });
+
+    test("the exception keeps the HTTP status GitHub answered with", () => {
+      assert.equal(new GitHubException("conflict", undefined, 409).status, 409);
     });
   }
 }

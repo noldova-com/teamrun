@@ -15,6 +15,9 @@ export default interface IScenarioPullRequest {
   readonly isDraft?: boolean;
   readonly base?: string;
   readonly mergeState?: string;
+  readonly unknownMergeStates?: number;
+  readonly activeRuns?: readonly number[];
+  readonly conflicts?: readonly string[] | null;
   readonly hasAutoMerge?: boolean;
   readonly commitMinutesAgo?: number;
   readonly buildRuns?: number;
