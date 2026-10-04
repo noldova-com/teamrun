@@ -230,6 +230,7 @@ export class Resources {
   public static readonly tooltipShowDelay: number = 0;
   public static readonly tooltipHideDelay: number = 0;
   public static readonly tooltipPaneClass: string = "tr-tooltip-pane";
+  public static readonly zeroPixels: string = "0px";
   public static readonly tooltipTextInput: string = "text";
   public static readonly overlayAlignmentFactors: Readonly<Record<OverlayAlignment, number>> = {
     [OverlayAlignment.Center]: 0.5,
