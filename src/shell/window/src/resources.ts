@@ -302,7 +302,7 @@ export class Resources {
   public static readonly commandSearchLabel: string = "Search commands";
   public static readonly commandSearchPaneClass: string = "tr-command-search-pane";
   public static readonly windowRowSelector: string = "tr-window-row";
-  public static readonly wordSeparatorPattern: RegExp = /[\s\-_./:,]/u;
+  public static readonly categorySeparator: string = " ";
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
   public static readonly hideDockLabels: Readonly<Record<DockSide, string>> = {

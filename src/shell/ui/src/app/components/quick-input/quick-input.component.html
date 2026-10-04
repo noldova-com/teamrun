@@ -11,12 +11,20 @@
           @if (segment.isMatch) {
             <mark class="tr-quick-input-match">{{ segment.text }}</mark>
           } @else {
-            {{ segment.text }}
+            <span>{{ segment.text }}</span>
           }
         }
       </span>
-      @if (item.detail; as detail) {
-        <span class="tr-quick-input-detail">{{ detail }}</span>
+      @if (item.detail) {
+        <span class="tr-quick-input-detail">
+          @for (segment of item.detailSegments; track $index) {
+            @if (segment.isMatch) {
+              <mark class="tr-quick-input-match">{{ segment.text }}</mark>
+            } @else {
+              <span>{{ segment.text }}</span>
+            }
+          }
+        </span>
       }
       @if (item.keyLabel; as keys) {
         <span class="tr-quick-input-key">{{ keys }}</span>

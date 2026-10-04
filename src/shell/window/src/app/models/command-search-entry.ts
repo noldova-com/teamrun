@@ -10,10 +10,12 @@ import type { QuickInputItem } from "@noldova/teamrun-shell-ui";
 
 export class CommandSearchEntry {
   public readonly item: QuickInputItem;
+  public readonly category: string;
   public readonly run: () => void;
 
-  public constructor(item: QuickInputItem, run: () => void) {
+  public constructor(item: QuickInputItem, category: string, run: () => void) {
     this.item = item;
+    this.category = category;
     this.run = run;
   }
 }
