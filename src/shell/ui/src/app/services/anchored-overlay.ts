@@ -115,6 +115,8 @@ export class AnchoredOverlay {
       return;
     const element = this.element;
     element.style.maxHeight = String.empty;
+    this.strategy.left(Resources.zeroPixels).top(Resources.zeroPixels);
+    this.overlay.updatePosition();
     const size = element.getBoundingClientRect();
     this.originAt = this.origin.getBoundingClientRect();
     const anchor = Object.isNull(this.area) ? this.originAt : this.area();
