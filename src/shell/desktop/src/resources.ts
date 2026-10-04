@@ -132,6 +132,8 @@ export class Resources {
   public static readonly willQuitEvent: "will-quit" = "will-quit";
   public static readonly resizeEvent: "resize" = "resize";
   public static readonly moveEvent: "move" = "move";
+  public static readonly willMoveEvent: "will-move" = "will-move";
+  public static readonly willResizeEvent: "will-resize" = "will-resize";
   public static readonly maximizeEvent: "maximize" = "maximize";
   public static readonly unmaximizeEvent: "unmaximize" = "unmaximize";
   public static readonly boundsSaveDelay: number = 500;
