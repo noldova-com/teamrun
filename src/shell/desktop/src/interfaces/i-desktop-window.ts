@@ -21,7 +21,6 @@ export interface IDesktopWindow {
   setAppDetails(options: AppDetailsOptions): void;
   getNormalBounds(): Rectangle;
   setBounds(bounds: Partial<Rectangle>): void;
-  center(): void;
   isMaximized(): boolean;
   maximize(): void;
   isVisible(): boolean;

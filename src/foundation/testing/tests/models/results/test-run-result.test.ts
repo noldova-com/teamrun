@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Assert, TestClass, TestClassResult, TestMethod, TestMethodResult, TestMethodResultOptions, TestOutcome, TestRunResult } from "@noldova/teamrun-foundation-testing";
+import { Assert, TestClass, TestClassResult, TestMethod, TestMethodResult, TestMethodResultOptions, TestOutcome, TestRunResult, TestSelection } from "@noldova/teamrun-foundation-testing";
 
 @TestClass
 export class TestRunResultTests {
@@ -29,6 +29,27 @@ export class TestRunResultTests {
     Assert.areEqual(3, result.durationMilliseconds);
     Assert.areEqual(3, result.executed);
     Assert.areEqual(4, result.total);
+  }
+
+  @TestMethod
+  public selectsEverythingWhenNoSelectionIsGiven(): void {
+    const result = new TestRunResult([
+      new TestClassResult("TestPackage", "FirstTests", "first.test.js", [
+        new TestMethodResult("TestPackage", "FirstTests", "passes", TestOutcome.Passed, 1)
+      ])
+    ]);
+
+    Assert.isFalse(result.selection.isFiltered);
+    Assert.areEqual(1, result.selection.discovered);
+    Assert.areEqual(1, result.selection.selected);
+  }
+
+  @TestMethod
+  public keepsTheSelectionItWasGiven(): void {
+    const selection = new TestSelection(["first"], 4, 1);
+    const result = new TestRunResult([], selection);
+
+    Assert.areEqual(selection, result.selection);
   }
 
   @TestMethod

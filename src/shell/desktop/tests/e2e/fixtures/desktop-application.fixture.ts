@@ -59,6 +59,9 @@ export default class DesktopApplicationFixture {
   private static readonly MAIN_PROCESS_TIMEOUT: number = 10_000;
   private static readonly QUIT_TIMEOUT: number = 30_000;
   private static readonly SILENCE_FILE: string = "main-process.txt";
+  private static readonly THREADS_FILE: string = "main-process-threads.txt";
+  private static readonly THREADS_TIMEOUT: number = 20_000;
+  private static readonly PAGE_UNREACHABLE: string = "The page did not answer the silence report's request, which reaches it through the main process, so the test did not wait for it.";
   private static readonly MAIN_WINDOW: string = "main-window";
   private static readonly NO_ANSWER: unique symbol = Symbol("no answer");
 
@@ -72,6 +75,7 @@ export default class DesktopApplicationFixture {
   private viewport: { width: number; height: number } | null;
   private readonly recorded: Set<number> = new Set();
   private placement: string = "The window had not been moved off the cursor.";
+  private isPageUnreachable: boolean = false;
   private silence: MainProcessSilence | null = null;
   private mainProcessId: number | null = null;
 
@@ -284,11 +288,17 @@ export default class DesktopApplicationFixture {
     if (!isRunning)
       return;
     const silence = this.silence;
-    if (silence !== null)
-      await this.keepAsync(DesktopApplicationFixture.SILENCE_FILE, "text/plain", () => this.describeSilenceAsync(silence));
+    if (silence !== null) {
+      const processId = this.mainProcessId;
+      if (processId !== null)
+        await this.keepAsync(DesktopApplicationFixture.THREADS_FILE, "text/plain", () => ProcessListFixture.describeThreadsAsync(processId),
+          DesktopApplicationFixture.THREADS_TIMEOUT);
+      await this.keepAsync(DesktopApplicationFixture.SILENCE_FILE, "text/plain", () => this.describeSilenceAsync(silence),
+        DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT + DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT);
+    }
     for (const [index, page] of this.application.windows().entries()) {
-      await this.keepAsync(`page-${index}.png`, "image/png", () => page.screenshot());
-      await this.keepAsync(`page-${index}.html`, "text/html", () => page.content());
+      await this.keepAsync(`page-${index}.png`, "image/png", () => this.isPageUnreachable ? Promise.reject(new Error(DesktopApplicationFixture.PAGE_UNREACHABLE)) : page.screenshot());
+      await this.keepAsync(`page-${index}.html`, "text/html", () => this.isPageUnreachable ? Promise.reject(new Error(DesktopApplicationFixture.PAGE_UNREACHABLE)) : page.content());
     }
     await this.keepAsync(DesktopApplicationFixture.WINDOWS_FILE, "application/json", async () => JSON.stringify(await this.answerAsync("describe its windows", this.application.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows().map(t => ({
@@ -306,11 +316,11 @@ export default class DesktopApplicationFixture {
     });
   }
 
-  private async keepAsync(name: string, contentType: string, capture: () => Promise<Buffer | string>): Promise<void> {
+  private async keepAsync(name: string, contentType: string, capture: () => Promise<Buffer | string>, limit: number = DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT): Promise<void> {
     try {
-      const body = await DesktopApplicationFixture.withinAsync(capture(), DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT);
+      const body = await DesktopApplicationFixture.withinAsync(capture(), limit);
       if (body === DesktopApplicationFixture.NO_ANSWER)
-        throw new Error(`No answer within ${DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT} ms.`);
+        throw new Error(`No answer within ${limit} ms.`);
       await this.testInfo.attach(name, { body, contentType });
     }
     catch (error) {
@@ -323,6 +333,7 @@ export default class DesktopApplicationFixture {
     const started = Date.now();
     const request = this.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { readBuild(): Promise<unknown> }).readBuild());
     const answer = await DesktopApplicationFixture.withinAsync(request.then(() => null, (error: unknown) => String(error)), DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT);
+    this.isPageUnreachable = answer === DesktopApplicationFixture.NO_ANSWER;
     const described = answer === DesktopApplicationFixture.NO_ANSWER
       ? `had no answer within ${DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT / 1000} s`
       : answer === null ? `was answered in ${Date.now() - started} ms` : `failed: ${answer}`;
@@ -456,7 +467,11 @@ export default class DesktopApplicationFixture {
   }
 
   private async moveOffCursorAsync(): Promise<void> {
-    await this.answerAsync("unmaximize the window", this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.unmaximize()));
+    await this.answerAsync("unmaximize the window", this.application.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (window?.isMaximized() === true)
+        window.unmaximize();
+    }));
     await expect.poll(() => this.answerAsync("say whether the window is maximized", this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isMaximized())))
       .toBe(false);
     const state = await this.answerAsync("read the cursor, the window's bounds and the displays", this.application.evaluate(({ BrowserWindow, screen }) => {
@@ -477,6 +492,8 @@ export default class DesktopApplicationFixture {
       this.placement += ` After the move, the window was at ${OffCursorPlacement.describe(placed)}.`;
     }
     await expect.poll(() => this.isCursorInsideAsync()).toBe(false);
+    await this.answerAsync("send the window a pointer leave", this.application.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0]?.webContents.sendInputEvent({ type: "mouseLeave", x: 0, y: 0 })));
     await expect.poll(() => this.window.evaluate(() => document.querySelector(":hover") === null)).toBe(true);
   }
 

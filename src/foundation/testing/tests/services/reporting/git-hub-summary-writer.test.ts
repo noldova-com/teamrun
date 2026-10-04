@@ -12,7 +12,7 @@ import { join } from "node:path";
 
 import {
   Assert, AssertFailedException, BlockCoverage, CoverageResult, FileCoverage, GitHubSummaryWriter, LineRange, TestClass, TestClassResult, TestDataRow, TestMethod,
-  TestMethodResult, TestMethodResultOptions, TestOutcome, TestRunResult
+  TestMethodResult, TestMethodResultOptions, TestOutcome, TestRunResult, TestSelection
 } from "@noldova/teamrun-foundation-testing";
 
 @TestClass
@@ -48,6 +48,28 @@ export class GitHubSummaryWriterTests {
       Assert.isTrue(report.includes("not available"));
       Assert.isFalse(report.includes("\u001b"));
       Assert.isFalse(report.includes("<script>"));
+    }
+    finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public listsTheFiltersAndTheCountsOfAFilteredRunOnly(): void {
+    const directory = mkdtempSync(join(tmpdir(), "teamrun-summary-"));
+    try {
+      const path = join(directory, "summary.md");
+      const writer = new GitHubSummaryWriter(path);
+      const classResults = [new TestClassResult("Package", "SampleTests", "sample.test.js", [
+        new TestMethodResult("Package", "SampleTests", "passes", TestOutcome.Passed, 1)
+      ])];
+      writer.writeTests(new TestRunResult(classResults));
+      Assert.isFalse(readFileSync(path, "utf8").includes("Discovered:"));
+
+      writer.writeTests(new TestRunResult(classResults, new TestSelection(["Sample", "Other"], 9, 1)));
+      const report = readFileSync(path, "utf8");
+      for (const line of ["| Filters: | Sample, Other |", "| Discovered: | 9 |", "| Selected: | 1 |", "| Unselected: | 8 |"])
+        Assert.isTrue(report.includes(line), line);
     }
     finally {
       rmSync(directory, { recursive: true, force: true });
