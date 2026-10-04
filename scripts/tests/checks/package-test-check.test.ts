@@ -126,6 +126,17 @@ class PackageTestCheckTests {
       assert.deepEqual(unreadable.map(t => [t.isPassing, t.discovered, t.selected]), Array.from({ length: 5 }, () => [false, 0, 0]));
     });
 
+    test("a filtered run fails with the reason when the framework discovered no package test at all", async t => {
+      const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
+      const runner = new SelectionRunnerFixture([0], JSON.stringify({ discovered: 0, selected: 0 }));
+      const output = new TextOutputFixture();
+
+      const selection = await new PackageTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, {}).runSelectedAsync(["Alpha"], output);
+
+      assert.deepEqual([selection.isPassing, selection.discovered, selection.selected], [false, 0, 0]);
+      assert.equal(output.text, "Packages have test output, but the test framework discovered no test in it.\n");
+    });
+
     test("failing tests or incomplete coverage fail the check, and both still run", async t => {
       const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
       const runner = new ProcessRunnerFixture([1, 0, 0, 1]);

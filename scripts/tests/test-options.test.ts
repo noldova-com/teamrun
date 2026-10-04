@@ -32,6 +32,12 @@ class TestOptionsTests {
       assert.deepEqual([options.isDocuments, options.filters, options.repeat], [false, ["alpha", "category:fast"], 5]);
     });
 
+    test("documents after the first argument is a filter's text, not the document checks", () => {
+      const options = TestOptions.parse(["--filter", "documents"]);
+
+      assert.deepEqual([options.isDocuments, options.filters, options.repeat], [false, ["documents"], 1]);
+    });
+
     test("anything else is refused with the reason", () => {
       const refused: readonly (readonly [readonly string[], string])[] = [
         [["documents", "documents"], "documents takes no other option."],
@@ -47,7 +53,8 @@ class TestOptionsTests {
         [["--repeat", "two"], "--repeat takes a whole number from 1."],
         [["--repeat", "2", "--repeat", "3"], "--repeat may be given only once."],
         [["coverage"], "\"coverage\" is not an option of npm test."],
-        [["--filter", "alpha", "extra"], "\"extra\" is not an option of npm test."]
+        [["--filter", "alpha", "extra"], "\"extra\" is not an option of npm test."],
+        [["--repeat", "2", "documents"], "\"documents\" is not an option of npm test."]
       ];
 
       for (const [args, reason] of refused)

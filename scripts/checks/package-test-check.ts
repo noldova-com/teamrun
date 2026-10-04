@@ -38,6 +38,7 @@ export default class PackageTestCheck implements ISelectableCheck {
   private static readonly UNIT: string = "package tests";
   private static readonly ALL_TESTS: readonly string[] = [];
   private static readonly NO_TESTS: string = "No package has tests.\n";
+  private static readonly NONE_DISCOVERED: string = "Packages have test output, but the test framework discovered no test in it.\n";
   private static readonly NO_FRAMEWORK: string = `Packages have tests, but ${PackageTestCheck.TESTING_PACKAGE} is not a package under src/.\n`;
 
   private readonly root: string;
@@ -93,7 +94,7 @@ export default class PackageTestCheck implements ISelectableCheck {
       }
       const testsPassed = await this.runner.runAsync(process.execPath, [PackageTestCheck.SOURCE_MAPS_OPTION, this.locateEntry(PackageTestCheck.TEST_ENTRY_SEGMENTS), ...tests], this.root, environment) === 0;
       if (isFiltered)
-        return await this.readSelectionAsync(selectionFile, testsPassed);
+        return await this.readSelectionAsync(selectionFile, testsPassed, output);
       const projects = packages.flatMap(t => [t.name, layout.locateInstalled(t), layout.locateSource(t, PackageTestCheck.SOURCE_FOLDER), t.coverageExclusions]);
       const coverageComplete = await this.runner.runAsync(process.execPath, [this.locateEntry(PackageTestCheck.COVERAGE_ENTRY_SEGMENTS), coverage, ...projects], this.root, this.environment) === 0;
       return new CheckSelection(testsPassed && coverageComplete, PackageTestCheck.UNIT, 0, 0);
@@ -106,11 +107,13 @@ export default class PackageTestCheck implements ISelectableCheck {
     }
   }
 
-  private async readSelectionAsync(file: string, testsPassed: boolean): Promise<CheckSelection> {
+  private async readSelectionAsync(file: string, testsPassed: boolean, output: Writable): Promise<CheckSelection> {
     const counts = existsSync(file) ? PackageTestCheck.parseSelection(await readFile(file, PackageTestCheck.SELECTION_ENCODING)) : null;
     if (counts === null)
       return new CheckSelection(false, PackageTestCheck.UNIT, 0, 0);
-    return new CheckSelection(testsPassed, PackageTestCheck.UNIT, counts.discovered, counts.selected);
+    if (counts.discovered === 0)
+      output.write(PackageTestCheck.NONE_DISCOVERED);
+    return new CheckSelection(testsPassed && counts.discovered > 0, PackageTestCheck.UNIT, counts.discovered, counts.selected);
   }
 
   private static parseSelection(text: string): { discovered: number; selected: number } | null {
