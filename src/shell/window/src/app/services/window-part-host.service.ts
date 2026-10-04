@@ -45,6 +45,7 @@ import { LayoutService } from "./layout.service";
 import { MenuService } from "./menu.service";
 import { SettingsService } from "./settings.service";
 import { TabLabelService } from "./tab-label.service";
+import { ViewDialogService } from "./view-dialog.service";
 
 @Injectable({ providedIn: "root" })
 export class WindowPartHostService implements IWindowPartHost {
@@ -56,6 +57,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly bars: BarItemsService = inject(BarItemsService);
   private readonly menus: MenuService = inject(MenuService);
   private readonly settings: SettingsService = inject(SettingsService);
+  private readonly viewDialogs: ViewDialogService = inject(ViewDialogService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
   private readonly activations: WindowPartActivation[] = [];
@@ -138,6 +140,11 @@ export class WindowPartHostService implements IWindowPartHost {
       this.opener.keep(moduleId, name, instance);
     else
       this.pendingOpens = this.pendingOpens.map(t => t.kept(moduleId, name, instance));
+  }
+
+  public async showInDialogAsync(name: string, instance: string | null, title: string | null): Promise<void> {
+    const tab = this.layout.registry().hasDocument(name) ? new DocumentTab(name, instance ?? undefined) : new ViewTab(name, instance ?? undefined);
+    await this.viewDialogs.showAsync(tab, title);
   }
 
   public declaresDynamicMenuGroup(moduleId: string, group: string): boolean {

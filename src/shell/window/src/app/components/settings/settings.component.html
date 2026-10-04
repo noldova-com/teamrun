@@ -1,9 +1,17 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
 <div class="tr-settings-search">
   <input tr-text-field type="search" class="tr-settings-search-field" [attr.aria-label]="resources.searchSettingsLabel" [placeholder]="resources.searchSettingsLabel"
     [value]="query()" (input)="search($event)" />
 </div>
 <div class="tr-settings-body">
-  <nav class="tr-settings-pages" [attr.aria-label]="resources.settingsPagesLabel">
+  <nav #pageList class="tr-settings-pages" [attr.aria-label]="resources.settingsPagesLabel" (scroll)="keep()">
     @for (page of pages(); track page.title) {
       @let isCurrent = !isSearching() && page.title === currentPage()?.title;
       <button type="button" class="tr-settings-page" [class.tr-settings-page-current]="isCurrent" [attr.aria-current]="isCurrent ? 'page' : null" (click)="select(page)">
@@ -11,7 +19,7 @@
       </button>
     }
   </nav>
-  <div class="tr-settings-content">
+  <div #content class="tr-settings-content" (scroll)="keep()">
     @if (isSearching()) {
       @for (page of results(); track page.title) {
         <section class="tr-settings-result" [attr.aria-label]="page.title">

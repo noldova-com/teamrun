@@ -131,6 +131,21 @@ class AngularProjectTests {
       assert.equal(AngularProject.LOG_FILE, "_build/angular-tests.log");
     });
 
+    test("tests selected by path run through the CLI's include option, without the coverage gate", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      const directory = path.join(repository.directory, "src");
+      const report = path.join(repository.directory, "_build", "angular-tests.json");
+      const reporting = new AngularReportRunnerFixture(JSON.stringify({ testResults: [{ name: path.join(directory, "a.spec.ts") }] }), [0]);
+
+      const run = await AngularProjectTests.create(repository, reporting).testAsync(["a.spec.ts", "shell/b.spec.ts"]);
+
+      assert.deepEqual(run.collected, ["a.spec.ts"]);
+      assert.deepEqual(reporting.runs, [[
+        process.execPath, directory, path.join(directory, "node_modules", "@angular", "cli", "bin", "ng.js"), "test", "--reporters=default", "--reporters=json", "--output-file", report,
+        "--no-coverage", "--include", "a.spec.ts", "--include", "shell/b.spec.ts"
+      ]]);
+    });
+
     test("the tests start without the runner's pre-bundled dependencies, since the package check may have reinstalled TeamRun's packages since the build", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
       await repository.writeAsync({ "src/node_modules/.vite/vitest/0123abcd/deps/@noldova_teamrun-shell-protocol.js": "export class EarlierBuild {}\n" });

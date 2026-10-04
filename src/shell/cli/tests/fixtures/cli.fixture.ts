@@ -9,9 +9,9 @@
 import { EventEmitter } from "node:events";
 import path from "node:path";
 import { PassThrough } from "node:stream";
-import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
+import { Wait } from "@noldova/teamrun-foundation-testing";
 import { Cli, CliContext } from "@noldova/teamrun-shell-cli";
 import type { BuildIdentity } from "@noldova/teamrun-shell-protocol";
 import { DataDirectory, DiscoveryReader, type IProcessStarter, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions, ServerSettings } from "@noldova/teamrun-shell-runtime";
@@ -24,7 +24,6 @@ export class CliFixture implements AsyncDisposable {
   public static readonly CHECKOUT_VARIABLE: string = "TEAMRUN_CHECKOUT";
   public static readonly DATA_DIRECTORY_VARIABLE: string = "TEAMRUN_DATA_DIR";
   private static readonly STOP_LIMIT: number = 15_000;
-  private static readonly POLL_INTERVAL: number = 25;
 
   private readonly folder: SocketFolderFixture;
   private readonly hosts: RuntimeHost[] = [];
@@ -95,9 +94,7 @@ export class CliFixture implements AsyncDisposable {
     catch {
       return;
     }
-    const deadline = Date.now() + CliFixture.STOP_LIMIT;
-    while (OwnershipLock.isOwned(new DataDirectory(this.dataDirectory)) && Date.now() < deadline)
-      await delay(CliFixture.POLL_INTERVAL);
+    await Wait.untilAsync(() => !OwnershipLock.isOwned(new DataDirectory(this.dataDirectory)), CliFixture.STOP_LIMIT);
   }
 
   public async [Symbol.asyncDispose](): Promise<void> {

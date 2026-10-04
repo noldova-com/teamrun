@@ -64,6 +64,11 @@ class FakeWindowPartHost implements IWindowPartHost {
     this.calls.push(`log ${moduleId} ${message}`);
   }
 
+  public showInDialogAsync(name: string, instance: string | null, title: string | null): Promise<void> {
+    this.calls.push(`show ${name} ${instance ?? "-"} ${title ?? "-"}`);
+    return Promise.resolve();
+  }
+
   public isCommandRegistered(name: string): boolean {
     return this.registered.has(name);
   }
@@ -288,6 +293,16 @@ describe("WindowPartContext", () => {
     context.keepDocument("notes.note", "2");
 
     expect(host.calls).toEqual(["open notes notes.note 1 Note 1", "open notes notes.note 2 Note 2 as a preview", "open notes notes.note 3 Note 3", "keep notes notes.note 2"]);
+  });
+
+  it("shows its own, its dependencies' and the shell's views and documents in a dialog through the host, and refuses another module's", async () => {
+    await context.showInDialogAsync("notes.list");
+    await context.showInDialogAsync("notes.note", { instance: "1", title: "Note 1" });
+    await context.showInDialogAsync("tasks.board", { title: "Board" });
+    await context.showInDialogAsync("shell.settings");
+
+    await expect(context.showInDialogAsync("clock.face")).rejects.toThrowError(WindowPartAccessException);
+    expect(host.calls).toEqual(["show notes.list - -", "show notes.note 1 Note 1", "show tasks.board - Board", "show shell.settings - -"]);
   });
 
   it("writes its log lines through the host under its module's id", () => {

@@ -13,11 +13,18 @@ import type { Locator, Page } from "@playwright/test";
 
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
 
 const windowColors = { Light: "rgb(248, 248, 248)", Dark: "rgb(24, 24, 24)" };
+const settingsKey = "document/shell.settings";
 
 function settingsTab(window: Page): Locator {
-  return window.locator("tr-tab[data-tab-key=\"document/shell.settings\"]");
+  return TabDragFixture.tab(window, settingsKey);
+}
+
+async function expectSamePageAsync(window: Page, top: number): Promise<void> {
+  await expect(window.locator(".tr-settings-page[aria-current=page]")).toHaveText("Keyboard shortcuts");
+  await expect.poll(() => window.locator(".tr-settings-content").evaluate(t => t.scrollTop)).toBe(top);
 }
 
 function row(window: Page, name: string): Locator {
@@ -35,8 +42,7 @@ async function otherModeAsync(window: Page): Promise<"Light" | "Dark"> {
 }
 
 async function chooseAsync(window: Page, name: string, option: string): Promise<void> {
-  await row(window, name).locator(".tr-select-button").click();
-  await window.getByRole("option", { name: option, exact: true }).click();
+  await row(window, name).getByRole("radio", { name: option, exact: true }).click();
 }
 
 async function nativeBackgroundAsync(desktop: DesktopApplicationFixture): Promise<string> {
@@ -91,6 +97,31 @@ test.describe("settings", () => {
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
   });
 
+  test("Settings keeps its page and scroll position when its tab becomes active again and when it moves to another group", async ({ desktop }) => {
+    const window = desktop.window;
+    const note = "document/notes.note/2";
+    await openSettingsAsync(window);
+    await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
+    const top = await window.locator(".tr-settings-content").evaluate(async t => {
+      t.scrollTop = 120;
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      return t.scrollTop;
+    });
+    expect(top).toBeGreaterThan(0);
+
+    await TabDragFixture.tab(window, note).click();
+    await expect(window.locator("tr-settings")).toHaveCount(0);
+    await settingsTab(window).click();
+    await expectSamePageAsync(window, top);
+
+    await TabDragFixture.dragOntoPlateAsync(window, settingsKey, note, "Right");
+    await window.mouse.up();
+
+    await expect(window.locator("tr-tab-group").filter({ has: window.locator("tr-tab[data-tab-key^='document/']") })).toHaveCount(2);
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, settingsKey))).toEqual([settingsKey]);
+    await expectSamePageAsync(window, top);
+  });
+
   test("changing the mode, a font and a size repaints the window at once, marks them modified, and Reset returns each", async ({ desktop }) => {
     const window = desktop.window;
     await openSettingsAsync(window);
@@ -115,6 +146,31 @@ test.describe("settings", () => {
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).toBe(before.font);
   });
 
+  test("the Mode pills are one radio group: the checked pill is the tab stop and the arrow keys move the choice", async ({ desktop }) => {
+    const window = desktop.window;
+    await openSettingsAsync(window);
+    const pill = (name: string): Locator => row(window, "shell.mode").getByRole("radiogroup", { name: "Mode" }).getByRole("radio", { name, exact: true });
+    const backgroundAsync = (): Promise<string> => window.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+    await pill("Light").click();
+    await expect.poll(backgroundAsync).toBe(windowColors.Light);
+    await window.keyboard.press("ArrowRight");
+    await expect(pill("Dark")).toBeChecked();
+    await expect(pill("Dark")).toBeFocused();
+    await expect.poll(backgroundAsync).toBe(windowColors.Dark);
+    await window.keyboard.press("ArrowRight");
+    await expect(pill("System")).toBeChecked();
+    await window.keyboard.press("ArrowRight");
+    await expect(pill("Light")).toBeChecked();
+    await window.keyboard.press("End");
+    await expect(pill("System")).toBeChecked();
+    await window.keyboard.press("ArrowLeft");
+    await expect(pill("Dark")).toBeChecked();
+    await expect(pill("Light")).toHaveAttribute("tabindex", "-1");
+    await expect(pill("Dark")).toHaveAttribute("tabindex", "0");
+    await desktop.checkpointAsync("settings-mode-pills");
+  });
+
   test("choosing a setting's default by hand removes its Modified marker and Reset, also after a restart", async ({ desktop }) => {
     const window = desktop.window;
     await openSettingsAsync(window);
@@ -130,7 +186,7 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-default-by-hand");
     await desktop.restartAsync();
     await openSettingsAsync(desktop.window);
-    await expect(row(desktop.window, "shell.mode").locator(".tr-select-button")).toContainText("System");
+    await expect(row(desktop.window, "shell.mode").getByRole("radio", { name: "System" })).toBeChecked();
     await expect(row(desktop.window, "shell.mode").locator(".tr-setting-row-marker")).toHaveCount(0);
     await expect(row(desktop.window, "shell.mode").getByRole("button", { name: /^Reset / })).toHaveCount(0);
   });

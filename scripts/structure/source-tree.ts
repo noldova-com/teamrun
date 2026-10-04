@@ -19,7 +19,7 @@ export default class SourceTree {
   private static readonly MODULE_FILE: RegExp = /^src\/modules\/([^/]+)\/./;
   private static readonly SHELL_FILE: RegExp = /^src\/(?:shell|foundation)\/./;
   private static readonly SHELL_AREA_DEPTH: number = 2;
-  private static readonly TEST_FOLDERS: ReadonlySet<string> = new Set(["tests", "e2e", "fixtures"]);
+  public static readonly TEST_FOLDERS: ReadonlySet<string> = new Set(["tests", "e2e", "fixtures"]);
   private static readonly SCANNED_EXTENSIONS: ReadonlySet<string> = new Set([
     ".ts", ".mts", ".cts", ".js", ".mjs", ".cjs", ".html", ".css", ".scss", ".json"
   ]);

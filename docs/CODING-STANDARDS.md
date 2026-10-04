@@ -219,7 +219,7 @@ Shells: on Windows, explicitly use Git for Windows Bash (plain `bash.exe` launch
 
 ## 12. License header
 
-TeamRun's own code is intended for distribution under the MIT license. The root `LICENSE` file must contain that license before distribution and is the license authority; this standards document does not replace it. Every repository-owned source, test, script, and generated file that supports comments begins with this exact header; generators emit it themselves, and formats without comments (such as JSON) are excluded:
+TeamRun's own code is intended for distribution under the MIT license. The root `LICENSE` file must contain that license before distribution and is the license authority; this standards document does not replace it. Every repository-owned source, test, script, style, template, workflow and generated file that supports comments begins with this exact notice, in the comment form of its format; generators emit it themselves, and formats without comments (such as JSON) are excluded. TypeScript, JavaScript, CSS and SCSS use the block comment:
 
 ```ts
 /**
@@ -231,9 +231,29 @@ TeamRun's own code is intended for distribution under the MIT license. The root 
  */
 ```
 
-Third-party material is never copied in without checking its license and recording any obligation; AGPL-licensed references are read, not copied.
+HTML templates use the markup comment:
 
-YAML configuration uses `#` comments containing the same license notice; it cannot use the TypeScript block-comment delimiters.
+```html
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+```
+
+YAML configuration uses `#` comments:
+
+```yaml
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+```
+
+`npm test` refuses a tracked file of these formats that does not start with its header. Third-party material is never copied in without checking its license and recording any obligation; AGPL-licensed references are read, not copied.
 
 ## 13. Tests
 

@@ -10,6 +10,8 @@ import type PullRequestCheck from "./pull-request-check.ts";
 import type PullRequestNote from "./pull-request-note.ts";
 
 export default class PullRequestSnapshot {
+  private static readonly CONFLICTED: string = "dirty";
+
   public readonly number: number;
   public readonly head: string;
   public readonly mergeState: string;
@@ -42,5 +44,9 @@ export default class PullRequestSnapshot {
     this.buildRuns = buildRuns;
     this.checks = [...checks];
     this.notes = [...notes];
+  }
+
+  public get isConflicted(): boolean {
+    return this.mergeState === PullRequestSnapshot.CONFLICTED;
   }
 }

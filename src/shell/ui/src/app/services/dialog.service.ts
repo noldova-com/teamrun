@@ -19,7 +19,15 @@ export class DialogService {
 
   private readonly dialog: Dialog = inject(Dialog);
 
-  public open<T>(component: ComponentType<T>, initialFocus: string): DialogRef<unknown, T> {
+  public get isOpen(): boolean {
+    return this.dialog.openDialogs.length > 0;
+  }
+
+  public isTopmost<T>(dialog: DialogRef<unknown, T>): boolean {
+    return this.dialog.openDialogs.at(-1) === dialog;
+  }
+
+  public open<T>(component: ComponentType<T>, initialFocus: string = Resources.dialogCloseSelector): DialogRef<unknown, T> {
     const titleId = `${Resources.dialogTitleIdPrefix}${DialogService.count++}`;
     return this.dialog.open<unknown, unknown, T>(component, {
       ariaLabelledBy: titleId,

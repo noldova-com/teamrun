@@ -9,8 +9,8 @@
 import path from "node:path";
 
 export default class SourceFile {
-  private static readonly SCRIPT_EXTENSIONS: ReadonlySet<string> = new Set([".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"]);
-  private static readonly STYLE_EXTENSIONS: ReadonlySet<string> = new Set([".css", ".scss"]);
+  public static readonly SCRIPT_EXTENSIONS: ReadonlySet<string> = new Set([".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"]);
+  public static readonly STYLE_EXTENSIONS: ReadonlySet<string> = new Set([".css", ".scss"]);
   private static readonly JSON_EXTENSION: string = ".json";
   private static readonly MANIFEST_NAME: string = "package.json";
 

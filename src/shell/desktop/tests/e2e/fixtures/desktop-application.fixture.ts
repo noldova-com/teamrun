@@ -11,10 +11,10 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 
 import { type ElectronApplication, type Page, type TestInfo, _electron, expect } from "@playwright/test";
 
+import { Wait } from "@noldova/teamrun-foundation-testing";
 import { StopPolicy } from "@noldova/teamrun-shell-protocol";
 import { DataDirectory, DiscoveryReader, Endpoint, OwnershipLock, RuntimeBuild, RuntimeClient, type RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
 
@@ -123,23 +123,18 @@ export default class DesktopApplicationFixture {
     const discovery = await DiscoveryReader.readAsync(directory);
     const asked = discovery !== null && DesktopApplicationFixture.isAlive(discovery.processId) ? discovery : null;
     const answer = asked === null ? "it had already withdrawn its discovery file" : await DesktopApplicationFixture.askToStopAsync(asked);
-    const deadline = Date.now() + DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT;
-    let exited: number | null = null;
-    while (DesktopApplicationFixture.isOwned(directory)) {
-      if (asked !== null && !DesktopApplicationFixture.isAlive(asked.processId)) {
-        exited ??= Date.now();
-        if (Date.now() - exited >= DesktopApplicationFixture.OWNERSHIP_RELEASE_TIMEOUT)
-          return;
-      }
-      else if (Date.now() >= deadline) {
-        const seconds = DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT / 1000;
-        if (asked === null)
-          throw new Error(`A runtime still owned ${dataDirectory} ${seconds} s after the test found it stopping, and no discovery file named a running process.`);
-        if (DesktopApplicationFixture.killIfRunning(asked.processId))
-          throw new Error(`The runtime ${asked.processId} still ran ${seconds} s after it was asked to stop (${answer}), so the test killed it.`);
-      }
-      await delay(DesktopApplicationFixture.OWNERSHIP_INTERVAL);
+    const seconds = DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT / 1000;
+    const isReleased = (): boolean => !DesktopApplicationFixture.isOwned(directory);
+    if (asked === null) {
+      if (!await Wait.untilAsync(isReleased, DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT, DesktopApplicationFixture.OWNERSHIP_INTERVAL))
+        throw new Error(`A runtime still owned ${dataDirectory} ${seconds} s after the test found it stopping, and no discovery file named a running process.`);
+      return;
     }
+    const hasEnded = await Wait.untilAsync(
+      () => isReleased() || !DesktopApplicationFixture.isAlive(asked.processId), DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT, DesktopApplicationFixture.OWNERSHIP_INTERVAL);
+    if (!hasEnded && DesktopApplicationFixture.killIfRunning(asked.processId))
+      throw new Error(`The runtime ${asked.processId} still ran ${seconds} s after it was asked to stop (${answer}), so the test killed it.`);
+    await Wait.untilAsync(isReleased, DesktopApplicationFixture.OWNERSHIP_RELEASE_TIMEOUT, DesktopApplicationFixture.OWNERSHIP_INTERVAL);
   }
 
   public static isAlive(processId: number): boolean {
@@ -420,29 +415,33 @@ export default class DesktopApplicationFixture {
     const started = Date.now();
     let held: [number, number] | null = null;
     let isExtended = false;
-    while ((await DiscoveryReader.readAsync(directory))?.productVersion !== RuntimeBuild.identity.productVersion) {
+    const isStarted = await Wait.untilAsync(async () => {
+      if ((await DiscoveryReader.readAsync(directory))?.productVersion === RuntimeBuild.identity.productVersion)
+        return true;
       const elapsed = Date.now() - started;
       const isHeld = DesktopApplicationFixture.isOwned(directory);
       if (isHeld)
         held = [held?.[0] ?? elapsed, elapsed];
       const failure = await this.readStartupFailureAsync();
-      const isStalled = elapsed >= DesktopApplicationFixture.LAUNCH_WAIT && !isHeld;
-      if (failure !== null || isStalled || elapsed >= DesktopApplicationFixture.LAUNCH_LIMIT) {
-        const waited = `no runtime published discovery within ${elapsed / 1000} s`;
-        const reason = failure !== null
-          ? `the window reports that TeamRun could not start (${failure})`
-          : isStalled ? `${waited}, and none holds the data directory` : `${waited}, though one holds the data directory`;
-        const lock = held === null ? "never held" : `held from ${held[0] / 1000} s to ${held[1] / 1000} s`;
-        const naming = await ProcessListFixture.describeNamingAsync(this.dataDirectory).catch((error: unknown) => `unknown (${String(error)})`);
-        throw new Error(`TeamRun's runtime did not start: ${reason}. The data directory's lock was ${lock}. Processes naming the data directory: ${naming}. Processor load: ${load.describe()}.`);
-      }
+      if (failure !== null)
+        throw await this.describeLaunchFailureAsync(`the window reports that TeamRun could not start (${failure})`, held, load);
+      if (elapsed >= DesktopApplicationFixture.LAUNCH_WAIT && !isHeld)
+        throw await this.describeLaunchFailureAsync(`no runtime published discovery within ${elapsed / 1000} s, and none holds the data directory`, held, load);
       if (elapsed >= DesktopApplicationFixture.LAUNCH_WAIT && !isExtended) {
         this.testInfo.setTimeout(this.testInfo.timeout + DesktopApplicationFixture.LAUNCH_LIMIT - DesktopApplicationFixture.LAUNCH_WAIT);
         isExtended = true;
       }
       load.sample();
-      await delay(DesktopApplicationFixture.LAUNCH_INTERVAL);
-    }
+      return false;
+    }, DesktopApplicationFixture.LAUNCH_LIMIT, DesktopApplicationFixture.LAUNCH_INTERVAL);
+    if (!isStarted)
+      throw await this.describeLaunchFailureAsync(`no runtime published discovery within ${(Date.now() - started) / 1000} s, though one holds the data directory`, held, load);
+  }
+
+  private async describeLaunchFailureAsync(reason: string, held: readonly [number, number] | null, load: ProcessorLoadFixture): Promise<Error> {
+    const lock = held === null ? "never held" : `held from ${held[0] / 1000} s to ${held[1] / 1000} s`;
+    const naming = await ProcessListFixture.describeNamingAsync(this.dataDirectory).catch((error: unknown) => `unknown (${String(error)})`);
+    return new Error(`TeamRun's runtime did not start: ${reason}. The data directory's lock was ${lock}. Processes naming the data directory: ${naming}. Processor load: ${load.describe()}.`);
   }
 
   private async readStartupFailureAsync(): Promise<string | null> {
