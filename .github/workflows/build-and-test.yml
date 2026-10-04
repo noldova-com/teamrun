@@ -298,7 +298,7 @@ jobs:
           name: ui-build-${{ matrix.runner }}-${{ matrix.architecture }}
 
       - name: Unpack the builds
-        run: tar -xf ui-build.tar
+        run: tar -xf ui-build.tar && rm ui-build.tar
 
       - name: Let Electron's sandbox start on Linux
         if: runner.os == 'Linux'

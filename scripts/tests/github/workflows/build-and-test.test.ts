@@ -204,8 +204,9 @@ class BuildAndTestTests {
       const removed = await doubles.runAsync(listing);
       const unpacked = await doubles.runAsync(workflow.readStepScript("Unpack the builds"));
       const restored = await doubles.runAsync(listing);
+      const archive = await doubles.runAsync("test -e ui-build.tar\n");
 
-      assert.deepEqual([packed.status, removed.status, unpacked.status, restored.status], [0, 1, 0, 0], packed.stderr + unpacked.stderr + restored.stderr);
+      assert.deepEqual([packed.status, removed.status, unpacked.status, restored.status, archive.status], [0, 1, 0, 0, 1], packed.stderr + unpacked.stderr + restored.stderr);
       assert.equal(restored.stdout, paths.map(t => `${t}\n`).join(""));
       assert.equal(workflow.readStepScript("Build the test build and its variants"), "npm run test:ui -- --list\n");
       assert.ok(text.includes("  ui-build:\n    name: Build for the UI workflows (${{ matrix.target }})\n    needs: changes\n" +
