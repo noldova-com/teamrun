@@ -32,7 +32,7 @@ describe("WindowErrorHandler", () => {
   it("writes each error to the console and sends it with its stack and causes to the desktop, under the module's id for a window part's failure", () => {
     const plain = new Error("A defect.");
     const bare = new TypeError("No stack.");
-    bare.stack = undefined;
+    delete bare.stack;
     const failure = new WindowPartFailureException("clock", "Its window part failed to activate.", bare);
 
     handler.handleError(plain);
