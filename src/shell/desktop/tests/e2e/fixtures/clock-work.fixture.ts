@@ -30,7 +30,7 @@ export default class ClockWorkFixture {
   }
 
   public static async finishAsync(dataDirectory: string): Promise<void> {
-    await CliFixture.runCommandAsync(dataDirectory, "clock.finishWork");
+    await CliFixture.runAsync("run", "clock.finishWork", "--data-dir", dataDirectory);
   }
 
   public static async readAsync(dataDirectory: string): Promise<string[]> {

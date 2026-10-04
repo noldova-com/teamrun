@@ -20,8 +20,4 @@ export default class CliFixture {
     const { stdout } = await promisify(execFile)(executable, [entry, ...commandLine], { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" }, encoding: "utf8", timeout: CliFixture.TIMEOUT });
     return stdout;
   }
-
-  public static async runCommandAsync(dataDirectory: string, command: string): Promise<void> {
-    await CliFixture.runAsync("run", command, "--data-dir", dataDirectory);
-  }
 }

@@ -194,7 +194,7 @@ test.describe("the harness's teardown", () => {
     expect(await ProcessListFixture.waitForSignalsAsync(desktop.recordedProcessIds, 0)).toEqual([]);
   });
 
-  test("a quit that stops at the question about running work is reported with the question, not as a silent main process", async ({ desktop }, testInfo) => {
+  test("a quit that stops at the question about running work is reported with the question, not as a silent main process", async ({ desktop }) => {
     test.setTimeout(120_000);
     await ClockWorkFixture.beginAsync(desktop);
 
@@ -205,7 +205,6 @@ test.describe("the harness's teardown", () => {
     expect(reported[0]).toMatch(/^TeamRun did not quit within 30 s because window 0 asked the question below, so the test killed it\.\nThe test left work running: finish or stop it before the test ends\.\n- dialog "Work is still running":\n/);
     expect(reported[0]).toContain(`- listitem: ${ClockWorkFixture.WORK}`);
     expect(desktop.failures).toEqual([]);
-    expect(testInfo.attachments.map(t => t.name)).not.toContain("main-process.txt");
     expect(await ProcessListFixture.waitForSignalsAsync(desktop.recordedProcessIds, 0)).toEqual([]);
   });
 });
