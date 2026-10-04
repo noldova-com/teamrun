@@ -29,6 +29,13 @@
   --tr-removed-background: color-mix(in srgb, var(--tr-removed) 12%, transparent);
 }
 
+:where([data-truncates]) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 body {
   margin: 0;
   background-color: var(--tr-window);

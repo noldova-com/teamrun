@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export enum MatchKind {
-  Prefix,
-  WordStarts,
-  Subsequence
+import type { ProcessTable } from "../models/process-table.js";
+
+export interface IProcessTableReader {
+  readAsync(): Promise<ProcessTable>;
 }

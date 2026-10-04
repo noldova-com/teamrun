@@ -89,9 +89,11 @@ describe("CommandSearchComponent", () => {
     await fixture.whenStable();
   }
 
-  it("lists every enabled command and menu row alphabetically by title, with the ones run this session first, and leaves out a disabled one", async () => {
-    const entries = [...commands.commands().filter(t => t.isEnabled(null)).map(t => [t.name, t.title]), ...menuBar.searchRows().map(t => [t.id, t.title])];
-    expect(ids()).toEqual(entries.sort((a, b) => String(a[1]).localeCompare(String(b[1]))).map(t => t[0]));
+  it("lists every enabled command and menu row by category and title, with the ones run this session first, latest first, and leaves out a disabled one", async () => {
+    const rows = [...root().querySelectorAll("[role=option]")].map(t => [t.querySelector(".tr-quick-input-detail")?.textContent?.trim(), t.querySelector(".tr-quick-input-title")?.textContent?.trim()]);
+    expect(rows).toHaveLength(commands.commands().filter(t => t.isEnabled(null)).length + menuBar.searchRows().length);
+    expect(rows).toEqual([...rows].sort((a, b) => String(a[0]).localeCompare(String(b[0])) || String(a[1]).localeCompare(String(b[1]))));
+    expect(rows.slice(-4)).toEqual([["weather", "Open the tools"], ["weather", "Photo"], ["weather", "Pluto"], ["weather", "Today's weather"]]);
     expect(ids()).not.toContain("notes.archive");
 
     search.remember("weather.today");
@@ -102,13 +104,18 @@ describe("CommandSearchComponent", () => {
     expect(ids().slice(0, 2)).toEqual(["notes.newNote", "weather.today"]);
   });
 
-  it("filters by the query, ranking prefix matches, then word starts, then letters anywhere, and shorter titles first within each", async () => {
-    await typeAsync("to");
+  it("keeps the rows whose title, or category followed by the title, contains the query as one run, in the same order, and marks the run", async () => {
+    const marks = (id: string, part: string): readonly (string | null)[] => [...root().querySelectorAll(`[data-item="${id}"] .tr-quick-input-${part} mark`)].map(t => t.textContent);
+    search.remember("weather.pluto");
 
-    expect(ids().filter(t => t.startsWith("weather."))).toEqual(["weather.today", "weather.tools", "weather.photo", "weather.pluto"]);
+    await typeAsync("TO");
+    const to = [ids().filter(t => t.startsWith("weather.") || ids().indexOf(t) === 0), marks("weather.tools", "title"), root().querySelector("[data-item=\"weather.tools\"] .tr-quick-input-title")?.textContent];
+    await typeAsync("weather p");
+    const category = [ids(), marks("weather.photo", "detail"), marks("weather.photo", "title")];
     await typeAsync("nn");
-    expect(ids()).toEqual(["notes.newNote", menuBar.searchRows().find(u => u.title === "New note")?.id]);
-    await typeAsync("zzz");
+
+    expect(to).toEqual([["weather.pluto", "weather.tools", "weather.photo", "weather.today"], ["to"], "Open the tools"]);
+    expect(category).toEqual([["weather.pluto", "weather.photo"], ["weather"], ["P"]]);
     expect(ids()).toEqual([]);
   });
 
@@ -144,7 +151,7 @@ describe("CommandSearchComponent", () => {
     expect([detail(template), key(template)]).toEqual(["File › New from template", undefined]);
 
     await typeAsync("new note");
-    expect(ids()).toEqual(["notes.newNote", template]);
+    expect(ids()).toEqual([template, "notes.newNote"]);
     await typeAsync("forecast");
     expect(ids()).toEqual([]);
     await typeAsync("quick note");
