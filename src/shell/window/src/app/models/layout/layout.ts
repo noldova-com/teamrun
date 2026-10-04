@@ -115,6 +115,12 @@ export class Layout {
     return this.withGroup(isPreview ? this.documents.openPreview(tab) : this.documents.insert(tab, this.documents.tabs.length));
   }
 
+  public restoreDocument(tab: DocumentTab, isPreview: boolean): Layout {
+    if (this.isOpen(tab))
+      return isPreview ? this : this.keep(tab);
+    return this.withGroup(this.documents.append(tab, isPreview));
+  }
+
   public keepPreviews(): Layout {
     return this.groups.flatMap(t => Object.isNull(t.preview) ? [] : [t.preview]).reduce<Layout>((layout, t) => layout.keep(t), this);
   }
