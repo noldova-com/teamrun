@@ -10,7 +10,6 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, type Writab
 
 import { AppearanceService } from "@noldova/teamrun-shell-ui";
 
-import { Resources } from "../../../resources";
 import { DockSide } from "../../enums/dock-side";
 import type { GroupFrame } from "../../models/layout/group-frame";
 import { LayoutService } from "../../services/layout.service";
@@ -52,6 +51,6 @@ export class WorkspaceComponent {
   }
 
   protected isEmptyDocuments(frame: GroupFrame): boolean {
-    return frame.group.id === Resources.documentsGroupId && this.layout.registry().views.length === 0;
+    return frame.group.isDocuments && this.layout.registry().views.length === 0;
   }
 }

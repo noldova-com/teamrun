@@ -109,6 +109,7 @@ export class LayoutService {
 
   public focusGroup(id: number): void {
     this.currentGroupId.set(id);
+    this.update(this.layoutState().focusDocuments(id));
   }
 
   public close(tab: Tab): void {

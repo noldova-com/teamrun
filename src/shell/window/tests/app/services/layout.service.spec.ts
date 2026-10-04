@@ -12,6 +12,7 @@ import { TestBed } from "@angular/core/testing";
 import { BottomDockSpan } from "../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { PanelEdge } from "../../../src/app/enums/panel-edge";
+import { DocumentTab } from "../../../src/app/models/layout/document-tab";
 import { Layout } from "../../../src/app/models/layout/layout";
 import { LayoutReader } from "../../../src/app/models/layout/layout.reader";
 import { ToolbarLayout } from "../../../src/app/models/layout/toolbar-layout";
@@ -159,6 +160,17 @@ describe("LayoutService", () => {
     service.resizeSplit(handle, handle.leadingLength + 4);
 
     expect(service.geometry().handles[0]?.leadingLength).toBeCloseTo(handle.leadingLength + 4);
+  });
+
+  it("restores which documents group is active, so a document opens there", async () => {
+    const readme = new DocumentTab("notes.note", "readme");
+    const split = prepared().splitGroup(LayoutFixture.todo, 0, PanelEdge.Right);
+    const first = split.documentGroups[0];
+    await loadAsync(split.focusDocuments(first?.id ?? -1));
+
+    expect([service.layout().documents.id, service.layout().documentGroups.length]).toEqual([first?.id, 2]);
+    service.openDocument(readme);
+    expect(service.layout().groupOf(readme)?.id).toBe(first?.id);
   });
 
   it("spans the bottom dock across the window or keeps it between the side docks", async () => {

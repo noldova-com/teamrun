@@ -63,7 +63,7 @@ export class ShellCommandsService {
     this.tabCommand(Resources.nextTabCommand, Resources.nextTabTitle, Resources.nextTabGlyph, t => this.show(t, 1), t => t.group.tabs.length > 1),
     this.tabCommand(Resources.previousTabCommand, Resources.previousTabTitle, Resources.previousTabGlyph, t => this.show(t, -1), t => t.group.tabs.length > 1),
     ...Object.values(PanelEdge).map(edge => this.tabCommand(Resources.splitTabCommands[edge], Resources.splitTabTitles[edge], Resources.splitGlyphs[edge],
-      t => this.place(t.tab, new SplitDropTarget(t.group.id, edge)), t => t.canSplit, t => t.tab.isMovable)),
+      t => this.place(t.tab, new SplitDropTarget(t.group.id, edge)), t => t.canSplit)),
     ...Object.values(DockSide).map(side => this.tabCommand(Resources.dockTabCommands[side], Resources.dockTabTitles[side], Resources.dockGlyphs[side],
       t => this.place(t.tab, new SideDropTarget(side)), t => t.tab.isMovable, t => t.tab.isMovable)),
     new CommandContribution(Resources.moveTabToGroupCommand, Resources.moveTabToGroupTitle, Resources.moveToGlyph, null,
@@ -73,7 +73,14 @@ export class ShellCommandsService {
           this.place(move.target.tab, new TabDropTarget(move.group.id, move.group.tabs.length));
       }),
       commandArguments => !Object.isNull(this.moveOf(commandArguments)), null,
-      commandArguments => this.targetOf(commandArguments)?.tab.isMovable ?? false),
+      commandArguments => !Object.isNull(this.targetOf(commandArguments))),
+    this.tabCommand(Resources.moveTabToNextGroupCommand, Resources.moveTabToNextGroupTitle, Resources.moveToGlyph, t => this.moveToGroup(t, 1), t => this.neighborOf(t, 1).length > 0,
+      t => this.neighborOf(t, 1).length > 0),
+    this.tabCommand(Resources.moveTabToPreviousGroupCommand, Resources.moveTabToPreviousGroupTitle, Resources.moveToGlyph, t => this.moveToGroup(t, -1), t => this.neighborOf(t, -1).length > 0,
+      t => this.neighborOf(t, -1).length > 0),
+    new CommandContribution(Resources.focusNextGroupCommand, Resources.focusNextGroupTitle, Resources.focusNextGroupGlyph, null, () => this.done(() => this.focusGroup(1)), () => this.focusable().length > 1),
+    new CommandContribution(Resources.focusPreviousGroupCommand, Resources.focusPreviousGroupTitle, Resources.focusPreviousGroupGlyph, null, () => this.done(() => this.focusGroup(-1)),
+      () => this.focusable().length > 1),
     ...Object.values(DockSide).map(side => new CommandContribution(Resources.toggleDockCommands[side], Resources.toggleDockTitles[side], Resources.hideDockGlyphs[side], null,
       () => this.done(() => this.layout.toggleDock(side)), () => true, () => this.layout.layout().dock(side).isExpanded)),
     ...Object.values(EditAction).map(action => new CommandContribution(Resources.editCommands[action], Resources.editTitles[action], Resources.editGlyphs[action], null,
@@ -171,7 +178,7 @@ export class ShellCommandsService {
     const key = this.tabKeyOf(commandArguments);
     const tab = Object.isUndefined(key) ? this.layout.currentGroup().active : layout.groups.flatMap(t => t.tabs).find(t => t.key === key) ?? null;
     const group = Object.isNull(tab) ? null : layout.groupOf(tab);
-    return Object.isNull(tab) || Object.isNull(group) ? null : new TabTarget(tab, group);
+    return Object.isNull(tab) || Object.isNull(group) ? null : new TabTarget(tab, group, layout.canSplit(tab, group.id));
   }
 
   private toolbarOf(commandArguments: JsonValue): string | null {
@@ -207,9 +214,33 @@ export class ShellCommandsService {
     return Object.isNull(commandArguments) ? undefined : JsonReader.fromValue(commandArguments).readOptionalString(Resources.tabArgument);
   }
 
+  private neighborOf(target: TabTarget, step: number): readonly TabGroup[] {
+    const groups = this.layout.layout().groups.filter(t => t.accepts(target.tab));
+    const next = (groups.findIndex(t => t.id === target.group.id) + step + groups.length) % groups.length;
+    return groups.length < 2 ? [] : groups.slice(next, next + 1);
+  }
+
+  private moveToGroup(target: TabTarget, step: number): void {
+    for (const group of this.neighborOf(target, step))
+      this.place(target.tab, new TabDropTarget(group.id, group.tabs.length));
+  }
+
+  private focusable(): readonly (readonly [TabGroup, Tab])[] {
+    return this.layout.geometry().frames.flatMap(t => Object.isNull(t.group.active) ? [] : [[t.group, t.group.active] as const]);
+  }
+
+  private focusGroup(step: number): void {
+    const groups = this.focusable();
+    const next = (groups.findIndex(([group]) => group.id === this.layout.currentGroup().id) + step + groups.length) % groups.length;
+    for (const [group, tab] of groups.slice(next, next + 1)) {
+      this.layout.focusGroup(group.id);
+      this.focus(tab);
+    }
+  }
+
   private close(target: TabTarget): void {
     this.layout.close(target.tab);
-    const next = this.layout.layout().group(target.group.id)?.active ?? null;
+    const next = this.layout.layout().group(target.group.id)?.active ?? this.layout.currentGroup().active;
     if (!Object.isNull(next))
       this.focus(next);
   }

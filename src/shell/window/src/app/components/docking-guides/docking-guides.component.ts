@@ -44,7 +44,7 @@ export class DockingGuidesComponent {
     const tab = this.drag.dragging();
     const id = this.drag.hoveredGroup();
     const frame = Object.isNull(id) ? null : this.layout.geometry().frameOf(id);
-    if (Object.isNull(tab) || Object.isNull(frame) || (frame.group.has(tab) && frame.group.tabs.length === 1 && !frame.group.isDocuments))
+    if (Object.isNull(tab) || Object.isNull(frame) || !this.layout.layout().canSplit(tab, frame.group.id))
       return null;
     return frame;
   });
