@@ -34,29 +34,7 @@
     @if (!isResult) {
       <h2 class="tr-settings-group-title">{{ page.title }}</h2>
     }
-    <p class="tr-settings-explanation">{{ resources.shortcutsExplanation }}</p>
-    <table class="tr-settings-shortcuts">
-      <thead>
-        <tr><th scope="col">{{ resources.commandColumn }}</th><th scope="col">{{ resources.keyColumn }}</th></tr>
-      </thead>
-      <tbody>
-        @for (row of matchingShortcuts(); track row.name) {
-          <tr [attr.data-command]="row.name">
-            <td><tr-highlighted-text [text]="row.title" [query]="query()" /></td>
-            <td>
-              @if (row.key === resources.noKey) {
-                <tr-highlighted-text [text]="row.key" [query]="query()" />
-              } @else {
-                <tr-chip [kind]="keyKind"><tr-highlighted-text [text]="row.key" [query]="query()" /></tr-chip>
-              }
-              @if (row.collision; as collision) {
-                <span class="tr-settings-collision">{{ collision }}</span>
-              }
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
+    <tr-shortcuts [rows]="matchingShortcuts()" [query]="query()" />
   } @else {
     @for (group of page.groups; track group.title) {
       <section class="tr-settings-group" [attr.aria-label]="group.title">

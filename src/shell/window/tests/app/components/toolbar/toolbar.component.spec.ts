@@ -130,6 +130,22 @@ describe("ToolbarComponent", () => {
     expect(errors.map(t => String(t))).toEqual(["Error: No wrap."]);
   });
 
+  it("lays its items out as wide as it measured them, dropdowns included, so its last item is not clipped", async () => {
+    const tokens = document.createElement("style");
+    tokens.textContent = "tr-toolbar { --tr-border-width: 1px; }";
+    document.head.append(tokens);
+    await showAsync(1000);
+    const edges = (container: string, selector: string): number[] => {
+      const origin = (element.querySelector(container) as HTMLElement).getBoundingClientRect().left;
+      return [...element.querySelectorAll(selector)].map(t => t.getBoundingClientRect().right - origin);
+    };
+    const shown = edges(".tr-toolbar-content", ".tr-toolbar-section");
+    const measured = edges(".tr-toolbar-ghost", ".tr-toolbar-ghost-section");
+    tokens.remove();
+
+    expect(shown).toEqual(measured);
+  });
+
   it("opens the place of a submenu item as a dropdown", async () => {
     await showAsync(1000);
 

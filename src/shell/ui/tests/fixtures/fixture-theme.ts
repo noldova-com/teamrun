@@ -183,6 +183,7 @@ export class FixtureTheme {
     ["toolbar-button", "2rem"],
     ["toolbar-button-padding", "0.5rem"],
     ["toolbar-gap", "0.75rem"],
+    ["toolbar-grip-gap", "0.25rem"],
     ["menu-separator-spacing", "0.375rem"],
     ["tooltip-width", "30rem"],
     ["tooltip-padding", "0.25rem 0.625rem"],

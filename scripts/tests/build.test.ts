@@ -16,6 +16,7 @@ import AngularProject from "../angular/angular-project.ts";
 import GalleryFile from "../angular/gallery-file.ts";
 import ProductFile from "../angular/product-file.ts";
 import Build from "../build.ts";
+import ElectronBinary from "../desktop/electron-binary.ts";
 import ModuleArtifacts from "../modules/module-artifacts.ts";
 import ModuleCatalog from "../modules/module-catalog.ts";
 import PackageBuild from "../packages/package-build.ts";
@@ -200,7 +201,7 @@ class BuildTests {
 
   private static createWith(root: string, angular: AngularProject, output: TextOutputFixture, environment: NodeJS.ProcessEnv = process.env): Build {
     const runner = new ProcessRunner();
-    return new Build(new PackageBuild(root, runner, environment), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, output);
+    return new Build(new PackageBuild(root, runner, environment), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, new ElectronBinary(root, runner), output);
   }
 }
 

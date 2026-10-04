@@ -41,7 +41,9 @@ export class SettingsServiceTests {
     [new SettingDefinition(QualifiedName.parse("chat.sounds"), "Sounds", "Plays sounds.", SettingType.boolean(), true, SettingLocality.Shared, [], "Chat", "Look"), false, true],
     [new SettingDefinition(QualifiedName.parse("chat.volume"), "Volume", "Sets the volume.", SettingType.number(0, 10, 1), 5, SettingLocality.Shared, [], "Chat", "Look"), 7, 5],
     [new SettingDefinition(QualifiedName.parse("chat.nickname"), "Nickname", "Names you.", SettingType.text(20), "guest", SettingLocality.Shared, [], "Chat", "Look"), "ana", "guest"],
-    [new SettingDefinition(QualifiedName.parse("chat.muted"), "Muted", "Lists modules.", SettingType.modules(), ["chat", "mail"], SettingLocality.Shared, [], "Chat", "Look"), ["chat"], ["chat", "mail"]]
+    [new SettingDefinition(QualifiedName.parse("chat.muted"), "Muted", "Lists modules.", SettingType.modules(), ["chat", "mail"], SettingLocality.Shared, [], "Chat", "Look"), ["chat"], ["chat", "mail"]],
+    [new SettingDefinition(QualifiedName.parse("chat.keys"), "Keys", "Binds keys.", SettingType.keyBindings(), {}, SettingLocality.Shared, [], "Chat", "Look"),
+      { "chat.send": "Mod+Enter", "shell.closeTab": null }, {}]
   ];
 
   @TestMethod
@@ -82,7 +84,7 @@ export class SettingsServiceTests {
     }
     Assert.isFalse(settings.service.snapshot(null).entries.some(t => t.isSet));
     Assert.areEqual(0, settings.database.readAll("SELECT name FROM setting_values").length);
-    Assert.areEqual(10, changes.length);
+    Assert.areEqual(12, changes.length);
 
     const mode = SettingsServiceTests.KINDS[0]?.[0];
     if (mode === undefined)

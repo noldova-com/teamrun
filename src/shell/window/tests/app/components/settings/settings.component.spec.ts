@@ -21,6 +21,7 @@ import { WindowPartSource } from "../../../../src/app/models/window-part-source"
 import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { SettingsService } from "../../../../src/app/services/settings.service";
+import { Resources } from "../../../../src/resources";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { SettingsFixture } from "../../../fixtures/settings.fixture";
@@ -159,21 +160,32 @@ describe("SettingsComponent", () => {
     expect([texts(".tr-settings-page"), texts(".tr-settings-group-title")]).toEqual([["Appearance", "Notifications", "Keyboard shortcuts"], ["Theme", "Text"]]);
   });
 
-  it("shows every command's key on Keyboard shortcuts, and a key another command kept", async () => {
+  it("shows every command's owner and key on Keyboard shortcuts, a key another command kept, and the person's bindings as modified", async () => {
+    settings.values.update(t => new Map([...t, ["shell.keyBindings", { "shell.closeTab": null }]]));
     render();
 
     await page.getByRole("button", { name: "Keyboard shortcuts" }).click();
     fixture.detectChanges();
     const rows = [...element().querySelectorAll("tbody tr")].map(t => [t.getAttribute("data-command"), ...[...t.querySelectorAll("td")].map(u => u.textContent?.trim())]);
 
-    expect(texts("th")).toEqual(["Command", "Key"]);
+    expect(texts("th")).toEqual(["Command", "From", "Key", ""]);
     expect(rows.filter(t => t[0]?.startsWith("clock."))).toEqual([
-      ["clock.tick", "Tick the clock", "Ctrl+Alt+T"],
-      ["clock.stop", "Stop the clock", "—Ctrl+Alt+T is taken by Tick the clock"]
+      ["clock.tick", "Tick the clock", "Clock", "Ctrl+Alt+T", "Remove"],
+      ["clock.stop", "Stop the clock", "Clock", "No keyCtrl+Alt+T is taken by Tick the clock", ""]
     ]);
-    expect(rows.find(t => t[0] === "shell.openSettings")?.[1]).toBe("Settings…");
-    expect(Object.fromEntries([...element().querySelectorAll("tbody tr")].map(t => [t.getAttribute("data-command"), t.querySelector("td:nth-child(2) tr-chip.tr-chip-key")?.textContent?.trim() ?? null])))
-      .toEqual(expect.objectContaining({ "clock.tick": "Ctrl+Alt+T", "clock.stop": null }));
+    expect(rows.find(t => t[0] === "shell.openSettings")?.slice(1, 3)).toEqual(["Settings…", Resources.productName]);
+    expect(rows.find(t => t[0] === "shell.closeTab")?.slice(3)).toEqual(["No key", "Reset"]);
+    expect(element().querySelector("[data-command='shell.closeTab'] .tr-shortcut-marker")?.getAttribute("aria-label")).toBe("Modified");
+  });
+
+  it("finds commands by their owner", async () => {
+    render();
+
+    await searchAsync(Resources.productName);
+    const found = [...element().querySelectorAll("tbody tr")].map(t => String(t.getAttribute("data-command")));
+
+    expect(found.length).toBeGreaterThan(0);
+    expect(found.every(t => t.startsWith("shell."))).toBe(true);
   });
 
   it("searches every page by title, description and name, grouping the hits by page and marking them, and leaves the search when a page is chosen", async () => {
@@ -188,7 +200,7 @@ describe("SettingsComponent", () => {
     await page.getByRole("button", { name: "Appearance" }).click();
     fixture.detectChanges();
 
-    expect(hits).toEqual({ pages: ["Keyboard shortcuts", "Clock"], groups: ["Words", "Ticks"], rows: ["Greeting", "Tick step"], marks: 6 });
+    expect(hits).toEqual({ pages: ["Keyboard shortcuts", "Clock"], groups: ["Words", "Ticks"], rows: ["Greeting", "Tick step"], marks: 8 });
     expect(empty).toEqual(["No settings match your search."]);
     expect(current).toEqual([]);
     expect([(element().querySelector(".tr-settings-search-field") as HTMLInputElement).value, texts(".tr-settings-result-title")]).toEqual(["", []]);

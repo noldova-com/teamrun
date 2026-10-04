@@ -12,7 +12,7 @@ import { ChangeDetectionStrategy, Component, ErrorHandler, type Signal, type Typ
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
-import { ChipComponent, ChipKind, SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
+import { SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
 
 import { GalleryTokens } from "../../models/gallery-tokens";
 import { SettingsPage } from "../../models/settings/settings-page";
@@ -24,12 +24,12 @@ import { Resources } from "../../../resources";
 import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { SettingsService } from "../../services/settings.service";
-import { HighlightedTextComponent } from "../highlighted-text/highlighted-text.component";
 import { SettingRowComponent } from "../setting-row/setting-row.component";
+import { ShortcutsComponent } from "../shortcuts/shortcuts.component";
 
 @Component({
   selector: "tr-settings",
-  imports: [ChipComponent, HighlightedTextComponent, NgComponentOutlet, NgTemplateOutlet, SettingRowComponent, TextFieldComponent],
+  imports: [NgComponentOutlet, NgTemplateOutlet, SettingRowComponent, ShortcutsComponent, TextFieldComponent],
   templateUrl: "./settings.component.html",
   styleUrl: "./settings.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -45,7 +45,6 @@ export class SettingsComponent {
   private readonly selected: WritableSignal<string> = signal(Resources.appearancePage);
 
   protected readonly resources: typeof Resources = Resources;
-  protected readonly keyKind: ChipKind = ChipKind.Key;
   protected readonly query: WritableSignal<string> = signal("");
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
 
@@ -66,9 +65,11 @@ export class SettingsComponent {
   protected readonly currentPage: Signal<SettingsPage | undefined> = computed(() => this.pages().find(t => t.title === this.selected()) ?? this.pages()[0]);
   protected readonly shortcuts: Signal<readonly ShortcutRow[]> = computed(() => {
     const map = this.commands.shortcuts();
+    const bindings = this.commands.bindings();
     return this.commands.commands().map(command => {
       const collision = map.collisions.find(t => t.refused === command.name);
-      return new ShortcutRow(command.name, command.title, this.commands.keyLabel(command.name) ?? Resources.noKey,
+      const key = this.commands.keyLabel(command.name);
+      return new ShortcutRow(command.name, command.title, this.commands.ownerOf(command.name), key ?? Resources.noKey, !Object.isNull(key), bindings.has(command.name),
         Object.isUndefined(collision) ? null : Resources.formatKeyTaken(collision.key.label(this.bridge.platform), this.commands.titleOf(collision.keptBy)));
     });
   });
@@ -80,7 +81,7 @@ export class SettingsComponent {
   });
   protected readonly matchingShortcuts: Signal<readonly ShortcutRow[]> = computed(() => {
     const query = this.query();
-    return this.isSearching() ? this.shortcuts().filter(t => [t.title, t.name, t.key].some(u => TextMatch.contains(u, query))) : this.shortcuts();
+    return this.isSearching() ? this.shortcuts().filter(t => [t.title, t.name, t.owner, t.key].some(u => TextMatch.contains(u, query))) : this.shortcuts();
   });
 
   protected search(event: Event): void {

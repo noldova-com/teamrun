@@ -112,6 +112,7 @@ export class ToolbarDragService {
     const dragged = this.toolbars.rows().flatMap((t, r) => t.map((u, i) => ({ name: u.name, row: r, index: i }))).find(t => t.name === name);
     const before = Object.isUndefined(next) ? length : Number(next.dataset[Resources.toolbarIndexData]);
     const index = dragged?.row === row && dragged.index < before ? before - 1 : before;
-    return new ToolbarDropTarget(row, index, false, next?.getBoundingClientRect().left ?? last?.right ?? rect.left, rect.top, rect.height);
+    const bar = (element.querySelector<HTMLElement>(Resources.toolbarSelector) ?? element).getBoundingClientRect();
+    return new ToolbarDropTarget(row, index, false, next?.getBoundingClientRect().left ?? last?.right ?? rect.left, bar.top, bar.height);
   }
 }
