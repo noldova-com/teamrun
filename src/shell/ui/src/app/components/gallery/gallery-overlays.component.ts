@@ -9,12 +9,12 @@
 import { NgTemplateOutlet } from "@angular/common";
 import { ChangeDetectionStrategy, Component, Injector, type WritableSignal, inject, signal } from "@angular/core";
 
+import { ButtonVariant } from "../../enums/button-variant";
 import { DockingDirection } from "../../enums/docking-direction";
+import { DialogTokens } from "../../models/dialog-tokens";
 import { OverlaySide } from "../../models/overlay-side";
 import { QuickInputItem } from "../../models/quick-input-item";
-import { DialogTokens } from "../../models/dialog-tokens";
 import { ButtonComponent } from "../button/button.component";
-import { ButtonVariant } from "../../enums/button-variant";
 import { DialogComponent } from "../dialog/dialog.component";
 import { DockingGuideComponent } from "../docking-guide/docking-guide.component";
 import { DockingPlateComponent } from "../docking-plate/docking-plate.component";
@@ -31,8 +31,6 @@ import { TooltipDirective } from "../tooltip/tooltip.directive";
 import { GalleryResources } from "./gallery-resources";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
 
-let dialogCount = 0;
-
 @Component({
   selector: "tr-gallery-overlays",
   imports: [
@@ -44,9 +42,11 @@ let dialogCount = 0;
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GalleryOverlaysComponent {
+  private static count: number = 0;
+
   protected readonly text: typeof GalleryResources.text = GalleryResources.text;
   protected readonly dialogInjector: Injector = Injector.create({
-    providers: [{ provide: DialogTokens.titleId, useValue: `${GalleryResources.dialogTitleIdPrefix}${dialogCount++}` }],
+    providers: [{ provide: DialogTokens.titleId, useValue: `${GalleryResources.dialogTitleIdPrefix}${GalleryOverlaysComponent.count++}` }],
     parent: inject(Injector)
   });
   protected readonly variants: typeof ButtonVariant = ButtonVariant;

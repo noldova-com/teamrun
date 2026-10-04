@@ -8,11 +8,12 @@
 
 export class GalleryResources {
   public static readonly scopeClass: string = "tr-theme-scope";
-  public static readonly focusableSelector: string = "button:not(:disabled):not([data-gallery-walk]), input:not(:disabled), [tabindex=\"0\"], [role=\"tab\"][aria-selected=\"true\"]";
+  public static readonly focusableSelector: string = "button:not(:disabled), input:not(:disabled), [tabindex=\"0\"], [role=\"tab\"][aria-selected=\"true\"]";
+  public static readonly overlayContainerClass: string = "cdk-overlay-container";
   public static readonly dialogTitleIdPrefix: string = "tr-gallery-dialog-";
   public static readonly text = {
     gallery: "Gallery",
-    focusFirst: "Show the keyboard focus on the first control",
+    showFocus: "Show the keyboard focus",
     sample: "Sample",
     primary: "Primary",
     secondary: "Secondary",
@@ -107,6 +108,10 @@ export class GalleryResources {
     dockingGuide: "A chosen guide",
     dockingPlate: "A plate with the center chosen"
   } as const;
+
+  public static formatShowFocus(specimen: string): string {
+    return `Show the keyboard focus on the ${specimen}`;
+  }
 
   public static formatScope(themeName: string, mode: string): string {
     return `${themeName}, ${mode.toLowerCase()} mode`;

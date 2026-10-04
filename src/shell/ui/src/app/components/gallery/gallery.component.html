@@ -10,9 +10,12 @@ LICENSE file in the root directory of this source tree.
   <section #frame class="tr-gallery-scope-frame" [trGalleryScope]="scope.theme" [trGalleryMode]="scope.mode" [attr.aria-label]="scope.label" [attr.data-theme]="scope.theme.id"
     [attr.data-mode]="scope.mode">
     <h2 class="tr-gallery-scope-title">{{ scope.label }}</h2>
-    <button type="button" tr-button data-gallery-walk [variant]="variants.Secondary" (click)="focusFirst(frame)">{{ text.focusFirst }}</button>
-    <tr-gallery-forms />
-    <tr-gallery-navigation />
-    <tr-gallery-overlays />
+    <ng-container [ngTemplateOutlet]="specimens" [ngTemplateOutletInjector]="injectorOf(frame)" />
   </section>
 }
+
+<ng-template #specimens>
+  <tr-gallery-forms />
+  <tr-gallery-navigation />
+  <tr-gallery-overlays />
+</ng-template>

@@ -73,18 +73,44 @@ describe("GalleryComponent", () => {
     expect(colorOf(document.body, "background-color", "var(--tr-inline-code)")).not.toBe(colorOf(fixtureLight, "background-color", "var(--tr-inline-code)"));
   });
 
-  it("shows the keyboard focus on the first control of a scope when its button is pressed from the keyboard, and not before", async () => {
+  it("shows the keyboard focus on the first control of a specimen when its button is pressed from the keyboard, and not before", async () => {
     await showAsync();
-    const frame = frames()[2] as HTMLElement;
-    const button = frame.querySelector<HTMLButtonElement>("[data-gallery-walk]") as HTMLButtonElement;
-    const first = frame.querySelector("tr-gallery-forms button:not(:disabled)");
+    const checkbox = (frames()[2] as HTMLElement).querySelector<HTMLElement>(".tr-gallery-specimen[aria-label=\"Checkbox\"]") as HTMLElement;
+    const button = checkbox.querySelector<HTMLButtonElement>(".tr-gallery-specimen-focus") as HTMLButtonElement;
+    const input = checkbox.querySelector("input") as HTMLInputElement;
 
-    expect(document.activeElement).not.toBe(first);
+    expect(document.activeElement).not.toBe(input);
+    expect(button.getAttribute("aria-label")).toBe("Show the keyboard focus on the Checkbox");
     button.focus();
     await userEvent.keyboard("{Enter}");
 
-    expect(document.activeElement).toBe(first);
-    expect(first?.matches(":focus-visible")).toBe(true);
+    expect(document.activeElement).toBe(input);
+    expect(input.matches(":focus-visible")).toBe(true);
+  });
+
+  it("offers the focus button on every specimen that has a control to focus, and on no other", async () => {
+    await showAsync();
+    const specimens = [...(frames()[0] as HTMLElement).querySelectorAll<HTMLElement>(".tr-gallery-specimen")];
+
+    const offered = specimens.filter(t => t.querySelector(".tr-gallery-specimen-focus") !== null).map(t => t.getAttribute("aria-label"));
+    const without = specimens.filter(t => t.querySelector(".tr-gallery-specimen-focus") === null).map(t => t.getAttribute("aria-label"));
+
+    expect(offered).toEqual(expect.arrayContaining(["Button", "Icon button", "Checkbox", "Text field", "Select", "Tab", "Toolbar", "Toolbar button", "Menu"]));
+    expect(without).toEqual(expect.arrayContaining(["Progress", "View badge"]));
+  });
+
+  it("opens the overlays of a scope inside it, so they take its theme and mode", async () => {
+    await showAsync();
+    const frame = frames()[3] as HTMLElement;
+
+    (frame.querySelector(".tr-select-button") as HTMLButtonElement).click();
+    await fixture.whenStable();
+    const option = frame.querySelector(".cdk-overlay-container .tr-select-option") as HTMLElement;
+
+    expect(option).not.toBeNull();
+    expect(getComputedStyle(option).getPropertyValue("--tr-text")).toBe(getComputedStyle(frame).getPropertyValue("--tr-text"));
+    expect(getComputedStyle(option).getPropertyValue("--tr-text")).not.toBe(getComputedStyle(document.body).getPropertyValue("--tr-text"));
+    await userEvent.keyboard("{Escape}");
   });
 
   it("lets the sample controls be used: a toggle button, a checkbox, a select and a checkbox row of a menu", async () => {

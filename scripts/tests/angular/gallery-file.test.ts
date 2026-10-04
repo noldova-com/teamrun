@@ -7,12 +7,13 @@
  */
 
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
 import GalleryFile from "../../angular/gallery-file.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
+import SourceTreeFixture from "../fixtures/source-tree.fixture.ts";
 
 class GalleryFileTests {
   private static readonly LICENSE: string = [
@@ -55,7 +56,14 @@ class GalleryFileTests {
       await file.writeAsync(false);
 
       assert.deepEqual([packaged, await file.isPackagedAsync()], [true, false]);
-      assert.deepEqual(GalleryFile.MARKERS, ["tr-gallery-scope-frame", "tr-gallery-forms", "Show the keyboard focus on the first control"]);
+      assert.deepEqual(GalleryFile.MARKERS, ["tr-gallery-scope-frame", "tr-gallery-forms", "Show the keyboard focus"]);
+    });
+
+    test("every marker the packaged check looks for occurs in the Gallery's own source, so renaming it cannot make the check pass on nothing", async () => {
+      const folder = path.join(SourceTreeFixture.root, "src", "shell", "ui", "src", "app", "components", "gallery");
+      const source = (await Promise.all((await readdir(folder)).map(t => readFile(path.join(folder, t), "utf8")))).join("\n");
+
+      assert.deepEqual(GalleryFile.MARKERS.filter(t => !source.includes(t)), []);
     });
 
     test("a packaged build's gallery file names no Gallery, and a later development build brings it back", async t => {

@@ -97,14 +97,19 @@ export default class AngularProject {
       return;
 
     const folder = outputPath ?? path.join(this.root, ...AngularProject.OUTPUT_SEGMENTS);
+    const shown = path.relative(this.root, folder).split(path.sep).join(path.posix.sep);
+    let scanned = 0;
     for await (const file of glob("**/*", { cwd: folder })) {
       if (!AngularProject.isFile(path.join(folder, file)))
         continue;
+      scanned++;
       const content = await readFile(path.join(folder, file), AngularProject.RECORD_ENCODING);
       const found = texts.find(t => content.includes(t));
       if (found !== undefined)
-        throw new ProcessException(`The window built in ${path.relative(this.root, folder).split(path.sep).join(path.posix.sep)} contains ${JSON.stringify(found)} in ${file}.`);
+        throw new ProcessException(`The window built in ${shown} contains ${JSON.stringify(found)} in ${file}.`);
     }
+    if (scanned === 0)
+      throw new ProcessException(`The window built in ${shown} has no files to check.`);
   }
 
   public async testAsync(): Promise<AngularTestRun> {

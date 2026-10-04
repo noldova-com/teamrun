@@ -7,8 +7,13 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <section class="tr-gallery-specimen" [attr.aria-label]="name()">
-  <h3 class="tr-gallery-specimen-name">{{ name() }}</h3>
-  <div class="tr-gallery-specimen-body">
+  <div class="tr-gallery-specimen-head">
+    <h3 class="tr-gallery-specimen-name">{{ name() }}</h3>
+    @if (isFocusable()) {
+      <button type="button" tr-button class="tr-gallery-specimen-focus" [variant]="variants.Secondary" [attr.aria-label]="focusLabel()" (click)="showFocus()">{{ text.showFocus }}</button>
+    }
+  </div>
+  <div #body class="tr-gallery-specimen-body">
     <ng-content />
   </div>
 </section>

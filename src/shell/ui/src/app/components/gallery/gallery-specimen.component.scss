@@ -17,6 +17,13 @@
   min-width: 0;
 }
 
+.tr-gallery-specimen-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tr-space-3);
+}
+
 .tr-gallery-specimen-name {
   margin: 0;
   color: var(--tr-text-muted);
