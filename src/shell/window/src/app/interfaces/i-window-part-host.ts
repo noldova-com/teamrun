@@ -21,6 +21,8 @@ export interface IWindowPartHost {
 
   keepDocument(moduleId: string, name: string, instance: string): void;
 
+  showInDialogAsync(name: string, instance: string | null, title: string | null): Promise<void>;
+
   log(moduleId: string, message: string): void;
 
   isCommandRegistered(name: string): boolean;
