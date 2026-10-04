@@ -22,6 +22,7 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   template: `
     <tr-dialog title="Work is still running" (dismissed)="dismissals = dismissals + 1">
       <p class="tr-dialog-probe">TeamRun is still working on the project.</p>
+      Wait for it to finish, or stop it now.
       <button tr-button trDialogAction [variant]="secondary" data-cancel>Cancel</button>
       <button tr-button trDialogAction data-wait>Wait, then quit</button>
     </tr-dialog>
@@ -118,5 +119,23 @@ describe("DialogComponent", () => {
         expect(dialog.backgroundColor).toBe(AppearanceFixture.readColor(theme, mode, "dialog.background"));
         expect(dialog.borderTopColor).toBe(AppearanceFixture.readColor(theme, mode, "widget.border"));
         expect(title.fontWeight).toBe("600");
+      });
+
+  for (const theme of AppearanceFixture.themes)
+    for (const mode of AppearanceFixture.modes)
+      it(`shows its body in the dialog's text color at full opacity from the start and under the pointer, with the ${theme.id} theme in ${mode} mode`, async () => {
+        AppearanceFixture.apply(theme, mode);
+        await openAsync();
+        const text = AppearanceFixture.readColor(theme, mode, "foreground");
+        const colors = (): string[] => [".tr-dialog-text", ".tr-dialog-probe"].map(t => getComputedStyle(document.querySelector(t) as HTMLElement).color);
+        const opened = colors();
+        const opacity = getComputedStyle(document.querySelector(".tr-dialog-probe") as HTMLElement).opacity;
+
+        await userEvent.hover(document.querySelector(".tr-dialog-probe") as HTMLElement);
+        const body = document.querySelector(".tr-dialog-body") as HTMLElement;
+        await vi.waitFor(() => expect(getComputedStyle(body).color).not.toBe("rgba(0, 0, 0, 0)"));
+
+        expect([opened, opacity]).toEqual([[text, text], "1"]);
+        expect(colors()).toEqual([text, text]);
       });
 });
