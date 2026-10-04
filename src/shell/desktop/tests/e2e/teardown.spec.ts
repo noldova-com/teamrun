@@ -14,6 +14,7 @@ import path from "node:path";
 
 import { DataDirectory, OwnershipLock } from "@noldova/teamrun-shell-runtime";
 
+import ClockWorkFixture from "./fixtures/clock-work.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import ProcessListFixture from "./fixtures/process-list.fixture.ts";
@@ -190,6 +191,21 @@ test.describe("the harness's teardown", () => {
       ? new RegExp(`^Analysis of sampling .* \\(pid ${main}\\)[\\s\\S]*Call graph:`)
       : process.platform === "win32" ? /^\d+ Wait \w+ \d+ ms\r?$/m : /^\s*\d+ \S+ .*\d+:\d+(?:\.\d+)? \S/m);
     expect(testInfo.attachments.map(t => t.name)).toEqual(expect.arrayContaining(["page-0.png.unavailable.txt", "page-0.html.unavailable.txt"]));
+    expect(await ProcessListFixture.waitForSignalsAsync(desktop.recordedProcessIds, 0)).toEqual([]);
+  });
+
+  test("a quit that stops at the question about running work is reported with the question, not as a silent main process", async ({ desktop }, testInfo) => {
+    test.setTimeout(120_000);
+    await ClockWorkFixture.beginAsync(desktop);
+
+    await desktop.disposeAsync(false);
+    const reported = desktop.acceptFailures(/^TeamRun did not quit/);
+
+    expect(reported).toHaveLength(1);
+    expect(reported[0]).toMatch(/^TeamRun did not quit within 30 s because window 0 asked the question below, so the test killed it\.\nThe test left work running: finish or stop it before the test ends\.\n- dialog "Work is still running":\n/);
+    expect(reported[0]).toContain(`- listitem: ${ClockWorkFixture.WORK}`);
+    expect(desktop.failures).toEqual([]);
+    expect(testInfo.attachments.map(t => t.name)).not.toContain("main-process.txt");
     expect(await ProcessListFixture.waitForSignalsAsync(desktop.recordedProcessIds, 0)).toEqual([]);
   });
 });
