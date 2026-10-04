@@ -7,7 +7,7 @@
  */
 
 import { NgComponentOutlet, NgTemplateOutlet } from "@angular/common";
-import { ChangeDetectionStrategy, Component, ErrorHandler, type Signal, type Type, type WritableSignal, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, ElementRef, ErrorHandler, type Signal, type Type, type WritableSignal, afterNextRender, computed, inject, signal, viewChild } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
@@ -16,14 +16,17 @@ import { SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
 
 import { GalleryTokens } from "../../models/gallery-tokens";
 import { SettingsPage } from "../../models/settings/settings-page";
+import { SettingsView } from "../../models/settings/settings-view";
 import { ShortcutRow } from "../../models/settings/shortcut-row";
 import { TextMatch } from "../../models/settings/text-match";
+import { ShellDocuments } from "../../models/shell-documents";
 import type { WindowPartSource } from "../../models/window-part-source";
 import { WindowPartTokens } from "../../models/window-part-tokens";
 import { Resources } from "../../../resources";
 import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { SettingsService } from "../../services/settings.service";
+import { ViewStateService } from "../../services/view-state.service";
 import { HighlightedTextComponent } from "../highlighted-text/highlighted-text.component";
 import { SettingRowComponent } from "../setting-row/setting-row.component";
 
@@ -42,10 +45,14 @@ export class SettingsComponent {
   private readonly commands: CommandService = inject(CommandService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
-  private readonly selected: WritableSignal<string> = signal(Resources.appearancePage);
+  private readonly views: ViewStateService = inject(ViewStateService);
+  private readonly kept: SettingsView = this.views.find(ShellDocuments.settingsTab.key, SettingsView) ?? SettingsView.initial;
+  private readonly selected: WritableSignal<string> = signal(this.kept.page);
+  private readonly pageList: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("pageList");
+  private readonly content: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("content");
 
   protected readonly resources: typeof Resources = Resources;
-  protected readonly query: WritableSignal<string> = signal("");
+  protected readonly query: WritableSignal<string> = signal(this.kept.query);
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
 
   protected readonly gallery: Type<unknown> | null = inject(GalleryTokens.component);
@@ -82,13 +89,27 @@ export class SettingsComponent {
     return this.isSearching() ? this.shortcuts().filter(t => [t.title, t.name, t.key].some(u => TextMatch.contains(u, query))) : this.shortcuts();
   });
 
+  public constructor() {
+    afterNextRender(() => {
+      this.pageList().nativeElement.scrollTop = this.kept.pagesTop;
+      this.content().nativeElement.scrollTop = this.kept.contentTop;
+    });
+  }
+
+  protected keep(): void {
+    this.views.keep(ShellDocuments.settingsTab.key,
+      new SettingsView(this.selected(), this.query(), this.pageList().nativeElement.scrollTop, this.content().nativeElement.scrollTop));
+  }
+
   protected search(event: Event): void {
     this.query.set((event.target as HTMLInputElement).value);
+    this.keep();
   }
 
   protected select(page: SettingsPage): void {
     this.query.set("");
     this.selected.set(page.title);
+    this.keep();
   }
 
   protected isMutedModules(definition: SettingDefinition): boolean {

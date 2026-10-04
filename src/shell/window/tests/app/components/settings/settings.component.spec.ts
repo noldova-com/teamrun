@@ -56,9 +56,10 @@ describe("SettingsComponent", () => {
   let errors: unknown[];
   let gallery: Type<unknown> | null;
 
-  function render(mode: ThemeMode = ThemeMode.Light): HTMLElement {
+  function render(mode: ThemeMode = ThemeMode.Light, height: string = String.empty): HTMLElement {
     AppearanceFixture.apply(DefaultTheme.theme, mode);
     fixture = TestBed.createComponent(SettingsComponent);
+    (fixture.nativeElement as HTMLElement).style.height = height;
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
@@ -157,6 +158,35 @@ describe("SettingsComponent", () => {
     fixture.detectChanges();
 
     expect([texts(".tr-settings-page"), texts(".tr-settings-group-title")]).toEqual([["Appearance", "Notifications", "Keyboard shortcuts"], ["Theme", "Text"]]);
+  });
+
+  it("shows the page and the scroll positions it had when it is created again, as its tab becomes active again", async () => {
+    render(ThemeMode.Light, "5rem");
+    await page.getByRole("button", { name: "Keyboard shortcuts" }).click();
+    fixture.detectChanges();
+    const scrollers = (): readonly HTMLElement[] => [".tr-settings-pages", ".tr-settings-content"].map(t => element().querySelector(t) as HTMLElement);
+    scrollers().forEach((t, index) => {
+      t.scrollTop = 24 + index * 40;
+      t.dispatchEvent(new Event("scroll"));
+    });
+    const left = scrollers().map(t => t.scrollTop);
+    fixture.destroy();
+
+    render(ThemeMode.Light, "5rem");
+    await fixture.whenStable();
+
+    expect(left.every(t => t > 0)).toBe(true);
+    expect([texts("[aria-current=page]"), scrollers().map(t => t.scrollTop)]).toEqual([["Keyboard shortcuts"], left]);
+  });
+
+  it("shows the search it had when it is created again", async () => {
+    render();
+    await searchAsync("tick");
+    fixture.destroy();
+
+    render();
+
+    expect([(element().querySelector(".tr-settings-search-field") as HTMLInputElement).value, texts(".tr-settings-result-title")]).toEqual(["tick", ["Keyboard shortcuts", "Clock"]]);
   });
 
   it("shows every command's key on Keyboard shortcuts, and a key another command kept", async () => {
