@@ -65,7 +65,7 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
 |---|---|
 | `scripts/tests/fixtures/repository.fixture.ts` | Between bounded attempts to remove a fixture repository that Windows still holds open. |
 | `src/foundation/testing/tests/fixtures/execution/entry-lifetime.fixture.ts` | One fixture test outlasts its time limit on purpose, so the runner's time limit is tested. |
-| `src/shell/desktop/tests/e2e/teardown.spec.ts` | Two workflows block the main process on purpose, so the harness's handling of a main process that stops answering is tested. |
+| `src/shell/desktop/tests/e2e/teardown.spec.ts` | Two workflows block the main process on purpose, so the harness's handling of a main process that stops answering is tested. A third leaves work running, so a quit that stops at the question about it is reported as that question, with its window and text, and not as a silent main process. |
 | `src/shell/runtime/tests/services/client/runtime-launcher.test.ts` | A runtime publishes itself 600 ms after the launcher starts, so the launcher's wait past its own timeout is tested. |
 | `src/shell/runtime/tests/services/lifetime/runtime-host.test.ts` | Another holder releases the data directory, or publishes discovery, 200 ms after the runtime starts, so the runtime's wait for either is tested. |
 
