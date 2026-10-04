@@ -21,6 +21,7 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   template: `
     <button type="button" class="primary" tr-button [disabled]="disabled()" (click)="presses = presses + 1">Move aside</button>
     <button type="button" class="secondary" tr-button [variant]="secondary">Wait for it</button>
+    <div style="width: 6rem"><button type="button" class="long" tr-button>A label far too long to fit the width its button is given</button></div>
   `
 })
 class ButtonHostComponent {
@@ -62,6 +63,20 @@ describe("ButtonComponent", () => {
     expect(button("secondary").classList.contains("tr-button-secondary")).toBe(true);
     expect(getComputedStyle(button("primary")).opacity).toBe("0.5");
     expect(getComputedStyle(button("primary")).cursor).toBe("default");
+  });
+
+  it("starts a label too long for its width at its start padding and ends it with an ellipsis, inside the width its parent gives it", () => {
+    render();
+    const long = button("long");
+    const label = long.querySelector("[data-truncates]") as HTMLElement;
+    const style = getComputedStyle(long);
+
+    expect(label.classList.contains("tr-button-label")).toBe(true);
+    expect(long.getBoundingClientRect().width).toBeCloseTo((long.parentElement as HTMLElement).getBoundingClientRect().width, 1);
+    AppearanceFixture.expectPixels(label.getBoundingClientRect().left - long.getBoundingClientRect().left, parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft));
+    AppearanceFixture.expectPixels(long.getBoundingClientRect().right - label.getBoundingClientRect().right, parseFloat(style.borderRightWidth) + parseFloat(style.paddingRight));
+    expect([label.scrollWidth > label.clientWidth, getComputedStyle(label).textOverflow, getComputedStyle(label).whiteSpace]).toEqual([true, "ellipsis", "nowrap"]);
+    expect(button("primary").querySelector("[data-truncates]")?.scrollWidth).toBe(button("primary").querySelector("[data-truncates]")?.clientWidth);
   });
 
   for (const mode of AppearanceFixture.modes)
