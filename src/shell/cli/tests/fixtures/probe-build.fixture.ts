@@ -11,7 +11,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { BuildIdentity } from "@noldova/teamrun-shell-protocol";
-import { RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+import { ProductInfo, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 export class ProbeBuildFixture implements AsyncDisposable {
   public static readonly WAITING_MARKER: string = "waiting";
@@ -54,15 +54,12 @@ export class ProbeBuildFixture implements AsyncDisposable {
     const copy = path.join(folder, "node_modules", "@noldova", "teamrun-shell-runtime");
     await cp(installed, copy, { recursive: true });
     const identity = new BuildIdentity(productVersion, RuntimeBuild.identity.protocolVersion, `${RuntimeBuild.identity.fingerprint}-${productVersion}`);
-    const resources = path.join(copy, "resources.js");
-    const text = (await readFile(resources, "utf8"))
-      .replace(`productVersion = "${RuntimeBuild.identity.productVersion}"`, `productVersion = "${identity.productVersion}"`)
-      .replace(`build = "${RuntimeBuild.identity.fingerprint}"`, `build = "${identity.fingerprint}"`);
-    await writeFile(resources, text);
     const probe = path.join(folder, "probe.mjs");
     await writeFile(probe, ProbeBuildFixture.PROBE_PART);
     const modules = path.join(folder, "_build", "modules");
     await mkdir(modules, { recursive: true });
+    const product = { ...JSON.parse(await readFile(ProductInfo.file, "utf8")), version: identity.productVersion, build: identity.fingerprint };
+    await writeFile(path.join(folder, "_build", "product.json"), JSON.stringify(product));
     const declaration = { id: "probe", version: "0.0.1", displayName: "Probe", description: "Answers the command line tests.", dependencies: [], runtimePackage: pathToFileURL(probe).href, contributes: { commands: ["probe.echo", "probe.fail", "probe.wait"] } };
     const declarationsFile = path.join(modules, "declarations.json");
     await writeFile(declarationsFile, JSON.stringify({ formatVersion: 1, modules: [declaration] }));

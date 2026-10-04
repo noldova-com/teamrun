@@ -72,7 +72,7 @@ export default class Build {
       const outputIndex = names.indexOf(Build.OUTPUT_OPTION);
       const outputFolder = outputIndex < 0 ? null : path.resolve(String(values[outputIndex]));
       const declarations = await this.modules.listBuildAsync(variant.isTest, variant.excluded);
-      const packages = await this.build.buildAsync(this.output, variant);
+      const packages = await this.build.buildAsync(this.output, variant, outputFolder);
       this.output.write(packages.length === 0 ? Build.NO_PACKAGES : `Packages built and installed: ${packages.length}.\n`);
       await this.artifacts.writeAsync(declarations, outputFolder);
       this.output.write(`Modules in the build: ${declarations.length}.\n`);

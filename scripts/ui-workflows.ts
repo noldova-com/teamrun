@@ -25,6 +25,7 @@ export default class UiWorkflows {
   private static readonly PLAYWRIGHT_CONFIG: string = "src/shell/desktop/tests/e2e/playwright.config.ts";
   private static readonly RECORD_SEGMENTS: readonly string[] = ["_build", "ui-builds.record"];
   private static readonly DECLARATIONS_SEGMENTS: readonly string[] = ["_build", "modules", "declarations.json"];
+  private static readonly PRODUCT_SEGMENTS: readonly string[] = ["_build", "product.json"];
   private static readonly TREE_OUTPUTS: readonly (readonly string[])[] = [
     ["_build", "window"],
     ["_build", "variants", "no-modules"],
@@ -94,14 +95,16 @@ export default class UiWorkflows {
   }
 
   private async hashOutputsAsync(inputs: string): Promise<BuildRecord> {
-    const outputs = [await ContentHash.ofFileAsync(path.join(this.root, ...UiWorkflows.DECLARATIONS_SEGMENTS))];
+    const outputs: string[] = [];
+    for (const file of [UiWorkflows.DECLARATIONS_SEGMENTS, UiWorkflows.PRODUCT_SEGMENTS])
+      outputs.push(await ContentHash.ofFileAsync(path.join(this.root, ...file)));
     for (const tree of UiWorkflows.TREE_OUTPUTS)
       outputs.push(await ContentHash.ofTreeAsync(path.join(this.root, ...tree)));
     return new BuildRecord(inputs, outputs);
   }
 
   private listOutputs(): readonly string[] {
-    return [path.join(this.root, ...UiWorkflows.DECLARATIONS_SEGMENTS), ...UiWorkflows.TREE_OUTPUTS.map(t => path.join(this.root, ...t))];
+    return [path.join(this.root, ...UiWorkflows.DECLARATIONS_SEGMENTS), path.join(this.root, ...UiWorkflows.PRODUCT_SEGMENTS), ...UiWorkflows.TREE_OUTPUTS.map(t => path.join(this.root, ...t))];
   }
 }
 

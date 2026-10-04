@@ -25,6 +25,7 @@ export { OwnershipReleasedException } from "../exceptions/ownership-released.exc
 export { PreShellDataException } from "../exceptions/pre-shell-data.exception.js";
 export { PreShellDataFoundException } from "../exceptions/pre-shell-data-found.exception.js";
 export { ProcessStartException } from "../exceptions/process-start.exception.js";
+export { ProductFileException } from "../exceptions/product-file.exception.js";
 export { RegistrationException } from "../exceptions/registration.exception.js";
 export { RuntimeHandoverException } from "../exceptions/runtime-handover.exception.js";
 export { ServiceAccessException } from "../exceptions/service-access.exception.js";
@@ -60,6 +61,7 @@ export { ProcessExit } from "../models/process-exit.js";
 export { ProcessLaunchCommand } from "../models/process-launch-command.js";
 export { ProcessRequest } from "../models/process-request.js";
 export { ProcessSettings } from "../models/process-settings.js";
+export { ProductInfo } from "../models/product-info.js";
 export { Registration } from "../models/registration.js";
 export { RequestContext } from "../models/request-context.js";
 export { Refusal } from "../models/refusal.js";

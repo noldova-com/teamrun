@@ -13,6 +13,7 @@ import { ArgumentException, ArgumentOutOfRangeException } from "@noldova/teamrun
 
 import { EndpointKind } from "../enums/endpoint-kind.js";
 import { Resources } from "../resources.js";
+import { ProductInfo } from "./product-info.js";
 
 export class Endpoint {
   public readonly kind: EndpointKind;
@@ -46,7 +47,7 @@ export class Endpoint {
 
     const port = text.slice(Resources.tcpEndpointPrefix.length);
     if (!Resources.portPattern.test(port))
-      throw new ArgumentException(Resources.formatEndpointInvalid(text), Resources.textParameterName);
+      throw new ArgumentException(Resources.formatEndpointInvalid(ProductInfo.current.name, text), Resources.textParameterName);
     return Endpoint.tcp(Number(port));
   }
 

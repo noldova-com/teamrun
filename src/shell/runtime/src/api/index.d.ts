@@ -1548,6 +1548,29 @@ export declare class ProcessStartException extends Exception {
 }
 
 /**
+ * The exception thrown when the build's product file cannot be read: the file
+ * is missing or not JSON, or a field is missing or blank. Its message names
+ * the file and the problem.
+ */
+export declare class ProductFileException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What is wrong.
+   * @param options The cause, when another error led to this one.
+   * @example
+   * ```ts
+   * import { ProductFileException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new ProductFileException("The build's product file has no build.");
+   * }
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
  * The exception a method handler throws to answer its request with a specific failure.
  */
 export declare class MethodFailureException extends Exception {
@@ -3369,6 +3392,125 @@ export declare class ProcessSettings {
    * ```
    */
   public constructor(graceMilliseconds?: number, endMilliseconds?: number, seenMilliseconds?: number);
+}
+
+/**
+ * The product and build this runtime belongs to, as the build wrote them to
+ * `_build/product.json` beside the installed runtime: the product's identity,
+ * its version and the build's fingerprint. The runtime, the desktop and the
+ * command line read it once, at start, instead of having it compiled in.
+ */
+export declare class ProductInfo {
+  /**
+   * The product's name, such as the one in messages and window titles.
+   */
+  public readonly name: string;
+
+  /**
+   * The product's slug: its lowercase name for programs, packages and
+   * variables.
+   */
+  public readonly slug: string;
+
+  /**
+   * The packaged application's ID.
+   */
+  public readonly applicationId: string;
+
+  /**
+   * The development application's ID, before the checkout's hash is added.
+   */
+  public readonly developmentApplicationId: string;
+
+  /**
+   * The data folder under the home folder, its segments separated by `/`.
+   */
+  public readonly dataFolder: string;
+
+  /**
+   * The per-device folder on Windows, under the local application data
+   * folder, its segments separated by `/`.
+   */
+  public readonly windowsDeviceFolder: string;
+
+  /**
+   * The per-device folder on macOS, under `Library/Application Support`, its
+   * segments separated by `/`.
+   */
+  public readonly macosDeviceFolder: string;
+
+  /**
+   * The per-device folder on Linux, under the state folder, its segments
+   * separated by `/`.
+   */
+  public readonly linuxDeviceFolder: string;
+
+  /**
+   * The environment variable that names another data directory.
+   */
+  public readonly dataDirectoryVariable: string;
+
+  /**
+   * The folder of the product's icons, relative to the repository, its
+   * segments separated by `/`.
+   */
+  public readonly icons: string;
+
+  /**
+   * The product version.
+   */
+  public readonly version: string;
+
+  /**
+   * The build's fingerprint: the same inputs give the same fingerprint, and
+   * any change gives another.
+   */
+  public readonly build: string;
+
+  private constructor();
+
+  /**
+   * The product file of the installed runtime's build.
+   */
+  public static get file(): string;
+
+  /**
+   * The installed runtime's product, read from {@link ProductInfo.file} on
+   * first use and kept.
+   *
+   * @throws {ProductFileException} When the file cannot be read or a field is
+   * missing or blank.
+   * @example
+   * ```ts
+   * import { ProductInfo } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function describeBuild(): string {
+   *   const product = ProductInfo.current;
+   *   return `${product.name} ${product.version} (build ${product.build})`;
+   * }
+   * ```
+   */
+  public static get current(): ProductInfo;
+
+  /**
+   * Reads a product file.
+   *
+   * @param file The product file.
+   * @returns The product it describes.
+   * @throws {ProductFileException} When the file cannot be read or a field is
+   * missing or blank.
+   * @example
+   * ```ts
+   * import path from "node:path";
+   *
+   * import { ProductInfo } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readVersion(checkout: string): string {
+   *   return ProductInfo.read(path.join(checkout, "_build", "product.json")).version;
+   * }
+   * ```
+   */
+  public static read(file: string): ProductInfo;
 }
 
 /**
@@ -5862,7 +6004,7 @@ export declare class DataDirectoryLocator {
  */
 export declare class RuntimeBuild {
   /**
-   * The build's identity: the stamped product version, the supported protocol version and the build fingerprint.
+   * The build's identity: the product version and the build fingerprint from {@link ProductInfo.current}, and the supported protocol version.
    */
   public static readonly identity: BuildIdentity;
 }
