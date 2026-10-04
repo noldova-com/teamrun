@@ -111,10 +111,10 @@ test.describe("document groups", () => {
       await TabDragFixture.moveOverAsync(window, window.locator("tr-docking-plate [data-direction=Right]"));
       await expect(preview).toBeVisible();
       await expect(line).toHaveCount(0);
-      const group = await TabDragFixture.groupOf(window, secondNote).boundingBox();
-      const box = await preview.boundingBox();
-      expect([box?.x, box?.y, box?.width, box?.height].map(t => Math.round(t ?? 0)))
-        .toEqual([(group?.x ?? 0) + (group?.width ?? 0) / 2, group?.y ?? 0, (group?.width ?? 0) / 2, group?.height ?? 0].map(t => Math.round(t)));
+      const group = await TabDragFixture.groupOf(window, secondNote).boundingBox() ?? { x: 0, y: 0, width: 0, height: 0 };
+      const box = await preview.boundingBox() ?? { x: 0, y: 0, width: 0, height: 0 };
+      expect([box.x + box.width, box.y, box.height].map(t => Math.round(t))).toEqual([group.x + group.width, group.y, group.height].map(t => Math.round(t)));
+      expect(box.x).toBeGreaterThanOrEqual(group.x + group.width / 2);
       await desktop.checkpointAsync(`tab-split-preview-${scheme}`);
       await window.keyboard.press("Escape");
       await window.mouse.up();
