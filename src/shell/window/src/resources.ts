@@ -378,6 +378,7 @@ export class Resources {
   public static readonly submenuRowType: string = "submenu";
   public static readonly separatorRowType: string = "separator";
   public static readonly menuRowPathSeparator: string = "/";
+  public static readonly menuTitleSeparator: string = " › ";
   public static readonly menuGlyph: string = "menu";
   public static readonly focusInEvent: string = "focusin";
   public static readonly focusOutEvent: string = "focusout";

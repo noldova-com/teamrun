@@ -8,12 +8,17 @@
 
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
+
 import { CommandSearchComponent } from "../../../../src/app/components/command-search/command-search.component";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
+import { MenuDeclarations } from "../../../../src/app/models/menu-declarations";
 import { WindowPartSource } from "../../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { CommandSearchService } from "../../../../src/app/services/command-search.service";
 import { CommandService } from "../../../../src/app/services/command.service";
+import { MenuBarService } from "../../../../src/app/services/menu-bar.service";
+import { MenuService } from "../../../../src/app/services/menu.service";
 import { Resources } from "../../../../src/resources";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 
@@ -21,25 +26,44 @@ describe("CommandSearchComponent", () => {
   let fixture: ComponentFixture<CommandSearchComponent>;
   let commands: CommandService;
   let search: CommandSearchService;
+  let menuBar: MenuBarService;
   let runs: string[];
+  let received: JsonValue[];
 
   const command = (name: string, title: string, key: string | null = null, isEnabled: boolean = true): CommandContribution =>
-    new CommandContribution(name, title, null, key, async () => {
+    new CommandContribution(name, title, null, key, async commandArguments => {
       runs.push(name);
+      received.push(commandArguments);
       return null;
     }, () => isEnabled);
 
   beforeEach(async () => {
     runs = [];
+    received = [];
     DesktopBridgeFixture.install("win32");
     TestBed.configureTestingModule({
-      providers: [{ provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], ["notes.newNote"], [], [], [], () => Promise.reject(new Error("Not loaded.")))] }]
+      providers: [
+        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], ["notes.newNote"], [], [], [], () => Promise.reject(new Error("Not loaded.")))] },
+        {
+          provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
+            places: [{ name: "notes.templates", title: "New from template", menuBar: false }],
+            groups: [
+              { name: "notes.create", place: "shell.file", exclusive: false, items: [{ command: "notes.newNote", arguments: {} }, { submenu: "notes.templates" }] },
+              { name: "notes.fromTemplate", place: "notes.templates", exclusive: false, items: [{ command: "notes.newNote", arguments: { template: "plan" } }] },
+              { name: "notes.shown", place: "shell.view", exclusive: false, items: [{ command: "weather.today", arguments: {}, label: "Forecast" }, { command: "notes.newNote", arguments: {}, label: "Quick note" }] },
+              { name: "notes.locked", place: "shell.view", exclusive: false, items: [{ command: "notes.archive", arguments: { force: true } }] }
+            ]
+          })]
+        }
+      ]
     });
     commands = TestBed.inject(CommandService);
     search = TestBed.inject(CommandSearchService);
+    menuBar = TestBed.inject(MenuBarService);
     commands.setCommands([
       command("notes.newNote", "New note", "Mod+Alt+N"), command("notes.archive", "Archive the note", null, false), command("weather.today", "Today's weather"), command("weather.tools", "Open the tools"), command("weather.pluto", "Pluto"), command("weather.photo", "Photo")
     ]);
+    TestBed.inject(MenuService).setActiveModules(["notes"]);
     fixture = TestBed.createComponent(CommandSearchComponent);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -65,9 +89,9 @@ describe("CommandSearchComponent", () => {
     await fixture.whenStable();
   }
 
-  it("lists every enabled command alphabetically by title, with the ones run this session first, and leaves out a disabled one", async () => {
-    const titles = commands.commands().filter(t => t.isEnabled(null)).map(t => t.title).sort((a, b) => a.localeCompare(b));
-    expect(ids()).toEqual(titles.map(t => commands.commands().find(u => u.title === t)?.name));
+  it("lists every enabled command and menu row alphabetically by title, with the ones run this session first, and leaves out a disabled one", async () => {
+    const entries = [...commands.commands().filter(t => t.isEnabled(null)).map(t => [t.name, t.title]), ...menuBar.searchRows().map(t => [t.id, t.title])];
+    expect(ids()).toEqual(entries.sort((a, b) => String(a[1]).localeCompare(String(b[1]))).map(t => t[0]));
     expect(ids()).not.toContain("notes.archive");
 
     search.remember("weather.today");
@@ -83,7 +107,7 @@ describe("CommandSearchComponent", () => {
 
     expect(ids().filter(t => t.startsWith("weather."))).toEqual(["weather.today", "weather.tools", "weather.photo", "weather.pluto"]);
     await typeAsync("nn");
-    expect(ids()).toEqual(["notes.newNote"]);
+    expect(ids()).toEqual(["notes.newNote", menuBar.searchRows().find(u => u.title === "New note")?.id]);
     await typeAsync("zzz");
     expect(ids()).toEqual([]);
   });
@@ -105,6 +129,37 @@ describe("CommandSearchComponent", () => {
     await vi.waitFor(() => expect(runs).toEqual(["notes.newNote"]));
     expect(close).toHaveBeenCalledOnce();
     expect(search.recent()).toEqual(["notes.newNote"]);
+  });
+
+  it("lists a menu row that passes arguments or shows its own label, with its menu as the detail and no key for arguments, but not one that runs a command alone", async () => {
+    const detail = (id: string): string | null | undefined => root().querySelector(`[data-item="${id}"] .tr-quick-input-detail`)?.textContent;
+    const key = (id: string): string | null | undefined => root().querySelector(`[data-item="${id}"] .tr-quick-input-key`)?.textContent;
+    const rows = menuBar.searchRows();
+    const template = rows.find(t => t.title === "New note")?.id ?? "";
+    const labelled = rows.find(t => t.title === "Quick note")?.id ?? "";
+
+    expect(rows.map(t => [t.title, t.menu])).toEqual(expect.arrayContaining([["New note", "File › New from template"], ["Forecast", "View"], ["Quick note", "View"]]));
+    expect(rows.map(t => t.title)).not.toContain("Archive the note");
+    expect(ids().filter(t => t.startsWith("shell.file/"))).toEqual([template]);
+    expect([detail(template), key(template), detail(labelled), key(labelled)]).toEqual(["File › New from template", undefined, "View", "Ctrl+Alt+N"]);
+
+    await typeAsync("new note");
+    expect(ids()).toEqual(["notes.newNote", template]);
+    await typeAsync("forecast");
+    expect(ids()).toHaveLength(1);
+  });
+
+  it("runs a chosen menu row with its arguments after closing the search, and remembers it", async () => {
+    const close = vi.spyOn(search, "close");
+    const template = menuBar.searchRows().find(t => t.title === "New note")?.id ?? "";
+    await typeAsync("new note");
+
+    root().querySelector<HTMLElement>(`[data-item="${template}"]`)?.click();
+
+    await vi.waitFor(() => expect(received).toEqual([{ template: "plan" }]));
+    expect(runs).toEqual(["notes.newNote"]);
+    expect(close).toHaveBeenCalledOnce();
+    expect(search.recent()).toEqual([template]);
   });
 
   it("closes the search when it is dismissed", () => {

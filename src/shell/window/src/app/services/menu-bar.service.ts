@@ -12,6 +12,7 @@ import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 
 import type { CommandRow } from "../models/command-row";
 import type { MenuPlace } from "../models/menu-place";
+import { MenuSearchRow } from "../models/menu-search-row";
 import { CommandService } from "./command.service";
 import { MenuService } from "./menu.service";
 import { Resources } from "../../resources";
@@ -37,6 +38,8 @@ export class MenuBarService {
     [Resources.menusField]: [...this.menus.active().flatMap(t => t.places).filter(t => t.name === Resources.appMenu), ...this.places()].map(t => ({ [Resources.placeField]: t.name, [Resources.titleField]: t.title, [Resources.rowsField]: this.rowsOf([t.name]) }))
   }));
 
+  public readonly searchRows: Signal<readonly MenuSearchRow[]> = computed(() => this.places().flatMap(t => this.searchRowsOf([t.name], [t.title])));
+
   public run(id: string): void {
     const row = this.find(id.split(Resources.menuRowPathSeparator));
     if (!Object.isNull(row) && row.isEnabled)
@@ -61,6 +64,19 @@ export class MenuBarService {
           };
       })
     ]);
+  }
+
+  private searchRowsOf(path: readonly string[], titles: readonly string[]): readonly MenuSearchRow[] {
+    return this.menus.resolve(String(path.at(-1))).flatMap(section => section.rows.flatMap((row, position) => {
+      const rowPath = [...path, section.group, String(position)];
+      if (row.isSubmenu)
+        return this.searchRowsOf([...rowPath, row.place], [...titles, row.title]);
+      const hasArguments = Object.keys(row.commandArguments).length > 0;
+      const isListed = !hasArguments && this.commands.commands().some(u => u.name === row.command && u.title === row.title);
+      return row.isEnabled && !isListed
+        ? [new MenuSearchRow(rowPath.join(Resources.menuRowPathSeparator), row.title, row.icon, hasArguments ? null : row.key, titles.join(Resources.menuTitleSeparator))]
+        : [];
+    }));
   }
 
   private find(path: readonly string[]): CommandRow | null {
