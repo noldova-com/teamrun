@@ -3452,6 +3452,8 @@ export declare class ProductInfo {
    */
   public readonly build: string;
 
+  private constructor();
+
   /**
    * The product file of the installed runtime's build.
    */

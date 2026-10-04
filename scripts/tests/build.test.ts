@@ -66,8 +66,8 @@ class BuildTests {
       assert.deepEqual(Object.keys(product), [
         "name", "slug", "applicationId", "developmentApplicationId", "dataFolder", "deviceFolders", "dataDirectoryVariable", "icons", "version", "build"
       ]);
-      assert.equal(product.name, ProductIdentityFixture.json.name);
-      assert.deepEqual(product.deviceFolders, ProductIdentityFixture.json.deviceFolders);
+      assert.equal(product.name, ProductIdentityFixture.json["name"]);
+      assert.deepEqual(product.deviceFolders, ProductIdentityFixture.json["deviceFolders"]);
       assert.equal(product.build, fingerprint);
       assert.equal(product.version, "0.0.7");
       assert.deepEqual(JSON.parse(await readFile(path.join(variant, "product.json"), "utf8")), product);

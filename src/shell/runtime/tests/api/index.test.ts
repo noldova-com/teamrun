@@ -77,6 +77,8 @@ export class RuntimeApiTests {
       "ProcessSettings",
       "ProcessStartException",
       "ProcessSupervisor",
+      "ProductFileException",
+      "ProductInfo",
       "Refusal",
       "Registration",
       "RegistrationException",
