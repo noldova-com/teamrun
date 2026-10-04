@@ -303,8 +303,8 @@ test.describe("toolbars", () => {
     const window = desktop.window;
     await setShownAsync(window, "Spare", true);
     await setShownAsync(window, "Display", false);
-    const before = await arrangementOf(window);
-    expect(before).toEqual([["notes.main", "notes.spare"]]);
+    const before = [["notes.main", "notes.spare"]];
+    await expect.poll(() => arrangementOf(window)).toEqual(before);
 
     await desktop.reopenAsync();
 
