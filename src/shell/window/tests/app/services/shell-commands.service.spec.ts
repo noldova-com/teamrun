@@ -184,6 +184,18 @@ describe("ShellCommandsService", () => {
     expect([layout.layout().isOpen(changes), layout.layout().group(group)]).toEqual([false, null]);
   });
 
+  it("passes the focus to the group that remains when a closed tab was the last of its group, and has none to focus when no tab remains", async () => {
+    await runAsync("shell.splitTabRight", tab(todo.key));
+    const remaining = layout.layout().documentGroups[0];
+
+    await runAsync("shell.closeTab", tab(todo.key));
+
+    expect([layout.layout().documentGroups.map(t => t.id), layout.currentGroup().id, layout.currentGroup().active]).toEqual([[remaining?.id], remaining?.id, remaining?.active]);
+    await runAsync("shell.closeTab", tab(plan.key));
+    await runAsync("shell.closeTab", tab(settings.key));
+    expect([layout.layout().documents.tabs, layout.currentGroup().active]).toEqual([[], null]);
+  });
+
   it("moves a tab to another group that accepts it, and to no other", async () => {
     const other = layout.layout().groupOf(changes)?.id ?? -1;
     const own = layout.layout().groupOf(search)?.id ?? -1;

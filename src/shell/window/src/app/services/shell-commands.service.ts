@@ -174,7 +174,7 @@ export class ShellCommandsService {
 
   private close(target: TabTarget): void {
     this.layout.close(target.tab);
-    const next = this.layout.layout().group(target.group.id)?.active ?? null;
+    const next = this.layout.layout().group(target.group.id)?.active ?? this.layout.currentGroup().active;
     if (!Object.isNull(next))
       this.focus(next);
   }

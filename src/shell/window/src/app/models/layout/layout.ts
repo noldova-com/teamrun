@@ -120,7 +120,7 @@ export class Layout {
     const target = this.group(groupId);
     if (Object.isNull(target) || (!tab.isMovable && !target.isDocuments))
       return false;
-    return !(target.has(tab) && target.tabs.length === 1 && (!target.isDocuments || !tab.isMovable || this.documentGroups.length > 1));
+    return !this.isOnlyTabOf(tab, target) || this.keepsEmptyDocuments(tab, target);
   }
 
   public keep(tab: Tab): Layout {
@@ -219,6 +219,14 @@ export class Layout {
 
   private withGroup(group: TabGroup): Layout {
     return this.withRegions(t => t.withGroup(group));
+  }
+
+  private isOnlyTabOf(tab: Tab, group: TabGroup): boolean {
+    return group.has(tab) && group.tabs.length === 1;
+  }
+
+  private keepsEmptyDocuments(tab: Tab, group: TabGroup): boolean {
+    return group.isDocuments && tab.isMovable && this.documentGroups.length === 1;
   }
 
   private withoutGroup(id: number): Layout {

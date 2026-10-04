@@ -54,7 +54,27 @@ function tabKeysOf(group: Locator): Promise<readonly (string | null)[]> {
 async function runCommandAsync(window: Page, title: string, name: string): Promise<void> {
   await window.keyboard.press("ControlOrMeta+Shift+KeyP");
   await window.keyboard.type(title);
-  await window.locator(`[role=option][data-item="${name}"]`).click();
+  await expect(window.getByRole("option").first()).toHaveAttribute("data-item", name);
+  await window.keyboard.press("Enter");
+}
+
+async function chooseRowAsync(window: Page, label: string, key: string = "Enter"): Promise<void> {
+  for (let step = 0; step < 12; step++) {
+    const current = await window.evaluate(() => document.activeElement?.textContent?.trim() ?? "");
+    if (current.includes(label)) {
+      await window.keyboard.press(key);
+      return;
+    }
+    await window.keyboard.press("ArrowDown");
+  }
+  throw new Error(`The menu has no row ${label}.`);
+}
+
+async function openTabMenuAsync(window: Page, key: string): Promise<void> {
+  await tab(window, key).focus();
+  await window.keyboard.press("Shift+F10");
+  await expect(window.locator(".cdk-overlay-container tr-menu[data-place='shell.tab']")).toBeVisible();
+  await expect.poll(() => window.evaluate(() => document.activeElement?.closest("tr-menu") !== null && document.activeElement?.closest("tr-menu") !== undefined)).toBe(true);
 }
 
 function documentGroups(window: Page): Locator {
@@ -117,23 +137,23 @@ test.describe("document groups", () => {
     await expect.poll(() => tabKeysOf(groupOf(window, firstNote))).toEqual([firstNote, secondNote]);
   });
 
-  test("the tab menu splits a document, moves it to the next or previous group and the commands focus another group", async ({ desktop }) => {
+  test("the keyboard splits a document from its tab menu, moves it to the next or previous group and runs the move command from command search", async ({ desktop }) => {
     const window = desktop.window;
-    await tab(window, firstNote).click();
-    await window.keyboard.press("Shift+F10");
-    await window.getByRole("menuitem", { name: "Split", exact: true }).click();
-    await window.getByRole("menuitem", { name: "Split right" }).click();
+    await openTabMenuAsync(window, firstNote);
+    await chooseRowAsync(window, "Split", "ArrowRight");
+    await chooseRowAsync(window, "Split right");
 
     await expect.poll(() => tabKeysOf(groupOf(window, firstNote))).toEqual([firstNote]);
     await expect(tab(window, firstNote)).toBeFocused();
-    await tab(window, firstNote).click({ button: "right" });
-    await window.getByRole("menuitem", { name: "Move to previous group" }).click();
+    await openTabMenuAsync(window, firstNote);
+    await chooseRowAsync(window, "Move to previous group");
     await expect.poll(() => tabKeysOf(groupOf(window, secondNote))).toEqual([secondNote, firstNote]);
     await expect(documentGroups(window)).toHaveCount(1);
+    await expect(tab(window, firstNote)).toBeFocused();
 
-    await tab(window, secondNote).click({ button: "right" });
-    await window.getByRole("menuitem", { name: "Split", exact: true }).click();
-    await window.getByRole("menuitem", { name: "Split down" }).click();
+    await openTabMenuAsync(window, secondNote);
+    await chooseRowAsync(window, "Split", "ArrowRight");
+    await chooseRowAsync(window, "Split down");
     await expect(documentGroups(window)).toHaveCount(2);
     await runCommandAsync(window, "Move the tab to the next group", "shell.moveTabToNextGroup");
     await expect.poll(() => tabKeysOf(groupOf(window, firstNote))).toEqual([firstNote, secondNote]);
@@ -149,6 +169,18 @@ test.describe("document groups", () => {
     await expect(tab(window, secondNote)).not.toBeFocused();
     await expect(window.locator("tr-tab:focus")).toHaveCount(1);
     await runCommandAsync(window, "Focus the previous group", "shell.focusPreviousGroup");
+    await expect(tab(window, secondNote)).toBeFocused();
+  });
+
+  test("closing the last document of a group from the keyboard focuses a tab of the group that remains", async ({ desktop }) => {
+    const window = desktop.window;
+    await splitFirstNoteAsync(window);
+    await tab(window, firstNote).focus();
+
+    await window.keyboard.press("ControlOrMeta+KeyW");
+
+    await expect(documentGroups(window)).toHaveCount(1);
+    await expect(tab(window, firstNote)).toHaveCount(0);
     await expect(tab(window, secondNote)).toBeFocused();
   });
 

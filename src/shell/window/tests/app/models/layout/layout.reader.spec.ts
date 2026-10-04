@@ -82,6 +82,19 @@ describe("LayoutReader", () => {
     expect(LayoutReader.read(JSON.parse(JSON.stringify(LayoutReader.read(full).toJson())))).toEqual(LayoutReader.read(full));
   });
 
+  it("reads which documents group is active by its position, and the first when the layout names none or a position it lacks", () => {
+    const beside = {
+      axis: "Horizontal",
+      children: [{ tabs: [{ document: "notes.note", instance: "plan" }], active: 0, documents: true, weight: 0.5 }, { tabs: [{ document: "notes.note", instance: "todo" }], active: 0, documents: true, weight: 0.5 }]
+    };
+    const { activeDocuments, ...unnamed } = saved({}, beside);
+    const active = (json: Record<string, unknown>): string | undefined => LayoutReader.read(json).documents.active?.key;
+
+    expect([activeDocuments, active(unnamed)]).toEqual([0, "document/notes.note/plan"]);
+    expect([active({ ...unnamed, activeDocuments: 1 }), active({ ...unnamed, activeDocuments: 7 })]).toEqual(["document/notes.note/todo", "document/notes.note/plan"]);
+    expect(failure({ ...unnamed, activeDocuments: "second" }).path).toBe("$.activeDocuments");
+  });
+
   it("reads a group marked as not the documents group as a view group", () => {
     expect(LayoutReader.read(saved({ Left: dock({ ...group({ view: "files.tree" }), documents: false }) })).dock(DockSide.Left).root)
       .toEqual(new TabGroup(1, [files], files));
