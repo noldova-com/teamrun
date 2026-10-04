@@ -5,9 +5,7 @@
   @for (item of items(); track item.id; let index = $index) {
     <div class="tr-quick-input-option" role="option" [id]="optionId(index)" [attr.aria-selected]="index === active()" [attr.data-item]="item.id"
       (click)="choose(index)">
-      @if (item.icon; as glyph) {
-        <span class="tr-quick-input-icon material-symbols-rounded" aria-hidden="true">{{ glyph }}</span>
-      }
+      <span class="tr-quick-input-icon material-symbols-rounded" aria-hidden="true">{{ item.icon }}</span>
       <span class="tr-quick-input-title">
         @for (segment of item.segments; track $index) {
           @if (segment.isMatch) {

@@ -146,7 +146,9 @@ describe("QuickInputComponent", () => {
     expect([...full?.querySelectorAll("mark") ?? []].map(t => t.textContent)).toEqual(["Cl"]);
     expect(full?.querySelector(".tr-quick-input-title")?.textContent?.replace(/\s+/gu, " ").trim()).toBe("Cl ose the tab");
     expect([full?.querySelector(".tr-quick-input-detail")?.textContent, full?.querySelector(".tr-quick-input-key")?.textContent]).toEqual(["TeamRun", "Ctrl+W"]);
-    expect([bare?.querySelector(".tr-quick-input-icon"), bare?.querySelector(".tr-quick-input-detail"), bare?.querySelector(".tr-quick-input-key")]).toEqual([null, null, null]);
+    expect([bare?.querySelector(".tr-quick-input-icon")?.textContent, bare?.querySelector(".tr-quick-input-detail"), bare?.querySelector(".tr-quick-input-key")]).toEqual(["", null, null]);
+    expect(bare?.querySelector(".tr-quick-input-icon")?.getBoundingClientRect().width).toBe(full?.querySelector(".tr-quick-input-icon")?.getBoundingClientRect().width);
+    expect(bare?.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left).toBe(full?.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left);
   });
 
   it("takes its outline, margin, padding and gap from the theme and fits its options in its height", () => {
