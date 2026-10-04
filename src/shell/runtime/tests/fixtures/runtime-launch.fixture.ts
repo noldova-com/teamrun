@@ -8,8 +8,8 @@
 
 import { rm } from "node:fs/promises";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 
+import { Wait } from "@noldova/teamrun-foundation-testing";
 import { ClientSettings, DataDirectory, DiscoveryReader, LaunchSettings, OwnershipLock, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import { SocketFolderFixture } from "./socket-folder.fixture.js";
@@ -41,14 +41,8 @@ export class RuntimeLaunchFixture implements AsyncDisposable {
     }
   }
 
-  public static async waitForExitAsync(processId: number): Promise<boolean> {
-    const deadline = Date.now() + RuntimeLaunchFixture.EXIT_TIMEOUT;
-    while (RuntimeLaunchFixture.isRunning(processId)) {
-      if (Date.now() >= deadline)
-        return false;
-      await delay(RuntimeLaunchFixture.POLL_INTERVAL);
-    }
-    return true;
+  public static waitForExitAsync(processId: number): Promise<boolean> {
+    return Wait.untilAsync(() => !RuntimeLaunchFixture.isRunning(processId), RuntimeLaunchFixture.EXIT_TIMEOUT);
   }
 
   public createSettings(idleGraceMilliseconds: number = 30_000, entryPath: string = RuntimeEntry.entryPath): LaunchSettings {
@@ -72,15 +66,16 @@ export class RuntimeLaunchFixture implements AsyncDisposable {
   }
 
   public async [Symbol.asyncDispose](): Promise<void> {
-    const deadline = Date.now() + RuntimeLaunchFixture.EXIT_TIMEOUT;
-    while (OwnershipLock.isOwned(this.dataDirectory) && Date.now() < deadline) {
+    await Wait.untilAsync(async () => {
+      if (!OwnershipLock.isOwned(this.dataDirectory))
+        return true;
       const discovery = await DiscoveryReader.readAsync(this.dataDirectory).catch(() => null);
       if (discovery !== null && RuntimeLaunchFixture.isRunning(discovery.processId)) {
         process.kill(discovery.processId);
         await RuntimeLaunchFixture.waitForExitAsync(discovery.processId);
       }
-      await delay(RuntimeLaunchFixture.POLL_INTERVAL);
-    }
+      return false;
+    }, RuntimeLaunchFixture.EXIT_TIMEOUT);
     await rm(this.root, { recursive: true, force: true, maxRetries: 20, retryDelay: RuntimeLaunchFixture.POLL_INTERVAL });
   }
 }

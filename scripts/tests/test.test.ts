@@ -37,12 +37,12 @@ class TestTests {
 
       assert.equal(exitCode, 0, output.text);
       const titles = [
-        "Documents", "Module folders", "Shell names no module", "Product identity", "Module imports", "Unique names", "Declared dependencies", "Packages", "Package tests and coverage",
+        "Documents", "License headers", "Test waits", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Unique names", "Declared dependencies", "Packages", "Package tests and coverage",
         "Script types", "API declarations", "API examples",
         "Script tests and coverage", "Angular tests and coverage", "Packaged build leaves out the Gallery"
       ];
       assert.deepEqual([...output.text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`), titles.map(t => `${t}: passed`));
-      assert.ok(output.text.endsWith("\n15 of 15 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n19 of 19 checks passed.\n"));
       assert.equal(runner.runs.length, 4);
       assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
     });
@@ -57,7 +57,7 @@ class TestTests {
       assert.equal(exitCode, 1);
       assert.ok(output.text.includes("\nScript types: failed\n"));
       assert.ok(output.text.includes("\nScript tests and coverage: passed\n"));
-      assert.ok(output.text.endsWith("\n14 of 15 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n18 of 19 checks passed.\n"));
       assert.equal(runner.runs.length, 4);
     });
 

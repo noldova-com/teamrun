@@ -11,15 +11,14 @@ import { test } from "node:test";
 
 import GitHubException from "../../repository/github.exception.ts";
 import GitHubApi from "../../repository/github-api.ts";
-import OpenPullRequest from "../../workflows/open-pull-request.ts";
 import PullRequestNote from "../../workflows/pull-request-note.ts";
+import type PullRequestSnapshot from "../../workflows/pull-request-snapshot.ts";
 import PullRequestReader from "../../workflows/pull-request.reader.ts";
 import GitHubApiFixture from "../fixtures/github-api.fixture.ts";
 import PullRequestScenarioFixture from "../fixtures/pull-request-scenario.fixture.ts";
 
 class PullRequestReaderTests {
   private static readonly NUMBER: number = 7;
-  private static readonly OPEN: OpenPullRequest = new OpenPullRequest(PullRequestReaderTests.NUMBER, false, "main");
 
   public static register(): void {
     test("the repository's default branch, required checks without repeats and the base's last change are read", async () => {
@@ -63,7 +62,7 @@ class PullRequestReaderTests {
         ]
       });
 
-      const pull = await PullRequestReaderTests.createReader(scenario).readAsync(PullRequestReaderTests.OPEN);
+      const pull = await PullRequestReaderTests.readAsync(PullRequestReaderTests.createReader(scenario));
 
       assert.equal(pull.number, PullRequestReaderTests.NUMBER);
       assert.equal(pull.head, PullRequestScenarioFixture.head(PullRequestReaderTests.NUMBER));
@@ -81,8 +80,8 @@ class PullRequestReaderTests {
       scenario.add({ number: 8, commitMinutesAgo: 25, checks: [{ name: "Build and test (Linux x64)", conclusion: null, startedMinutesAgo: null, finishedMinutesAgo: null }] });
       const reader = PullRequestReaderTests.createReader(scenario);
 
-      const none = await reader.readAsync(new OpenPullRequest(7, false, "main"));
-      const queued = await reader.readAsync(new OpenPullRequest(8, false, "main"));
+      const none = await PullRequestReaderTests.readAsync(reader, 7);
+      const queued = await PullRequestReaderTests.readAsync(reader, 8);
 
       assert.equal(none.pushedAt.toISOString(), PullRequestScenarioFixture.ago(45));
       assert.equal(none.hasAutoMerge, false);
@@ -106,7 +105,7 @@ class PullRequestReaderTests {
         const scenario = new PullRequestScenarioFixture();
         scenario.add({ number: PullRequestReaderTests.NUMBER, reviews: reviews.map(([login, state]) => ({ login, state })) });
 
-        const pull = await PullRequestReaderTests.createReader(scenario).readAsync(PullRequestReaderTests.OPEN);
+        const pull = await PullRequestReaderTests.readAsync(PullRequestReaderTests.createReader(scenario));
 
         assert.equal(pull.isApproved, expected, JSON.stringify(reviews));
       }
@@ -117,7 +116,7 @@ class PullRequestReaderTests {
       scenario.add({ number: PullRequestReaderTests.NUMBER });
       scenario.api.answer(`/pulls/${PullRequestReaderTests.NUMBER}/reviews?per_page=100`, [{ state: "APPROVED", user: null }]);
 
-      const pull = await PullRequestReaderTests.createReader(scenario).readAsync(PullRequestReaderTests.OPEN);
+      const pull = await PullRequestReaderTests.readAsync(PullRequestReaderTests.createReader(scenario));
 
       assert.equal(pull.isApproved, true);
     });
@@ -127,7 +126,7 @@ class PullRequestReaderTests {
         const scenario = new PullRequestScenarioFixture();
         scenario.add({ number: PullRequestReaderTests.NUMBER, events });
 
-        const pull = await PullRequestReaderTests.createReader(scenario).readAsync(PullRequestReaderTests.OPEN);
+        const pull = await PullRequestReaderTests.readAsync(PullRequestReaderTests.createReader(scenario));
 
         assert.equal(pull.hadAutoMerge, expected, events.join());
       }
@@ -146,10 +145,23 @@ class PullRequestReaderTests {
         { id: 5, body: marker, user: null }
       ]);
 
-      const pull = await PullRequestReaderTests.createReader(scenario).readAsync(PullRequestReaderTests.OPEN);
+      const pull = await PullRequestReaderTests.readAsync(PullRequestReaderTests.createReader(scenario));
 
       assert.ok(pull.notes.every(t => t instanceof PullRequestNote));
       assert.deepEqual(pull.notes.map(t => [t.id, t.kind, t.head, t.isCleared]), [[1, "conflict", head, false], [4, "failed", head, true]]);
+    });
+
+    test("a pull request's state is read alone, and its build runs that are not completed are listed", async () => {
+      const scenario = new PullRequestScenarioFixture();
+      scenario.add({ number: PullRequestReaderTests.NUMBER, mergeState: "dirty", hasAutoMerge: true, activeRuns: [71, 72] });
+      const reader = PullRequestReaderTests.createReader(scenario);
+
+      const state = await reader.readStateAsync(PullRequestReaderTests.NUMBER);
+
+      assert.deepEqual([state.number, state.head, state.mergeState, state.hasAutoMerge, state.isMergeStateKnown],
+        [PullRequestReaderTests.NUMBER, PullRequestScenarioFixture.head(PullRequestReaderTests.NUMBER), "dirty", true, true]);
+      assert.deepEqual(scenario.api.requests, [`GET /pulls/${PullRequestReaderTests.NUMBER}`]);
+      assert.deepEqual(await reader.listActiveBuildRunsAsync(PullRequestScenarioFixture.head(PullRequestReaderTests.NUMBER)), [71, 72]);
     });
 
     test("an answer of the wrong shape is refused naming the field", async () => {
@@ -164,14 +176,16 @@ class PullRequestReaderTests {
       scenario.api.answer("/rules/branches/main?per_page=100", [2]);
       await assert.rejects(reader.readRepositoryAsync(), new GitHubException("rules[0] must be an object."));
       scenario.api.answer(`/pulls/${PullRequestReaderTests.NUMBER}`, { head: { sha: "a".repeat(40) }, mergeable_state: 3 });
-      scenario.api.answer(`/commits/${"a".repeat(40)}/check-runs?per_page=100`, { check_runs: [] });
-      scenario.api.answer(`/commits/${"a".repeat(40)}`, { commit: { committer: { date: PullRequestScenarioFixture.ago(5) } } });
-      await assert.rejects(reader.readAsync(PullRequestReaderTests.OPEN), new GitHubException("pull request.mergeable_state must be text."));
+      await assert.rejects(reader.readStateAsync(PullRequestReaderTests.NUMBER), new GitHubException("pull request.mergeable_state must be text."));
     });
   }
 
   private static createReader(scenario: PullRequestScenarioFixture): PullRequestReader {
     return new PullRequestReader(new GitHubApi(GitHubApiFixture.REPOSITORY, scenario.api, "work"));
+  }
+
+  private static async readAsync(reader: PullRequestReader, number: number = PullRequestReaderTests.NUMBER): Promise<PullRequestSnapshot> {
+    return await reader.readAsync(await reader.readStateAsync(number));
   }
 }
 

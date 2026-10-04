@@ -13,7 +13,7 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
-import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import { Assert, TestClass, TestMethod, Wait } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Failure, FailureCode, PreShellData, QualifiedName, ShellMethods, StopPolicy } from "@noldova/teamrun-shell-protocol";
 import {
   AttachOptions,
@@ -431,8 +431,7 @@ export class RuntimeLauncherTests {
       () => new RuntimeLauncher(fake.createSettings(200, 5_000), RuntimeServerFixture.IDENTITY, starter).attachAsync("desktop", new ClientListenerFixture()),
       LaunchException);
 
-    while (starter.processIds.length === 0)
-      await delay(25);
+    Assert.isTrue(await Wait.untilAsync(() => starter.processIds.length > 0, 5_000), "The launcher started no runtime within 5 s.");
     Assert.isTrue(await RuntimeLaunchFixture.waitForExitAsync(Number(starter.processIds[0])));
     fake.release();
     const exception = await attaching;

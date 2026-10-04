@@ -7,6 +7,8 @@
 name: Watch pull requests
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: '*/15 * * * *'
   workflow_run:
@@ -15,7 +17,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: read
+  actions: write
   checks: read
   contents: read
   pull-requests: write
@@ -38,6 +40,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Set up Node.js
         id: node
