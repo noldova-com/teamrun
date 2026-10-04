@@ -19,7 +19,7 @@ export default class ScriptTestCheck implements ISelectableCheck {
   private static readonly UNIT: string = "script test files";
   private static readonly REPORT_SEGMENTS: readonly string[] = ["_build", "script-tests.tap"];
   private static readonly REPORT_ENCODING: BufferEncoding = "utf8";
-  private static readonly RESULT_PATTERN: RegExp = /^(?:not )?ok \d+ - (?!.*\.test\.ts$).+$/gm;
+  private static readonly UNSELECTED_PATTERN: RegExp = /^ok \d+ - .+\.test\.ts$/gm;
   private static readonly SELECTED_ARGUMENTS: readonly string[] = ["--test", "--test-timeout=30000"];
   private static readonly TEST_ARGUMENTS: readonly string[] = [
     "--test",
@@ -68,7 +68,7 @@ export default class ScriptTestCheck implements ISelectableCheck {
       this.root);
     if (!existsSync(report))
       return new CheckSelection(false, ScriptTestCheck.UNIT, files.length, 0);
-    const matched = (await readFile(report, ScriptTestCheck.REPORT_ENCODING)).match(ScriptTestCheck.RESULT_PATTERN)?.length ?? 0;
-    return new CheckSelection(matched === 0 || exitCode === 0, ScriptTestCheck.UNIT, files.length, matched === 0 ? 0 : files.length);
+    const unselected = (await readFile(report, ScriptTestCheck.REPORT_ENCODING)).match(ScriptTestCheck.UNSELECTED_PATTERN)?.length ?? 0;
+    return new CheckSelection(exitCode === 0, ScriptTestCheck.UNIT, files.length, files.length - unselected);
   }
 }

@@ -86,6 +86,8 @@ class TestTests {
         ""
       ].join("\n"));
       assert.equal(await readFile(summaryPath, "utf8"), [
+        "Filters: <code>alpha</code> <code>a.spec</code>",
+        "",
         "| Check | Result | Unit | Discovered | Selected | Unselected |",
         "|---|---|---|---|---|---|",
         "| Package tests and coverage | None selected | package tests | 0 | 0 | 0 |",
@@ -101,13 +103,15 @@ class TestTests {
       const summaryPath = path.join(repository.directory, "summary.md");
       const output = new TextOutputFixture();
 
-      const exitCode = await new Test(repository.directory, new AngularReportRunnerFixture(TestTests.REPORT, [0]), output, { GITHUB_STEP_SUMMARY: summaryPath }).runAsync(["--filter", "nothing"]);
+      const exitCode = await new Test(repository.directory, new AngularReportRunnerFixture(TestTests.REPORT, [0]), output, { GITHUB_STEP_SUMMARY: summaryPath }).runAsync(["--filter", "no|<match>&"]);
 
       assert.equal(exitCode, 1);
       assert.ok(output.text.includes("Script tests and coverage: none selected; 0 of 2 script test files selected, 2 not selected.\n"));
       assert.ok(output.text.includes("Angular tests and coverage: none selected; 0 of 2 spec files selected, 2 not selected.\n"));
       assert.ok(output.text.endsWith("\nNo test matched the filters.\n\n2 of 3 checks passed.\n"));
-      assert.ok((await readFile(summaryPath, "utf8")).endsWith("\nNo test matched the filters.\n"));
+      const summary = await readFile(summaryPath, "utf8");
+      assert.ok(summary.startsWith("Filters: <code>no&#124;&lt;match&gt;&amp;</code>\n\n| Check |"), summary);
+      assert.ok(summary.endsWith("\nNo test matched the filters.\n"));
     });
 
     test("a filtered run fails with a failing check, which does not stop the other checks", async t => {
@@ -186,12 +190,18 @@ class TestTests {
       assert.equal(runner.runs.length, 0);
     });
 
-    test("an unknown selection is refused with the usage", async () => {
-      for (const selection of [["coverage"], ["documents", "documents"], ["--repeat", "0"], ["--filter"]]) {
+    test("an unknown selection is refused with the reason and the usage", async () => {
+      const refused: readonly (readonly [readonly string[], string])[] = [
+        [["coverage"], "\"coverage\" is not an option of npm test.\n"],
+        [["--repeat", "0"], "--repeat takes a whole number from 1.\n"],
+        [["--filter"], "--filter takes a text that is not blank and does not start with --.\n"]
+      ];
+
+      for (const [selection, reason] of refused) {
         const output = new TextOutputFixture();
 
         assert.equal(await new Test("unused", new ProcessRunnerFixture(), output, {}).runAsync(selection), 2);
-        assert.equal(output.text, "Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>]]\n");
+        assert.equal(output.text, `${reason}Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>]]\n`);
       }
     });
 
@@ -232,6 +242,12 @@ class TestTests {
       assert.match(String(empty.stdout), /^Run 1 of 3 failed; the repeats stop there\.$/m);
       assert.doesNotMatch(String(empty.stdout), /^Run 2 of 3$/m);
       assert.equal(refused.status, 2);
+
+      await repository.writeAsync({ "scripts/tests/broken.test.ts": "import \"./missing.ts\";\n" });
+      const broken = run("--filter", "matches no test");
+
+      assert.equal(broken.status, 1, `${broken.stdout}${broken.stderr}`);
+      assert.match(String(broken.stdout), /Script tests and coverage: failed; 1 of 3 script test files selected, 2 not selected\./);
     });
 
     test("the command exits with the selected checks' result and terminates", async t => {

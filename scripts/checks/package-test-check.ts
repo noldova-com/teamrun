@@ -107,10 +107,23 @@ export default class PackageTestCheck implements ISelectableCheck {
   }
 
   private async readSelectionAsync(file: string, testsPassed: boolean): Promise<CheckSelection> {
-    if (!existsSync(file))
+    const counts = existsSync(file) ? PackageTestCheck.parseSelection(await readFile(file, PackageTestCheck.SELECTION_ENCODING)) : null;
+    if (counts === null)
       return new CheckSelection(false, PackageTestCheck.UNIT, 0, 0);
-    const counts = JSON.parse(await readFile(file, PackageTestCheck.SELECTION_ENCODING)) as { discovered: number; selected: number };
-    return new CheckSelection(counts.selected === 0 || testsPassed, PackageTestCheck.UNIT, counts.discovered, counts.selected);
+    return new CheckSelection(testsPassed, PackageTestCheck.UNIT, counts.discovered, counts.selected);
+  }
+
+  private static parseSelection(text: string): { discovered: number; selected: number } | null {
+    let counts: { discovered?: unknown; selected?: unknown } | null;
+    try {
+      counts = JSON.parse(text) as { discovered?: unknown; selected?: unknown } | null;
+    }
+    catch {
+      return null;
+    }
+    const discovered = counts?.discovered;
+    const selected = counts?.selected;
+    return Number.isInteger(discovered) && Number.isInteger(selected) ? { discovered: discovered as number, selected: selected as number } : null;
   }
 
   private locateEntry(segments: readonly string[]): string {

@@ -51,15 +51,16 @@ export class TestRunEntry {
 
       reporter.writeSummary(result);
       summary.writeTests(result);
-      if (result.selection.isFiltered && result.selection.selected === 0) {
+      const selectionFile = process.env[Resources.selectionFileVariable];
+      const ownsEmptySelection = Object.isUndefined(selectionFile);
+      if (ownsEmptySelection && result.selection.isFiltered && result.selection.selected === 0) {
         console.error(Resources.noTestMatchedFilters.trimEnd());
         summary.writeFailure(Resources.noTestMatchedFilters);
       }
-      const selectionFile = process.env[Resources.selectionFileVariable];
-      if (!Object.isUndefined(selectionFile))
+      if (!ownsEmptySelection)
         writeFileSync(selectionFile, JSON.stringify({ discovered: result.selection.discovered, selected: result.selection.selected }));
       interrupted = result.isInterrupted;
-      process.exitCode = Math.min(result.failed + result.unreached + Number(result.total === 0), 1);
+      process.exitCode = Math.min(result.failed + result.unreached + Number(ownsEmptySelection && result.total === 0), 1);
     }
     catch (error) {
       console.error(String(error));

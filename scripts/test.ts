@@ -36,6 +36,7 @@ import Git from "./repository/git.ts";
 import RepositoryFiles from "./repository/repository-files.ts";
 import SourceTree from "./structure/source-tree.ts";
 import TestOptions from "./test-options.ts";
+import TestOptionsException from "./test-options.exception.ts";
 import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Test {
@@ -60,9 +61,14 @@ export default class Test {
   }
 
   public async runAsync(selection: readonly string[]): Promise<number> {
-    const options = TestOptions.parse(selection);
-    if (options === null) {
-      this.output.write(Test.USAGE);
+    let options: TestOptions;
+    try {
+      options = TestOptions.parse(selection);
+    }
+    catch (error) {
+      if (!(error instanceof TestOptionsException))
+        throw error;
+      this.output.write(`${error.message}\n${Test.USAGE}`);
       return Test.USAGE_EXIT_CODE;
     }
     if (options.isDocuments)
@@ -121,7 +127,7 @@ export default class Test {
       new AngularTestCheck(angular)
     ];
 
-    let summary = Test.FILTERED_SUMMARY_HEADER;
+    let summary = `Filters: ${filters.map(t => Test.formatSummaryFilter(t)).join(" ")}\n\n${Test.FILTERED_SUMMARY_HEADER}`;
     let failures = 0;
     let selected = 0;
     for (const check of checks) {
@@ -143,6 +149,10 @@ export default class Test {
     this.output.write(`\n${checks.length - failures} of ${checks.length} checks passed.\n`);
     await this.writeSummaryAsync(summary);
     return failures === 0 ? 0 : 1;
+  }
+
+  private static formatSummaryFilter(filter: string): string {
+    return `<code>${filter.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("|", "&#124;")}</code>`;
   }
 
   private createDocumentChecks(): readonly ICheck[] {
