@@ -183,7 +183,7 @@ class PackageBuildTests {
       await PackageTreeFixture.writePackageAsync(repository, "shell-gamma", [], false, false);
       await PackageTreeFixture.writePackageAsync(repository, "fixture-notes-runtime", [], false, true, `${ModuleCatalog.FIXTURE_FOLDER}/notes/runtime`);
       const root = JSON.parse(await readFile(path.join(repository.directory, "package.json"), "utf8"));
-      const declare = (id: string, displayName: string): string => JSON.stringify({ id, displayName, parts: [], dependencies: [], contributes: {} });
+      const declare = (id: string, displayName: string): string => JSON.stringify({ id, displayName, description: "Used by the tests.", parts: [], dependencies: [], contributes: {} });
       await repository.writeAsync({
         "package.json": `${JSON.stringify({ ...root, teamrun: { ...root.teamrun, modules: ["tasks"] } }, null, 2)}\n`,
         "src/modules/tasks/module.json": declare("tasks", "Tasks"),

@@ -49,7 +49,7 @@ describe("TypographyPainter", () => {
   });
 
   for (const panelSize of AppearanceFixture.panelSizes)
-    it(`makes panel ${panelSize} pixels and derives the label size and line heights at the root`, () => {
+    it(`makes panel ${panelSize} pixels and derives the label and title sizes and line heights at the root`, () => {
       AppearanceFixture.apply(undefined, undefined, panelSize);
       const probe = document.createElement("span");
       document.body.append(probe);
@@ -63,6 +63,7 @@ describe("TypographyPainter", () => {
       const [panel, panelLine] = measure("var(--tr-text-panel)", "var(--tr-line-panel)");
       const [label, labelLine] = measure("var(--tr-text-label)", "var(--tr-line-label)");
       const [, tooltipLine] = measure("var(--tr-text-label)", "var(--tr-line-tooltip)");
+      const [title, titleLine] = measure("var(--tr-text-title)", "var(--tr-line-title)");
       const [heading, headingLine] = measure("var(--tr-text-heading)", "var(--tr-line-heading)");
       probe.remove();
 
@@ -72,6 +73,8 @@ describe("TypographyPainter", () => {
       expect(label).toBeCloseTo(Math.max(12, panelSize - 0.0625 * rem), 2);
       expect(labelLine).toBeCloseTo(label + 0.25 * rem, 2);
       expect(tooltipLine).toBeCloseTo(label + 0.4375 * rem, 2);
+      expect(title).toBeCloseTo(panelSize + 0.125 * rem, 2);
+      expect(titleLine).toBeCloseTo(title + 0.3125 * rem, 2);
       expect(heading).toBeCloseTo(panelSize * 2, 2);
       expect(headingLine).toBeCloseTo(panelSize * 2 * 1.25, 2);
     });
