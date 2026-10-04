@@ -44,6 +44,27 @@ class BuildMatrixTests {
       ]);
     });
 
+    test("pull requests run every UI workflow in shards on Linux and only the smoke set in one self-built job on Windows and macOS, and other runs shard every target", () => {
+      const describe = (matrix: BuildMatrix): string[] => matrix.targets.map(t =>
+        `${t.name}: ${matrix.uiShards(t).map(s => `${s.index}/${s.count}${s.grep === "" ? "" : ` ${s.grep}`}${s.isPrebuilt ? " prebuilt" : ""}`).join(" ")}`);
+
+      assert.deepEqual(describe(new BuildMatrix(true)), [
+        "Linux x64: 1/2 prebuilt 2/2 prebuilt",
+        "Linux ARM64: 1/2 prebuilt 2/2 prebuilt",
+        "Windows x64: 1/1 @smoke",
+        "macOS ARM64: 1/1 @smoke"
+      ]);
+      assert.deepEqual(describe(new BuildMatrix(false)), [
+        "Linux x64: 1/2 prebuilt 2/2 prebuilt",
+        "Linux ARM64: 1/2 prebuilt 2/2 prebuilt",
+        "Windows x64: 1/3 prebuilt 2/3 prebuilt 3/3 prebuilt",
+        "Windows ARM64: 1/3 prebuilt 2/3 prebuilt 3/3 prebuilt",
+        "macOS x64: 1/3 prebuilt 2/3 prebuilt 3/3 prebuilt",
+        "macOS ARM64: 1/2 prebuilt 2/2 prebuilt"
+      ]);
+      assert.ok(new BuildMatrix(true).targets.every(t => new BuildMatrix(true).uiShards(t).every(s => s.target === t)));
+    });
+
     test("a target's key and operating system come from its name", () => {
       assert.deepEqual(new BuildMatrix(false).targets.map(t => `${t.key} ${t.operatingSystem}`), [
         "linux-x64 Linux", "linux-arm64 Linux", "windows-x64 Windows", "windows-arm64 Windows", "macos-x64 macOS", "macos-arm64 macOS"

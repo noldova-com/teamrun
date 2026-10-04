@@ -225,8 +225,10 @@ class BuildAndTestTests {
           `      plan: \${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['${target.key}']) }}\n\n`), target.name);
       assert.equal(text.match(/^ {4}uses: \.\/\.github\/workflows\/ui-workflows\.yml$/gm)?.length, new BuildMatrix(false).targets.length);
       assert.ok(ui.includes("on:\n  workflow_call:\n    inputs:\n      plan:\n"));
-      assert.ok(ui.includes("  build:\n    name: Build (${{ matrix.target }})\n    strategy:\n      matrix:\n        include: ${{ fromJSON(inputs.plan).build }}\n    runs-on: ${{ matrix.runner }}\n"));
-      assert.ok(ui.includes("  shards:\n    name: Shard ${{ matrix.shard }} of ${{ matrix.shards }}\n    needs: build\n" +
+      assert.ok(ui.includes("  build:\n    name: Build (${{ matrix.target }})\n    if: ${{ fromJSON(inputs.plan).build[0] != null }}\n" +
+        "    strategy:\n      matrix:\n        include: ${{ fromJSON(inputs.plan).build }}\n    runs-on: ${{ matrix.runner }}\n"));
+      assert.ok(ui.includes("  shards:\n    name: ${{ matrix.grep == '' && format('Shard {0} of {1}', matrix.shard, matrix.shards) || 'Smoke set' }}\n    needs: build\n" +
+        "    if: ${{ !cancelled() && contains(fromJSON('[\"success\", \"skipped\"]'), needs.build.result) }}\n" +
         "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(inputs.plan).shards }}\n    runs-on: ${{ matrix.runner }}\n"));
       assert.deepEqual(ui.match(/^ {2}[a-z-]+:(?=\n {4}name: )/gm), ["  build:", "  shards:"]);
     });
@@ -431,15 +433,23 @@ class BuildAndTestTests {
       doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3", "");
       doubles.respond("npm", "run test:ui -- --require-current --shard 2/3", "");
 
-      const linux = await doubles.runAsync(script, { RUNNER_OS: "Linux", SHARD: "2/3" });
-      const windows = await doubles.runAsync(script, { RUNNER_OS: "Windows", SHARD: "2/3" });
-      const macos = await doubles.runAsync(script, { RUNNER_OS: "macOS", SHARD: "2/3" });
+      doubles.respond("npm", "run test:ui -- --shard 1/1 --grep @smoke", "");
+      const shard = { SHARD: "2/3", REQUIRE_CURRENT: "--require-current", GREP: "" };
 
-      assert.deepEqual([linux.status, windows.status, macos.status], [0, 0, 0], linux.stderr + windows.stderr + macos.stderr);
+      const linux = await doubles.runAsync(script, { RUNNER_OS: "Linux", ...shard });
+      const windows = await doubles.runAsync(script, { RUNNER_OS: "Windows", ...shard });
+      const macos = await doubles.runAsync(script, { RUNNER_OS: "macOS", ...shard });
+      const smoke = await doubles.runAsync(script, { RUNNER_OS: "macOS", SHARD: "1/1", REQUIRE_CURRENT: "", GREP: "@smoke" });
+
+      assert.deepEqual([linux.status, windows.status, macos.status, smoke.status], [0, 0, 0, 0], linux.stderr + windows.stderr + macos.stderr + smoke.stderr);
       assert.deepEqual(await doubles.readCallsAsync(), [
-        "xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3", "npm run test:ui -- --require-current --shard 2/3", "npm run test:ui -- --require-current --shard 2/3"
+        "xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3", "npm run test:ui -- --require-current --shard 2/3", "npm run test:ui -- --require-current --shard 2/3",
+        "npm run test:ui -- --shard 1/1 --grep @smoke"
       ]);
-      assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n        env:\n          SHARD: ${{ matrix.shard }}/${{ matrix.shards }}\n"));
+      assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n        env:\n          SHARD: ${{ matrix.shard }}/${{ matrix.shards }}\n" +
+        "          REQUIRE_CURRENT: ${{ matrix.prebuilt && '--require-current' || '' }}\n          GREP: ${{ matrix.grep }}\n"));
+      assert.ok(text.includes("      - name: Fetch the builds\n        id: fetch\n        if: matrix.prebuilt\n"));
+      assert.ok(text.includes("      - name: Unpack the builds\n        if: matrix.prebuilt\n"));
       assert.equal(workflow.readStepScript(BuildAndTestTests.SUMMARY_STEP), "node scripts/ui-summary.ts\n");
       assert.ok(text.includes("          UI_TARGET: ${{ matrix.target }}, ${{ matrix.shard }} of ${{ matrix.shards }}\n" +
         "          SCREENSHOT_URL: ${{ steps.screenshot-last.outputs.artifact-url || steps.screenshot-again.outputs.artifact-url || steps.screenshot.outputs.artifact-url }}\n"));
@@ -473,11 +483,14 @@ class BuildAndTestTests {
         const simulation = new WorkflowSimulation(workflow.text, first, last);
         const attempts = [first, again, last].map(t => simulation.find(t));
 
-        const passed = simulation.run({}, {});
-        const retried = simulation.run({}, { [first]: "failure" });
-        const failed = simulation.run({}, { [first]: "failure", [again]: "failure", [last]: "failure" });
+        const prebuilt = { prebuilt: "true" };
+        const passed = simulation.run(prebuilt, {});
+        const retried = simulation.run(prebuilt, { [first]: "failure" });
+        const failed = simulation.run(prebuilt, { [first]: "failure", [again]: "failure", [last]: "failure" });
+        const selfBuilt = simulation.run({ prebuilt: "false" }, {});
 
         assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[action, true], [action, true], [action, false]], first);
+        assert.deepEqual(selfBuilt.ran, first === "Fetch the builds" ? [] : [first], first);
         assert.deepEqual(attempts.map(t => t.settings), [settings, settings, settings], first);
         assert.deepEqual([workflow.readStepScript(`${pause} again`), workflow.readStepScript(`${pause} a last time`)], ["sleep 15\n", "sleep 15\n"], first);
         assert.deepEqual([passed.ran, passed.isJobFailed], [[first], false], first);
@@ -603,8 +616,8 @@ class BuildAndTestTests {
       doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 1/3", "", 1);
       doubles.respond("npm", "run test:ui -- --require-current --shard 1/3", "", 1);
 
-      assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Linux", SHARD: "1/3" })).status, 1);
-      assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Windows", SHARD: "1/3" })).status, 1);
+      assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Linux", SHARD: "1/3", REQUIRE_CURRENT: "--require-current", GREP: "" })).status, 1);
+      assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Windows", SHARD: "1/3", REQUIRE_CURRENT: "--require-current", GREP: "" })).status, 1);
     });
 
     test("Linux shards let Electron's sandbox create its namespaces before the UI workflows", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
