@@ -415,6 +415,8 @@ export class RuntimeHostTests {
 
       Assert.areEqual(probed.map(() => "absent").join(","), await readFile(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "probe"), "utf8"));
       Assert.areNotEqual("earlier-token", discovery.token);
+      if (process.platform !== "win32")
+        Assert.areEqual(probed[1], discovery.endpoint);
     });
   }
 
@@ -800,7 +802,7 @@ export class RuntimeHostTests {
     ].join("\n");
   }
 
-  private static async runAsync(test:(fixture: RuntimeHostFixture) => Promise<void>): Promise<void> {
+  private static async runAsync(test: (fixture: RuntimeHostFixture) => Promise<void>): Promise<void> {
     await using fixture = await RuntimeHostFixture.createAsync();
     await test(fixture);
   }
