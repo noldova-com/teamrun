@@ -12,6 +12,7 @@ export class SystemCommandFixture extends SystemCommand {
   private readonly outputs: (string | Error | ((commandArguments: readonly string[]) => Promise<string>))[];
 
   public readonly calls: (readonly string[])[] = [];
+  public readonly environments: (NodeJS.ProcessEnv | undefined)[] = [];
 
   public constructor(outputs: readonly (string | Error | ((commandArguments: readonly string[]) => Promise<string>))[]) {
     super();
@@ -19,8 +20,9 @@ export class SystemCommandFixture extends SystemCommand {
     this.outputs = [...outputs];
   }
 
-  public override async runAsync(file: string, commandArguments: readonly string[]): Promise<string> {
+  public override async runAsync(file: string, commandArguments: readonly string[], environment?: NodeJS.ProcessEnv): Promise<string> {
     this.calls.push([file, ...commandArguments]);
+    this.environments.push(environment);
     const output = this.outputs.shift() ?? "";
     if (output instanceof Error)
       throw output;

@@ -30,7 +30,7 @@ Use weight 400 for ordinary text and 600 for document titles, section headers, s
 
 Rows, controls, headings and overlays grow with fonts, zoom, translations and validation text; never clip glyphs or labels vertically. Specified horizontal truncation retains the full accessible name or tooltip.
 
-Use Material Symbols Rounded for interface icons. Glyph sizes and control geometry are separate: a small icon still needs a usable pointer target.
+Use Material Symbols Rounded for interface icons. A mark that must sit centred in a drawn frame, such as the checkbox's tick, is an inline vector shape instead, because a glyph is centred by its font box, not by what it draws. Glyph sizes and control geometry are separate: a small icon still needs a usable pointer target.
 
 ## 2. Themes and color
 
@@ -216,7 +216,7 @@ This table assigns geometry and radius tokens under sections 1, 3 and 7, with th
 | Text field | 1.625rem minimum high; preferred width 12.5rem; 0.375rem inner padding; small radius | Panel | Input tokens; labelled; focus border; an invalid entry (`aria-invalid`) takes the error border, focused or not; wraps validation text outside the input |
 | Select | 1.625rem minimum high; preferred width 20rem; small radius | Panel | Field styling; arrow in readable foreground; shrinks to its container |
 | Dropdown list | 1.625rem minimum rows; 0.25rem inner padding; 0.5rem row side padding; small radius | Panel | Dropdown surface, 1px border and widget shadow; chosen/keyboard row uses active-list pair; no decorative check mark |
-| Checkbox | 1.125rem visual square; 0.5rem label gap; hover radius | Panel label | Label participates in the hit target; border and check mark remain identifiable |
+| Checkbox | 1.125rem visual square; 0.5rem label gap; hover radius; a drawn tick in a 1rem icon square, centred in the box | Panel label | Label participates in the hit target; border and check mark remain identifiable; disabled dims the box and its tick |
 | Choice pills (toggle group) | 1.375rem minimum visual height; 0.5rem side padding; 0.25rem gaps, wrapping onto further lines when they do not fit; small radius | Panel, 600 | A named radio group of radios: the checked pill, or the first when none is checked, is the one Tab stop, and the arrow keys, Home and End move the choice and the focus together, wrapping at the ends. The checked pill takes the selected fill and a hovered one the toolbar hover fill, so it still shows on a hovered Settings row; a long title wraps inside the pill, which never grows wider than its group; no border or check mark; keyboard focus is an outline inside the pill |
 | Settings item | Padding 0.75rem 0.875rem 1.125rem; description gap 0.1875rem; control gap 0.5625rem; medium radius | Panel; title 600 | Subtle hover surface; text and controls wrap. A Choice setting of two to four options shows them as choice pills, and one of a single option or more than four shows a select. A modules setting shows a checkbox per module in module order; Notifications from modules labels each "<Module> notifications", checked while its notifications are on |
 | Settings heading | Automatic height; 0.625rem surrounding space, 0.9375rem start inset | Settings group heading, 600 | Heading foreground; grows with its proportional line height |
