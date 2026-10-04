@@ -610,7 +610,6 @@ export class Resources {
   public static readonly appMenu: string = "shell.app";
   public static readonly appMenuTitle: string = Resources.productName;
   public static readonly noModules: string = "No modules";
-  public static readonly moduleFailuresTitle: string = "Modules that didn't start";
   public static readonly copyDetailsLabel: string = "Copy details";
   public static readonly copiedLabel: string = "Copied";
   public static readonly openLogFolderLabel: string = "Open log folder";

@@ -51,6 +51,9 @@ LICENSE file in the root directory of this source tree.
         <dt>{{ resources.dependentsTitle }}</dt>
         <dd class="tr-modules-fact-dependents"><ng-container [ngTemplateOutlet]="links" [ngTemplateOutletContext]="{ $implicit: dependents() }" /></dd>
       </dl>
+      @if (module.state !== active) {
+        <tr-module-actions [module]="module" />
+      }
       <h3 class="tr-modules-section-title">{{ resources.contributionsTitle }}</h3>
       @if (contributions().length > 0) {
         <dl class="tr-modules-facts">

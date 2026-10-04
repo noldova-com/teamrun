@@ -1,0 +1,21 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="tr-module-actions-buttons">
+  <button type="button" tr-button class="tr-module-actions-copy" [variant]="secondary" (click)="copy()">
+    <span class="material-symbols-rounded tr-module-actions-glyph" aria-hidden="true">{{ isCopied() ? resources.copiedGlyph : resources.copyGlyph }}</span>
+    <span>{{ isCopied() ? resources.copiedLabel : resources.copyDetailsLabel }}</span>
+  </button>
+  <button type="button" tr-button class="tr-module-actions-logs" [variant]="secondary" (click)="openLogFolder()">
+    <span class="material-symbols-rounded tr-module-actions-glyph" aria-hidden="true">{{ resources.logFolderGlyph }}</span>
+    <span>{{ resources.openLogFolderLabel }}</span>
+  </button>
+</div>
+@if (isLogFolderFailed()) {
+  <p class="tr-module-actions-notice" role="status">{{ resources.logFolderNotOpened }}</p>
+}

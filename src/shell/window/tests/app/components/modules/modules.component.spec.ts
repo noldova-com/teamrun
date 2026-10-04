@@ -15,6 +15,7 @@ import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
 import { ModulesComponent } from "../../../../src/app/components/modules/modules.component";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { CommandService } from "../../../../src/app/services/command.service";
+import { ModuleSelectionService } from "../../../../src/app/services/module-selection.service";
 import { SettingsService } from "../../../../src/app/services/settings.service";
 import { WindowPartHostService } from "../../../../src/app/services/window-part-host.service";
 import { Resources } from "../../../../src/resources";
@@ -137,6 +138,24 @@ describe("ModulesComponent", () => {
 
     expect(kept).toEqual([["Alarm"], ["Active"]]);
     expect([texts(".tr-modules-row .tr-modules-name"), texts(".tr-modules-detail-title")]).toEqual([["Notes", "Clock"], ["Notes"]]);
+  });
+
+  it("offers to copy the details and open the log folder for a module that isn't active only", async () => {
+    await renderAsync();
+    const active = element().querySelectorAll("tr-module-actions").length;
+
+    click(row("notes"));
+
+    expect(active).toBe(0);
+    expect(texts(".tr-modules-detail tr-module-actions button")).toEqual(["content_copy Copy details", "folder_open Open log folder"]);
+  });
+
+  it("shows the module the selection names, as when the status bar opens the document on a failed module", async () => {
+    TestBed.inject(ModuleSelectionService).select("alarm");
+
+    await renderAsync();
+
+    expect([texts("[aria-current=true] .tr-modules-name"), texts(".tr-modules-detail-title")]).toEqual([["Alarm"], ["Alarm"]]);
   });
 
   it("says when the build has no modules, and reports a build it cannot read without showing a version", async () => {

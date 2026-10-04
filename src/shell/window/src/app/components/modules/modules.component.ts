@@ -28,13 +28,15 @@ import type { ContributionGroup } from "../../models/modules/contribution-group"
 import { ModuleOverview } from "../../models/modules/module-overview";
 import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
+import { ModuleSelectionService } from "../../services/module-selection.service";
 import { SettingsService } from "../../services/settings.service";
 import { WindowPartHostService } from "../../services/window-part-host.service";
 import { Resources } from "../../../resources";
+import { ModuleActionsComponent } from "../module-actions/module-actions.component";
 
 @Component({
   selector: "tr-modules",
-  imports: [NgTemplateOutlet],
+  imports: [ModuleActionsComponent, NgTemplateOutlet],
   templateUrl: "./modules.component.html",
   styleUrl: "./modules.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -48,13 +50,13 @@ export class ModulesComponent {
   private readonly element: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly injector: Injector = inject(Injector);
   private readonly modules: Signal<readonly ModuleStatus[]> = inject(WindowPartHostService).modules;
-  private readonly selected: WritableSignal<string | null> = signal(null);
+  private readonly selection: ModuleSelectionService = inject(ModuleSelectionService);
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly active: ModuleState = ModuleState.Active;
   protected readonly version: WritableSignal<string | null> = signal(null);
   protected readonly overview: Signal<ModuleOverview> = computed(() => new ModuleOverview(this.modules()));
-  protected readonly current: Signal<ModuleStatus | null> = computed(() => this.overview().select(this.selected()));
+  protected readonly current: Signal<ModuleStatus | null> = computed(() => this.overview().select(this.selection.selected()));
   protected readonly dependencies: Signal<readonly ModuleStatus[]> = computed(() => this.listOf(t => this.overview().listDependencies(t)));
   protected readonly blockers: Signal<readonly ModuleStatus[]> = computed(() => this.dependencies().filter(t => t.id === this.current()?.blockedBy));
   protected readonly dependents: Signal<readonly ModuleStatus[]> = computed(() => this.listOf(t => this.overview().listDependents(t)));
@@ -70,11 +72,11 @@ export class ModulesComponent {
   }
 
   protected select(id: string): void {
-    this.selected.set(id);
+    this.selection.select(id);
   }
 
   protected follow(id: string): void {
-    this.selected.set(id);
+    this.selection.select(id);
     afterNextRender(() => [...this.element.querySelectorAll<HTMLElement>(Resources.moduleSelector)].find(t => t.dataset[Resources.moduleData] === id)?.focus(),
       { injector: this.injector });
   }
