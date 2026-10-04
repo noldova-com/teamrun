@@ -16,6 +16,7 @@ import { ModuleState, type ModuleStatus, NotificationPost, NotificationSeverity,
 import { ModulesComponent } from "../../../src/app/components/modules/modules.component";
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
 import { DockSide } from "../../../src/app/enums/dock-side";
+import { WindowPartFailureException } from "../../../src/app/exceptions/window-part-failure.exception";
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
 import type { IWindowPartContext } from "../../../src/app/interfaces/i-window-part-context";
@@ -243,7 +244,10 @@ describe("WindowPartHostService", () => {
     expect(log).toEqual(["activate clock"]);
     expect(host.findContribution(new ViewTab("clock.face"))).toBeNull();
     expect(layout.registry().view("clock.face").isShownByDefault).toBe(false);
-    expect(errors.map(t => (t as Error).message)).toEqual(["No chunk.", "The clock broke."]);
+    expect(errors.map(t => [(t as WindowPartFailureException).moduleId, (t as Error).message, ((t as Error).cause as Error).message])).toEqual([
+      ["tasks", "Its window part could not be loaded.", "No chunk."],
+      ["clock", "Its window part failed to activate.", "The clock broke."]
+    ]);
   });
 
   it("posts, updates and dismisses notifications through the runtime and reports a dismissal that fails", async () => {
@@ -418,7 +422,7 @@ describe("WindowPartHostService", () => {
     bridge.publishStartup({ kind: "Ready", details: [] });
     await vi.waitFor(() => expect(host.generation()).toBe(2));
 
-    expect(errors.map(t => (t as Error).message)).toEqual(["The command notes.sync is already registered."]);
+    expect(errors.map(t => [(t as WindowPartFailureException).moduleId, ((t as Error).cause as Error).message])).toEqual([["notes", "The command notes.sync is already registered."]]);
     expect(commands.commands().filter(t => !t.name.startsWith("shell.")).map(t => t.title)).toEqual(["Sync"]);
     expect(host.isCommandRegistered("notes.sync")).toBe(true);
     expect(host.failures().length).toBe(0);

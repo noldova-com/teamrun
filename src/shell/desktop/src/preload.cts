@@ -101,5 +101,8 @@ contextBridge.exposeInMainWorld("teamrun", {
   },
   logModule(moduleId: string, message: string): void {
     ipcRenderer.send("teamrun:moduleLog", moduleId, message);
+  },
+  logError(moduleId: string | null, text: string): void {
+    ipcRenderer.send("teamrun:windowError", moduleId, text);
   }
 });

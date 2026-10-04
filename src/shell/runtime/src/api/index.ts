@@ -85,6 +85,7 @@ export { ShellMigrations } from "../services/database/shell-migrations.js";
 export { SettingsService } from "../services/settings/settings-service.js";
 export { DiagnosticRedactor } from "../services/diagnostics/diagnostic-redactor.js";
 export { LogFile } from "../services/diagnostics/log-file.js";
+export { LogText } from "../services/diagnostics/log-text.js";
 export { DiscoveryPublisher } from "../services/discovery/discovery-publisher.js";
 export { DiscoveryReader } from "../services/discovery/discovery-reader.js";
 export { FolderProtectorFactory } from "../services/discovery/folder-protector-factory.js";

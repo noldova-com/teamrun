@@ -131,6 +131,10 @@ export class DesktopBridgeService {
     this.bridge.logModule(moduleId, message);
   }
 
+  public logError(moduleId: string | null, text: string): void {
+    this.bridge.logError(moduleId, text);
+  }
+
   private static readAnswer(value: unknown): JsonValue {
     const answer = JsonReader.fromValue(value);
     if (!answer.hasField(Resources.failureField))
@@ -170,6 +174,7 @@ export class DesktopBridgeService {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onNotificationOpened))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onQuitQuestion))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerQuit))) &&
-      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.logModule)));
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.logModule))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.logError)));
   }
 }

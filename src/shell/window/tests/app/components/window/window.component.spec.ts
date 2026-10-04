@@ -14,6 +14,7 @@ import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
 import { DockSide } from "../../../../src/app/enums/dock-side";
 import { LayoutStoreService } from "../../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../../src/app/services/layout.service";
+import { WindowErrorHandler } from "../../../../src/app/services/window-error-handler";
 import { WindowComponent } from "../../../../src/app/components/window/window.component";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
@@ -95,8 +96,9 @@ describe("WindowComponent", () => {
     fixture.destroy();
   });
 
-  it("reports a failed layout save and still lets TeamRun close", async () => {
+  it("writes a failed layout save to the desktop's log and still lets TeamRun close", async () => {
     const bridge = DesktopBridgeFixture.install();
+    TestBed.configureTestingModule({ providers: [{ provide: ErrorHandler, useClass: WindowErrorHandler }] });
     const fixture = TestBed.createComponent(WindowComponent);
     await fixture.whenStable();
     const layout = TestBed.inject(LayoutService);
@@ -104,12 +106,12 @@ describe("WindowComponent", () => {
     layout.toggleDock(DockSide.Left);
     const failure = new Error("This device has no identity, so the window's layout is not kept.");
     vi.spyOn(TestBed.inject(LayoutStoreService), "writeAsync").mockRejectedValue(failure);
-    const handled = vi.spyOn(TestBed.inject(ErrorHandler), "handleError").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     bridge.requestClose("request");
 
     await vi.waitFor(() => expect(bridge.answers).toEqual(["request:true"]));
-    expect(handled).toHaveBeenCalledWith(failure);
+    expect(bridge.errorsLogged).toEqual([[null, failure.stack]]);
     fixture.destroy();
   });
 });

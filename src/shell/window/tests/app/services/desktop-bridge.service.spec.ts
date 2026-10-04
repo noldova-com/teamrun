@@ -41,7 +41,8 @@ describe("DesktopBridgeService", () => {
     onNotificationOpened: (): (() => void) => () => undefined,
     onQuitQuestion: (): (() => void) => () => undefined,
     answerQuit: (): Promise<boolean> => Promise.resolve(true),
-    logModule: (): void => undefined
+    logModule: (): void => undefined,
+    logError: (): void => undefined
   };
   const incomplete: readonly [string, unknown][] = [
     ["nothing", undefined],
@@ -65,7 +66,8 @@ describe("DesktopBridgeService", () => {
     ["no onNotificationOpened", { ...complete, onNotificationOpened: null }],
     ["no onQuitQuestion", { ...complete, onQuitQuestion: null }],
     ["no answerQuit", { ...complete, answerQuit: null }],
-    ["no logModule", { ...complete, logModule: null }]
+    ["no logModule", { ...complete, logModule: null }],
+    ["no logError", { ...complete, logError: null }]
   ];
 
   for (const [name, value] of incomplete)
@@ -251,9 +253,10 @@ describe("DesktopBridgeService", () => {
     bridge.askToQuit(null);
     const isTaken = await service.answerQuitAsync(QuitChoice.Wait);
     service.logModule("clock", "Ticked");
+    service.logError("clock", "Error: It broke.");
 
     expect(questions.map(t => t === null ? null : [t.descriptions, t.isWaiting])).toEqual([[["Indexing the project"], true], null]);
-    expect([isTaken, bridge.quitAnswers, bridge.logged]).toEqual([true, ["Wait"], ["clock: Ticked"]]);
+    expect([isTaken, bridge.quitAnswers, bridge.logged, bridge.errorsLogged]).toEqual([true, ["Wait"], ["clock: Ticked"], [["clock", "Error: It broke."]]]);
   });
 
   it("refuses a kept layout that is not a JSON object", async () => {
