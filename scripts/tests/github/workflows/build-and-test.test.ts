@@ -475,9 +475,9 @@ class BuildAndTestTests {
         const simulation = new WorkflowSimulation(workflow.text, first, last);
         const attempts = [first, again, last].map(t => simulation.find(t));
 
-        const passed = simulation.run({});
-        const retried = simulation.run({ [first]: "failure" });
-        const failed = simulation.run({ [first]: "failure", [again]: "failure", [last]: "failure" });
+        const passed = simulation.run({}, {});
+        const retried = simulation.run({}, { [first]: "failure" });
+        const failed = simulation.run({}, { [first]: "failure", [again]: "failure", [last]: "failure" });
 
         assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[action, true], [action, true], [action, false]], first);
         assert.deepEqual(attempts.map(t => t.settings), [settings, [...settings, ...overwrite], [...settings, ...overwrite]], first);
@@ -498,9 +498,9 @@ class BuildAndTestTests {
         const simulation = new WorkflowSimulation(file.text, first, last);
         const attempts = [first, again, last].map(t => simulation.find(t));
 
-        const passed = simulation.run({});
-        const retried = simulation.run({ [first]: "failure" });
-        const failed = simulation.run({ [first]: "failure", [again]: "failure", [last]: "failure" });
+        const passed = simulation.run({}, {});
+        const retried = simulation.run({}, { [first]: "failure" });
+        const failed = simulation.run({}, { [first]: "failure", [again]: "failure", [last]: "failure" });
 
         assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[BuildAndTestTests.NODE_ACTION, true], [BuildAndTestTests.NODE_ACTION, true], [BuildAndTestTests.NODE_ACTION, false]], first);
         assert.deepEqual([attempts[1]?.settings, attempts[2]?.settings], [attempts[0]?.settings, attempts[0]?.settings], first);
@@ -519,9 +519,9 @@ class BuildAndTestTests {
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
 
-      const passed = simulation.run({});
-      const failed = simulation.run({ [BuildAndTestTests.TEST_STEP]: "failure" });
-      const unkept = simulation.run(Object.fromEntries([BuildAndTestTests.TEST_STEP, ...BuildAndTestTests.ANGULAR_UPLOADS].map(t => [t, "failure"])));
+      const passed = simulation.run({}, {});
+      const failed = simulation.run({}, { [BuildAndTestTests.TEST_STEP]: "failure" });
+      const unkept = simulation.run({}, Object.fromEntries([BuildAndTestTests.TEST_STEP, ...BuildAndTestTests.ANGULAR_UPLOADS].map(t => [t, "failure"])));
       const warning = await doubles.runAsync(workflow.readStepScript(BuildAndTestTests.ANGULAR_WARNING));
 
       assert.deepEqual([passed.ran, passed.isJobFailed], [[BuildAndTestTests.TEST_STEP], false]);
@@ -543,7 +543,7 @@ class BuildAndTestTests {
     test("an upload that fails and then succeeds is tried again once and keeps the job green", async () => {
       const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
 
-      const result = simulation.run({ "Keep the UI workflow results": "failure", "Keep the main window screenshot": "failure", "Keep the main window screenshot again": "failure" });
+      const result = simulation.run({}, { "Keep the UI workflow results": "failure", "Keep the main window screenshot": "failure", "Keep the main window screenshot again": "failure" });
 
       assert.equal(result.isJobFailed, false);
       assert.deepEqual(result.ran, [
@@ -562,7 +562,7 @@ class BuildAndTestTests {
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
 
-      const result = simulation.run(failures);
+      const result = simulation.run({}, failures);
       const results = await doubles.runAsync(workflow.readStepScript("Warn that the UI workflow results were not kept"));
       const screenshot = await doubles.runAsync(workflow.readStepScript("Warn that the main window screenshot was not kept"));
 
@@ -578,8 +578,8 @@ class BuildAndTestTests {
     test("uploads that succeed run no retry and no warning, and failed UI workflows still fail the job", async () => {
       const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
 
-      const passed = simulation.run({});
-      const failed = simulation.run({ [BuildAndTestTests.UI_STEP]: "failure" });
+      const passed = simulation.run({}, {});
+      const failed = simulation.run({}, { [BuildAndTestTests.UI_STEP]: "failure" });
 
       assert.deepEqual(passed.ran, [BuildAndTestTests.UI_STEP, "Keep the UI workflow results", "Keep the main window screenshot", BuildAndTestTests.SUMMARY_STEP]);
       assert.equal(passed.isJobFailed, false);

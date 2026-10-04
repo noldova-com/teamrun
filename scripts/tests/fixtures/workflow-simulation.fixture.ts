@@ -21,7 +21,9 @@ export default class WorkflowSimulation {
   private static readonly STEP_PATTERN: RegExp = /^( *)- name: (.+)$/;
   private static readonly KEY_PATTERN: RegExp = /^([a-z-]+):(?: (.*))?$/;
   private static readonly OUTCOME_PATTERN: RegExp = /^steps\.([a-z-]+)\.outcome (==|!=) '([a-z]+)'$/;
+  private static readonly MATRIX_PATTERN: RegExp = /^matrix\.([a-z]+) (==|!=) '([a-z]+)'$/;
   private static readonly ALWAYS: string = "always()";
+  private static readonly FAILURE: string = "failure()";
   private static readonly SKIPPED: string = "skipped";
 
   public readonly steps: readonly SimulatedStep[];
@@ -42,13 +44,13 @@ export default class WorkflowSimulation {
     return step;
   }
 
-  public run(outcomes: Readonly<Record<string, string>>): { readonly ran: readonly string[]; readonly isJobFailed: boolean } {
+  public run(matrix: Readonly<Record<string, string>>, outcomes: Readonly<Record<string, string>>): { readonly ran: readonly string[]; readonly isJobFailed: boolean } {
     const results = new Map<string, string>();
     const ran: string[] = [];
     let isJobFailed = false;
     for (const step of this.steps) {
       const terms = step.condition?.split(" && ") ?? [];
-      const isRun = (terms.includes(WorkflowSimulation.ALWAYS) || !isJobFailed) && this.evaluate(terms, results);
+      const isRun = (terms.includes(WorkflowSimulation.FAILURE) ? isJobFailed : terms.includes(WorkflowSimulation.ALWAYS) || !isJobFailed) && this.evaluate(terms, matrix, results);
       const outcome = isRun ? outcomes[step.name] ?? "success" : WorkflowSimulation.SKIPPED;
       if (step.id !== null)
         results.set(step.id, outcome);
@@ -61,10 +63,16 @@ export default class WorkflowSimulation {
     return { ran, isJobFailed };
   }
 
-  private evaluate(terms: readonly string[], results: ReadonlyMap<string, string>): boolean {
+  private evaluate(terms: readonly string[], matrix: Readonly<Record<string, string>>, results: ReadonlyMap<string, string>): boolean {
     return terms.every(term => {
-      if (term === WorkflowSimulation.ALWAYS)
+      if (term === WorkflowSimulation.ALWAYS || term === WorkflowSimulation.FAILURE)
         return true;
+      const setting = WorkflowSimulation.MATRIX_PATTERN.exec(term);
+      if (setting !== null) {
+        const value = matrix[setting[1] ?? ""];
+        assert.ok(value !== undefined, `The simulated leg has no matrix value "${setting[1]}".`);
+        return setting[2] === "==" ? value === setting[3] : value !== setting[3];
+      }
       const match = WorkflowSimulation.OUTCOME_PATTERN.exec(term);
       assert.ok(match !== null, `Unsupported condition term "${term}".`);
       const outcome = results.get(match[1] ?? "") ?? WorkflowSimulation.SKIPPED;
