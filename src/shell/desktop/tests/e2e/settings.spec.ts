@@ -13,6 +13,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import ScrollAreaFixture from "./fixtures/scroll-area.fixture.ts";
 import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
 
 const windowColors = { Light: "rgb(248, 248, 248)", Dark: "rgb(24, 24, 24)" };
@@ -78,6 +79,22 @@ test.describe("settings", () => {
     await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
     await expect(window.locator("[data-command=\"shell.openSettings\"] td").first()).toHaveText("Settings…");
     await desktop.checkpointAsync("settings-shortcuts");
+  });
+
+  test("the page list and a long page show their scrollbar's thumb while hovered, and dragging the page's thumb scrolls it", async ({ desktop }) => {
+    const window = desktop.window;
+    const content = window.locator(".tr-settings-content");
+    await openSettingsAsync(window);
+    await window.getByRole("button", { name: "Gallery", exact: true }).click();
+    await expect(content.locator("tr-quick-input").getByRole("option").first()).toBeAttached();
+    await content.evaluate(t => t.scrollTo(0, 0));
+    expect(await content.evaluate(t => t.scrollHeight > t.clientHeight)).toBe(true);
+
+    await ScrollAreaFixture.revealThumbAsync(window, window.locator(".tr-settings-pages"));
+    expect(await ScrollAreaFixture.thumbChangesOnHoverAsync(window, content, "vertical")).toBe(true);
+    const drag = await ScrollAreaFixture.dragThumbAsync(window, content, 100);
+
+    await expect.poll(async () => Math.abs(await ScrollAreaFixture.scrollTopAsync(content) - drag.start - drag.expected)).toBeLessThan(drag.expected / 10);
   });
 
   test("search filters every page by title, description and name, marking the matches, and choosing a page ends it", async ({ desktop }) => {
