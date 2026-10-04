@@ -17,6 +17,7 @@ export default class BuildVariantFixture {
   private static readonly WINDOW_FOLDER: string = "window";
   private static readonly DECLARATIONS_SEGMENTS: readonly string[] = ["modules", "declarations.json"];
   private static readonly DECLARATIONS_FILE: string = "declarations.json";
+  private static readonly PRODUCT_FILE: string = "product.json";
 
   public static readonly noModules: string = "no-modules";
 
@@ -54,6 +55,11 @@ export default class BuildVariantFixture {
         path.join(BuildVariantFixture.BUILD_FOLDER, ...BuildVariantFixture.DECLARATIONS_SEGMENTS),
         path.join(BuildVariantFixture.SWAPPED_FOLDER, BuildVariantFixture.DECLARATIONS_FILE),
         path.join(variant, ...BuildVariantFixture.DECLARATIONS_SEGMENTS)
+      ],
+      [
+        path.join(BuildVariantFixture.BUILD_FOLDER, BuildVariantFixture.PRODUCT_FILE),
+        path.join(BuildVariantFixture.SWAPPED_FOLDER, BuildVariantFixture.PRODUCT_FILE),
+        path.join(variant, BuildVariantFixture.PRODUCT_FILE)
       ]
     ];
   }

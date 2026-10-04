@@ -82,24 +82,22 @@ class PackageBuildTests {
       assert.deepEqual(changed, PackageBuildTests.ALL_BUILT);
     });
 
-    test("one application fingerprint is stamped, and any source change rebuilds the packages that stamp it but not unchanged ones", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
+    test("any source change gives the build another fingerprint, yet rebuilds only the changed package and what depends on it", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
       await PackageTreeFixture.writePackageAsync(repository, "shell-gamma", [], false, false);
-      await repository.writeAsync({ "src/shell/gamma/src/resources.ts": "export default class Resources {\n  public static readonly build: string = \"__BUILD__\";\n}\n" });
       const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
-      const stamped = async (): Promise<string> => (await readFile(path.join(repository.directory, "node_modules", "@noldova", "teamrun-shell-gamma", "resources.js"), "utf8")).match(/build = "([0-9a-f]+)";/)?.[1] ?? "";
       await PackageBuildTests.buildAsync(build);
-      const first = await stamped();
+      const first = await build.hashFingerprintAsync(BuildVariant.REGULAR);
 
       await repository.writeAsync({ "src/shell/beta/src/resources.ts": "export default class Resources {\n  public static readonly version: string = \"changed\";\n  public static readonly protocol: string = \"\";\n}\n" });
       const changed = await PackageBuildTests.buildAsync(build);
       await build.requireCurrentAsync(BuildVariant.REGULAR);
 
       assert.match(first, /^[0-9a-f]{64}$/);
-      assert.notEqual(await stamped(), first);
+      assert.notEqual(await build.hashFingerprintAsync(BuildVariant.REGULAR), first);
       assert.deepEqual(changed, [
         `${PackageBuildTests.ALPHA}: reused`,
-        `${PackageBuildTests.GAMMA}: built`,
+        `${PackageBuildTests.GAMMA}: reused`,
         `${PackageBuildTests.BETA}: built`,
         `${PackageBuildTests.ALPHA} tests: compiled`,
         `${PackageBuildTests.BETA} tests: compiled`
@@ -178,7 +176,7 @@ class PackageBuildTests {
       ]);
     });
 
-    test("the build's module declarations and the packages it hosts decide the fingerprint", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
+    test("the build's module declarations and the packages it hosts decide the fingerprint, and a test build or its variants rebuild no package they share", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await PackageTreeFixture.writeRootAsync(repository);
@@ -189,22 +187,30 @@ class PackageBuildTests {
       await repository.writeAsync({
         "package.json": `${JSON.stringify({ ...root, teamrun: { ...root.teamrun, modules: ["tasks"] } }, null, 2)}\n`,
         "src/modules/tasks/module.json": declare("tasks", "Tasks"),
-        [`${ModuleCatalog.FIXTURE_FOLDER}/notes/module.json`]: declare("notes", "Notes"),
-        "src/shell/gamma/src/resources.ts": "export default class Resources {\n  public static readonly build: string = \"__BUILD__\";\n}\n"
+        [`${ModuleCatalog.FIXTURE_FOLDER}/notes/module.json`]: declare("notes", "Notes")
       });
       const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
-      const stamped = async (variant: BuildVariant): Promise<string> => {
-        await build.buildAsync(new TextOutputFixture(), variant);
-        await build.requireCurrentAsync(variant);
-        return await readFile(path.join(repository.directory, "node_modules", "@noldova", "teamrun-shell-gamma", "resources.js"), "utf8");
+      const built = async (variant: BuildVariant): Promise<readonly string[]> => {
+        const output = new TextOutputFixture();
+        await build.buildAsync(output, variant);
+        return output.text.split("\n").filter(t => t.length > 0);
       };
 
-      const regular = await stamped(BuildVariant.REGULAR);
-      const tested = await stamped(new BuildVariant(true, ["notes"]));
+      const regular = await build.hashFingerprintAsync(BuildVariant.REGULAR);
+      const tested = await build.hashFingerprintAsync(new BuildVariant(true, []));
+      const withoutNotes = await build.hashFingerprintAsync(new BuildVariant(true, ["notes"]));
+      await built(BuildVariant.REGULAR);
+      const variants = [...await built(new BuildVariant(true, [])), ...await built(new BuildVariant(true, ["notes"]))];
       await repository.writeAsync({ "src/modules/tasks/module.json": declare("tasks", "Task list") });
-      const renamed = await stamped(BuildVariant.REGULAR);
+      const renamed = await build.hashFingerprintAsync(BuildVariant.REGULAR);
 
-      assert.equal(new Set([regular, tested, renamed]).size, 3);
+      assert.equal(new Set([regular, tested, withoutNotes, renamed]).size, 4);
+      assert.deepEqual(variants, [
+        "@noldova/teamrun-fixture-notes-runtime: built",
+        `${PackageBuildTests.GAMMA}: reused`,
+        "@noldova/teamrun-fixture-notes-runtime: reused",
+        `${PackageBuildTests.GAMMA}: reused`
+      ]);
     });
 
     test("a regular build type-checks the fixture packages it does not build, and refuses one with a type error", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {

@@ -34,6 +34,7 @@ import type { IEventSink } from "../../interfaces/event-sink.js";
 import type { ISessionListener } from "../../interfaces/session-listener.js";
 import type { CapabilityToken } from "../../models/capability-token.js";
 import { Endpoint } from "../../models/endpoint.js";
+import { ProductInfo } from "../../models/product-info.js";
 import type { Refusal } from "../../models/refusal.js";
 import { RequestContext } from "../../models/request-context.js";
 import type { ServerSettings } from "../../models/server-settings.js";
@@ -210,7 +211,7 @@ export class RuntimeServer implements IEventSink {
     }
     if (!Object.isNull(this.identity.findMismatch(message.identity))) {
       session.enter(SessionState.OtherBuild, message.client);
-      session.send(Response.failure(message.id, new Failure(FailureCode.BuildMismatch, Resources.buildMismatch, this.handover.toJson())));
+      session.send(Response.failure(message.id, new Failure(FailureCode.BuildMismatch, Resources.formatBuildMismatchFailure(ProductInfo.current.name), this.handover.toJson())));
       return;
     }
     if (!Object.isNull(this.refusal)) {
