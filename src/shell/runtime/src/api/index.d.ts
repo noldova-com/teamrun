@@ -1134,6 +1134,26 @@ export declare class LogFile {
 }
 
 /**
+ * Prepares text that comes from outside the shell's own code for a log, so it cannot pass for a record of its own.
+ */
+export declare class LogText {
+  /**
+   * Splits a text into the lines a log shows.
+   *
+   * @param text The text, with any line endings.
+   * @returns The lines, without the text's trailing white space. Every line ending ends a line: CR LF, LF, CR, vertical tab, form feed, U+0085, U+2028 and U+2029.
+   * Each line keeps its tabs and loses every other control character, so terminal escapes do nothing.
+   * @example
+   * ```ts
+   * import { LogText } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const lines: readonly string[] = LogText.lines("Synced\rwith the server\n");
+   * ```
+   */
+  public static lines(text: string): readonly string[];
+}
+
+/**
  * Publishes and withdraws a runtime's discovery metadata.
  */
 export declare class DiscoveryPublisher {

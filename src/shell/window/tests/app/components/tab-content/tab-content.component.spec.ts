@@ -19,6 +19,7 @@ import { DocumentTab } from "../../../../src/app/models/layout/document-tab";
 import type { Tab } from "../../../../src/app/models/layout/tab";
 import { ViewTab } from "../../../../src/app/models/layout/view-tab";
 import { ModuleFailure } from "../../../../src/app/models/module-failure";
+import { ShellDocuments } from "../../../../src/app/models/shell-documents";
 import { WindowPartContext } from "../../../../src/app/models/window-part-context";
 import { WindowPartSource } from "../../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
@@ -140,6 +141,23 @@ describe("TabContentComponent", () => {
     const element = await renderAsync(tab);
 
     expect(element.querySelector(".shell-document")?.textContent).toBe("settings");
+    expect(TestShellDocumentComponent.contexts).toEqual([null]);
+  });
+
+  it("keeps a shell document while the parts change", async () => {
+    const tab = ShellDocuments.settingsTab;
+    TestShellDocumentComponent.contexts = [];
+    host.contributions.set(tab.key, new ContributionMatch(() => Promise.resolve(TestShellDocumentComponent), null));
+    const fixture = TestBed.createComponent(TabContentComponent);
+    fixture.componentRef.setInput("tab", tab);
+    await fixture.whenStable();
+    const element: HTMLElement = fixture.nativeElement;
+    const shown = element.querySelector(".shell-document");
+
+    host.generation.set(1);
+    await fixture.whenStable();
+
+    expect(element.querySelector(".shell-document")).toBe(shown);
     expect(TestShellDocumentComponent.contexts).toEqual([null]);
   });
 

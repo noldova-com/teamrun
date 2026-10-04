@@ -103,6 +103,15 @@ test.describe("command search", () => {
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"] .tr-tab-label")).toHaveText("Note 3");
   });
 
+  test("lists each focus command once, leaving out the View menu items that run them without arguments", async ({ desktop }) => {
+    const window = desktop.window;
+    await CommandSearchFixture.searchAsync(window, "focus");
+
+    await expect(options(window).and(window.locator("[data-item=\"shell.focusNextGroup\"]"))).toHaveCount(1);
+    await expect(options(window).and(window.locator("[data-item=\"shell.focusPreviousGroup\"]"))).toHaveCount(1);
+    await expect(options(window).and(window.locator("[data-item^=\"shell.view/\"]"))).toHaveCount(0);
+  });
+
   test("a query keeps the rows that contain it as one run, in the same order, and marks the run in the title without changing its text", async ({ desktop }) => {
     const window = desktop.window;
     const rows = (): Promise<readonly (readonly [string, string, string, readonly string[]])[]> => options(window).evaluateAll(items => items.map(item => [
