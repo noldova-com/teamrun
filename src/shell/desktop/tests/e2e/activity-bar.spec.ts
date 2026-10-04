@@ -130,4 +130,27 @@ test.describe("activity bar", () => {
     await expect(window.locator("tr-tab-group[data-side=Left] .tr-tab-group-title")).toHaveText("Notes");
     await desktop.checkpointAsync("group-header");
   });
+
+  test("an icon opens its view's tab menu from the keyboard or a right click, so the view can be docked elsewhere from the strip", async ({ desktop }) => {
+    const window = desktop.window;
+    const menus = window.locator(".cdk-overlay-container tr-menu");
+    await setDockStyleAsync(window, "shell.leftDockStyle", "Icons");
+    await expect(icon(window, outline)).toBeVisible();
+
+    await icon(window, outline).focus();
+    await window.keyboard.press("Shift+F10");
+    await window.getByRole("menuitem", { name: "Dock", exact: true }).click();
+    await window.getByRole("menuitem", { name: "Dock at the bottom" }).click();
+    await expect(menus).toHaveCount(0);
+
+    await expect(window.locator("tr-tab-group[data-side=Bottom] tr-tab")).toHaveAttribute("data-tab-key", outline);
+    await expect(icon(window, outline)).toHaveCount(0);
+
+    await icon(window, notes).click({ button: "right" });
+    await expect(menus.filter({ has: window.getByRole("menuitem", { name: "Dock", exact: true }) })).toBeVisible();
+    await desktop.checkpointAsync("strip-icon-menu");
+    await window.keyboard.press("Escape");
+    await expect(menus).toHaveCount(0);
+    await expect(icon(window, notes)).toBeFocused();
+  });
 });
