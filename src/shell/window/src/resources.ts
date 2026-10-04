@@ -195,7 +195,7 @@ export class Resources {
   public static readonly showInDialogCommand: string = "shell.showInDialog";
   public static readonly showInDialogTitle: string = "Show in a dialog";
   public static readonly showInDialogGlyph: string = "open_in_full";
-  public static readonly viewDialogShown: string = "A dialog is already open.";
+  public static readonly dialogAlreadyOpen: string = "A dialog is already open.";
   public static readonly settingsDocument: string = "shell.settings";
   public static readonly settingsTitle: string = "Settings";
   public static readonly settingsGlyph: string = "settings";

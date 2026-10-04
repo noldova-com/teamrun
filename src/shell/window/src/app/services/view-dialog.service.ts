@@ -49,7 +49,7 @@ export class ViewDialogService {
 
   public showAsync(tab: Tab, title: string | null = null): Promise<void> {
     if (this.dialogs.isOpen)
-      return Promise.reject(new ViewDialogException(Resources.viewDialogShown));
+      return Promise.reject(new ViewDialogException(Resources.dialogAlreadyOpen));
     if (!tab.isAvailable(this.layout.registry()))
       return Promise.reject(new ArgumentException(tab instanceof DocumentTab ? Resources.formatUnregisteredDocument(tab.name) : Resources.formatUnregisteredView(tab.name), "tab"));
     if (!Object.isNull(title))

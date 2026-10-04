@@ -158,12 +158,14 @@ describe("ViewDialogService", () => {
     layout.close(plan);
     await fromTab;
 
-    void dialogs.showAsync(LayoutFixture.todo);
+    layout.openDocument(plan);
+    layout.openDocument(LayoutFixture.todo);
+    void dialogs.showAsync(plan);
     await vi.waitFor(() => expect(document.querySelector(".tr-test-note")).not.toBeNull());
     layout.close(LayoutFixture.todo);
     TestBed.tick();
 
-    expect(dialogs.shown()?.key).toBe(LayoutFixture.todo.key);
+    expect([layout.layout().isOpen(LayoutFixture.todo), layout.layout().isOpen(plan), dialogs.shown()?.key]).toEqual([false, true, plan.key]);
   });
 
   it("focuses the tab it came from when the control that opened it is gone, and leaves focus where it returned otherwise", async () => {

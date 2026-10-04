@@ -17,9 +17,9 @@ import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../src/app/services/command.service";
 import { MenuBarService } from "../../../src/app/services/menu-bar.service";
 import { MenuService } from "../../../src/app/services/menu.service";
-import { ViewDialogService } from "../../../src/app/services/view-dialog.service";
 import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
+import { ViewDialogFixture } from "../../fixtures/view-dialog.fixture";
 
 describe("MenuBarService", () => {
   let runs: string[];
@@ -30,7 +30,7 @@ describe("MenuBarService", () => {
     sortBy = "week";
     DesktopBridgeFixture.install();
     TestBed.configureTestingModule({
-      providers: [{ provide: DialogService, useValue: { isOpen: isDialogOpen } }, { provide: ViewDialogService, useValue: { ownsCommand: (name: string) => !Object.isNull(viewModule) && name.startsWith(`${viewModule}.`) } }, {
+      providers: [{ provide: DialogService, useValue: { isOpen: isDialogOpen } }, ViewDialogFixture.provideShowing(viewModule), {
         provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
           places: [{ name: "notes.tools", title: "Notes", shows: "menuBar" }, { name: "notes.templates", title: "New from template", shows: "menu" }],
           groups: [
@@ -112,18 +112,22 @@ describe("MenuBarService", () => {
     expect(runs).toEqual([]);
   });
 
-  it("runs the rows of the module whose view a dialog shows, but not another module's", async () => {
-    const shown = start(true, "notes");
-    shown.run("notes.tools/notes.sorting/0");
-    await Promise.resolve();
-    const fromNotes = [...runs];
-    TestBed.resetTestingModule();
-    DesktopBridgeFixture.remove();
-    const other = start(true, "clock");
-    other.run("notes.tools/notes.sorting/0");
+  it("runs the rows of the module whose view a dialog shows", async () => {
+    const bar = start(true, "notes");
+
+    bar.run("notes.tools/notes.sorting/0");
     await Promise.resolve();
 
-    expect([fromNotes, runs]).toEqual([[JSON.stringify({ by: "title" })], []]);
+    expect(runs).toEqual([JSON.stringify({ by: "title" })]);
+  });
+
+  it("runs no row of another module while a dialog shows a view", async () => {
+    const bar = start(true, "clock");
+
+    bar.run("notes.tools/notes.sorting/0");
+    await Promise.resolve();
+
+    expect(runs).toEqual([]);
   });
 
   it("ignores an id for a disabled row or a row that no longer exists", async () => {

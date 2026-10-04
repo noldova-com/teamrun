@@ -8,7 +8,7 @@
 
 import { NgTemplateOutlet } from "@angular/common";
 import {
-  ChangeDetectionStrategy, Component, DestroyRef, ElementRef, EnvironmentInjector, type Signal, afterNextRender, computed, effect, inject, input, viewChild
+  ChangeDetectionStrategy, Component, DestroyRef, ElementRef, type Signal, computed, effect, inject, input, viewChild
 } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
@@ -26,6 +26,7 @@ import { CommandService } from "../../services/command.service";
 import { LayoutService } from "../../services/layout.service";
 import { TabDestinationsService } from "../../services/tab-destinations.service";
 import { TabDragService } from "../../services/tab-drag.service";
+import { TabFocusService } from "../../services/tab-focus.service";
 import { TabLabelService } from "../../services/tab-label.service";
 import { TabStripService } from "../../services/tab-strip.service";
 import { PlaceMenuComponent } from "../place-menu/place-menu.component";
@@ -52,7 +53,7 @@ import { TabScrollerDirective } from "./tab-scroller.directive";
 })
 export class TabGroupComponent {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-  private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
+  private readonly tabFocus: TabFocusService = inject(TabFocusService);
   private readonly commands: CommandService = inject(CommandService);
   private readonly scroller: Signal<TabScrollerDirective | undefined> = viewChild(TabScrollerDirective);
   private readonly overflowTrigger: Signal<MenuTriggerDirective | undefined> = viewChild("overflowTrigger", { read: MenuTriggerDirective });
@@ -103,24 +104,15 @@ export class TabGroupComponent {
 
   protected choose(tab: Tab): void {
     this.layout.activate(tab);
-    afterNextRender(() => {
-      for (const element of this.host.querySelectorAll<HTMLElement>(Resources.tabKeySelector))
-        if (element.dataset[Resources.tabKeyData] === tab.key)
-          element.focus();
-    }, { injector: this.environment });
+    this.tabFocus.focus(tab);
   }
 
   protected close(tab: Tab): void {
     const hadFocus = this.host.contains(this.host.ownerDocument.activeElement);
     this.layout.close(tab);
     const next = this.layout.layout().group(this.group().id)?.active ?? this.layout.currentGroup().active;
-    if (!hadFocus || Object.isNull(next))
-      return;
-    afterNextRender(() => {
-      for (const element of this.host.ownerDocument.querySelectorAll<HTMLElement>(Resources.tabKeySelector))
-        if (element.dataset[Resources.tabKeyData] === next.key)
-          element.focus();
-    }, { injector: this.environment });
+    if (hadFocus && !Object.isNull(next))
+      this.tabFocus.focus(next);
   }
 
   protected keep(tab: Tab): void {

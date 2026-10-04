@@ -17,9 +17,9 @@ import { WindowPartSource } from "../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../src/app/services/command.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
-import { ViewDialogService } from "../../../src/app/services/view-dialog.service";
 import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
+import { ViewDialogFixture } from "../../fixtures/view-dialog.fixture";
 
 describe("CommandService", () => {
   let errors: unknown[];
@@ -41,7 +41,7 @@ describe("CommandService", () => {
       providers: [
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } },
         { provide: DialogService, useValue: { isOpen: isDialogOpen } },
-        { provide: ViewDialogService, useValue: { ownsCommand: (name: string) => !Object.isNull(viewModule) && name.startsWith(`${viewModule}.`) } },
+        ViewDialogFixture.provideShowing(viewModule),
         { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] }
       ]
     });
