@@ -1046,15 +1046,36 @@ export declare class WorkReport {
 }
 
 /**
- * Where one module stands in the runtime: an active module has no cause; a
- * failed or blocked one has a cause that is safe to show, without a stack or
- * a path outside the data directory.
+ * One module of the runtime's build: what its declaration says about it and
+ * where it stands. An active module has no cause; a failed or blocked one has
+ * a cause that is safe to show, without a stack or a path outside the data
+ * directory, and a blocked one also names the dependency that blocks it.
  */
 export declare class ModuleStatus {
   /**
    * The module's id.
    */
   public readonly id: string;
+
+  /**
+   * The name people see.
+   */
+  public readonly displayName: string;
+
+  /**
+   * What the module does, in a sentence people see.
+   */
+  public readonly description: string;
+
+  /**
+   * The ids of the modules it depends on, as it declares them.
+   */
+  public readonly dependencies: readonly string[];
+
+  /**
+   * The names it declares, by kind, such as `commands` or `views`.
+   */
+  public readonly contributions: ReadonlyMap<string, readonly string[]>;
 
   /**
    * Where the module stands.
@@ -1067,23 +1088,47 @@ export declare class ModuleStatus {
   public readonly cause: string | null;
 
   /**
+   * The dependency that is not active, for a blocked module; otherwise
+   * `null`.
+   */
+  public readonly blockedBy: string | null;
+
+  /**
    * Creates the status.
    *
    * @param id The module's id; not whitespace only.
+   * @param displayName The name people see; not whitespace only.
+   * @param description What the module does; not whitespace only.
+   * @param dependencies The ids of the modules it depends on.
+   * @param contributions The names it declares, by kind.
    * @param state Where the module stands.
    * @param cause `null` for an active module; otherwise text that is not
    * whitespace only.
-   * @throws ArgumentException synchronously when the id is blank, an active
-   * module has a cause, or a failed or blocked module has none or a blank one.
+   * @param blockedBy For a blocked module, the dependency that blocks it;
+   * otherwise `null`, the default.
+   * @throws ArgumentException synchronously when the id, the display name or
+   * the description is blank, an active module has a cause, a failed or
+   * blocked module has none or a blank one, or `blockedBy` is not one of the
+   * dependencies of a blocked module.
    *
    * @example
    * ```ts
    * import { ModuleState, ModuleStatus } from "@noldova/teamrun-shell-protocol";
    *
-   * export const status: ModuleStatus = new ModuleStatus("notes", ModuleState.Blocked, "It depends on tasks, which is not active.");
+   * export const status: ModuleStatus = new ModuleStatus(
+   *   "notes", "Notes", "Keeps notes.", ["tasks"], new Map([["commands", ["notes.newNote"]]]), ModuleState.Blocked,
+   *   "It depends on tasks, which is not active.", "tasks");
    * ```
    */
-  public constructor(id: string, state: ModuleState, cause: string | null);
+  public constructor(
+    id: string,
+    displayName: string,
+    description: string,
+    dependencies: readonly string[],
+    contributions: ReadonlyMap<string, readonly string[]>,
+    state: ModuleState,
+    cause: string | null,
+    blockedBy?: string | null);
 
   /**
    * Reads the status from its wire form. Unknown fields are ignored.
@@ -1091,30 +1136,73 @@ export declare class ModuleStatus {
    * @param value The untrusted value.
    * @param path The path a failure reports; `$` by default.
    * @returns The status.
-   * @throws JsonException synchronously when `id` or `state` is missing or
-   * invalid, or `cause` is not a string or does not match the state; its path
-   * names the field.
+   * @throws JsonException synchronously when a field is missing or invalid,
+   * or `cause` or `blockedBy` does not match the state; its path names the
+   * field.
    *
    * @example
    * ```ts
    * import { ModuleStatus } from "@noldova/teamrun-shell-protocol";
    *
-   * export const status: ModuleStatus = ModuleStatus.fromJson({ id: "notes", state: "Active" });
+   * export const status: ModuleStatus = ModuleStatus.fromJson({
+   *   id: "notes", displayName: "Notes", description: "Keeps notes.", dependencies: [], contributes: {}, state: "Active"
+   * });
    * ```
    */
   public static fromJson(value: unknown, path?: string): ModuleStatus;
 
   /**
+   * Lists the names the module declares of one kind.
+   *
+   * @param kind The kind, such as `commands`.
+   * @returns The names, in declared order; none when it declares none.
+   *
+   * @example
+   * ```ts
+   * import type { ModuleStatus } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function listCommands(status: ModuleStatus): readonly string[] {
+   *   return status.listContributions("commands");
+   * }
+   * ```
+   */
+  public listContributions(kind: string): readonly string[];
+
+  /**
+   * Returns the same module in another state.
+   *
+   * @param state Where the module stands.
+   * @param cause `null` for an active module; otherwise text that is not
+   * whitespace only.
+   * @param blockedBy For a blocked module, the dependency that blocks it;
+   * otherwise `null`, the default.
+   * @returns The new status.
+   * @throws ArgumentException synchronously as the constructor does.
+   *
+   * @example
+   * ```ts
+   * import { ModuleState, type ModuleStatus } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function fail(status: ModuleStatus): ModuleStatus {
+   *   return status.withState(ModuleState.Failed, "Its window part could not be loaded.");
+   * }
+   * ```
+   */
+  public withState(state: ModuleState, cause: string | null, blockedBy?: string | null): ModuleStatus;
+
+  /**
    * Returns the wire form.
    *
-   * @returns The `id` and `state` fields, and `cause` when there is one.
+   * @returns The `id`, `displayName`, `description`, `dependencies`,
+   * `contributes` and `state` fields, `cause` when there is one and
+   * `blockedBy` when there is one.
    *
    * @example
    * ```ts
    * import type { JsonObject } from "@noldova/teamrun-foundation-json";
    * import { ModuleState, ModuleStatus } from "@noldova/teamrun-shell-protocol";
    *
-   * export const json: JsonObject = new ModuleStatus("notes", ModuleState.Active, null).toJson();
+   * export const json: JsonObject = new ModuleStatus("notes", "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null).toJson();
    * ```
    */
   public toJson(): JsonObject;
@@ -1139,7 +1227,7 @@ export declare class ModuleStatusList {
    * ```ts
    * import { ModuleState, ModuleStatus, ModuleStatusList } from "@noldova/teamrun-shell-protocol";
    *
-   * export const list: ModuleStatusList = new ModuleStatusList([new ModuleStatus("notes", ModuleState.Active, null)]);
+   * export const list: ModuleStatusList = new ModuleStatusList([new ModuleStatus("notes", "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null)]);
    * ```
    */
   public constructor(modules: readonly ModuleStatus[]);
@@ -1157,7 +1245,9 @@ export declare class ModuleStatusList {
    * ```ts
    * import { ModuleStatusList } from "@noldova/teamrun-shell-protocol";
    *
-   * export const list: ModuleStatusList = ModuleStatusList.fromJson({ modules: [{ id: "notes", state: "Active" }] });
+   * export const list: ModuleStatusList = ModuleStatusList.fromJson({
+   *   modules: [{ id: "notes", displayName: "Notes", description: "Keeps notes.", dependencies: [], contributes: {}, state: "Active" }]
+   * });
    * ```
    */
   public static fromJson(value: unknown, path?: string): ModuleStatusList;
@@ -1285,8 +1375,9 @@ export declare class ShellMethods {
   public static readonly moveAside: QualifiedName;
 
   /**
-   * `shell.modules`: asks the runtime where every module of its build
-   * stands; it answers with a `ModuleStatusList`. A client that never asks
+   * `shell.modules`: asks the runtime for every module of its build, what
+   * its declaration says and where it stands; it answers with a
+   * `ModuleStatusList`. A client that never asks
    * is unaffected.
    */
   public static readonly modules: QualifiedName;

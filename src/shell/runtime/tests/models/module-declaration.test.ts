@@ -16,6 +16,7 @@ export class ModuleDeclarationTests {
   private static readonly VALID: Readonly<Record<string, unknown>> = {
     id: "notes",
     displayName: "Notes",
+    description: "Keeps notes.",
     dependencies: ["tasks"],
     runtimePackage: "@noldova/teamrun-modules-notes-runtime",
     contributes: { methods: ["notes.list"], events: [] }
@@ -28,6 +29,7 @@ export class ModuleDeclarationTests {
 
     Assert.areEqual("notes", declaration.id);
     Assert.areEqual("Notes", declaration.displayName);
+    Assert.areEqual("Keeps notes.", declaration.description);
     Assert.areEqual("tasks", declaration.dependencies.join(","));
     Assert.areEqual("@noldova/teamrun-modules-notes-runtime", declaration.runtimePackage);
     Assert.areEqual("notes.list", declaration.listContributions("methods").join(","));
@@ -42,7 +44,7 @@ export class ModuleDeclarationTests {
     const methods = ["notes.list"];
     const contributions = new Map([["methods", methods]]);
 
-    const declaration = new ModuleDeclaration("notes", "Notes", dependencies, null, contributions);
+    const declaration = new ModuleDeclaration("notes", "Notes", "Keeps notes.", dependencies, null, contributions);
     dependencies.push("clock");
     methods.push("notes.open");
     contributions.set("events", ["notes.changed"]);
@@ -57,15 +59,16 @@ export class ModuleDeclarationTests {
   @TestData("Notes")
   @TestData("")
   public refusesAnInvalidId(id: string): void {
-    Assert.throws(() => new ModuleDeclaration(id, "Notes", [], null, new Map()), ArgumentException);
+    Assert.throws(() => new ModuleDeclaration(id, "Notes", "Keeps notes.", [], null, new Map()), ArgumentException);
     Assert.areEqual(
       "A module declaration's id is missing or invalid.",
       Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, id }), DeclarationsFormatException).message);
   }
 
   @TestMethod
-  public refusesABlankDisplayName(): void {
-    Assert.throws(() => new ModuleDeclaration("notes", " ", [], null, new Map()), ArgumentException);
+  public refusesABlankDisplayNameOrDescription(): void {
+    Assert.throws(() => new ModuleDeclaration("notes", " ", "Keeps notes.", [], null, new Map()), ArgumentException);
+    Assert.throws(() => new ModuleDeclaration("notes", "Notes", " ", [], null, new Map()), ArgumentException);
   }
 
   @TestMethod
@@ -80,6 +83,7 @@ export class ModuleDeclarationTests {
       [{ ...ModuleDeclarationTests.VALID, contributes: { methods: "notes.list" } }, "A module declaration's contributes is missing or invalid."],
       [{ ...ModuleDeclarationTests.VALID, contributes: { methods: [" "] } }, "A module declaration's contributes is missing or invalid."],
       [ModuleDeclarationTests.without("displayName"), "A module declaration's displayName is missing or invalid."],
+      [ModuleDeclarationTests.without("description"), "A module declaration's description is missing or invalid."],
       [ModuleDeclarationTests.without("dependencies"), "A module declaration's dependencies is missing or invalid."],
       [{ ...ModuleDeclarationTests.VALID, dependencies: [1] }, "A module declaration's dependencies is missing or invalid."],
       [ModuleDeclarationTests.without("runtimePackage"), "A module declaration's runtimePackage is missing or invalid."],

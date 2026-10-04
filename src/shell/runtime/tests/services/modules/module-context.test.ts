@@ -46,6 +46,7 @@ export class ModuleContextTests {
   private static readonly NOTES: ModuleDeclaration = new ModuleDeclaration(
     "notes",
     "Notes",
+    "Keeps notes.",
     ["tasks"],
     "@noldova/teamrun-modules-notes-runtime",
     new Map([

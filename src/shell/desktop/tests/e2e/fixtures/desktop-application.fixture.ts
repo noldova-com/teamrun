@@ -64,6 +64,8 @@ export default class DesktopApplicationFixture {
   private static readonly THREADS_TIMEOUT: number = 20_000;
   private static readonly PAGE_UNREACHABLE: string = "The page did not answer the silence report's request, which reaches it through the main process, so the test did not wait for it.";
   private static readonly MAIN_WINDOW: string = "main-window";
+  private static readonly QUIT_ACTION: string = "quit";
+  private static readonly QUIT_QUESTION: string = "tr-quit-dialog";
   private static readonly NO_ANSWER: unique symbol = Symbol("no answer");
 
   private readonly testInfo: TestInfo;
@@ -219,17 +221,21 @@ export default class DesktopApplicationFixture {
     }
     try {
       const started = Date.now();
-      await this.answerAsync("quit", this.application.close(), DesktopApplicationFixture.QUIT_TIMEOUT);
+      await this.answerAsync(DesktopApplicationFixture.QUIT_ACTION, this.application.close(), DesktopApplicationFixture.QUIT_TIMEOUT);
       this.closeMilliseconds = Date.now() - started;
     }
     catch (error) {
       if (this.silence === null)
         throw error;
       const processId = this.mainProcessId;
+      const question = this.silence.action === DesktopApplicationFixture.QUIT_ACTION ? await this.describeQuestionAsync() : null;
+      const failure = question ?? `The main process ${processId ?? "(id unknown)"} did not answer for ${Math.round((Date.now() - this.silence.since) / 1000)} s after it was asked to ${this.silence.action}, so the test killed it.`;
+      if (question !== null)
+        this.silence = null;
       if (processId !== null && DesktopApplicationFixture.isAlive(processId))
         process.kill(processId, "SIGKILL");
       child.kill("SIGKILL");
-      this.failures.push(`The main process ${processId ?? "(id unknown)"} did not answer for ${Math.round((Date.now() - this.silence.since) / 1000)} s after it was asked to ${this.silence.action}, so the test killed it.`);
+      this.failures.push(failure);
     }
     const exitCode = await exited;
     this.electronApplication = null;
@@ -332,6 +338,19 @@ export default class DesktopApplicationFixture {
     catch (error) {
       await this.testInfo.attach(`${name}.unavailable.txt`, { body: String(error), contentType: "text/plain" });
     }
+  }
+
+  private async describeQuestionAsync(): Promise<string | null> {
+    const questions = await DesktopApplicationFixture.withinAsync(Promise.all(this.application.windows().map(async (page, index) => {
+      const question = page.getByRole("dialog").filter({ has: page.locator(DesktopApplicationFixture.QUIT_QUESTION) });
+      return await question.count() === 0 ? null : { index, text: await question.first().ariaSnapshot() };
+    }).map(t => t.catch(() => null))), DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT);
+    const asked = questions === DesktopApplicationFixture.NO_ANSWER ? null : questions.find(t => t !== null) ?? null;
+    return asked === null ? null : [
+      `TeamRun did not quit within ${DesktopApplicationFixture.QUIT_TIMEOUT / 1000} s because window ${asked.index} asked the question below, so the test killed it.`,
+      "The test left work running: finish or stop it before the test ends.",
+      asked.text
+    ].join("\n");
   }
 
   private async describeSilenceAsync(silence: MainProcessSilence): Promise<string> {

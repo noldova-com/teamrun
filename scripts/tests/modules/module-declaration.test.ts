@@ -19,6 +19,7 @@ class ModuleDeclarationTests {
   private static readonly VALID: Readonly<Record<string, unknown>> = {
     id: "notes",
     displayName: "Notes",
+    description: "Keeps notes.",
     parts: ["runtime", "window"],
     dependencies: ["tasks", "git-hub2"],
     contributes: { methods: ["notes.list"], commands: ["notes.newNote"], notifications: ["notes.saved"], views: ["notes.list", "notes.outlineView"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"], themes: [] }
@@ -39,6 +40,7 @@ class ModuleDeclarationTests {
       assert.equal(declaration.folder, ModuleDeclarationTests.FOLDER);
       assert.equal(declaration.file, "src/modules/notes/module.json");
       assert.equal(declaration.displayName, "Notes");
+      assert.equal(declaration.description, "Keeps notes.");
       assert.deepEqual(declaration.parts, ["runtime", "window"]);
       assert.equal(declaration.isFixture, false);
       assert.equal(declaration.runtimePackage, "@noldova/teamrun-modules-notes-runtime");
@@ -46,6 +48,7 @@ class ModuleDeclarationTests {
       assert.deepEqual(declaration.toJson(), {
         id: "notes",
         displayName: "Notes",
+        description: "Keeps notes.",
         dependencies: ["tasks", "git-hub2"],
         runtimePackage: "@noldova/teamrun-modules-notes-runtime",
         contributes: { methods: ["notes.list"], commands: ["notes.newNote"], notifications: ["notes.saved"], views: ["notes.list", "notes.outlineView"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"], themes: [] },
@@ -68,7 +71,7 @@ class ModuleDeclarationTests {
       await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...ModuleDeclarationTests.VALID, version: 1, themes: [] }), "has unknown fields: version, themes");
     });
 
-    test("an id other than its folder's name, a reserved or invalid id and a blank display name are refused", async t => {
+    test("an id other than its folder's name, a reserved or invalid id and a blank display name or description are refused", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       const idRule = "must have the id \"notes\", its folder's name: lowercase kebab-case and not \"shell\"";
@@ -77,6 +80,8 @@ class ModuleDeclarationTests {
         await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...ModuleDeclarationTests.VALID, id }), idRule);
       for (const displayName of [undefined, " "])
         await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...ModuleDeclarationTests.VALID, displayName }), "must have a display name");
+      for (const description of [undefined, 1, " "])
+        await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...ModuleDeclarationTests.VALID, description }), "must have a description");
       await repository.writeAsync({ "src/modules/shell/module.json": JSON.stringify({ ...ModuleDeclarationTests.VALID, id: "shell" }), "src/modules/Notes/module.json": JSON.stringify({ ...ModuleDeclarationTests.VALID, id: "Notes" }) });
       await assert.rejects(ModuleDeclaration.readAsync(repository.directory, "src/modules/shell", false),
         new ModuleException("src/modules/shell/module.json must have the id \"shell\", its folder's name: lowercase kebab-case and not \"shell\"."));

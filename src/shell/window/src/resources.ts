@@ -83,6 +83,8 @@ export class Resources {
   public static readonly dropTargetSeparator: string = ":";
   public static readonly tabKeySelector: string = "[data-tab-key]";
   public static readonly tabKeyData: string = "tabKey";
+  public static readonly tabGroupSelector: string = "tr-tab-group";
+  public static readonly tabGroupData: string = "group";
   public static readonly tabCloseSelector: string = ".tr-tab-close";
   public static readonly selectedTabSelector: string = ".tr-tab-selected";
   public static readonly revealOptions: ScrollIntoViewOptions = { block: "nearest", inline: "nearest" };
@@ -197,9 +199,15 @@ export class Resources {
   public static readonly showInDialogTitle: string = "Show in a dialog";
   public static readonly showInDialogGlyph: string = "open_in_full";
   public static readonly dialogAlreadyOpen: string = "A dialog is already open.";
+  public static readonly dialogWhileReconnecting: string = "A dialog can't open while the window reconnects to the runtime.";
   public static readonly settingsDocument: string = "shell.settings";
   public static readonly settingsTitle: string = "Settings";
   public static readonly settingsGlyph: string = "settings";
+  public static readonly openModulesCommand: string = "shell.openModules";
+  public static readonly openModulesTitle: string = "Modules…";
+  public static readonly modulesDocument: string = "shell.modules";
+  public static readonly modulesTitle: string = "Modules";
+  public static readonly modulesGlyph: string = "extension";
   public static readonly modifiedLabel: string = "Modified";
   public static readonly modifiedGlyph: string = "circle";
   public static readonly resetLabel: string = "Reset";
@@ -230,6 +238,7 @@ export class Resources {
   public static readonly noKey: string = "No key";
   public static readonly choicePillMinimum: number = 2;
   public static readonly choicePillLimit: number = 4;
+  public static readonly settingErrorIdPrefix: string = "tr-setting-error-";
   public static readonly shortcutsExplanation: string = "The keys that run commands. Choose a key to record a new one; your keys apply on every device.";
   public static readonly resetAllShortcutsLabel: string = "Reset all shortcuts";
   public static readonly removeKeyLabel: string = "Remove";
@@ -516,6 +525,7 @@ export class Resources {
   public static readonly docksGroup: string = "shell.docks";
   public static readonly bottomDockGroup: string = "shell.bottomDock";
   public static readonly layoutGroup: string = "shell.layout";
+  public static readonly modulesGroup: string = "shell.modules";
   public static readonly toolbarsMenu: string = "shell.toolbars";
   public static readonly toolbarsMenuTitle: string = "Toolbars";
   public static readonly noPlace: string = "";
@@ -613,7 +623,6 @@ export class Resources {
   public static readonly appMenu: string = "shell.app";
   public static readonly appMenuTitle: string = Resources.productName;
   public static readonly noModules: string = "No modules";
-  public static readonly moduleFailuresTitle: string = "Modules that didn't start";
   public static readonly copyDetailsLabel: string = "Copy details";
   public static readonly copiedLabel: string = "Copied";
   public static readonly openLogFolderLabel: string = "Open log folder";
@@ -625,6 +634,24 @@ export class Resources {
     [ModuleState.Failed]: "Failed",
     [ModuleState.Blocked]: "Blocked"
   };
+  public static readonly moduleStateTitle: string = "State";
+  public static readonly blockedByTitle: string = "Blocked by";
+  public static readonly dependenciesTitle: string = "Depends on";
+  public static readonly dependentsTitle: string = "Needed by";
+  public static readonly noModulesNamed: string = "None";
+  public static readonly contributionsTitle: string = "Contributes";
+  public static readonly noContributions: string = "No commands, settings, menus, views or notification kinds.";
+  public static readonly commandsKind: string = "commands";
+  public static readonly settingsKind: string = "settings";
+  public static readonly moduleContributionKinds: readonly (readonly [string, string])[] = [
+    [Resources.commandsKind, "Commands"],
+    [Resources.settingsKind, "Settings"],
+    ["menus", "Menus"],
+    ["views", "Views"],
+    ["notifications", "Notification kinds"]
+  ];
+  public static readonly moduleSelector: string = "[data-module]";
+  public static readonly moduleData: string = "module";
   public static readonly bridgeName: string = "teamrun";
   public static readonly macPlatform: string = "darwin";
   public static readonly backgroundField: string = "background";
@@ -684,6 +711,10 @@ export class Resources {
 
   public static formatModuleDidNotStart(displayName: string): string {
     return `${displayName} didn't start`;
+  }
+
+  public static formatProductVersion(productVersion: string): string {
+    return `${Resources.productName} ${productVersion}`;
   }
 
   public static formatBuildDetails(productVersion: string, fingerprint: string): string {

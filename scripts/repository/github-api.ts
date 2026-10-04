@@ -41,6 +41,10 @@ export default class GitHubApi {
     await this.captureAsync(["api", "--method", method, this.locate(resource), "--raw-field", `body=${body}`]);
   }
 
+  public async createAsync(resource: string, fields: readonly (readonly [string, string])[]): Promise<unknown> {
+    return this.parse(await this.captureAsync(["api", "--method", "POST", this.locate(resource), ...fields.flatMap(([name, value]) => ["--raw-field", `${name}=${value}`])]), resource);
+  }
+
   public async postAsync(resource: string): Promise<void> {
     await this.captureAsync(["api", "--method", "POST", this.locate(resource)]);
   }

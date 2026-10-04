@@ -10,14 +10,12 @@ export class MenuSearchRow {
   public readonly id: string;
   public readonly title: string;
   public readonly icon: string | null;
-  public readonly key: string | null;
   public readonly menu: string;
 
-  public constructor(id: string, title: string, icon: string | null, key: string | null, menu: string) {
+  public constructor(id: string, title: string, icon: string | null, menu: string) {
     this.id = id;
     this.title = title;
     this.icon = icon;
-    this.key = key;
     this.menu = menu;
   }
 }

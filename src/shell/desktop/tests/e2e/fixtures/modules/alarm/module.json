@@ -1,0 +1,8 @@
+{
+  "id": "alarm",
+  "displayName": "Alarm",
+  "description": "Depends on the clock, so it is blocked whenever the clock fails, for the UI workflows.",
+  "parts": [],
+  "dependencies": ["clock"],
+  "contributes": {}
+}
