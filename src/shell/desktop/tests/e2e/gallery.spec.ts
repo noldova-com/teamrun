@@ -85,7 +85,7 @@ test.describe("gallery", () => {
 
   test("a button's label too long for it starts at its start padding, ends with an ellipsis and shows in full in its tooltip, in light and in dark", async ({ desktop }) => {
     const window = desktop.window;
-    await openGalleryAsync(window);
+    await SettingsFixture.openGalleryAsync(window);
 
     for (const mode of ["Light", "Dark"] as const) {
       const button = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Button\"] button.tr-gallery-narrow");
