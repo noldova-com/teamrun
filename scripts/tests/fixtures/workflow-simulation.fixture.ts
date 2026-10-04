@@ -22,6 +22,7 @@ export default class WorkflowSimulation {
   private static readonly KEY_PATTERN: RegExp = /^([a-z-]+):(?: (.*))?$/;
   private static readonly OUTCOME_PATTERN: RegExp = /^steps\.([a-z-]+)\.outcome (==|!=) '([a-z]+)'$/;
   private static readonly MATRIX_PATTERN: RegExp = /^matrix\.([a-z]+) (==|!=) '([a-z]+)'$/;
+  private static readonly MATRIX_FLAG_PATTERN: RegExp = /^matrix\.([a-z]+)$/;
   private static readonly ALWAYS: string = "always()";
   private static readonly FAILURE: string = "failure()";
   private static readonly SKIPPED: string = "skipped";
@@ -69,15 +70,23 @@ export default class WorkflowSimulation {
         return true;
       const setting = WorkflowSimulation.MATRIX_PATTERN.exec(term);
       if (setting !== null) {
-        const value = matrix[setting[1] ?? ""];
-        assert.ok(value !== undefined, `The simulated leg has no matrix value "${setting[1]}".`);
+        const value = WorkflowSimulation.readMatrix(matrix, setting[1] ?? "");
         return setting[2] === "==" ? value === setting[3] : value !== setting[3];
       }
+      const flag = WorkflowSimulation.MATRIX_FLAG_PATTERN.exec(term);
+      if (flag !== null)
+        return WorkflowSimulation.readMatrix(matrix, flag[1] ?? "") === "true";
       const match = WorkflowSimulation.OUTCOME_PATTERN.exec(term);
       assert.ok(match !== null, `Unsupported condition term "${term}".`);
       const outcome = results.get(match[1] ?? "") ?? WorkflowSimulation.SKIPPED;
       return match[2] === "==" ? outcome === match[3] : outcome !== match[3];
     });
+  }
+
+  private static readMatrix(matrix: Readonly<Record<string, string>>, name: string): string {
+    const value = matrix[name];
+    assert.ok(value !== undefined, `The simulated leg has no matrix value "${name}".`);
+    return value;
   }
 
   private static parse(lines: readonly string[]): SimulatedStep {
