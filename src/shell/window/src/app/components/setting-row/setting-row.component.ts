@@ -43,7 +43,7 @@ export class SettingRowComponent {
 
   protected readonly current: Signal<JsonValue> = computed(() => this.value() ?? this.definition().defaultValue);
   protected readonly options: Signal<readonly SelectOption[]> = computed(() => this.definition().type.options.map(t => new SelectOption(t.value, t.title)));
-  protected readonly isFew: Signal<boolean> = computed(() => this.options().length <= Resources.choicePillLimit);
+  protected readonly isFew: Signal<boolean> = computed(() => this.options().length >= Resources.choicePillMinimum && this.options().length <= Resources.choicePillLimit);
   protected readonly chosenModules: Signal<ReadonlySet<string>> = computed(() => {
     const value = this.current();
     return new Set(Array.isArray(value) ? value.filter((t): t is string => typeof t === "string") : []);

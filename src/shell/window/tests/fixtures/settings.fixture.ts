@@ -14,6 +14,8 @@ export class SettingsFixture {
     SettingType.choice([new SettingOption("Light", "Light"), new SettingOption("Dark", "Dark"), new SettingOption("System", "System")]), "System", "Appearance", "Theme");
   public static readonly accent: SettingDefinition = SettingsFixture.define("shell.accent", "Accent", "The color that marks the selection.",
     SettingType.choice(["Blue", "Green", "Orange", "Red", "Violet"].map(t => new SettingOption(t, t))), "Blue", "Appearance", "Theme");
+  public static readonly theme: SettingDefinition = SettingsFixture.define("shell.theme", "Theme", "The colors and look of the window.",
+    SettingType.choice([new SettingOption("Default", "Default")]), "Default", "Appearance", "Theme");
   public static readonly panelSize: SettingDefinition = SettingsFixture.define("shell.panelSize", "Interface text size", "The size of interface text, in pixels.",
     SettingType.number(12, 18, 1), 13, "Appearance", "Text");
   public static readonly doNotDisturb: SettingDefinition = SettingsFixture.define("shell.doNotDisturb", "Do not disturb", "Holds back notifications on this device.",

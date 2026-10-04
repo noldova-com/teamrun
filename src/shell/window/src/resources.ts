@@ -221,6 +221,7 @@ export class Resources {
   public static readonly commandColumn: string = "Command";
   public static readonly keyColumn: string = "Key";
   public static readonly noKey: string = "—";
+  public static readonly choicePillMinimum: number = 2;
   public static readonly choicePillLimit: number = 4;
   public static readonly shortcutsExplanation: string = "The keys that run commands. Changing them comes later.";
   public static readonly showAllTabsCommand: string = "shell.showAllTabs";

@@ -93,9 +93,12 @@ describe("SettingRowComponent", () => {
     expect(changes).toEqual(["Dark", "Light"]);
   });
 
-  it("shows a choice of more than four options as a select", async () => {
+  it("shows a choice of more than four options, or of a single one, as a select", async () => {
+    const lone = render(SettingsFixture.theme, "Default");
+    const isLoneSelect = [lone.querySelector("[role=radiogroup]"), lone.querySelector("tr-select")?.tagName];
     const row = render(SettingsFixture.accent, "Blue");
 
+    expect(isLoneSelect).toEqual([null, "TR-SELECT"]);
     expect([row.querySelector("[role=radiogroup]"), row.querySelector("tr-select")?.tagName]).toEqual([null, "TR-SELECT"]);
     await page.getByRole("button", { name: "Accent, Blue" }).click();
     await page.getByRole("option", { name: "Violet" }).click();
