@@ -47,12 +47,10 @@
 
 .tr-toolbar-button-glyph,
 .tr-toolbar-button-chevron {
+  flex: none;
   font-size: var(--tr-icon);
 }
 
 .tr-toolbar-button-label {
-  min-width: 0;
-  overflow: hidden;
   color: var(--tr-text);
-  text-overflow: ellipsis;
 }
