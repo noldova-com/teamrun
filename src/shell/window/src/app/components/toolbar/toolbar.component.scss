@@ -24,8 +24,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: calc(0.25rem - var(--tr-sash-grip));
+  justify-content: space-between;
   align-self: stretch;
   flex: none;
   box-sizing: border-box;
