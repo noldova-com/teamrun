@@ -179,7 +179,7 @@ export class FixtureTheme {
     ["menu-item-inset", "0.375rem"],
     ["menu-item-padding", "0.625rem"],
     ["menu-trail-gap", "2rem"],
-    ["toolbar-row", "2.25rem"],
+    ["band-gap", "0.375rem"],
     ["toolbar-button", "2rem"],
     ["toolbar-button-padding", "0.5rem"],
     ["toolbar-gap", "0.75rem"],

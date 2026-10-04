@@ -6,14 +6,19 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ErrorHandler } from "@angular/core";
+import { ErrorHandler, signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
-import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
+import { AppearanceService, DefaultTheme, ThemeMode, Typography } from "@noldova/teamrun-shell-ui";
 
 import { DockSide } from "../../../../src/app/enums/dock-side";
+import { MenuCheck } from "../../../../src/app/enums/menu-check";
+import { CommandRow } from "../../../../src/app/models/command-row";
+import { MenuSection } from "../../../../src/app/models/menu-section";
+import { Toolbar } from "../../../../src/app/models/toolbar";
 import { LayoutStoreService } from "../../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../../src/app/services/layout.service";
+import { ToolbarService } from "../../../../src/app/services/toolbar.service";
 import { WindowComponent } from "../../../../src/app/components/window/window.component";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
@@ -47,9 +52,34 @@ describe("WindowComponent", () => {
       background: AppearanceFixture.readColor(theme, mode, "sideBar.background"),
       titleBar: AppearanceFixture.readColor(theme, mode, "titleBar.activeBackground"),
       titleBarText: AppearanceFixture.readColor(theme, mode, "titleBar.activeForeground"),
-      titleBarHeight: 35
+      titleBarHeight: AppearanceFixture.toPixels(2)
     }]);
   });
+
+  for (const panelSize of [12, 13, 18])
+    for (const platform of ["win32", "darwin"])
+      for (const count of [0, 2])
+        it(`stands the window row's controls, ${count} toolbar rows and the panels 0.25rem apart at panel size ${panelSize} on ${platform}`, async () => {
+          const toolbar = new Toolbar("notes.main", "Main", [new MenuSection("notes.create", [new CommandRow("notes.newNote", {}, "New note", "note", null, true, MenuCheck.None, false)])]);
+          const rows = Array.from({ length: count }, () => [toolbar]);
+          DesktopBridgeFixture.install(platform);
+          TestBed.configureTestingModule({ providers: [{ provide: ToolbarService, useValue: { rows: signal(rows), hasContent: signal(count > 0) } }] });
+          AppearanceFixture.apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
+          TestBed.inject(AppearanceService).setTypography(new Typography(panelSize));
+          const fixture = TestBed.createComponent(WindowComponent);
+          await fixture.whenStable();
+          const root: HTMLElement = fixture.nativeElement;
+          const row = root.querySelector("tr-window-row") as HTMLElement;
+          const controls = [...row.querySelectorAll<HTMLElement>("button")].filter(t => t.checkVisibility({ visibilityProperty: true })).map(t => t.getBoundingClientRect().bottom);
+          const bands = [...root.querySelectorAll<HTMLElement>(".tr-toolbar-row")].map(t => t.getBoundingClientRect());
+          const panel = (root.querySelector("tr-tab-group") as HTMLElement).getBoundingClientRect();
+          const edges = [{ top: Number.NaN, bottom: platform === "darwin" ? row.getBoundingClientRect().bottom : Math.max(...controls) }, ...bands, { top: panel.top, bottom: Number.NaN }];
+          const gaps = edges.slice(1).map((t, index) => t.top - (edges[index]?.bottom ?? Number.NaN));
+
+          expect(gaps).toHaveLength(count + 1);
+          for (const gap of gaps)
+            AppearanceFixture.expectPixels(gap, AppearanceFixture.toPixels(0.25, panelSize));
+        });
 
   it("shows the startup card instead of the workspace until the runtime is ready", async () => {
     const bridge = DesktopBridgeFixture.install();
