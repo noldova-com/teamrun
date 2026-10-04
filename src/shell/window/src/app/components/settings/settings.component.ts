@@ -20,11 +20,10 @@ import { SettingsView } from "../../models/settings/settings-view";
 import { ShortcutRow } from "../../models/settings/shortcut-row";
 import { TextMatch } from "../../models/settings/text-match";
 import { ShellDocuments } from "../../models/shell-documents";
-import type { WindowPartSource } from "../../models/window-part-source";
-import { WindowPartTokens } from "../../models/window-part-tokens";
 import { Resources } from "../../../resources";
 import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
+import { ModuleStatusService } from "../../services/module-status.service";
 import { SettingsService } from "../../services/settings.service";
 import { ViewStateService } from "../../services/view-state.service";
 import { SettingRowComponent } from "../setting-row/setting-row.component";
@@ -53,14 +52,13 @@ export class SettingsComponent {
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly query: WritableSignal<string> = signal(this.kept.query);
-  private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
+  private readonly statuses: ModuleStatusService = inject(ModuleStatusService);
 
   protected readonly gallery: Type<unknown> | null = inject(GalleryTokens.component);
 
-  protected readonly modules: readonly SelectOption[] = this.sources.map(t => new SelectOption(t.moduleId, t.displayName));
-  protected readonly notifyingModules: readonly SelectOption[] = this.sources
-    .filter(t => t.notificationKinds.length > 0)
-    .map(t => new SelectOption(t.moduleId, Resources.formatModuleNotifications(t.displayName)));
+  protected readonly modules: Signal<readonly SelectOption[]> = computed(() => this.statuses.modules().map(t => new SelectOption(t.id, t.displayName)));
+  protected readonly notifyingModules: Signal<readonly SelectOption[]> = computed(() =>
+    this.statuses.notifying().map(t => new SelectOption(t.id, Resources.formatModuleNotifications(t.displayName))));
   protected readonly values: Signal<ReadonlyMap<string, JsonValue>> = this.settings.values;
   protected readonly setFlags: Signal<ReadonlyMap<string, Signal<boolean>>> = computed(() =>
     new Map(this.settings.definitions().map(t => [t.name.text, this.settings.isSet(t.name.text)])));

@@ -17,8 +17,8 @@ import { ModulesComponent } from "../../../../src/app/components/modules/modules
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { ModuleSelectionService } from "../../../../src/app/services/module-selection.service";
+import { ModuleStatusService } from "../../../../src/app/services/module-status.service";
 import { SettingsService } from "../../../../src/app/services/settings.service";
-import { WindowPartHostService } from "../../../../src/app/services/window-part-host.service";
 import { Resources } from "../../../../src/resources";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
@@ -72,7 +72,7 @@ describe("ModulesComponent", () => {
     errors = [];
     TestBed.configureTestingModule({
       providers: [
-        { provide: WindowPartHostService, useValue: { modules } },
+        { provide: ModuleStatusService, useValue: { modules } },
         { provide: SettingsService, useValue: { definitions: signal<readonly SettingDefinition[]>(SettingsFixture.all), values: signal<ReadonlyMap<string, JsonValue>>(new Map()) } },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
