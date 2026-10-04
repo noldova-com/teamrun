@@ -146,6 +146,45 @@ test.describe("settings", () => {
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).toBe(before.font);
   });
 
+  test("a checked checkbox centres its drawn tick in its box and has the hover radius, also at the largest panel size", async ({ desktop }) => {
+    const window = desktop.window;
+    await openSettingsAsync(window);
+    const measureAsync = async (): Promise<readonly [number, number, string, string]> => {
+      await window.getByRole("button", { name: "Notifications", exact: true }).click();
+      const control = row(window, "shell.mutedModules").locator(".tr-checkbox-control").first();
+      await expect(control.locator("input")).toBeChecked();
+      return await control.evaluate(t => {
+        const box = (t.querySelector("input") as HTMLInputElement).getBoundingClientRect();
+        const tick = (t.querySelector(".tr-checkbox-mark path") as SVGPathElement).getBoundingClientRect();
+        const probe = document.createElement("div");
+        probe.style.borderTopLeftRadius = "var(--tr-radius-hover)";
+        document.body.append(probe);
+        const hover = getComputedStyle(probe).borderTopLeftRadius;
+        probe.remove();
+        return [
+          Math.abs(tick.left + tick.right - box.left - box.right) / 2,
+          Math.abs(tick.top + tick.bottom - box.top - box.bottom) / 2,
+          getComputedStyle(t.querySelector("input") as HTMLInputElement).borderTopLeftRadius,
+          hover
+        ] as const;
+      });
+    };
+
+    const regular = await measureAsync();
+    await window.getByRole("button", { name: "Appearance", exact: true }).click();
+    await row(window, "shell.panelSize").locator("input").fill("18");
+    await row(window, "shell.panelSize").locator("input").press("Enter");
+    await expect.poll(() => window.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(16 * 18 / 13, 2);
+    const largest = await measureAsync();
+
+    for (const [horizontal, vertical, radius, hover] of [regular, largest]) {
+      expect(horizontal).toBeLessThanOrEqual(0.5);
+      expect(vertical).toBeLessThanOrEqual(0.5);
+      expect(radius).toBe(hover);
+    }
+    await desktop.checkpointAsync("settings-checkbox");
+  });
+
   test("the Mode pills are one radio group: the checked pill is the tab stop and the arrow keys move the choice", async ({ desktop }) => {
     const window = desktop.window;
     await openSettingsAsync(window);
