@@ -15,6 +15,7 @@ import { PanelEdge } from "../../../src/app/enums/panel-edge";
 import { DocumentTab } from "../../../src/app/models/layout/document-tab";
 import { Layout } from "../../../src/app/models/layout/layout";
 import { LayoutReader } from "../../../src/app/models/layout/layout.reader";
+import { ToolbarLayout } from "../../../src/app/models/layout/toolbar-layout";
 import { ViewTab } from "../../../src/app/models/layout/view-tab";
 import { SideDropTarget } from "../../../src/app/models/layout/side-drop-target";
 import { SplitDropTarget } from "../../../src/app/models/layout/split-drop-target";
@@ -113,6 +114,17 @@ describe("LayoutService", () => {
     expect(await store.readAsync()).toEqual(prepared().toJson());
     vi.advanceTimersByTime(1);
     await vi.waitFor(async () => expect(await store.readAsync()).toEqual(service.layout().toJson()));
+  });
+
+  it("keeps the toolbar arrangement it is given and returns to the declared one on a reset", async () => {
+    await loadAsync(prepared());
+
+    service.setToolbars(new ToolbarLayout([["notes.main"]], ["notes.spare"]));
+
+    expect(service.layout().toolbars.rows).toEqual([["notes.main"]]);
+    expect(service.layout().toolbars.hidden).toEqual(["notes.spare"]);
+    service.reset();
+    expect(service.layout().toolbars.isEmpty).toBe(true);
   });
 
   it("closes several tabs at once, passing over a tab that is not open", async () => {

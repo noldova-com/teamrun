@@ -40,6 +40,8 @@ export default class DesktopApplicationFixture {
   private static readonly DEVICE_FOLDER: string = "device";
   private static readonly RUNTIME_STOP_TIMEOUT: number = 15_000;
   private static readonly OWNERSHIP_INTERVAL: number = 50;
+  private static readonly OWNERSHIP_RELEASE_TIMEOUT: number = 2_000;
+  private static readonly NO_SUCH_PROCESS: string = "ESRCH";
   private static readonly NOT_A_DATABASE: number = 26;
   private static readonly CLIENT_NAME: string = "ui-test";
   private static readonly PROCESS_EXIT_TIMEOUT: number = 30_000;
@@ -109,17 +111,22 @@ export default class DesktopApplicationFixture {
   public static async stopRuntimeAsync(dataDirectory: string): Promise<void> {
     const directory = new DataDirectory(dataDirectory);
     const discovery = await DiscoveryReader.readAsync(directory);
-    const answer = discovery !== null && DesktopApplicationFixture.isAlive(discovery.processId)
-      ? await DesktopApplicationFixture.askToStopAsync(discovery)
-      : "it had already withdrawn its discovery file";
+    const asked = discovery !== null && DesktopApplicationFixture.isAlive(discovery.processId) ? discovery : null;
+    const answer = asked === null ? "it had already withdrawn its discovery file" : await DesktopApplicationFixture.askToStopAsync(asked);
     const deadline = Date.now() + DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT;
+    let exited: number | null = null;
     while (DesktopApplicationFixture.isOwned(directory)) {
-      if (Date.now() >= deadline) {
+      if (asked !== null && !DesktopApplicationFixture.isAlive(asked.processId)) {
+        exited ??= Date.now();
+        if (Date.now() - exited >= DesktopApplicationFixture.OWNERSHIP_RELEASE_TIMEOUT)
+          return;
+      }
+      else if (Date.now() >= deadline) {
         const seconds = DesktopApplicationFixture.RUNTIME_STOP_TIMEOUT / 1000;
-        if (discovery === null)
-          throw new Error(`A runtime still owned ${dataDirectory} ${seconds} s after the test found it stopping, and it had no discovery file to name its process.`);
-        process.kill(discovery.processId);
-        throw new Error(`The runtime ${discovery.processId} still owned ${dataDirectory} ${seconds} s after it was asked to stop (${answer}), so the test killed it.`);
+        if (asked === null)
+          throw new Error(`A runtime still owned ${dataDirectory} ${seconds} s after the test found it stopping, and no discovery file named a running process.`);
+        if (DesktopApplicationFixture.killIfRunning(asked.processId))
+          throw new Error(`The runtime ${asked.processId} still ran ${seconds} s after it was asked to stop (${answer}), so the test killed it.`);
       }
       await delay(DesktopApplicationFixture.OWNERSHIP_INTERVAL);
     }
@@ -451,6 +458,18 @@ export default class DesktopApplicationFixture {
     }
     catch (error) {
       if ((error as { errcode?: unknown }).errcode === DesktopApplicationFixture.NOT_A_DATABASE)
+        return false;
+      throw error;
+    }
+  }
+
+  private static killIfRunning(processId: number): boolean {
+    try {
+      process.kill(processId);
+      return true;
+    }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === DesktopApplicationFixture.NO_SUCH_PROCESS)
         return false;
       throw error;
     }

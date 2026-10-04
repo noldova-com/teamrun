@@ -18,6 +18,7 @@ import { DocumentGroup } from "../../../../src/app/models/layout/document-group"
 import { DocumentTab } from "../../../../src/app/models/layout/document-tab";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { LayoutReader } from "../../../../src/app/models/layout/layout.reader";
+import { ToolbarLayout } from "../../../../src/app/models/layout/toolbar-layout";
 import { SplitHandle } from "../../../../src/app/models/layout/split-handle";
 import type { SplitNode } from "../../../../src/app/models/layout/split.node";
 import type { Tab } from "../../../../src/app/models/layout/tab";
@@ -239,6 +240,17 @@ describe("Layout", () => {
     expect(between.withBottomSpan(BottomDockSpan.Full).bottomSpan).toBe(BottomDockSpan.Full);
   });
 
+  it("keeps the toolbar arrangement through every change, writes it only once it holds a choice, and returns to the declared defaults on a reset", () => {
+    const arranged = initial.withToolbars(new ToolbarLayout([["notes.main"]], ["notes.second"]));
+
+    expect(initial.toolbars).toBe(ToolbarLayout.EMPTY);
+    expect(initial.withToolbars(ToolbarLayout.EMPTY)).toBe(initial);
+    expect(arranged.withBottomSpan(BottomDockSpan.Between).openView(terminal, registry).toggleDock(DockSide.Bottom).openDocument(plan).toolbars).toEqual(arranged.toolbars);
+    expect(arranged.toJson()["toolbars"]).toEqual({ rows: [{ toolbars: ["notes.main"] }], hidden: ["notes.second"] });
+    expect(initial.toJson()).not.toHaveProperty("toolbars");
+    expect(arranged.reset(registry).toolbars).toBe(ToolbarLayout.EMPTY);
+  });
+
   it("resizes a split through its handle", () => {
     const split = initial.splitGroup(changes, 1, PanelEdge.Right);
     const root = split.dock(DockSide.Left).root as SplitNode;
@@ -300,8 +312,8 @@ describe("Layout", () => {
       const middle = createSplit(5, SplitAxis.Horizontal, [new DocumentGroup([plan], plan), new DocumentGroup([todo], todo, null, 6)], [1, 1]);
 
       expect(new Layout([], middle).documents.id).toBe(0);
-      expect(new Layout([], middle, BottomDockSpan.Full, 6).documents.id).toBe(6);
-      expect(new Layout([], middle, BottomDockSpan.Full, 9).documents.id).toBe(0);
+      expect(new Layout([], middle, BottomDockSpan.Full, ToolbarLayout.EMPTY, 6).documents.id).toBe(6);
+      expect(new Layout([], middle, BottomDockSpan.Full, ToolbarLayout.EMPTY, 9).documents.id).toBe(0);
       expect(new Layout([], middle).documentGroups.map(t => t.id)).toEqual([0, 6]);
     });
 

@@ -9,7 +9,7 @@
 import { Component, type Type } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName, SettingChange, SettingKey, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../../../src/app/enums/dock-side";
@@ -19,6 +19,8 @@ import { CommandContribution } from "../../../src/app/models/command-contributio
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
 import { DocumentContribution } from "../../../src/app/models/document-contribution";
+import type { MenuItem } from "../../../src/app/models/menu-item";
+import { MenuRowContribution } from "../../../src/app/models/menu-row-contribution";
 import { StatusBarItemContribution } from "../../../src/app/models/status-bar-item-contribution";
 import { StatusBarItemState } from "../../../src/app/models/status-bar-item-state";
 import { TopBarActionContribution } from "../../../src/app/models/top-bar-action-contribution";
@@ -37,6 +39,8 @@ class FakeWindowPartHost implements IWindowPartHost {
   public readonly listeners: Set<(name: string, payload: JsonValue) => void> = new Set();
   public readonly registered: Set<string> = new Set(["notes.taken"]);
   public readonly settingListeners: Set<(change: SettingChange) => void> = new Set();
+  public readonly dynamicGroups: Set<string> = new Set(["notes.recent"]);
+  public readonly providers: Map<string, (context: JsonObject) => readonly MenuItem[]> = new Map();
 
   public requestAsync(method: string, payload: JsonValue): Promise<JsonValue> {
     this.calls.push(`request ${method}`);
@@ -62,6 +66,15 @@ class FakeWindowPartHost implements IWindowPartHost {
 
   public isCommandRegistered(name: string): boolean {
     return this.registered.has(name);
+  }
+
+  public declaresDynamicMenuGroup(moduleId: string, group: string): boolean {
+    return moduleId === "notes" && this.dynamicGroups.has(group);
+  }
+
+  public provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuItem[]): () => void {
+    this.providers.set(group, provider);
+    return () => this.providers.delete(group);
   }
 
   public runCommandAsync(name: string, commandArguments: JsonValue): Promise<JsonValue> {
@@ -302,6 +315,23 @@ describe("WindowPartContext", () => {
 
     expect(heard).toEqual([1]);
     expect(() => context.onEvent("clock.ticked", () => undefined)).toThrowError(WindowPartAccessException);
+  });
+
+  it("supplies the rows of its own dynamic groups, keeps only the commands it may run and stops supplying them when withdrawn", () => {
+    const withdraw = context.provideMenuGroup("notes.recent", t => [new MenuRowContribution("notes.newNote", t, "New"), new MenuRowContribution("tasks.show"), new MenuRowContribution("other.show")]);
+    const items = host.providers.get("notes.recent")?.({ tab: "a" }) ?? [];
+
+    expect(items.map(t => [t.command, t.commandArguments, t.label])).toEqual([["notes.newNote", { tab: "a" }, "New"], ["tasks.show", {}, null]]);
+    withdraw();
+    expect(host.providers.has("notes.recent")).toBe(false);
+    context.provideMenuGroup("notes.recent", () => []);
+    context.withdraw();
+    expect(host.providers.has("notes.recent")).toBe(false);
+  });
+
+  it("refuses to supply another module's group and a group that it does not declare as dynamic", () => {
+    expect(() => context.provideMenuGroup("tasks.recent", () => [])).toThrowError(WindowPartAccessException);
+    expect(() => context.provideMenuGroup("notes.sorting", () => [])).toThrowError(WindowPartAccessException);
   });
 
   it("sets and clears a badge on its own declared views only, and clears what it set when withdrawn", () => {

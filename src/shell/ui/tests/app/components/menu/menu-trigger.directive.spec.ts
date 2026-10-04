@@ -247,4 +247,13 @@ describe("MenuTriggerDirective", () => {
     expect(isOpenAfterAgain).toBe(true);
     expect(menu("root")).toBeNull();
   });
+
+  it("opens its menu with the focus on the first item when asked to focus", async () => {
+    const directive = fixture.debugElement.query(t => t.nativeElement === trigger()).injector.get(MenuTriggerDirective);
+
+    directive.openFocusing("keyboard");
+    await settledAsync();
+
+    expect(document.activeElement).toBe(row("alpha"));
+  });
 });

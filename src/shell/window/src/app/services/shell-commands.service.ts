@@ -17,6 +17,7 @@ import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
 import { EditAction } from "../enums/edit-action";
 import { PanelEdge } from "../enums/panel-edge";
+import { ToolbarMove } from "../enums/toolbar-move";
 import { CommandContribution } from "../models/command-contribution";
 import { SideDropTarget } from "../models/layout/side-drop-target";
 import { SplitDropTarget } from "../models/layout/split-drop-target";
@@ -30,6 +31,7 @@ import { CommandSearchService } from "./command-search.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { EditTargetService } from "./edit-target.service";
 import { LayoutService } from "./layout.service";
+import { ToolbarService } from "./toolbar.service";
 import { TabStripService } from "./tab-strip.service";
 
 @Injectable({ providedIn: "root" })
@@ -41,6 +43,10 @@ export class ShellCommandsService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly document: Document = inject(DOCUMENT);
   private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
+
+  private get toolbars(): ToolbarService {
+    return this.environment.get(ToolbarService);
+  }
 
   public readonly commands: readonly CommandContribution[] = [
     this.tabCommand(Resources.closeTabCommand, Resources.closeTabTitle, Resources.closeGlyph, t => this.close(t), () => true),
@@ -84,6 +90,41 @@ export class ShellCommandsService {
     new CommandContribution(Resources.openSettingsCommand, Resources.openSettingsTitle, Resources.settingsGlyph, null,
       () => this.done(() => this.layout.openDocument(ShellDocuments.settingsTab)),
       () => this.layout.registry().hasDocument(ShellDocuments.settings.name)),
+    new CommandContribution(Resources.toggleToolbarCommand, Resources.toggleToolbarTitle, Resources.focusToolbarsGlyph, null,
+      commandArguments => this.done(() => {
+        const name = this.toolbarOf(commandArguments);
+        if (!Object.isNull(name))
+          this.toolbars.setShown(name, !this.toolbars.isShown(name));
+      }),
+      commandArguments => !Object.isNull(this.toolbarOf(commandArguments)),
+      commandArguments => {
+        const name = this.toolbarOf(commandArguments);
+        return !Object.isNull(name) && this.toolbars.isShown(name);
+      }),
+    ...Object.values(ToolbarMove).map(move => new CommandContribution(Resources.moveToolbarCommands[move], Resources.moveToolbarTitles[move], Resources.moveToolbarGlyphs[move], null,
+      commandArguments => this.done(() => {
+        const name = this.toolbarOf(commandArguments);
+        if (!Object.isNull(name)) {
+          this.toolbars.moveBy(name, move);
+          this.focusGrip(name);
+        }
+      }),
+      commandArguments => {
+        const name = this.toolbarOf(commandArguments);
+        return !Object.isNull(name) && this.toolbars.canMove(name, move);
+      })),
+    new CommandContribution(Resources.hideToolbarCommand, Resources.hideToolbarTitle, Resources.hideToolbarGlyph, null,
+      commandArguments => this.done(() => {
+        const name = this.toolbarOf(commandArguments);
+        if (!Object.isNull(name)) {
+          const index = this.gripsOf().findIndex(t => t.closest<HTMLElement>(Resources.toolbarSelector)?.dataset[Resources.toolbarData] === name);
+          this.toolbars.setShown(name, false);
+          this.focusAfterHide(index);
+        }
+      }),
+      commandArguments => !Object.isNull(this.toolbarOf(commandArguments))),
+    new CommandContribution(Resources.focusToolbarsCommand, Resources.focusToolbarsTitle, Resources.focusToolbarsGlyph, null,
+      () => this.done(() => this.focusToolbars()), () => this.toolbars.hasContent()),
     new CommandContribution(Resources.resetLayoutCommand, Resources.resetLayoutLabel, Resources.resetLayoutGlyph, null, () => this.done(() => this.layout.reset())),
     ...Object.values(BottomDockSpan).map(span => new CommandContribution(Resources.bottomSpanCommands[span], Resources.bottomSpanLabels[span], Resources.bottomSpanGlyphs[span], null,
       () => this.done(() => this.layout.setBottomSpan(span)), () => true, () => this.layout.layout().bottomSpan === span)),
@@ -138,6 +179,31 @@ export class ShellCommandsService {
     const tab = Object.isUndefined(key) ? this.layout.currentGroup().active : layout.groups.flatMap(t => t.tabs).find(t => t.key === key) ?? null;
     const group = Object.isNull(tab) ? null : layout.groupOf(tab);
     return Object.isNull(tab) || Object.isNull(group) ? null : new TabTarget(tab, group, layout.canSplit(tab, group.id));
+  }
+
+  private toolbarOf(commandArguments: JsonValue): string | null {
+    const name = Object.isNull(commandArguments) ? undefined : JsonReader.fromValue(commandArguments).readOptionalString(Resources.toolbarArgument);
+    return !Object.isUndefined(name) && this.toolbars.isKnown(name) ? name : null;
+  }
+
+  private focusGrip(name: string): void {
+    afterNextRender(() => [...this.document.querySelectorAll<HTMLElement>(Resources.toolbarSelector)]
+      .find(t => t.dataset[Resources.toolbarData] === name)?.querySelector<HTMLElement>(Resources.toolbarGripSelector)?.focus(), { injector: this.environment });
+  }
+
+  private gripsOf(): readonly HTMLElement[] {
+    return [...this.document.querySelectorAll<HTMLElement>(Resources.toolbarGripSelector)];
+  }
+
+  private focusAfterHide(index: number): void {
+    afterNextRender(() => {
+      const grips = this.gripsOf();
+      (grips[index] ?? grips.at(-1) ?? this.document.querySelector<HTMLElement>(Resources.commandSearchButtonSelector))?.focus();
+    }, { injector: this.environment });
+  }
+
+  private focusToolbars(): void {
+    this.document.querySelector<HTMLElement>(Resources.toolbarItemSelector)?.focus();
   }
 
   private groupOf(commandArguments: JsonValue): number | null {

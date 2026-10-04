@@ -9,7 +9,7 @@
 import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal, inject, signal } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   type CommandInfo, CommandList, CommandRun, ModuleState, ModuleStatus, ModuleStatusList, type NotificationPost, NotificationReference, NotificationUpdate, type SettingScope,
   type SettingChange, ShellEvents, ShellMethods
@@ -26,6 +26,7 @@ import { TabLabel } from "../models/layout/tab-label";
 import { ViewRegistry } from "../models/layout/view-registry";
 import { ViewTab } from "../models/layout/view-tab";
 import { ViewType } from "../models/layout/view-type";
+import type { MenuItem } from "../models/menu-item";
 import { ShellDocuments } from "../models/shell-documents";
 import { ModuleFailure } from "../models/module-failure";
 import { PendingDocument } from "../models/pending-document";
@@ -137,6 +138,14 @@ export class WindowPartHostService implements IWindowPartHost {
       this.opener.keep(moduleId, name, instance);
     else
       this.pendingOpens = this.pendingOpens.map(t => t.kept(moduleId, name, instance));
+  }
+
+  public declaresDynamicMenuGroup(moduleId: string, group: string): boolean {
+    return this.menus.declaresDynamicGroup(moduleId, group);
+  }
+
+  public provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuItem[]): () => void {
+    return this.menus.provideGroup(group, provider);
   }
 
   public isCommandRegistered(name: string): boolean {

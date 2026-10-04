@@ -14,14 +14,18 @@ import MenuGroup from "./menu-group.ts";
 import MenuItem from "./menu-item.ts";
 import MenuPlace from "./menu-place.ts";
 import ModuleException from "./module.exception.ts";
+import ToolbarPlacement from "./toolbar-placement.ts";
 
 export default class ModuleMenus {
   private static readonly FILE_NAME: string = "menus.json";
   private static readonly FIELDS: readonly string[] = ["places", "groups"];
-  private static readonly PLACE_FIELDS: readonly string[] = ["name", "title", "menuBar"];
-  private static readonly GROUP_FIELDS: readonly string[] = ["name", "place", "exclusive", "items"];
+  private static readonly PLACE_FIELDS: readonly string[] = ["name", "title", "shows", "shown", "after", "before", "newRow"];
+  private static readonly GROUP_FIELDS: readonly string[] = ["name", "place", "exclusive", "dynamic", "items"];
   private static readonly COMMAND_FIELDS: readonly string[] = ["command", "arguments", "label"];
   private static readonly SUBMENU_FIELDS: readonly string[] = ["submenu"];
+  private static readonly CHOICE_FIELDS: readonly string[] = ["choice"];
+  private static readonly SHOWS: readonly string[] = ["menu", "menuBar", "toolbar"];
+  private static readonly TOOLBAR_FIELDS: readonly string[] = ["shown", "after", "before", "newRow"];
   private static readonly QUALIFIED_NAME: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.[a-z][a-zA-Z0-9]*$/;
   private static readonly MEMBER_PATTERN: RegExp = /^[a-z][a-zA-Z0-9]*$/;
 
@@ -67,14 +71,23 @@ export default class ModuleMenus {
     return new ModuleMenus(places, groups);
   }
 
-  public checkReferences(id: string, places: ReadonlySet<string>, commands: ReadonlySet<string>): void {
+  public checkReferences(id: string, places: ReadonlySet<string>, toolbars: ReadonlySet<string>, commands: ReadonlySet<string>): void {
     const file = `${id}'s ${ModuleMenus.FILE_NAME}`;
+    const own = new Set(this.places.filter(t => t.toolbar !== null).map(t => t.name));
+    for (const place of this.places)
+      for (const anchor of [place.toolbar?.after ?? null, place.toolbar?.before ?? null])
+        if (anchor !== null && !toolbars.has(anchor))
+          throw new ModuleException(`${file} puts the toolbar ${place.name} next to ${anchor}, which is not a toolbar of its own or of a module it depends on.`);
     for (const group of this.groups) {
       if (!places.has(group.place))
         throw new ModuleException(`${file} adds the group ${group.name} to ${group.place}, which is neither the shell's place nor its own or a dependency's.`);
-      for (const item of group.items)
+      for (const item of group.items) {
         if (item.command !== null && !commands.has(item.command))
           throw new ModuleException(`${file} runs ${item.command}, which neither it nor a module it depends on declares.`);
+        const opened = item.submenu ?? item.choice;
+        if (opened !== null && own.has(opened))
+          throw new ModuleException(`${file} opens the toolbar ${opened} as a menu in the group ${group.name}, which a toolbar cannot be.`);
+      }
     }
   }
 
@@ -83,21 +96,47 @@ export default class ModuleMenus {
   }
 
   private static readPlace(value: unknown, declared: readonly string[], fail: (problem: string) => ModuleException): MenuPlace {
-    const record = ModuleMenus.readRecord(value, ModuleMenus.PLACE_FIELDS, fail, "must describe each place with a name, a title and optionally menuBar");
+    const record = ModuleMenus.readRecord(value, ModuleMenus.PLACE_FIELDS, fail, "must describe each place with a name, a title and optionally shows");
     const name = record.get("name");
     if (typeof name !== "string" || !declared.includes(name))
       throw fail(`describes the place ${String(name)}, which module.json does not declare in contributes.menus`);
     const title = record.get("title");
     if (typeof title !== "string" || title.trim().length === 0)
       throw fail(`must give the place ${name} a title`);
-    const menuBar = record.get("menuBar") ?? false;
-    if (typeof menuBar !== "boolean")
-      throw fail(`must give the place ${name} a menuBar of true or false`);
-    return new MenuPlace(name, title, menuBar);
+    const shows = record.get("shows") ?? "menu";
+    if (typeof shows !== "string" || !ModuleMenus.SHOWS.includes(shows))
+      throw fail(`must give the place ${name} a shows of ${ModuleMenus.SHOWS.join(", ")}`);
+    if (shows !== "toolbar") {
+      if (ModuleMenus.TOOLBAR_FIELDS.some(t => record.has(t)))
+        throw fail(`must give shown, after, before and newRow only to a place that shows as a toolbar, not ${name}`);
+      return new MenuPlace(name, title, shows === "menuBar");
+    }
+    return new MenuPlace(name, title, false, ModuleMenus.readToolbar(record, name, fail));
+  }
+
+  private static readToolbar(record: ReadonlyMap<string, unknown>, name: string, fail: (problem: string) => ModuleException): ToolbarPlacement {
+    const isShown = record.get("shown") ?? true;
+    if (typeof isShown !== "boolean")
+      throw fail(`must give the toolbar ${name} a shown of true or false`);
+    const startsRow = record.get("newRow") ?? false;
+    if (typeof startsRow !== "boolean")
+      throw fail(`must give the toolbar ${name} a newRow of true or false`);
+    const anchors = ["after", "before"].filter(t => record.has(t));
+    if (anchors.length + (startsRow ? 1 : 0) > 1)
+      throw fail(`must give the toolbar ${name} at most one of after, before and newRow`);
+    const read = (field: string): string | null => {
+      if (!record.has(field))
+        return null;
+      const anchor = record.get(field);
+      if (typeof anchor !== "string" || !ModuleMenus.QUALIFIED_NAME.test(anchor) || anchor === name)
+        throw fail(`must give the toolbar ${name} an ${field} naming another toolbar as "<id>.<name>"`);
+      return anchor;
+    };
+    return new ToolbarPlacement(isShown, read("after"), read("before"), startsRow);
   }
 
   private static readGroup(value: unknown, id: string, declared: readonly string[], fail: (problem: string) => ModuleException): MenuGroup {
-    const record = ModuleMenus.readRecord(value, ModuleMenus.GROUP_FIELDS, fail, "must describe each group with a name, a place, its items and optionally exclusive");
+    const record = ModuleMenus.readRecord(value, ModuleMenus.GROUP_FIELDS, fail, "must describe each group with a name, a place, its items or dynamic, and optionally exclusive");
     const name = record.get("name");
     if (typeof name !== "string" || !name.startsWith(`${id}.`) || !ModuleMenus.MEMBER_PATTERN.test(name.slice(id.length + 1)))
       throw fail(`must name each group "${id}.<name>", with a camelCase name`);
@@ -107,6 +146,14 @@ export default class ModuleMenus {
     const exclusive = record.get("exclusive") ?? false;
     if (typeof exclusive !== "boolean")
       throw fail(`must give the group ${name} an exclusive of true or false`);
+    const isDynamic = record.get("dynamic") ?? false;
+    if (typeof isDynamic !== "boolean")
+      throw fail(`must give the group ${name} a dynamic of true or false`);
+    if (isDynamic) {
+      if (record.has("items"))
+        throw fail(`must not give the dynamic group ${name} items, since its window part supplies them`);
+      return new MenuGroup(name, place, exclusive, [], true);
+    }
     const items = ModuleMenus.readArray(record.get("items"), fail, `items of the group ${name}`);
     if (items.length === 0)
       throw fail(`must give the group ${name} at least one item`);
@@ -115,8 +162,15 @@ export default class ModuleMenus {
 
   private static readItem(value: unknown, group: string, declared: readonly string[], fail: (problem: string) => ModuleException): MenuItem {
     const isSubmenu = typeof value === "object" && value !== null && "submenu" in value;
-    const record = ModuleMenus.readRecord(value, isSubmenu ? ModuleMenus.SUBMENU_FIELDS : ModuleMenus.COMMAND_FIELDS, fail,
-      `must make each item of the group ${group} either a command with optional arguments and label, or a submenu`);
+    const isChoice = typeof value === "object" && value !== null && "choice" in value;
+    const record = ModuleMenus.readRecord(value, isSubmenu ? ModuleMenus.SUBMENU_FIELDS : isChoice ? ModuleMenus.CHOICE_FIELDS : ModuleMenus.COMMAND_FIELDS, fail,
+      `must make each item of the group ${group} either a command with optional arguments and label, a submenu, or a choice`);
+    if (isChoice) {
+      const choice = record.get("choice");
+      if (typeof choice !== "string" || !declared.includes(choice))
+        throw fail(`opens ${String(choice)} as a choice in the group ${group}, which is not one of its own places`);
+      return new MenuItem(null, {}, null, null, choice);
+    }
     if (isSubmenu) {
       const submenu = record.get("submenu");
       if (typeof submenu !== "string" || !declared.includes(submenu))
@@ -139,8 +193,8 @@ export default class ModuleMenus {
     const edges = new Map<string, string[]>();
     for (const group of groups)
       for (const item of group.items)
-        if (item.submenu !== null)
-          edges.set(group.place, [...edges.get(group.place) ?? [], item.submenu]);
+        if (item.submenu !== null || item.choice !== null)
+          edges.set(group.place, [...edges.get(group.place) ?? [], item.submenu ?? String(item.choice)]);
     const visit = (place: string, path: readonly string[]): void => {
       if (path.includes(place))
         throw fail(`opens ${place} inside itself: ${[...path, place].join(" > ")}`);

@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { FocusOrigin } from "@angular/cdk/a11y";
 import { CDK_MENU, CdkMenuBar, CdkMenuTrigger, type Menu, PARENT_OR_NEW_MENU_STACK_PROVIDER } from "@angular/cdk/menu";
 import { Directive, ElementRef, Injector, forwardRef, inject, input } from "@angular/core";
 import { takeUntil } from "rxjs";
@@ -53,6 +54,11 @@ export class MenuTriggerDirective extends CdkMenuTrigger {
     super.open();
     if (!wasOpen && this.isOpen())
       this.follow();
+  }
+
+  public openFocusing(origin: FocusOrigin): void {
+    this.open();
+    this.childMenu?.focusFirstItem(origin);
   }
 
   private follow(): void {

@@ -23,6 +23,7 @@ import { SplitPart } from "./split-part";
 import { SplitNode } from "./split.node";
 import type { Tab } from "./tab";
 import { TabGroup } from "./tab-group";
+import { ToolbarLayout } from "./toolbar-layout";
 import { ViewTab } from "./view-tab";
 
 export class LayoutReader {
@@ -55,7 +56,8 @@ export class LayoutReader {
     const documents = middle.groups.filter(t => t.isDocuments);
     const index = json.hasField(Resources.activeDocumentsField) ? json.readInteger(Resources.activeDocumentsField) : 0;
     const span = json.hasField(Resources.bottomSpanField) ? json.readOneOf(Resources.bottomSpanField, Object.values(BottomDockSpan)) : BottomDockSpan.Full;
-    return LayoutReader.construct(json, () => new Layout(read, middle, span, documents[index]?.id));
+    const toolbars = json.hasField(Resources.toolbarsField) ? LayoutReader.construct(json, () => ToolbarLayout.fromJson(json.readObject(Resources.toolbarsField))) : ToolbarLayout.EMPTY;
+    return LayoutReader.construct(json, () => new Layout(read, middle, span, toolbars, documents[index]?.id));
   }
 
   private readDock(side: DockSide, json: JsonReader): Dock {

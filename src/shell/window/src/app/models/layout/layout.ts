@@ -21,6 +21,7 @@ import type { LayoutNode } from "./layout.node";
 import { SplitNode } from "./split.node";
 import type { Tab } from "./tab";
 import { TabGroup } from "./tab-group";
+import { ToolbarLayout } from "./toolbar-layout";
 import type { ViewRegistry } from "./view-registry";
 import { ViewTab } from "./view-tab";
 
@@ -30,8 +31,9 @@ export class Layout {
   public readonly documentGroups: readonly TabGroup[];
   public readonly documents: TabGroup;
   public readonly bottomSpan: BottomDockSpan;
+  public readonly toolbars: ToolbarLayout;
 
-  public constructor(docks: readonly Dock[], middle: LayoutNode | null, bottomSpan: BottomDockSpan = BottomDockSpan.Full, activeDocumentsId?: number) {
+  public constructor(docks: readonly Dock[], middle: LayoutNode | null, bottomSpan: BottomDockSpan = BottomDockSpan.Full, toolbars: ToolbarLayout = ToolbarLayout.EMPTY, activeDocumentsId?: number) {
     const documents = middle?.groups.filter(t => t.isDocuments) ?? [];
     const [first] = documents;
     if (Object.isNull(middle) || Object.isUndefined(first))
@@ -57,6 +59,7 @@ export class Layout {
     this.documentGroups = documents;
     this.documents = documents.find(t => t.id === activeDocumentsId) ?? first;
     this.bottomSpan = bottomSpan;
+    this.toolbars = toolbars;
   }
 
   public static createDefault(registry: ViewRegistry): Layout {
@@ -113,7 +116,7 @@ export class Layout {
   }
 
   public focusDocuments(groupId: number): Layout {
-    return groupId === this.documents.id || !this.documentGroups.some(t => t.id === groupId) ? this : new Layout(this.docks, this.middle, this.bottomSpan, groupId);
+    return groupId === this.documents.id || !this.documentGroups.some(t => t.id === groupId) ? this : new Layout(this.docks, this.middle, this.bottomSpan, this.toolbars, groupId);
   }
 
   public canSplit(tab: Tab, groupId: number): boolean {
@@ -179,7 +182,11 @@ export class Layout {
   }
 
   public withBottomSpan(span: BottomDockSpan): Layout {
-    return span === this.bottomSpan ? this : new Layout(this.docks, this.middle, span, this.documents.id);
+    return span === this.bottomSpan ? this : new Layout(this.docks, this.middle, span, this.toolbars, this.documents.id);
+  }
+
+  public withToolbars(toolbars: ToolbarLayout): Layout {
+    return toolbars === this.toolbars ? this : new Layout(this.docks, this.middle, this.bottomSpan, toolbars, this.documents.id);
   }
 
   public resizeSplit(split: SplitNode): Layout {
@@ -205,7 +212,8 @@ export class Layout {
       [Resources.docksField]: Object.fromEntries(this.docks.map(t => [t.side, t.toJson()])),
       [Resources.middleField]: this.middle.toJson(),
       [Resources.bottomSpanField]: this.bottomSpan,
-      [Resources.activeDocumentsField]: this.documentGroups.findIndex(t => t.id === this.documents.id)
+      [Resources.activeDocumentsField]: this.documentGroups.findIndex(t => t.id === this.documents.id),
+      ...this.toolbars.isEmpty ? {} : { [Resources.toolbarsField]: this.toolbars.toJson() }
     };
   }
 
@@ -255,6 +263,6 @@ export class Layout {
   }
 
   private copy(docks: readonly Dock[], middle: LayoutNode | null, documentsId: number | undefined = this.documents.id): Layout {
-    return middle === this.middle && docks.every(t => t === this.dock(t.side)) && documentsId === this.documents.id ? this : new Layout(docks, middle, this.bottomSpan, documentsId);
+    return middle === this.middle && docks.every(t => t === this.dock(t.side)) && documentsId === this.documents.id ? this : new Layout(docks, middle, this.bottomSpan, this.toolbars, documentsId);
   }
 }

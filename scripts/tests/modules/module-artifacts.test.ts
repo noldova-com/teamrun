@@ -100,7 +100,7 @@ class ModuleArtifactsTests {
         "",
         "export const moduleMenus: readonly MenuDeclarations[] = [",
         `  MenuDeclarations.fromJson("notes", ${JSON.stringify({
-          places: [{ name: "notes.templates", title: "New from template", menuBar: false }],
+          places: [{ name: "notes.templates", title: "New from template", shows: "menu" }],
           groups: [
             { name: "notes.create", place: "shell.file", exclusive: false, items: [{ command: "notes.newNote", arguments: {} }, { submenu: "notes.templates" }] },
             { name: "notes.sorting", place: "notes.templates", exclusive: true, items: [{ command: "notes.newNote", arguments: { template: "plan" } }] }

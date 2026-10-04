@@ -61,6 +61,10 @@ export class CommandService {
     return this.canRun(this.find(name), commandArguments);
   }
 
+  public isChecked(name: string, commandArguments: JsonValue = null): boolean {
+    return this.ask(() => this.find(name).isChecked?.(commandArguments) ?? false);
+  }
+
   public isApplicable(name: string, commandArguments: JsonValue = null): boolean {
     return this.ask(() => this.find(name).isApplicable(commandArguments));
   }

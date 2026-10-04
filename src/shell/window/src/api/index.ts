@@ -22,6 +22,7 @@ export { MenuDeclarations } from "../app/models/menu-declarations";
 export { StatusBarItem } from "../app/models/status-bar-item";
 export { StatusBarItemContribution } from "../app/models/status-bar-item-contribution";
 export { StatusBarItemState } from "../app/models/status-bar-item-state";
+export { MenuRowContribution } from "../app/models/menu-row-contribution";
 export { TopBarAction } from "../app/models/top-bar-action";
 export { TopBarActionContribution } from "../app/models/top-bar-action-contribution";
 export { TopBarActionState } from "../app/models/top-bar-action-state";
