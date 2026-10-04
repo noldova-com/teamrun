@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component } from "@angular/core";
+import { ApplicationRef, ChangeDetectionStrategy, Component } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { DefaultTheme } from "@noldova/teamrun-shell-ui";
@@ -55,7 +55,7 @@ describe("ViewDialogComponent", () => {
       AppearanceFixture.apply(DefaultTheme.theme, mode);
       void dialogs.showAsync(changes);
       await vi.waitFor(() => expect(document.querySelector(".tr-test-changes")).not.toBeNull());
-      await new Promise(t => requestAnimationFrame(() => requestAnimationFrame(t)));
+      await TestBed.inject(ApplicationRef).whenStable();
       const content = document.querySelector("tr-tab-content") as HTMLElement;
       const body = (document.querySelector(".tr-dialog-body") as HTMLElement).getBoundingClientRect();
       const bounds = content.getBoundingClientRect();

@@ -20,8 +20,9 @@
 }
 
 .tr-gallery-large-dialog {
-  width: 36rem;
-  height: 14rem;
+  --tr-dialog-large-width: 36rem;
+  --tr-dialog-large-height: 14rem;
+  --tr-dialog-large-min-height: 14rem;
 }
 
 .tr-gallery-large-dialog-body {

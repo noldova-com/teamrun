@@ -68,6 +68,10 @@ test.describe("view dialog", () => {
     await window.keyboard.press("ControlOrMeta+KeyB");
     const behind = await other.boundingBox();
     await window.mouse.click((behind?.x ?? 0) + (behind?.width ?? 0) / 2, (behind?.y ?? 0) + (behind?.height ?? 0) / 2);
+    await summary.focus();
+    await window.keyboard.press("End");
+    await window.keyboard.type("!");
+    await expect(summary).toHaveValue("Plan the week!");
     await expect(dialog(window)).toBeVisible();
     await expect(tab).toBeAttached();
     await expect(other).toHaveAttribute("aria-selected", "false");
@@ -100,6 +104,7 @@ test.describe("view dialog", () => {
     await window.keyboard.press("Escape");
     await expect(dialog(window)).toHaveCount(0);
     await expect(window.locator("tr-workspace [data-fixture-content=notes-list]")).toBeVisible();
+    await expect(window.locator("tr-tab[data-tab-key=\"view/notes.list\"]")).toBeFocused();
 
     await showAsync(window, "Show Settings in a dialog");
     await expect(dialog(window)).toHaveAccessibleName("Settings");

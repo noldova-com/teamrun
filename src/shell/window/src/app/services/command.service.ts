@@ -79,14 +79,16 @@ export class CommandService {
     return this.shortcuts().keyOf(this.find(name).name)?.label(this.bridge.platform) ?? null;
   }
 
+  public isHeldByDialog(name: string): boolean {
+    return this.dialogs.isOpen && !Resources.modalCommands.includes(name);
+  }
+
   public dispatch(event: KeyboardEvent): boolean {
     if (event.defaultPrevented || event.isComposing || event.repeat)
       return false;
     const name = this.shortcuts().find(event);
-    if (this.dialogs.isOpen && !Resources.modalCommands.some(t => t === name))
-      return false;
     const command = this.commands().find(t => t.name === name);
-    if (Object.isUndefined(command) || !this.canRun(command, null))
+    if (Object.isUndefined(command) || this.isHeldByDialog(command.name) || !this.canRun(command, null))
       return false;
 
     event.preventDefault();

@@ -9,9 +9,11 @@
 :host {
   display: flex;
   flex-direction: column;
+  --tr-dialog-bounds-width: calc(100vw - var(--tr-space-2) * 2);
+  --tr-dialog-bounds-height: calc(100vh - var(--tr-window-row-height) - var(--tr-status-bar-height) - var(--tr-space-2) * 2);
   box-sizing: border-box;
-  width: min(var(--tr-dialog-width), calc(100vw - var(--tr-space-2) * 2));
-  max-height: calc(100vh - var(--tr-window-row-height) - var(--tr-status-bar-height) - var(--tr-space-2) * 2);
+  width: min(var(--tr-dialog-width), var(--tr-dialog-bounds-width));
+  max-height: var(--tr-dialog-bounds-height);
   border: var(--tr-border-width) solid var(--tr-widget-border);
   border-radius: var(--tr-radius-large);
   background-color: var(--tr-dialog);
@@ -23,8 +25,8 @@
 }
 
 :host(.tr-dialog-large) {
-  width: min(max(var(--tr-dialog-large-width), var(--tr-dialog-large-min-width)), calc(100vw - var(--tr-space-2) * 2));
-  height: min(max(var(--tr-dialog-large-height), var(--tr-dialog-large-min-height)), calc(100vh - var(--tr-window-row-height) - var(--tr-status-bar-height) - var(--tr-space-2) * 2));
+  width: min(max(var(--tr-dialog-large-width), var(--tr-dialog-large-min-width)), var(--tr-dialog-bounds-width));
+  height: min(max(var(--tr-dialog-large-height), var(--tr-dialog-large-min-height)), var(--tr-dialog-bounds-height));
   overflow: hidden;
 }
 

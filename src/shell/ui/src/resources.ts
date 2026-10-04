@@ -255,6 +255,7 @@ export class Resources {
   public static readonly dialogTitleIdPrefix: string = "tr-dialog-title-";
   public static readonly dialogTitleIdToken: string = "tr-dialog-title-id";
   public static readonly dialogCloseLabel: string = "Close";
+  public static readonly dialogCloseSelector: string = ".tr-dialog-close";
   public static readonly noLimit: string = "none";
   public static readonly dropdownPaneClass: string = "tr-dropdown-pane";
   public static readonly listboxSelector: string = "[role=listbox]";

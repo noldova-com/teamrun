@@ -23,7 +23,7 @@ export class DialogService {
     return this.dialog.openDialogs.length > 0;
   }
 
-  public open<T>(component: ComponentType<T>, initialFocus: string): DialogRef<unknown, T> {
+  public open<T>(component: ComponentType<T>, initialFocus: string = Resources.dialogCloseSelector): DialogRef<unknown, T> {
     const titleId = `${Resources.dialogTitleIdPrefix}${DialogService.count++}`;
     return this.dialog.open<unknown, unknown, T>(component, {
       ariaLabelledBy: titleId,
