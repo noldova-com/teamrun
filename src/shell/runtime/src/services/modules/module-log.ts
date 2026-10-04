@@ -11,6 +11,7 @@ import type { Writable } from "node:stream";
 import type { IModuleLog } from "../../interfaces/module-log.js";
 import { Resources } from "../../resources.js";
 import type { DiagnosticRedactor } from "../diagnostics/diagnostic-redactor.js";
+import { LogText } from "../diagnostics/log-text.js";
 
 export class ModuleLog implements IModuleLog {
   private readonly moduleId: string;
@@ -24,7 +25,7 @@ export class ModuleLog implements IModuleLog {
   }
 
   public write(message: string): void {
-    const lines = this.redactor.redact(message).trimEnd().split(Resources.lineBreakPattern);
+    const lines = LogText.lines(this.redactor.redact(message));
     this.output.write(lines.map(t => Resources.formatModuleLogLine(this.moduleId, t)).join(""));
   }
 }

@@ -16,7 +16,7 @@ import {
   type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, Response, type RuntimeHandover, SettingChange, SettingKey,
   ShellEvents, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
 } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, LogText, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
@@ -26,6 +26,7 @@ import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import type { IWindowContents } from "../interfaces/i-window-contents.js";
 import { StartupStateKind } from "../enums/startup-state-kind.js";
+import { WindowErrorAdmission } from "../enums/window-error-admission.js";
 import { DesktopSettings } from "../models/desktop-settings.js";
 import { MenuBar } from "../models/menu-bar.js";
 import { ScreenArea } from "../models/screen-area.js";
@@ -180,6 +181,7 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
     this.electron.ipcMain.handle(Resources.quitAnswerChannel, (event, choice) => this.answerQuit(event, choice));
     this.electron.ipcMain.on(Resources.moduleLogChannel, (event, moduleId, message) => this.writeModuleLog(event, moduleId, message));
+    this.electron.ipcMain.on(Resources.windowErrorChannel, (event, moduleId, text) => this.writeWindowError(event, moduleId, text));
     this.electron.ipcMain.handle(Resources.readStartupChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.startup.current.toJson());
     this.electron.ipcMain.handle(Resources.startupActionChannel, (event, action) => Object.isNull(this.findTrusted(event)) ? false : this.startup.actAsync(action));
     this.electron.ipcMain.handle(Resources.readLayoutChannel, event => this.readLayoutAsync(event));
@@ -307,10 +309,23 @@ export class DesktopApplication {
   }
 
   private writeModuleLog(event: IIpcEvent, moduleId: unknown, message: unknown): void {
-    if (Object.isNull(this.findTrusted(event)) || !Object.isString(moduleId) || !Resources.moduleIdPattern.test(moduleId) || !Object.isString(message) ||
-      message.length > Resources.moduleLogLimit)
+    if (!Object.isNull(this.findTrusted(event)) && DesktopApplication.isModuleId(moduleId) && Object.isString(message))
+      this.writeWindowText(message, t => Resources.formatModuleLogLine(moduleId, t));
+  }
+
+  private writeWindowError(event: IIpcEvent, moduleId: unknown, text: unknown): void {
+    const open = this.findTrusted(event);
+    if (Object.isNull(open) || !(Object.isNull(moduleId) || DesktopApplication.isModuleId(moduleId)) || !Object.isString(text))
       return;
-    this.log.write(message.trimEnd().split(Resources.lineBreakPattern).map(t => Resources.formatModuleLogLine(moduleId, t)).join(Resources.logLineSeparator));
+    const admission = open.errors.admit();
+    if (admission === WindowErrorAdmission.Write)
+      this.writeWindowText(text, t => Resources.formatWindowErrorLine(moduleId, t));
+    else if (admission === WindowErrorAdmission.Notice)
+      this.log.write(Resources.windowErrorsLeftOut);
+  }
+
+  private writeWindowText(text: string, format: (line: string) => string): void {
+    this.log.write(LogText.lines(text.slice(0, Resources.windowLogLimit)).map(format).join(Resources.logLineSeparator));
   }
 
   private beginNotifier(epoch: number, device: string, response: Response): void {
@@ -575,6 +590,10 @@ export class DesktopApplication {
 
   private static isPackagedBuild(electron: IElectron, process: IDesktopProcess): boolean {
     return electron.app.isPackaged && !process.isDefaultApp;
+  }
+
+  private static isModuleId(value: unknown): value is string {
+    return Object.isString(value) && Resources.moduleIdPattern.test(value);
   }
 
   private static readArgument(argv: readonly string[], prefix: string): string | undefined {

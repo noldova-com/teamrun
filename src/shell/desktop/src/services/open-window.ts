@@ -19,6 +19,7 @@ import type { QuitQuestion } from "../models/quit-question.js";
 import { Resources } from "../resources.js";
 import { CloseCoordinator } from "./close-coordinator.js";
 import { WindowBoundsKeeper } from "./window-bounds-keeper.js";
+import { WindowErrorLimit } from "./window-error-limit.js";
 
 export class OpenWindow implements IQuitPrompt {
   private readonly log: IDesktopLog;
@@ -33,6 +34,7 @@ export class OpenWindow implements IQuitPrompt {
   public readonly window: IDesktopWindow;
   public readonly coordinator: CloseCoordinator;
   public readonly bounds: WindowBoundsKeeper;
+  public readonly errors: WindowErrorLimit = new WindowErrorLimit(Resources.windowErrorBurst, Resources.windowErrorPeriod);
 
   public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog, guard: ICloseGuard, platform: string) {
     this.window = window;
