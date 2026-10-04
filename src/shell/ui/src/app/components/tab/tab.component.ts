@@ -9,11 +9,12 @@
 import { ChangeDetectionStrategy, Component, type Signal, ViewEncapsulation, computed, input, output } from "@angular/core";
 
 import { Resources } from "../../../resources";
+import { SpinnerComponent } from "../spinner/spinner.component";
 import { ViewBadgeComponent } from "../view-badge/view-badge.component";
 
 @Component({
   selector: "tr-tab",
-  imports: [ViewBadgeComponent],
+  imports: [SpinnerComponent, ViewBadgeComponent],
   templateUrl: "./tab.component.html",
   styleUrl: "./tab.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,

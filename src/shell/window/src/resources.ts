@@ -208,6 +208,7 @@ export class Resources {
   public static readonly codeSizeSetting: string = "shell.codeSize";
   public static readonly doNotDisturbSetting: string = "shell.doNotDisturb";
   public static readonly mutedModulesSetting: string = "shell.mutedModules";
+  public static readonly keyBindingsSetting: string = "shell.keyBindings";
   public static readonly appearanceUnreadable: string = "The appearance preferences could not be read.";
   public static readonly notificationsPage: string = "Notifications";
   public static readonly shortcutsPage: string = "Keyboard shortcuts";
@@ -218,9 +219,30 @@ export class Resources {
   public static readonly settingsPagesLabel: string = "Settings pages";
   public static readonly noSettingsFound: string = "No settings match your search.";
   public static readonly commandColumn: string = "Command";
+  public static readonly ownerColumn: string = "From";
   public static readonly keyColumn: string = "Key";
-  public static readonly noKey: string = "—";
-  public static readonly shortcutsExplanation: string = "The keys that run commands. Changing them comes later.";
+  public static readonly actionsColumn: string = "Actions";
+  public static readonly noKey: string = "No key";
+  public static readonly choicePillMinimum: number = 2;
+  public static readonly choicePillLimit: number = 4;
+  public static readonly shortcutsExplanation: string = "The keys that run commands. Choose a key to record a new one; your keys apply on every device.";
+  public static readonly resetAllShortcutsLabel: string = "Reset all shortcuts";
+  public static readonly removeKeyLabel: string = "Remove";
+  public static readonly useKeyHereLabel: string = "Use it here";
+  public static readonly cancelLabel: string = "Cancel";
+  public static readonly recordingHint: string = "Press the new key";
+  public static readonly recordingEllipsis: string = "…";
+  public static readonly unknownKeyRefused: string = "This key can't be part of a shortcut.";
+  public static readonly typingKeyRefused: string = "A key needs Ctrl, Alt or a function key.";
+  public static readonly macTypingKeyRefused: string = "A key needs Command, Control, Option or a function key.";
+  public static readonly windowsKeyRefused: string = "The Windows key can't be part of a shortcut.";
+  public static readonly superKeyRefused: string = "The Super key can't be part of a shortcut.";
+  public static readonly windowsPlatform: string = "win32";
+  public static readonly modifierKeys: readonly string[] = ["Control", "Shift", "Alt", "AltGraph", "Meta", "OS"];
+  public static readonly macModifierSymbols: readonly string[] = ["⌃", "⌥", "⇧", "⌘"];
+  public static readonly modifierNames: readonly string[] = ["Ctrl", "Alt", "Shift"];
+  public static readonly modifierSeparator: string = "+";
+  public static readonly tabKey: string = "Tab";
   public static readonly showAllTabsCommand: string = "shell.showAllTabs";
   public static readonly splitTabCommands: Readonly<Record<PanelEdge, string>> = {
     [PanelEdge.Left]: "shell.splitTabLeft",
@@ -769,6 +791,26 @@ export class Resources {
 
   public static formatKeyTaken(key: string, keptBy: string): string {
     return `${key} is taken by ${keptBy}`;
+  }
+
+  public static formatKeyUsed(key: string, holder: string): string {
+    return `${key} is used by ${holder}`;
+  }
+
+  public static formatKeyReserved(key: string, owner: string): string {
+    return `${key} belongs to ${owner}`;
+  }
+
+  public static formatChangeKeyLabel(title: string, key: string): string {
+    return `Change the key of ${title}, now ${key}`;
+  }
+
+  public static formatRecordingLabel(title: string, hint: string): string {
+    return `${hint} for ${title}`;
+  }
+
+  public static formatRemoveKeyLabel(title: string): string {
+    return `Remove the key of ${title}`;
   }
 
   public static formatForeignDocument(moduleId: string, name: string): string {

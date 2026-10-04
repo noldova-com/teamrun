@@ -35,8 +35,7 @@ async function otherModeAsync(window: Page): Promise<"Light" | "Dark"> {
 }
 
 async function chooseAsync(window: Page, name: string, option: string): Promise<void> {
-  await row(window, name).locator(".tr-select-button").click();
-  await window.getByRole("option", { name: option, exact: true }).click();
+  await row(window, name).getByRole("radio", { name: option, exact: true }).click();
 }
 
 async function nativeBackgroundAsync(desktop: DesktopApplicationFixture): Promise<string> {
@@ -115,6 +114,31 @@ test.describe("settings", () => {
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).toBe(before.font);
   });
 
+  test("the Mode pills are one radio group: the checked pill is the tab stop and the arrow keys move the choice", async ({ desktop }) => {
+    const window = desktop.window;
+    await openSettingsAsync(window);
+    const pill = (name: string): Locator => row(window, "shell.mode").getByRole("radiogroup", { name: "Mode" }).getByRole("radio", { name, exact: true });
+    const backgroundAsync = (): Promise<string> => window.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+    await pill("Light").click();
+    await expect.poll(backgroundAsync).toBe(windowColors.Light);
+    await window.keyboard.press("ArrowRight");
+    await expect(pill("Dark")).toBeChecked();
+    await expect(pill("Dark")).toBeFocused();
+    await expect.poll(backgroundAsync).toBe(windowColors.Dark);
+    await window.keyboard.press("ArrowRight");
+    await expect(pill("System")).toBeChecked();
+    await window.keyboard.press("ArrowRight");
+    await expect(pill("Light")).toBeChecked();
+    await window.keyboard.press("End");
+    await expect(pill("System")).toBeChecked();
+    await window.keyboard.press("ArrowLeft");
+    await expect(pill("Dark")).toBeChecked();
+    await expect(pill("Light")).toHaveAttribute("tabindex", "-1");
+    await expect(pill("Dark")).toHaveAttribute("tabindex", "0");
+    await desktop.checkpointAsync("settings-mode-pills");
+  });
+
   test("choosing a setting's default by hand removes its Modified marker and Reset, also after a restart", async ({ desktop }) => {
     const window = desktop.window;
     await openSettingsAsync(window);
@@ -130,7 +154,7 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-default-by-hand");
     await desktop.restartAsync();
     await openSettingsAsync(desktop.window);
-    await expect(row(desktop.window, "shell.mode").locator(".tr-select-button")).toContainText("System");
+    await expect(row(desktop.window, "shell.mode").getByRole("radio", { name: "System" })).toBeChecked();
     await expect(row(desktop.window, "shell.mode").locator(".tr-setting-row-marker")).toHaveCount(0);
     await expect(row(desktop.window, "shell.mode").getByRole("button", { name: /^Reset / })).toHaveCount(0);
   });

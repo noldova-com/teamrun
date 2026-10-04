@@ -48,11 +48,15 @@ export class ShortcutMap {
     return this.entries.find(t => t[1] === command)?.[0] ?? null;
   }
 
+  public holderOf(key: KeyChord): string | undefined {
+    return this.entries.find(t => t[0].isSameOn(key, this.platform))?.[1];
+  }
+
   private assign(key: KeyChord, command: string): void {
-    const holder = this.entries.find(t => t[0].isSameOn(key, this.platform));
+    const holder = this.holderOf(key);
     if (Object.isUndefined(holder))
       this.entries.push([key, command]);
     else
-      this.collisionList.push(new ShortcutCollision(key, holder[1], command));
+      this.collisionList.push(new ShortcutCollision(key, holder, command));
   }
 }

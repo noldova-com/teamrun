@@ -28,6 +28,6 @@ export class ViewBadgeComponent {
   public readonly isDot: Signal<boolean> = computed(() => Object.isNull(this.count()));
   public readonly text: Signal<string> = computed(() => {
     const count = this.count();
-    return Object.isNull(count) ? String.empty : count > Resources.badgeLimit ? Resources.badgeOverflow : String(count);
+    return Object.isNull(count) ? String.empty : Resources.formatBadgeCount(count);
   });
 }

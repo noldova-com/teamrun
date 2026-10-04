@@ -12,6 +12,7 @@ import type { Writable } from "node:stream";
 import AngularProject from "./angular/angular-project.ts";
 import GalleryFile from "./angular/gallery-file.ts";
 import ProductFile from "./angular/product-file.ts";
+import ElectronBinary from "./desktop/electron-binary.ts";
 import BuildVariant from "./modules/build-variant.ts";
 import ModuleArtifacts from "./modules/module-artifacts.ts";
 import ModuleCatalog from "./modules/module-catalog.ts";
@@ -38,15 +39,17 @@ export default class Build {
   private readonly product: ProductFile;
   private readonly gallery: GalleryFile;
   private readonly angular: AngularProject;
+  private readonly electron: ElectronBinary;
   private readonly output: Writable;
 
-  public constructor(build: PackageBuild, modules: ModuleCatalog, artifacts: ModuleArtifacts, product: ProductFile, gallery: GalleryFile, angular: AngularProject, output: Writable) {
+  public constructor(build: PackageBuild, modules: ModuleCatalog, artifacts: ModuleArtifacts, product: ProductFile, gallery: GalleryFile, angular: AngularProject, electron: ElectronBinary, output: Writable) {
     this.build = build;
     this.modules = modules;
     this.artifacts = artifacts;
     this.product = product;
     this.gallery = gallery;
     this.angular = angular;
+    this.electron = electron;
     this.output = output;
   }
 
@@ -76,6 +79,7 @@ export default class Build {
       await this.product.writeAsync();
       await this.gallery.writeAsync(variant.isPackaged);
       await this.angular.prepareAsync(this.output);
+      await this.electron.installAsync(this.output);
       const windowFolder = outputFolder === null ? null : path.join(outputFolder, Build.WINDOW_FOLDER);
       await this.angular.buildAsync(this.output, windowFolder);
       if (variant.isPackaged)
@@ -95,6 +99,6 @@ if (import.meta.main) {
   const runner = new ProcessRunner();
   const root = process.cwd();
   const angular = new AngularProject(root, runner, new NpmCommand(runner, process.env));
-  const build = new Build(new PackageBuild(root, runner, process.env), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, process.stdout);
+  const build = new Build(new PackageBuild(root, runner, process.env), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, new ElectronBinary(root, runner), process.stdout);
   process.exitCode = await build.runAsync(process.argv.slice(2));
 }

@@ -9,7 +9,7 @@
   @if (closable() || working()) {
     <span class="tr-tab-action">
       @if (working()) {
-        <span class="tr-tab-spinner" aria-hidden="true"></span>
+        <tr-spinner class="tr-tab-spinner" aria-hidden="true" />
       }
       @if (closable()) {
         <button type="button" class="tr-tab-close" tabindex="-1" [attr.aria-label]="closeLabel()" (click)="onCloseClick($event)">

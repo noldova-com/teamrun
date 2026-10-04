@@ -11,5 +11,6 @@ export enum SettingKind {
   Choice = "Choice",
   Number = "Number",
   Text = "Text",
-  Modules = "Modules"
+  Modules = "Modules",
+  KeyBindings = "KeyBindings"
 }
