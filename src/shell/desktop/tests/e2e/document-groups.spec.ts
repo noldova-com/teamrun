@@ -104,14 +104,22 @@ test.describe("document groups", () => {
       await expect(preview).toHaveCount(0);
       await expect(window.locator("tr-docking-plate")).toHaveCount(0);
       await desktop.checkpointAsync(`tab-row-insertion-${scheme}`);
+      await TabDragFixture.moveOverAsync(window, TabDragFixture.groupOf(window, secondNote).locator(".tr-tab-group-actions"));
+      await expect(line).toHaveClass(/tr-tab-group-end/);
+      await expect(window.locator("tr-docking-plate")).toHaveCount(0);
       await TabDragFixture.moveOverAsync(window, TabDragFixture.groupOf(window, secondNote).locator("[role=tabpanel]"));
       await TabDragFixture.moveOverAsync(window, window.locator("tr-docking-plate [data-direction=Right]"));
       await expect(preview).toBeVisible();
       await expect(line).toHaveCount(0);
+      const group = await TabDragFixture.groupOf(window, secondNote).boundingBox();
+      const box = await preview.boundingBox();
+      expect([box?.x, box?.y, box?.width, box?.height].map(t => Math.round(t ?? 0)))
+        .toEqual([(group?.x ?? 0) + (group?.width ?? 0) / 2, group?.y ?? 0, (group?.width ?? 0) / 2, group?.height ?? 0].map(t => Math.round(t)));
       await desktop.checkpointAsync(`tab-split-preview-${scheme}`);
       await window.keyboard.press("Escape");
       await window.mouse.up();
       await expect(preview).toHaveCount(0);
+      await window.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     }
 
     await TabDragFixture.startAsync(window, firstNote);
