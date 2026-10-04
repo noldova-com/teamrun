@@ -13,8 +13,9 @@ Issue: #
 
 <!-- List the checks you ran and their results.
 If a relevant check was not run or does not apply, explain why.
-If the change touches startup, shutdown, processes, windows or inter-process messages,
-list the five repeated native runs of the affected tests on Windows, Linux and macOS. -->
+If the change touches startup, shutdown, processes, windows or inter-process messages, fixes a flaky test,
+or adds or changes a test of processes, timing or platform behavior, list the five repeated runs of the
+affected tests on Linux and Windows, and on macOS when the behavior is macOS-specific. -->
 
 ## Notes
 

@@ -20,7 +20,7 @@ const colors = {
 };
 
 test.describe("the empty window", () => {
-  test("TeamRun starts with no module and shows the empty window", async ({ desktop }) => {
+  test("TeamRun starts with no module and shows the empty window @smoke", async ({ desktop }) => {
     const window = desktop.window;
 
     await expect(window).toHaveTitle("TeamRun");
@@ -111,7 +111,7 @@ test.describe("the empty window", () => {
     }
   });
 
-  test("the window closes cleanly", async ({ desktop }) => {
+  test("the window closes cleanly @smoke", async ({ desktop }) => {
     expect(await desktop.closeAsync()).toBe(0);
   });
 });

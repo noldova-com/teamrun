@@ -35,7 +35,7 @@ test.describe("quitting while a module works", () => {
     });
   };
 
-  test("asks before quitting, stays open when the person cancels and quits once the work they waited for finishes", async ({ desktop }) => {
+  test("asks before quitting, stays open when the person cancels and quits once the work they waited for finishes @smoke", async ({ desktop }) => {
     const window = desktop.window;
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]")).toBeVisible();
     await ClockWorkFixture.beginAsync(desktop);
@@ -131,7 +131,7 @@ test.describe("quitting while a module works", () => {
     await expect.poll(() => ClockWorkFixture.readAsync(desktop.dataDirectory), { timeout: ClockWorkFixture.TIMEOUT, intervals: [ClockWorkFixture.INTERVAL] }).toEqual([]);
   });
 
-  test("stops the work and quits when the person chooses to, and the runtime stops with it and ends the programs its modules run", async ({ desktop }) => {
+  test("stops the work and quits when the person chooses to, and the runtime stops with it and ends the programs its modules run @smoke", async ({ desktop }) => {
     const window = desktop.window;
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]")).toBeVisible();
     const programs = await startProgramAsync(desktop.dataDirectory);
