@@ -477,6 +477,8 @@ export default class DesktopApplicationFixture {
       this.placement += ` After the move, the window was at ${OffCursorPlacement.describe(placed)}.`;
     }
     await expect.poll(() => this.isCursorInsideAsync()).toBe(false);
+    await this.answerAsync("send the window a pointer leave", this.application.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0]?.webContents.sendInputEvent({ type: "mouseLeave", x: 0, y: 0 })));
     await expect.poll(() => this.window.evaluate(() => document.querySelector(":hover") === null)).toBe(true);
   }
 
