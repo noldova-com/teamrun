@@ -244,7 +244,7 @@ describe("TabGroupComponent", () => {
     expect(layout.layout().dock(DockSide.Left).isCollapsed).toBe(true);
   });
 
-  it("shows a header with the view's title and the group's actions for a one-view group on a side set to icons", async () => {
+  it("shows a header with the active view's title and the group's actions instead of a tab bar, whatever its number of views, on a side set to icons", async () => {
     await renderAsync(prepared.splitGroup(LayoutFixture.search, 1, PanelEdge.Bottom));
     bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
     update();
@@ -259,11 +259,21 @@ describe("TabGroupComponent", () => {
     expect([group(corner).querySelector(".tr-tab-group-menu"), group(corner).querySelector(".tr-tab-group-hide")].every(t => !Object.isNull(t))).toBe(true);
     expect(group(layout.layout().dock(DockSide.Right).root?.cornerGroup.id ?? -1).querySelector("[role=tablist]")).not.toBeNull();
     title?.dispatchEvent(new PointerEvent("pointerdown", { button: 0 }));
-    expect(begin).toHaveBeenCalledWith(LayoutFixture.files, expect.any(PointerEvent));
+    expect(begin).not.toHaveBeenCalled();
 
     layout.place(LayoutFixture.search, new TabDropTarget(corner, 1));
     update();
-    expect([group(corner).querySelector("[role=tablist]") !== null, group(corner).querySelector(".tr-tab-group-title")]).toEqual([true, null]);
+    const shared = group(corner).querySelector<HTMLElement>(".tr-tab-group-title");
+    const sharedBody = group(corner).querySelector<HTMLElement>(".tr-tab-group-body");
+    expect(layout.layout().group(corner)?.tabs.length).toBe(2);
+    expect([group(corner).querySelector("[role=tablist]"), group(corner).querySelectorAll("tr-tab").length]).toEqual([null, 0]);
+    expect(shared?.textContent?.trim()).toBe("files.search");
+    expect([sharedBody?.getAttribute("role"), sharedBody?.getAttribute("aria-labelledby")]).toEqual(["region", shared?.id]);
+    expect([group(corner).querySelector(".tr-tab-group-menu"), group(corner).querySelector(".tr-tab-group-hide")].every(t => !Object.isNull(t))).toBe(true);
+
+    layout.activate(LayoutFixture.files);
+    update();
+    expect(group(corner).querySelector(".tr-tab-group-title")?.textContent?.trim()).toBe("files.tree");
   });
 
   it("opens the active tab's menu from the panel actions and a tab's menu from the keyboard", async () => {

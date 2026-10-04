@@ -14,7 +14,7 @@
           <span class="tr-toast-text">{{ toast.post.text }}</span>
         }
         @if (isIndeterminate(toast) || progressOf(toast) !== null) {
-          <progress class="tr-toast-progress" max="1" [attr.value]="progressOf(toast)" [attr.aria-label]="toast.post.title"></progress>
+          <tr-progress [value]="progressOf(toast)" [label]="toast.post.title" />
         }
         <span class="tr-toast-meta">{{ moduleName(toast) }} · {{ timeOf(toast) }}</span>
         @if (toast.post.actions.length > 0) {

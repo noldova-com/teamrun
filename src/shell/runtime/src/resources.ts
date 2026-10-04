@@ -192,6 +192,7 @@ export class Resources {
   public static readonly codeSizeSetting: string = "codeSize";
   public static readonly leftDockStyleSetting: string = "leftDockStyle";
   public static readonly rightDockStyleSetting: string = "rightDockStyle";
+  public static readonly menuBarSetting: string = "menuBar";
   public static readonly doNotDisturbSetting: string = "doNotDisturb";
   public static readonly mutedModulesSetting: string = "mutedModules";
   public static readonly appearancePage: string = "Appearance";
@@ -214,6 +215,10 @@ export class Resources {
   public static readonly rightDockStyleDescription: string = "Show the right dock's views as tabs, or as icons along the window's right edge.";
   public static readonly dockStyleOptions: readonly (readonly [string, string])[] = [["Tabs", "Tabs"], ["Icons", "Icons"]];
   public static readonly defaultDockStyle: string = "Tabs";
+  public static readonly menuBarTitle: string = "Menus";
+  public static readonly menuBarDescription: string = "On Windows and Linux, show the menus as a bar in the window row, as a menu button, or not at all. A menu bar that does not fit the window row folds into the menu button. macOS keeps its menu bar.";
+  public static readonly menuBarOptions: readonly (readonly [string, string])[] = [["Inline", "Menu bar"], ["Button", "Menu button"], ["Hidden", "Hidden"]];
+  public static readonly defaultMenuBar: string = "Inline";
   public static readonly interfaceFontTitle: string = "Interface font";
   public static readonly interfaceFontDescription: string = "The font of menus, panels and prose.";
   public static readonly codeFontTitle: string = "Code font";
@@ -273,6 +278,8 @@ export class Resources {
   public static readonly answerGrace: number = 5_000;
   public static readonly closeGrace: number = 2_000;
   public static readonly idleGrace: number = 30_000;
+  public static readonly takeover: number = 5_000;
+  public static readonly takeoverInterval: number = 50;
   public static readonly launchTimeout: number = 20_000;
   public static readonly launchPollInterval: number = 100;
   public static readonly productVersionPattern: RegExp = /^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/;

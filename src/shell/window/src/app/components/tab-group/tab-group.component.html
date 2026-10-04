@@ -10,8 +10,7 @@ LICENSE file in the root directory of this source tree.
   @if (header(); as tab) {
     @let label = labels.of(tab);
     <div class="tr-tab-group-bar tr-tab-group-header">
-      <span class="tr-tab-group-title" [attr.id]="tabId(0)" [attr.data-header-key]="tab.key" [trTooltip]="label.title" [trTooltipSide]="below" [trTooltipTruncated]="true"
-        (pointerdown)="drag.begin(tab, $event)">{{ label.title }}</span>
+      <span class="tr-tab-group-title" [attr.id]="activeTabId()" [attr.data-header-key]="tab.key" [trTooltip]="label.title" [trTooltipSide]="below" [trTooltipTruncated]="true">{{ label.title }}</span>
       <div class="tr-tab-group-actions" [class.tr-tab-group-actions-shell]="isShell()">
         <ng-container [ngTemplateOutlet]="groupActions" />
       </div>

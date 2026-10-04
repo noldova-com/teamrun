@@ -17,6 +17,16 @@ const colors = {
 };
 const titles = ["Note 2 couldn't be saved", "Syncing the clock", "The clock started"];
 
+function contrast(foreground: string, background: string): number {
+  const luminance = (color: string): number => {
+    const [red = 0, green = 0, blue = 0] = (color.match(/\d+/gu) ?? []).slice(0, 3).map(t => Number(t) / 255)
+      .map(t => t <= 0.03928 ? t / 12.92 : ((t + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  };
+  const [lighter = 0, darker = 0] = [luminance(foreground), luminance(background)].sort((x, y) => y - x);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 function bell(window: Page): Locator {
   return window.locator("button.tr-notifications-item");
 }
@@ -49,7 +59,7 @@ test.describe("notifications", () => {
 
     await expect(list(window).locator(".tr-notifications-row-title")).toHaveText(titles);
     await expect(list(window).locator(".tr-notifications-row").first().locator(".tr-notifications-meta")).toContainText("Notes · ");
-    await expect(list(window).locator(".tr-notifications-row").nth(1).locator("progress")).toBeVisible();
+    await expect(list(window).locator(".tr-notifications-row").nth(1).locator("tr-progress")).toBeVisible();
     await expect(bell(window).locator(".tr-notifications-count")).toHaveCount(0);
     await expect(bell(window)).toHaveAttribute("aria-label", "Notifications");
   });
@@ -205,5 +215,51 @@ test.describe("notifications", () => {
     expect(Math.round((anchor?.["top"] ?? 0) - (placed?.["bottom"] ?? 0))).toBe(8);
     expect(Math.abs((anchor?.["right"] ?? 0) - (placed?.["right"] ?? 0))).toBeLessThan(1);
     await desktop.checkpointAsync("notifications");
+  });
+
+  test("the progress bar of a notification in progress is visible in the list and moves, in light and in dark", async ({ desktop }) => {
+    const window = desktop.window;
+    await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
+    const colorOf = (variable: string): Promise<string> => window.evaluate(name => {
+      const probe = document.createElement("div");
+      probe.style.backgroundColor = `var(${name})`;
+      document.body.append(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    }, variable);
+
+    await bell(window).click();
+    await expect(list(window).locator(".tr-notifications-row")).toHaveCount(3);
+    for (const scheme of ["light", "dark"] as const) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await desktop.checkpointAsync(`progress-in-the-list-${scheme}`);
+      const track = list(window).locator(".tr-notifications-row").nth(1).locator("tr-progress");
+      const fill = track.locator(".tr-progress-bar");
+      await expect(fill).toBeVisible();
+
+      const look = await track.evaluate(t => {
+        const bar = t.querySelector(".tr-progress-bar") as Element;
+        return {
+          track: getComputedStyle(t).backgroundColor, fill: getComputedStyle(bar).backgroundColor, animation: getComputedStyle(bar).animationName,
+          surface: getComputedStyle(t.closest(".tr-notifications-popover") as Element).backgroundColor,
+          width: bar.getBoundingClientRect().width, height: bar.getBoundingClientRect().height
+        };
+      });
+
+      expect(look.fill).toBe(await colorOf("--tr-progress"));
+      expect(look.fill).not.toBe(look.surface);
+      expect(look.fill.startsWith("rgb(")).toBe(true);
+      expect(look.surface.startsWith("rgb(")).toBe(true);
+      expect(contrast(look.fill, look.surface)).toBeGreaterThanOrEqual(3);
+      expect(look.fill).not.toBe(look.track);
+      expect(look.fill).not.toMatch(/^rgba\(.*, 0\)$/);
+      expect(look.width).toBeGreaterThan(0);
+      expect(look.height).toBeGreaterThan(0);
+      expect(look.animation).toContain("tr-progress-slide");
+      const first = (await fill.boundingBox())?.x;
+      await expect.poll(async () => (await fill.boundingBox())?.x).not.toBe(first);
+    }
   });
 });

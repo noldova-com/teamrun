@@ -12,23 +12,59 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import type { Page } from "@playwright/test";
-
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 test.describe("quitting while a module works", () => {
-  const runCommandAsync = async (dataDirectory: string, command: string): Promise<void> => {
+  const runCliAsync = async (...commandLine: string[]): Promise<string> => {
     const executable = await readFile(path.resolve("_build", "development-app", "path.txt"), "utf8");
     const entry = path.resolve("node_modules", "@noldova", "teamrun-shell-cli", "services", "cli-entry.js");
-    await promisify(execFile)(executable, [entry, "run", command, "--data-dir", dataDirectory], { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" }, timeout: 30_000 });
+    const { stdout } = await promisify(execFile)(executable, [entry, ...commandLine], { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" }, encoding: "utf8", timeout: 30_000 });
+    return stdout;
   };
 
-  const beginWorkAsync = async (window: Page): Promise<void> => {
+  const runCommandAsync = async (dataDirectory: string, command: string): Promise<void> => {
+    await runCliAsync("run", command, "--data-dir", dataDirectory);
+  };
+
+  const readLogAsync = async (desktop: DesktopApplicationFixture, name: string): Promise<string | null> => {
+    const file = path.join(desktop.dataDirectory, "logs", name);
+    return existsSync(file) ? await readFile(file, "utf8") : null;
+  };
+
+  const readWorkAsync = async (dataDirectory: string): Promise<string[]> => {
+    return (JSON.parse(await runCliAsync("status", "--json", "--data-dir", dataDirectory)) as { work: string[] }).work;
+  };
+
+  const waitForWorkAsync = async (desktop: DesktopApplicationFixture): Promise<void> => {
+    let reported: string = "no report";
+    try {
+      await expect.poll(async () => {
+        reported = JSON.stringify(await readWorkAsync(desktop.dataDirectory));
+        return reported;
+      }, { timeout: 20_000, intervals: [500] }).toBe(JSON.stringify(["Counting the ticks"]));
+    }
+    catch (error) {
+      const runtimeLog = await readLogAsync(desktop, "runtime.log");
+      const desktopLog = await readLogAsync(desktop, "desktop.log");
+      throw new Error([
+        "The shell did not report the work before the window was closed.",
+        `The shell's work report, the one the quit question reads: ${reported}.`,
+        `The work command ran (the clock's work folder exists): ${existsSync(path.join(desktop.dataDirectory, "work", "clock"))}.`,
+        `The runtime logged that the clock began counting: ${runtimeLog?.includes("clock: The clock began counting.") ?? false}.`,
+        `Runtime log: ${runtimeLog === null ? "missing" : JSON.stringify(runtimeLog.split("\n").slice(-8))}.`,
+        `Desktop log: ${desktopLog === null ? "missing" : JSON.stringify(desktopLog.split("\n").slice(-8))}.`
+      ].join("\n"), { cause: error });
+    }
+  };
+
+  const beginWorkAsync = async (desktop: DesktopApplicationFixture): Promise<void> => {
+    const window = desktop.window;
     await window.keyboard.press("ControlOrMeta+Shift+KeyP");
     await window.keyboard.type("Begin work");
     await expect(window.locator(".tr-command-search-pane [role=option]").first()).toHaveAttribute("data-item", "clock.beginWork");
     await window.keyboard.press("Enter");
+    await waitForWorkAsync(desktop);
   };
 
   const closeWindowAsync = async (desktop: DesktopApplicationFixture): Promise<void> => {
@@ -48,7 +84,7 @@ test.describe("quitting while a module works", () => {
   test("asks before quitting, stays open when the person cancels and quits once the work they waited for finishes", async ({ desktop }) => {
     const window = desktop.window;
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]")).toBeVisible();
-    await beginWorkAsync(window);
+    await beginWorkAsync(desktop);
     const asking = window.getByRole("dialog", { name: "Work is still running" });
 
     await closeWindowAsync(desktop);
@@ -81,7 +117,7 @@ test.describe("quitting while a module works", () => {
   test("stops the work and quits when the person chooses to, and the runtime stops with it", async ({ desktop }) => {
     const window = desktop.window;
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]")).toBeVisible();
-    await beginWorkAsync(window);
+    await beginWorkAsync(desktop);
     const runtime = await desktop.readRuntimeProcessIdAsync() ?? 0;
 
     await closeWindowAsync(desktop);

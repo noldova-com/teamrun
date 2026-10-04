@@ -9,6 +9,7 @@
 import { Injectable, type Signal, type WritableSignal, computed, signal } from "@angular/core";
 
 import { StatusBarSide } from "../enums/status-bar-side";
+import { TopBarSide } from "../enums/top-bar-side";
 import type { StatusBarItem } from "../models/status-bar-item";
 import type { TopBarAction } from "../models/top-bar-action";
 
@@ -19,7 +20,8 @@ export class BarItemsService {
 
   public readonly leftItems: Signal<readonly StatusBarItem[]> = computed(() => this.statusBarItemsValue().filter(t => t.side === StatusBarSide.Left));
   public readonly rightItems: Signal<readonly StatusBarItem[]> = computed(() => this.statusBarItemsValue().filter(t => t.side === StatusBarSide.Right));
-  public readonly topBarActions: Signal<readonly TopBarAction[]> = this.topBarActionsValue.asReadonly();
+  public readonly startActions: Signal<readonly TopBarAction[]> = computed(() => this.topBarActionsValue().filter(t => t.side === TopBarSide.Start));
+  public readonly endActions: Signal<readonly TopBarAction[]> = computed(() => this.topBarActionsValue().filter(t => t.side === TopBarSide.End));
 
   public set(statusBarItems: readonly StatusBarItem[], topBarActions: readonly TopBarAction[]): void {
     this.statusBarItemsValue.set([...statusBarItems]);

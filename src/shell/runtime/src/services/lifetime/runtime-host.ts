@@ -6,9 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { inspect } from "node:util";
 
 import "@noldova/teamrun-foundation-core";
@@ -16,6 +18,7 @@ import { type BuildIdentity, Failure, FailureCode, NotificationBroadcast, PreShe
 
 import { DataDirectoryState } from "../../enums/data-directory-state.js";
 import { WindowStateKind } from "../../enums/window-state-kind.js";
+import { DataDirectoryOwnedException } from "../../exceptions/data-directory-owned.exception.js";
 import type { IIdleParticipant } from "../../interfaces/idle-participant.js";
 import { CapabilityToken } from "../../models/capability-token.js";
 import type { Endpoint } from "../../models/endpoint.js";
@@ -144,7 +147,7 @@ export class RuntimeHost implements IIdleParticipant {
 
   public static async startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv): Promise<RuntimeHost> {
     const declarations = await ModuleDeclarationReader.readAsync(options.declarationsFile);
-    const lock = OwnershipLock.acquire(options.dataDirectory);
+    const lock = await RuntimeHost.acquireAsync(options);
     let log: RuntimeLog | null = null;
     let database: ShellDatabase | null = null;
     try {
@@ -186,6 +189,20 @@ export class RuntimeHost implements IIdleParticipant {
   private workChanged(): void {
     this.workEvent.publish(this.work.report.toJson());
     this.idle.check();
+  }
+
+  private static async acquireAsync(options: RuntimeOptions): Promise<OwnershipLock> {
+    const deadline = Date.now() + options.takeoverMilliseconds;
+    for (;;) {
+      try {
+        return OwnershipLock.acquire(options.dataDirectory);
+      }
+      catch (error) {
+        if (!(error instanceof DataDirectoryOwnedException) || existsSync(options.dataDirectory.discoveryFile) || Date.now() >= deadline)
+          throw error;
+      }
+      await delay(Resources.takeoverInterval);
+    }
   }
 
   private async openAsync(platform: string): Promise<void> {
@@ -272,9 +289,13 @@ export class RuntimeHost implements IIdleParticipant {
       throw error;
     }
     finally {
-      this.database?.close();
-      this.lock.release();
-      await this.log.closeAsync();
+      try {
+        this.database?.close();
+        await this.log.closeAsync();
+      }
+      finally {
+        this.lock.release();
+      }
     }
   }
 }

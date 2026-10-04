@@ -62,7 +62,7 @@ test.describe("activity bar", () => {
     await expect(group).toHaveCount(0);
     await expect(icon(window, notes)).toHaveAttribute("aria-pressed", "false");
     await icon(window, outline).click();
-    await expect(group.locator("tr-tab[data-tab-key=\"view/notes.outline\"]")).toHaveAttribute("aria-selected", "true");
+    await expect(group.locator(".tr-tab-group-title")).toHaveText("Outline");
     await expect(icon(window, outline)).toHaveAttribute("aria-pressed", "true");
 
     await setDockStyleAsync(window, "shell.leftDockStyle", "Tabs");
@@ -103,7 +103,7 @@ test.describe("activity bar", () => {
     await desktop.checkpointAsync("view-badge");
   });
 
-  test("the strip is one tab stop driven by the arrow keys, and a one-view group shows a header instead of a tab", async ({ desktop }) => {
+  test("the strip is one tab stop driven by the arrow keys, and every group shows a header instead of a tab bar", async ({ desktop }) => {
     const window = desktop.window;
     await setDockStyleAsync(window, "shell.leftDockStyle", "Icons");
     await setDockStyleAsync(window, "shell.rightDockStyle", "Icons");
@@ -122,6 +122,12 @@ test.describe("activity bar", () => {
     await expect(window.locator("tr-tab-group[data-side=Right] .tr-tab-group-title")).toHaveText("Clock");
     await expect(window.locator("tr-tab-group[data-side=Right] [role=tablist]")).toHaveCount(0);
     await expect(window.locator("tr-tab-group[data-side=Right] [role=region]")).toHaveAccessibleName("Clock");
-    await desktop.checkpointAsync("one-view-header");
+    await expect(window.locator("tr-tab-group[data-side=Left] .tr-tab-group-title")).toHaveText("Outline");
+    await expect(window.locator("tr-tab-group[data-side=Left] [role=tablist]")).toHaveCount(0);
+    await expect(window.locator("tr-tab-group[data-side=Left] tr-tab")).toHaveCount(0);
+    await expect(window.locator("tr-tab-group[data-side=Left] [role=region]")).toHaveAccessibleName("Outline");
+    await icon(window, notes).click();
+    await expect(window.locator("tr-tab-group[data-side=Left] .tr-tab-group-title")).toHaveText("Notes");
+    await desktop.checkpointAsync("group-header");
   });
 });
