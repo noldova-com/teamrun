@@ -17,14 +17,16 @@ export default class BuildTarget {
   public readonly architecture: string;
   public readonly runsOnPullRequests: boolean;
   public readonly runsSmokeOnPullRequests: boolean;
+  public readonly runsUiOnPushes: boolean;
   public readonly uiShardCount: number;
 
-  public constructor(name: string, runner: string, architecture: string, runsOnPullRequests: boolean, runsSmokeOnPullRequests: boolean, uiShardCount: number) {
+  public constructor(name: string, runner: string, architecture: string, runsOnPullRequests: boolean, runsSmokeOnPullRequests: boolean, runsUiOnPushes: boolean, uiShardCount: number) {
     this.name = name;
     this.runner = runner;
     this.architecture = architecture;
     this.runsOnPullRequests = runsOnPullRequests;
     this.runsSmokeOnPullRequests = runsSmokeOnPullRequests;
+    this.runsUiOnPushes = runsUiOnPushes;
     this.uiShardCount = uiShardCount;
   }
 
