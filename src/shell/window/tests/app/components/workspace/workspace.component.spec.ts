@@ -16,6 +16,7 @@ import { PanelEdge } from "../../../../src/app/enums/panel-edge";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
 import { ViewDialogService } from "../../../../src/app/services/view-dialog.service";
+import { WindowPartHostService } from "../../../../src/app/services/window-part-host.service";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
@@ -33,6 +34,7 @@ class WorkspaceHostComponent {
 
 describe("WorkspaceComponent", () => {
   let bridge: DesktopBridgeFixture;
+  let parts: WindowPartHostFixture;
 
   beforeEach(() => {
     bridge = DesktopBridgeFixture.install();
@@ -42,7 +44,10 @@ describe("WorkspaceComponent", () => {
     DesktopBridgeFixture.remove();
   });
 
-  beforeEach(() => TestBed.configureTestingModule({ providers: [WindowPartHostFixture.provide()] }));
+  beforeEach(() => {
+    parts = new WindowPartHostFixture();
+    TestBed.configureTestingModule({ providers: [{ provide: WindowPartHostService, useValue: parts }] });
+  });
 
   afterEach(() => AppearanceFixture.reset());
 
@@ -86,6 +91,27 @@ describe("WorkspaceComponent", () => {
     expect(whileStarting).toEqual([true, false]);
     expect(workspace.hasAttribute("inert")).toBe(false);
     expect(document.activeElement).toBe(focused);
+  });
+
+  it("focuses the active tab of the group that held the focus when its place is gone once the parts load again", async () => {
+    const registry = LayoutFixture.createRegistry();
+    const fixture = await renderAsync(registry, Layout.createDefault(registry).openDocument(LayoutFixture.plan));
+    const host = fixture.nativeElement as HTMLElement;
+    const tab = host.querySelector<HTMLElement>(`[data-tab-key="${LayoutFixture.plan.key}"]`) as HTMLElement;
+    const focused = (tab.closest("tr-tab-group") as HTMLElement).appendChild(document.createElement("button"));
+    focused.focus();
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    await settleAsync(fixture);
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await settleAsync(fixture);
+    const whileLoading = document.activeElement === focused;
+    focused.remove();
+    parts.generation.update(t => t + 1);
+    await settleAsync(fixture);
+
+    expect(whileLoading).toBe(true);
+    expect(document.activeElement).toBe(tab);
   });
 
   it("leaves the focus where it is when the person moved it while the runtime started again", async () => {

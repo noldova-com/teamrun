@@ -11,6 +11,7 @@ import { TestBed } from "@angular/core/testing";
 
 import { DialogService } from "@noldova/teamrun-shell-ui";
 
+import { EditAction } from "../../../src/app/enums/edit-action";
 import { CommandNotFoundException } from "../../../src/app/exceptions/command-not-found.exception";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { WindowPartSource } from "../../../src/app/models/window-part-source";
@@ -98,6 +99,28 @@ describe("CommandService", () => {
 
     expect(whileStarting).toEqual([false, false]);
     expect(service.isEnabled("notes.newNote")).toBe(true);
+    expect(runs).toEqual([]);
+  });
+
+  it("runs no command from anywhere while the runtime starts again, but keeps the edit commands", async () => {
+    const service = start("win32");
+    service.setCommands([command("notes.newNote", null)]);
+    await vi.waitFor(() => expect(TestBed.inject(StartupService).hasStarted()).toBe(true));
+    const input = document.createElement("input");
+    input.value = "draft";
+    document.body.append(input);
+    input.focus();
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    const ran = await service.runAsync("notes.newNote");
+    service.run("notes.newNote");
+    const whileStarting = [service.isAvailable("notes.newNote"), service.isAvailable(Resources.editCommands[EditAction.SelectAll])];
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    input.remove();
+
+    expect(ran).toBeNull();
+    expect(whileStarting).toEqual([false, true]);
+    expect([service.isAvailable("notes.newNote"), service.isAvailable("clock.tick")]).toEqual([true, false]);
     expect(runs).toEqual([]);
   });
 

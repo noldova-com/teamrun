@@ -6,9 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { TestBed } from "@angular/core/testing";
 
 import { StartupService } from "../../../src/app/services/startup.service";
+import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 
 describe("StartupService", () => {
@@ -25,9 +27,10 @@ describe("StartupService", () => {
     expect(service.state().isReady).toBe(true);
   });
 
-  it("has started once the runtime was first ready, and reconnects whenever it is not ready after that", async () => {
+  it("has started once the runtime was first ready, and reconnects, announcing it once, whenever it is not ready after that", async () => {
     const bridge = DesktopBridgeFixture.install();
     bridge.startup = { kind: "Connecting", details: [] };
+    const announce = vi.spyOn(TestBed.inject(LiveAnnouncer), "announce").mockResolvedValue();
     const service = TestBed.inject(StartupService);
     const read = (): readonly boolean[] => [service.hasStarted(), service.isReconnecting()];
     const seen = [read()];
@@ -38,6 +41,7 @@ describe("StartupService", () => {
     }
 
     expect(seen).toEqual([[false, false], [false, false], [true, false], [true, true], [true, true], [true, false]]);
+    expect(announce.mock.calls).toEqual([[Resources.startingTitle, Resources.politeAnnouncement]]);
   });
 
   it("is acting while the desktop carries out the person's choice", async () => {

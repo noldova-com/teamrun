@@ -61,7 +61,8 @@ export class CommandService {
   }
 
   public async runAsync(name: string, commandArguments: JsonValue = null): Promise<JsonValue> {
-    return this.find(name).runAsync(commandArguments);
+    const command = this.find(name);
+    return this.isHeldByReconnect(command.name) ? null : command.runAsync(commandArguments);
   }
 
   public run(name: string, commandArguments: JsonValue = null): void {
@@ -70,6 +71,11 @@ export class CommandService {
 
   public isEnabled(name: string, commandArguments: JsonValue = null): boolean {
     return this.canRun(this.find(name), commandArguments);
+  }
+
+  public isAvailable(name: string, commandArguments: JsonValue = null): boolean {
+    const command = this.commands().find(t => t.name === name);
+    return !Object.isUndefined(command) && this.canRun(command, commandArguments);
   }
 
   public isChecked(name: string, commandArguments: JsonValue = null): boolean {
@@ -116,7 +122,11 @@ export class CommandService {
   }
 
   private canRun(command: CommandContribution, commandArguments: JsonValue): boolean {
-    return !this.startup.isReconnecting() && this.ask(() => command.isEnabled(commandArguments));
+    return !this.isHeldByReconnect(command.name) && this.ask(() => command.isEnabled(commandArguments));
+  }
+
+  private isHeldByReconnect(name: string): boolean {
+    return this.startup.isReconnecting() && !Resources.modalCommands.includes(name);
   }
 
   private ask(question: () => boolean): boolean {

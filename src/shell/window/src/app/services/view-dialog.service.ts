@@ -21,6 +21,7 @@ import type { Tab } from "../models/layout/tab";
 import type { TabReveal } from "../models/layout/tab-reveal";
 import { Resources } from "../../resources";
 import { LayoutService } from "./layout.service";
+import { StartupService } from "./startup.service";
 import { TabFocusService } from "./tab-focus.service";
 import { TabLabelService } from "./tab-label.service";
 
@@ -30,6 +31,7 @@ export class ViewDialogService {
   private readonly layout: LayoutService = inject(LayoutService);
   private readonly labels: TabLabelService = inject(TabLabelService);
   private readonly tabFocus: TabFocusService = inject(TabFocusService);
+  private readonly startup: StartupService = inject(StartupService);
   private readonly shownValue: WritableSignal<Tab | null> = signal(null);
   private dialog: DialogRef<unknown, ViewDialogComponent> | null = null;
   private wasOpen: boolean = false;
@@ -52,12 +54,14 @@ export class ViewDialogService {
   }
 
   public canShow(tab: Tab): boolean {
-    return !this.dialogs.isOpen && tab.isAvailable(this.layout.registry());
+    return !this.dialogs.isOpen && !this.startup.isReconnecting() && tab.isAvailable(this.layout.registry());
   }
 
   public showAsync(tab: Tab, title: string | null = null): Promise<void> {
     if (this.dialogs.isOpen)
       return Promise.reject(new ViewDialogException(Resources.dialogAlreadyOpen));
+    if (this.startup.isReconnecting())
+      return Promise.reject(new ViewDialogException(Resources.dialogWhileReconnecting));
     if (!tab.isAvailable(this.layout.registry()))
       return Promise.reject(new ArgumentException(tab instanceof DocumentTab ? Resources.formatUnregisteredDocument(tab.name) : Resources.formatUnregisteredView(tab.name), "tab"));
     if (!Object.isNull(title))
@@ -101,6 +105,6 @@ export class ViewDialogService {
   }
 
   private isShowable(tab: Tab): boolean {
-    return tab.isAvailable(this.layout.registry()) && (!this.wasOpen || this.layout.layout().isOpen(tab));
+    return !this.startup.isReconnecting() && tab.isAvailable(this.layout.registry()) && (!this.wasOpen || this.layout.layout().isOpen(tab));
   }
 }
