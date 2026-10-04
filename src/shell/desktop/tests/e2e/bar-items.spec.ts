@@ -64,3 +64,29 @@ test.describe("the status bar and the top bar", () => {
     expect(await window.locator(".tr-status-bar-right > *").evaluateAll(t => t.map(u => u.tagName.toLowerCase()))).toEqual(["tr-notifications", "tr-module-failures"]);
   });
 });
+
+test.describe("a status bar item cut short", () => {
+  test.use({ desktopDataFiles: { "modules/notes/long-count": "" } });
+
+  test("shows its full text in a tooltip on hover and keyboard focus, and is named by it", async ({ desktop }) => {
+    const window = desktop.window;
+    const text = "2 notes, neither pinned nor archived, both last changed today by the person who wrote them, and both waiting for review";
+    const item = window.locator("tr-status-bar-item[data-tr-item=\"notes.count\"]").getByRole("button");
+    const tooltip = window.locator(".cdk-overlay-container tr-tooltip");
+    await desktop.useViewportAsync(640, 480);
+    await expect(item).toHaveAccessibleName(text);
+    expect(await item.locator(".tr-status-bar-item-text").evaluate(t => t.scrollWidth > t.clientWidth)).toBe(true);
+
+    await item.hover();
+    await expect(tooltip).toHaveText(text);
+    await window.mouse.move(320, 200);
+    await expect(tooltip).toHaveCount(0);
+    await item.focus();
+    await window.keyboard.press("Tab");
+    await window.keyboard.press("Shift+Tab");
+
+    await expect(item).toBeFocused();
+    await expect(tooltip).toHaveText(text);
+    await desktop.checkpointAsync("status-bar-item-cut-short");
+  });
+});

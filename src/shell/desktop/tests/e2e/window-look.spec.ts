@@ -9,6 +9,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import ScrollAreaFixture from "./fixtures/scroll-area.fixture.ts";
 
 const documentsGroup = "tr-tab-group:has(tr-tab[data-tab-key='document/notes.note/1'])";
 const bottomGroup = "tr-tab-group:has(tr-tab[data-tab-key='view/notes.terminal'])";
@@ -25,44 +26,6 @@ function boxOf(locator: Locator): Promise<Readonly<Record<"left" | "top" | "righ
     const box = t.getBoundingClientRect();
     return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width };
   });
-}
-
-function scrollbarOf(locator: Locator): Promise<Readonly<Record<"vertical" | "horizontal" | "rem", number>>> {
-  return locator.evaluate(t => {
-    const element = t as HTMLElement;
-    const style = getComputedStyle(element);
-    return {
-      vertical: element.offsetWidth - element.clientWidth - Number.parseFloat(style.borderLeftWidth) - Number.parseFloat(style.borderRightWidth),
-      horizontal: element.offsetHeight - element.clientHeight - Number.parseFloat(style.borderTopWidth) - Number.parseFloat(style.borderBottomWidth),
-      rem: Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
-    };
-  });
-}
-
-async function thumbChangesOnHoverAsync(window: Page, area: Locator, axis: "vertical" | "horizontal"): Promise<boolean> {
-  const clip = await area.evaluate((t, direction) => {
-    const element = t as HTMLElement;
-    const box = element.getBoundingClientRect();
-    const left = box.left + element.clientLeft;
-    const top = box.top + element.clientTop;
-    return direction === "vertical"
-      ? { x: left + element.clientWidth, y: top, width: element.offsetWidth - element.clientWidth - element.clientLeft * 2, height: element.clientHeight }
-      : { x: left, y: top + element.clientHeight, width: element.clientWidth, height: element.offsetHeight - element.clientHeight - element.clientTop * 2 };
-  }, axis);
-  const thumbColor = (): Promise<string> => area.evaluate(t => getComputedStyle(t).color);
-  const shown = await window.evaluate(() => {
-    const probe = document.body.appendChild(document.createElement("div"));
-    probe.style.color = "var(--tr-scrollbar)";
-    const color = getComputedStyle(probe).color;
-    probe.remove();
-    return color;
-  });
-  await window.mouse.move(1, 1);
-  await expect.poll(thumbColor).toBe("rgba(0, 0, 0, 0)");
-  const rest = await window.screenshot({ clip });
-  await area.hover({ position: { x: 20, y: 10 } });
-  await expect.poll(thumbColor).toBe(shown);
-  return !rest.equals(await window.screenshot({ clip }));
 }
 
 test.describe("the window's look", () => {
@@ -107,16 +70,16 @@ test.describe("the window's look", () => {
     const content = window.locator(`${documentsGroup} tr-tab-content`);
     const scroller = window.locator(`${documentsGroup} .tr-tab-group-scroller`);
 
-    const area = await scrollbarOf(content);
-    const strip = await scrollbarOf(scroller);
-    const quietStrip = await scrollbarOf(window.locator(`${bottomGroup} .tr-tab-group-scroller`));
+    const area = await ScrollAreaFixture.scrollbarSizesAsync(content);
+    const strip = await ScrollAreaFixture.scrollbarSizesAsync(scroller);
+    const quietStrip = await ScrollAreaFixture.scrollbarSizesAsync(window.locator(`${bottomGroup} .tr-tab-group-scroller`));
     expect(area.vertical).toBeCloseTo(0.375 * area.rem, 0);
     expect(strip.horizontal).toBeCloseTo(0.375 * strip.rem, 0);
     expect(quietStrip.horizontal).toBeCloseTo(0.375 * strip.rem, 0);
     const before = await boxOf(content.locator("h1"));
-    expect(await thumbChangesOnHoverAsync(window, content, "vertical")).toBe(true);
+    expect(await ScrollAreaFixture.thumbChangesOnHoverAsync(window, content, "vertical")).toBe(true);
     expect(await boxOf(content.locator("h1"))).toEqual(before);
-    expect(await thumbChangesOnHoverAsync(window, scroller, "horizontal")).toBe(true);
+    expect(await ScrollAreaFixture.thumbChangesOnHoverAsync(window, scroller, "horizontal")).toBe(true);
   });
 
   test("a heading that wraps keeps its lines apart", async ({ desktop }) => {

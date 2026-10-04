@@ -30,6 +30,14 @@
   box-shadow: inset calc(-2 * var(--tr-border-width)) 0 0 var(--tr-accent);
 }
 
+.tr-dock-strip-drop-before:dir(rtl) {
+  box-shadow: inset calc(-2 * var(--tr-border-width)) 0 0 var(--tr-accent);
+}
+
+.tr-dock-strip-drop-after:dir(rtl) {
+  box-shadow: inset calc(2 * var(--tr-border-width)) 0 0 var(--tr-accent);
+}
+
 .tr-dock-strip-vertical .tr-dock-strip-drop-before {
   box-shadow: inset 0 calc(2 * var(--tr-border-width)) 0 var(--tr-accent);
 }

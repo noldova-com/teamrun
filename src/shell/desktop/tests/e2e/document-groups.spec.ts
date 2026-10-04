@@ -15,6 +15,7 @@ import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
 const notes = "view/notes.list";
 const firstNote = "document/notes.note/1";
 const secondNote = "document/notes.note/2";
+const thirdNote = "document/notes.note/3";
 
 async function runCommandAsync(window: Page, title: string, name: string): Promise<void> {
   await CommandSearchFixture.searchAsync(window, title);
@@ -88,6 +89,54 @@ test.describe("document groups", () => {
     await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, secondNote))).toEqual([secondNote, firstNote]);
     await expect(documentGroups(window)).toHaveCount(1);
     await desktop.checkpointAsync("document-center-joins-group");
+  });
+
+  test("over a tab row a dragged tab shows only an insertion line and drops there, while over the content a guide previews its area", async ({ desktop }) => {
+    const window = desktop.window;
+    const line = window.locator(".tr-tab-drop-before");
+    const preview = window.locator(".tr-docking-preview");
+    for (const scheme of ["light", "dark"] as const) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await TabDragFixture.startAsync(window, firstNote);
+      await TabDragFixture.moveOverAsync(window, TabDragFixture.tab(window, secondNote), 30);
+      await expect(line).toHaveCount(1);
+      await expect(line).toHaveClass(/tr-tab-group-end/);
+      await expect(preview).toHaveCount(0);
+      await expect(window.locator("tr-docking-plate")).toHaveCount(0);
+      await desktop.checkpointAsync(`tab-row-insertion-${scheme}`);
+      await TabDragFixture.moveOverAsync(window, TabDragFixture.groupOf(window, secondNote).locator(".tr-tab-group-actions"));
+      await expect(line).toHaveClass(/tr-tab-group-end/);
+      await expect(window.locator("tr-docking-plate")).toHaveCount(0);
+      await TabDragFixture.moveOverAsync(window, TabDragFixture.groupOf(window, secondNote).locator("[role=tabpanel]"));
+      await TabDragFixture.moveOverAsync(window, window.locator("tr-docking-plate [data-direction=Right]"));
+      await expect(preview).toBeVisible();
+      await expect(line).toHaveCount(0);
+      const group = await TabDragFixture.groupOf(window, secondNote).boundingBox() ?? { x: 0, y: 0, width: 0, height: 0 };
+      const box = await preview.boundingBox() ?? { x: 0, y: 0, width: 0, height: 0 };
+      expect([box.x + box.width, box.y, box.height].map(t => Math.round(t))).toEqual([group.x + group.width, group.y, group.height].map(t => Math.round(t)));
+      expect(box.x).toBeGreaterThanOrEqual(group.x + group.width / 2);
+      await desktop.checkpointAsync(`tab-split-preview-${scheme}`);
+      await window.keyboard.press("Escape");
+      await window.mouse.up();
+      await expect(preview).toHaveCount(0);
+      await window.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    }
+
+    await TabDragFixture.startAsync(window, firstNote);
+    await TabDragFixture.moveOverAsync(window, TabDragFixture.tab(window, secondNote), 30);
+    await window.mouse.up();
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, firstNote))).toEqual([secondNote, firstNote]);
+    await expect(line).toHaveCount(0);
+    await splitFirstNoteAsync(window);
+    await TabDragFixture.startAsync(window, secondNote);
+    await TabDragFixture.moveOverAsync(window, TabDragFixture.tab(window, firstNote), -30);
+    await expect(TabDragFixture.tab(window, firstNote)).toHaveClass(/tr-tab-drop-before/);
+    await expect(preview).toHaveCount(0);
+    await window.mouse.up();
+
+    await expect(documentGroups(window)).toHaveCount(1);
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, firstNote))).toEqual([secondNote, firstNote]);
   });
 
   test("a document shows no plate over a views group", async ({ desktop }) => {
@@ -211,16 +260,15 @@ test.describe("document groups", () => {
       const window = desktop.window;
       const outline = "view/notes.outline";
       const clock = "view/clock.face";
-      const thirdNote = "document/notes.note/3";
       const tabOf = (key: string): Locator => TabDragFixture.tab(desktop.window, key);
       await TabDragFixture.dragOntoPlateAsync(window, clock, notes, "Center");
       await window.mouse.up();
       await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, notes))).toEqual([notes, outline, clock]);
-      await TabDragFixture.tab(window, firstNote).click();
+      await tabOf(firstNote).click();
       await window.keyboard.press("ControlOrMeta+Alt+KeyN");
       await expect(tabOf(thirdNote)).toHaveAttribute("aria-selected", "true");
-      await TabDragFixture.tab(window, firstNote).click();
-      await TabDragFixture.tab(window, outline).click();
+      await tabOf(firstNote).click();
+      await tabOf(outline).click();
       await expect(tabOf(firstNote)).toHaveAttribute("aria-selected", "true");
       await expect(tabOf(outline)).toHaveAttribute("aria-selected", "true");
 
@@ -232,6 +280,26 @@ test.describe("document groups", () => {
       await expect(tabOf(outline)).toHaveAttribute("aria-selected", "true");
       await expect(tabOf(secondNote)).toHaveAttribute("aria-selected", "false");
       await expect(tabOf(clock)).toHaveAttribute("aria-selected", "false");
+    });
+
+  for (const reopen of [true, false])
+    test(`a document closed before ${reopen ? "reopening on the running runtime" : "a restart that stops the runtime"} stays closed, though its module opens it at start`, async ({ desktop }) => {
+      const window = desktop.window;
+      const tabOf = (key: string): Locator => TabDragFixture.tab(desktop.window, key);
+      await tabOf(firstNote).click();
+      await window.keyboard.press("ControlOrMeta+Alt+KeyN");
+      await expect(tabOf(thirdNote)).toHaveAttribute("aria-selected", "true");
+      await tabOf(firstNote).click();
+      await window.keyboard.press("ControlOrMeta+KeyW");
+      await expect(tabOf(firstNote)).toHaveCount(0);
+      await tabOf(secondNote).click();
+      await expect(tabOf(secondNote)).toHaveAttribute("aria-selected", "true");
+
+      await (reopen ? desktop.reopenAsync() : desktop.restartAsync());
+
+      await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(desktop.window, secondNote))).toEqual([secondNote, thirdNote]);
+      await expect(tabOf(secondNote)).toHaveAttribute("aria-selected", "true");
+      await expect(tabOf(firstNote)).toHaveCount(0);
     });
 
   test("Reset the layout returns the documents to one group", async ({ desktop }) => {

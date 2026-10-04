@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { FocusOrigin } from "@angular/cdk/a11y";
+import type { AriaLivePoliteness, FocusOrigin } from "@angular/cdk/a11y";
 
 import "@noldova/teamrun-foundation-core";
 import { ModuleState, NotificationSeverity } from "@noldova/teamrun-shell-protocol";
@@ -322,6 +322,7 @@ export class Resources {
   public static readonly regionRole: string = "region";
   public static readonly tabPanelRole: string = "tabpanel";
   public static readonly verticalOrientation: string = "vertical";
+  public static readonly rightToLeft: string = "rtl";
   public static readonly previewTabsSetting: string = "shell.previewTabs";
   public static readonly dockStyleSettings: ReadonlyMap<DockSide, string> = new Map([[DockSide.Left, "shell.leftDockStyle"], [DockSide.Right, "shell.rightDockStyle"]]);
   public static readonly dockStripLabels: Readonly<Record<DockSide, string>> = {
@@ -716,6 +717,9 @@ export class Resources {
   public static readonly dismissLabel: string = "Dismiss";
   public static readonly unreadLimit: number = 9;
   public static readonly toastLimit: number = 3;
+  public static readonly politeAnnouncement: AriaLivePoliteness = "polite";
+  public static readonly assertiveAnnouncement: AriaLivePoliteness = "assertive";
+  public static readonly announcementSeparator: string = ". ";
   public static readonly hoverSelector: string = ":hover";
   public static readonly toastDuration: number = 8000;
   public static readonly toastKindInterval: number = 5000;
