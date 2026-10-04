@@ -132,6 +132,8 @@ export class Resources {
   public static readonly willQuitEvent: "will-quit" = "will-quit";
   public static readonly resizeEvent: "resize" = "resize";
   public static readonly moveEvent: "move" = "move";
+  public static readonly willMoveEvent: "will-move" = "will-move";
+  public static readonly willResizeEvent: "will-resize" = "will-resize";
   public static readonly maximizeEvent: "maximize" = "maximize";
   public static readonly unmaximizeEvent: "unmaximize" = "unmaximize";
   public static readonly boundsSaveDelay: number = 500;
@@ -169,6 +171,7 @@ export class Resources {
   public static readonly windowMinimumHeight: number = 400;
   public static readonly windowWidth: number = 1280;
   public static readonly windowHeight: number = 800;
+  public static readonly windowAreaShare: number = 0.9;
   public static readonly closeAnswerTimeout: number = 5000;
   public static readonly workQueryTimeout: number = 2000;
   public static readonly moduleLogLimit: number = 65536;

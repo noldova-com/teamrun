@@ -11,7 +11,7 @@ import { ArgumentException, ArgumentOutOfRangeException, ExceptionOptions } from
 import { JsonException, type JsonObject, JsonReader } from "@noldova/teamrun-foundation-json";
 
 import { Resources } from "../resources.js";
-import type { ScreenArea } from "./screen-area.js";
+import { ScreenArea } from "./screen-area.js";
 
 export class WindowState {
   public readonly x: number | null;
@@ -39,8 +39,9 @@ export class WindowState {
     this.isMaximized = isMaximized;
   }
 
-  public static createDefault(): WindowState {
-    return new WindowState(null, null, Resources.windowWidth, Resources.windowHeight, false);
+  public static createDefault(area: ScreenArea): WindowState {
+    return new WindowState(null, null, WindowState.shareOf(Resources.windowWidth, area.width, Resources.windowMinimumWidth),
+      WindowState.shareOf(Resources.windowHeight, area.height, Resources.windowMinimumHeight), false);
   }
 
   public static fromJson(value: unknown): WindowState {
@@ -58,11 +59,38 @@ export class WindowState {
     }
   }
 
-  public placeOn(workAreas: readonly ScreenArea[]): WindowState {
+  public placeOn(workAreas: readonly ScreenArea[], primary: ScreenArea): ScreenArea {
     const { x, y } = this;
-    if (Object.isNull(x) || Object.isNull(y) || workAreas.some(t => t.overlaps(x, y, this.width, this.height)))
-      return this;
-    return new WindowState(null, null, this.width, this.height, this.isMaximized);
+    if (Object.isNull(x) || Object.isNull(y))
+      return this.centerOn(primary);
+    const shown = this.displayOf(workAreas, x, y);
+    if (Object.isNull(shown))
+      return this.centerOn(primary);
+    return shown.fits(this.width, this.height) ? new ScreenArea(x, y, this.width, this.height) : this.centerOn(shown);
+  }
+
+  private static shareOf(size: number, available: number, minimum: number): number {
+    return Math.max(minimum, Math.min(size, Math.floor(available * Resources.windowAreaShare)));
+  }
+
+  private centerOn(area: ScreenArea): ScreenArea {
+    const isFitting = area.fits(this.width, this.height);
+    const width = isFitting ? this.width : WindowState.shareOf(this.width, area.width, Resources.windowMinimumWidth);
+    const height = isFitting ? this.height : WindowState.shareOf(this.height, area.height, Resources.windowMinimumHeight);
+    return new ScreenArea(area.x + Math.floor((area.width - width) / 2), area.y + Math.floor((area.height - height) / 2), width, height);
+  }
+
+  private displayOf(workAreas: readonly ScreenArea[], x: number, y: number): ScreenArea | null {
+    let shown: ScreenArea | null = null;
+    let most = 0;
+    for (const area of workAreas) {
+      const shared = area.overlapArea(x, y, this.width, this.height);
+      if (shared > most) {
+        shown = area;
+        most = shared;
+      }
+    }
+    return shown;
   }
 
   public toJson(): JsonObject {

@@ -10,4 +10,5 @@ import type { Rectangle } from "electron";
 
 export interface IDisplayHost {
   getAllDisplays(): readonly { readonly workArea: Rectangle }[];
+  getPrimaryDisplay(): { readonly workArea: Rectangle };
 }

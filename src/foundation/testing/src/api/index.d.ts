@@ -799,10 +799,16 @@ export declare class TestRunResult {
   public readonly total: number;
 
   /**
+   * What the run selected out of what it discovered.
+   */
+  public readonly selection: TestSelection;
+
+  /**
    * Creates the result and computes its totals.
    *
    * @param classResults The class results, in execution order. The result
    * keeps its own copy.
+   * @param selection What the run discovered and selected; every test counts as selected, with no filters, when absent.
    * @example
    * ```ts
    * import { TestClassResult, TestMethodResult, TestOutcome, TestRunResult } from "@noldova/teamrun-foundation-testing";
@@ -813,7 +819,53 @@ export declare class TestRunResult {
    * export const total: number = result.total;
    * ```
    */
-  public constructor(classResults: readonly TestClassResult[]);
+  public constructor(classResults: readonly TestClassResult[], selection?: TestSelection | null);
+}
+
+/**
+ * The filters of a run and how many tests they discovered, selected and left out.
+ */
+export declare class TestSelection {
+  /**
+   * The filters, in the order given; none when the run was not filtered.
+   */
+  public readonly filters: readonly string[];
+
+  /**
+   * How many tests discovery found.
+   */
+  public readonly discovered: number;
+
+  /**
+   * How many of them the filters selected.
+   */
+  public readonly selected: number;
+
+  /**
+   * How many the filters left out: discovered minus selected.
+   */
+  public readonly unselected: number;
+
+  /**
+   * True when the run had at least one filter.
+   */
+  public readonly isFiltered: boolean;
+
+  /**
+   * Creates the selection and computes the number left out.
+   *
+   * @param filters The filters, in the order given. The selection keeps its own copy.
+   * @param discovered How many tests discovery found.
+   * @param selected How many of them the filters selected.
+   * @example
+   * ```ts
+   * import { TestSelection } from "@noldova/teamrun-foundation-testing";
+   *
+   * const selection: TestSelection = new TestSelection(["category:fast"], 120, 8);
+   * export const unselected: number = selection.unselected;
+   * ```
+   */
+  public constructor(filters: readonly string[], discovered: number, selected: number);
 }
 
 /**

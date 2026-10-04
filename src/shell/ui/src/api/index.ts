@@ -25,6 +25,8 @@ export { MenuTriggerDirective } from "../app/components/menu/menu-trigger.direct
 export { MenuComponent } from "../app/components/menu/menu.component";
 export { ProgressComponent } from "../app/components/progress/progress.component";
 export { PanelCardComponent } from "../app/components/panel-card/panel-card.component";
+export { PopoverDirective } from "../app/components/popover/popover.directive";
+export { PopoverTriggerDirective } from "../app/components/popover/popover-trigger.directive";
 export { QuickInputComponent } from "../app/components/quick-input/quick-input.component";
 export { SashComponent } from "../app/components/sash/sash.component";
 export { SelectComponent } from "../app/components/select/select.component";

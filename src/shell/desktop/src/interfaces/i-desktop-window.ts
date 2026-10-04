@@ -21,7 +21,6 @@ export interface IDesktopWindow {
   setAppDetails(options: AppDetailsOptions): void;
   getNormalBounds(): Rectangle;
   setBounds(bounds: Partial<Rectangle>): void;
-  center(): void;
   isMaximized(): boolean;
   maximize(): void;
   isVisible(): boolean;
@@ -35,6 +34,8 @@ export interface IDesktopWindow {
   on(event: "close", listener: (event: IPreventableEvent) => void): unknown;
   on(event: "resize", listener: () => void): unknown;
   on(event: "move", listener: () => void): unknown;
+  on(event: "will-move", listener: () => void): unknown;
+  on(event: "will-resize", listener: () => void): unknown;
   on(event: "maximize", listener: () => void): unknown;
   on(event: "unmaximize", listener: () => void): unknown;
   on(event: "unresponsive", listener: () => void): unknown;
