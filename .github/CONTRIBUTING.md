@@ -62,6 +62,21 @@ Keep the change small enough to review coherently. A PR that changes the appeara
 
 An authorized maintainer, or an agent the maintainer designates, reviews each change. Once it is approved, auto-merge squashes it into `main` when its required checks pass: the linked-issue check and **Build and test (all targets)**. The branch need not be up to date with `main`. The push run on `main` is the first run of the combined code and of the targets that pull requests skip; a failure there belongs to the pull request that caused it, and merging stops until it is fixed ([stop the line](../docs/TESTING.md#flakiness-and-races)). A passing check does not authorize a release or establish that behavior outside the check's scope works.
 
+### The pull request watch
+
+The **Watch pull requests** workflow checks every open pull request that targets `main` and is not a draft, every 15 minutes and after each **Build and test** run. It reads the repository, runs and checks and writes pull request comments only; it holds no other secret, starts no run, and never approves, merges or turns on auto-merge. Each run's summary lists every open pull request and its finding, or "nothing to do".
+
+For each finding it posts one comment, never twice for the same head commit, and adds a line to that comment when the finding clears or the head commit changes:
+
+| Finding | When it is posted | What the author does |
+|---|---|---|
+| `no-build` | The head commit has had no **Build and test** run 10 minutes after it was pushed. Events made with the workflow's own token start no pull request runs, so the workflow cannot start one. | Push again, for example an empty commit, or close and reopen the pull request. |
+| `conflict` | The pull request has conflicted with `main` for 20 minutes. | Merge or rebase `main`, resolve the conflicts and push. |
+| `failed` | A required check failed 30 minutes ago and nothing has been pushed since. | Fix the failure and push. If a known flaky test caused it, comment on its issue and rerun the failed job once. |
+| `not-merging` | Every required check passed 15 minutes ago, auto-merge is off, and the pull request has an approving review or had auto-merge on before. | Ask the reviewer to merge it or turn on auto-merge. |
+
+The workflow measures a push by the first check that started on the head commit, or the commit's date when none started; a conflict from the later of that push and the last change to `main`; and a failure or a pass by the completion of the required checks.
+
 ### AI-assisted changes
 
 Explain material AI involvement and how you reviewed and verified the result. The contributor remains responsible for correctness, security and licensing. Keep discussion constructive and address findings on their merits.

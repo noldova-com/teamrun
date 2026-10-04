@@ -22,6 +22,13 @@ describe("SettingsPage", () => {
     ]);
   });
 
+  it("makes a Gallery page of no settings", () => {
+    const gallery = SettingsPage.galleryOf("Gallery");
+
+    expect([gallery.title, gallery.isGallery, gallery.isShortcuts, gallery.groups]).toEqual(["Gallery", true, false, []]);
+    expect(SettingsPage.pagesOf(SettingsFixture.all).some(t => t.isGallery)).toBe(false);
+  });
+
   it("keeps the leading pages even without settings, and filters a page's groups down to the matching settings", () => {
     const appearance = SettingsPage.pagesOf(SettingsFixture.all)[0] as SettingsPage;
 

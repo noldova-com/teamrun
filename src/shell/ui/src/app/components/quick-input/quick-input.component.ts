@@ -36,6 +36,7 @@ export class QuickInputComponent {
   public readonly items = input.required<readonly QuickInputItem[]>();
   public readonly label = input.required<string>();
   public readonly query = model<string>(String.empty);
+  public readonly isFocusing = input<boolean>(true);
   public readonly chosen = output<QuickInputItem>();
   public readonly dismissed = output<void>();
 
@@ -47,7 +48,10 @@ export class QuickInputComponent {
     afterRenderEffect(() => {
       this.host.querySelector(`#${this.optionId(this.active())}`)?.scrollIntoView(Resources.revealOptions);
     });
-    afterNextRender(() => this.host.querySelector<HTMLInputElement>(Resources.quickInputFieldSelector)?.focus());
+    afterNextRender(() => {
+      if (this.isFocusing())
+        this.host.querySelector<HTMLInputElement>(Resources.quickInputFieldSelector)?.focus();
+    });
   }
 
   protected optionId(index: number): string {
