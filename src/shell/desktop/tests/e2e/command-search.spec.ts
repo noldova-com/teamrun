@@ -91,6 +91,7 @@ test.describe("command search", () => {
 
     await window.keyboard.type("new note");
 
+    await expect(options(window).last().locator("mark")).toHaveText(["New note"]);
     await expect(options(window)).toHaveCount(2);
     await expect(options(window).last()).toHaveAttribute("data-item", "notes.newNote");
     await expect(options(window).first().locator(".tr-quick-input-detail")).toHaveText("File › New from template");
@@ -123,15 +124,14 @@ test.describe("command search", () => {
     await CommandSearchFixture.searchAsync(window, String());
     await expect(options(window).first()).toBeVisible();
     const all = await rows();
+    const expected = all.filter(t => `${t[1]} ${t[2]}`.toLowerCase().includes("tab")).map(t => t[0]);
 
     await window.keyboard.type("tab");
-    await expect.poll(async () => (await rows()).length).toBeLessThan(all.length);
+    await expect.poll(async () => (await rows()).map(t => [t[0], t[3].map(u => u.toLowerCase())])).toEqual(expected.map(t => [t, ["tab"]]));
     const found = await rows();
 
     expect(found.length).toBeGreaterThan(0);
-    expect(found.map(t => t[0])).toEqual(all.filter(t => `${t[1]} ${t[2]}`.toLowerCase().includes("tab")).map(t => t[0]));
     expect(found.map(t => [t[1], t[2]])).toEqual(found.map(t => all.find(u => u[0] === t[0])).map(t => [t?.[1], t?.[2]]));
-    expect(found.every(t => t[3].length === 1 && t[3][0]?.toLowerCase() === "tab")).toBe(true);
     for (const mode of WindowModeFixture.modes) {
       await WindowModeFixture.setAsync(window, mode);
       await desktop.checkpointAsync(`command-search-match-${mode.toLowerCase()}`);
