@@ -126,13 +126,13 @@ describe("StatusBarItemComponent", () => {
     expect(getComputedStyle(host).display).toBe("none");
   });
 
-  for (const command of [undefined, "clock.tick"])
-    for (const tooltip of [undefined, "Tick the clock"])
-      it(`shows the full text of ${command ? "a button" : "a plain"} item ${tooltip ? "with" : "without"} its own tooltip only when cut short, and is named by it`, async () => {
+  for (const [kind, command] of [["a plain", {}], ["a button", { command: "clock.tick" }]] as const)
+    for (const [owning, tooltip] of [["without", {}], ["with", { tooltip: "Tick the clock" }]] as const)
+      it(`shows the full text of ${kind} item ${owning} its own tooltip only when cut short, and is named by it`, async () => {
         AppearanceFixture.apply();
         register("clock.tick");
         const shownFor = async (text: string): Promise<string | null> => {
-          const [fixture] = render(new StatusBarItemState(text, { command, tooltip }));
+          const [fixture] = render(new StatusBarItemState(text, { ...command, ...tooltip }));
           const host: HTMLElement = fixture.nativeElement;
           host.style.width = "6rem";
           const directive = fixture.debugElement.query(By.directive(TooltipDirective)).injector.get(TooltipDirective);
@@ -141,7 +141,7 @@ describe("StatusBarItemComponent", () => {
           const shown = document.querySelector(".cdk-overlay-container tr-tooltip")?.textContent?.trim() ?? null;
           directive.hide();
           const pill = host.querySelector(".tr-status-bar-item");
-          expect(pill?.getAttribute("aria-label")).toBe(command ? null : text);
+          expect(pill?.getAttribute("aria-label")).toBe("command" in command ? null : text);
           expect(pill?.textContent?.trim()).toBe(text);
           fixture.destroy();
           return shown;
@@ -150,7 +150,7 @@ describe("StatusBarItemComponent", () => {
         const long = await shownFor(LONG);
         const short = await shownFor("2 notes");
 
-        expect([long, short]).toEqual(tooltip ? [tooltip, tooltip] : [LONG, null]);
+        expect([long, short]).toEqual("tooltip" in tooltip ? [tooltip.tooltip, tooltip.tooltip] : [LONG, null]);
       });
 
   for (const theme of AppearanceFixture.themes)
