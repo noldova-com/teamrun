@@ -67,6 +67,29 @@ describe("WindowComponent", () => {
     expect(root.querySelector("tr-startup")).toBeNull();
   });
 
+  it("keeps the workspace under the startup card while the runtime starts again", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const fixture = TestBed.createComponent(WindowComponent);
+    await fixture.whenStable();
+    const root: HTMLElement = fixture.nativeElement;
+    const workspace = root.querySelector("tr-workspace");
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    await fixture.whenStable();
+    const card = root.querySelector("tr-startup") as HTMLElement;
+    const tags = [...root.children].map(t => t.tagName.toLowerCase());
+    const [cardBox, workspaceBox] = [card, workspace as Element].map(t => t.getBoundingClientRect().toJSON());
+    const announced = [card.querySelector("[role=status]")?.textContent?.trim(), card.classList.contains("tr-window-reconnecting")];
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await fixture.whenStable();
+
+    expect(tags).toEqual(["tr-window-row", "tr-toolbar-band", "tr-workspace", "tr-startup", "tr-status-bar", "tr-toasts"]);
+    expect(cardBox).toEqual(workspaceBox);
+    expect(announced).toEqual(["Starting TeamRun…", true]);
+    expect(root.querySelector("tr-workspace")).toBe(workspace);
+    expect(root.querySelector("tr-startup")).toBeNull();
+  });
+
   it("answers close requests as saved and stops listening when destroyed", async () => {
     const bridge = DesktopBridgeFixture.install();
     const fixture = TestBed.createComponent(WindowComponent);

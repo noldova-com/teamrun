@@ -44,6 +44,6 @@ LICENSE file in the root directory of this source tree.
   @let state = action.state();
   @if (!state.isHidden) {
     <button type="button" tr-icon-button class="tr-window-row-action" [attr.data-tr-item]="action.name" [icon]="state.icon" [label]="state.title"
-      [disabled]="!isAvailable(state.command)" [trTooltip]="state.title" [trTooltipSide]="below" (click)="run(state.command, state.commandArguments)"></button>
+      [disabled]="!isAvailable(state.command, state.commandArguments)" [trTooltip]="state.title" [trTooltipSide]="below" (click)="run(state.command, state.commandArguments)"></button>
   }
 </ng-template>
