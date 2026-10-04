@@ -9,10 +9,9 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
-import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import { Assert, TestClass, TestMethod, Wait } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity } from "@noldova/teamrun-shell-protocol";
 import { DataDirectory, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
@@ -224,7 +223,7 @@ export class CliTests {
     const timedOut = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--timeout", "0.2", "--json"]));
     await rm(marker, { force: true });
     const running = fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--json"]));
-    await CliTests.waitForAsync(() => existsSync(marker));
+    await CliTests.waitForWaitingAsync(marker);
     fixture.signals.emit("SIGINT");
     const interrupted = await running;
 
@@ -334,7 +333,7 @@ export class CliTests {
     const marker = path.join(new DataDirectory(fixture.dataDirectory).locateModuleFolder("probe"), ProbeBuildFixture.WAITING_MARKER);
 
     const running = fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--json"]), build);
-    await CliTests.waitForAsync(() => existsSync(marker));
+    await CliTests.waitForWaitingAsync(marker);
     await fixture.stopRuntimeAsync();
     const lost = await running;
     const broken = { identity: new BuildIdentity("1.0.0", RuntimeBuild.identity.protocolVersion, "broken"), entryPath: path.join(fixture.root, "missing-entry.js") };
@@ -381,10 +380,7 @@ export class CliTests {
     Assert.areEqual("TeamRun could not be started.\n", failed.error);
   }
 
-  private static async waitForAsync(condition: () => boolean): Promise<void> {
-    const deadline = Date.now() + CliTests.WAIT_LIMIT;
-    while (!condition() && Date.now() < deadline)
-      await delay(10);
-    Assert.isTrue(condition());
+  private static async waitForWaitingAsync(marker: string): Promise<void> {
+    Assert.isTrue(await Wait.untilAsync(() => existsSync(marker), CliTests.WAIT_LIMIT), `The probe's command did not start waiting within ${CliTests.WAIT_LIMIT} ms.`);
   }
 }

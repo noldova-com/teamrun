@@ -29,7 +29,7 @@ export class GitHubSummaryWriter {
     const files = new Set(result.classResults.map(t => JSON.stringify([t.packageName, t.filePath])));
     const selection = result.selection.isFiltered
       ? [
-          Resources.formatSummaryRow(Resources.filtersLabel, result.selection.filters.join(", ")),
+          Resources.formatSummaryRow(Resources.filtersLabel, result.selection.filters.map(t => Resources.formatSummaryFilter(t)).join(" ")),
           Resources.formatSummaryRow(Resources.discoveredLabel, result.selection.discovered),
           Resources.formatSummaryRow(Resources.selectedLabel, result.selection.selected),
           Resources.formatSummaryRow(Resources.unselectedLabel, result.selection.unselected)

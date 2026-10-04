@@ -9,6 +9,7 @@
 import { TestBed } from "@angular/core/testing";
 
 import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
+import { DialogService } from "@noldova/teamrun-shell-ui";
 
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { MenuDeclarations } from "../../../src/app/models/menu-declarations";
@@ -18,17 +19,18 @@ import { MenuBarService } from "../../../src/app/services/menu-bar.service";
 import { MenuService } from "../../../src/app/services/menu.service";
 import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
+import { ViewDialogFixture } from "../../fixtures/view-dialog.fixture";
 
 describe("MenuBarService", () => {
   let runs: string[];
   let sortBy: string;
 
-  function start(): MenuBarService {
+  function start(isDialogOpen: boolean = false, viewModule: string | null = null): MenuBarService {
     runs = [];
     sortBy = "week";
     DesktopBridgeFixture.install();
     TestBed.configureTestingModule({
-      providers: [{
+      providers: [{ provide: DialogService, useValue: { isOpen: isDialogOpen } }, ViewDialogFixture.provideShowing(viewModule), {
         provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
           places: [{ name: "notes.tools", title: "Notes", shows: "menuBar" }, { name: "notes.templates", title: "New from template", shows: "menu" }],
           groups: [
@@ -99,6 +101,33 @@ describe("MenuBarService", () => {
     await Promise.resolve();
 
     expect(runs).toEqual([JSON.stringify({ by: "title" }), JSON.stringify({ template: "plan" })]);
+  });
+
+  it("runs no row while a modal dialog is open, so the window behind it doesn't change", async () => {
+    const bar = start(true);
+
+    bar.run("notes.tools/notes.sorting/0");
+    await Promise.resolve();
+
+    expect(runs).toEqual([]);
+  });
+
+  it("runs the rows of the module whose view a dialog shows", async () => {
+    const bar = start(true, "notes");
+
+    bar.run("notes.tools/notes.sorting/0");
+    await Promise.resolve();
+
+    expect(runs).toEqual([JSON.stringify({ by: "title" })]);
+  });
+
+  it("runs no row of another module while a dialog shows a view", async () => {
+    const bar = start(true, "clock");
+
+    bar.run("notes.tools/notes.sorting/0");
+    await Promise.resolve();
+
+    expect(runs).toEqual([]);
   });
 
   it("ignores an id for a disabled row or a row that no longer exists", async () => {

@@ -18,6 +18,7 @@ import type { TestRunResult } from "../../models/results/test-run-result.js";
 import { Resources } from "../../resources.js";
 
 export class TestReportWriter implements ITestProgressListener {
+  private static readonly LABEL_WIDTH: number = 12;
   private static readonly CENTISECONDS_PER_SECOND: number = 100;
   private static readonly DURATION_DECIMAL_PLACES: number = 2;
   private static readonly MILLISECONDS_PER_CENTISECOND: number = 10;
@@ -72,22 +73,27 @@ export class TestReportWriter implements ITestProgressListener {
     const lines: string[] = [];
     lines.push(Resources.testReportSeparator);
     if (result.selection.isFiltered) {
-      lines.push(`${Resources.filtersLabel}    ${result.selection.filters.join(", ")}`);
-      lines.push(`${Resources.discoveredLabel} ${result.selection.discovered}`);
-      lines.push(`${Resources.selectedLabel}   ${result.selection.selected}`);
-      lines.push(`${Resources.unselectedLabel} ${result.selection.unselected}`);
+      lines.push(this.formatRow(Resources.filtersLabel, result.selection.filters.map(t => JSON.stringify(t)).join(", ")));
+      lines.push(this.formatRow(Resources.discoveredLabel, result.selection.discovered));
+      lines.push(this.formatRow(Resources.selectedLabel, result.selection.selected));
+      lines.push(this.formatRow(Resources.unselectedLabel, result.selection.unselected));
     }
-    lines.push(`${Resources.totalLabel}   ${result.total}`);
-    lines.push(`${Resources.timeLabel}    ${this.formatDuration(result.durationMilliseconds)}`);
-    lines.push(`${TerminalColor.GREEN}${Resources.passedLabel}  ${result.passed}${TerminalColor.RESET}`);
+    lines.push(this.formatRow(Resources.totalLabel, result.total));
+    lines.push(this.formatRow(Resources.timeLabel, this.formatDuration(result.durationMilliseconds)));
+    lines.push(this.formatRow(Resources.passedLabel, result.passed, TerminalColor.GREEN));
     if (result.failed > 0)
-      lines.push(`${TerminalColor.RED}${Resources.failedLabel}  ${result.failed}${TerminalColor.RESET}`);
+      lines.push(this.formatRow(Resources.failedLabel, result.failed, TerminalColor.RED));
     if (result.skipped > 0)
-      lines.push(`${TerminalColor.YELLOW}${Resources.skippedLabel} ${result.skipped}${TerminalColor.RESET}`);
+      lines.push(this.formatRow(Resources.skippedLabel, result.skipped, TerminalColor.YELLOW));
     if (result.unreached > 0)
-      lines.push(`${TerminalColor.RED}${Resources.unreachedLabel} ${result.unreached}${TerminalColor.RESET}`);
+      lines.push(this.formatRow(Resources.unreachedLabel, result.unreached, TerminalColor.RED));
 
     return lines;
+  }
+
+  private formatRow(label: string, value: string | number, color: string = String.empty): string {
+    const row = `${label.padEnd(TestReportWriter.LABEL_WIDTH)}${value}`;
+    return color === String.empty ? row : `${color}${row}${TerminalColor.RESET}`;
   }
 
   private formatDuration(durationMilliseconds: number): string {

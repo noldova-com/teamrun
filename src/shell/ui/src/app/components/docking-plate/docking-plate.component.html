@@ -1,3 +1,11 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
 @for (direction of directions; track direction) {
   <tr-docking-guide [direction]="direction" [chosen]="direction === chosen()" [class]="'tr-docking-plate-' + direction" />
 }

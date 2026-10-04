@@ -42,7 +42,7 @@ export class MenuBarService {
 
   public run(id: string): void {
     const row = this.find(id.split(Resources.menuRowPathSeparator));
-    if (!Object.isNull(row) && row.isEnabled)
+    if (!Object.isNull(row) && row.isEnabled && !this.commands.isHeldByDialog(row.command))
       this.commands.run(row.command, row.commandArguments);
   }
 

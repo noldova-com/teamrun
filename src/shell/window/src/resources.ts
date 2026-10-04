@@ -192,6 +192,10 @@ export class Resources {
   public static readonly previousTabCommand: string = "shell.previousTab";
   public static readonly openSettingsCommand: string = "shell.openSettings";
   public static readonly openSettingsTitle: string = "Settings…";
+  public static readonly showInDialogCommand: string = "shell.showInDialog";
+  public static readonly showInDialogTitle: string = "Show in a dialog";
+  public static readonly showInDialogGlyph: string = "open_in_full";
+  public static readonly dialogAlreadyOpen: string = "A dialog is already open.";
   public static readonly settingsDocument: string = "shell.settings";
   public static readonly settingsTitle: string = "Settings";
   public static readonly settingsGlyph: string = "settings";
@@ -223,6 +227,8 @@ export class Resources {
   public static readonly keyColumn: string = "Key";
   public static readonly actionsColumn: string = "Actions";
   public static readonly noKey: string = "No key";
+  public static readonly choicePillMinimum: number = 2;
+  public static readonly choicePillLimit: number = 4;
   public static readonly shortcutsExplanation: string = "The keys that run commands. Choose a key to record a new one; your keys apply on every device.";
   public static readonly resetAllShortcutsLabel: string = "Reset all shortcuts";
   public static readonly removeKeyLabel: string = "Remove";
@@ -443,6 +449,7 @@ export class Resources {
     [EditAction.Paste]: "shell.paste",
     [EditAction.SelectAll]: "shell.selectAll"
   };
+  public static readonly modalCommands: readonly string[] = Object.values(Resources.editCommands);
   public static readonly editTitles: Readonly<Record<EditAction, string>> = {
     [EditAction.Undo]: "Undo",
     [EditAction.Redo]: "Redo",

@@ -9,6 +9,8 @@
 export { ViewBadgeComponent } from "../app/components/view-badge/view-badge.component";
 export { ButtonComponent } from "../app/components/button/button.component";
 export { CheckboxComponent } from "../app/components/checkbox/checkbox.component";
+export { ChipComponent } from "../app/components/chip/chip.component";
+export { ChoicePillsComponent } from "../app/components/choice-pills/choice-pills.component";
 export { DialogComponent } from "../app/components/dialog/dialog.component";
 export { DockingGuideComponent } from "../app/components/docking-guide/docking-guide.component";
 export { DockingPlateComponent } from "../app/components/docking-plate/docking-plate.component";
@@ -28,6 +30,7 @@ export { PopoverTriggerDirective } from "../app/components/popover/popover-trigg
 export { QuickInputComponent } from "../app/components/quick-input/quick-input.component";
 export { SashComponent } from "../app/components/sash/sash.component";
 export { SelectComponent } from "../app/components/select/select.component";
+export { SpinnerComponent } from "../app/components/spinner/spinner.component";
 export { TabComponent } from "../app/components/tab/tab.component";
 export { TextFieldComponent } from "../app/components/text-field/text-field.component";
 export { TooltipComponent } from "../app/components/tooltip/tooltip.component";
@@ -36,6 +39,8 @@ export { ToolbarItemDirective } from "../app/components/toolbar/toolbar-item.dir
 export { ToolbarDirective } from "../app/components/toolbar/toolbar.directive";
 export { TooltipDirective } from "../app/components/tooltip/tooltip.directive";
 export { ButtonVariant } from "../app/enums/button-variant";
+export { ChipKind } from "../app/enums/chip-kind";
+export { DialogSize } from "../app/enums/dialog-size";
 export { DockingDirection } from "../app/enums/docking-direction";
 export { FontChoice } from "../app/enums/font-choice";
 export { ModePreference } from "../app/enums/mode-preference";

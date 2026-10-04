@@ -28,6 +28,18 @@ class GitTests {
         t => t instanceof ProcessException && /^"git rev-parse --verify missing-branch" failed with exit code 128: fatal: /.test(t.message));
     });
 
+    test("reading accepts the exit codes it is given instead of zero alone", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await repository.commitAsync({ "one.txt": "one\n", "two.txt": "two\n" });
+      const git = new Git(repository.directory, new ProcessRunner());
+      const compare = ["diff", "--quiet", "--no-index", "one.txt", "two.txt"];
+
+      assert.equal(await git.readOutputAsync(compare, [0, 1]), "");
+      await assert.rejects(git.readOutputAsync(compare), t => t instanceof ProcessException && /failed with exit code 1/.test(t.message));
+      await assert.rejects(git.readOutputAsync(["rev-parse", "--verify", "missing-branch"], [0, 1]), ProcessException);
+    });
+
     test("a command succeeds only when Git exits with zero", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
