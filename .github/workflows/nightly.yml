@@ -252,6 +252,7 @@ jobs:
             _build/ui/results
           retention-days: 14
           if-no-files-found: ignore
+          overwrite: true
 
   report:
     name: Report the failures
