@@ -2709,7 +2709,7 @@ export declare class RuntimeStartup {
    * shows {@link StartupStateKind.NewerBuild}.
    * @param waitInterval How long to pause between attempts while waiting for an older build's work, in milliseconds.
    * @param forward Receives each event the runtime sends on the current connection.
-   * @param log Receives the full description of a failure other than the launcher's refusals.
+   * @param log Receives each launch or connection failure, and the full description of any other failure.
    * @example
    * ```ts
    * import { type IRuntimeLauncher, RuntimeStartup } from "@noldova/teamrun-shell-desktop";
@@ -2740,8 +2740,9 @@ export declare class RuntimeStartup {
 
   /**
    * Starts or attaches to the runtime, stopping an older build's runtime only when it is idle. Reconnects when the
-   * runtime disconnects until {@link close}. A start or reconnection that fails for a reason other than the
-   * launcher's refusals is logged in full, shows the failure and offers to try again.
+   * runtime disconnects until {@link close}. A start or reconnection that fails for any reason other than data from
+   * before the shell, an older build's work or a newer build is logged, an unexpected failure in full, and shows
+   * the failure with an offer to try again.
    *
    * @returns A promise that settles once the state is ready or shows why not.
    * @example

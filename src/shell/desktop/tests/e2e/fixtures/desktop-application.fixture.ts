@@ -437,7 +437,7 @@ export default class DesktopApplicationFixture {
   private async readStartupFailureAsync(): Promise<string | null> {
     if (await this.window.getByRole("heading", { name: DesktopApplicationFixture.FAILED_TITLE }).count() === 0)
       return null;
-    return await this.window.locator(DesktopApplicationFixture.FAILED_DETAIL).first().textContent() ?? "";
+    return (await this.window.locator(DesktopApplicationFixture.FAILED_DETAIL).allTextContents())[0] ?? "";
   }
 
   private async applyViewportAsync(viewport: { width: number; height: number }): Promise<void> {

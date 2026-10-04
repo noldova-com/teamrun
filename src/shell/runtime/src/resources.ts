@@ -328,7 +328,7 @@ export class Resources {
   public static readonly portOutOfRange: string = "A port must be from 1 to 65535.";
   public static readonly socketPathNotAbsolute: string = "A local socket's path must be absolute.";
   public static readonly defaultRequestTimeoutTooLong: string = "The default time limit of a request cannot exceed its maximum.";
-  public static readonly launchLimitTooShort: string = "The limit for a runtime that is still starting cannot be shorter than the launch timeout.";
+  public static readonly launchLimitTooShort: string = "The limit while the data directory is owned cannot be shorter than the launch timeout.";
   public static readonly endpointUnavailable: string = "The runtime's local endpoint has no address.";
   public static readonly handshakeRequired: string = "A connection must begin with a handshake.";
   public static readonly unauthorized: string = "The capability token is not valid for this runtime.";
@@ -621,6 +621,10 @@ export class Resources {
 
   public static formatRuntimeExited(reason: string): string {
     return `The runtime exited while starting: ${reason}`;
+  }
+
+  public static formatLaunchLimitReached(milliseconds: number): string {
+    return `A runtime held the data directory but was not reachable within ${milliseconds / 1000} s.`;
   }
 
   public static formatStartLogNameInvalid(name: string): string {

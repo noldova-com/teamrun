@@ -47,7 +47,7 @@ export class LaunchSettingsTests {
   }
 
   @TestMethod
-  public waitsForAStartingRuntimeAtLeastAsLongAsTheLaunchTimeoutByDefault(): void {
+  public waitsOnAnOwnedDirectoryAtLeastAsLongAsTheLaunchTimeoutByDefault(): void {
     const settings = new LaunchSettings(LaunchSettingsTests.DIRECTORY, "node", "entry.js", {}, "linux", 10, 90_000);
 
     Assert.areEqual(90_000, settings.launchLimit);
@@ -65,6 +65,6 @@ export class LaunchSettingsTests {
     Assert.areEqual("launchLimit", Assert.throws(() => new LaunchSettings(directory, "node", "e", {}, "linux", 1, 1, 1, client, 0), ArgumentOutOfRangeException).parameterName);
     const short = Assert.throws(() => new LaunchSettings(directory, "node", "e", {}, "linux", 1, 20, 1, client, 10), ArgumentOutOfRangeException);
     Assert.areEqual("launchLimit", short.parameterName);
-    Assert.isTrue(short.message.includes("The limit for a runtime that is still starting cannot be shorter than the launch timeout."));
+    Assert.isTrue(short.message.includes("The limit while the data directory is owned cannot be shorter than the launch timeout."));
   }
 }

@@ -137,8 +137,10 @@ export class RuntimeStartup {
       if (!this.handOver(error.handover))
         this.update(StartupState.newerBuild(error.handover.identity.productVersion));
     }
-    else if (error instanceof LaunchException || error instanceof ConnectionException)
+    else if (error instanceof LaunchException || error instanceof ConnectionException) {
+      this.log(Resources.formatRuntimeNotStarted(error.message));
       this.update(StartupState.failed(error.message));
+    }
     else {
       this.log(Resources.formatRuntimeNotStarted(inspect(error)));
       this.update(StartupState.failed(String(error)));

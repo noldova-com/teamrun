@@ -78,9 +78,10 @@ export class RuntimeLauncher {
     const deadline = Date.now() + this.settings.launchTimeout;
     const limit = Date.now() + this.settings.launchLimit;
     let started: StartedRuntime | null = null;
-    while (Date.now() < deadline || (Date.now() < limit && this.isStarting(started))) {
+    for (;;) {
       const discovery = await DiscoveryReader.readAsync(this.settings.dataDirectory);
-      if (!Object.isNull(discovery) && OwnershipLock.isOwned(this.settings.dataDirectory)) {
+      const isOwned = OwnershipLock.isOwned(this.settings.dataDirectory);
+      if (!Object.isNull(discovery) && isOwned) {
         const client = await this.tryConnectAsync(discovery, clientName, listener);
         if (!Object.isNull(client)) {
           await RuntimeLauncher.forgetAsync(started);
@@ -97,16 +98,14 @@ export class RuntimeLauncher {
           throw new NoRuntimeException(this.settings.dataDirectory.root);
         started = await this.startAsync();
       }
-      else if (!started.isRunning && !OwnershipLock.isOwned(this.settings.dataDirectory))
+      else if (!started.isRunning && !isOwned)
         throw await RuntimeLauncher.describeExitAsync(started);
+      if (Date.now() >= (isOwned ? limit : deadline)) {
+        await RuntimeLauncher.forgetAsync(started);
+        throw new LaunchException(isOwned ? Resources.formatLaunchLimitReached(this.settings.launchLimit) : Resources.launchTimedOut);
+      }
       await delay(this.settings.pollInterval);
     }
-    await RuntimeLauncher.forgetAsync(started);
-    throw new LaunchException(Resources.launchTimedOut);
-  }
-
-  private isStarting(started: StartedRuntime | null): boolean {
-    return !Object.isNull(started) && started.isRunning && OwnershipLock.isOwned(this.settings.dataDirectory);
   }
 
   private static async forgetAsync(started: StartedRuntime | null): Promise<void> {

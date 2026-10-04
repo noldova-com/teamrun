@@ -2697,7 +2697,7 @@ export declare class LaunchSettings {
 
   /**
    * How long attaching may take, including a takeover, in milliseconds,
-   * unless the runtime it started is still starting.
+   * unless the data directory is owned.
    */
   public readonly launchTimeout: number;
 
@@ -2712,8 +2712,8 @@ export declare class LaunchSettings {
   public readonly clientSettings: ClientSettings;
 
   /**
-   * How long attaching may take, in milliseconds, while the runtime it
-   * started still runs and the data directory is owned.
+   * How long attaching may take, in milliseconds, while the data directory
+   * is owned, by the runtime the launcher started or by another.
    */
   public readonly launchLimit: number;
 
@@ -2729,8 +2729,8 @@ export declare class LaunchSettings {
    * @param launchTimeout The attach limit in milliseconds. Defaults to 20 seconds.
    * @param pollInterval The polling interval in milliseconds. Defaults to 100 milliseconds.
    * @param clientSettings The clients' settings. Defaults to {@link ClientSettings}' defaults.
-   * @param launchLimit The attach limit, in milliseconds, while the started runtime is still
-   * starting. Defaults to 60 seconds, or the launch timeout when that is longer.
+   * @param launchLimit The attach limit, in milliseconds, while the data directory is owned.
+   * Defaults to 60 seconds, or the launch timeout when that is longer.
    * @throws {ArgumentException} When a path is empty or whitespace.
    * @throws {ArgumentOutOfRangeException} When a duration is not a positive integer, or the
    * launch limit is shorter than the launch timeout.
@@ -3425,7 +3425,7 @@ export declare class RuntimeLauncher {
    * @throws {RuntimeHandoverException} Rejected when a newer build's runtime owns the directory.
    * @throws {PreShellDataFoundException} Rejected when the runtime refuses until data from before the shell is moved aside.
    * @throws {WorkInProgressException} Rejected when an older runtime has work in progress and the policy is to stop only if idle.
-   * @throws {LaunchException} Rejected when the runtime cannot start, does not start in time, or an older runtime refuses to stop or does not stop in time.
+   * @throws {LaunchException} Rejected when the runtime cannot start, exits before it is reachable, does not start in time, holds the directory without becoming reachable within the launch limit, or an older runtime refuses to stop or does not stop in time.
    * @throws {ConnectionException} Rejected when the runtime refuses the connection.
    * @example
    * ```ts

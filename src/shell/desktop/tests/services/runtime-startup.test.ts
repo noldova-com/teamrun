@@ -115,6 +115,12 @@ export class RuntimeStartupTests {
     Assert.isTrue(await startup.actAsync("retry"));
 
     Assert.areEqual("Ready", startup.current.kind);
+    Assert.areEqual(
+      JSON.stringify([
+        "The runtime could not be started or reached, so the window offers to try again: The runtime did not start in time.",
+        "The runtime could not be started or reached, so the window offers to try again: The runtime refused the connection."
+      ]),
+      JSON.stringify(this.logged));
   }
 
   @TestMethod
