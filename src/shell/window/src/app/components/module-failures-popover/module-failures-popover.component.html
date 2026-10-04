@@ -18,11 +18,11 @@ LICENSE file in the root directory of this source tree.
 </ul>
 <div class="tr-module-failures-actions">
   <button type="button" tr-button class="tr-module-failures-copy" [variant]="secondary" (click)="copy()">
-    <span class="material-symbols-rounded tr-module-failures-glyph" aria-hidden="true">{{ isCopied() ? resources.copiedGlyph : resources.copyGlyph }}</span>
+    <span trButtonIcon class="material-symbols-rounded tr-module-failures-glyph" aria-hidden="true">{{ isCopied() ? resources.copiedGlyph : resources.copyGlyph }}</span>
     <span>{{ isCopied() ? resources.copiedLabel : resources.copyDetailsLabel }}</span>
   </button>
   <button type="button" tr-button class="tr-module-failures-logs" [variant]="secondary" (click)="openLogFolder()">
-    <span class="material-symbols-rounded tr-module-failures-glyph" aria-hidden="true">{{ resources.logFolderGlyph }}</span>
+    <span trButtonIcon class="material-symbols-rounded tr-module-failures-glyph" aria-hidden="true">{{ resources.logFolderGlyph }}</span>
     <span>{{ resources.openLogFolderLabel }}</span>
   </button>
 </div>

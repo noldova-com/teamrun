@@ -16,7 +16,8 @@ import { Resources } from "./resources.js";
 export class RuntimePart implements IRuntimePart {
   public async activateAsync(context: IRuntimePartContext): Promise<void> {
     const isMany = existsSync(path.join(context.moduleFolder, Resources.manyTabsMarker));
-    context.registerMethod(Resources.manyTabsMethod, { handleAsync: async () => ({ isMany }) });
+    const isLongCount = existsSync(path.join(context.moduleFolder, Resources.longCountMarker));
+    context.registerMethod(Resources.optionsMethod, { handleAsync: async () => ({ isMany, isLongCount }) });
   }
 
   public async deactivateAsync(): Promise<void> {

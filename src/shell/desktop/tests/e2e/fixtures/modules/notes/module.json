@@ -4,7 +4,7 @@
   "parts": ["runtime", "window"],
   "dependencies": [],
   "contributes": {
-    "methods": ["notes.manyTabs"],
+    "methods": ["notes.options"],
     "commands": ["notes.newNote", "notes.openNote", "notes.sortByTitle", "notes.sortByWeek", "notes.wrapLines", "notes.showListInDialog", "notes.showNoteInDialog", "notes.showSettingsInDialog"],
     "notifications": ["notes.saveFailed"],
     "views": [

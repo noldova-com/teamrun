@@ -68,6 +68,10 @@
   box-shadow: inset calc(2 * var(--tr-border-width)) 0 0 var(--tr-accent);
 }
 
+.tr-tab-drop-before:dir(rtl) {
+  box-shadow: inset calc(-2 * var(--tr-border-width)) 0 0 var(--tr-accent);
+}
+
 .tr-tab-dragged {
   opacity: 0.5;
 }
