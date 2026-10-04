@@ -8,6 +8,7 @@
 
 import { QualifiedName, SettingDefinition, SettingLocality, SettingOption, SettingType } from "@noldova/teamrun-shell-protocol";
 
+import { ProductInfo } from "../../models/product-info.js";
 import { Resources } from "../../resources.js";
 
 export class ShellSettings {
@@ -27,7 +28,7 @@ export class ShellSettings {
   public static readonly keyBindings: QualifiedName = ShellSettings.named(Resources.keyBindingsSetting);
 
   public static readonly all: readonly SettingDefinition[] = [
-    ShellSettings.appearance(ShellSettings.theme, Resources.themeTitle, Resources.themeDescription,
+    ShellSettings.appearance(ShellSettings.theme, Resources.themeTitle, Resources.formatThemeDescription(ProductInfo.current.name),
       SettingType.choice([new SettingOption(Resources.defaultThemeId, Resources.defaultThemeTitle)]), Resources.defaultThemeId, SettingLocality.Shared, Resources.themeGroup),
     ShellSettings.appearance(ShellSettings.mode, Resources.modeTitle, Resources.modeDescription,
       ShellSettings.choiceOf(Resources.modeOptions), Resources.defaultMode, SettingLocality.Shared, Resources.themeGroup),
