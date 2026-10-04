@@ -8,6 +8,7 @@
 
 import type { Locator, Page } from "@playwright/test";
 
+import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 async function setMenuBarAsync(window: Page, value: string): Promise<void> {
@@ -143,9 +144,7 @@ test.describe("the window row's menus on Windows and Linux", () => {
     await expect(button(window)).toHaveCount(0);
     await window.keyboard.press("F10");
     await expect(tag).toBeFocused();
-    await window.keyboard.press("ControlOrMeta+Shift+KeyP");
-    await expect(window.getByRole("combobox", { name: "Search commands" })).toBeFocused();
-    await window.keyboard.type("new n");
+    await CommandSearchFixture.searchAsync(window, "new n");
     await expect(window.locator(".cdk-overlay-container .tr-command-search-pane").getByRole("option").first()).toHaveAttribute("data-item", "notes.newNote");
     await desktop.checkpointAsync("menu-bar-hidden");
     await window.keyboard.press("Escape");
