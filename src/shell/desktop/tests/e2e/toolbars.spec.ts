@@ -162,10 +162,10 @@ test.describe("toolbars", () => {
       };
     });
     expect(dots.sizes).toEqual([[dots.rem * 0.125, dots.rem * 0.125], [dots.rem * 0.125, dots.rem * 0.125], [dots.rem * 0.125, dots.rem * 0.125]]);
-    expect(Math.abs(dots.gaps[0]! - dots.gaps[1]!)).toBeLessThan(0.5);
-    expect(dots.centres.map(t => Math.abs(t - dots.rem * 0.6875) < 0.5)).toEqual([true, true]);
-    expect(Math.abs(dots.above)).toBeLessThan(0.5);
-    expect(Math.abs(dots.below)).toBeLessThan(0.5);
+    expect(dots.gaps.map(t => Math.abs(t - dots.rem * 0.2) < 0.5)).toEqual([true, true]);
+    expect(dots.centres.map(t => Math.abs(t - dots.rem * 0.325) < 0.5)).toEqual([true, true]);
+    expect(Math.abs(dots.above - dots.below)).toBeLessThan(0.5);
+    expect(dots.above).toBeGreaterThan(dots.rem * 0.25);
     expect(Math.abs(dots.left - dots.right)).toBeLessThan(0.5);
     await desktop.checkpointAsync("toolbars");
   });

@@ -177,6 +177,7 @@ export class DefaultTheme {
       ["toolbar-button", "1.5rem"],
       ["toolbar-button-padding", "0.375rem"],
       ["toolbar-gap", "0.5rem"],
+      ["toolbar-grip-gap", "0.2rem"],
       ["menu-separator-spacing", "0.3125rem"],
       ["tooltip-width", "43.75rem"],
       ["tooltip-padding", "0.125rem 0.5rem"],
