@@ -76,8 +76,9 @@ export class RuntimeLauncher {
 
   private async connectAsync(clientName: string, listener: IRuntimeClientListener, policy: StopPolicy, options: AttachOptions): Promise<RuntimeClient> {
     const deadline = Date.now() + this.settings.launchTimeout;
+    const limit = Date.now() + this.settings.launchLimit;
     let started: StartedRuntime | null = null;
-    while (Date.now() < deadline) {
+    while (Date.now() < deadline || (Date.now() < limit && this.isStarting(started))) {
       const discovery = await DiscoveryReader.readAsync(this.settings.dataDirectory);
       if (!Object.isNull(discovery) && OwnershipLock.isOwned(this.settings.dataDirectory)) {
         const client = await this.tryConnectAsync(discovery, clientName, listener);
@@ -102,6 +103,10 @@ export class RuntimeLauncher {
     }
     await RuntimeLauncher.forgetAsync(started);
     throw new LaunchException(Resources.launchTimedOut);
+  }
+
+  private isStarting(started: StartedRuntime | null): boolean {
+    return !Object.isNull(started) && started.isRunning && OwnershipLock.isOwned(this.settings.dataDirectory);
   }
 
   private static async forgetAsync(started: StartedRuntime | null): Promise<void> {

@@ -23,6 +23,7 @@ export class RuntimeStartupTests {
   private readonly published: string[] = [];
   private readonly handedOver: string[] = [];
   private readonly events: string[] = [];
+  private readonly logged: string[] = [];
 
   @TestMethod
   public async attachesAndReportsTheWindowReady(): Promise<void> {
@@ -142,10 +143,19 @@ export class RuntimeStartupTests {
   }
 
   @TestMethod
-  public async letsUnexpectedFailuresThrough(): Promise<void> {
-    const startup = this.create(new FakeRuntimeLauncher(new TypeError("A defect.")));
+  public async logsAnUnexpectedFailureInFullAndOffersToTryAgain(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher(new TypeError("A defect."));
+    const startup = this.create(launcher);
 
-    await Assert.throwsAsync(() => startup.startAsync(), TypeError);
+    await startup.startAsync();
+    const failed = startup.current.toJson();
+    Assert.isTrue(await startup.actAsync("retry"));
+
+    Assert.areEqual(JSON.stringify({ kind: "Failed", details: ["TypeError: A defect."] }), JSON.stringify(failed));
+    Assert.areEqual(1, this.logged.length);
+    Assert.isTrue(String(this.logged[0]).startsWith("The runtime could not be started or reached, so the window offers to try again: TypeError: A defect.\n    at "));
+    Assert.areEqual("Ready", startup.current.kind);
+    Assert.areEqual(2, launcher.calls.length);
   }
 
   @TestMethod
@@ -175,6 +185,7 @@ export class RuntimeStartupTests {
     Assert.isTrue(await startup.actAsync("retry"));
 
     Assert.areEqual(JSON.stringify({ kind: "Failed", details: ["Error: ENOENT: no such file or directory, open 'runtime.json'"] }), JSON.stringify(failed));
+    Assert.areEqual(1, this.logged.length);
     Assert.areEqual(JSON.stringify(["Connecting", "Ready", "Connecting", "Failed", "Connecting", "Ready"]), JSON.stringify(this.published));
     Assert.areEqual(3, launcher.calls.length);
   }
@@ -221,6 +232,7 @@ export class RuntimeStartupTests {
         return handsOver;
       },
       waitInterval,
-      t => this.events.push(t.name.text));
+      t => this.events.push(t.name.text),
+      t => this.logged.push(t));
   }
 }

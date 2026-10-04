@@ -13,7 +13,7 @@ import { expect, test } from "@playwright/test";
 
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 
-test("a launch that fails keeps its trace, windows, pages and logs, and leaves nothing behind", async ({}, testInfo) => {
+test("a launch that fails says what the window, the data directory's lock, the processes and the processors showed, keeps its trace, windows, pages and logs, and leaves nothing behind", async ({}, testInfo) => {
   test.setTimeout(90_000);
   const listRoots = async (): Promise<string[]> => (await readdir(os.tmpdir())).filter(t => t.startsWith("teamrun-ui-")).sort();
   const rootsBefore = await listRoots();
@@ -21,7 +21,12 @@ test("a launch that fails keeps its trace, windows, pages and logs, and leaves n
   const failure = await DesktopApplicationFixture.launchAsync(testInfo, {}, { "ownership.sqlite": "This is not a database." })
     .then(() => null, (error: unknown) => error);
 
-  expect(failure).not.toBeNull();
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toMatch(new RegExp([
+    "^TeamRun's runtime did not start: the window reports that TeamRun could not start \\(.*file is not a database\\)\\. ",
+    "The data directory's lock was never held\\. Processes naming the data directory: .+\\. ",
+    "Processor load: \\d+ processors, busy each second: (?:not sampled|[\\d, ]+ %)\\.$"
+  ].join(""), "s"));
   const attachments = new Map(testInfo.attachments.map(t => [t.name, t]));
   expect([...attachments.keys()]).toEqual(expect.arrayContaining(["trace.zip", "windows.json", "page-0.png", "page-0.html"]));
   expect(JSON.parse(String(attachments.get("windows.json")?.body))).toEqual([expect.objectContaining({ isVisible: true, isCrashed: false })]);

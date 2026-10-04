@@ -2709,12 +2709,14 @@ export declare class RuntimeStartup {
    * shows {@link StartupStateKind.NewerBuild}.
    * @param waitInterval How long to pause between attempts while waiting for an older build's work, in milliseconds.
    * @param forward Receives each event the runtime sends on the current connection.
+   * @param log Receives the full description of a failure other than the launcher's refusals.
    * @example
    * ```ts
    * import { type IRuntimeLauncher, RuntimeStartup } from "@noldova/teamrun-shell-desktop";
    *
    * export function create(launcher: IRuntimeLauncher): RuntimeStartup {
-   *   return new RuntimeStartup(launcher, state => console.log(state.kind), () => false, 2000, event => console.log(event.name.text));
+   *   return new RuntimeStartup(
+   *     launcher, state => console.log(state.kind), () => false, 2000, event => console.log(event.name.text), message => console.error(message));
    * }
    * ```
    */
@@ -2723,7 +2725,8 @@ export declare class RuntimeStartup {
     publish: (state: StartupState) => void,
     handOver: (handover: RuntimeHandover) => boolean,
     waitInterval: number,
-    forward: (event: Event) => void);
+    forward: (event: Event) => void,
+    log: (message: string) => void);
 
   /**
    * The latest state.
@@ -2737,11 +2740,10 @@ export declare class RuntimeStartup {
 
   /**
    * Starts or attaches to the runtime, stopping an older build's runtime only when it is idle. Reconnects when the
-   * runtime disconnects until {@link close}; a reconnection that fails for any other reason shows the failure and
-   * offers to try again.
+   * runtime disconnects until {@link close}. A start or reconnection that fails for a reason other than the
+   * launcher's refusals is logged in full, shows the failure and offers to try again.
    *
    * @returns A promise that settles once the state is ready or shows why not.
-   * @throws Any failure other than the launcher's refusals, as a rejection.
    * @example
    * ```ts
    * import type { RuntimeStartup } from "@noldova/teamrun-shell-desktop";
@@ -2759,7 +2761,6 @@ export declare class RuntimeStartup {
    *
    * @param action The choice, as the window sends it.
    * @returns A promise of `true` once the choice is carried out, or `false` when it does not fit the state.
-   * @throws Any failure other than the launcher's refusals, as a rejection.
    * @example
    * ```ts
    * import type { RuntimeStartup } from "@noldova/teamrun-shell-desktop";

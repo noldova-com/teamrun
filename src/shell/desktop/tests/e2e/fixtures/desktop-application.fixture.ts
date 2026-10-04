@@ -21,6 +21,7 @@ import { DataDirectory, DiscoveryReader, Endpoint, OwnershipLock, RuntimeBuild, 
 import ErrorOutputClassifier from "./error-output.classifier.ts";
 import OffCursorPlacement from "./off-cursor-placement.ts";
 import ProcessListFixture from "./process-list.fixture.ts";
+import ProcessorLoadFixture from "./processor-load.fixture.ts";
 
 interface MainProcessSilence {
   readonly action: string;
@@ -43,6 +44,11 @@ export default class DesktopApplicationFixture {
   private static readonly OWNERSHIP_RELEASE_TIMEOUT: number = 2_000;
   private static readonly NO_SUCH_PROCESS: string = "ESRCH";
   private static readonly NOT_A_DATABASE: number = 26;
+  private static readonly LAUNCH_WAIT: number = 20_000;
+  private static readonly LAUNCH_LIMIT: number = 60_000;
+  private static readonly LAUNCH_INTERVAL: number = 250;
+  private static readonly FAILED_TITLE: string = "TeamRun could not start";
+  private static readonly FAILED_DETAIL: string = ".tr-startup-detail";
   private static readonly CLIENT_NAME: string = "ui-test";
   private static readonly PROCESS_EXIT_TIMEOUT: number = 30_000;
   private static readonly REMOVE_RETRIES: number = 3;
@@ -391,11 +397,47 @@ export default class DesktopApplicationFixture {
     window.on("pageerror", t => this.failures.push(`renderer: ${t.message}`));
     this.page = window;
     await expect.poll(() => this.isVisibleAsync()).toBe(true);
-    await expect.poll(async () => (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.productVersion)
-      .toBe(RuntimeBuild.identity.productVersion);
+    await this.waitForRuntimeAsync();
     await this.recordProcessesAsync();
     if (this.viewport !== null)
       await this.applyViewportAsync(this.viewport);
+  }
+
+  private async waitForRuntimeAsync(): Promise<void> {
+    const directory = new DataDirectory(this.dataDirectory);
+    const load = new ProcessorLoadFixture();
+    const started = Date.now();
+    let held: [number, number] | null = null;
+    let isExtended = false;
+    while ((await DiscoveryReader.readAsync(directory))?.productVersion !== RuntimeBuild.identity.productVersion) {
+      const elapsed = Date.now() - started;
+      const isHeld = DesktopApplicationFixture.isOwned(directory);
+      if (isHeld)
+        held = [held?.[0] ?? elapsed, elapsed];
+      const failure = await this.readStartupFailureAsync();
+      const isStalled = elapsed >= DesktopApplicationFixture.LAUNCH_WAIT && !isHeld;
+      if (failure !== null || isStalled || elapsed >= DesktopApplicationFixture.LAUNCH_LIMIT) {
+        const waited = `no runtime published discovery within ${elapsed / 1000} s`;
+        const reason = failure !== null
+          ? `the window reports that TeamRun could not start (${failure})`
+          : isStalled ? `${waited}, and none holds the data directory` : `${waited}, though one holds the data directory`;
+        const lock = held === null ? "never held" : `held from ${held[0] / 1000} s to ${held[1] / 1000} s`;
+        const naming = await ProcessListFixture.describeNamingAsync(this.dataDirectory).catch((error: unknown) => `unknown (${String(error)})`);
+        throw new Error(`TeamRun's runtime did not start: ${reason}. The data directory's lock was ${lock}. Processes naming the data directory: ${naming}. Processor load: ${load.describe()}.`);
+      }
+      if (elapsed >= DesktopApplicationFixture.LAUNCH_WAIT && !isExtended) {
+        this.testInfo.setTimeout(this.testInfo.timeout + DesktopApplicationFixture.LAUNCH_LIMIT - DesktopApplicationFixture.LAUNCH_WAIT);
+        isExtended = true;
+      }
+      load.sample();
+      await delay(DesktopApplicationFixture.LAUNCH_INTERVAL);
+    }
+  }
+
+  private async readStartupFailureAsync(): Promise<string | null> {
+    if (await this.window.getByRole("heading", { name: DesktopApplicationFixture.FAILED_TITLE }).count() === 0)
+      return null;
+    return await this.window.locator(DesktopApplicationFixture.FAILED_DETAIL).first().textContent() ?? "";
   }
 
   private async applyViewportAsync(viewport: { width: number; height: number }): Promise<void> {

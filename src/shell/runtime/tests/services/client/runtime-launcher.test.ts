@@ -10,6 +10,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
@@ -278,12 +279,12 @@ export class RuntimeLauncherTests {
   }
 
   @TestMethod
-  public givesUpOnARuntimeItCannotReach(): Promise<void> {
+  public givesUpAtItsTimeoutOnARuntimeItCannotReachAndDidNotStart(): Promise<void> {
     return RuntimeLauncherTests.runWithFakeAsync(async fake => {
       await fake.server.server.closeAsync();
 
       const exception = await Assert.throwsAsync(
-        () => new RuntimeLauncher(fake.createSettings(300), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture()),
+        () => new RuntimeLauncher(fake.createSettings(300, 600), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture()),
         LaunchException);
 
       Assert.areEqual("The runtime did not start in time.", exception.message);
@@ -369,6 +370,49 @@ export class RuntimeLauncherTests {
     Assert.areEqual("The runtime did not start in time.", exception.message);
     Assert.areEqual("", (await readdir(launch.dataDirectory.logsFolder)).join(","));
     Assert.isTrue(await RuntimeLaunchFixture.waitForExitAsync(Number(starter.processIds[0])));
+  }
+
+  @TestMethod
+  public async waitsPastItsTimeoutWhileTheRuntimeItStartedRunsAndTheDirectoryIsOwned(): Promise<void> {
+    await using fake = await FakeRuntimeFixture.ownAsync();
+    const starter = new ScriptedStarterFixture("setTimeout(() => {}, 1500);");
+    const started = Date.now();
+    const publishing = delay(600).then(() => fake.publishAsync());
+
+    const client = await new RuntimeLauncher(fake.createSettings(200, 5_000), RuntimeServerFixture.IDENTITY, starter).attachAsync("desktop", new ClientListenerFixture());
+    client.close();
+    await publishing;
+
+    Assert.isTrue(Date.now() - started >= 600, "the launcher waited for the runtime past its timeout");
+    Assert.areEqual(1, starter.processIds.length);
+    Assert.isTrue(await RuntimeLaunchFixture.waitForExitAsync(Number(starter.processIds[0])));
+  }
+
+  @TestMethod
+  public async givesUpAtItsLimitOnARuntimeThatNeverStarts(): Promise<void> {
+    await using fake = await FakeRuntimeFixture.ownAsync();
+    const starter = new ScriptedStarterFixture("setTimeout(() => {}, 1500);");
+    const started = Date.now();
+
+    const exception = await Assert.throwsAsync(
+      () => new RuntimeLauncher(fake.createSettings(200, 800), RuntimeServerFixture.IDENTITY, starter).attachAsync("desktop", new ClientListenerFixture()),
+      LaunchException);
+
+    Assert.areEqual("The runtime did not start in time.", exception.message);
+    Assert.isTrue(Date.now() - started >= 800, "the launcher waited until its limit");
+    Assert.isTrue(await RuntimeLaunchFixture.waitForExitAsync(Number(starter.processIds[0])));
+  }
+
+  @TestMethod
+  public async stopsWaitingAtItsTimeoutOnceTheRuntimeItStartedHasExited(): Promise<void> {
+    await using fake = await FakeRuntimeFixture.ownAsync();
+    const starter = new ScriptedStarterFixture("process.exit(0);");
+
+    const exception = await Assert.throwsAsync(
+      () => new RuntimeLauncher(fake.createSettings(400, 20_000), RuntimeServerFixture.IDENTITY, starter).attachAsync("desktop", new ClientListenerFixture()),
+      LaunchException);
+
+    Assert.areEqual("The runtime did not start in time.", exception.message);
   }
 
   private static async runWithHostAsync(test: (fixture: RuntimeHostFixture, settings: LaunchSettings) => Promise<void>): Promise<void> {

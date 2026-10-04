@@ -281,6 +281,7 @@ export class Resources {
   public static readonly takeover: number = 5_000;
   public static readonly takeoverInterval: number = 50;
   public static readonly launchTimeout: number = 20_000;
+  public static readonly launchLimit: number = 60_000;
   public static readonly launchPollInterval: number = 100;
   public static readonly productVersionPattern: RegExp = /^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/;
   public static readonly positiveIntegerPattern: RegExp = /^[1-9]\d{0,9}$/;
@@ -321,11 +322,13 @@ export class Resources {
   public static readonly clientParameterName: string = "client";
   public static readonly entryPathParameterName: string = "entryPath";
   public static readonly launchTimeoutParameterName: string = "launchTimeout";
+  public static readonly launchLimitParameterName: string = "launchLimit";
   public static readonly pollIntervalParameterName: string = "pollInterval";
   public static readonly argumentsParameterName: string = "arguments";
   public static readonly portOutOfRange: string = "A port must be from 1 to 65535.";
   public static readonly socketPathNotAbsolute: string = "A local socket's path must be absolute.";
   public static readonly defaultRequestTimeoutTooLong: string = "The default time limit of a request cannot exceed its maximum.";
+  public static readonly launchLimitTooShort: string = "The limit for a runtime that is still starting cannot be shorter than the launch timeout.";
   public static readonly endpointUnavailable: string = "The runtime's local endpoint has no address.";
   public static readonly handshakeRequired: string = "A connection must begin with a handshake.";
   public static readonly unauthorized: string = "The capability token is not valid for this runtime.";

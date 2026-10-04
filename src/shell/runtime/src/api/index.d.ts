@@ -2696,7 +2696,8 @@ export declare class LaunchSettings {
   public readonly idleGraceMilliseconds: number;
 
   /**
-   * How long attaching may take, including a takeover, in milliseconds.
+   * How long attaching may take, including a takeover, in milliseconds,
+   * unless the runtime it started is still starting.
    */
   public readonly launchTimeout: number;
 
@@ -2711,6 +2712,12 @@ export declare class LaunchSettings {
   public readonly clientSettings: ClientSettings;
 
   /**
+   * How long attaching may take, in milliseconds, while the runtime it
+   * started still runs and the data directory is owned.
+   */
+  public readonly launchLimit: number;
+
+  /**
    * Creates the settings.
    *
    * @param dataDirectory The data directory.
@@ -2722,8 +2729,11 @@ export declare class LaunchSettings {
    * @param launchTimeout The attach limit in milliseconds. Defaults to 20 seconds.
    * @param pollInterval The polling interval in milliseconds. Defaults to 100 milliseconds.
    * @param clientSettings The clients' settings. Defaults to {@link ClientSettings}' defaults.
+   * @param launchLimit The attach limit, in milliseconds, while the started runtime is still
+   * starting. Defaults to 60 seconds, or the launch timeout when that is longer.
    * @throws {ArgumentException} When a path is empty or whitespace.
-   * @throws {ArgumentOutOfRangeException} When a duration is not a positive integer.
+   * @throws {ArgumentOutOfRangeException} When a duration is not a positive integer, or the
+   * launch limit is shorter than the launch timeout.
    * @example
    * ```ts
    * import { DataDirectory, LaunchSettings, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
@@ -2745,7 +2755,8 @@ export declare class LaunchSettings {
     idleGraceMilliseconds?: number,
     launchTimeout?: number,
     pollInterval?: number,
-    clientSettings?: ClientSettings);
+    clientSettings?: ClientSettings,
+    launchLimit?: number);
 }
 
 /**

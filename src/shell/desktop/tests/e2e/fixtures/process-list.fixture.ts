@@ -91,6 +91,15 @@ export default class ProcessListFixture {
     return processIds.map(t => `${t} ${described.get(t) ?? "(gone)"}`).join("; ");
   }
 
+  public static async describeNamingAsync(text: string): Promise<string> {
+    const output = process.platform === "win32"
+      ? await ProcessListFixture.runAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+        "CimCmdlets\\Get-CimInstance Win32_Process | Microsoft.PowerShell.Core\\ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }"], ProcessListFixture.COMMAND_LINE_TIMEOUT)
+      : await ProcessListFixture.runAsync("ps", ["-ww", "-A", "-o", "pid=,args="]);
+    const naming = output.split(/\r?\n/).map(t => t.trim()).filter(t => t.includes(text));
+    return naming.length === 0 ? "none" : naming.join("; ");
+  }
+
   public static async readProcessorMillisecondsAsync(processId: number): Promise<number | null> {
     if (process.platform === "win32") {
       const output = await ProcessListFixture.runAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",

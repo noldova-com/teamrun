@@ -31,17 +31,26 @@ export class LaunchSettingsTests {
     Assert.areEqual(20_000, settings.launchTimeout);
     Assert.areEqual(100, settings.pollInterval);
     Assert.areEqual(5_000, settings.clientSettings.handshakeTimeout);
+    Assert.areEqual(60_000, settings.launchLimit);
   }
 
   @TestMethod
   public keepsTheGivenLimits(): void {
     const client = new ClientSettings(1, 2, 3, 4);
-    const settings = new LaunchSettings(LaunchSettingsTests.DIRECTORY, "node", "entry.js", {}, "win32", 10, 20, 30, client);
+    const settings = new LaunchSettings(LaunchSettingsTests.DIRECTORY, "node", "entry.js", {}, "win32", 10, 20, 30, client, 40);
 
     Assert.areEqual(10, settings.idleGraceMilliseconds);
     Assert.areEqual(20, settings.launchTimeout);
     Assert.areEqual(30, settings.pollInterval);
     Assert.areEqual(client, settings.clientSettings);
+    Assert.areEqual(40, settings.launchLimit);
+  }
+
+  @TestMethod
+  public waitsForAStartingRuntimeAtLeastAsLongAsTheLaunchTimeoutByDefault(): void {
+    const settings = new LaunchSettings(LaunchSettingsTests.DIRECTORY, "node", "entry.js", {}, "linux", 10, 90_000);
+
+    Assert.areEqual(90_000, settings.launchLimit);
   }
 
   @TestMethod
@@ -52,5 +61,10 @@ export class LaunchSettingsTests {
     Assert.areEqual("idleGraceMilliseconds", Assert.throws(() => new LaunchSettings(directory, "node", "e", {}, "linux", 0), ArgumentOutOfRangeException).parameterName);
     Assert.areEqual("launchTimeout", Assert.throws(() => new LaunchSettings(directory, "node", "e", {}, "linux", 1, 0), ArgumentOutOfRangeException).parameterName);
     Assert.areEqual("pollInterval", Assert.throws(() => new LaunchSettings(directory, "node", "e", {}, "linux", 1, 1, 0), ArgumentOutOfRangeException).parameterName);
+    const client = new ClientSettings();
+    Assert.areEqual("launchLimit", Assert.throws(() => new LaunchSettings(directory, "node", "e", {}, "linux", 1, 1, 1, client, 0), ArgumentOutOfRangeException).parameterName);
+    const short = Assert.throws(() => new LaunchSettings(directory, "node", "e", {}, "linux", 1, 20, 1, client, 10), ArgumentOutOfRangeException);
+    Assert.areEqual("launchLimit", short.parameterName);
+    Assert.isTrue(short.message.includes("The limit for a runtime that is still starting cannot be shorter than the launch timeout."));
   }
 }
