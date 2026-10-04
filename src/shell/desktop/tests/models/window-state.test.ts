@@ -94,57 +94,58 @@ export class WindowStateTests {
   public keepsAPositionThatShowsOnADisplay(): void {
     const state = new WindowState(1800, 900, 1280, 800, false);
 
-    Assert.areEqual(state, state.placeOn([new ScreenArea(0, 0, 1920, 1040), new ScreenArea(1920, 0, 1920, 1040)], WindowStateTests.PRIMARY));
-    Assert.areEqual(state, state.placeOn([new ScreenArea(-1920, 0, 1920, 1040), new ScreenArea(0, 0, 1920, 1040)], WindowStateTests.PRIMARY));
+    Assert.areEqual("1800,900,1280,800", WindowStateTests.describe(state.placeOn([new ScreenArea(0, 0, 1920, 1040), new ScreenArea(1920, 0, 1920, 1040)], WindowStateTests.PRIMARY)));
+    Assert.areEqual("1800,900,1280,800", WindowStateTests.describe(state.placeOn([new ScreenArea(-1920, 0, 1920, 1040), new ScreenArea(0, 0, 1920, 1040)], WindowStateTests.PRIMARY)));
   }
 
   @TestMethod
-  public dropsAPositionThatNoDisplayShows(): void {
+  public centersAPositionThatNoDisplayShowsOnThePrimaryDisplay(): void {
     const placed = new WindowState(4000, 100, 1000, 700, true).placeOn([new ScreenArea(0, 0, 1920, 1040)], WindowStateTests.PRIMARY);
 
-    Assert.isNull(placed.x);
-    Assert.isNull(placed.y);
-    Assert.areEqual(1000, placed.width);
-    Assert.isTrue(placed.isMaximized);
-    Assert.isNull(new WindowState(0, 0, 1000, 700, false).placeOn([], WindowStateTests.PRIMARY).x);
+    Assert.areEqual("460,170,1000,700", WindowStateTests.describe(placed));
+    Assert.areEqual("460,170,1000,700", WindowStateTests.describe(new WindowState(0, 0, 1000, 700, false).placeOn([], WindowStateTests.PRIMARY)));
   }
 
   @TestMethod
-  public leavesAStateWithoutAPositionAsItIs(): void {
+  public centersAStateWithoutAPositionOnThePrimaryDisplay(): void {
     const state = WindowState.createDefault(WindowStateTests.PRIMARY);
 
-    Assert.areEqual(state, state.placeOn([], WindowStateTests.PRIMARY));
+    Assert.areEqual("320,120,1280,800", WindowStateTests.describe(state.placeOn([], WindowStateTests.PRIMARY)));
   }
 
   @TestMethod
   public keepsASavedSizeThatFitsItsDisplayEvenAboveNineTenths(): void {
     const state = new WindowState(10, 30, 1000, 700, true);
 
-    Assert.areEqual(state, state.placeOn([new ScreenArea(0, 25, 1024, 743)], new ScreenArea(0, 25, 1024, 743)));
+    Assert.areEqual("10,30,1000,700", WindowStateTests.describe(state.placeOn([new ScreenArea(0, 25, 1024, 743)], new ScreenArea(0, 25, 1024, 743))));
   }
 
   @TestMethod
-  public shrinksASavedSizeLargerThanItsDisplayAndCentresItThere(): void {
+  public shrinksASavedSizeLargerThanItsDisplayAndCentersItThere(): void {
     const small = new ScreenArea(1920, 25, 1024, 743);
     const placed = new WindowState(1900, 30, 1280, 800, true).placeOn([new ScreenArea(0, 0, 1920, 1040), small], WindowStateTests.PRIMARY);
 
-    Assert.areEqual("1971,62,921,668,true", [placed.x, placed.y, placed.width, placed.height, placed.isMaximized].join(","));
+    Assert.areEqual("1971,62,921,668", WindowStateTests.describe(placed));
   }
 
   @TestMethod
   public keepsASideAlreadyWithinNineTenthsWhenItShrinks(): void {
     const placed = new WindowState(0, 25, 900, 800, false).placeOn([new ScreenArea(0, 25, 1024, 743)], WindowStateTests.PRIMARY);
 
-    Assert.areEqual("62,62,900,668", [placed.x, placed.y, placed.width, placed.height].join(","));
+    Assert.areEqual("62,62,900,668", WindowStateTests.describe(placed));
   }
 
   @TestMethod
-  public shrinksASizeWithoutAPositionToThePrimaryDisplay(): void {
+  public shrinksASizeWithoutAPositionAndCentersItOnThePrimaryDisplay(): void {
     const primary = new ScreenArea(0, 25, 1024, 743);
     const unplaced = new WindowState(null, null, 1280, 800, false).placeOn([primary], primary);
     const lost = new WindowState(4000, 100, 1280, 800, true).placeOn([primary], primary);
 
-    Assert.areEqual(",,921,668,false", [unplaced.x, unplaced.y, unplaced.width, unplaced.height, unplaced.isMaximized].join(","));
-    Assert.areEqual(",,921,668,true", [lost.x, lost.y, lost.width, lost.height, lost.isMaximized].join(","));
+    Assert.areEqual("51,62,921,668", WindowStateTests.describe(unplaced));
+    Assert.areEqual("51,62,921,668", WindowStateTests.describe(lost));
+  }
+
+  private static describe(area: ScreenArea): string {
+    return [area.x, area.y, area.width, area.height].join(",");
   }
 }

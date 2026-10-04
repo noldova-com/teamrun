@@ -1454,20 +1454,6 @@ export interface IDesktopWindow {
   setBounds(bounds: Partial<Rectangle>): void;
 
   /**
-   * Centers the window on its display.
-   *
-   * @example
-   * ```ts
-   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
-   *
-   * export function centerOnDisplay(window: IDesktopWindow): void {
-   *   window.center();
-   * }
-   * ```
-   */
-  center(): void;
-
-  /**
    * Whether the window is maximized.
    *
    * @returns `true` when the window is maximized.
@@ -2342,23 +2328,23 @@ export declare class WindowState {
   public static fromJson(value: unknown): WindowState;
 
   /**
-   * Places a saved state on the connected displays. The window belongs to the display that shows most of it, or to the
-   * primary display when no display shows it, which then loses its position so the operating system centers it. A size
-   * that fits that display's work area is kept; a larger one shrinks to no more than nine tenths of the work area on each
-   * side, centered on that display. The maximized state is kept.
+   * Places the state's bounds on the connected displays. Bounds that a display shows and that fit its work area are kept,
+   * on the display that shows most of them. Otherwise the window is centered on that display, or on the primary display
+   * when no display shows it or it has no position; a size that fits the work area is kept, and a larger one shrinks to no
+   * more than nine tenths of the work area on each side.
    *
    * @param workAreas The work areas of the connected displays.
    * @param primary The work area of the primary display.
-   * @returns This state, or the placed one.
+   * @returns The bounds to apply.
    * @example
    * ```ts
    * import { ScreenArea, WindowState } from "@noldova/teamrun-shell-desktop";
    *
    * const primary: ScreenArea = new ScreenArea(0, 0, 1920, 1040);
-   * export const state: WindowState = new WindowState(3000, 100, 1280, 800, false).placeOn([primary], primary);
+   * export const bounds: ScreenArea = new WindowState(3000, 100, 1280, 800, false).placeOn([primary], primary);
    * ```
    */
-  public placeOn(workAreas: readonly ScreenArea[], primary: ScreenArea): WindowState;
+  public placeOn(workAreas: readonly ScreenArea[], primary: ScreenArea): ScreenArea;
 
   /**
    * Writes the state for saving.

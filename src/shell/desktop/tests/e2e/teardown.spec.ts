@@ -189,6 +189,7 @@ test.describe("the harness's teardown", () => {
     expect(threads).toMatch(process.platform === "darwin"
       ? new RegExp(`^Analysis of sampling .* \\(pid ${main}\\)[\\s\\S]*Call graph:`)
       : process.platform === "win32" ? /^\d+ Wait \w+ \d+ ms\r?$/m : /^\s*\d+ \S+ .*\d+:\d+(?:\.\d+)? \S/m);
+    expect(testInfo.attachments.map(t => t.name)).toEqual(expect.arrayContaining(["page-0.png.unavailable.txt", "page-0.html.unavailable.txt"]));
     expect(await ProcessListFixture.waitForSignalsAsync(desktop.recordedProcessIds, 0)).toEqual([]);
   });
 });
