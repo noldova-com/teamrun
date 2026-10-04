@@ -7,9 +7,9 @@
  */
 
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { MenuItem } from "../models/menu-item";
 import type { NotificationPost, SettingChange, SettingScope } from "@noldova/teamrun-shell-protocol";
 
+import type { MenuItem } from "../models/menu-item";
 import type { ViewBadge } from "../models/view-badge";
 
 export interface IWindowPartHost {

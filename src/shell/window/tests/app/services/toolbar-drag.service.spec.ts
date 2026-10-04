@@ -58,7 +58,6 @@ describe("ToolbarDragService", () => {
     expect(drag.dragging()).toBeNull();
     moveTo(150, 20);
     expect(drag.dragging()).toBe("a");
-    expect(document.body.classList.contains(Resources.toolbarDraggingClass)).toBe(true);
   });
 
   it("targets a position in a row, counting the others without the dragged toolbar", () => {
@@ -126,7 +125,7 @@ describe("ToolbarDragService", () => {
     moveTo(150, 20);
     document.dispatchEvent(new PointerEvent("pointerup"));
     expect(toolbars.move).toHaveBeenCalledWith("a", 0, 1);
-    expect([drag.dragging(), drag.target(), document.body.classList.contains(Resources.toolbarDraggingClass)]).toEqual([null, null, false]);
+    expect([drag.dragging(), drag.target()]).toEqual([null, null]);
 
     start("c");
     moveTo(50, 2);

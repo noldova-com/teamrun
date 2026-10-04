@@ -55,7 +55,6 @@ export class ToolbarDragService {
       if (Math.hypot(event.clientX - startX, event.clientY - startY) < Resources.dragThreshold)
         return;
       this.draggingState.set(name);
-      this.document.body.classList.add(Resources.toolbarDraggingClass);
     }
     const target = this.targetAt(name, event.clientX, event.clientY);
     if (!(target?.equals(this.targetState()) ?? Object.isNull(this.targetState())))
@@ -87,7 +86,6 @@ export class ToolbarDragService {
     this.stopListening = null;
     this.draggingState.set(null);
     this.targetState.set(null);
-    this.document.body.classList.remove(Resources.toolbarDraggingClass);
   }
 
   private targetAt(name: string, x: number, y: number): ToolbarDropTarget | null {

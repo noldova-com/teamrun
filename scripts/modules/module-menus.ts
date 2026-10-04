@@ -71,14 +71,23 @@ export default class ModuleMenus {
     return new ModuleMenus(places, groups);
   }
 
-  public checkReferences(id: string, places: ReadonlySet<string>, commands: ReadonlySet<string>): void {
+  public checkReferences(id: string, places: ReadonlySet<string>, toolbars: ReadonlySet<string>, commands: ReadonlySet<string>): void {
     const file = `${id}'s ${ModuleMenus.FILE_NAME}`;
+    const own = new Set(this.places.filter(t => t.toolbar !== null).map(t => t.name));
+    for (const place of this.places)
+      for (const anchor of [place.toolbar?.after ?? null, place.toolbar?.before ?? null])
+        if (anchor !== null && !toolbars.has(anchor))
+          throw new ModuleException(`${file} puts the toolbar ${place.name} next to ${anchor}, which is not a toolbar of its own or of a module it depends on.`);
     for (const group of this.groups) {
       if (!places.has(group.place))
         throw new ModuleException(`${file} adds the group ${group.name} to ${group.place}, which is neither the shell's place nor its own or a dependency's.`);
-      for (const item of group.items)
+      for (const item of group.items) {
         if (item.command !== null && !commands.has(item.command))
           throw new ModuleException(`${file} runs ${item.command}, which neither it nor a module it depends on declares.`);
+        const opened = item.submenu ?? item.choice;
+        if (opened !== null && own.has(opened))
+          throw new ModuleException(`${file} opens the toolbar ${opened} as a menu in the group ${group.name}, which a toolbar cannot be.`);
+      }
     }
   }
 

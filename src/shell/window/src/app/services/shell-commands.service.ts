@@ -17,6 +17,7 @@ import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
 import { EditAction } from "../enums/edit-action";
 import { PanelEdge } from "../enums/panel-edge";
+import { ToolbarMove } from "../enums/toolbar-move";
 import { CommandContribution } from "../models/command-contribution";
 import { SideDropTarget } from "../models/layout/side-drop-target";
 import { SplitDropTarget } from "../models/layout/split-drop-target";
@@ -93,6 +94,25 @@ export class ShellCommandsService {
         const name = this.toolbarOf(commandArguments);
         return !Object.isNull(name) && this.toolbars.isShown(name);
       }),
+    ...Object.values(ToolbarMove).map(move => new CommandContribution(Resources.moveToolbarCommands[move], Resources.moveToolbarTitles[move], Resources.moveToolbarGlyphs[move], null,
+      commandArguments => this.done(() => {
+        const name = this.toolbarOf(commandArguments);
+        if (!Object.isNull(name)) {
+          this.toolbars.moveBy(name, move);
+          this.focusGrip(name);
+        }
+      }),
+      commandArguments => {
+        const name = this.toolbarOf(commandArguments);
+        return !Object.isNull(name) && this.toolbars.canMove(name, move);
+      })),
+    new CommandContribution(Resources.hideToolbarCommand, Resources.hideToolbarTitle, Resources.hideToolbarGlyph, null,
+      commandArguments => this.done(() => {
+        const name = this.toolbarOf(commandArguments);
+        if (!Object.isNull(name))
+          this.toolbars.setShown(name, false);
+      }),
+      commandArguments => !Object.isNull(this.toolbarOf(commandArguments))),
     new CommandContribution(Resources.focusToolbarsCommand, Resources.focusToolbarsTitle, Resources.focusToolbarsGlyph, null,
       () => this.done(() => this.focusToolbars()), () => this.toolbars.rows().length > 0),
     new CommandContribution(Resources.resetLayoutCommand, Resources.resetLayoutLabel, Resources.resetLayoutGlyph, null, () => this.done(() => this.layout.reset())),
@@ -154,6 +174,11 @@ export class ShellCommandsService {
   private toolbarOf(commandArguments: JsonValue): string | null {
     const name = Object.isNull(commandArguments) ? undefined : JsonReader.fromValue(commandArguments).readOptionalString(Resources.toolbarArgument);
     return !Object.isUndefined(name) && this.toolbars.isKnown(name) ? name : null;
+  }
+
+  private focusGrip(name: string): void {
+    afterNextRender(() => [...this.document.querySelectorAll<HTMLElement>(Resources.toolbarSelector)]
+      .find(t => t.dataset[Resources.toolbarData] === name)?.querySelector<HTMLElement>(Resources.toolbarGripSelector)?.focus(), { injector: this.environment });
   }
 
   private focusToolbars(): void {

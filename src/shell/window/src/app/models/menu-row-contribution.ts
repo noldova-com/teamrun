@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
+import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { Resources } from "../../resources";

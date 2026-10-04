@@ -81,6 +81,22 @@ describe("ToolbarLayout", () => {
     expect(start.hidden).toEqual(["a.none"]);
   });
 
+  it("keeps the saved place of an absent module's toolbars through every change, so they return where they stood", () => {
+    const places = [toolbar("a.one"), toolbar("a.two"), toolbar("a.three")];
+    const withAbsent = [...places, toolbar("gone.one"), toolbar("gone.two"), toolbar("gone.three")];
+    const saved = new ToolbarLayout([["gone.one", "a.one", "gone.two", "gone.three", "a.two"], ["gone.four"], ["a.three"]], []);
+
+    expect(saved.hide("a.two", places).rows).toEqual([["gone.one", "a.one", "gone.two", "gone.three"], ["gone.four"], ["a.three"]]);
+    expect(saved.hide("a.one", places).hide("a.two", places).rows).toEqual([["gone.one", "gone.two", "gone.three"], ["gone.four"], ["a.three"]]);
+    expect(saved.move("a.three", 0, 0, places).rows).toEqual([["a.three", "gone.one", "a.one", "gone.two", "gone.three", "a.two"], ["gone.four"]]);
+    expect(saved.moveToNewRow("a.one", 0, places).rows).toEqual([["gone.one", "a.one", "gone.two", "gone.three"], ["gone.four"], ["a.two"], ["a.three"]]);
+    expect(saved.hide("a.three", places).rows).toEqual([["gone.one", "a.one", "gone.two", "gone.three", "a.two"], ["gone.four"]]);
+    expect(saved.show("a.three", places)).toBe(saved);
+    expect(ToolbarLayout.EMPTY.hide("a.one", places).show("a.one", places).rows).toEqual([["a.two", "a.three", "a.one"]]);
+    expect(saved.hide("a.two", places).shownRows(withAbsent)).toEqual([["gone.one", "a.one", "gone.two", "gone.three"], ["a.three"]]);
+    expect(saved.hide("a.two", places).shownRows(places)).toEqual([["a.one"], ["a.three"]]);
+  });
+
   it("moves a hidden toolbar into view", () => {
     const places = [toolbar("a.one"), toolbar("a.two")];
     const hidden = ToolbarLayout.EMPTY.hide("a.two", places);

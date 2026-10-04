@@ -65,12 +65,12 @@ export class ToolbarLayout {
     if (Object.isUndefined(place) || Object.isNull(place.toolbar) || rows.flat().includes(name))
       return this;
     ToolbarLayout.insert(rows, place);
-    return new ToolbarLayout(rows, this.hidden.filter(t => t !== name));
+    return this.keeping(rows, this.hidden.filter(t => t !== name), places);
   }
 
   public hide(name: string, places: readonly MenuPlace[]): ToolbarLayout {
     const rows = this.shownRows(places).map(t => t.filter(u => u !== name)).filter(t => t.length > 0);
-    return new ToolbarLayout(rows, [...this.hidden.filter(t => t !== name), name]);
+    return this.keeping(rows, [...this.hidden.filter(t => t !== name), name], places);
   }
 
   public move(name: string, row: number, index: number, places: readonly MenuPlace[]): ToolbarLayout {
@@ -90,7 +90,27 @@ export class ToolbarLayout {
     insert(rows);
     if (!rows.flat().includes(name))
       return this;
-    return new ToolbarLayout(rows.filter(t => t.length > 0), this.hidden.filter(t => t !== name));
+    return this.keeping(rows, this.hidden.filter(t => t !== name), places);
+  }
+
+  private keeping(shown: readonly (readonly string[])[], hidden: readonly string[], places: readonly MenuPlace[]): ToolbarLayout {
+    const known = new Set(places.filter(t => !Object.isNull(t.toolbar)).map(t => t.name));
+    const rows = shown.map(t => [...t]).filter(t => t.length > 0);
+    const present = new Set(rows.flat());
+    this.rows.forEach((stored, index) => stored.forEach((name, position) => {
+      if (known.has(name))
+        return;
+      const before = stored.slice(0, position).reverse().find(t => present.has(t));
+      const after = stored.slice(position + 1).find(t => present.has(t));
+      const anchor = before ?? after;
+      const row = Object.isUndefined(anchor) ? undefined : rows.find(t => t.includes(anchor));
+      if (Object.isUndefined(anchor) || Object.isUndefined(row))
+        rows.splice(Math.min(index, rows.length), 0, [name]);
+      else
+        row.splice(row.indexOf(anchor) + (Object.isUndefined(before) ? 0 : 1), 0, name);
+      present.add(name);
+    }));
+    return new ToolbarLayout(rows, hidden);
   }
 
   private static isWaiting(place: MenuPlace, shown: ReadonlySet<string>, placed: ReadonlySet<string>): boolean {

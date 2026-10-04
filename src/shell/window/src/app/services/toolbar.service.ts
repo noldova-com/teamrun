@@ -11,6 +11,7 @@ import { Injectable, type Signal, computed, inject } from "@angular/core";
 import "@noldova/teamrun-foundation-core";
 
 import { Resources } from "../../resources";
+import { ToolbarMove } from "../enums/toolbar-move";
 import { MenuItem } from "../models/menu-item";
 import type { MenuPlace } from "../models/menu-place";
 import { Toolbar } from "../models/toolbar";
@@ -50,6 +51,40 @@ export class ToolbarService {
 
   public moveToNewRow(name: string, row: number): void {
     this.layout.setToolbars(this.layout.layout().toolbars.moveToNewRow(name, row, this.places()));
+  }
+
+  public canMove(name: string, move: ToolbarMove): boolean {
+    return this.destination(name, move) !== null;
+  }
+
+  public moveBy(name: string, move: ToolbarMove): void {
+    const destination = this.destination(name, move);
+    if (destination === null)
+      return;
+    if (destination.isNewRow)
+      this.moveToNewRow(name, destination.row);
+    else
+      this.move(name, destination.row, destination.index);
+  }
+
+  private destination(name: string, move: ToolbarMove): { readonly row: number; readonly index: number; readonly isNewRow: boolean } | null {
+    const rows = this.layout.layout().toolbars.shownRows(this.places());
+    const row = rows.findIndex(t => t.includes(name));
+    const current = rows[row] ?? [];
+    const index = current.indexOf(name);
+    const into = (target: number): { readonly row: number; readonly index: number; readonly isNewRow: boolean } =>
+      ({ row: target, index: Math.min(index, rows.slice(target, target + 1).flat().length), isNewRow: false });
+    const alone = current.length < 2;
+    switch (move) {
+      case ToolbarMove.Left:
+        return index > 0 ? { row, index: index - 1, isNewRow: false } : null;
+      case ToolbarMove.Right:
+        return index >= 0 && index < current.length - 1 ? { row, index: index + 1, isNewRow: false } : null;
+      case ToolbarMove.Up:
+        return row > 0 ? into(row - 1) : row === 0 && !alone ? { row: 0, index: 0, isNewRow: true } : null;
+      case ToolbarMove.Down:
+        return row >= 0 && row < rows.length - 1 ? into(row + 1) : row >= 0 && !alone ? { row: rows.length, index: 0, isNewRow: true } : null;
+    }
   }
 
   private toolbarsOf(name: string): readonly Toolbar[] {

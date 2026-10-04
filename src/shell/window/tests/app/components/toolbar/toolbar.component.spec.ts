@@ -169,6 +169,82 @@ describe("ToolbarComponent", () => {
     });
   });
 
+  it("moves the focus to More actions when a resize puts the focused item into the menu, and leaves it alone otherwise", async () => {
+    await showAsync(1000);
+    items()[0]?.focus();
+
+    fixture.componentInstance.width.set(100);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(element.querySelector(".tr-toolbar-overflow")).not.toBeNull();
+    });
+    expect(document.activeElement).toBe(items()[0]);
+
+    fixture.componentInstance.width.set(1000);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(element.querySelector(".tr-toolbar-overflow")).toBeNull();
+    });
+    items()[2]?.focus();
+    fixture.componentInstance.width.set(100);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(document.activeElement).toBe(element.querySelector(".tr-toolbar-overflow"));
+    });
+  });
+
+  it("names its grip, keeps it out of the tab order and opens the toolbar's menu from a click or, from any item, the Menu key or Shift+F10", async () => {
+    await showAsync(1000);
+    const grip = element.querySelector<HTMLButtonElement>(".tr-toolbar-grip") as HTMLButtonElement;
+    const rowsOf = (): readonly (string | null)[] => [...document.querySelectorAll("tr-menu[data-place='shell.toolbar'] button[tr-menu-item] .tr-menu-item-label")].map(t => t.textContent);
+
+    expect([grip.tagName, grip.getAttribute("aria-label"), grip.tabIndex]).toEqual(["BUTTON", "Move toolbar", -1]);
+    expect(grip.querySelectorAll(".tr-toolbar-dot").length).toBe(3);
+    items()[0]?.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+    items()[0]?.dispatchEvent(new KeyboardEvent("keydown", { key: "F10", bubbles: true }));
+    fixture.detectChanges();
+    expect(rowsOf()).toEqual([]);
+
+    const outer = vi.fn();
+    element.addEventListener("keydown", outer);
+    items()[0]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ContextMenu", bubbles: true }));
+    fixture.detectChanges();
+    expect(outer).toHaveBeenCalledTimes(0);
+    expect(rowsOf()).toEqual(["Move left", "Move right", "Move to the row above", "Move to the row below", "Hide toolbar"]);
+  });
+
+  it("opens the toolbar's menu from a context click or the keyboard's context menu event on it, without letting the band's menu open too", async () => {
+    await showAsync(1000);
+    const outer = vi.fn();
+    element.addEventListener("contextmenu", outer);
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+
+    items()[0]?.dispatchEvent(event);
+    fixture.detectChanges();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(outer).not.toHaveBeenCalled();
+    expect(document.querySelectorAll("tr-menu[data-place='shell.toolbar'] button[tr-menu-item]").length).toBe(5);
+  });
+
+  it("opens the toolbar's menu from a click on its grip", async () => {
+    await showAsync(1000);
+
+    element.querySelector<HTMLButtonElement>(".tr-toolbar-grip")?.click();
+    fixture.detectChanges();
+
+    expect(document.querySelectorAll("tr-menu[data-place='shell.toolbar'] button[tr-menu-item]").length).toBe(5);
+  });
+
+  it("opens the toolbar's menu from Shift+F10 on an item", async () => {
+    await showAsync(1000);
+
+    items()[1]?.dispatchEvent(new KeyboardEvent("keydown", { key: "F10", shiftKey: true, bubbles: true }));
+    fixture.detectChanges();
+
+    expect(document.querySelector("tr-menu[data-place='shell.toolbar']")).not.toBeNull();
+  });
+
   it("starts moving the toolbar from its grip and fades while it is dragged", async () => {
     await showAsync(1000);
 

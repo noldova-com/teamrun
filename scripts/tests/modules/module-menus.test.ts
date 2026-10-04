@@ -203,12 +203,41 @@ class ModuleMenusTests {
       const menus = await ModuleMenus.readAsync(repository.directory, ModuleMenusTests.FOLDER, "notes", ModuleMenusTests.DECLARED);
       const places = new Set([...ModuleMenus.SHELL_PLACES, ...ModuleMenusTests.DECLARED]);
 
-      menus.checkReferences("notes", places, new Set(["notes.newNote", "notes.sortBy"]));
+      menus.checkReferences("notes", places, new Set(), new Set(["notes.newNote", "notes.sortBy"]));
 
-      assert.throws(() => menus.checkReferences("notes", new Set(ModuleMenus.SHELL_PLACES), new Set(["notes.newNote", "notes.sortBy"])), new ModuleException(
+      assert.throws(() => menus.checkReferences("notes", new Set(ModuleMenus.SHELL_PLACES), new Set(), new Set(["notes.newNote", "notes.sortBy"])), new ModuleException(
         "notes's menus.json adds the group notes.sorting to notes.tools, which is neither the shell's place nor its own or a dependency's."));
-      assert.throws(() => menus.checkReferences("notes", places, new Set(["notes.newNote"])), new ModuleException(
+      assert.throws(() => menus.checkReferences("notes", places, new Set(), new Set(["notes.newNote"])), new ModuleException(
         "notes's menus.json runs notes.sortBy, which neither it nor a module it depends on declares."));
+    });
+
+    test("a toolbar stands next to a toolbar of its own or of a dependency, and no toolbar is opened as a menu", async t => {
+      const repository = await ModuleMenusTests.createAsync(t, ModuleMenusTests.VALID);
+      const declared = ["notes.main", "notes.side", "notes.tools"];
+      const read = async (anchors: Readonly<Record<string, unknown>>, groups: readonly unknown[] = []): Promise<ModuleMenus> => {
+        const places = [
+          { name: "notes.main", title: "Main", shows: "toolbar", ...anchors },
+          { name: "notes.side", title: "Side", shows: "toolbar" },
+          { name: "notes.tools", title: "Tools", shows: "menu" }
+        ];
+        await repository.writeAsync({ [`${ModuleMenusTests.FOLDER}/menus.json`]: JSON.stringify({ places, groups }) });
+        return await ModuleMenus.readAsync(repository.directory, ModuleMenusTests.FOLDER, "notes", declared);
+      };
+      const places = new Set([...ModuleMenus.SHELL_PLACES, ...declared, "tasks.bar"]);
+      const toolbars = new Set(["notes.main", "notes.side", "tasks.bar"]);
+      const commands = new Set(["notes.newNote"]);
+
+      (await read({ after: "notes.side" })).checkReferences("notes", places, toolbars, commands);
+      (await read({ before: "tasks.bar" })).checkReferences("notes", places, toolbars, commands);
+      await assert.rejects(Promise.resolve().then(async () => (await read({ after: "tasks.gone" })).checkReferences("notes", places, toolbars, commands)), new ModuleException(
+        "notes's menus.json puts the toolbar notes.main next to tasks.gone, which is not a toolbar of its own or of a module it depends on."));
+      await assert.rejects(Promise.resolve().then(async () => (await read({ before: "notes.tools" })).checkReferences("notes", places, toolbars, commands)), new ModuleException(
+        "notes's menus.json puts the toolbar notes.main next to notes.tools, which is not a toolbar of its own or of a module it depends on."));
+      for (const [kind, item] of [["submenu", { submenu: "notes.side" }], ["choice", { choice: "notes.side" }]] as const) {
+        const group = { name: "notes.open", place: "notes.tools", items: [item] };
+        await assert.rejects(Promise.resolve().then(async () => (await read({}, [group])).checkReferences("notes", places, toolbars, commands)), new ModuleException(
+          `notes's menus.json opens the toolbar notes.side as a menu in the group notes.open, which a toolbar cannot be.`), kind);
+      }
     });
 
     test("the build checks each module's menus against its own and its dependencies' places and commands", async t => {
@@ -216,15 +245,15 @@ class ModuleMenusTests {
       t.after(() => repository.disposeAsync());
       const module = (id: string, dependencies: readonly string[], contributes: Readonly<Record<string, unknown>>): string =>
         JSON.stringify({ id, displayName: id, parts: [], dependencies, contributes });
-      const notesMenus = (place: string, command: string): string =>
-        JSON.stringify({ places: [], groups: [{ name: "notes.extra", place, items: [{ command }] }] });
+      const notesMenus = (place: string, command: string, anchor: string = "tasks.bar"): string =>
+        JSON.stringify({ places: [{ name: "notes.bar", title: "Bar", shows: "toolbar", after: anchor }], groups: [{ name: "notes.extra", place, items: [{ command }] }] });
       await repository.writeAsync({
         "package.json": JSON.stringify({ teamrun: { modules: ["notes", "tasks", "clock"] } }),
-        "src/modules/tasks/module.json": module("tasks", [], { commands: ["tasks.add"], menus: ["tasks.tools"] }),
-        "src/modules/tasks/menus.json": JSON.stringify({ places: [{ name: "tasks.tools", title: "Tasks", shows: "menuBar" }], groups: [] }),
-        "src/modules/clock/module.json": module("clock", [], { commands: ["clock.tick"], menus: ["clock.tools"] }),
-        "src/modules/clock/menus.json": JSON.stringify({ places: [{ name: "clock.tools", title: "Clock" }], groups: [] }),
-        "src/modules/notes/module.json": module("notes", ["tasks"], {}),
+        "src/modules/tasks/module.json": module("tasks", [], { commands: ["tasks.add"], menus: ["tasks.tools", "tasks.bar"] }),
+        "src/modules/tasks/menus.json": JSON.stringify({ places: [{ name: "tasks.tools", title: "Tasks", shows: "menuBar" }, { name: "tasks.bar", title: "Bar", shows: "toolbar" }], groups: [] }),
+        "src/modules/clock/module.json": module("clock", [], { commands: ["clock.tick"], menus: ["clock.tools", "clock.bar"] }),
+        "src/modules/clock/menus.json": JSON.stringify({ places: [{ name: "clock.tools", title: "Clock" }, { name: "clock.bar", title: "Bar", shows: "toolbar" }], groups: [] }),
+        "src/modules/notes/module.json": module("notes", ["tasks"], { menus: ["notes.bar"] }),
         "src/modules/notes/menus.json": notesMenus("tasks.tools", "tasks.add")
       });
       const catalog = new ModuleCatalog(repository.directory);
@@ -234,6 +263,8 @@ class ModuleMenusTests {
       await assert.rejects(catalog.listBuildAsync(false, []), /adds the group notes\.extra to clock\.tools/);
       await repository.writeAsync({ "src/modules/notes/menus.json": notesMenus("shell.view", "clock.tick") });
       await assert.rejects(catalog.listBuildAsync(false, []), /runs clock\.tick, which neither it nor a module it depends on declares/);
+      await repository.writeAsync({ "src/modules/notes/menus.json": notesMenus("tasks.tools", "tasks.add", "clock.bar") });
+      await assert.rejects(catalog.listBuildAsync(false, []), /puts the toolbar notes\.bar next to clock\.bar, which is not a toolbar of its own or of a module it depends on/);
     });
   }
 

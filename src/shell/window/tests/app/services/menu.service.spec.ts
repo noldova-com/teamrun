@@ -184,4 +184,39 @@ describe("MenuService", () => {
     expect(describeSections(menus.resolve("shell.file"))).toEqual([["New note (disabled)"]]);
     expect(reported).toHaveBeenCalledOnce();
   });
+
+  it("leaves out a dynamic group whose rows function throws, shows a row whose checked state throws as unchecked, and reports each failure", () => {
+    const menus = start(new MenuDeclarations("notes", [new MenuPlace("notes.recent", "Recent", false)], [
+      new MenuGroup("notes.display", "shell.file", false, [MenuItem.ofCommand("notes.wrapLines"), MenuItem.ofCommand("notes.newNote")]),
+      MenuGroup.dynamic("notes.recentNotes", "shell.file", false)
+    ]));
+    const reported = vi.spyOn(TestBed.inject(ErrorHandler), "handleError").mockImplementation(() => undefined);
+    TestBed.inject(CommandService).setCommands([
+      new CommandContribution("notes.wrapLines", "Wrap lines", null, null, () => Promise.resolve(null), () => true, () => {
+        throw new Error("No wrapping state.");
+      }),
+      new CommandContribution("notes.newNote", "New note", null, null, () => Promise.resolve(null))
+    ]);
+    menus.setActiveModules(["notes"]);
+    menus.provideGroup("notes.recentNotes", () => {
+      throw new Error("No recent notes.");
+    });
+
+    expect(describeSections(menus.resolve("shell.file"))).toEqual([["Wrap lines Checkbox:false", "New note"]]);
+    expect(reported).toHaveBeenCalledTimes(2);
+  });
+
+  it("withdraws a dynamic group's rows only while the withdrawing function's own provider is still the one supplying them", () => {
+    const menus = start(new MenuDeclarations("notes", [], [MenuGroup.dynamic("notes.recentNotes", "shell.file", false)]));
+    TestBed.inject(CommandService).setCommands([new CommandContribution("notes.newNote", "New note", null, null, () => Promise.resolve(null))]);
+    menus.setActiveModules(["notes"]);
+
+    const old = menus.provideGroup("notes.recentNotes", () => [MenuItem.ofCommand("notes.newNote", {}, "Old")]);
+    const current = menus.provideGroup("notes.recentNotes", () => [MenuItem.ofCommand("notes.newNote", {}, "Current")]);
+    old();
+
+    expect(describeSections(menus.resolve("shell.file"))).toEqual([["Current"]]);
+    current();
+    expect(menus.resolve("shell.file")).toEqual([]);
+  });
 });

@@ -12,6 +12,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 
 import { BottomDockSpan } from "../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../src/app/enums/dock-side";
+import { ToolbarMove } from "../../../src/app/enums/toolbar-move";
 import type { CommandContribution } from "../../../src/app/models/command-contribution";
 import { Layout } from "../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../src/app/models/layout/view-registry";
@@ -67,7 +68,8 @@ describe("ShellCommandsService", () => {
       "shell.closeTab", "shell.keepTab", "shell.closeOtherTabs", "shell.closeTabsToTheRight", "shell.closeAllTabs", "shell.moveTabLeft", "shell.moveTabRight",
       "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight",
       "shell.dockTabBottom", "shell.moveTabToGroup", "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut",
-      "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.toggleToolbar", "shell.focusToolbars", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
+      "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.toggleToolbar", "shell.moveToolbarLeft", "shell.moveToolbarRight", "shell.moveToolbarUp", "shell.moveToolbarDown", "shell.hideToolbar",
+      "shell.focusToolbars", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
     expect(service.commands.every(t => t.title.length > 0 && t.icon !== null)).toBe(true);
     expect(service.commands.filter(t => t.defaultKey !== null)).toEqual([]);
@@ -263,6 +265,40 @@ describe("ShellCommandsService", () => {
     await runAsync("shell.toggleToolbar", missing);
     expect(setShown).not.toHaveBeenCalled();
     expect(known).toHaveBeenCalled();
+  });
+
+  it("moves the toolbar it names one step and returns the focus to its grip, enabled only where that step is possible, and hides it", async () => {
+    const toolbars = TestBed.inject(ToolbarService);
+    vi.spyOn(toolbars, "isKnown").mockImplementation(name => name === "notes.main");
+    const canMove = vi.spyOn(toolbars, "canMove").mockImplementation((_, move) => move === ToolbarMove.Left);
+    const moveBy = vi.spyOn(toolbars, "moveBy").mockImplementation(() => undefined);
+    const setShown = vi.spyOn(toolbars, "setShown").mockImplementation(() => undefined);
+    const main = { toolbar: "notes.main" };
+    const missing = { toolbar: "notes.none" };
+    const frame = document.createElement("div");
+    frame.className = "tr-toolbar";
+    frame.dataset["toolbar"] = "notes.main";
+    const grip = document.createElement("button");
+    grip.className = "tr-toolbar-grip";
+    frame.append(grip);
+    document.body.append(frame);
+
+    expect(Object.values(ToolbarMove).map(t => enabled(`shell.moveToolbar${t[0]?.toUpperCase()}${t.slice(1)}`, main))).toEqual([true, false, false, false]);
+    expect([enabled("shell.moveToolbarLeft", missing), enabled("shell.moveToolbarLeft"), enabled("shell.hideToolbar", main), enabled("shell.hideToolbar", missing)]).toEqual([false, false, true, false]);
+    await runAsync("shell.moveToolbarLeft", main);
+    await vi.waitFor(() => expect(document.activeElement).toBe(grip));
+    expect(moveBy).toHaveBeenLastCalledWith("notes.main", ToolbarMove.Left);
+    moveBy.mockClear();
+    await runAsync("shell.moveToolbarLeft", missing);
+    expect(moveBy).not.toHaveBeenCalled();
+    await runAsync("shell.hideToolbar", main);
+    expect(setShown).toHaveBeenLastCalledWith("notes.main", false);
+    setShown.mockClear();
+    await runAsync("shell.hideToolbar", missing);
+    expect(setShown).not.toHaveBeenCalled();
+    frame.remove();
+    await runAsync("shell.moveToolbarLeft", main);
+    expect(canMove).toHaveBeenCalled();
   });
 
   it("focuses the first toolbar item, and is enabled only while a toolbar is shown", async () => {

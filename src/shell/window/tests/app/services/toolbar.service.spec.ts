@@ -8,6 +8,7 @@
 
 import { TestBed } from "@angular/core/testing";
 
+import { ToolbarMove } from "../../../src/app/enums/toolbar-move";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { CommandRow } from "../../../src/app/models/command-row";
 import { Layout } from "../../../src/app/models/layout/layout";
@@ -92,6 +93,33 @@ describe("ToolbarService", () => {
     expect(shape()).toEqual([["notes.main:1"], ["notes.spare:1"], ["notes.second:1", "notes.empty:0"]]);
     layout.reset();
     expect(shape()).toEqual([["notes.main:1"], ["notes.second:1", "notes.empty:0"]]);
+  });
+
+  it("tells where a toolbar can move by one step and moves it there, to a new row at the first or last row's edge", () => {
+    service.setShown("notes.spare", true);
+    const can = (name: string): readonly boolean[] => Object.values(ToolbarMove).map(t => service.canMove(name, t));
+
+    expect([can("notes.main"), can("notes.spare"), can("notes.second"), can("notes.empty"), can("notes.gone")]).toEqual([
+      [false, true, true, true], [true, false, true, true], [false, true, true, true], [true, false, true, true], [false, false, false, false]
+    ]);
+    service.moveBy("notes.main", ToolbarMove.Right);
+    expect(shape()[0]).toEqual(["notes.spare:1", "notes.main:1"]);
+    service.moveBy("notes.main", ToolbarMove.Left);
+    expect(shape()[0]).toEqual(["notes.main:1", "notes.spare:1"]);
+    service.moveBy("notes.main", ToolbarMove.Left);
+    service.moveBy("notes.gone", ToolbarMove.Right);
+    expect(shape()[0]).toEqual(["notes.main:1", "notes.spare:1"]);
+    service.moveBy("notes.second", ToolbarMove.Up);
+    expect(shape()).toEqual([["notes.second:1", "notes.main:1", "notes.spare:1"], ["notes.empty:0"]]);
+    service.moveBy("notes.second", ToolbarMove.Down);
+    expect(shape()).toEqual([["notes.main:1", "notes.spare:1"], ["notes.second:1", "notes.empty:0"]]);
+    service.moveBy("notes.main", ToolbarMove.Up);
+    expect(shape()).toEqual([["notes.main:1"], ["notes.spare:1"], ["notes.second:1", "notes.empty:0"]]);
+    service.moveBy("notes.second", ToolbarMove.Down);
+    expect(shape()).toEqual([["notes.main:1"], ["notes.spare:1"], ["notes.empty:0"], ["notes.second:1"]]);
+    service.moveBy("notes.second", ToolbarMove.Down);
+    service.moveBy("notes.main", ToolbarMove.Up);
+    expect(shape()).toEqual([["notes.main:1"], ["notes.spare:1"], ["notes.empty:0"], ["notes.second:1"]]);
   });
 
   it("lists every toolbar by its title in the dynamic group of the Toolbars menu", () => {

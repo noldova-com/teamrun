@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Injectable, type Signal, type WritableSignal, computed, inject, signal } from "@angular/core";
+import { ErrorHandler, Injectable, type Signal, type WritableSignal, computed, inject, signal } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
@@ -27,6 +27,7 @@ import { DesktopBridgeService } from "./desktop-bridge.service";
 @Injectable({ providedIn: "root" })
 export class MenuService {
   private readonly commands: CommandService = inject(CommandService);
+  private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly declarations: readonly MenuDeclarations[] = inject(WindowPartTokens.menus);
   private readonly activeValue: WritableSignal<readonly string[]> = signal([]);
   private readonly providers: WritableSignal<ReadonlyMap<string, (context: JsonObject) => readonly MenuItem[]>> = signal(new Map());
@@ -47,7 +48,7 @@ export class MenuService {
 
   public provideGroup(group: string, provider: (context: JsonObject) => readonly MenuItem[]): () => void {
     this.providers.update(t => new Map([...t, [group, provider]]));
-    return () => this.providers.update(t => new Map([...t].filter(u => u[0] !== group)));
+    return () => this.providers.update(t => t.get(group) === provider ? new Map([...t].filter(u => u[0] !== group)) : t);
   }
 
   public findPlace(name: string): MenuPlace | null {
@@ -63,7 +64,15 @@ export class MenuService {
   }
 
   private itemsOf(group: MenuGroup, context: JsonObject): readonly MenuItem[] {
-    return group.isDynamic ? this.providers().get(group.name)?.(context) ?? [] : group.items;
+    if (!group.isDynamic)
+      return group.items;
+    try {
+      return this.providers().get(group.name)?.(context) ?? [];
+    }
+    catch (error) {
+      this.errors.handleError(error);
+      return [];
+    }
   }
 
   private resolveItem(group: MenuGroup, item: MenuItem, context: JsonObject): readonly (CommandRow | SubmenuRow)[] {
@@ -82,7 +91,7 @@ export class MenuService {
       return [];
     const check = Object.isNull(command.isChecked) ? MenuCheck.None : group.isExclusive ? MenuCheck.Radio : MenuCheck.Checkbox;
     return [new CommandRow(name, commandArguments, item.label ?? command.title, command.icon, this.commands.keyLabel(name), this.commands.isEnabled(name, commandArguments), check,
-      command.isChecked?.(commandArguments) ?? false)];
+      this.commands.isChecked(name, commandArguments))];
   }
 
   private resolveChoice(placeName: string, context: JsonObject): readonly SubmenuRow[] {

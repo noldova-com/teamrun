@@ -10,6 +10,7 @@ import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
 import { EditAction } from "../enums/edit-action";
 import { PanelEdge } from "../enums/panel-edge";
+import { ToolbarMove } from "../enums/toolbar-move";
 import { MenuDeclarations } from "./menu-declarations";
 import { MenuGroup } from "./menu-group";
 import { MenuItem } from "./menu-item";
@@ -28,6 +29,7 @@ export class ShellMenus {
     new MenuPlace(Resources.tabSplitMenu, Resources.splitLabel, false, Resources.splitGlyph),
     new MenuPlace(Resources.tabDockMenu, Resources.dockLabel, false, Resources.dockGlyph),
     new MenuPlace(Resources.toolbarsMenu, Resources.toolbarsMenuTitle, false),
+    new MenuPlace(Resources.toolbarMenu, Resources.toolbarMenuTitle, false),
     new MenuPlace(Resources.appMenu, Resources.appMenuTitle, false)
   ];
   private static readonly EDITING: MenuGroup = new MenuGroup(Resources.editingGroup, Resources.editMenu, false,
@@ -40,6 +42,9 @@ export class ShellMenus {
     new MenuGroup(Resources.bottomDockGroup, Resources.viewMenu, true, Object.values(BottomDockSpan).map(t => MenuItem.ofCommand(Resources.bottomSpanCommands[t]))),
     new MenuGroup(Resources.viewToolbarsGroup, Resources.viewMenu, false, [MenuItem.ofSubmenu(Resources.toolbarsMenu)]),
     MenuGroup.dynamic(Resources.toolbarListGroup, Resources.toolbarsMenu, false),
+    new MenuGroup(Resources.toolbarMoveGroup, Resources.toolbarMenu, false,
+      Object.values(ToolbarMove).map(t => MenuItem.ofCommand(Resources.moveToolbarCommands[t], {}, Resources.moveToolbarLabels[t]))),
+    new MenuGroup(Resources.toolbarHideGroup, Resources.toolbarMenu, false, [MenuItem.ofCommand(Resources.hideToolbarCommand, {}, Resources.hideToolbarLabel)]),
     new MenuGroup(Resources.layoutGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.resetLayoutCommand)]),
     new MenuGroup(Resources.tabArrangeGroup, Resources.tabMenu, false, [
       MenuItem.ofCommand(Resources.keepTabCommand, {}, Resources.keepLabel),

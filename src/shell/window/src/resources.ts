@@ -17,6 +17,7 @@ import { DockSide } from "./app/enums/dock-side";
 import { EditAction } from "./app/enums/edit-action";
 import { PanelEdge } from "./app/enums/panel-edge";
 import { SplitAxis } from "./app/enums/split-axis";
+import { ToolbarMove } from "./app/enums/toolbar-move";
 import { productName } from "../../../generated/product";
 
 export class Resources {
@@ -477,7 +478,6 @@ export class Resources {
   public static readonly toolbarOverflowSelector: string = ".tr-toolbar-ghost-overflow";
   public static readonly toolbarFitTolerance: number = 0.5;
   public static readonly toolbarEdgeFraction: number = 4;
-  public static readonly toolbarDraggingClass: string = "tr-toolbar-dragging";
   public static readonly toolbarBandSelector: string = ".tr-toolbar-band";
   public static readonly toolbarRowSelector: string = ".tr-toolbar-row";
   public static readonly toolbarSelector: string = ".tr-toolbar[data-toolbar]";
@@ -487,7 +487,45 @@ export class Resources {
   public static readonly toolbarOverflowLabel: string = "More actions";
   public static readonly toolbarOverflowGlyph: string = "more_horiz";
   public static readonly toolbarGripLabel: string = "Move toolbar";
-  public static readonly toolbarsLabel: string = "Toolbars";
+  public static readonly toolbarMenu: string = "shell.toolbar";
+  public static readonly toolbarMenuTitle: string = "Toolbar";
+  public static readonly toolbarMoveGroup: string = "shell.toolbarMove";
+  public static readonly toolbarHideGroup: string = "shell.toolbarHide";
+  public static readonly moveToolbarCommands: Readonly<Record<ToolbarMove, string>> = {
+    [ToolbarMove.Left]: "shell.moveToolbarLeft",
+    [ToolbarMove.Right]: "shell.moveToolbarRight",
+    [ToolbarMove.Up]: "shell.moveToolbarUp",
+    [ToolbarMove.Down]: "shell.moveToolbarDown"
+  };
+  public static readonly moveToolbarTitles: Readonly<Record<ToolbarMove, string>> = {
+    [ToolbarMove.Left]: "Move the toolbar left",
+    [ToolbarMove.Right]: "Move the toolbar right",
+    [ToolbarMove.Up]: "Move the toolbar to the row above",
+    [ToolbarMove.Down]: "Move the toolbar to the row below"
+  };
+  public static readonly moveToolbarLabels: Readonly<Record<ToolbarMove, string>> = {
+    [ToolbarMove.Left]: "Move left",
+    [ToolbarMove.Right]: "Move right",
+    [ToolbarMove.Up]: "Move to the row above",
+    [ToolbarMove.Down]: "Move to the row below"
+  };
+  public static readonly moveToolbarGlyphs: Readonly<Record<ToolbarMove, string>> = {
+    [ToolbarMove.Left]: "arrow_back",
+    [ToolbarMove.Right]: "arrow_forward",
+    [ToolbarMove.Up]: "arrow_upward",
+    [ToolbarMove.Down]: "arrow_downward"
+  };
+  public static readonly hideToolbarGlyph: string = "visibility_off";
+  public static readonly hideToolbarCommand: string = "shell.hideToolbar";
+  public static readonly hideToolbarTitle: string = "Hide the toolbar";
+  public static readonly hideToolbarLabel: string = "Hide toolbar";
+  public static readonly toolbarGripSelector: string = ".tr-toolbar-grip";
+  public static readonly toolbarContentSectionSelector: string = ".tr-toolbar-section";
+  public static readonly toolbarOverflowItemSelector: string = ".tr-toolbar-overflow";
+  public static readonly toolbarGroupData: string = "group";
+  public static readonly focusedSelector: string = ":focus";
+  public static readonly toolbarMenuKey: string = "ContextMenu";
+  public static readonly toolbarMenuShiftKey: string = "F10";
   public static readonly settingsGroup: string = "shell.settings";
   public static readonly windowPartMenusToken: string = "The build's module menus";
   public static readonly placeInput: string = "place";

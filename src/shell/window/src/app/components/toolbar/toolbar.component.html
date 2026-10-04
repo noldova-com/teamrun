@@ -6,7 +6,13 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-<span #grip class="tr-toolbar-grip" aria-hidden="true" [trTooltip]="resources.toolbarGripLabel" [trTooltipSide]="below" (pointerdown)="drag.begin(toolbar().name, $event)"></span>
+<tr-place-menu #moves [place]="resources.toolbarMenu" [context]="menuContext()" />
+<button #grip type="button" tabindex="-1" class="tr-toolbar-grip" [attr.aria-label]="resources.toolbarGripLabel" [trMenuTriggerFor]="moves.menu()" [trTooltip]="resources.toolbarGripLabel"
+  [trTooltipSide]="below" (pointerdown)="drag.begin(toolbar().name, $event)">
+  <span class="tr-toolbar-dot"></span>
+  <span class="tr-toolbar-dot"></span>
+  <span class="tr-toolbar-dot"></span>
+</button>
 <div #content class="tr-toolbar-content" trToolbar [trToolbarLabel]="toolbar().title">
   @for (section of shown(); track section.group; let first = $first) {
     @if (!first) {
