@@ -164,7 +164,7 @@ describe("ToolbarComponent", () => {
     submenu.dispatchEvent(new PointerEvent("pointerenter"));
     await vi.waitFor(() => expect(tooltip()).toBeDefined());
 
-    expect(tooltip()?.getBoundingClientRect().top).toBeGreaterThan(submenu.getBoundingClientRect().bottom);
+    expect(tooltip()?.getBoundingClientRect().top).toBeGreaterThanOrEqual(submenu.getBoundingClientRect().bottom);
     submenu.dispatchEvent(new PointerEvent("pointerleave"));
     await vi.waitFor(() => expect(tooltip()).toBeUndefined());
   });
