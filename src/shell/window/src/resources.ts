@@ -83,6 +83,8 @@ export class Resources {
   public static readonly dropTargetSeparator: string = ":";
   public static readonly tabKeySelector: string = "[data-tab-key]";
   public static readonly tabKeyData: string = "tabKey";
+  public static readonly tabGroupSelector: string = "tr-tab-group";
+  public static readonly tabGroupData: string = "group";
   public static readonly tabCloseSelector: string = ".tr-tab-close";
   public static readonly selectedTabSelector: string = ".tr-tab-selected";
   public static readonly revealOptions: ScrollIntoViewOptions = { block: "nearest", inline: "nearest" };
@@ -197,6 +199,7 @@ export class Resources {
   public static readonly showInDialogTitle: string = "Show in a dialog";
   public static readonly showInDialogGlyph: string = "open_in_full";
   public static readonly dialogAlreadyOpen: string = "A dialog is already open.";
+  public static readonly dialogWhileReconnecting: string = "A dialog can't open while the window reconnects to the runtime.";
   public static readonly settingsDocument: string = "shell.settings";
   public static readonly settingsTitle: string = "Settings";
   public static readonly settingsGlyph: string = "settings";
@@ -230,6 +233,7 @@ export class Resources {
   public static readonly noKey: string = "No key";
   public static readonly choicePillMinimum: number = 2;
   public static readonly choicePillLimit: number = 4;
+  public static readonly settingErrorIdPrefix: string = "tr-setting-error-";
   public static readonly shortcutsExplanation: string = "The keys that run commands. Choose a key to record a new one; your keys apply on every device.";
   public static readonly resetAllShortcutsLabel: string = "Reset all shortcuts";
   public static readonly removeKeyLabel: string = "Remove";
