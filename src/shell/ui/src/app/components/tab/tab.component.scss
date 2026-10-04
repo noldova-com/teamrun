@@ -134,24 +134,7 @@
   visibility: hidden;
 }
 
-.tr-tab-spinner {
-  box-sizing: border-box;
+.tr-tab .tr-tab-spinner {
   width: var(--tr-icon);
   height: var(--tr-icon);
-  border: calc(var(--tr-border-width) * 2) solid color-mix(in srgb, var(--tr-progress) 25%, transparent);
-  border-top-color: var(--tr-progress);
-  border-radius: 50%;
-  animation: tr-tab-spin 1s linear infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tr-tab-spinner {
-    animation: none;
-  }
-}
-
-@keyframes tr-tab-spin {
-  to {
-    transform: rotate(1turn);
-  }
 }
