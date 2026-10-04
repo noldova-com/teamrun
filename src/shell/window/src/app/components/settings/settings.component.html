@@ -28,7 +28,9 @@
 </div>
 
 <ng-template #body let-page let-isResult="isResult">
-  @if (page.isShortcuts) {
+  @if (page.isGallery) {
+    <ng-container [ngComponentOutlet]="gallery" />
+  } @else if (page.isShortcuts) {
     @if (!isResult) {
       <h2 class="tr-settings-group-title">{{ page.title }}</h2>
     }

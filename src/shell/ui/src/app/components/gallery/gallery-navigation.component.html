@@ -1,0 +1,62 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<tr-gallery-specimen [name]="text.tab">
+  <div class="tr-gallery-strip" role="tablist">
+    <tr-tab [label]="text.tabNormal" [icon]="text.glyphDescription" [closable]="false" />
+    <tr-tab [label]="text.tabSelected" [icon]="text.glyphDescription" [selected]="true" />
+    <tr-tab [label]="text.tabPreview" [preview]="true" />
+    <tr-tab [label]="text.tabWorking" [working]="true" />
+    <tr-tab [label]="text.tabBadge" [badge]="text.tabBadgeLabel" [badgeCount]="3" />
+    <tr-tab [label]="text.tabNotClosable" [closable]="false" />
+    <tr-tab class="tr-gallery-narrow" [label]="text.tabLong" [icon]="text.glyphDescription" />
+  </div>
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.viewBadge">
+  <tr-view-badge />
+  <tr-view-badge [count]="3" />
+  <tr-view-badge [count]="120" />
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.toolbar">
+  <div trToolbar [trToolbarLabel]="text.toolbarLabel" class="tr-gallery-toolbar">
+    <button type="button" tr-icon-button trToolbarItem [icon]="text.glyphAdd" [label]="text.button"></button>
+    <button type="button" tr-icon-button trToolbarItem [icon]="text.glyphSave" [label]="text.pressed" [pressed]="true"></button>
+    <button type="button" tr-icon-button trToolbarItem [icon]="text.iconGlyph" [label]="text.disabled" aria-disabled="true"></button>
+  </div>
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.toolbarButtons">
+  <div trToolbar [trToolbarLabel]="text.toolbarButtonsLabel" class="tr-gallery-toolbar">
+    <button type="button" tr-toolbar-button trToolbarItem [icon]="text.glyphAdd" [label]="text.button"></button>
+    <button type="button" tr-toolbar-button trToolbarItem [icon]="text.glyphSave" [label]="text.toolbarWithLabel" [isShowingLabel]="true"></button>
+    <button type="button" tr-toolbar-button trToolbarItem [icon]="text.iconGlyph" [label]="text.pressed" [pressed]="true"></button>
+    <button type="button" tr-toolbar-button trToolbarItem [icon]="text.glyphDescription" [label]="text.menu" [isShowingLabel]="true" [hasMenu]="true"></button>
+    <button type="button" tr-toolbar-button trToolbarItem [icon]="text.glyphAdd" [label]="text.disabled" [isUnavailable]="true"></button>
+    <button type="button" tr-toolbar-button trToolbarItem class="tr-gallery-narrow" [label]="text.longText"></button>
+  </div>
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.sash">
+  <div class="tr-gallery-sash-box">
+    <div class="tr-gallery-pane"></div>
+    <tr-sash [orientation]="orientations.Vertical" [label]="text.sashVertical" />
+    <div class="tr-gallery-pane"></div>
+  </div>
+  <div class="tr-gallery-sash-box tr-gallery-sash-box-column">
+    <div class="tr-gallery-pane"></div>
+    <tr-sash [orientation]="orientations.Horizontal" [label]="text.sashHorizontal" />
+    <div class="tr-gallery-pane"></div>
+  </div>
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.panelCard">
+  <tr-panel-card class="tr-gallery-card" [surface]="surfaces.Shell">{{ text.panelShell }}</tr-panel-card>
+  <tr-panel-card class="tr-gallery-card">{{ text.panelPanel }}</tr-panel-card>
+</tr-gallery-specimen>

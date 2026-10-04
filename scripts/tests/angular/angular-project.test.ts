@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -201,6 +201,35 @@ class AngularProjectTests {
       await assert.rejects(
         AngularProjectTests.create(repository, new ProcessRunnerFixture([3])).buildAsync(new TextOutputFixture(), null),
         new ProcessException("Building the window failed with exit code 3."));
+    });
+
+    test("a window is checked for a text it must not contain, in the build folder or the given one, and a tree without the project has nothing to check", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      const empty = await RepositoryFixture.createAsync();
+      t.after(() => empty.disposeAsync());
+      await repository.writeAsync({
+        "_build/window/browser/main.js": "const a = 1;\n",
+        "_build/window/browser/styles/page.css": ".tr-page {}\n",
+        "_build/variants/window/main.js": "const b = \"tr-gallery-scope-frame\";\n"
+      });
+      const project = AngularProjectTests.create(repository, new ProcessRunnerFixture());
+
+      await project.verifyWithoutAsync(null, ["tr-gallery-forms", "tr-gallery-scope-frame"]);
+      await assert.rejects(
+        project.verifyWithoutAsync(path.join(repository.directory, "_build", "variants", "window"), ["tr-gallery-forms", "tr-gallery-scope-frame"]),
+        new ProcessException("The window built in _build/variants/window contains \"tr-gallery-scope-frame\" in main.js."));
+      await AngularProjectTests.create(empty, new ProcessRunnerFixture()).verifyWithoutAsync(null, ["tr-gallery-scope-frame"]);
+    });
+
+    test("a window folder with no files, or none at all, cannot pass the check for a text it must not contain", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      await mkdir(path.join(repository.directory, "_build", "variants", "window", "browser"), { recursive: true });
+      const project = AngularProjectTests.create(repository, new ProcessRunnerFixture());
+
+      await assert.rejects(
+        project.verifyWithoutAsync(path.join(repository.directory, "_build", "variants", "window"), ["tr-gallery-scope-frame"]),
+        new ProcessException("The window built in _build/variants/window has no files to check."));
+      await assert.rejects(project.verifyWithoutAsync(null, ["tr-gallery-scope-frame"]), new ProcessException("The window built in _build/window has no files to check."));
     });
 
     test("a tree without the Angular project has no window to build", async t => {

@@ -10,6 +10,7 @@ import { appendFile } from "node:fs/promises";
 import type { Writable } from "node:stream";
 
 import AngularProject from "./angular/angular-project.ts";
+import GalleryFile from "./angular/gallery-file.ts";
 import AngularTestCheck from "./checks/angular-test-check.ts";
 import DeclaredDependencyCheck from "./checks/declared-dependency-check.ts";
 import DocumentCheck from "./checks/document-check.ts";
@@ -19,6 +20,7 @@ import ModuleImportCheck from "./checks/module-import-check.ts";
 import NameUniquenessCheck from "./checks/name-uniqueness-check.ts";
 import PackageCheck from "./checks/package-check.ts";
 import PackageTestCheck from "./checks/package-test-check.ts";
+import PackagedBuildCheck from "./checks/packaged-build-check.ts";
 import ProductIdentityCheck from "./checks/product-identity-check.ts";
 import ScriptTestCheck from "./checks/script-test-check.ts";
 import ShellIndependenceCheck from "./checks/shell-independence-check.ts";
@@ -96,6 +98,7 @@ export default class Test {
     const modules = new ModuleCatalog(this.root);
     const layout = new BuildLayout(this.root);
     const server = [ApiServer.locateCompiler()];
+    const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
     return [
       documents,
       new ModuleFolderCheck(this.root, modules),
@@ -110,7 +113,8 @@ export default class Test {
       new ApiDeclarationCheck(this.root, catalog, layout, server, Test.API_TIMEOUT),
       new ApiExampleCheck(this.root, catalog, layout, this.runner, server, Test.API_TIMEOUT),
       new ScriptTestCheck(this.root, this.runner),
-      new AngularTestCheck(new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment)))
+      new AngularTestCheck(angular),
+      new PackagedBuildCheck(this.root, this.runner, new GalleryFile(this.root), angular)
     ];
   }
 }

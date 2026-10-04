@@ -11,9 +11,11 @@ export default class BuildVariant {
 
   public readonly isTest: boolean;
   public readonly excluded: readonly string[];
+  public readonly isPackaged: boolean;
 
-  public constructor(isTest: boolean, excluded: readonly string[]) {
+  public constructor(isTest: boolean, excluded: readonly string[], isPackaged: boolean = false) {
     this.isTest = isTest;
     this.excluded = excluded;
+    this.isPackaged = isPackaged;
   }
 }

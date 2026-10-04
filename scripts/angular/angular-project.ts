@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { glob, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
@@ -38,6 +38,7 @@ export default class AngularProject {
   private static readonly OPTIONS_PATH: readonly string[] = ["architect", AngularProject.TEST_TARGET, "options"];
   private static readonly BUILD_ARGUMENTS: readonly string[] = ["build"];
   private static readonly OUTPUT_PATH_OPTION: string = "--output-path";
+  private static readonly OUTPUT_SEGMENTS: readonly string[] = ["_build", "window"];
   private static readonly NO_PROJECT: string = "No Angular project under src/; there is nothing to prepare.\n";
   private static readonly INSTALLING: string = "Installing the Angular project in src/...\n";
   private static readonly INSTALLING_BROWSER: string = "Installing the browser for the Angular tests...\n";
@@ -89,6 +90,26 @@ export default class AngularProject {
       this.directory);
     if (exitCode !== 0)
       throw new ProcessException(`Building the window failed with exit code ${exitCode}.`);
+  }
+
+  public async verifyWithoutAsync(outputPath: string | null, texts: readonly string[]): Promise<void> {
+    if (!this.hasProject())
+      return;
+
+    const folder = outputPath ?? path.join(this.root, ...AngularProject.OUTPUT_SEGMENTS);
+    const shown = path.relative(this.root, folder).split(path.sep).join(path.posix.sep);
+    let scanned = 0;
+    for await (const file of glob("**/*", { cwd: folder })) {
+      if (!AngularProject.isFile(path.join(folder, file)))
+        continue;
+      scanned++;
+      const content = await readFile(path.join(folder, file), AngularProject.RECORD_ENCODING);
+      const found = texts.find(t => content.includes(t));
+      if (found !== undefined)
+        throw new ProcessException(`The window built in ${shown} contains ${JSON.stringify(found)} in ${file}.`);
+    }
+    if (scanned === 0)
+      throw new ProcessException(`The window built in ${shown} has no files to check.`);
   }
 
   public async testAsync(): Promise<AngularTestRun> {
@@ -147,7 +168,11 @@ export default class AngularProject {
     return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>)[name] : undefined;
   }
 
-  private hasProject(): boolean {
+  private static isFile(file: string): boolean {
+    return statSync(file).isFile();
+  }
+
+  public hasProject(): boolean {
     return existsSync(path.join(this.directory, AngularProject.WORKSPACE_FILE));
   }
 
