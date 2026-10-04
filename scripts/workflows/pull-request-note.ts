@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type PullRequestFinding from "./pull-request-finding.ts";
+import type IPullRequestComment from "./interfaces/pull-request-comment.ts";
 
 export default class PullRequestNote {
   private static readonly PREFIX: string = "pull-request-watch";
@@ -31,8 +31,8 @@ export default class PullRequestNote {
     this.isCleared = body.includes(PullRequestNote.CLEARED);
   }
 
-  public static compose(finding: PullRequestFinding, head: string): string {
-    return `<!-- ${PullRequestNote.PREFIX}:${finding.kind}:${head} -->\n${PullRequestNote.HEADING} ${finding.text}`;
+  public static compose(comment: IPullRequestComment, head: string): string {
+    return `<!-- ${PullRequestNote.PREFIX}:${comment.kind}:${head} -->\n${PullRequestNote.HEADING} ${comment.text}`;
   }
 
   public static parse(id: number, body: string): PullRequestNote | null {

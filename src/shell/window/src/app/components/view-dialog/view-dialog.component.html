@@ -1,0 +1,13 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (dialogs.shown(); as tab) {
+  <tr-dialog [title]="labels.of(tab).title" [size]="large" (dismissed)="dialogs.close()">
+    <tr-tab-content class="tr-view-dialog-content" [tab]="tab" />
+  </tr-dialog>
+}

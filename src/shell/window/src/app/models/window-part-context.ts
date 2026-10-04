@@ -12,6 +12,7 @@ import type { NotificationPost, SettingScope } from "@noldova/teamrun-shell-prot
 import { WindowPartAccessException } from "../exceptions/window-part-access.exception";
 import type { IWindowPartContext } from "../interfaces/i-window-part-context";
 import type { IDocumentOptions } from "../interfaces/i-document-options";
+import type { IViewDialogOptions } from "../interfaces/i-view-dialog-options";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
 import type { CommandContribution } from "./command-contribution";
 import type { DocumentContribution } from "./document-contribution";
@@ -151,6 +152,11 @@ export class WindowPartContext implements IWindowPartContext {
   public keepDocument(name: string, instance: string): void {
     this.requireOwn(name);
     this.host.keepDocument(this.moduleId, name, instance);
+  }
+
+  public async showInDialogAsync(name: string, options: IViewDialogOptions = {}): Promise<void> {
+    this.requireReadable(name);
+    await this.host.showInDialogAsync(name, options.instance ?? null, options.title ?? null);
   }
 
   public log(message: string): void {

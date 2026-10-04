@@ -13,6 +13,7 @@ import { AppearanceService } from "@noldova/teamrun-shell-ui";
 import { DockSide } from "../../enums/dock-side";
 import type { GroupFrame } from "../../models/layout/group-frame";
 import { LayoutService } from "../../services/layout.service";
+import { ViewDialogService } from "../../services/view-dialog.service";
 import { DockComponent } from "../dock/dock.component";
 import { DockingGuidesComponent } from "../docking-guides/docking-guides.component";
 import { EmptyWindowComponent } from "../empty-window/empty-window.component";
@@ -32,6 +33,7 @@ export class WorkspaceComponent {
   private readonly height: WritableSignal<number> = signal(0);
 
   protected readonly layout: LayoutService = inject(LayoutService);
+  protected readonly dialogs: ViewDialogService = inject(ViewDialogService);
   protected readonly sides: readonly DockSide[] = Object.values(DockSide);
 
   public constructor() {

@@ -9,11 +9,12 @@
 import type { DialogRef } from "@angular/cdk/dialog";
 import { Component } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 
 import { ButtonComponent } from "../../../../src/app/components/button/button.component";
 import { DialogComponent } from "../../../../src/app/components/dialog/dialog.component";
 import { ButtonVariant } from "../../../../src/app/enums/button-variant";
+import { DialogSize } from "../../../../src/app/enums/dialog-size";
 import { DialogService } from "../../../../src/app/services/dialog.service";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
@@ -34,9 +35,24 @@ class DialogHostComponent {
   public dismissals: number = 0;
 }
 
+@Component({
+  imports: [DialogComponent],
+  template: `
+    <tr-dialog title="Notes" [size]="large" (dismissed)="dismissals = dismissals + 1">
+      <input class="tr-dialog-field" aria-label="Draft" (keydown.escape)="$event.preventDefault()" />
+    </tr-dialog>
+  `
+})
+class LargeDialogHostComponent {
+  protected readonly large: DialogSize = DialogSize.Large;
+
+  public dismissals: number = 0;
+}
+
 describe("DialogComponent", () => {
   let opener: HTMLButtonElement;
-  let reference: DialogRef<unknown, DialogHostComponent> | null = null;
+  let reference: { close(): void } | null = null;
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
 
   beforeEach(() => {
     opener = document.createElement("button");
@@ -51,12 +67,31 @@ describe("DialogComponent", () => {
     await vi.waitFor(() => expect(document.querySelector("tr-dialog")).toBeNull());
     opener.remove();
     AppearanceFixture.reset();
+    await page.viewport(viewport.width, viewport.height);
   });
 
   async function openAsync(): Promise<DialogRef<unknown, DialogHostComponent>> {
-    reference = TestBed.inject(DialogService).open(DialogHostComponent, "[data-wait]");
+    const opened = TestBed.inject(DialogService).open(DialogHostComponent, "[data-wait]");
+    reference = opened;
     await vi.waitFor(() => expect(document.querySelector("tr-dialog")).not.toBeNull());
-    return reference;
+    return opened;
+  }
+
+  async function openLargeAsync(): Promise<DialogRef<unknown, LargeDialogHostComponent>> {
+    const opened = TestBed.inject(DialogService).open(LargeDialogHostComponent, ".tr-dialog-close");
+    reference = opened;
+    await vi.waitFor(() => expect(document.activeElement?.classList.contains("tr-dialog-close")).toBe(true));
+    return opened;
+  }
+
+  function pixels(value: string, property: "width" | "height"): number {
+    const probe = document.createElement("div");
+    probe.style.position = "fixed";
+    probe.style.setProperty(property, value);
+    document.body.append(probe);
+    const resolved = probe.getBoundingClientRect()[property];
+    probe.remove();
+    return resolved;
   }
 
   function container(): HTMLElement {
@@ -78,6 +113,17 @@ describe("DialogComponent", () => {
     expect(document.getElementById(container().getAttribute("aria-labelledby") ?? "")?.textContent).toBe("Work is still running");
     expect(afterLast).toBe(cancel);
     expect(document.activeElement).toBe(wait);
+  });
+
+  it("says whether a dialog is the topmost one open", async () => {
+    const dialogs = TestBed.inject(DialogService);
+    const first = await openAsync();
+    const second = dialogs.open(DialogHostComponent, "[data-wait]");
+    const whileBoth = [dialogs.isTopmost(first), dialogs.isTopmost(second)];
+    second.close();
+
+    expect(whileBoth).toEqual([false, true]);
+    expect(dialogs.isTopmost(first)).toBe(true);
   });
 
   it("tells its owner when Escape is pressed, leaves closing to it and returns focus to the opener once closed", async () => {
@@ -137,5 +183,62 @@ describe("DialogComponent", () => {
 
         expect([opened, opacity]).toEqual([[text, text], "1"]);
         expect(colors()).toEqual([text, text]);
+      });
+
+  it("gives a large dialog a title bar whose close button asks its owner to close, and leaves Escape to a control that handled it", async () => {
+    AppearanceFixture.apply();
+    const opened = await openLargeAsync();
+    const field = document.querySelector(".tr-dialog-field") as HTMLInputElement;
+    const close = page.getByRole("button", { name: "Close" });
+
+    await userEvent.click(close);
+    const afterClick = opened.componentInstance?.dismissals;
+    field.focus();
+    await userEvent.keyboard("{Escape}");
+    const afterHandledEscape = opened.componentInstance?.dismissals;
+    (document.querySelector(".tr-dialog-close") as HTMLElement).focus();
+    await userEvent.keyboard("{Escape}");
+
+    expect(document.getElementById(container().getAttribute("aria-labelledby") ?? "")?.textContent).toBe("Notes");
+    expect([afterClick, afterHandledEscape, opened.componentInstance?.dismissals]).toEqual([1, 1, 2]);
+    expect(document.querySelector("tr-dialog")?.classList.contains("tr-dialog-large")).toBe(true);
+  });
+
+  for (const theme of AppearanceFixture.themes)
+    for (const mode of AppearanceFixture.modes)
+      it(`lays out a large dialog's title bar and a body without padding or actions, with the ${theme.id} theme in ${mode} mode`, async () => {
+        AppearanceFixture.apply(theme, mode);
+        await openLargeAsync();
+        const header = getComputedStyle(document.querySelector(".tr-dialog-header") as HTMLElement);
+        const title = getComputedStyle(document.querySelector(".tr-dialog-title") as HTMLElement);
+        const body = getComputedStyle(document.querySelector(".tr-dialog-body") as HTMLElement);
+        const actions = getComputedStyle(document.querySelector(".tr-dialog-actions") as HTMLElement);
+
+        AppearanceFixture.expectLook(header.paddingTop, theme, "dialog-large-header-padding", "padding-top", "padding");
+        AppearanceFixture.expectLook(header.paddingRight, theme, "dialog-large-header-padding", "padding-right", "padding");
+        AppearanceFixture.expectLook(header.paddingLeft, theme, "dialog-large-header-padding", "padding-left", "padding");
+        AppearanceFixture.expectLook(header.borderBottomWidth, theme, "border-width", "border-bottom-width");
+        expect(header.borderBottomColor).toBe(AppearanceFixture.readColor(theme, mode, "widget.border"));
+        expect([title.paddingTop, title.paddingLeft, title.textOverflow, title.whiteSpace]).toEqual(["0px", "0px", "ellipsis", "nowrap"]);
+        expect([body.paddingTop, body.paddingRight, body.paddingBottom, body.paddingLeft, body.display]).toEqual(["0px", "0px", "0px", "0px", "flex"]);
+        expect(actions.display).toBe("none");
+      });
+
+  for (const theme of AppearanceFixture.themes)
+    for (const [width, height] of [[1280, 800], [640, 400], [320, 200]] as const)
+      it(`sizes a large dialog to its share of a ${width} by ${height} window with its minimum yielding to the window, with the ${theme.id} theme`, async () => {
+        await page.viewport(width, height);
+        AppearanceFixture.apply(theme);
+        await openLargeAsync();
+        const rectangle = (document.querySelector("tr-dialog") as HTMLElement).getBoundingClientRect();
+        const share = (name: string, property: "width" | "height"): number => pixels(theme.readLook(name) ?? String.empty, property);
+        const gap = share("space-2", "width");
+        const widest = width - gap * 2;
+        const tallest = height - share("window-row-height", "height") - share("status-bar-height", "height") - gap * 2;
+
+        AppearanceFixture.expectPixels(rectangle.width, Math.min(Math.max(share("dialog-large-width", "width"), share("dialog-large-min-width", "width")), widest));
+        AppearanceFixture.expectPixels(rectangle.height, Math.min(Math.max(share("dialog-large-height", "height"), share("dialog-large-min-height", "height")), tallest));
+        expect(rectangle.left).toBeGreaterThanOrEqual(gap - 1);
+        expect(rectangle.top).toBeGreaterThanOrEqual(0);
       });
 });
