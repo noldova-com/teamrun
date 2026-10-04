@@ -116,6 +116,23 @@ export class DiscoveryPublisherTests {
 
     await Assert.throwsAsync(() => publisher.publishAsync(DiscoveryPublisherTests.DISCOVERY), OwnershipReleasedException);
     await Assert.throwsAsync(() => publisher.withdrawAsync(DiscoveryPublisherTests.DISCOVERY), OwnershipReleasedException);
+    await Assert.throwsAsync(() => publisher.withdrawEarlierAsync(), OwnershipReleasedException);
+  }
+
+  @TestMethod
+  public async withdrawsTheMetadataAnEarlierOwnerLeft(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const dataDirectory = new DataDirectory(folder.path);
+    const earlier = OwnershipLock.acquire(dataDirectory);
+    await new DiscoveryPublisher(earlier, new FolderProtectorFixture()).publishAsync(DiscoveryPublisherTests.DISCOVERY);
+    earlier.release();
+    using lock = OwnershipLock.acquire(dataDirectory);
+    const publisher = new DiscoveryPublisher(lock, new FolderProtectorFixture());
+
+    await publisher.withdrawEarlierAsync();
+    await publisher.withdrawEarlierAsync();
+
+    Assert.isFalse(existsSync(dataDirectory.discoveryFile));
   }
 
   @TestMethod

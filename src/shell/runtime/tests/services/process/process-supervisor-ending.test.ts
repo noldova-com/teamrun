@@ -661,11 +661,11 @@ export class ProcessSupervisorEndingTests {
       Assert.areEqual("-NoProfile -NonInteractive -EncodedCommand", call.slice(1, 4).join(" "));
       Assert.areEqual(JSON.stringify({ SystemRoot: ProcessSupervisorEndingTests.SYSTEM_ROOT, TEAMRUN_KEPT: "kept" }), JSON.stringify(command.environments[index]));
     }
-    Assert.isTrue(table.includes("CimCmdlets\\Get-CimInstance -ClassName Win32_Process"), table);
+    Assert.isTrue(table.includes("Microsoft.PowerShell.Management\\Get-WmiObject -Query 'SELECT ProcessId, ParentProcessId, ExecutablePath FROM Win32_Process'"), table);
     Assert.isTrue(kill.startsWith(`$targets = @(900101,${started + 1},900102,${started + 2},900105,${started + 4}); $deadline = [DateTime]::UtcNow.AddMilliseconds(500); `), kill);
-    Assert.isTrue(kill.includes("CimCmdlets\\Get-CimInstance -ClassName Win32_Process"), kill);
+    Assert.isTrue(kill.includes("Microsoft.PowerShell.Management\\Get-WmiObject -Query 'SELECT ProcessId, ParentProcessId, ExecutablePath FROM Win32_Process'"), kill);
     Assert.isTrue(late.startsWith(`$targets = @(900106,${started + 5}); $deadline = [DateTime]::UtcNow.AddMilliseconds(500); `), late);
-    Assert.isFalse(late.includes("Get-CimInstance"), late);
+    Assert.isFalse(late.includes("Get-WmiObject"), late);
     Assert.areEqual("900101 SIGKILL,900102 SIGKILL,900106 SIGKILL", simulated.signals.join(","));
     Assert.isTrue(simulated.isAlive(900_103) && simulated.isAlive(900_104) && simulated.isAlive(900_107));
     Assert.areEqual(
