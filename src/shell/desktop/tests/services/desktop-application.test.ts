@@ -1239,11 +1239,11 @@ export class DesktopApplicationTests {
     const connection = new FakeRuntimeConnection();
     connection.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: false });
     let arrive: (connection: FakeRuntimeConnection) => void = () => undefined;
-    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new Promise(resolve => {
+    const electron = await DesktopApplicationTests.startReadyAsync("win32", new FakeRuntimeLauncher(new Promise(resolve => {
       arrive = resolve;
     })));
     const window = DesktopApplicationTests.firstWindow(electron);
-    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("win32"), DesktopApplicationTests.APPEARANCE);
     await Condition.waitAsync(() => window.isShown);
 
     window.bounds = { x: 40, y: 60, width: 900, height: 640 };
@@ -1258,18 +1258,39 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async recordsBoundsLostWhenAWindowMovedBeforeTheRuntimeWasReadyClosesFirst(): Promise<void> {
-    const process = new FakeDesktopProcess("linux");
-    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new Promise<FakeRuntimeConnection>(() => undefined)), new FakeElectron(), new FakeDeviceIdentity(), process);
+  @TestData("linux")
+  @TestData("darwin")
+  public async restoresTheSavedBoundsOfAWindowMovedBeforeTheRuntimeWasReadyWhereTheSystemAlsoMovesIt(platform: string): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: false });
+    let arrive: (connection: FakeRuntimeConnection) => void = () => undefined;
+    const electron = await DesktopApplicationTests.startReadyAsync(platform, new FakeRuntimeLauncher(new Promise(resolve => {
+      arrive = resolve;
+    })));
     const window = DesktopApplicationTests.firstWindow(electron);
-    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent(platform), DesktopApplicationTests.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown);
+
+    window.change("will-move");
+    arrive(connection);
+    await Condition.waitAsync(() => window.calls.some(t => t.startsWith("setBounds")));
+
+    Assert.areEqual(0, connection.calls.filter(t => t === "shell.writeWindowBounds").length);
+  }
+
+  @TestMethod
+  public async recordsBoundsLostWhenAWindowMovedBeforeTheRuntimeWasReadyClosesFirst(): Promise<void> {
+    const process = new FakeDesktopProcess("win32");
+    const electron = await DesktopApplicationTests.startReadyAsync("win32", new FakeRuntimeLauncher(new Promise<FakeRuntimeConnection>(() => undefined)), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("win32"), DesktopApplicationTests.APPEARANCE);
     await Condition.waitAsync(() => window.isShown);
     window.bounds = { x: 40, y: 60, width: 900, height: 640 };
     window.change("will-move");
 
     window.close();
     await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
-    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("win32"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
     await Condition.waitAsync(() => window.isGone);
 
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The window closed without saving its bounds, because the runtime could not be reached").length);

@@ -45,7 +45,7 @@ export class WindowBoundsKeeperTests {
     const window = new FakeDesktopWindow({}, 1);
     const store = new MemoryStore(null);
     const log = new FakeDesktopLog();
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 1, log);
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 1, log, true);
     await keeper.restoreAsync(store);
     store.failure = new WindowStateUnavailableException("TeamRun is not connected to its runtime.");
 
@@ -70,7 +70,7 @@ export class WindowBoundsKeeperTests {
     const window = new FakeDesktopWindow({}, 1);
     const store = new MemoryStore(null);
     const log = new FakeDesktopLog();
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 1, log);
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 1, log, true);
     await keeper.restoreAsync(store);
 
     await keeper.saveUnsavedAsync();
@@ -89,7 +89,7 @@ export class WindowBoundsKeeperTests {
     for (const event of ["will-move", "will-resize"]) {
       const window = new FakeDesktopWindow({}, 1);
       const store = new MemoryStore({ x: 200, y: 100, width: 1000, height: 700, maximized: false });
-      const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
+      const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true);
 
       window.bounds = { x: 40, y: 60, width: 900, height: 640 };
       window.change(event);
@@ -105,7 +105,7 @@ export class WindowBoundsKeeperTests {
     const window = new FakeDesktopWindow({}, 1);
     const store = new MemoryStore(null);
     store.failure = new WindowStateUnavailableException("TeamRun is not connected to its runtime.");
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true);
 
     window.change("will-move");
     await Assert.throwsAsync(() => keeper.restoreAsync(store), WindowStateUnavailableException);
@@ -119,7 +119,7 @@ export class WindowBoundsKeeperTests {
   public async restoresTheSavedBoundsWhenOnlyTheWindowManagerChangedTheWindowBeforeTheStore(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const store = new MemoryStore({ x: 200, y: 100, width: 1000, height: 700, maximized: false });
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true);
 
     window.bounds = { x: 0, y: 0, width: 1280, height: 752 };
     window.change("resize");
@@ -131,9 +131,25 @@ export class WindowBoundsKeeperTests {
   }
 
   @TestMethod
+  public async restoresTheSavedBoundsWhereTheWindowDoesNotHoldThePersonsMoves(): Promise<void> {
+    for (const event of ["will-move", "will-resize"]) {
+      const window = new FakeDesktopWindow({}, 1);
+      const store = new MemoryStore({ x: 200, y: 100, width: 1000, height: 700, maximized: false });
+      const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), false);
+
+      window.bounds = { x: 0, y: 0, width: 1280, height: 752 };
+      window.change(event);
+      await keeper.restoreAsync(store);
+
+      Assert.areEqual(JSON.stringify(["setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}"]), JSON.stringify(window.calls));
+      Assert.areEqual(0, store.writes.length);
+    }
+  }
+
+  @TestMethod
   public async refusesToSaveAtCloseBoundsMovedBeforeAnyStoreSoTheyAreReportedLost(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true);
 
     window.change("will-resize");
 
@@ -143,7 +159,7 @@ export class WindowBoundsKeeperTests {
   @TestMethod
   public async restoresSavedBoundsThatADisplayShows(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true);
 
     await keeper.restoreAsync(new MemoryStore({ x: 200, y: 100, width: 1000, height: 700, maximized: true }));
 
@@ -153,7 +169,7 @@ export class WindowBoundsKeeperTests {
   @TestMethod
   public async centersSavedBoundsThatNoDisplayShows(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true);
 
     await keeper.restoreAsync(new MemoryStore({ x: 5000, y: 100, width: 1000, height: 700, maximized: false }));
 
@@ -164,8 +180,8 @@ export class WindowBoundsKeeperTests {
   public async keepsTheDefaultBoundsWhenNoneWereSavedOrTheyAreNotValid(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
 
-    await new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog()).restoreAsync(new MemoryStore(null));
-    await Assert.throwsAsync(() => new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog()).restoreAsync(new MemoryStore({ width: 10 })), JsonException);
+    await new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true).restoreAsync(new MemoryStore(null));
+    await Assert.throwsAsync(() => new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true).restoreAsync(new MemoryStore({ width: 10 })), JsonException);
 
     Assert.areEqual("[]", JSON.stringify(window.calls));
   }
@@ -174,7 +190,7 @@ export class WindowBoundsKeeperTests {
   public async savesOnceAfterAPauseInChanges(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const store = new MemoryStore(null);
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true);
 
     window.change("move");
     await keeper.restoreAsync(store);
@@ -191,7 +207,7 @@ export class WindowBoundsKeeperTests {
   public async savesAtOnceWhenAskedAndNotAfterTheWindowIsGone(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const store = new MemoryStore(null);
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true);
 
     await keeper.saveAsync();
     await keeper.restoreAsync(store);
@@ -212,7 +228,7 @@ export class WindowBoundsKeeperTests {
     const store = new MemoryStore(null);
     store.failure = new Error("The runtime is gone.");
     const log = new FakeDesktopLog();
-    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 1, log);
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 1, log, true);
 
     await keeper.restoreAsync(store);
     window.change("resize");

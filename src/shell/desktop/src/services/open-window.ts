@@ -34,12 +34,12 @@ export class OpenWindow implements IQuitPrompt {
   public readonly coordinator: CloseCoordinator;
   public readonly bounds: WindowBoundsKeeper;
 
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog, guard: ICloseGuard) {
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog, guard: ICloseGuard, platform: string) {
     this.window = window;
     this.log = log;
     this.guard = guard;
     this.coordinator = new CloseCoordinator(t => this.sendCloseRequest(t), Resources.closeAnswerTimeout);
-    this.bounds = new WindowBoundsKeeper(window, displays, Resources.boundsSaveDelay, log);
+    this.bounds = new WindowBoundsKeeper(window, displays, Resources.boundsSaveDelay, log, platform === Resources.windowsPlatform);
     window.on(Resources.closeEvent, event => {
       if (this.canClose)
         return;

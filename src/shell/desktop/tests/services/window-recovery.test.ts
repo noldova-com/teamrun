@@ -29,7 +29,7 @@ class Recovered {
 
   public constructor(answers: readonly number[], reloadCrashLimit: number = 10_000, rendererEndLimit: number = 1_000) {
     this.dialog = new FakeDialogHost(answers);
-    new WindowRecovery(new OpenWindow(this.window, new FakeDisplayHost(), this.log, new FakeCloseGuard()), this.dialog, this.log, this.process, () => this.quits++, () => {
+    new WindowRecovery(new OpenWindow(this.window, new FakeDisplayHost(), this.log, new FakeCloseGuard(), "win32"), this.dialog, this.log, this.process, () => this.quits++, () => {
       this.logFolders++;
       return Promise.resolve(true);
     }, reloadCrashLimit, rendererEndLimit);

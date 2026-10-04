@@ -2417,16 +2417,17 @@ export declare class OpenWindow implements IQuitPrompt {
    * @param log Records why a window was shown unpainted and saves that failed.
    * @param guard Decides whether closing the window may go ahead while work is in progress, and stops the work when
    * the person chose to.
+   * @param platform The operating system's name, as Node reports it.
    * @example
    * ```ts
    * import { type ICloseGuard, type IDesktopLog, type IDesktopWindow, type IDisplayHost, OpenWindow } from "@noldova/teamrun-shell-desktop";
    *
    * export function track(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog, guard: ICloseGuard): OpenWindow {
-   *   return new OpenWindow(window, displays, log, guard);
+   *   return new OpenWindow(window, displays, log, guard, "win32");
    * }
    * ```
    */
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog, guard: ICloseGuard);
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog, guard: ICloseGuard, platform: string);
 
   /**
    * Shows the page the question about work in progress, or takes it away.
@@ -3101,23 +3102,24 @@ export declare class DesktopLog implements IDesktopLog {
 export declare class WindowBoundsKeeper {
   /**
    * Creates the keeper and listens for the window's changes, which it saves once it has a store. A move or resize the
-   * person makes before then is held; the window reports those as "will-move" and "will-resize" on Windows and macOS only,
-   * so the window manager's own adjustments never count.
+   * person makes before then is held where the window reports only the person's own as "will-move" and "will-resize", which
+   * is Windows; on macOS the system's own moves report as "will-move" too, and Linux reports neither, so nothing is held there.
    *
    * @param window The window.
    * @param displays The displays, for placing restored bounds.
    * @param saveDelay How long a pause in changes lasts before the bounds are saved, in milliseconds.
    * @param log Records a save that failed.
+   * @param holdsPersonsMoves Whether the window's "will-move" and "will-resize" come only from the person.
    * @example
    * ```ts
    * import { type IDesktopLog, type IDesktopWindow, type IDisplayHost, WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
    *
    * export function keep(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog): WindowBoundsKeeper {
-   *   return new WindowBoundsKeeper(window, displays, 500, log);
+   *   return new WindowBoundsKeeper(window, displays, 500, log, true);
    * }
    * ```
    */
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog);
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog, holdsPersonsMoves: boolean);
 
   /**
    * Keeps the bounds in the store from now on, and applies the bounds it holds: the saved position when a display

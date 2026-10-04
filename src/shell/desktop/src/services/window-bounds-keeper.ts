@@ -26,7 +26,7 @@ export class WindowBoundsKeeper {
   private timer: NodeJS.Timeout | null = null;
   private hasUnsaved: boolean = false;
 
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog) {
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog, holdsPersonsMoves: boolean) {
     this.window = window;
     this.displays = displays;
     this.saveDelay = saveDelay;
@@ -36,9 +36,11 @@ export class WindowBoundsKeeper {
     window.on(Resources.moveEvent, changed);
     window.on(Resources.maximizeEvent, changed);
     window.on(Resources.unmaximizeEvent, changed);
-    const placed = (): void => this.notePlacedByPerson();
-    window.on(Resources.willMoveEvent, placed);
-    window.on(Resources.willResizeEvent, placed);
+    if (holdsPersonsMoves) {
+      const placed = (): void => this.notePlacedByPerson();
+      window.on(Resources.willMoveEvent, placed);
+      window.on(Resources.willResizeEvent, placed);
+    }
   }
 
   public async restoreAsync(store: IWindowStateStore): Promise<void> {
