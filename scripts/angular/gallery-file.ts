@@ -10,7 +10,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export default class GalleryFile {
-  public static readonly MARKERS: readonly string[] = ["tr-gallery-scope-frame", "tr-gallery-forms", "Show the keyboard focus"];
+  public static readonly MARKERS: readonly string[] = ["tr-gallery-scope-frame", "tr-gallery-forms", "Show the keyboard focus", "\"data-tr-state\""];
 
   private static readonly FILE_SEGMENTS: readonly string[] = ["src", "generated", "gallery.ts"];
   private static readonly TYPE_IMPORT: string = "import type { Type } from \"@angular/core\";\n";

@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "../../../styles/states";
+
 :host {
   position: relative;
   isolation: isolate;
@@ -37,7 +39,7 @@
   content: "";
 }
 
-:host(:not([aria-disabled="true"]):is(:hover, :focus-visible, [aria-expanded="true"]))::before {
+:host(:not([aria-disabled="true"]):is(#{states.$hover}, :focus-visible, [aria-expanded="true"]))::before {
   background-color: var(--tr-hover);
 }
 

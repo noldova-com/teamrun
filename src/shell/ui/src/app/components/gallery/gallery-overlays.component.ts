@@ -11,6 +11,7 @@ import { ChangeDetectionStrategy, Component, Injector, type WritableSignal, inje
 
 import { ButtonVariant } from "../../enums/button-variant";
 import { DockingDirection } from "../../enums/docking-direction";
+import { GallerySize } from "../../enums/gallery-size";
 import { DialogTokens } from "../../models/dialog-tokens";
 import { OverlaySide } from "../../models/overlay-side";
 import { QuickInputItem } from "../../models/quick-input-item";
@@ -31,12 +32,14 @@ import { QuickInputComponent } from "../quick-input/quick-input.component";
 import { TooltipComponent } from "../tooltip/tooltip.component";
 import { TooltipDirective } from "../tooltip/tooltip.directive";
 import { GalleryResources } from "./gallery-resources";
+import { GalleryCellComponent } from "./gallery-cell.component";
+import { GalleryHoverDirective } from "./gallery-hover.directive";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
 
 @Component({
   selector: "tr-gallery-overlays",
   imports: [
-    ButtonComponent, ContextMenuTriggerDirective, DialogComponent, DockingGuideComponent, DockingPlateComponent, GallerySpecimenComponent, MenuBarComponent, MenuBarItemComponent,
+    ButtonComponent, ContextMenuTriggerDirective, DialogComponent, DockingGuideComponent, DockingPlateComponent, GalleryCellComponent, GalleryHoverDirective, GallerySpecimenComponent, MenuBarComponent, MenuBarItemComponent,
     MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, PopoverDirective, PopoverTriggerDirective, QuickInputComponent, TooltipComponent, TooltipDirective
   ],
   templateUrl: "./gallery-overlays.component.html",
@@ -47,6 +50,7 @@ export class GalleryOverlaysComponent {
   private static count: number = 0;
 
   protected readonly text: typeof GalleryResources.text = GalleryResources.text;
+  protected readonly sizes: typeof GallerySize = GallerySize;
   protected readonly dialogInjector: Injector = Injector.create({
     providers: [{ provide: DialogTokens.titleId, useValue: `${GalleryResources.dialogTitleIdPrefix}${GalleryOverlaysComponent.count++}` }],
     parent: inject(Injector)

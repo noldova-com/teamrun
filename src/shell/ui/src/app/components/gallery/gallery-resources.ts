@@ -10,9 +10,22 @@ export class GalleryResources {
   public static readonly scopeClass: string = "tr-theme-scope";
   public static readonly focusableSelector: string = "button:not(:disabled), input:not(:disabled), [tabindex=\"0\"], [role=\"tab\"][aria-selected=\"true\"]";
   public static readonly overlayContainerClass: string = "cdk-overlay-container";
+  public static readonly longAttribute: string = "long";
+  public static readonly stateAttribute: string = "data-tr-state";
+  public static readonly hoverState: string = "hover";
+  public static readonly hoveredPill: string = ".tr-choice-pill[aria-checked=\"false\"]";
   public static readonly dialogTitleIdPrefix: string = "tr-gallery-dialog-";
   public static readonly text = {
     gallery: "Gallery",
+    defaultState: "Default",
+    focus: "Focus",
+    hover: "Hover",
+    secondaryHover: "Secondary, hover",
+    longCaption: "Long text",
+    secondaryDisabled: "Secondary, disabled",
+    delayed: "Delayed",
+    triggerCaption: "Trigger",
+    openCaption: "Open",
     showFocus: "Show the keyboard focus",
     sample: "Sample",
     primary: "Primary",
@@ -47,6 +60,8 @@ export class GalleryResources {
     progress: "Progress",
     determinate: "Half done",
     indeterminate: "Unknown amount",
+    progressDeterminate: "Determinate",
+    progressIndeterminate: "Indeterminate",
     spinner: "Spinner",
     spinnerWorking: "Loading the list",
     spinnerDelayed: "Loading after a short wait",
@@ -54,6 +69,8 @@ export class GalleryResources {
     chipCount: "Count",
     chipAdded: "Added",
     chipRemoved: "Removed",
+    chipLargeCount: "Large count",
+    chipKeyCaption: "Key",
     chipKey: "Ctrl+K",
     choicePills: "Choice pills",
     choicePillsLabel: "Mode",
@@ -76,9 +93,13 @@ export class GalleryResources {
     tabBadge: "Inbox",
     tabLong: "A tab title that is far too long to fit the width of its strip",
     tabNotClosable: "Pinned",
+    tabPreviewCaption: "Preview",
+    tabBadgeCaption: "Badge",
+    tabNotClosableCaption: "Not closable",
     viewBadge: "View badge",
     menuBar: "Menu bar",
     menuBarLabel: "Gallery menus",
+    menuBarHover: "Menu bar, hover",
     toolbar: "Toolbar",
     toolbarLabel: "Gallery toolbar",
     toolbarButtons: "Toolbar button",
@@ -87,14 +108,21 @@ export class GalleryResources {
     sash: "Sash",
     sashVertical: "Resize the side",
     sashHorizontal: "Resize the bottom",
+    sashVerticalCaption: "Vertical",
+    sashHorizontalCaption: "Horizontal",
     panelCard: "Panel card",
     panelShell: "On the shell surface",
     panelPanel: "On the panel surface",
+    panelShellCaption: "Shell surface",
+    panelPanelCaption: "Panel surface",
     menu: "Menu",
     menuTrigger: "Open a menu",
     contextMenu: "Right-click or press the context-menu key here",
     menuLabel: "Menu rows",
+    menuRowsCaption: "Rows",
+    contextMenuCaption: "Context menu",
     menuPlain: "A plain row",
+    menuHovered: "A hovered row",
     menuIcon: "A row with an icon",
     menuShortcut: "A row with a shortcut",
     menuChecked: "A checked row",
@@ -134,7 +162,10 @@ export class GalleryResources {
     selectInitial: "one",
     docking: "Docking guides",
     dockingGuide: "A chosen guide",
-    dockingPlate: "A plate with the center chosen"
+    dockingPlate: "A plate with the center chosen",
+    dockingGuideCaption: "Guide",
+    dockingChosenCaption: "Chosen guide",
+    dockingPlateCaption: "Plate, center chosen"
   } as const;
 
   public static formatShowFocus(specimen: string): string {

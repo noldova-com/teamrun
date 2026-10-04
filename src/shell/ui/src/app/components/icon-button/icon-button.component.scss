@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "../../../styles/states";
+
 :host {
   display: inline-grid;
   place-items: center;
@@ -27,7 +29,7 @@
   border-radius: var(--tr-radius-small);
 }
 
-:host(:not(:disabled):hover)::before,
+:host(:not(:disabled)#{states.$hover})::before,
 :host([aria-pressed="true"])::before {
   background-color: var(--tr-toolbar-hover);
 }

@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "../../../styles/states";
+
 :host {
   display: inline-flex;
   max-width: 100%;
@@ -37,7 +39,7 @@
   cursor: pointer;
 }
 
-.tr-choice-pill:hover {
+.tr-choice-pill#{states.$hover} {
   background-color: var(--tr-toolbar-hover);
 }
 

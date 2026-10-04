@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "../../../styles/states";
+
 .tr-tab {
   display: inline-flex;
   align-items: center;
@@ -40,7 +42,7 @@
   border-radius: var(--tr-radius-small);
 }
 
-[data-tr-tab-shape="pill"] .tr-tab:hover .tr-tab-pill {
+[data-tr-tab-shape="pill"] .tr-tab#{states.$hover} .tr-tab-pill {
   background-color: var(--tr-hover);
 }
 
@@ -121,16 +123,16 @@
 }
 
 .tr-tab.tr-tab-selected .tr-tab-close,
-.tr-tab:hover .tr-tab-close,
+.tr-tab#{states.$hover} .tr-tab-close,
 .tr-tab:focus-visible .tr-tab-close {
   visibility: visible;
 }
 
-.tr-tab.tr-tab-working:not(:hover, :focus-visible) .tr-tab-close {
+.tr-tab.tr-tab-working:not(#{states.$hover}, :focus-visible) .tr-tab-close {
   visibility: hidden;
 }
 
-.tr-tab.tr-tab-working:is(:hover, :focus-visible) .tr-tab-spinner {
+.tr-tab.tr-tab-working:is(#{states.$hover}, :focus-visible) .tr-tab-spinner {
   visibility: hidden;
 }
 

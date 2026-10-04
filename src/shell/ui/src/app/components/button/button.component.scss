@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "../../../styles/states";
+
 :host {
   display: inline-flex;
   align-items: center;
@@ -24,7 +26,7 @@
   white-space: nowrap;
 }
 
-:host(:not(:disabled):hover) {
+:host(:not(:disabled)#{states.$hover}) {
   background-color: var(--tr-button-hover);
 }
 
@@ -33,7 +35,7 @@
   color: var(--tr-button-secondary-text);
 }
 
-:host(.tr-button-secondary:not(:disabled):hover) {
+:host(.tr-button-secondary:not(:disabled)#{states.$hover}) {
   background-color: var(--tr-button-secondary-hover);
 }
 

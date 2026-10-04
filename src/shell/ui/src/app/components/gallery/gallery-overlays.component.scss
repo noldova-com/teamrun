@@ -8,11 +8,15 @@
 
 :host {
   display: grid;
-  gap: var(--tr-space-4);
+  gap: var(--tr-space-6);
 }
 
 .tr-gallery-menu {
   width: 16rem;
+}
+
+.tr-gallery-fit {
+  max-width: 100%;
 }
 
 .tr-gallery-narrow {

@@ -6,24 +6,39 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-<tr-gallery-specimen [name]="text.menu">
-  <tr-menu [attr.aria-label]="text.menuLabel" class="tr-gallery-menu">
-    <button type="button" tr-menu-item [label]="text.menuPlain"></button>
-    <button type="button" tr-menu-item [label]="text.menuIcon" [icon]="text.glyphAdd"></button>
-    <button type="button" tr-menu-item [label]="text.menuShortcut" [shortcut]="text.menuShortcutKeys"></button>
-    <button type="button" tr-menu-item [label]="text.menuChecked" [checked]="true"></button>
-    <button type="button" tr-menu-item [label]="text.menuCheckbox" [checkbox]="true" [checked]="isChecked()" (triggered)="isChecked.set(!isChecked())"></button>
-    <tr-menu-separator />
-    <button type="button" tr-menu-item [label]="text.menuDisabled" [disabled]="true"></button>
-    <button type="button" tr-menu-item [label]="text.menuSubmenu" [trMenuTriggerFor]="submenu"></button>
-    <button type="button" tr-menu-item [label]="text.menuLong"></button>
-  </tr-menu>
-  <button type="button" tr-button [variant]="variants.Secondary" [trMenuTriggerFor]="popup">{{ text.menuTrigger }}</button>
-  <div class="tr-gallery-context" tabindex="0" [trContextMenuTriggerFor]="popup">{{ text.contextMenu }}</div>
-  <tr-menu-bar [label]="text.menuBarLabel">
-    <button type="button" tr-menu-bar-item [label]="text.file" [trMenuTriggerFor]="popup"></button>
-    <button type="button" tr-menu-bar-item [label]="text.edit" [trMenuTriggerFor]="popup"></button>
-  </tr-menu-bar>
+<tr-gallery-specimen [name]="text.menu" [size]="sizes.Wide">
+  <tr-gallery-cell [caption]="text.menuRowsCaption" [isFocusTarget]="true">
+    <tr-menu [attr.aria-label]="text.menuLabel" class="tr-gallery-menu">
+      <button type="button" tr-menu-item [label]="text.menuPlain"></button>
+      <button type="button" tr-menu-item trGalleryHover [label]="text.menuHovered"></button>
+      <button type="button" tr-menu-item [label]="text.menuIcon" [icon]="text.glyphAdd"></button>
+      <button type="button" tr-menu-item [label]="text.menuShortcut" [shortcut]="text.menuShortcutKeys"></button>
+      <button type="button" tr-menu-item [label]="text.menuChecked" [checked]="true"></button>
+      <button type="button" tr-menu-item [label]="text.menuCheckbox" [checkbox]="true" [checked]="isChecked()" (triggered)="isChecked.set(!isChecked())"></button>
+      <tr-menu-separator />
+      <button type="button" tr-menu-item [label]="text.menuDisabled" [disabled]="true"></button>
+      <button type="button" tr-menu-item [label]="text.menuSubmenu" [trMenuTriggerFor]="submenu"></button>
+      <button type="button" tr-menu-item [label]="text.menuLong"></button>
+    </tr-menu>
+  </tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.triggerCaption">
+    <button type="button" tr-button [variant]="variants.Secondary" [trMenuTriggerFor]="popup">{{ text.menuTrigger }}</button>
+  </tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.contextMenuCaption">
+    <div class="tr-gallery-context" tabindex="0" [trContextMenuTriggerFor]="popup">{{ text.contextMenu }}</div>
+  </tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.menuBar">
+    <tr-menu-bar [label]="text.menuBarLabel">
+      <button type="button" tr-menu-bar-item [label]="text.file" [trMenuTriggerFor]="popup"></button>
+      <button type="button" tr-menu-bar-item [label]="text.edit" [trMenuTriggerFor]="popup"></button>
+    </tr-menu-bar>
+  </tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.menuBarHover">
+    <tr-menu-bar [label]="text.menuBarHover">
+      <button type="button" tr-menu-bar-item trGalleryHover [label]="text.file" [trMenuTriggerFor]="popup"></button>
+      <button type="button" tr-menu-bar-item [label]="text.edit" [trMenuTriggerFor]="popup"></button>
+    </tr-menu-bar>
+  </tr-gallery-cell>
   <ng-template #popup>
     <tr-menu>
       <button type="button" tr-menu-item [label]="text.menuIcon" [icon]="text.glyphAdd"></button>
@@ -38,14 +53,18 @@ LICENSE file in the root directory of this source tree.
   </ng-template>
 </tr-gallery-specimen>
 
-<tr-gallery-specimen [name]="text.popover">
-  <div trPopover class="tr-gallery-popover" [label]="text.popoverLabel">
-    <h2 class="tr-gallery-popover-title">{{ text.popoverTitle }}</h2>
-    <p class="tr-gallery-popover-text">{{ text.popoverBody }}</p>
-    <p class="tr-gallery-popover-text">{{ text.popoverLong }}</p>
-    <button type="button" tr-button [variant]="variants.Secondary">{{ text.popoverClose }}</button>
-  </div>
-  <button type="button" tr-button [variant]="variants.Secondary" [trPopoverTrigger]="popover">{{ text.popoverTrigger }}</button>
+<tr-gallery-specimen [name]="text.popover" [size]="sizes.Wide">
+  <tr-gallery-cell [caption]="text.openCaption" [isFocusTarget]="true">
+    <div trPopover class="tr-gallery-popover" [label]="text.popoverLabel">
+      <h2 class="tr-gallery-popover-title">{{ text.popoverTitle }}</h2>
+      <p class="tr-gallery-popover-text">{{ text.popoverBody }}</p>
+      <p class="tr-gallery-popover-text">{{ text.popoverLong }}</p>
+      <button type="button" tr-button [variant]="variants.Secondary">{{ text.popoverClose }}</button>
+    </div>
+  </tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.triggerCaption">
+    <button type="button" tr-button [variant]="variants.Secondary" [trPopoverTrigger]="popover">{{ text.popoverTrigger }}</button>
+  </tr-gallery-cell>
   <ng-template #popover>
     <div trPopover [label]="text.popoverLabel">
       <h2 class="tr-gallery-popover-title">{{ text.popoverTitle }}</h2>
@@ -55,15 +74,19 @@ LICENSE file in the root directory of this source tree.
 </tr-gallery-specimen>
 
 <tr-gallery-specimen [name]="text.tooltip">
-  <button type="button" tr-button [variant]="variants.Secondary" [trTooltip]="text.tooltipText" [trTooltipSide]="below">{{ text.tooltipTrigger }}</button>
-  <tr-tooltip [text]="text.tooltipText" />
-  <tr-tooltip class="tr-gallery-narrow" [text]="text.tooltipLong" />
+  <tr-gallery-cell [caption]="text.triggerCaption" [isFocusTarget]="true">
+    <button type="button" tr-button [variant]="variants.Secondary" [trTooltip]="text.tooltipText" [trTooltipSide]="below">{{ text.tooltipTrigger }}</button>
+  </tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.defaultState"><tr-tooltip [text]="text.tooltipText" /></tr-gallery-cell>
+  <tr-gallery-cell long [caption]="text.longCaption"><tr-tooltip class="tr-gallery-narrow" [text]="text.tooltipLong" /></tr-gallery-cell>
 </tr-gallery-specimen>
 
-<tr-gallery-specimen [name]="text.dialog">
-  <ng-container [ngTemplateOutlet]="dialog" [ngTemplateOutletInjector]="dialogInjector" />
+<tr-gallery-specimen [name]="text.dialog" [size]="sizes.Full">
+  <tr-gallery-cell [caption]="text.defaultState" [isFocusTarget]="true">
+    <ng-container [ngTemplateOutlet]="dialog" [ngTemplateOutletInjector]="dialogInjector" />
+  </tr-gallery-cell>
   <ng-template #dialog>
-    <tr-dialog [title]="text.dialogTitle">
+    <tr-dialog class="tr-gallery-fit" [title]="text.dialogTitle">
       {{ text.dialogBody }}
       <button type="button" tr-button trDialogAction [variant]="variants.Secondary">{{ text.dialogCancel }}</button>
       <button type="button" tr-button trDialogAction>{{ text.dialogConfirm }}</button>
@@ -71,12 +94,14 @@ LICENSE file in the root directory of this source tree.
   </ng-template>
 </tr-gallery-specimen>
 
-<tr-gallery-specimen [name]="text.quickInput">
-  <tr-quick-input [items]="items" [label]="text.quickInputLabel" [query]="text.quickInputQuery" [isFocusing]="false" />
+<tr-gallery-specimen [name]="text.quickInput" [size]="sizes.Full">
+  <tr-gallery-cell [caption]="text.defaultState" [isFocusTarget]="true">
+    <tr-quick-input class="tr-gallery-fit" [items]="items" [label]="text.quickInputLabel" [query]="text.quickInputQuery" [isFocusing]="false" />
+  </tr-gallery-cell>
 </tr-gallery-specimen>
 
 <tr-gallery-specimen [name]="text.docking">
-  <tr-docking-guide [direction]="directions.Left" />
-  <tr-docking-guide [direction]="directions.Right" [chosen]="true" />
-  <tr-docking-plate [chosen]="directions.Center" />
+  <tr-gallery-cell [caption]="text.dockingGuideCaption"><tr-docking-guide [direction]="directions.Left" /></tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.dockingChosenCaption"><tr-docking-guide [direction]="directions.Right" [chosen]="true" /></tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.dockingPlateCaption"><tr-docking-plate [chosen]="directions.Center" /></tr-gallery-cell>
 </tr-gallery-specimen>

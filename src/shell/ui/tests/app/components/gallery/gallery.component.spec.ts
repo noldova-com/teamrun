@@ -73,11 +73,11 @@ describe("GalleryComponent", () => {
     expect(colorOf(document.body, "background-color", "var(--tr-inline-code)")).not.toBe(colorOf(fixtureLight, "background-color", "var(--tr-inline-code)"));
   });
 
-  it("shows the keyboard focus on the first control of a specimen when its button is pressed from the keyboard, and not before", async () => {
+  it("shows the keyboard focus on the control in a specimen's Focus cell when its button is pressed from the keyboard, and not before", async () => {
     await showAsync();
     const checkbox = (frames()[2] as HTMLElement).querySelector<HTMLElement>(".tr-gallery-specimen[aria-label=\"Checkbox\"]") as HTMLElement;
     const button = checkbox.querySelector<HTMLButtonElement>(".tr-gallery-specimen-focus") as HTMLButtonElement;
-    const input = checkbox.querySelector("input") as HTMLInputElement;
+    const input = checkbox.querySelector("tr-gallery-cell[aria-label=\"Focus\"] input") as HTMLInputElement;
 
     expect(document.activeElement).not.toBe(input);
     expect(button.getAttribute("aria-label")).toBe("Show the keyboard focus on the Checkbox");
@@ -88,6 +88,20 @@ describe("GalleryComponent", () => {
     expect(input.matches(":focus-visible")).toBe(true);
   });
 
+  it("shows the hovered look statically in each Hover cell, through the kit's own hover rules", async () => {
+    await showAsync();
+    const frame = frames()[0] as HTMLElement;
+    const cell = (specimen: string, caption: string): HTMLElement => frame.querySelector(`.tr-gallery-specimen[aria-label="${specimen}"] tr-gallery-cell[aria-label="${caption}"]`) as HTMLElement;
+    const background = (element: Element | null): string => getComputedStyle(element as Element).backgroundColor;
+
+    const hovered = [...frame.querySelectorAll("[data-tr-state='hover']")].map(t => t.closest("tr-gallery-cell")?.getAttribute("aria-label"));
+
+    expect(hovered).toEqual(["Hover", "Secondary, hover", "Hover", "Hover", "Hover", "Hover", "Rows", "Menu bar, hover"]);
+    expect(background(cell("Button", "Hover").querySelector("button"))).toBe(colorOf(frame, "background-color", "var(--tr-button-hover)"));
+    expect(background(cell("Button", "Primary").querySelector("button"))).not.toBe(background(cell("Button", "Hover").querySelector("button")));
+    expect(background(cell("Choice pills", "Hover").querySelector("[data-tr-state='hover']"))).toBe(colorOf(frame, "background-color", "var(--tr-toolbar-hover)"));
+  });
+
   it("offers the focus button on every specimen that has a control to focus, and on no other", async () => {
     await showAsync();
     const specimens = [...(frames()[0] as HTMLElement).querySelectorAll<HTMLElement>(".tr-gallery-specimen")];
@@ -95,8 +109,9 @@ describe("GalleryComponent", () => {
     const offered = specimens.filter(t => t.querySelector(".tr-gallery-specimen-focus") !== null).map(t => t.getAttribute("aria-label"));
     const without = specimens.filter(t => t.querySelector(".tr-gallery-specimen-focus") === null).map(t => t.getAttribute("aria-label"));
 
-    expect(offered).toEqual(expect.arrayContaining(["Button", "Icon button", "Checkbox", "Text field", "Select", "Tab", "Toolbar", "Toolbar button", "Menu"]));
-    expect(without).toEqual(expect.arrayContaining(["Progress", "View badge"]));
+    expect(offered).toEqual(["Button", "Icon button", "Checkbox", "Text field", "Select", "Choice pills", "Tab", "Toolbar", "Toolbar button", "Sash", "Menu", "Popover", "Tooltip",
+      "Dialog", "Quick input"]);
+    expect(without).toEqual(["Progress", "Spinner", "Badge and key chip", "View badge", "Panel card", "Docking guides"]);
   });
 
   it("opens the overlays of a scope inside it, so they take its theme and mode", async () => {
