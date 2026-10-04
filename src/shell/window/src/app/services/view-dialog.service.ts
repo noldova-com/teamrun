@@ -11,6 +11,7 @@ import { Injectable, type Signal, type WritableSignal, effect, inject, signal, u
 
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
+import { QualifiedName } from "@noldova/teamrun-shell-protocol";
 import { DialogService } from "@noldova/teamrun-shell-ui";
 
 import { ViewDialogComponent } from "../components/view-dialog/view-dialog.component";
@@ -63,6 +64,14 @@ export class ViewDialogService {
       this.tabFocus.focusIfLost(tab);
       resolve();
     }));
+  }
+
+  public ownsCommand(name: string): boolean {
+    const tab = this.shownValue();
+    if (Object.isNull(tab) || Object.isNull(this.dialog) || !this.dialogs.isTopmost(this.dialog))
+      return false;
+    const owner = QualifiedName.parse(tab.name);
+    return !owner.isShell && owner.owner === QualifiedName.parse(name).owner;
   }
 
   public close(): void {

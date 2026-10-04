@@ -17,6 +17,7 @@ import { WindowPartSource } from "../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../src/app/services/command.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
+import { ViewDialogService } from "../../../src/app/services/view-dialog.service";
 import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 
@@ -34,12 +35,13 @@ describe("CommandService", () => {
 
   let bridge: DesktopBridgeFixture;
 
-  function start(platform: string, isDialogOpen: boolean = false): CommandService {
+  function start(platform: string, isDialogOpen: boolean = false, viewModule: string | null = null): CommandService {
     bridge = DesktopBridgeFixture.install(platform);
     TestBed.configureTestingModule({
       providers: [
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } },
         { provide: DialogService, useValue: { isOpen: isDialogOpen } },
+        { provide: ViewDialogService, useValue: { ownsCommand: (name: string) => !Object.isNull(viewModule) && name.startsWith(`${viewModule}.`) } },
         { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] }
       ]
     });
@@ -111,6 +113,19 @@ describe("CommandService", () => {
 
     expect(runs).toEqual([]);
     expect([module.defaultPrevented, shell.defaultPrevented, edit.defaultPrevented]).toEqual([false, false, true]);
+  });
+
+  it("runs the keys of the module whose view a dialog shows, as in its tab, but still leaves the shell's to the page", async () => {
+    const service = start("win32", true, "notes");
+    service.setCommands([command("notes.newNote", "Mod+Alt+N"), command("clock.tick", "Mod+Alt+T")]);
+
+    const module = press({ key: "n", code: "KeyN", ctrlKey: true, altKey: true });
+    const other = press({ key: "t", code: "KeyT", ctrlKey: true, altKey: true });
+    const closeTab = press({ key: "w", code: "KeyW", ctrlKey: true });
+
+    await vi.waitFor(() => expect(runs).toEqual(["notes.newNote null"]));
+    expect([module.defaultPrevented, other.defaultPrevented, closeTab.defaultPrevented]).toEqual([true, false, false]);
+    expect(["notes.newNote", "clock.tick", "shell.closeTab", "shell.selectAll"].map(t => service.isHeldByDialog(t))).toEqual([false, true, true, false]);
   });
 
   it("leaves keys an input or editor handled, composed text and repeats alone", () => {

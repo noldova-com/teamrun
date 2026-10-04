@@ -115,6 +115,17 @@ describe("DialogComponent", () => {
     expect(document.activeElement).toBe(wait);
   });
 
+  it("says whether a dialog is the topmost one open", async () => {
+    const dialogs = TestBed.inject(DialogService);
+    const first = await openAsync();
+    const second = dialogs.open(DialogHostComponent, "[data-wait]");
+    const whileBoth = [dialogs.isTopmost(first), dialogs.isTopmost(second)];
+    second.close();
+
+    expect(whileBoth).toEqual([false, true]);
+    expect(dialogs.isTopmost(first)).toBe(true);
+  });
+
   it("tells its owner when Escape is pressed, leaves closing to it and returns focus to the opener once closed", async () => {
     AppearanceFixture.apply();
     const opened = await openAsync();

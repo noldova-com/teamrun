@@ -17,6 +17,7 @@ import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../src/app/services/command.service";
 import { MenuBarService } from "../../../src/app/services/menu-bar.service";
 import { MenuService } from "../../../src/app/services/menu.service";
+import { ViewDialogService } from "../../../src/app/services/view-dialog.service";
 import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 
@@ -24,12 +25,12 @@ describe("MenuBarService", () => {
   let runs: string[];
   let sortBy: string;
 
-  function start(isDialogOpen: boolean = false): MenuBarService {
+  function start(isDialogOpen: boolean = false, viewModule: string | null = null): MenuBarService {
     runs = [];
     sortBy = "week";
     DesktopBridgeFixture.install();
     TestBed.configureTestingModule({
-      providers: [{ provide: DialogService, useValue: { isOpen: isDialogOpen } }, {
+      providers: [{ provide: DialogService, useValue: { isOpen: isDialogOpen } }, { provide: ViewDialogService, useValue: { ownsCommand: (name: string) => !Object.isNull(viewModule) && name.startsWith(`${viewModule}.`) } }, {
         provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
           places: [{ name: "notes.tools", title: "Notes", shows: "menuBar" }, { name: "notes.templates", title: "New from template", shows: "menu" }],
           groups: [
@@ -109,6 +110,20 @@ describe("MenuBarService", () => {
     await Promise.resolve();
 
     expect(runs).toEqual([]);
+  });
+
+  it("runs the rows of the module whose view a dialog shows, but not another module's", async () => {
+    const shown = start(true, "notes");
+    shown.run("notes.tools/notes.sorting/0");
+    await Promise.resolve();
+    const fromNotes = [...runs];
+    TestBed.resetTestingModule();
+    DesktopBridgeFixture.remove();
+    const other = start(true, "clock");
+    other.run("notes.tools/notes.sorting/0");
+    await Promise.resolve();
+
+    expect([fromNotes, runs]).toEqual([[JSON.stringify({ by: "title" })], []]);
   });
 
   it("ignores an id for a disabled row or a row that no longer exists", async () => {

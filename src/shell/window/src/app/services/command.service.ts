@@ -23,12 +23,14 @@ import { Resources } from "../../resources";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { SettingsService } from "./settings.service";
 import { ShellCommandsService } from "./shell-commands.service";
+import { ViewDialogService } from "./view-dialog.service";
 
 @Injectable({ providedIn: "root" })
 export class CommandService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly dialogs: DialogService = inject(DialogService);
+  private readonly viewDialogs: ViewDialogService = inject(ViewDialogService);
   private readonly shell: ShellCommandsService = inject(ShellCommandsService);
   private readonly shellCommands: readonly CommandContribution[] = this.shell.commands;
   private readonly moduleCommands: WritableSignal<readonly CommandContribution[]> = signal([]);
@@ -95,7 +97,7 @@ export class CommandService {
   }
 
   public isHeldByDialog(name: string): boolean {
-    return this.dialogs.isOpen && !Resources.modalCommands.includes(name);
+    return this.dialogs.isOpen && !Resources.modalCommands.includes(name) && !this.viewDialogs.ownsCommand(name);
   }
 
   public dispatch(event: KeyboardEvent): boolean {

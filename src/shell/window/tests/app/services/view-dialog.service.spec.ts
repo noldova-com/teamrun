@@ -58,7 +58,7 @@ describe("ViewDialogService", () => {
     DesktopBridgeFixture.install();
     const host = new WindowPartHostFixture();
     host.contributions.set(search.key, new ContributionMatch(() => Promise.resolve(TestSearchComponent), null));
-    for (const note of [new DocumentTab(plan.name, "draft"), plan, LayoutFixture.todo])
+    for (const note of [new DocumentTab(plan.name, "draft"), plan, LayoutFixture.todo, LayoutFixture.settings])
       host.contributions.set(note.key, new ContributionMatch(() => Promise.resolve(TestNoteComponent), null));
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartHostService, useValue: host }] });
     const registry = LayoutFixture.createRegistry();
@@ -113,6 +113,25 @@ describe("ViewDialogService", () => {
     await expect(dialogs.showAsync(new ViewTab("files.missing"))).rejects.toThrowError(new ArgumentException("No view named \"files.missing\" is registered.", "tab"));
     await expect(dialogs.showAsync(new DocumentTab("notes.page", "1"))).rejects.toThrowError(ArgumentException);
     expect([dialogs.canShow(search), dialogs.shown()]).toEqual([true, null]);
+  });
+
+  it("lets its view's module run its commands while it is the topmost dialog, but not another module's, the shell's for its own document, or any under another dialog", async () => {
+    const before = dialogs.ownsCommand("files.find");
+    const shown = dialogs.showAsync(search);
+    await vi.waitFor(() => expect(document.activeElement?.classList.contains("tr-test-query")).toBe(true));
+    const whileShown = ["files.find", "notes.newNote", "shell.closeTab"].map(t => dialogs.ownsCommand(t));
+    const other = TestBed.inject(DialogService).open(TestSearchComponent, ".tr-test-query");
+    const underAnother = dialogs.ownsCommand("files.find");
+    other.close();
+    dialogs.close();
+    await shown;
+    const settings = dialogs.showAsync(LayoutFixture.settings);
+    await vi.waitFor(() => expect(container()).not.toBeNull());
+    const forShellDocument = dialogs.ownsCommand("shell.closeTab");
+    dialogs.close();
+    await settings;
+
+    expect([before, ...whileShown, underAnother, forShellDocument]).toEqual([false, true, false, false, false, false]);
   });
 
   it("refuses a view while another dialog is open", async () => {
