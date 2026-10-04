@@ -73,10 +73,9 @@ class NightlyWorkflowTests {
 
       for (const step of NightlyWorkflowTests.SHARED_STEPS)
         assert.equal(nightly.readStepScript(step), validation.readStepScript(step), step);
-      for (const step of ["Restore the installed dependencies", "Restore the Angular project's installed dependencies"]) {
-        const [own, validated] = [nightly, validation].map(t => new WorkflowSimulation(t.text, step, step).find(step));
-        assert.deepEqual([own?.uses, own?.settings], [validated?.uses, validated?.settings], step);
-      }
+      const restores = ["Restore the installed dependencies", "Restore the Angular project's installed dependencies"] as const;
+      const [own, validated] = [nightly, validation].map(t => new WorkflowSimulation(t.text, ...restores).steps.map(step => [step.name, step.uses, step.settings]));
+      assert.deepEqual(own, validated);
       for (const first of ["Set up Node.js", "Set up Node.js to report"]) {
         const [again, last] = [`${first} again`, `${first} a last time`];
         const simulation = new WorkflowSimulation(nightly.text, first, last);
