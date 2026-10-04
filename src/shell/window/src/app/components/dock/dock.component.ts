@@ -10,7 +10,7 @@ import { ChangeDetectionStrategy, Component, type Signal, computed, inject, inpu
 
 import "@noldova/teamrun-foundation-core";
 import {
-  AppearanceService, IconButtonComponent, OverlaySide, PanelCardComponent, PanelSurface, SashComponent, SashOrientation, ToolbarDirective, ToolbarItemDirective, ToolbarOrientation,
+  AppearanceService, ContextMenuTriggerDirective, IconButtonComponent, OverlaySide, PanelCardComponent, PanelSurface, SashComponent, SashOrientation, ToolbarDirective, ToolbarItemDirective, ToolbarOrientation,
   TooltipDirective, ViewBadgeComponent
 } from "@noldova/teamrun-shell-ui";
 
@@ -19,14 +19,18 @@ import { DockSide } from "../../enums/dock-side";
 import { Bounds } from "../../models/layout/bounds";
 import type { Dock } from "../../models/layout/dock";
 import type { LayoutNode } from "../../models/layout/layout.node";
+import { DockStripIcon } from "../../models/layout/dock-strip-icon";
 import type { Tab } from "../../models/layout/tab";
+import { TabDropTarget } from "../../models/layout/tab-drop-target";
 import type { TabGroup } from "../../models/layout/tab-group";
 import { LayoutService } from "../../services/layout.service";
+import { TabDragService } from "../../services/tab-drag.service";
 import { TabLabelService } from "../../services/tab-label.service";
+import { PlaceMenuComponent } from "../place-menu/place-menu.component";
 
 @Component({
   selector: "tr-dock",
-  imports: [IconButtonComponent, PanelCardComponent, SashComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, ViewBadgeComponent],
+  imports: [ContextMenuTriggerDirective, IconButtonComponent, PanelCardComponent, PlaceMenuComponent, SashComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, ViewBadgeComponent],
   templateUrl: "./dock.component.html",
   styleUrl: "./dock.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -42,6 +46,7 @@ export class DockComponent {
   protected readonly surface: PanelSurface = PanelSurface.Shell;
   protected readonly layout: LayoutService = inject(LayoutService);
   protected readonly labels: TabLabelService = inject(TabLabelService);
+  protected readonly drag: TabDragService = inject(TabDragService);
   protected readonly dock: Signal<Dock> = computed(() => this.layout.layout().dock(this.side()));
   protected readonly bounds: Signal<Bounds> = computed(() => this.layout.geometry().dock(this.side()));
   protected readonly isShown: Signal<boolean> = computed(() => this.layout.geometry().isShown(this.side()));
@@ -53,6 +58,7 @@ export class DockComponent {
   protected readonly isRail: Signal<boolean> = computed(() => !Object.isNull(this.layout.geometry().rail(this.side())));
   protected readonly stripBounds: Signal<Bounds | null> = computed(() => this.layout.geometry().rail(this.side()) ?? (this.isCollapsed() ? this.bounds() : null));
   protected readonly stripOrientation: Signal<ToolbarOrientation> = computed(() => this.isVertical() ? ToolbarOrientation.Vertical : ToolbarOrientation.Horizontal);
+  protected readonly axis: Signal<string> = computed(() => this.isVertical() ? Resources.verticalOrientation : Resources.horizontalOrientation);
   protected readonly separatorOrientation: Signal<string> = computed(() => this.isVertical() ? Resources.horizontalOrientation : Resources.verticalOrientation);
   protected readonly sash: Signal<Bounds> = computed(() => {
     const bounds = this.bounds();
@@ -69,8 +75,18 @@ export class DockComponent {
 
   public readonly side = input.required<DockSide>();
 
-  protected groupsOf(root: LayoutNode): readonly (readonly [TabGroup, readonly Tab[]])[] {
-    return root.groups.map(t => [t, t.tabs.filter(u => u.isAvailable(this.layout.registry()))] as const).filter(([, tabs]) => tabs.length > 0);
+  protected iconsOf(root: LayoutNode): readonly (readonly DockStripIcon[])[] {
+    const groups = root.groups.map(t => [t, t.tabs.filter(u => u.isAvailable(this.layout.registry()))] as const).filter(([, tabs]) => tabs.length > 0);
+    return groups.map(([group, tabs], position) => tabs.map((tab, order) => {
+      const index = group.tabs.findIndex(t => t.equals(tab));
+      const previous = order === 0 ? groups[position - 1]?.[0] : undefined;
+      const before = Object.isUndefined(previous) ? new TabDropTarget(group.id, index) : new TabDropTarget(previous.id, previous.tabs.length);
+      return new DockStripIcon(group, tab, before, new TabDropTarget(group.id, index + 1));
+    }));
+  }
+
+  protected encode(target: TabDropTarget): string {
+    return `${target.groupId}${Resources.dropTargetSeparator}${target.index}`;
   }
 
   protected isShowing(group: TabGroup, tab: Tab): boolean {

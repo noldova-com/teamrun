@@ -12,16 +12,21 @@ LICENSE file in the root directory of this source tree.
       <tr-panel-card class="tr-dock-strip" [class.tr-dock-strip-vertical]="isVertical()" [class.tr-dock-strip-rail]="isRail()" [surface]="surface"
         [attr.data-drop-group]="root.cornerGroup.id" data-drop-tabs trToolbar [trToolbarOrientation]="stripOrientation()" [trToolbarLabel]="resources.dockStripLabels[side()]"
         [style.left.rem]="box.x" [style.top.rem]="box.y" [style.width.rem]="box.width" [style.height.rem]="box.height">
-        @for (entry of groupsOf(root); track entry[0].id; let first = $first) {
+        @for (icons of iconsOf(root); track icons[0]?.group?.id; let first = $first, lastGroup = $last) {
           @if (!first) {
             <span class="tr-dock-strip-separator" role="separator" [attr.aria-orientation]="separatorOrientation()"></span>
           }
-          @for (tab of entry[1]; track tab.key) {
+          @for (icon of icons; track icon.tab.key; let last = $last) {
+            @let tab = icon.tab;
             @let label = labels.of(tab);
             @let badge = labels.badgeOf(tab);
-            <button type="button" tr-icon-button trToolbarItem class="tr-dock-strip-view" [attr.data-view]="tab.key" [icon]="label.icon"
+            <tr-place-menu #menu [place]="resources.tabMenu" [context]="{ tab: tab.key }" />
+            <button type="button" tr-icon-button trToolbarItem class="tr-dock-strip-view" [trContextMenuTriggerFor]="menu.menu()" [attr.data-view]="tab.key" [icon]="label.icon"
+              [attr.data-drop-before]="encode(icon.before)" [attr.data-drop-after]="encode(icon.after)" [attr.data-drop-axis]="axis()"
+              [class.tr-dock-strip-drop-before]="icon.before.equals(drag.target())" [class.tr-dock-strip-drop-after]="lastGroup && last && icon.after.equals(drag.target())"
+              [class.tr-dock-strip-dragged]="tab.equals(drag.dragging())" (pointerdown)="drag.begin(tab, $event)"
               [label]="badge ? resources.formatBadged(label.title, badge.description) : label.title"
-              [pressed]="isShowing(entry[0], tab)" [trTooltip]="label.title" [trTooltipSide]="tooltipSide()" [trTooltipBeside]="resources.dockStripSelector" (click)="toggle(entry[0], tab)">
+              [pressed]="isShowing(icon.group, tab)" [trTooltip]="label.title" [trTooltipSide]="tooltipSide()" [trTooltipBeside]="resources.dockStripSelector" (click)="toggle(icon.group, tab)">
               @if (badge) {
                 <tr-view-badge class="tr-dock-strip-badge" [count]="badge.count" />
               }

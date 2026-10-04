@@ -79,7 +79,7 @@ export class TabDragService {
     this.pointerYState.set(event.clientY);
     const element = this.document.elementFromPoint(event.clientX, event.clientY);
     this.hoveredState.set(this.groupAt(element)?.id ?? null);
-    const target = this.targetAt(tab, element, event.clientX);
+    const target = this.targetAt(tab, element, event.clientX, event.clientY);
     if (!(target?.equals(this.targetState()) ?? Object.isNull(this.targetState())))
       this.targetState.set(target);
   }
@@ -114,14 +114,26 @@ export class TabDragService {
     return Object.isNull(zone) ? null : this.layout.layout().group(Number(zone.dataset[Resources.dropGroupData]));
   }
 
-  private targetAt(tab: Tab, element: Element | null, x: number): DropTarget | null {
+  private targetAt(tab: Tab, element: Element | null, x: number, y: number): DropTarget | null {
     if (Object.isNull(element))
       return null;
     const group = this.groupAt(element);
     const docking = tab.isMovable ? this.dockingTargetAt(element, group) : null;
     if (!Object.isNull(docking))
       return docking;
+    const icon = element.closest<HTMLElement>(Resources.dropBeforeSelector);
+    if (!Object.isNull(icon))
+      return this.iconTargetAt(tab, icon, x, y);
     return Object.isNull(group) ? null : this.stripTargetAt(tab, element, group, x);
+  }
+
+  private iconTargetAt(tab: Tab, icon: HTMLElement, x: number, y: number): DropTarget | null {
+    const bounds = icon.getBoundingClientRect();
+    const isBefore = icon.dataset[Resources.dropAxisData] === Resources.verticalOrientation ? y < bounds.top + bounds.height / 2 : x < bounds.left + bounds.width / 2;
+    const encoded = String(icon.dataset[isBefore ? Resources.dropBeforeData : Resources.dropAfterData]);
+    const separator = encoded.indexOf(Resources.dropTargetSeparator);
+    const group = this.layout.layout().group(Number(encoded.slice(0, separator)));
+    return Object.isNull(group) || !group.accepts(tab) ? null : new TabDropTarget(group.id, Number(encoded.slice(separator + 1)));
   }
 
   private dockingTargetAt(element: Element, group: TabGroup | null): DropTarget | null {
