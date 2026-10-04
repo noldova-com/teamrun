@@ -115,6 +115,26 @@ test.describe("settings", () => {
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).toBe(before.font);
   });
 
+  test("choosing a setting's default by hand removes its Modified marker and Reset, also after a restart", async ({ desktop }) => {
+    const window = desktop.window;
+    await openSettingsAsync(window);
+    const mode = row(window, "shell.mode");
+
+    await chooseAsync(window, "shell.mode", "Dark");
+    await expect(mode.locator(".tr-setting-row-marker")).toHaveCount(1);
+    await expect(mode.getByRole("button", { name: /^Reset / })).toHaveCount(1);
+    await chooseAsync(window, "shell.mode", "System");
+
+    await expect(mode.locator(".tr-setting-row-marker")).toHaveCount(0);
+    await expect(mode.getByRole("button", { name: /^Reset / })).toHaveCount(0);
+    await desktop.checkpointAsync("settings-default-by-hand");
+    await desktop.restartAsync();
+    await openSettingsAsync(desktop.window);
+    await expect(row(desktop.window, "shell.mode").locator(".tr-select-button")).toContainText("System");
+    await expect(row(desktop.window, "shell.mode").locator(".tr-setting-row-marker")).toHaveCount(0);
+    await expect(row(desktop.window, "shell.mode").getByRole("button", { name: /^Reset / })).toHaveCount(0);
+  });
+
   test("a restart paints the first frame in the chosen mode, before the runtime has given the window any setting", async ({ desktop }) => {
     const window = desktop.window;
     await openSettingsAsync(window);

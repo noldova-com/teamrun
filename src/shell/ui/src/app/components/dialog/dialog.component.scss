@@ -41,6 +41,10 @@
   overflow-wrap: anywhere;
 }
 
+.tr-dialog-text {
+  display: contents;
+}
+
 .tr-dialog-actions {
   display: flex;
   flex: none;
