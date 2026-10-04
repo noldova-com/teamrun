@@ -8,8 +8,10 @@
 
 import { ErrorHandler } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { StatusBarItemComponent } from "../../../../src/app/components/status-bar-item/status-bar-item.component";
 import { StatusBarSide } from "../../../../src/app/enums/status-bar-side";
@@ -22,6 +24,8 @@ import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.f
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 
 describe("StatusBarItemComponent", () => {
+  const LONG = "2 notes, neither pinned nor archived, both last changed today and both waiting for review";
+
   let errors: unknown[];
   let runs: JsonValue[];
 
@@ -60,7 +64,7 @@ describe("StatusBarItemComponent", () => {
     const pill = host.querySelector(".tr-status-bar-item");
 
     expect(host.querySelector("button")).toBeNull();
-    expect([pill?.getAttribute("role"), pill?.getAttribute("aria-label"), pill?.textContent?.trim()]).toEqual(["status", null, "2 notes"]);
+    expect([pill?.getAttribute("role"), pill?.getAttribute("aria-label"), pill?.textContent?.trim()]).toEqual(["status", "2 notes", "2 notes"]);
     expect(host.getAttribute("data-tr-item")).toBe("clock.ticks");
   });
 
@@ -121,6 +125,33 @@ describe("StatusBarItemComponent", () => {
     expect(shown).toBe("3 notes");
     expect(getComputedStyle(host).display).toBe("none");
   });
+
+  for (const command of [undefined, "clock.tick"])
+    for (const tooltip of [undefined, "Tick the clock"])
+      it(`shows the full text of ${command ? "a button" : "a plain"} item ${tooltip ? "with" : "without"} its own tooltip only when cut short, and is named by it`, async () => {
+        AppearanceFixture.apply();
+        register("clock.tick");
+        const shownFor = async (text: string): Promise<string | null> => {
+          const [fixture] = render(new StatusBarItemState(text, { command, tooltip }));
+          const host: HTMLElement = fixture.nativeElement;
+          host.style.width = "6rem";
+          const directive = fixture.debugElement.query(By.directive(TooltipDirective)).injector.get(TooltipDirective);
+          directive.show();
+          await fixture.whenStable();
+          const shown = document.querySelector(".cdk-overlay-container tr-tooltip")?.textContent?.trim() ?? null;
+          directive.hide();
+          const pill = host.querySelector(".tr-status-bar-item");
+          expect(pill?.getAttribute("aria-label")).toBe(command ? null : text);
+          expect(pill?.textContent?.trim()).toBe(text);
+          fixture.destroy();
+          return shown;
+        };
+
+        const long = await shownFor(LONG);
+        const short = await shownFor("2 notes");
+
+        expect([long, short]).toEqual(tooltip ? [tooltip, tooltip] : [LONG, null]);
+      });
 
   for (const theme of AppearanceFixture.themes)
     it(`is a pill with the ${theme.id} theme's status bar item geometry`, () => {
