@@ -44,7 +44,7 @@ export class OpenWindowTests {
 
     for (const [index, failure] of failures.entries()) {
       const window = new FakeDesktopWindow({}, index + 1);
-      const open = new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard());
+      const open = new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard(), "win32");
       await open.bounds.restoreAsync(new RefusingStore(failure));
       window.close();
       const request = window.webContents.sent.find(t => t[0] === "teamrun:closeRequest");
@@ -65,7 +65,7 @@ export class OpenWindowTests {
     const window = new FakeDesktopWindow({}, 1);
     const guard = new FakeCloseGuard();
     guard.outcome = QuitOutcome.Stay;
-    const open = new OpenWindow(window, new FakeDisplayHost(), new FakeDesktopLog(), guard);
+    const open = new OpenWindow(window, new FakeDisplayHost(), new FakeDesktopLog(), guard, "win32");
 
     window.close();
     await Condition.waitAsync(() => guard.prompts.length === 1);
@@ -85,8 +85,8 @@ export class OpenWindowTests {
     guard.outcome = QuitOutcome.StopWork;
     const refusing = new FakeDesktopWindow({}, 1);
     const saving = new FakeDesktopWindow({}, 2);
-    const refused = new OpenWindow(refusing, new FakeDisplayHost(), new FakeDesktopLog(), guard);
-    const saved = new OpenWindow(saving, new FakeDisplayHost(), new FakeDesktopLog(), guard);
+    const refused = new OpenWindow(refusing, new FakeDisplayHost(), new FakeDesktopLog(), guard, "win32");
+    const saved = new OpenWindow(saving, new FakeDisplayHost(), new FakeDesktopLog(), guard, "win32");
     let isGoneWhenStopped: boolean | null = null;
     guard.onStop = () => isGoneWhenStopped = saving.isGone;
 
@@ -112,12 +112,12 @@ export class OpenWindowTests {
     crashed.webContents.crashed = true;
     const gone = new FakeDesktopWindow({}, 3);
     gone.destroy();
-    const open = new OpenWindow(window, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard());
+    const open = new OpenWindow(window, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard(), "win32");
 
     const shown = open.show(new QuitQuestion(["Indexing the project"], true));
     const cleared = open.show(null);
-    const onCrashed = new OpenWindow(crashed, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard()).show(null);
-    const onGone = new OpenWindow(gone, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard()).show(null);
+    const onCrashed = new OpenWindow(crashed, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard(), "win32").show(null);
+    const onGone = new OpenWindow(gone, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard(), "win32").show(null);
 
     Assert.isTrue(shown && cleared);
     Assert.isFalse(onCrashed || onGone);
@@ -139,7 +139,7 @@ export class OpenWindowTests {
     const log = new FakeDesktopLog();
 
     for (const window of windows)
-      new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard()).showUnpaintedWithin(20);
+      new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard(), "win32").showUnpaintedWithin(20);
     const isShownEarly = windows.some(t => t.isShown);
     await Condition.waitAsync(() => windows.every(t => t.isShown) && log.lines.length === 3);
 
@@ -156,7 +156,7 @@ export class OpenWindowTests {
   public async showsAPaintedWindowOnceSettledAndNeverRecordsItAsUnpainted(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const log = new FakeDesktopLog();
-    const open = new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard());
+    const open = new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard(), "win32");
     open.settleWithin(10);
     open.showUnpaintedWithin(30);
 
@@ -174,7 +174,7 @@ export class OpenWindowTests {
   public async showsNothingForAWindowClosedBeforeTheLimit(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const log = new FakeDesktopLog();
-    const open = new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard());
+    const open = new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard(), "win32");
     open.settleWithin(10);
     open.showUnpaintedWithin(20);
 
@@ -188,7 +188,7 @@ export class OpenWindowTests {
 
   private static startFence(milliseconds: number): FakeDesktopWindow {
     const fence = new FakeDesktopWindow({}, 99);
-    new OpenWindow(fence, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard()).showUnpaintedWithin(milliseconds);
+    new OpenWindow(fence, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard(), "win32").showUnpaintedWithin(milliseconds);
     return fence;
   }
 }
