@@ -109,15 +109,15 @@ export default class ApiServer {
       }
       catch (error) {
         const outputBeforeClosing = errorOutput;
+        const hasStopped = hasExited;
         await api.close();
         const isConnectionFailure = error instanceof Error && error.message.startsWith(ApiServer.CONNECTION_FAILURE);
         const elapsed = Date.now() - started;
-        const hasStopped = hasExited;
         if (!isConnectionFailure || hasStopped || elapsed >= ApiServer.START_TIMEOUT) {
           child.kill();
           await exited;
           await pipe.removeAsync();
-          throw new ApiException(ApiServer.describeFailure(projectFile, elapsed, hasStopped, hasStopped ? errorOutput : outputBeforeClosing),
+          throw new ApiException(ApiServer.describeFailure(projectFile, elapsed, hasStopped, outputBeforeClosing),
             { cause: error });
         }
       }
