@@ -14,6 +14,7 @@ import { IconButtonComponent } from "../icon-button/icon-button.component";
 import { PanelCardComponent } from "../panel-card/panel-card.component";
 import { SashComponent } from "../sash/sash.component";
 import { TabComponent } from "../tab/tab.component";
+import { ToolbarButtonComponent } from "../toolbar-button/toolbar-button.component";
 import { ToolbarItemDirective } from "../toolbar/toolbar-item.directive";
 import { ToolbarDirective } from "../toolbar/toolbar.directive";
 import { ViewBadgeComponent } from "../view-badge/view-badge.component";
@@ -22,7 +23,7 @@ import { GallerySpecimenComponent } from "./gallery-specimen.component";
 
 @Component({
   selector: "tr-gallery-navigation",
-  imports: [GallerySpecimenComponent, IconButtonComponent, PanelCardComponent, SashComponent, TabComponent, ToolbarDirective, ToolbarItemDirective, ViewBadgeComponent],
+  imports: [GallerySpecimenComponent, IconButtonComponent, PanelCardComponent, SashComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, ViewBadgeComponent],
   templateUrl: "./gallery-navigation.component.html",
   styleUrl: "./gallery-navigation.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
