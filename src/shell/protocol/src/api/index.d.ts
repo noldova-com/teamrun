@@ -209,7 +209,15 @@ export declare enum SettingKind {
   /**
    * A list of distinct module ids.
    */
-  Modules = "Modules"
+  Modules = "Modules",
+
+  /**
+   * The person's key bindings: an object from a command's name to the key
+   * bound to it, or to `null` when the person removed the command's key.
+   * Each key is one `KeyChord.canBind` accepts for its command. Only the
+   * shell's `shell.keyBindings` has this kind.
+   */
+  KeyBindings = "KeyBindings"
 }
 
 /**
@@ -321,6 +329,22 @@ export declare class QualifiedName {
    * ```
    */
   public static parse(text: string, parameterName?: string): QualifiedName;
+
+  /**
+   * Reads `owner.member` text without throwing, for checks that only need to
+   * know whether the text is a name.
+   *
+   * @param text The name's text.
+   * @returns The name, or `null` when `parse` would refuse the text.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const isName: boolean = QualifiedName.find("notes.create") !== null;
+   * ```
+   */
+  public static find(text: string): QualifiedName | null;
 
   /**
    * Compares two names.
@@ -1591,6 +1615,20 @@ export declare class SettingType {
   public static modules(): SettingType;
 
   /**
+   * Creates the type of the setting that holds the person's key bindings.
+   *
+   * @returns The key bindings type.
+   *
+   * @example
+   * ```ts
+   * import { SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const type: SettingType = SettingType.keyBindings();
+   * ```
+   */
+  public static keyBindings(): SettingType;
+
+  /**
    * Reads a type from its wire form: `kind` and the fields of that kind.
    *
    * @param value The untrusted value.
@@ -1611,7 +1649,9 @@ export declare class SettingType {
   /**
    * Tells whether a value fits the type: a boolean; one of the options'
    * values; a number within the limits on a step; a string within the
-   * length; or a list of distinct, non-blank strings.
+   * length; a list of distinct, non-blank strings; or an object from
+   * command names to `null` or a key `KeyChord.canBind` accepts for the
+   * command.
    *
    * @param value The value.
    * @returns Whether the type accepts it.
@@ -2313,6 +2353,22 @@ export declare class KeyName {
   public static find(token: string): KeyName | undefined;
 
   /**
+   * Finds the key a keyboard event reports, by the same rules as `matches`.
+   *
+   * @param stroke The key a keyboard event reports.
+   * @returns The key, or `undefined` for a key no chord names, such as a
+   * modifier pressed alone.
+   *
+   * @example
+   * ```ts
+   * import { KeyName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const pressed: KeyName | undefined = KeyName.fromStroke({ key: "<", code: "Comma", ctrlKey: false, altKey: false, shiftKey: true, metaKey: false });
+   * ```
+   */
+  public static fromStroke(stroke: IKeyStroke): KeyName | undefined;
+
+  /**
    * Tells whether a stroke is this key, whatever modifiers it has.
    *
    * @param stroke The key a keyboard event reports.
@@ -2381,7 +2437,29 @@ export declare class KeyChord {
    */
   public readonly text: string;
 
+  /**
+   * Whether the chord could take typing: it has no Mod, Ctrl or Alt and is
+   * not a function key, such as `K`, `Shift+K` or `Enter`.
+   */
+  public get isTypingKey(): boolean;
+
   private constructor();
+
+  /**
+   * Reads a chord from its text without throwing, for checks that only need
+   * to know whether the text is a chord.
+   *
+   * @param text The chord, such as `Mod+Shift+K`.
+   * @returns The chord, or `null` when `parse` would refuse the text.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const chord: KeyChord | null = KeyChord.find("Mod+Shift+K");
+   * ```
+   */
+  public static find(text: string): KeyChord | null;
 
   /**
    * Reads a chord from its text, with its modifiers in any order.
@@ -2424,6 +2502,84 @@ export declare class KeyChord {
    * ```
    */
   public static parseDefault(text: string, parameterName?: string): KeyChord;
+
+  /**
+   * Reads a chord the person may bind to a command. A binding follows the
+   * rules of `parseDefault`, except that a shell command may also take
+   * Mod+W and Mod+Comma, which the shell handles itself.
+   *
+   * @param text The chord.
+   * @param command The command the chord is bound to.
+   * @param parameterName The parameter a failure names; `key` by default.
+   * @returns The chord.
+   * @throws ArgumentException synchronously when the text is not a chord,
+   * has no modifier that guards typing, or is reserved for the command; the
+   * message says which.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const chord: KeyChord = KeyChord.parseBinding("Mod+W", QualifiedName.parse("shell.closeTab"));
+   * ```
+   */
+  public static parseBinding(text: string, command: QualifiedName, parameterName?: string): KeyChord;
+
+  /**
+   * Reads the chord a keyboard event presses on a platform, as the person
+   * records a key. On Windows and Linux Ctrl reads as Mod; on macOS Cmd reads
+   * as Mod and Control as Ctrl.
+   *
+   * @param stroke The key a keyboard event reports.
+   * @param platform The platform, as in `process.platform`.
+   * @returns The chord, or `null` when no chord can name the stroke: a key
+   * the chords do not name, such as a modifier pressed alone, the Windows,
+   * Super or Meta key on Windows and Linux, or Control and Cmd together on
+   * macOS.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const chord: KeyChord | null = KeyChord.fromStroke({ key: "k", code: "KeyK", ctrlKey: false, altKey: false, shiftKey: true, metaKey: true }, "darwin");
+   * ```
+   */
+  public static fromStroke(stroke: IKeyStroke, platform: string): KeyChord | null;
+
+  /**
+   * Finds who owns the chord when editing or an operating system reserves it
+   * on any platform.
+   *
+   * @param command The command the chord would be bound to, whose being a
+   * shell command frees Mod+W and Mod+Comma; `null` for a module's default.
+   * @returns `editing`, `macOS` or `Windows and Linux`, or `null` when the
+   * chord is free.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const owner: string | null = KeyChord.parse("Ctrl+C").findReservedOwner(null);
+   * ```
+   */
+  public findReservedOwner(command: QualifiedName | null): string | null;
+
+  /**
+   * Tells whether the person may bind the chord to a command: it does not
+   * take typing and nothing reserves it for that command.
+   *
+   * @param command The command.
+   * @returns `true` when `parseBinding` would accept the chord's text for the
+   * command.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const isAllowed: boolean = KeyChord.parse("Mod+Comma").canBind(QualifiedName.parse("notes.create"));
+   * ```
+   */
+  public canBind(command: QualifiedName): boolean;
 
   /**
    * Tells whether a keyboard event is this chord on a platform. The

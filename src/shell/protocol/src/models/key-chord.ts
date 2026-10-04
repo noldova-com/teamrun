@@ -12,6 +12,7 @@ import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { IKeyStroke } from "../interfaces/key-stroke.js";
 import { Resources } from "../resources.js";
 import { KeyName } from "./key-name.js";
+import type { QualifiedName } from "./qualified-name.js";
 
 export class KeyChord {
   public readonly hasMod: boolean;
@@ -30,30 +31,63 @@ export class KeyChord {
     this.text = [...Resources.modifierTokens.filter((_, index) => [hasMod, hasCtrl, hasAlt, hasShift][index]), key.token].join(Resources.keySeparator);
   }
 
-  public static parse(text: string, parameterName: string = Resources.keyParameterName): KeyChord {
-    const tokens = text.split(Resources.keySeparator);
-    const key = KeyName.find(String(tokens.pop()));
-    const modifiers = new Set(tokens);
-    if (Object.isUndefined(key) || modifiers.size !== tokens.length || tokens.some(t => !Resources.modifierTokens.includes(t)))
-      throw new ArgumentException(Resources.formatKeyInvalid(text), parameterName);
+  public get isTypingKey(): boolean {
+    return !this.hasMod && !this.hasCtrl && !this.hasAlt && !this.key.isFunctionKey;
+  }
 
-    const hasMod = modifiers.has(Resources.modToken);
-    const hasCtrl = modifiers.has(Resources.ctrlToken);
-    if (hasMod && hasCtrl)
+  public static find(text: string): KeyChord | null {
+    const chord = KeyChord.read(text);
+    return Object.isNull(chord) || chord.isAmbiguous ? null : chord;
+  }
+
+  public static parse(text: string, parameterName: string = Resources.keyParameterName): KeyChord {
+    const chord = KeyChord.read(text);
+    if (Object.isNull(chord))
+      throw new ArgumentException(Resources.formatKeyInvalid(text), parameterName);
+    if (chord.isAmbiguous)
       throw new ArgumentException(Resources.formatKeyAmbiguous(text), parameterName);
-    return new KeyChord(hasMod, hasCtrl, modifiers.has(Resources.altToken), modifiers.has(Resources.shiftToken), key);
+    return chord;
   }
 
   public static parseDefault(text: string, parameterName: string = Resources.keyParameterName): KeyChord {
     const chord = KeyChord.parse(text, parameterName);
-    if (!chord.hasMod && !chord.hasCtrl && !chord.hasAlt && !chord.key.isFunctionKey)
+    if (chord.isTypingKey)
       throw new ArgumentException(Resources.formatKeyNeedsModifier(chord.text), parameterName);
 
-    for (const [platform, owner, reserved] of Resources.reservedKeys) {
-      if (reserved.some(t => KeyChord.parse(t).isSameOn(chord, platform)))
-        throw new ArgumentException(Resources.formatKeyReserved(chord.text, owner), parameterName);
-    }
+    const owner = chord.findReservedOwner(null);
+    if (!Object.isNull(owner))
+      throw new ArgumentException(Resources.formatKeyReserved(chord.text, owner), parameterName);
     return chord;
+  }
+
+  public static parseBinding(text: string, command: QualifiedName, parameterName: string = Resources.keyParameterName): KeyChord {
+    const chord = KeyChord.parse(text, parameterName);
+    if (chord.isTypingKey)
+      throw new ArgumentException(Resources.formatBindingNeedsModifier(chord.text), parameterName);
+
+    const owner = chord.findReservedOwner(command);
+    if (!Object.isNull(owner))
+      throw new ArgumentException(Resources.formatBindingReserved(chord.text, owner), parameterName);
+    return chord;
+  }
+
+  public static fromStroke(stroke: IKeyStroke, platform: string): KeyChord | null {
+    const isMac = platform === Resources.macPlatform;
+    const key = KeyName.fromStroke(stroke);
+    if (Object.isUndefined(key) || (!isMac && stroke.metaKey))
+      return null;
+    const chord = new KeyChord(isMac ? stroke.metaKey : stroke.ctrlKey, isMac && stroke.ctrlKey, stroke.altKey, stroke.shiftKey, key);
+    return chord.isAmbiguous ? null : chord;
+  }
+
+  public findReservedOwner(command: QualifiedName | null): string | null {
+    if (command?.isShell === true && Resources.shellCommandKeys.includes(this.text))
+      return null;
+    return Resources.reservedKeys.find(([platform, , reserved]) => reserved.some(t => KeyChord.parse(t).isSameOn(this, platform)))?.[1] ?? null;
+  }
+
+  public canBind(command: QualifiedName): boolean {
+    return !this.isTypingKey && Object.isNull(this.findReservedOwner(command));
   }
 
   public matches(stroke: IKeyStroke, platform: string): boolean {
@@ -87,5 +121,18 @@ export class KeyChord {
 
   public toString(): string {
     return this.text;
+  }
+
+  private get isAmbiguous(): boolean {
+    return this.hasMod && this.hasCtrl;
+  }
+
+  private static read(text: string): KeyChord | null {
+    const tokens = text.split(Resources.keySeparator);
+    const key = KeyName.find(String(tokens.pop()));
+    const modifiers = new Set(tokens);
+    if (Object.isUndefined(key) || modifiers.size !== tokens.length || tokens.some(t => !Resources.modifierTokens.includes(t)))
+      return null;
+    return new KeyChord(modifiers.has(Resources.modToken), modifiers.has(Resources.ctrlToken), modifiers.has(Resources.altToken), modifiers.has(Resources.shiftToken), key);
   }
 }

@@ -151,6 +151,7 @@ export class Resources {
     [Resources.macPlatform, "macOS", Resources.macSystemKeys],
     [Resources.standardPlatform, "Windows and Linux", Resources.standardSystemKeys]
   ];
+  public static readonly shellCommandKeys: readonly string[] = ["Mod+W", "Mod+Comma"];
   public static readonly stopMember: string = "stop";
   public static readonly moveAsideMember: string = "moveAside";
   public static readonly modulesMember: string = "modules";
@@ -222,6 +223,14 @@ export class Resources {
 
   public static formatKeyReserved(text: string, owner: string): string {
     return `The key ${text} is reserved for ${owner} and cannot be a command's default.`;
+  }
+
+  public static formatBindingNeedsModifier(text: string): string {
+    return `The key ${text} needs Mod, Ctrl or Alt, or a function key, so that typing is never taken.`;
+  }
+
+  public static formatBindingReserved(text: string, owner: string): string {
+    return `The key ${text} is reserved for ${owner} and cannot be bound to a command.`;
   }
 
   public static formatFrameTooLarge(maximumFrameLength: number): string {

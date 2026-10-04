@@ -9,7 +9,7 @@
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { type IKeyStroke, KeyChord } from "@noldova/teamrun-shell-protocol";
+import { type IKeyStroke, KeyChord, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 @TestClass
 export class KeyChordTests {
@@ -33,6 +33,21 @@ export class KeyChordTests {
     }
     const ambiguous = Assert.throws(() => KeyChord.parse("Mod+Ctrl+K"), ArgumentException);
     Assert.areEqual("\"Mod+Ctrl+K\" names both Mod and Ctrl, which are the same key on Windows and Linux. (Parameter 'key')", ambiguous.message);
+  }
+
+  @TestMethod
+  public findsAChordWithoutThrowing(): void {
+    Assert.areEqual("Mod+Alt+Shift+K", KeyChord.find("Shift+Alt+Mod+K")?.text);
+    for (const text of ["", "Mod+", "Mod+Mod+K", "Cmd+K", "Mod+Ctrl+K"])
+      Assert.isNull(KeyChord.find(text), text);
+  }
+
+  @TestMethod
+  public tellsWhichChordsCouldTakeTyping(): void {
+    for (const text of ["K", "Shift+K", "Enter", "Shift+Space"])
+      Assert.isTrue(KeyChord.parse(text).isTypingKey, text);
+    for (const text of ["Mod+K", "Ctrl+K", "Alt+K", "F2", "Shift+F10"])
+      Assert.isFalse(KeyChord.parse(text).isTypingKey, text);
   }
 
   @TestMethod
@@ -126,6 +141,75 @@ export class KeyChordTests {
       Assert.areEqual(
         `The key ${KeyChord.parse(text).text} is reserved for Windows and Linux and cannot be a command's default. (Parameter 'key')`,
         Assert.throws(() => KeyChord.parseDefault(text), ArgumentException, text).message);
+  }
+
+  @TestMethod
+  public namesWhoOwnsAReservedChord(): void {
+    const module = QualifiedName.parse("notes.create");
+    const shell = QualifiedName.parse("shell.closeTab");
+
+    Assert.areEqual("editing", KeyChord.parse("Ctrl+C").findReservedOwner(null));
+    Assert.areEqual("editing", KeyChord.parse("Mod+C").findReservedOwner(shell));
+    Assert.areEqual("macOS", KeyChord.parse("Mod+W").findReservedOwner(module));
+    Assert.areEqual("macOS", KeyChord.parse("Mod+Q").findReservedOwner(shell));
+    Assert.areEqual("Windows and Linux", KeyChord.parse("Ctrl+Escape").findReservedOwner(module));
+    Assert.isNull(KeyChord.parse("Mod+W").findReservedOwner(shell));
+    Assert.isNull(KeyChord.parse("Mod+Comma").findReservedOwner(shell));
+    Assert.isNull(KeyChord.parse("Ctrl+W").findReservedOwner(null));
+    Assert.isNull(KeyChord.parse("Mod+K").findReservedOwner(module));
+  }
+
+  @TestMethod
+  public bindsWhatADefaultMayTakeAndTheShellsOwnKeysToShellCommands(): void {
+    const module = QualifiedName.parse("notes.create");
+    const shell = QualifiedName.parse("shell.openSettings");
+
+    for (const text of ["Mod+Alt+N", "Ctrl+W", "F5", "Alt+Escape"]) {
+      Assert.areEqual(KeyChord.parse(text).text, KeyChord.parseBinding(text, module).text, text);
+      Assert.isTrue(KeyChord.parse(text).canBind(module), text);
+    }
+    for (const text of ["Mod+W", "Mod+Comma"]) {
+      Assert.areEqual(text, KeyChord.parseBinding(text, shell).text);
+      Assert.isTrue(KeyChord.parse(text).canBind(shell), text);
+      Assert.isFalse(KeyChord.parse(text).canBind(module), text);
+    }
+    Assert.isFalse(KeyChord.parse("Shift+K").canBind(shell));
+    Assert.isFalse(KeyChord.parse("Mod+V").canBind(shell));
+  }
+
+  @TestMethod
+  public refusesABindingWithTheReason(): void {
+    const module = QualifiedName.parse("notes.create");
+    const typing = Assert.throws(() => KeyChord.parseBinding("Shift+K", module, "binding"), ArgumentException);
+    Assert.areEqual("The key Shift+K needs Mod, Ctrl or Alt, or a function key, so that typing is never taken. (Parameter 'binding')", typing.message);
+    Assert.areEqual(
+      "The key Mod+Comma is reserved for macOS and cannot be bound to a command. (Parameter 'key')",
+      Assert.throws(() => KeyChord.parseBinding("Mod+Comma", module), ArgumentException).message);
+    Assert.isTrue(Assert.throws(() => KeyChord.parseBinding("Mod+Plus", module), ArgumentException).message.startsWith("\"Mod+Plus\" is not a key."));
+  }
+
+  @TestMethod
+  public recordsTheChordAStrokePressesOnEachPlatform(): void {
+    const control = KeyChordTests.stroke("k", "KeyK", { ctrlKey: true, shiftKey: true });
+    const command = KeyChordTests.stroke("k", "KeyK", { metaKey: true, altKey: true });
+
+    Assert.areEqual("Mod+Shift+K", KeyChord.fromStroke(control, "win32")?.text);
+    Assert.areEqual("Mod+Shift+K", KeyChord.fromStroke(control, "linux")?.text);
+    Assert.areEqual("Ctrl+Shift+K", KeyChord.fromStroke(control, "darwin")?.text);
+    Assert.areEqual("Mod+Alt+K", KeyChord.fromStroke(command, "darwin")?.text);
+    Assert.areEqual("F2", KeyChord.fromStroke(KeyChordTests.stroke("F2", "F2", {}), "win32")?.text);
+    for (const platform of ["win32", "linux", "darwin"]) {
+      const chord = KeyChord.fromStroke(control, platform);
+      Assert.isTrue(chord?.matches(control, platform) === true, platform);
+    }
+  }
+
+  @TestMethod
+  public recordsNothingForAStrokeNoChordCanName(): void {
+    Assert.isNull(KeyChord.fromStroke(KeyChordTests.stroke("k", "KeyK", { metaKey: true }), "win32"));
+    Assert.isNull(KeyChord.fromStroke(KeyChordTests.stroke("k", "KeyK", { metaKey: true, ctrlKey: true }), "linux"));
+    Assert.isNull(KeyChord.fromStroke(KeyChordTests.stroke("k", "KeyK", { metaKey: true, ctrlKey: true }), "darwin"));
+    Assert.isNull(KeyChord.fromStroke(KeyChordTests.stroke("Control", "ControlLeft", { ctrlKey: true }), "win32"));
   }
 
   private static stroke(key: string, code: string, modifiers: Partial<Omit<IKeyStroke, "key" | "code">>): IKeyStroke {
