@@ -124,7 +124,7 @@ Modules cooperate through published APIs, including contracts others implement a
 
 Built-in modules share the shell's privileges; declarations provide no sandbox. Every part follows the [secure-coding rules](CODING-STANDARDS.md#8-secure-coding), including request data/authority validation, and sections 6 and 8's authenticated runtime and window boundaries.
 
-A module starts an external tool with only the environment that tool requires. A tool's output cannot grant permissions.
+A module starts an external tool through its context, with only the environment that tool requires (section 6). A tool's output cannot grant permissions.
 
 ### Documentation
 
@@ -270,6 +270,19 @@ A module declares its notification kinds in `contributes.notifications`. A part 
 - Work may outlive clients until the idle policy permits shutdown.
 - Explicit shutdown cancels owned work, resolves waiters, flushes state and closes resources; acknowledgement does not prove process exit.
 - Reconnect from durable records, allowing for missed events.
+
+### Programs modules run
+
+A runtime part starts an external program only through its context's `startProcessAsync`. The runtime owns the process and ends it; the part does not.
+
+- **Finding the program.** A name is searched for on the PATH of the program's environment, an absolute path is used as it is, and any other path is refused. On Windows each PATHEXT extension, or `.COM;.EXE;.BAT;.CMD` when PATHEXT is unset, is tried in order, after the name itself when it already has an extension. A `.bat` or `.cmd` file runs as `cmd.exe /d /s /c "<line>"`, with each argument quoted and its cmd.exe metacharacters escaped; an argument holding a line break or a NUL character is refused, because cmd.exe cannot pass it. No other program runs through a shell.
+- **Environment.** A program gets PATH, TEMP, TMP and TMPDIR; then HOME, LANG and LC_ALL, or on Windows SystemRoot, windir, PATHEXT, ComSpec and USERPROFILE; then the runtime's variables the request names; then the request's own variables. On Windows names compare without case.
+- **Record.** Each program has a row in the shell's database while it, or anything it started that the runtime still follows, runs: its module, process id, program, the executable that started it (`cmd.exe` for a batch file), when its start was requested and when it started.
+- **Identity.** A process is a record's when its id matches and it started within two seconds of the request and the start. On Windows, which reuses process ids quickly, a process an earlier runtime left must also run the recorded executable. Any other process is left alone.
+- **Ending.** On macOS and Linux each program leads its own process group, and stopping it sends the group SIGTERM; on Windows stopping closes the program's standard input. Whatever still runs after the grace period of 3 seconds is killed: the group's members, or on Windows the program and the descendants that started after it, found in the process table. The runtime's log names what had to be killed and what still ran 5 seconds later.
+- **When.** A part's programs end when it deactivates, when it fails to activate and when the runtime stops; the part may stop one sooner, or abort the request's signal. On macOS and Linux a program that exits with an error has the rest of its group ended at once, while after a clean exit the group stays until the part deactivates. On Windows nothing a program started is followed after the program exits.
+- **Crashes.** Before any module activates, a starting runtime kills what the records of an earlier runtime name and removes those records. A record it cannot check stays for the next start.
+- **Reporting.** The runtime lists each module's running programs with the program, process id and start time, never their arguments or environment.
 
 ### Launching the runtime
 

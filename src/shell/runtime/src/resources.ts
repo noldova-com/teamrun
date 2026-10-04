@@ -369,6 +369,71 @@ export class Resources {
   public static readonly launchDescriptorsUnavailable: string = "Starting a program on Linux requires access to /proc/self/fd. Ensure procfs is mounted at /proc and this process can read and traverse its descriptor directory.";
   public static readonly dataDirectoryRequired: string = "The --data-dir argument is required.";
   public static readonly usage: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>] [--start-log <start log name>]";
+  public static readonly ownedProcessesMigration: string = "owned-processes";
+  public static readonly createOwnedProcessesStatement: string =
+    "CREATE TABLE owned_processes (id INTEGER PRIMARY KEY, module TEXT NOT NULL, process_id INTEGER NOT NULL, program TEXT NOT NULL, executable TEXT NOT NULL, requested INTEGER NOT NULL, started INTEGER NOT NULL) STRICT";
+  public static readonly insertOwnedProcessStatement: string =
+    "INSERT INTO owned_processes (module, process_id, program, executable, requested, started) VALUES (?, ?, ?, ?, ?, ?)";
+  public static readonly deleteOwnedProcessStatement: string = "DELETE FROM owned_processes WHERE id = ?";
+  public static readonly readOwnedProcessesStatement: string = "SELECT id, module, process_id, program, executable, requested, started FROM owned_processes ORDER BY id";
+  public static readonly moduleColumn: string = "module";
+  public static readonly processIdColumn: string = "process_id";
+  public static readonly programColumn: string = "program";
+  public static readonly executableColumn: string = "executable";
+  public static readonly requestedColumn: string = "requested";
+  public static readonly startedColumn: string = "started";
+  public static readonly programParameterName: string = "program";
+  public static readonly workingFolderParameterName: string = "workingFolder";
+  public static readonly environmentParameterName: string = "environment";
+  public static readonly inheritParameterName: string = "inherit";
+  public static readonly codeParameterName: string = "code";
+  public static readonly graceMillisecondsParameterName: string = "graceMilliseconds";
+  public static readonly endMillisecondsParameterName: string = "endMilliseconds";
+  public static readonly workingFolderNotAbsolute: string = "The working folder must be an absolute path.";
+  public static readonly processExitInvalid: string = "A process exit has either an exit code or a signal, not both.";
+  public static readonly environmentNamePattern: RegExp = /^[^=\0]+$/;
+  public static readonly sharedEnvironmentNames: readonly string[] = ["PATH", "TEMP", "TMP", "TMPDIR"];
+  public static readonly posixEnvironmentNames: readonly string[] = ["HOME", "LANG", "LC_ALL"];
+  public static readonly windowsEnvironmentNames: readonly string[] = ["SystemRoot", "windir", "PATHEXT", "ComSpec", "USERPROFILE"];
+  public static readonly pathVariable: string = "PATH";
+  public static readonly programExtensionsVariable: string = "PATHEXT";
+  public static readonly defaultProgramExtensions: string = ".COM;.EXE;.BAT;.CMD";
+  public static readonly windowsPathDelimiter: string = ";";
+  public static readonly posixPathDelimiter: string = ":";
+  public static readonly batchExtensions: readonly string[] = [".bat", ".cmd"];
+  public static readonly commandShellName: string = "cmd.exe";
+  public static readonly commandShellArguments: readonly string[] = ["/d", "/s", "/c"];
+  public static readonly commandLineSeparator: string = " ";
+  public static readonly argumentQuote: string = "\"";
+  public static readonly batchMetacharacterPattern: RegExp = /([()\][%!^"`<>&|;, *?])/g;
+  public static readonly batchMetacharacterEscape: string = "^$1";
+  public static readonly quoteBackslashesPattern: RegExp = /(\\*)"/g;
+  public static readonly quoteBackslashesReplacement: string = "$1$1\\\"";
+  public static readonly trailingBackslashesPattern: RegExp = /(\\*)$/;
+  public static readonly trailingBackslashesReplacement: string = "$1$1";
+  public static readonly batchUnsafeArgumentPattern: RegExp = /[\r\n\0]/;
+  public static readonly processTableCommand: string = "/bin/ps";
+  public static readonly processTableArguments: readonly string[] = ["-A", "-o", "pid=,ppid=,pgid=,etime="];
+  public static readonly processTableRowPattern: RegExp = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(?:(?:(\d+)-)?(\d+):)?(\d+):(\d+)\s*$/;
+  public static readonly windowsShellSegments: readonly string[] = ["System32", "WindowsPowerShell", "v1.0", "powershell.exe"];
+  public static readonly windowsShellArguments: readonly string[] = ["-NoProfile", "-NonInteractive", "-EncodedCommand"];
+  public static readonly windowsProcessTableScript: string =
+    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; CimCmdlets\\Get-CimInstance -ClassName Win32_Process | Microsoft.PowerShell.Core\\Where-Object { $_.CreationDate } | " +
+    "Microsoft.PowerShell.Core\\ForEach-Object {\"{0}`t{1}`t{2}`t{3}\" -f $_.ProcessId, $_.ParentProcessId, ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds(), $_.ExecutablePath }";
+  public static readonly windowsScriptEncoding: BufferEncoding = "utf16le";
+  public static readonly base64Encoding: BufferEncoding = "base64";
+  public static readonly windowsProcessTableRowPattern: RegExp = /^(\d+)\t(\d+)\t(\d+)\t(.*)$/;
+  public static readonly moduleSearchPathVariable: string = "PSModulePath";
+  public static readonly processGraceMilliseconds: number = 3_000;
+  public static readonly processEndMilliseconds: number = 5_000;
+  public static readonly processPollMilliseconds: number = 50;
+  public static readonly processStartTolerance: number = 2_000;
+  public static readonly terminateSignal: NodeJS.Signals = "SIGTERM";
+  public static readonly killSignal: NodeJS.Signals = "SIGKILL";
+  public static readonly probeSignal: number = 0;
+  public static readonly missingProcessCode: string = "ESRCH";
+  public static readonly exitEvent: string = "exit";
+  public static readonly pipedOutput: "pipe" = "pipe";
 
   public static formatDiscoveryVersion(version: unknown): string {
     return `The discovery metadata has the unsupported format version ${String(version)}.`;
@@ -660,6 +725,46 @@ export class Resources {
 
   public static formatArgumentInvalid(name: string, value: string): string {
     return `The argument ${name} ${value} is not valid.`;
+  }
+
+  public static formatEnvironmentNameInvalid(name: string): string {
+    return `${JSON.stringify(name)} is not an environment variable's name.`;
+  }
+
+  public static formatProgramNotFound(program: string): string {
+    return `${program} was not found, or it is not a program that can be run.`;
+  }
+
+  public static formatProgramPathRelative(program: string): string {
+    return `${program} is neither a program's name nor an absolute path.`;
+  }
+
+  public static formatProcessStartFailed(program: string): string {
+    return `${program} could not be started.`;
+  }
+
+  public static formatBatchArgumentUnsafe(program: string): string {
+    return `${program} is a batch file, and cmd.exe cannot pass it an argument that holds a line break or a NUL character.`;
+  }
+
+  public static formatProcessTableRowUnreadable(row: string): string {
+    return `The process table has a row that could not be read: ${row}`;
+  }
+
+  public static formatProcessesForced(processIds: readonly number[]): string {
+    return `It did not end within the grace period, so processes ${processIds.join(", ")} were ended forcefully.`;
+  }
+
+  public static formatProcessesRemaining(processIds: readonly number[]): string {
+    return `Processes ${processIds.join(", ")} were still running after they were ended forcefully.`;
+  }
+
+  public static formatLeftoversEnded(processIds: readonly number[]): string {
+    return `An earlier runtime left it running, so processes ${processIds.join(", ")} were ended.`;
+  }
+
+  public static formatProcessDiagnostic(moduleId: string, program: string, processId: number, text: string): string {
+    return `The module ${moduleId}'s program ${program} (process ${processId}): ${text}\n`;
   }
 
   public static formatReadWindowState(column: string): string {
