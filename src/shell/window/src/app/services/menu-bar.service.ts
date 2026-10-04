@@ -71,10 +71,8 @@ export class MenuBarService {
       const rowPath = [...path, section.group, String(position)];
       if (row.isSubmenu)
         return this.searchRowsOf([...rowPath, row.place], [...titles, row.title]);
-      const hasArguments = Object.keys(row.commandArguments).length > 0;
-      const isListed = !hasArguments && this.commands.commands().some(u => u.name === row.command && u.title === row.title);
-      return row.isEnabled && !isListed
-        ? [new MenuSearchRow(rowPath.join(Resources.menuRowPathSeparator), row.title, row.icon, hasArguments ? null : row.key, titles.join(Resources.menuTitleSeparator))]
+      return row.isEnabled && Object.keys(row.commandArguments).length > 0
+        ? [new MenuSearchRow(rowPath.join(Resources.menuRowPathSeparator), row.title, row.icon, titles.join(Resources.menuTitleSeparator))]
         : [];
     }));
   }
