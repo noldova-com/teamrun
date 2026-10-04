@@ -244,7 +244,7 @@ class ModuleMenusTests {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       const module = (id: string, dependencies: readonly string[], contributes: Readonly<Record<string, unknown>>): string =>
-        JSON.stringify({ id, displayName: id, parts: [], dependencies, contributes });
+        JSON.stringify({ id, displayName: id, description: "Used by the tests.", parts: [], dependencies, contributes });
       const notesMenus = (place: string, command: string, anchor: string = "tasks.bar"): string =>
         JSON.stringify({ places: [{ name: "notes.bar", title: "Bar", shows: "toolbar", after: anchor }], groups: [{ name: "notes.extra", place, items: [{ command }] }] });
       await repository.writeAsync({

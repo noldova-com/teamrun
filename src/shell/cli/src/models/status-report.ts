@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import type { BuildIdentity, ModuleStatusList, WorkReport } from "@noldova/teamrun-shell-protocol";
 
@@ -26,7 +27,7 @@ export class StatusReport {
     return {
       build: this.identity.toJson(),
       dataDirectory: this.dataDirectory,
-      modules: this.modules.modules.map(t => t.toJson()),
+      modules: this.modules.modules.map(t => ({ id: t.id, state: t.state, ...Object.isNull(t.cause) ? {} : { cause: t.cause } })),
       work: [...this.work.descriptions]
     };
   }

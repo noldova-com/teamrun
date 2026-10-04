@@ -10,7 +10,7 @@ import { Component, ErrorHandler, signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
-import { AppearanceService, DefaultTheme, DialogService, ModePreference, type Theme, ThemeMode } from "@noldova/teamrun-shell-ui";
+import { AppearanceService, DefaultTheme, DialogService, ModePreference, type Theme, ThemeMode, Typography } from "@noldova/teamrun-shell-ui";
 
 import { WindowRowComponent } from "../../../../src/app/components/window-row/window-row.component";
 import { TopBarSide } from "../../../../src/app/enums/top-bar-side";
@@ -306,6 +306,33 @@ describe("WindowRowComponent", () => {
     expect(row.querySelector(".tr-window-row-menu")).toBeNull();
     expect(bar.classList.contains("tr-window-row-menu-bar-folded")).toBe(false);
   });
+
+  for (const panelSize of [12, 18])
+    it(`folds the menu bar once the row cannot leave 6rem for dragging, at panel size ${panelSize}`, async () => {
+      DesktopBridgeFixture.install("win32");
+      useNotesMenus([]);
+      apply();
+      TestBed.inject(AppearanceService).setTypography(new Typography(panelSize));
+      const fixture = TestBed.createComponent(WindowRowComponent);
+      const row: HTMLElement = fixture.nativeElement;
+      row.style.width = "1000px";
+      fixture.detectChanges();
+      await settle(fixture);
+      const style = getComputedStyle(row);
+      const parts = [".tr-window-row-start", ".tr-window-row-actions", "tr-menu-bar"].map(t => (row.querySelector(t) as HTMLElement).offsetWidth);
+      const fits = Math.ceil(parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + parts.reduce((a, b) => a + b, 0) + AppearanceFixture.toPixels(6, panelSize));
+      const folded = (): boolean | undefined => row.querySelector("tr-menu-bar")?.classList.contains("tr-window-row-menu-bar-folded");
+
+      row.style.width = `${fits}px`;
+      await settle(fixture);
+      fixture.detectChanges();
+      const atFit = folded();
+      row.style.width = `${fits - 1}px`;
+      await settle(fixture);
+      fixture.detectChanges();
+
+      expect([atFit, folded()]).toEqual([false, true]);
+    });
 
   it("shows neither the bar nor the button when the menus are hidden, and ignores Alt and F10", async () => {
     DesktopBridgeFixture.install("win32");

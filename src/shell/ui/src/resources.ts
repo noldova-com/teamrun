@@ -168,6 +168,8 @@ export class Resources {
     "settings-search-width",
     "settings-pages-width",
     "settings-content-width",
+    "modules-list-width",
+    "modules-detail-width",
     "dropdown-padding",
     "dropdown-row-height",
     "dropdown-row-padding",

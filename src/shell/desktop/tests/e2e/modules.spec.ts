@@ -16,8 +16,8 @@ import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 const colors = {
-  light: { error: "rgb(161, 38, 13)", menu: "rgb(255, 255, 255)", menuBorder: "rgb(206, 206, 206)", raised: "rgb(248, 248, 248)", cardBorder: "rgb(229, 229, 229)" },
-  dark: { error: "rgb(244, 135, 113)", menu: "rgb(31, 31, 31)", menuBorder: "rgb(69, 69, 69)", raised: "rgb(43, 43, 43)", cardBorder: "rgb(37, 37, 38)" }
+  light: { error: "rgb(161, 38, 13)", raised: "rgb(248, 248, 248)", cardBorder: "rgb(229, 229, 229)" },
+  dark: { error: "rgb(244, 135, 113)", raised: "rgb(43, 43, 43)", cardBorder: "rgb(37, 37, 38)" }
 };
 
 const tab = (desktop: DesktopApplicationFixture, key: string): ReturnType<DesktopApplicationFixture["window"]["locator"]> =>
@@ -79,7 +79,7 @@ test.describe("modules", () => {
     const item = window.locator("tr-module-failures button.tr-module-failures-item");
     await expect.poll(() => readKeptLayoutAsync(desktop)).toContain(JSON.stringify({ tabs: [{ view: "notes.list" }, { view: "notes.outline" }], active: 1 }));
 
-    await expect(item).toHaveText(/error\s*1 module didn't start/);
+    await expect(item).toHaveText(/error\s*2 modules didn't start/);
     await expect(window.locator("tr-tab-group[data-side=Right] .tr-tab-label")).toHaveText(["Clock"]);
     await expect(tab(desktop, "view/clock.face").locator(".tr-tab-icon")).toHaveText("error");
     await expect(window.locator("tr-module-failure-card")).toHaveText(/Clock didn't start\s*Its runtime part failed to activate\./);
@@ -105,37 +105,27 @@ test.describe("modules", () => {
     expect(look.cardIcon).toBe(palette.error);
 
     await item.click();
-    const popover = window.getByRole("dialog", { name: "Modules that didn't start" });
-    await expect(popover).toBeVisible();
-    await expect(popover).toBeFocused();
-    await expect(item).toHaveAttribute("aria-expanded", "true");
-    await expect(popover.locator(".tr-module-failures-row")).toHaveText([/Clock\s*Failed\s*Its runtime part failed to activate\./]);
-    const surface = await popover.evaluate(t => {
-      const style = getComputedStyle(t);
-      return { width: style.width, border: style.borderTopWidth, borderColor: style.borderTopColor, radius: style.borderTopLeftRadius, background: style.backgroundColor, hasShadow: style.boxShadow !== "none" };
-    });
-    expect(surface).toEqual({ width: "440px", border: "1px", borderColor: palette.menuBorder, radius: "8px", background: palette.menu, hasShadow: true });
-    const [placed, anchor] = await Promise.all([popover, item].map(t => t.evaluate(u => u.getBoundingClientRect().toJSON() as Record<string, number>)));
-    expect(Math.round((anchor?.["top"] ?? 0) - (placed?.["bottom"] ?? 0))).toBe(8);
-    expect(Math.abs((anchor?.["right"] ?? 0) - (placed?.["right"] ?? 0))).toBeLessThan(1);
+    const detail = window.locator("tr-modules .tr-modules-detail");
+    await expect(window.locator("tr-modules")).toBeVisible();
+    await expect(window.locator("tr-modules [aria-current=true]")).toHaveAttribute("data-module", "clock");
+    await expect(detail.locator(".tr-modules-detail-title")).toHaveText("Clock");
+    await expect(detail.locator(".tr-modules-fact-state")).toHaveText(/Failed\s*Its runtime part failed to activate\./);
     await desktop.checkpointAsync("module-failures");
 
-    await popover.getByRole("button", { name: "Copy details" }).click();
-    await expect(popover.getByRole("button", { name: "Copied" })).toBeVisible();
+    await detail.getByRole("button", { name: "Copy details" }).click();
+    await expect(detail.getByRole("button", { name: "Copied" })).toBeVisible();
     expect(await desktop.application.evaluate(({ clipboard }) => clipboard.readText())).toBe(
       `TeamRun ${RuntimeBuild.identity.productVersion}, build ${RuntimeBuild.identity.fingerprint}\nclock: Failed: Its runtime part failed to activate.`);
 
     await desktop.application.evaluate(({ shell }) => {
       shell.openPath = (folder: string): Promise<string> => Promise.resolve(folder.endsWith("logs") ? "" : "unexpected folder");
     });
-    await popover.getByRole("button", { name: "Open log folder" }).click();
+    await detail.getByRole("button", { name: "Open log folder" }).click();
     await expect.poll(() => existsSync(path.join(desktop.dataDirectory, "logs"))).toBe(true);
-    await expect(popover.getByRole("status")).toHaveCount(0);
+    await expect(detail.getByRole("status")).toHaveCount(0);
 
-    await window.keyboard.press("Escape");
-    await expect(popover).toBeHidden();
-    await expect(item).toBeFocused();
-    await expect(item).toHaveAttribute("aria-expanded", "false");
+    await window.locator("tr-modules .tr-modules-row[data-module=notes]").click();
+    await expect(detail.getByRole("button", { name: "Copy details" })).toHaveCount(0);
   });
 
   test("a module that didn't start when the runtime started again keeps the place it was moved to", async ({ desktop }) => {

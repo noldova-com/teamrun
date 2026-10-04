@@ -149,6 +149,7 @@ describe("ShortcutsComponent", () => {
     expect(settings.calls).toEqual(["set shell.keyBindings {\"clock.tick\":\"Mod+Shift+K\"}"]);
     expect(cells("clock.tick").slice(1)).toEqual(["clock", "Ctrl+Shift+K", "RemoveReset"]);
     expect(row("clock.tick").querySelector(".tr-shortcut-marker")?.getAttribute("aria-label")).toBe("Modified");
+    expect(getComputedStyle(row("clock.tick").querySelector(".tr-shortcut-marker") as Element).fontVariationSettings).toBe("\"FILL\" 1");
     expect(keyOf("clock.tick").getAttribute("aria-label")).toBe("Change the key of Tick the clock, now Ctrl+Shift+K");
     expect(document.activeElement).toBe(keyOf("clock.tick"));
   });

@@ -23,7 +23,7 @@ export default class ModuleDeclaration {
   private static readonly KINDS: readonly string[] = [
     "methods", "events", "commands", "notifications", "views", "documents", "statusBarItems", "topBarActions", "menus", "themes", ModuleSettings.SETTINGS_KIND, ModuleSettings.SCOPES_KIND
   ];
-  private static readonly FIELDS: readonly string[] = ["id", "displayName", "parts", "dependencies", "contributes"];
+  private static readonly FIELDS: readonly string[] = ["id", "displayName", "description", "parts", "dependencies", "contributes"];
   private static readonly RUNTIME_PART: string = "runtime";
   private static readonly WINDOW_PART: string = "window";
   private static readonly WINDOW_ENTRY: string = "window/src/api/index";
@@ -34,6 +34,7 @@ export default class ModuleDeclaration {
   public readonly folder: string;
   public readonly id: string;
   public readonly displayName: string;
+  public readonly description: string;
   public readonly parts: readonly string[];
   public readonly dependencies: readonly string[];
   public readonly contributions: ReadonlyMap<string, readonly string[]>;
@@ -45,6 +46,7 @@ export default class ModuleDeclaration {
     folder: string,
     id: string,
     displayName: string,
+    description: string,
     parts: readonly string[],
     dependencies: readonly string[],
     contributions: ReadonlyMap<string, readonly string[]>,
@@ -54,6 +56,7 @@ export default class ModuleDeclaration {
     this.folder = folder;
     this.id = id;
     this.displayName = displayName;
+    this.description = description;
     this.parts = parts;
     this.dependencies = dependencies;
     this.contributions = contributions;
@@ -89,6 +92,9 @@ export default class ModuleDeclaration {
     const displayName = record.get("displayName");
     if (typeof displayName !== "string" || displayName.trim().length === 0)
       throw fail("must have a display name");
+    const description = record.get("description");
+    if (typeof description !== "string" || description.trim().length === 0)
+      throw fail("must have a description");
     const parts = ModuleDeclaration.readList(record.get("parts"), t => ModuleDeclaration.PARTS.includes(t), fail, "parts", "runtime, window or cli");
     const missing = parts.filter(t => !existsSync(path.join(root, folder, t)));
     if (missing.length > 0)
@@ -106,7 +112,7 @@ export default class ModuleDeclaration {
     }
     const menus = await ModuleMenus.readAsync(root, folder, id, contributions.get(ModuleDeclaration.MENUS_KIND) ?? []);
     const settings = await ModuleSettings.readAsync(root, folder, dependencies, contributions);
-    return new ModuleDeclaration(folder, id, displayName, parts, dependencies, contributions, menus, settings, isFixture);
+    return new ModuleDeclaration(folder, id, displayName, description, parts, dependencies, contributions, menus, settings, isFixture);
   }
 
   public get file(): string {
@@ -127,6 +133,7 @@ export default class ModuleDeclaration {
     return {
       id: this.id,
       displayName: this.displayName,
+      description: this.description,
       dependencies: [...this.dependencies],
       runtimePackage: this.runtimePackage,
       contributes: Object.fromEntries([...this.contributions].map(([kind, names]) => [kind, [...names]])),

@@ -144,6 +144,31 @@ describe("SelectComponent", () => {
     expect([button().textContent?.includes("Sepia"), list(), getComputedStyle(button()).opacity]).toEqual([true, null, "0.5"]);
   });
 
+  it("shows its list's scrollbar thumb while the pointer is over the list", async () => {
+    render(DefaultTheme.theme, ThemeMode.Dark);
+    await openAsync();
+    const surface = list() as HTMLElement;
+
+    expect(surface.classList.contains("tr-scroll-reveal")).toBe(true);
+    expect(getComputedStyle(surface).color).toBe("rgba(0, 0, 0, 0)");
+    await userEvent.hover(surface);
+    await vi.waitFor(() => expect(getComputedStyle(surface).color).toBe(resolve("--tr-scrollbar")));
+    expect(getComputedStyle(surface).color).not.toBe("rgba(0, 0, 0, 0)");
+  });
+
+  for (const panelSize of AppearanceFixture.panelSizes)
+    it(`writes its value and options in the panel text role at panel size ${panelSize}`, async () => {
+      AppearanceFixture.apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
+      fixture = TestBed.createComponent(SelectHostComponent);
+      fixture.detectChanges();
+      await openAsync();
+
+      for (const element of [button(), options()[0] as HTMLElement]) {
+        AppearanceFixture.expectRem(getComputedStyle(element).fontSize, 0.8125, panelSize);
+        AppearanceFixture.expectRem(getComputedStyle(element).lineHeight, 1.125, panelSize);
+      }
+    });
+
   for (const mode of AppearanceFixture.modes)
     for (const theme of AppearanceFixture.themes)
       it(`takes its colors and geometry from the ${theme.id} theme in ${mode} mode`, async () => {
@@ -166,6 +191,7 @@ describe("SelectComponent", () => {
         AppearanceFixture.expectLook(surface.paddingTop, theme, "dropdown-padding", "padding-top");
         expect([chosen.backgroundColor, chosen.color]).toEqual([AppearanceFixture.readColor(theme, mode, "list.activeSelectionBackground"), AppearanceFixture.readColor(theme, mode, "list.activeSelectionForeground")]);
         expect(other.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+        expect([surface.color, other.color]).toEqual(["rgba(0, 0, 0, 0)", AppearanceFixture.readColor(theme, mode, "input.foreground")]);
         AppearanceFixture.expectLook(other.minHeight, theme, "dropdown-row-height", "min-height");
         AppearanceFixture.expectLook(other.paddingLeft, theme, "dropdown-row-padding", "padding-left");
       });

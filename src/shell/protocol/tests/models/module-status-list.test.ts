@@ -14,8 +14,12 @@ import { ModuleState, ModuleStatus, ModuleStatusList } from "@noldova/teamrun-sh
 export class ModuleStatusListTests {
   @TestMethod
   public pinsItsWireFormAndKeepsItsOwnCopy(): void {
-    const text = "{\"modules\":[{\"id\":\"tasks\",\"state\":\"Active\"},{\"id\":\"notes\",\"state\":\"Failed\",\"cause\":\"Its runtime part failed to activate.\"}]}";
-    const statuses = [new ModuleStatus("tasks", ModuleState.Active, null), new ModuleStatus("notes", ModuleState.Failed, "Its runtime part failed to activate.")];
+    const declared = (id: string): string => `"id":"${id}","displayName":"${id}","description":"Used by the tests.","dependencies":[],"contributes":{}`;
+    const text = `{"modules":[{${declared("tasks")},"state":"Active"},{${declared("notes")},"state":"Failed","cause":"Its runtime part failed to activate."}]}`;
+    const statuses = [
+      new ModuleStatus("tasks", "tasks", "Used by the tests.", [], new Map(), ModuleState.Active, null),
+      new ModuleStatus("notes", "notes", "Used by the tests.", [], new Map(), ModuleState.Failed, "Its runtime part failed to activate.")
+    ];
 
     const list = new ModuleStatusList(statuses);
     statuses.pop();
@@ -27,6 +31,11 @@ export class ModuleStatusListTests {
   @TestMethod
   public namesTheInvalidStatusByItsPath(): void {
     Assert.areEqual("$.modules", Assert.throws(() => ModuleStatusList.fromJson({}), JsonException).path);
-    Assert.areEqual("$.modules.1.cause", Assert.throws(() => ModuleStatusList.fromJson({ modules: [{ id: "tasks", state: "Active" }, { id: "notes", state: "Blocked" }] }), JsonException).path);
+    const modules = [ModuleStatusListTests.declared("tasks", "Active"), ModuleStatusListTests.declared("notes", "Blocked")];
+    Assert.areEqual("$.modules.1.cause", Assert.throws(() => ModuleStatusList.fromJson({ modules }), JsonException).path);
+  }
+
+  private static declared(id: string, state: string): Readonly<Record<string, unknown>> {
+    return { id, displayName: id, description: "Used by the tests.", dependencies: [], contributes: {}, state };
   }
 }

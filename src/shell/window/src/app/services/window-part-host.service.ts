@@ -68,6 +68,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private moduleOrder: readonly string[] = [];
   private runtimeCommands: readonly CommandContribution[] = [];
   private readonly runtimeStates: WritableSignal<CommandList | null> = signal(null);
+  private readonly modulesValue: WritableSignal<readonly ModuleStatus[]> = signal([]);
   private readonly failuresValue: WritableSignal<readonly ModuleFailure[]> = signal([]);
   private readonly generationValue: WritableSignal<number> = signal(0);
   private isReady: boolean = false;
@@ -75,11 +76,13 @@ export class WindowPartHostService implements IWindowPartHost {
   private isActivating: boolean = true;
   private reloading: Promise<void> = Promise.resolve();
 
+  public readonly modules: Signal<readonly ModuleStatus[]> = this.modulesValue.asReadonly();
   public readonly failures: Signal<readonly ModuleFailure[]> = this.failuresValue.asReadonly();
   public readonly generation: Signal<number> = this.generationValue.asReadonly();
 
   public constructor() {
     this.labels.register(ShellDocuments.settings.name, ShellDocuments.settingsLabel);
+    this.labels.register(ShellDocuments.modules.name, ShellDocuments.modulesLabel);
     const destroyRef = inject(DestroyRef);
     destroyRef.onDestroy(this.bridge.onStartup(t => this.follow(t)));
     destroyRef.onDestroy(this.bridge.onEvent((name, payload) => this.receiveCommands(name, payload)));
@@ -254,11 +257,12 @@ export class WindowPartHostService implements IWindowPartHost {
     const active = new Set<string>();
     const statuses: ModuleStatus[] = [];
     for (const status of report.modules) {
-      const result = status.state === ModuleState.Active ? await this.activateAsync(status.id, active) : status;
+      const result = status.state === ModuleState.Active ? await this.activateAsync(status, active) : status;
       if (result.state === ModuleState.Active)
         active.add(result.id);
       statuses.push(result);
     }
+    this.modulesValue.set(statuses);
     this.failuresValue.set(statuses.filter(t => t.state !== ModuleState.Active).map(t => this.describeFailure(t)));
   }
 
@@ -322,24 +326,24 @@ export class WindowPartHostService implements IWindowPartHost {
 
   private describeFailure(status: ModuleStatus): ModuleFailure {
     const source = this.sources.find(t => t.moduleId === status.id);
-    return new ModuleFailure(status.id, source?.displayName ?? status.id, status.state, status.cause, source?.viewNames ?? []);
+    return new ModuleFailure(status.id, status.displayName, status.state, status.cause, source?.viewNames ?? []);
   }
 
-  private async activateAsync(moduleId: string, active: ReadonlySet<string>): Promise<ModuleStatus> {
-    const source = this.sources.find(t => t.moduleId === moduleId);
+  private async activateAsync(status: ModuleStatus, active: ReadonlySet<string>): Promise<ModuleStatus> {
+    const source = this.sources.find(t => t.moduleId === status.id);
     if (Object.isUndefined(source))
-      return new ModuleStatus(moduleId, ModuleState.Active, null);
+      return status;
     const blocker = source.dependencies.find(t => !active.has(t));
     if (!Object.isUndefined(blocker))
-      return new ModuleStatus(moduleId, ModuleState.Blocked, Resources.formatModuleBlocked(blocker));
+      return status.withState(ModuleState.Blocked, Resources.formatModuleBlocked(blocker), blocker);
 
     let part: IWindowPart;
     try {
       part = await source.load();
     }
     catch (error) {
-      this.errors.handleError(new WindowPartFailureException(moduleId, Resources.windowPartLoadFailed, error));
-      return new ModuleStatus(moduleId, ModuleState.Failed, Resources.windowPartLoadFailed);
+      this.errors.handleError(new WindowPartFailureException(status.id, Resources.windowPartLoadFailed, error));
+      return status.withState(ModuleState.Failed, Resources.windowPartLoadFailed);
     }
 
     const activation = new WindowPartActivation(new WindowPartContext(source, this), part);
@@ -350,10 +354,10 @@ export class WindowPartHostService implements IWindowPartHost {
     catch (error) {
       this.activations.splice(this.activations.indexOf(activation), 1);
       activation.context.withdraw();
-      this.errors.handleError(new WindowPartFailureException(moduleId, Resources.windowPartActivationFailed, error));
-      return new ModuleStatus(moduleId, ModuleState.Failed, Resources.windowPartActivationFailed);
+      this.errors.handleError(new WindowPartFailureException(status.id, Resources.windowPartActivationFailed, error));
+      return status.withState(ModuleState.Failed, Resources.windowPartActivationFailed);
     }
-    return new ModuleStatus(moduleId, ModuleState.Active, null);
+    return status;
   }
 
   private async deactivateAsync(): Promise<void> {

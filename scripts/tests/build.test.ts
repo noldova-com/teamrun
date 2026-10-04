@@ -63,9 +63,9 @@ class BuildTests {
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
         "package.json": JSON.stringify({ teamrun: { modules: ["notes"], product: ProductIdentityFixture.json } }),
-        "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", parts: ["window"], dependencies: [], contributes: { views: ["notes.list"] } }),
+        "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", description: "Used by the tests.", parts: ["window"], dependencies: [], contributes: { views: ["notes.list"] } }),
         "src/modules/notes/window/src/api/index.ts": "export {};\n",
-        [`${ModuleCatalog.FIXTURE_FOLDER}/clock/module.json`]: JSON.stringify({ id: "clock", displayName: "Clock", parts: ["window"], dependencies: ["notes"], contributes: {} }),
+        [`${ModuleCatalog.FIXTURE_FOLDER}/clock/module.json`]: JSON.stringify({ id: "clock", displayName: "Clock", description: "Used by the tests.", parts: ["window"], dependencies: ["notes"], contributes: {} }),
         [`${ModuleCatalog.FIXTURE_FOLDER}/clock/window/src/api/index.ts`]: "export {};\n"
       });
       const artifacts = new ModuleArtifacts(repository.directory);

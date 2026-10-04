@@ -6,41 +6,40 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ErrorHandler, type WritableSignal, signal } from "@angular/core";
+import { type WritableSignal, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { userEvent } from "vitest/browser";
 
 import { ModuleState } from "@noldova/teamrun-shell-protocol";
 
 import { ModuleFailuresComponent } from "../../../../src/app/components/module-failures/module-failures.component";
+import type { DocumentTab } from "../../../../src/app/models/layout/document-tab";
 import { ModuleFailure } from "../../../../src/app/models/module-failure";
+import { ShellDocuments } from "../../../../src/app/models/shell-documents";
+import { LayoutService } from "../../../../src/app/services/layout.service";
+import { ModuleSelectionService } from "../../../../src/app/services/module-selection.service";
 import { WindowPartHostService } from "../../../../src/app/services/window-part-host.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
-import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 
 describe("ModuleFailuresComponent", () => {
   const clock = new ModuleFailure("clock", "Clock", ModuleState.Failed, "Its runtime part failed to activate.", ["clock.face"]);
   const notes = new ModuleFailure("notes", "Notes", ModuleState.Blocked, "It depends on clock, which is not active.", []);
   let failures: WritableSignal<readonly ModuleFailure[]>;
-  let bridge: DesktopBridgeFixture;
-  let errors: unknown[];
+  let opened: DocumentTab[];
 
   beforeEach(() => {
     failures = signal([clock]);
-    bridge = DesktopBridgeFixture.install();
-    errors = [];
+    opened = [];
     TestBed.configureTestingModule({
       providers: [
         { provide: WindowPartHostService, useValue: { failures } },
-        { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
+        { provide: LayoutService, useValue: { openDocument: (tab: DocumentTab) => opened.push(tab) } }
       ]
     });
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     AppearanceFixture.reset();
-    DesktopBridgeFixture.remove();
   });
 
   async function renderAsync(): Promise<ComponentFixture<ModuleFailuresComponent>> {
@@ -51,25 +50,6 @@ describe("ModuleFailuresComponent", () => {
 
   function item(fixture: ComponentFixture<ModuleFailuresComponent>): HTMLButtonElement {
     return (fixture.nativeElement as HTMLElement).querySelector("button.tr-module-failures-item") as HTMLButtonElement;
-  }
-
-  function popover(): HTMLElement | null {
-    return document.querySelector(".tr-module-failures-popover");
-  }
-
-  function button(name: string): HTMLButtonElement {
-    return document.querySelector(`.tr-module-failures-${name}`) as HTMLButtonElement;
-  }
-
-  async function settleAsync(): Promise<void> {
-    for (let turn = 0; turn < 10; turn++)
-      await Promise.resolve();
-  }
-
-  async function openAsync(fixture: ComponentFixture<ModuleFailuresComponent>): Promise<HTMLElement> {
-    item(fixture).click();
-    await fixture.whenStable();
-    return popover() as HTMLElement;
   }
 
   it("shows nothing while every module started", async () => {
@@ -88,193 +68,17 @@ describe("ModuleFailuresComponent", () => {
 
     expect(one).toMatch(/^\s*error\s*1 module didn't start\s*$/);
     expect(item(fixture).textContent).toMatch(/^\s*error\s*2 modules didn't start\s*$/);
-    expect(item(fixture).getAttribute("aria-haspopup")).toBe("dialog");
-    expect(item(fixture).getAttribute("aria-expanded")).toBe("false");
+    expect(item(fixture).hasAttribute("aria-haspopup")).toBe(false);
   });
 
-  it("opens a popover listing each module with its state and cause, and moves focus into it", async () => {
-    failures.set([clock, notes]);
+  it("opens the Modules document with the first module that didn't start selected", async () => {
+    failures.set([notes, clock]);
     const fixture = await renderAsync();
 
-    const surface = await openAsync(fixture);
-    await vi.waitFor(() => expect(document.activeElement).toBe(surface));
-
-    expect(surface.getAttribute("role")).toBe("dialog");
-    expect(surface.getAttribute("aria-label")).toBe("Modules that didn't start");
-    expect([...surface.querySelectorAll(".tr-module-failures-row")].map(t => [t.getAttribute("data-module"), ...[...t.children].map(u => u.textContent)])).toEqual([
-      ["clock", "Clock", "Failed", "Its runtime part failed to activate."],
-      ["notes", "Notes", "Blocked", "It depends on clock, which is not active."]
-    ]);
-    expect(item(fixture).getAttribute("aria-expanded")).toBe("true");
-  });
-
-  it("closes its popover when something around the item scrolls", async () => {
-    const fixture = await renderAsync();
-    await openAsync(fixture);
-
-    (fixture.nativeElement as HTMLElement).style.marginTop = "40px";
-    (fixture.nativeElement as HTMLElement).dispatchEvent(new Event("scroll"));
-    await fixture.whenStable();
-
-    expect(popover()).toBeNull();
-    expect(item(fixture).getAttribute("aria-expanded")).toBe("false");
-  });
-
-  it("places its popover above the item, a gap away and end-aligned with it", async () => {
-    AppearanceFixture.apply();
-    failures.set([clock, notes]);
-    const fixture = await renderAsync();
-    const host: HTMLElement = fixture.nativeElement;
-    Object.assign(host.style, { position: "fixed", right: "4rem", bottom: "0.25rem" });
-    host.setAttribute("data-tr-chrome", "bottom");
-
-    const surface = await openAsync(fixture);
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    const box = surface.getBoundingClientRect();
-    const anchor = item(fixture).getBoundingClientRect();
-    const gap = parseFloat(getComputedStyle(document.documentElement).fontSize) * 0.5;
-
-    expect(anchor.top - box.bottom).toBeCloseTo(gap, 1);
-    expect(box.right).toBeCloseTo(anchor.right, 1);
-  });
-
-  it("centers each action's glyph in its button", async () => {
-    AppearanceFixture.apply();
-    failures.set([clock]);
-    const fixture = await renderAsync();
-    await openAsync(fixture);
-    const middle = (element: Element): number => element.getBoundingClientRect().top + element.getBoundingClientRect().height / 2;
-
-    const offsets = ["copy", "logs"].map(name => Math.abs(middle(button(name).querySelector("[trButtonIcon]") as Element) - middle(button(name))));
-
-    expect(Math.max(...offsets)).toBeLessThanOrEqual(1.5);
-  });
-
-  it("closes on Escape and returns focus to the item, but not on other keys", async () => {
-    const fixture = await renderAsync();
-    const surface = await openAsync(fixture);
-
-    surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
-    await fixture.whenStable();
-    const isOpenAfterTab = popover() !== null;
-    surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    await fixture.whenStable();
-
-    expect(isOpenAfterTab).toBe(true);
-    expect(popover()).toBeNull();
-    expect(document.activeElement).toBe(item(fixture));
-  });
-
-  it("closes on a click outside it and when the item is clicked again", async () => {
-    const fixture = await renderAsync();
-    const outside = document.body.appendChild(document.createElement("div"));
-    const click = async (target: Element): Promise<void> => {
-      target.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
-      target.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      await fixture.whenStable();
-    };
-    await openAsync(fixture);
-    const isOpen = popover() !== null;
-
-    await click(outside);
-    const isClosedByOutside = popover() === null;
-    await click(item(fixture));
-    const isOpenedAgain = popover() !== null;
-    await click(item(fixture));
-    outside.remove();
-
-    expect([isOpen, isClosedByOutside, isOpenedAgain]).toEqual([true, true, true]);
-    expect(popover()).toBeNull();
-  });
-
-  it("closes once every module has started", async () => {
-    const fixture = await renderAsync();
-    await openAsync(fixture);
-
-    failures.set([]);
-    await fixture.whenStable();
-
-    expect(popover()).toBeNull();
-  });
-
-  it("copies the build and each module's id, state and cause, and says Copied for a while", async () => {
-    failures.set([clock, notes]);
-    const fixture = await renderAsync();
-    await openAsync(fixture);
-    vi.useFakeTimers();
-
-    button("copy").click();
-    await settleAsync();
-    fixture.detectChanges();
-    const copied = button("copy").textContent;
-    vi.advanceTimersByTime(1000);
-    button("copy").click();
-    await settleAsync();
-    vi.advanceTimersByTime(1999);
-    fixture.detectChanges();
-    const stillCopied = button("copy").textContent;
-    vi.advanceTimersByTime(1);
-    fixture.detectChanges();
-
-    expect(bridge.copied).toEqual([
-      "TeamRun 1.2.3, build abc123\nclock: Failed: Its runtime part failed to activate.\nnotes: Blocked: It depends on clock, which is not active.",
-      "TeamRun 1.2.3, build abc123\nclock: Failed: Its runtime part failed to activate.\nnotes: Blocked: It depends on clock, which is not active."
-    ]);
-    expect(copied).toMatch(/^\s*check\s*Copied\s*$/);
-    expect(stillCopied).toMatch(/^\s*check\s*Copied\s*$/);
-    expect(button("copy").textContent).toMatch(/^\s*content_copy\s*Copy details\s*$/);
-  });
-
-  it("says nothing was copied when the desktop refuses and reports a build it cannot read", async () => {
-    const fixture = await renderAsync();
-    await openAsync(fixture);
-    bridge.isCopyAccepted = false;
-
-    button("copy").click();
-    await vi.waitFor(() => expect(bridge.copied).toEqual([]));
-    bridge.build = null;
-    button("copy").click();
-    await vi.waitFor(() => expect(errors.length).toBe(1));
-    fixture.detectChanges();
-
-    expect(button("copy").textContent).toContain("Copy details");
-  });
-
-  it("opens the log folder and says when it could not", async () => {
-    const fixture = await renderAsync();
-    await openAsync(fixture);
-
-    button("logs").click();
-    await vi.waitFor(() => expect(bridge.logFolderOpens).toBe(1));
-    await fixture.whenStable();
-    const noticeAfterOpening = document.querySelector(".tr-module-failures-notice");
-    bridge.logFolderOpened = Promise.resolve(false);
-    button("logs").click();
-    await vi.waitFor(() => expect(document.querySelector(".tr-module-failures-notice")?.textContent).toBe("The log folder could not be opened."));
     item(fixture).click();
-    await fixture.whenStable();
-    await openAsync(fixture);
-    const noticeAfterReopening = document.querySelector(".tr-module-failures-notice");
-    bridge.logFolderOpened = Promise.reject(new Error("The bridge closed."));
-    button("logs").click();
-    await vi.waitFor(() => expect(errors.length).toBe(1));
-    await fixture.whenStable();
 
-    expect(noticeAfterOpening).toBeNull();
-    expect(noticeAfterReopening).toBeNull();
-    expect(document.querySelector(".tr-module-failures-notice")?.getAttribute("role")).toBe("status");
-  });
-
-  it("stops its Copied timer when destroyed", async () => {
-    const fixture = await renderAsync();
-    await openAsync(fixture);
-    const clearing = vi.spyOn(globalThis, "clearTimeout");
-
-    button("copy").click();
-    await vi.waitFor(() => expect(bridge.copied.length).toBe(1));
-    fixture.destroy();
-
-    expect(clearing).toHaveBeenCalled();
+    expect(opened).toEqual([ShellDocuments.modulesTab]);
+    expect(TestBed.inject(ModuleSelectionService).selected()).toBe("notes");
   });
 
   for (const mode of AppearanceFixture.modes)
@@ -289,7 +93,6 @@ describe("ModuleFailuresComponent", () => {
 
         const itemStyle = getComputedStyle(item(fixture));
         const icon = getComputedStyle(item(fixture).querySelector(".tr-module-failures-icon") as Element);
-        const surface = getComputedStyle(await openAsync(fixture));
 
         expect(itemStyle.backgroundColor).toBe("rgba(0, 0, 0, 0)");
         expect(icon.color).toBe(AppearanceFixture.readColor(theme, mode, "errorForeground"));
@@ -297,11 +100,5 @@ describe("ModuleFailuresComponent", () => {
         AppearanceFixture.expectLook(itemStyle.height, theme, "status-bar-item-height", "height");
         AppearanceFixture.expectLook(itemStyle.borderTopLeftRadius, theme, "radius-hover", "border-top-left-radius");
         AppearanceFixture.expectLook(icon.fontSize, theme, "icon", "font-size");
-        expect(surface.backgroundColor).toBe(AppearanceFixture.readColor(theme, mode, "menu.background"));
-        expect(surface.borderTopColor).toBe(AppearanceFixture.readColor(theme, mode, "menu.border"));
-        expect(surface.boxShadow).not.toBe("none");
-        AppearanceFixture.expectLook(surface.width, theme, "popover-width", "width");
-        AppearanceFixture.expectLook(surface.borderTopLeftRadius, theme, "radius-large", "border-top-left-radius");
-        AppearanceFixture.expectLook(surface.paddingTop, theme, "space-3", "padding-top");
       });
 });
