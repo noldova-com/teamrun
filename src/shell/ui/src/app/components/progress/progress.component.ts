@@ -9,12 +9,14 @@
 import { ChangeDetectionStrategy, Component, type Signal, computed, input } from "@angular/core";
 
 import { Resources } from "../../../resources";
+import { RevealDelayDirective } from "./reveal-delay.directive";
 
 @Component({
   selector: "tr-progress",
   templateUrl: "./progress.component.html",
   styleUrl: "./progress.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
+  hostDirectives: [{ directive: RevealDelayDirective, inputs: ["isDelayed"] }],
   host: {
     "role": "progressbar",
     "[attr.aria-label]": "label()",

@@ -77,13 +77,30 @@ describe("SettingRowComponent", () => {
     expect(changes).toEqual([true]);
   });
 
-  it("changes a choice through its select", async () => {
-    render(SettingsFixture.mode, "System");
+  it("shows a choice of few options as choice pills, and changes it with the pointer and the arrow keys", async () => {
+    const row = render(SettingsFixture.mode, "System");
+    const pills = (): string[] => [...row.querySelectorAll("[role=radio]")].filter(t => t.getAttribute("aria-checked") === "true").map(t => t.textContent?.trim() ?? "");
 
-    await page.getByRole("button", { name: "Mode, System" }).click();
-    await page.getByRole("option", { name: "Dark" }).click();
+    expect(row.querySelector("tr-select")).toBeNull();
+    expect(row.querySelector("[role=radiogroup]")?.getAttribute("aria-label")).toBe("Mode");
+    expect(pills()).toEqual(["System"]);
+    await page.getByRole("radio", { name: "Dark" }).click();
+    fixture.componentRef.setInput("value", "Dark");
+    fixture.detectChanges();
+    (row.querySelector("[role=radio][aria-checked=true]") as HTMLElement).focus();
+    await userEvent.keyboard("{ArrowLeft}");
 
-    expect(changes).toEqual(["Dark"]);
+    expect(changes).toEqual(["Dark", "Light"]);
+  });
+
+  it("shows a choice of more than four options as a select", async () => {
+    const row = render(SettingsFixture.accent, "Blue");
+
+    expect([row.querySelector("[role=radiogroup]"), row.querySelector("tr-select")?.tagName]).toEqual([null, "TR-SELECT"]);
+    await page.getByRole("button", { name: "Accent, Blue" }).click();
+    await page.getByRole("option", { name: "Violet" }).click();
+
+    expect(changes).toEqual(["Violet"]);
   });
 
   it("accepts a number within its range and step, and explains and restores one outside it", async () => {

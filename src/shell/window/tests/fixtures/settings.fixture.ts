@@ -12,6 +12,8 @@ import { QualifiedName, SettingDefinition, SettingLocality, SettingOption, Setti
 export class SettingsFixture {
   public static readonly mode: SettingDefinition = SettingsFixture.define("shell.mode", "Mode", "Light, dark, or following the operating system.",
     SettingType.choice([new SettingOption("Light", "Light"), new SettingOption("Dark", "Dark"), new SettingOption("System", "System")]), "System", "Appearance", "Theme");
+  public static readonly accent: SettingDefinition = SettingsFixture.define("shell.accent", "Accent", "The color that marks the selection.",
+    SettingType.choice(["Blue", "Green", "Orange", "Red", "Violet"].map(t => new SettingOption(t, t))), "Blue", "Appearance", "Theme");
   public static readonly panelSize: SettingDefinition = SettingsFixture.define("shell.panelSize", "Interface text size", "The size of interface text, in pixels.",
     SettingType.number(12, 18, 1), 13, "Appearance", "Text");
   public static readonly doNotDisturb: SettingDefinition = SettingsFixture.define("shell.doNotDisturb", "Do not disturb", "Holds back notifications on this device.",

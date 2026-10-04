@@ -44,7 +44,7 @@
           <tr [attr.data-command]="row.name">
             <td><tr-highlighted-text [text]="row.title" [query]="query()" /></td>
             <td>
-              <tr-highlighted-text [text]="row.key" [query]="query()" />
+              <tr-chip [kind]="keyKind"><tr-highlighted-text [text]="row.key" [query]="query()" /></tr-chip>
               @if (row.collision; as collision) {
                 <span class="tr-settings-collision">{{ collision }}</span>
               }

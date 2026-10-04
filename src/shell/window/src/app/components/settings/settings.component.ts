@@ -12,7 +12,7 @@ import { ChangeDetectionStrategy, Component, ErrorHandler, type Signal, type Typ
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
-import { SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
+import { ChipComponent, ChipKind, SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
 
 import { GalleryTokens } from "../../models/gallery-tokens";
 import { SettingsPage } from "../../models/settings/settings-page";
@@ -29,7 +29,7 @@ import { SettingRowComponent } from "../setting-row/setting-row.component";
 
 @Component({
   selector: "tr-settings",
-  imports: [HighlightedTextComponent, NgComponentOutlet, NgTemplateOutlet, SettingRowComponent, TextFieldComponent],
+  imports: [ChipComponent, HighlightedTextComponent, NgComponentOutlet, NgTemplateOutlet, SettingRowComponent, TextFieldComponent],
   templateUrl: "./settings.component.html",
   styleUrl: "./settings.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -45,6 +45,7 @@ export class SettingsComponent {
   private readonly selected: WritableSignal<string> = signal(Resources.appearancePage);
 
   protected readonly resources: typeof Resources = Resources;
+  protected readonly keyKind: ChipKind = ChipKind.Key;
   protected readonly query: WritableSignal<string> = signal("");
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
 

@@ -172,6 +172,7 @@ describe("SettingsComponent", () => {
       ["clock.stop", "Stop the clock", "—Ctrl+Alt+T is taken by Tick the clock"]
     ]);
     expect(rows.find(t => t[0] === "shell.openSettings")?.[1]).toBe("Settings…");
+    expect([...element().querySelectorAll("tbody tr")].every(t => t.querySelector("td:nth-child(2) tr-chip.tr-chip-key") !== null)).toBe(true);
   });
 
   it("searches every page by title, description and name, grouping the hits by page and marking them, and leaves the search when a page is chosen", async () => {

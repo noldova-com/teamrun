@@ -15,6 +15,10 @@
   background: color-mix(in srgb, var(--tr-progress) 25%, transparent);
 }
 
+:host(.tr-reveal-pending) {
+  visibility: hidden;
+}
+
 .tr-progress-bar {
   display: block;
   width: calc(var(--tr-progress-fraction) * 100%);
