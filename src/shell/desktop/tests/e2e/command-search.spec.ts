@@ -114,14 +114,14 @@ test.describe("command search", () => {
     await expect(options(window).first()).toBeVisible();
     const all = await rows();
 
-    await window.keyboard.type("op");
+    await window.keyboard.type("tab");
     await expect.poll(async () => (await rows()).length).toBeLessThan(all.length);
     const found = await rows();
 
     expect(found.length).toBeGreaterThan(0);
-    expect(found.map(t => t[0])).toEqual(all.filter(t => `${t[2]} ${t[1]}`.toLowerCase().includes("op")).map(t => t[0]));
+    expect(found.map(t => t[0])).toEqual(all.filter(t => `${t[2]} ${t[1]}`.toLowerCase().includes("tab")).map(t => t[0]));
     expect(found.map(t => [t[1], t[2]])).toEqual(found.map(t => all.find(u => u[0] === t[0])).map(t => [t?.[1], t?.[2]]));
-    expect(found.every(t => t[3].length === 1 && t[3][0]?.toLowerCase() === "op")).toBe(true);
+    expect(found.every(t => t[3].length === 1 && t[3][0]?.toLowerCase() === "tab")).toBe(true);
     for (const mode of ["Light", "Dark"] as const) {
       await window.evaluate(value => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
         .request("shell.setSetting", { name: "shell.mode", value }), mode);
