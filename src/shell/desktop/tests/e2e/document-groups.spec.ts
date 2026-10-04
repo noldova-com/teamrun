@@ -15,6 +15,7 @@ import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
 const notes = "view/notes.list";
 const firstNote = "document/notes.note/1";
 const secondNote = "document/notes.note/2";
+const thirdNote = "document/notes.note/3";
 
 async function runCommandAsync(window: Page, title: string, name: string): Promise<void> {
   await CommandSearchFixture.searchAsync(window, title);
@@ -211,16 +212,15 @@ test.describe("document groups", () => {
       const window = desktop.window;
       const outline = "view/notes.outline";
       const clock = "view/clock.face";
-      const thirdNote = "document/notes.note/3";
       const tabOf = (key: string): Locator => TabDragFixture.tab(desktop.window, key);
       await TabDragFixture.dragOntoPlateAsync(window, clock, notes, "Center");
       await window.mouse.up();
       await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, notes))).toEqual([notes, outline, clock]);
-      await TabDragFixture.tab(window, firstNote).click();
+      await tabOf(firstNote).click();
       await window.keyboard.press("ControlOrMeta+Alt+KeyN");
       await expect(tabOf(thirdNote)).toHaveAttribute("aria-selected", "true");
-      await TabDragFixture.tab(window, firstNote).click();
-      await TabDragFixture.tab(window, outline).click();
+      await tabOf(firstNote).click();
+      await tabOf(outline).click();
       await expect(tabOf(firstNote)).toHaveAttribute("aria-selected", "true");
       await expect(tabOf(outline)).toHaveAttribute("aria-selected", "true");
 
@@ -237,15 +237,14 @@ test.describe("document groups", () => {
   for (const reopen of [true, false])
     test(`a document closed before ${reopen ? "reopening on the running runtime" : "a restart that stops the runtime"} stays closed, though its module opens it at start`, async ({ desktop }) => {
       const window = desktop.window;
-      const thirdNote = "document/notes.note/3";
       const tabOf = (key: string): Locator => TabDragFixture.tab(desktop.window, key);
-      await TabDragFixture.tab(window, firstNote).click();
+      await tabOf(firstNote).click();
       await window.keyboard.press("ControlOrMeta+Alt+KeyN");
       await expect(tabOf(thirdNote)).toHaveAttribute("aria-selected", "true");
-      await TabDragFixture.tab(window, firstNote).click();
+      await tabOf(firstNote).click();
       await window.keyboard.press("ControlOrMeta+KeyW");
       await expect(tabOf(firstNote)).toHaveCount(0);
-      await TabDragFixture.tab(window, secondNote).click();
+      await tabOf(secondNote).click();
       await expect(tabOf(secondNote)).toHaveAttribute("aria-selected", "true");
 
       await (reopen ? desktop.reopenAsync() : desktop.restartAsync());
