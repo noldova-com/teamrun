@@ -256,7 +256,7 @@ export class WindowPartHostService implements IWindowPartHost {
 
   private openPending(pending: PendingDocument): void {
     try {
-      this.opener.open(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
+      this.opener.restore(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
     }
     catch (error) {
       this.errors.handleError(error);

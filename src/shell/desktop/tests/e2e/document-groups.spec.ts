@@ -242,6 +242,27 @@ test.describe("document groups", () => {
       ]))).toEqual(before);
     });
 
+  for (const reopen of [true, false])
+    test(`each group's active tab returns ${reopen ? "after reopening on the running runtime" : "after a restart that stops the runtime"}`, async ({ desktop }) => {
+      const window = desktop.window;
+      const outline = "view/notes.outline";
+      const thirdNote = "document/notes.note/3";
+      await tab(window, firstNote).click();
+      await window.keyboard.press("ControlOrMeta+Alt+KeyN");
+      await expect(tab(window, thirdNote)).toHaveAttribute("aria-selected", "true");
+      await tab(window, secondNote).click();
+      await tab(window, outline).click();
+      await expect(tab(window, secondNote)).toHaveAttribute("aria-selected", "true");
+      await expect(tab(window, outline)).toHaveAttribute("aria-selected", "true");
+
+      await (reopen ? desktop.reopenAsync() : desktop.restartAsync());
+
+      await expect.poll(() => tabKeysOf(groupOf(desktop.window, firstNote))).toEqual([firstNote, secondNote, thirdNote]);
+      await expect(tab(desktop.window, secondNote)).toHaveAttribute("aria-selected", "true");
+      await expect(tab(desktop.window, outline)).toHaveAttribute("aria-selected", "true");
+      await expect(tab(desktop.window, thirdNote)).toHaveAttribute("aria-selected", "false");
+    });
+
   test("Reset the layout returns the documents to one group", async ({ desktop }) => {
     const window = desktop.window;
     await splitFirstNoteAsync(window);

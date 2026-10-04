@@ -60,6 +60,23 @@ describe("DocumentOpenerService", () => {
     expect(() => opener.keep("notes", "notes.page", "2")).toThrow(ArgumentException);
   });
 
+  it("restores an open document with its title and keeps it without activating it, and opens one that is not open", () => {
+    const [first, second, third] = ["1", "2", "3"].map(t => new DocumentTab("notes.note", t));
+    opener.open("notes", "notes.note", "1", "Note 1", false);
+    opener.open("notes", "notes.note", "2", "Note 2", true);
+    opener.open("notes", "notes.note", "1", "Note 1", false);
+
+    opener.restore("notes", "notes.note", "2", "Second note", true);
+    expect([layout.layout().documents.active, layout.layout().documents.preview]).toEqual([first, second]);
+    opener.restore("notes", "notes.note", "2", "Second note", false);
+    expect([layout.layout().documents.active, layout.layout().documents.preview]).toEqual([first, null]);
+    expect(labels.of(second).title).toBe("Second note");
+    opener.restore("notes", "notes.note", "3", "Note 3", false);
+    expect(layout.layout().documents.tabs).toEqual([first, second, third]);
+    expect(layout.layout().documents.active).toEqual(third);
+    expect(() => opener.restore("clock", "notes.note", "1", "Note 1", false)).toThrow(ArgumentException);
+  });
+
   it("refuses another module's document, an unregistered one and an empty title", () => {
     expect(() => opener.open("clock", "notes.note", "1", "Note 1", false)).toThrow(ArgumentException);
     expect(() => opener.open("note", "notes.note", "1", "Note 1", false)).toThrow(ArgumentException);
