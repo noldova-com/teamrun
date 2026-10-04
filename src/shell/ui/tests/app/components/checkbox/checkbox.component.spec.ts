@@ -29,8 +29,6 @@ class CheckboxHostComponent {
 }
 
 describe("CheckboxComponent", () => {
-  const CENTRE_TOLERANCE = 0.5;
-
   let fixture: ComponentFixture<CheckboxHostComponent>;
 
   function render(theme = DefaultTheme.theme, mode = ThemeMode.Light, panelSize?: number): void {
@@ -85,8 +83,8 @@ describe("CheckboxComponent", () => {
       const drawn = tick("bare").getBoundingClientRect();
       const icon = mark("bare").getBoundingClientRect();
 
-      expect(Math.abs((drawn.left + drawn.right) / 2 - (outer.left + outer.right) / 2)).toBeLessThanOrEqual(CENTRE_TOLERANCE);
-      expect(Math.abs((drawn.top + drawn.bottom) / 2 - (outer.top + outer.bottom) / 2)).toBeLessThanOrEqual(CENTRE_TOLERANCE);
+      AppearanceFixture.expectPixels((drawn.left + drawn.right) / 2, (outer.left + outer.right) / 2);
+      AppearanceFixture.expectPixels((drawn.top + drawn.bottom) / 2, (outer.top + outer.bottom) / 2);
       expect(drawn.width).toBeGreaterThan(outer.width / 2);
       expect([drawn.left > outer.left, drawn.right < outer.right, drawn.top > outer.top, drawn.bottom < outer.bottom]).toEqual([true, true, true, true]);
       AppearanceFixture.expectLook(`${icon.width}px`, DefaultTheme.theme, "icon", "width");
@@ -102,7 +100,7 @@ describe("CheckboxComponent", () => {
 
         expect(style.backgroundColor).toBe(AppearanceFixture.readColor(theme, mode, "checkbox.background"));
         expect(style.borderTopColor).toBe(AppearanceFixture.readColor(theme, mode, "checkbox.border"));
-        expect([markStyle.stroke, markStyle.fill]).toEqual([AppearanceFixture.readColor(theme, mode, "foreground"), "none"]);
+        expect([markStyle.color, markStyle.stroke, markStyle.fill]).toEqual([AppearanceFixture.readColor(theme, mode, "foreground"), markStyle.color, "none"]);
         AppearanceFixture.expectLook(style.width, theme, "checkbox-size", "width");
         AppearanceFixture.expectLook(style.height, theme, "checkbox-size", "height");
         AppearanceFixture.expectLook(markStyle.width, theme, "icon", "width");

@@ -185,6 +185,31 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-checkbox");
   });
 
+  test("a checked checkbox keeps its tick in the forced text color in forced colors", async ({ desktop }) => {
+    const window = desktop.window;
+    await openSettingsAsync(window);
+    await window.getByRole("button", { name: "Notifications", exact: true }).click();
+    const control = row(window, "shell.mutedModules").locator(".tr-checkbox-control").first();
+    await expect(control.locator("input")).toBeChecked();
+    const readAsync = (): Promise<readonly [boolean, string, string, string]> => control.evaluate(t => {
+      const mark = getComputedStyle(t.querySelector(".tr-checkbox-mark") as Element);
+      const probe = document.createElement("span");
+      probe.style.color = "CanvasText";
+      document.body.append(probe);
+      const forced = getComputedStyle(probe).color;
+      probe.remove();
+      return [matchMedia("(forced-colors: active)").matches, mark.stroke, forced, getComputedStyle(t.querySelector("input") as Element).backgroundColor] as const;
+    });
+
+    await window.emulateMedia({ forcedColors: "active" });
+    const [isForced, stroke, text, background] = await readAsync();
+
+    expect(isForced).toBe(true);
+    expect(stroke).toBe(text);
+    expect(stroke).not.toBe(background);
+    await desktop.checkpointAsync("settings-checkbox-forced-colors");
+  });
+
   test("the Mode pills are one radio group: the checked pill is the tab stop and the arrow keys move the choice", async ({ desktop }) => {
     const window = desktop.window;
     await openSettingsAsync(window);
