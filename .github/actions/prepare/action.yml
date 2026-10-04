@@ -1,0 +1,104 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Prepare a build and test job
+description: Sets up Node.js, restores or installs the dependencies and installs Electron on a checked-out revision.
+
+inputs:
+  architecture:
+    description: The CPU architecture Node.js and the dependencies are installed for.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      id: node
+      continue-on-error: true
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      with:
+        node-version: '26.7.0'
+        architecture: ${{ inputs.architecture }}
+        package-manager-cache: false
+
+    - name: Wait before setting up Node.js again
+      if: steps.node.outcome == 'failure'
+      shell: bash
+      run: sleep 30
+
+    - name: Set up Node.js again
+      id: node-again
+      if: steps.node.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      with:
+        node-version: '26.7.0'
+        architecture: ${{ inputs.architecture }}
+        package-manager-cache: false
+
+    - name: Wait before setting up Node.js a last time
+      if: steps.node-again.outcome == 'failure'
+      shell: bash
+      run: sleep 30
+
+    - name: Set up Node.js a last time
+      if: steps.node-again.outcome == 'failure'
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      with:
+        node-version: '26.7.0'
+        architecture: ${{ inputs.architecture }}
+        package-manager-cache: false
+
+    - name: Verify the toolchain
+      shell: bash
+      env:
+        EXPECTED_ARCHITECTURE: ${{ inputs.architecture }}
+      run: |
+        node --version
+        npm --version
+        node --print "process.platform + '/' + process.arch"
+        test "$(node --version)" = v26.7.0
+        test "$(npm --version)" = 11.19.0
+        test "$(node --print process.arch)" = "$EXPECTED_ARCHITECTURE"
+
+    - name: Restore the installed dependencies
+      id: root-dependencies
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: node_modules
+        key: dependencies-root-${{ runner.os }}-${{ inputs.architecture }}-${{ hashFiles('package-lock.json') }}
+
+    - name: Restore the Angular project's installed dependencies
+      id: angular-dependencies
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: src/node_modules
+        key: dependencies-src-${{ runner.os }}-${{ inputs.architecture }}-${{ hashFiles('src/package-lock.json') }}
+
+    - name: Discard an inexact Angular install
+      if: steps.angular-dependencies.outputs.cache-hit != 'true'
+      shell: bash
+      run: rm -rf src/node_modules
+
+    - name: Install dependencies
+      if: steps.root-dependencies.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci --no-audit --no-fund
+
+    - name: Install Electron
+      shell: bash
+      run: |
+        for attempt in 1 2 3 4; do
+          if node node_modules/electron/install.js; then
+            exit 0
+          fi
+          if [ "$attempt" -lt 4 ]; then
+            echo "Electron's binary download failed (attempt $attempt of 4); trying again in 15 seconds."
+            sleep 15
+          fi
+        done
+        echo "::error::Electron's binary could not be downloaded in 4 attempts."
+        exit 1

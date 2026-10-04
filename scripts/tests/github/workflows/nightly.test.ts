@@ -11,6 +11,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
+import BuildMatrix from "../../../workflows/build-matrix.ts";
 import CommandDoublesFixture from "../../fixtures/command-doubles.fixture.ts";
 import WorkflowFileFixture from "../../fixtures/workflow-file.fixture.ts";
 import WorkflowSimulation from "../../fixtures/workflow-simulation.fixture.ts";
@@ -47,9 +48,7 @@ class NightlyWorkflowTests {
 
     test("each target's tests and UI workflows are jobs of their own, on the targets every build and test run validates", { timeout: NightlyWorkflowTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(NightlyWorkflowTests.WORKFLOW);
-      const validated = (await WorkflowFileFixture.readAsync("build-and-test.yml")).readStepScript("List the build and test jobs")
-        .split("<<'LEGS'\n")[1]?.split("LEGS\n")[0]?.trimEnd().split("\n").map(t => t.split("|")) ?? [];
-      const targets = [...new Map(validated.map(([, target, , runner, architecture]) => [target, { target, runner, architecture }])).values()];
+      const targets = new BuildMatrix(false).targets.map(t => ({ target: t.name, runner: t.runner, architecture: t.architecture }));
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
       await writeFile(path.join(doubles.directory, "outputs.txt"), "");
@@ -70,12 +69,13 @@ class NightlyWorkflowTests {
 
     test("a job prepares its target exactly as build and test does, setting up Node.js with three tries", async () => {
       const nightly = await WorkflowFileFixture.readAsync(NightlyWorkflowTests.WORKFLOW);
-      const validation = await WorkflowFileFixture.readAsync("build-and-test.yml");
+      const validation = await WorkflowFileFixture.readActionAsync("prepare");
 
       for (const step of NightlyWorkflowTests.SHARED_STEPS)
         assert.equal(nightly.readStepScript(step), validation.readStepScript(step), step);
       const restores = ["Restore the installed dependencies", "Restore the Angular project's installed dependencies"] as const;
-      const [own, validated] = [nightly, validation].map(t => new WorkflowSimulation(t.text, ...restores).steps.map(step => [step.name, step.uses, step.settings]));
+      const [own, validated] = [nightly.text, validation.text.replaceAll("inputs.architecture", "matrix.architecture")]
+        .map(t => new WorkflowSimulation(t, ...restores).steps.map(step => [step.name, step.uses, step.settings]));
       assert.deepEqual(own, validated);
       for (const first of ["Set up Node.js", "Set up Node.js to report"]) {
         const [again, last] = [`${first} again`, `${first} a last time`];
