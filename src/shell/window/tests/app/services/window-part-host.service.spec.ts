@@ -193,6 +193,21 @@ describe("WindowPartHostService", () => {
     expect(errors).toEqual([]);
   });
 
+  it("names the reported modules while their window parts activate and lists them for the Modules document once activation ends", async () => {
+    let during: readonly unknown[] = [];
+    const part = new FakeWindowPart("notes", log, () => {
+      const statuses = TestBed.inject(ModuleStatusService);
+      during = [statuses.nameOf("tasks"), statuses.nameOf("notes"), statuses.modules()];
+    });
+    const { loads } = start([source("notes", part)], [status("tasks"), status("notes")]);
+
+    await vi.waitFor(() => expect(loads).toHaveLength(1));
+
+    expect(log).toEqual(["activate notes"]);
+    expect(during).toEqual(["Tasks", "Notes", []]);
+    expect(TestBed.inject(ModuleStatusService).modules().map(t => t.id)).toEqual(["tasks", "notes"]);
+  });
+
   it("keeps a failed module's views in their saved places with its name and an error icon, and finds its failure", async () => {
 
     const { host, layout } = start(

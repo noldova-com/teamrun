@@ -250,6 +250,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private async activateReportedAsync(): Promise<void> {
     await this.settings.loadAsync();
     const report = ModuleStatusList.fromJson(await this.bridge.requestAsync(ShellMethods.modules.text, null));
+    this.statuses.report(report.modules);
     this.moduleOrder = report.modules.map(t => t.id);
     const commands = CommandList.fromJson(await this.bridge.requestAsync(ShellMethods.commands.text, null));
     this.applyCommands(commands);

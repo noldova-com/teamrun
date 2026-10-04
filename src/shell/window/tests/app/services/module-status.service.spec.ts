@@ -29,6 +29,18 @@ describe("ModuleStatusService", () => {
     expect(service.notifying().map(t => t.id)).toEqual(["reminder", "notes"]);
   });
 
+  it("names and offers the modules the runtime reports at once, and lists them only once the window sets their states", () => {
+    const service = TestBed.inject(ModuleStatusService);
+    const reported = [ModuleStatusFixture.create("clock", "Clock"), ModuleStatusFixture.create("reminder", "Reminder", ["reminder.due"])];
+
+    service.report(reported);
+    const early = [service.nameOf("reminder"), service.notifying().map(t => t.id), service.modules()];
+    service.set(reported.slice(1));
+
+    expect(early).toEqual(["Reminder", ["reminder"], []]);
+    expect([service.nameOf("clock"), service.modules().map(t => t.id)]).toEqual(["clock", ["reminder"]]);
+  });
+
   it("names an owner: the product for the shell, a reported module by its display name, or else its id", () => {
     const service = TestBed.inject(ModuleStatusService);
 
