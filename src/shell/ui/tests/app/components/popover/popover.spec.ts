@@ -105,6 +105,17 @@ describe("PopoverTriggerDirective and PopoverDirective", () => {
     expect([isOpenAfterInside, isClosedByOutside, surface(), trigger().getAttribute("aria-expanded")]).toEqual([true, true, null, "false"]);
   });
 
+  it("leaves focus alone when it closes before its first render", async () => {
+    await renderAsync();
+    trigger().focus();
+
+    trigger().click();
+    trigger().click();
+    await fixture.whenStable();
+
+    expect([surface(), document.activeElement, fixture.componentInstance.opens]).toEqual([null, trigger(), 1]);
+  });
+
   it("closes on Escape and returns focus to the trigger, but not on other keys", async () => {
     await renderAsync();
     const popover = await openAsync();
