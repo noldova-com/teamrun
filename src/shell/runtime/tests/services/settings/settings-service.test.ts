@@ -116,13 +116,15 @@ export class SettingsServiceTests {
     const quiet = (device: string | null): SettingKey => new SettingKey(SettingsServiceTests.QUIET, null, device);
 
     settings.service.write(new SettingValue(quiet("d1"), true));
-    settings.service.write(new SettingValue(quiet("d2"), false));
+    settings.service.write(new SettingValue(quiet("d2"), true));
+    settings.service.write(new SettingValue(quiet("d3"), true));
+    settings.service.write(new SettingValue(quiet("d3"), false));
     const missing = Assert.throws(() => settings.service.write(new SettingValue(quiet(null), true)), SettingException);
     const scoped = Assert.throws(() => settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.QUIET, new SettingScope(SettingsServiceTests.CONVERSATION, "c1"), "d1"), true)),
       SettingException);
 
-    Assert.areEqual("true,false,false,false", [quiet("d1"), quiet("d2"), quiet("d3"), quiet(null)].map(t => settings.service.read(t)).join(","));
-    Assert.areEqual("d1=true,d2=false", [...settings.service.readDevices(SettingsServiceTests.QUIET)].map(([device, value]) => `${device}=${String(value)}`).join(","));
+    Assert.areEqual("true,true,false,false", [quiet("d1"), quiet("d2"), quiet("d3"), quiet(null)].map(t => settings.service.read(t)).join(","));
+    Assert.areEqual("d1=true,d2=true", [...settings.service.readDevices(SettingsServiceTests.QUIET)].map(([device, value]) => `${device}=${String(value)}`).join(","));
     Assert.areEqual("true,false", [settings.service.snapshot("d1"), settings.service.snapshot(null)].map(t => t.entries.find(u => u.name.text === SettingsServiceTests.QUIET.text)?.value).join(","));
     Assert.areEqual(`${FailureCode.InvalidParams},${FailureCode.InvalidParams}`, [missing.failure.code, scoped.failure.code].join(","));
   }
