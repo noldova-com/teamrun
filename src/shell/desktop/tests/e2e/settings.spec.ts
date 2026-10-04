@@ -13,11 +13,18 @@ import type { Locator, Page } from "@playwright/test";
 
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
 
 const windowColors = { Light: "rgb(248, 248, 248)", Dark: "rgb(24, 24, 24)" };
+const settingsKey = "document/shell.settings";
 
 function settingsTab(window: Page): Locator {
-  return window.locator("tr-tab[data-tab-key=\"document/shell.settings\"]");
+  return TabDragFixture.tab(window, settingsKey);
+}
+
+async function expectSamePageAsync(window: Page, top: number): Promise<void> {
+  await expect(window.locator(".tr-settings-page[aria-current=page]")).toHaveText("Keyboard shortcuts");
+  await expect.poll(() => window.locator(".tr-settings-content").evaluate(t => t.scrollTop)).toBe(top);
 }
 
 function row(window: Page, name: string): Locator {
@@ -88,6 +95,31 @@ test.describe("settings", () => {
     await window.getByRole("button", { name: "Notifications", exact: true }).click();
     await expect(window.getByRole("searchbox", { name: "Search settings" })).toHaveValue("");
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
+  });
+
+  test("Settings keeps its page and scroll position when its tab becomes active again and when it moves to another group", async ({ desktop }) => {
+    const window = desktop.window;
+    const note = "document/notes.note/2";
+    await openSettingsAsync(window);
+    await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
+    const top = await window.locator(".tr-settings-content").evaluate(async t => {
+      t.scrollTop = 120;
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      return t.scrollTop;
+    });
+    expect(top).toBeGreaterThan(0);
+
+    await TabDragFixture.tab(window, note).click();
+    await expect(window.locator("tr-settings")).toHaveCount(0);
+    await settingsTab(window).click();
+    await expectSamePageAsync(window, top);
+
+    await TabDragFixture.dragOntoPlateAsync(window, settingsKey, note, "Right");
+    await window.mouse.up();
+
+    await expect(window.locator("tr-tab-group").filter({ has: window.locator("tr-tab[data-tab-key^='document/']") })).toHaveCount(2);
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, settingsKey))).toEqual([settingsKey]);
+    await expectSamePageAsync(window, top);
   });
 
   test("changing the mode, a font and a size repaints the window at once, marks them modified, and Reset returns each", async ({ desktop }) => {
