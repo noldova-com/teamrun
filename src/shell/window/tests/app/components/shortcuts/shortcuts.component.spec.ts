@@ -170,6 +170,20 @@ describe("ShortcutsComponent", () => {
     expect(document.activeElement).toBe(keyOf("clock.tick"));
   });
 
+  it("leaves a command that has another default key with that key when Use it here takes one of them", async () => {
+    await renderAsync();
+
+    await recordAsync("clock.tick");
+    await pressAsync("clock.tick", { key: "PageDown", code: "PageDown", ctrlKey: true });
+    const used = notice("clock.tick");
+    await page.getByRole("button", { name: "Use it here" }).click();
+    await settleAsync();
+
+    expect(used).toBe("Ctrl+PageDown is used by Show the next tab");
+    expect(settings.calls).toEqual(["set shell.keyBindings {\"clock.tick\":\"Mod+PageDown\"}"]);
+    expect(cells("shell.nextTab").slice(2)).toEqual(["Ctrl+TabCtrl+PageDown is taken by Tick the clock", "Remove"]);
+  });
+
   it("keeps both keys when the person cancels a collision", async () => {
     await renderAsync();
 

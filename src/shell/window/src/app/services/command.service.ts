@@ -11,6 +11,7 @@ import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal,
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { KeyChord } from "@noldova/teamrun-shell-protocol";
 
 import { CommandNotFoundException } from "../exceptions/command-not-found.exception";
 import type { CommandContribution } from "../models/command-contribution";
@@ -80,6 +81,11 @@ export class CommandService {
   public ownerOf(name: string): string {
     const owner = name.slice(0, name.indexOf(Resources.contributionSeparator));
     return this.ownerNames.get(owner) ?? owner;
+  }
+
+  public defaultKeysOf(name: string): readonly KeyChord[] {
+    const command = this.find(name);
+    return [...this.shell.keys(this.bridge.platform).filter(t => t[1] === command.name).map(t => t[0]), ...Object.isNull(command.defaultKey) ? [] : [command.defaultKey]];
   }
 
   public keyLabel(name: string): string | null {

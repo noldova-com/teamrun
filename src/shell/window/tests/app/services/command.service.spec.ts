@@ -187,6 +187,13 @@ describe("CommandService", () => {
     expect(() => service.titleOf("notes.gone")).toThrowError(CommandNotFoundException);
   });
 
+  it("lists a command's default keys on the platform, the shell's own and a module's", () => {
+    const service = start("darwin");
+    service.setCommands([command("notes.newNote", "Mod+Alt+N"), command("notes.sync", null)]);
+
+    expect(["shell.nextTab", "notes.newNote", "notes.sync"].map(t => service.defaultKeysOf(t).map(u => u.text))).toEqual([["Ctrl+Tab", "Mod+Alt+ArrowRight"], ["Mod+Alt+N"], []]);
+  });
+
   it("runs a command by name and reports its failure", async () => {
     const service = start("win32");
     service.setCommands([command("notes.newNote", null, true)]);

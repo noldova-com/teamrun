@@ -98,7 +98,9 @@ export class ShortcutsComponent {
   }
 
   protected useHere(notice: ShortcutNotice, holder: string): void {
-    this.write(this.bindings.with(notice.command, notice.key).with(holder, null), notice.command);
+    const bindings = this.bindings.with(notice.command, notice.key);
+    const keepsDefaults = !bindings.has(holder) && this.commands.defaultKeysOf(holder).length > 1;
+    this.write(keepsDefaults ? bindings : bindings.with(holder, null), notice.command);
   }
 
   protected dismiss(notice: ShortcutNotice): void {

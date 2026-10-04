@@ -123,6 +123,11 @@ test.describe("key bindings", () => {
     await expect(keyOf(window, "clock.tick")).toHaveText("No key");
     await expect(shortcut(window, "clock.tick").locator(".tr-shortcut-collision")).toHaveText(label("Ctrl+Alt+T is taken by New note", "⌥⌘T is taken by New note"));
     await expect(ticks).toHaveText("No ticks");
+    await recordAsync(window, "clock.tick", label("Control+PageDown", "Meta+Alt+ArrowRight"));
+    await expect(shortcut(window, "clock.tick").getByRole("alert")).toContainText("is used by Show the next tab");
+    await shortcut(window, "clock.tick").getByRole("button", { name: "Use it here" }).click();
+    await expect(shortcut(window, "shell.nextTab").locator(".tr-shortcut-collision")).toContainText("is taken by Tick");
+    await expect(keyOf(window, "shell.nextTab")).not.toHaveText("No key");
     await window.getByRole("button", { name: "Reset all shortcuts" }).click();
     await expect(keyOf(window, "notes.newNote")).toHaveText(label("Ctrl+Alt+N", "⌥⌘N"));
     await expect(keyOf(window, "clock.tick")).toHaveText(label("Ctrl+Alt+T", "⌥⌘T"));
