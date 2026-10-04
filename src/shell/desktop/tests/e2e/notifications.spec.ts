@@ -113,7 +113,7 @@ test.describe("notifications", () => {
     const modules = window.locator("tr-setting-row[data-setting=\"shell.mutedModules\"]");
     await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
     await openNotificationsPageAsync(window);
-    await expect(modules.locator(".tr-checkbox-text")).toHaveText(["Clock notifications", "Notes notifications"]);
+    await expect(modules.locator(".tr-checkbox-text")).toHaveText(["Clock notifications", "Notes notifications", "Reminder notifications"]);
     await expect(modules.getByRole("checkbox", { name: "Clock notifications" })).toBeChecked();
     await desktop.checkpointAsync("settings-notifications");
 

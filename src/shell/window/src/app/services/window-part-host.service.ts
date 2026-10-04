@@ -44,6 +44,7 @@ import { DesktopBridgeService } from "./desktop-bridge.service";
 import { DocumentOpenerService } from "./document-opener.service";
 import { LayoutService } from "./layout.service";
 import { MenuService } from "./menu.service";
+import { ModuleStatusService } from "./module-status.service";
 import { SettingsService } from "./settings.service";
 import { TabLabelService } from "./tab-label.service";
 import { ViewDialogService } from "./view-dialog.service";
@@ -57,6 +58,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly commands: CommandService = inject(CommandService);
   private readonly bars: BarItemsService = inject(BarItemsService);
   private readonly menus: MenuService = inject(MenuService);
+  private readonly statuses: ModuleStatusService = inject(ModuleStatusService);
   private readonly settings: SettingsService = inject(SettingsService);
   private readonly viewDialogs: ViewDialogService = inject(ViewDialogService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
@@ -68,7 +70,6 @@ export class WindowPartHostService implements IWindowPartHost {
   private moduleOrder: readonly string[] = [];
   private runtimeCommands: readonly CommandContribution[] = [];
   private readonly runtimeStates: WritableSignal<CommandList | null> = signal(null);
-  private readonly modulesValue: WritableSignal<readonly ModuleStatus[]> = signal([]);
   private readonly failuresValue: WritableSignal<readonly ModuleFailure[]> = signal([]);
   private readonly generationValue: WritableSignal<number> = signal(0);
   private isReady: boolean = false;
@@ -76,7 +77,6 @@ export class WindowPartHostService implements IWindowPartHost {
   private isActivating: boolean = true;
   private reloading: Promise<void> = Promise.resolve();
 
-  public readonly modules: Signal<readonly ModuleStatus[]> = this.modulesValue.asReadonly();
   public readonly failures: Signal<readonly ModuleFailure[]> = this.failuresValue.asReadonly();
   public readonly generation: Signal<number> = this.generationValue.asReadonly();
 
@@ -262,7 +262,7 @@ export class WindowPartHostService implements IWindowPartHost {
         active.add(result.id);
       statuses.push(result);
     }
-    this.modulesValue.set(statuses);
+    this.statuses.set(statuses);
     this.failuresValue.set(statuses.filter(t => t.state !== ModuleState.Active).map(t => this.describeFailure(t)));
   }
 
