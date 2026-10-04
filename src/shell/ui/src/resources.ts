@@ -295,7 +295,6 @@ export class Resources {
   public static readonly quickInputIdPrefix: string = "tr-quick-input-";
   public static readonly quickInputOptionSeparator: string = "-option-";
   public static readonly quickInputFieldSelector: string = ".tr-quick-input-field";
-  public static readonly quickInputListSelector: string = ".tr-quick-input-list";
   public static readonly quickInputOptionSelector: string = "[role=option]";
   public static readonly arrowDownKey: string = "ArrowDown";
   public static readonly arrowUpKey: string = "ArrowUp";

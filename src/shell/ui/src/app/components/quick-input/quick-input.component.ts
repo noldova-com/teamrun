@@ -124,9 +124,9 @@ export class QuickInputComponent {
   }
 
   private pageSize(): number {
-    const list = this.host.querySelector<HTMLElement>(Resources.quickInputListSelector);
-    const row = list?.querySelector<HTMLElement>(Resources.quickInputOptionSelector);
-    return Object.isNullOrUndefined(list) || Object.isNullOrUndefined(row) ? 1 : Math.max(1, Math.floor(list.clientHeight / row.offsetHeight));
+    const list = this.list().nativeElement;
+    const row = list.querySelector<HTMLElement>(Resources.quickInputOptionSelector);
+    return Object.isNull(row) ? 1 : Math.max(1, Math.floor(list.clientHeight / row.offsetHeight));
   }
 
   private static reveal(list: HTMLElement, row: HTMLElement): void {
