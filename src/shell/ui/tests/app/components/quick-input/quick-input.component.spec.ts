@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, signal } from "@angular/core";
+import { Component, type Signal, computed, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { userEvent } from "vitest/browser";
 
@@ -29,6 +29,17 @@ class QuickInputHostComponent {
   public readonly query = signal("");
   public readonly chosen: string[] = [];
   public dismissals: number = 0;
+}
+
+@Component({
+  imports: [QuickInputComponent],
+  template: `<tr-quick-input [items]="items()" label="Search commands" [(query)]="query" (chosen)="chosen.push($event.id)" />`
+})
+class FilteringHostComponent {
+  public readonly options: readonly QuickInputItem[] = Array.from({ length: 30 }, (_, index) => new QuickInputItem(`notes.command${index}`, `Command ${index}`, null, null, null));
+  public readonly query = signal("");
+  public readonly items: Signal<readonly QuickInputItem[]> = computed(() => this.options.filter(t => t.title.includes(this.query())));
+  public readonly chosen: string[] = [];
 }
 
 describe("QuickInputComponent", () => {
@@ -130,6 +141,22 @@ describe("QuickInputComponent", () => {
     expect(host.chosen).toEqual(["notes.command1", "notes.command3"]);
     expect(host.dismissals).toBe(1);
     expect(host.query()).toBe("clo");
+  });
+
+  it("chooses from the options for the text just typed when Enter comes before they are shown", async () => {
+    const filtering = TestBed.createComponent(FilteringHostComponent);
+    filtering.detectChanges();
+    await filtering.whenStable();
+    const typed = filtering.nativeElement.querySelector(".tr-quick-input-field") as HTMLInputElement;
+    const press = (key: string): boolean => typed.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+
+    press("ArrowDown");
+    typed.value = "Command 7";
+    typed.dispatchEvent(new Event("input", { bubbles: true }));
+    press("Enter");
+
+    expect(filtering.componentInstance.chosen).toEqual(["notes.command7"]);
+    filtering.destroy();
   });
 
   it("starts at the first option again when its options change, and chooses nothing and announces no results when it has none", async () => {

@@ -7,7 +7,7 @@
  */
 
 import {
-  ChangeDetectionStrategy, Component, ElementRef, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, input, model,
+  ApplicationRef, ChangeDetectionStrategy, Component, ElementRef, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, input, model,
   output, signal
 } from "@angular/core";
 
@@ -26,6 +26,7 @@ export class QuickInputComponent {
   private static count: number = 0;
 
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly application: ApplicationRef = inject(ApplicationRef);
   private readonly activeValue: WritableSignal<number> = signal(0);
 
   protected readonly listId: string = `${Resources.quickInputIdPrefix}${QuickInputComponent.count++}`;
@@ -67,6 +68,7 @@ export class QuickInputComponent {
     }
     if (event.key === Resources.enterKey) {
       event.preventDefault();
+      this.application.tick();
       this.choose(this.active());
     }
     else if (event.key === Resources.escapeKey) {
