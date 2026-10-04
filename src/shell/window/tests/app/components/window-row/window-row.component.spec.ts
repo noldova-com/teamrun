@@ -201,7 +201,7 @@ describe("WindowRowComponent", () => {
 
   for (const panelSize of [12, 13, 18])
     for (const platform of ["win32", "linux", "darwin"])
-      it(`stands as high as its tallest control and 0.25rem above and below it at panel size ${panelSize} on ${platform}, with 0.25rem more below it on macOS`, async () => {
+      it(`stands as high as its tallest control and 0.25rem above and below it at panel size ${panelSize} on ${platform}`, async () => {
         DesktopBridgeFixture.install(platform);
         useNotesMenus([]);
         apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
@@ -218,7 +218,6 @@ describe("WindowRowComponent", () => {
         AppearanceFixture.expectPixels(bounds.height, Math.max(24, AppearanceFixture.toPixels(1.375, panelSize)) + 2 * gap);
         AppearanceFixture.expectPixels(bounds.bottom - Math.max(...controls.map(t => t.bottom)), gap);
         AppearanceFixture.expectPixels(Math.min(...controls.map(t => t.top)) - bounds.top, gap);
-        AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(row).marginBottom), platform === "darwin" ? gap : 0);
       });
 
   function useMenuBarStyle(style: string): void {

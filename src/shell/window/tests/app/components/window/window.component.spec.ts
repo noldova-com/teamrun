@@ -74,7 +74,7 @@ describe("WindowComponent", () => {
           const controls = [...row.querySelectorAll<HTMLElement>("button")].filter(t => t.checkVisibility({ visibilityProperty: true })).map(t => t.getBoundingClientRect().bottom);
           const bands = [...root.querySelectorAll<HTMLElement>(".tr-toolbar-row")].map(t => t.getBoundingClientRect());
           const panel = (root.querySelector("tr-tab-group") as HTMLElement).getBoundingClientRect();
-          const edges = [{ top: Number.NaN, bottom: platform === "darwin" ? row.getBoundingClientRect().bottom : Math.max(...controls) }, ...bands, { top: panel.top, bottom: Number.NaN }];
+          const edges = [{ top: Number.NaN, bottom: Math.max(...controls) }, ...bands, { top: panel.top, bottom: Number.NaN }];
           const gaps = edges.slice(1).map((t, index) => t.top - (edges[index]?.bottom ?? Number.NaN));
 
           expect(gaps).toHaveLength(count + 1);

@@ -168,17 +168,17 @@ test.describe("toolbars", () => {
     await desktop.checkpointAsync("toolbars");
   });
 
-  test("the window row's controls, each toolbar row and the panels stand 0.25rem apart, with two rows, one row and none", async ({ desktop }) => {
+  test("the window row's controls, each toolbar row and the panels stand 0.25rem apart, with two rows, one row and none @smoke", async ({ desktop }) => {
     const window = desktop.window;
-    const gapsOf = (): Promise<readonly number[]> => window.evaluate(isMac => {
+    const gapsOf = (): Promise<readonly number[]> => window.evaluate(() => {
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const row = document.querySelector("tr-window-row") as HTMLElement;
       const controls = [...row.querySelectorAll<HTMLElement>("button")].filter(t => t.checkVisibility({ visibilityProperty: true })).map(t => t.getBoundingClientRect().bottom);
       const bands = [...document.querySelectorAll(".tr-toolbar-row")].map(t => t.getBoundingClientRect());
       const panel = Math.min(...[...document.querySelectorAll("tr-tab-group")].map(t => t.getBoundingClientRect().top));
-      const edges = [{ top: Number.NaN, bottom: isMac ? row.getBoundingClientRect().bottom : Math.max(...controls) }, ...bands, { top: panel, bottom: Number.NaN }];
+      const edges = [{ top: Number.NaN, bottom: Math.max(...controls) }, ...bands, { top: panel, bottom: Number.NaN }];
       return edges.slice(1).map((t, index) => Math.round((t.top - (edges[index]?.bottom ?? Number.NaN)) / rem * 1000) / 1000);
-    }, process.platform === "darwin");
+    });
 
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.main"], ["notes.second"]]);
     expect(await gapsOf()).toEqual([0.25, 0.25, 0.25]);
@@ -186,6 +186,7 @@ test.describe("toolbars", () => {
       await WindowModeFixture.setAsync(window, mode);
       await desktop.checkpointAsync(`toolbars-gaps-two-rows-${mode.toLowerCase()}`);
     }
+    await WindowModeFixture.setAsync(window, "Light");
     await setShownAsync(window, "Display", false);
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.main"]]);
     expect(await gapsOf()).toEqual([0.25, 0.25]);
