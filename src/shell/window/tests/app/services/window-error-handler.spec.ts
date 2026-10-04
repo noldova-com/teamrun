@@ -46,6 +46,18 @@ describe("WindowErrorHandler", () => {
     ]);
   });
 
+  it("handles an error object once however many times it is reported, and repeated texts every time", () => {
+    const error = new Error("Reported twice.");
+
+    handler.handleError(error);
+    handler.handleError(error);
+    handler.handleError("Repeated.");
+    handler.handleError("Repeated.");
+
+    expect(bridge.errorsLogged).toEqual([[null, error.stack], [null, "Repeated."], [null, "Repeated."]]);
+    expect(written).toHaveBeenCalledTimes(3);
+  });
+
   it("sends every error, cutting one longer than the log takes to its first 65536 characters", () => {
     for (let index = 0; index < 12; index++)
       handler.handleError(`Error ${index}`);
