@@ -6,11 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export enum SettingKind {
-  Boolean = "Boolean",
-  Choice = "Choice",
-  Number = "Number",
-  Text = "Text",
-  Modules = "Modules",
-  KeyBindings = "KeyBindings"
+:host {
+  display: contents;
 }

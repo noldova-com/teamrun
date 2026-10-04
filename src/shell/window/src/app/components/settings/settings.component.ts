@@ -27,12 +27,12 @@ import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { SettingsService } from "../../services/settings.service";
 import { ViewStateService } from "../../services/view-state.service";
-import { HighlightedTextComponent } from "../highlighted-text/highlighted-text.component";
 import { SettingRowComponent } from "../setting-row/setting-row.component";
+import { ShortcutsComponent } from "../shortcuts/shortcuts.component";
 
 @Component({
   selector: "tr-settings",
-  imports: [HighlightedTextComponent, NgComponentOutlet, NgTemplateOutlet, SettingRowComponent, TextFieldComponent],
+  imports: [NgComponentOutlet, NgTemplateOutlet, SettingRowComponent, ShortcutsComponent, TextFieldComponent],
   templateUrl: "./settings.component.html",
   styleUrl: "./settings.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -72,9 +72,11 @@ export class SettingsComponent {
   protected readonly currentPage: Signal<SettingsPage | undefined> = computed(() => this.pages().find(t => t.title === this.selected()) ?? this.pages()[0]);
   protected readonly shortcuts: Signal<readonly ShortcutRow[]> = computed(() => {
     const map = this.commands.shortcuts();
+    const bindings = this.commands.bindings();
     return this.commands.commands().map(command => {
       const collision = map.collisions.find(t => t.refused === command.name);
-      return new ShortcutRow(command.name, command.title, this.commands.keyLabel(command.name) ?? Resources.noKey,
+      const key = this.commands.keyLabel(command.name);
+      return new ShortcutRow(command.name, command.title, this.commands.ownerOf(command.name), key ?? Resources.noKey, !Object.isNull(key), bindings.has(command.name),
         Object.isUndefined(collision) ? null : Resources.formatKeyTaken(collision.key.label(this.bridge.platform), this.commands.titleOf(collision.keptBy)));
     });
   });
@@ -86,7 +88,7 @@ export class SettingsComponent {
   });
   protected readonly matchingShortcuts: Signal<readonly ShortcutRow[]> = computed(() => {
     const query = this.query();
-    return this.isSearching() ? this.shortcuts().filter(t => [t.title, t.name, t.key].some(u => TextMatch.contains(u, query))) : this.shortcuts();
+    return this.isSearching() ? this.shortcuts().filter(t => [t.title, t.name, t.owner, t.key].some(u => TextMatch.contains(u, query))) : this.shortcuts();
   });
 
   public constructor() {
