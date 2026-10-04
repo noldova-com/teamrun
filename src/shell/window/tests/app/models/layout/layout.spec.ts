@@ -107,6 +107,32 @@ describe("Layout", () => {
     expect(second.keep(new ViewTab("gone.view"))).toBe(second);
   });
 
+  it("keeps the preview of every group as an ordinary tab, and changes nothing when no group has one", () => {
+    const previews = LayoutReader.read({
+      version: 1,
+      docks: {
+        Left: { root: { tabs: [{ view: "files.tree" }, { view: "files.search" }], active: 0, preview: 1 }, size: null, collapsed: false },
+        Right: { root: null, size: null, collapsed: false },
+        Bottom: { root: null, size: null, collapsed: false }
+      },
+      middle: { tabs: [{ document: "notes.note", instance: "plan" }, { document: "notes.note", instance: "todo" }], active: 0, preview: 1, documents: true }
+    });
+    const kept = previews.keepPreviews();
+
+    expect(kept.groups.map(t => t.preview)).toEqual([null, null]);
+    expect(kept.groups.flatMap(t => t.tabs)).toEqual(previews.groups.flatMap(t => t.tabs));
+    expect(kept.keepPreviews()).toBe(kept);
+  });
+
+  it("keeps the preview of every document group when the middle holds two", () => {
+    const readme = new DocumentTab("notes.note", "readme");
+    const split = initial.openDocument(plan).openDocument(todo).splitGroup(todo, 0, PanelEdge.Right).openDocument(readme, true).focusDocuments(0).openDocument(settings, true);
+
+    expect(split.documentGroups.map(t => t.preview)).toEqual([settings, readme]);
+    expect(split.keepPreviews().documentGroups.map(t => t.preview)).toEqual([null, null]);
+    expect(split.keepPreviews().documentGroups.flatMap(t => t.tabs)).toEqual(split.documentGroups.flatMap(t => t.tabs));
+  });
+
   it("makes a moved, reordered, split or docked preview a normal tab, so a strip never holds two previews", () => {
     const previews = LayoutReader.read({
       version: 1,

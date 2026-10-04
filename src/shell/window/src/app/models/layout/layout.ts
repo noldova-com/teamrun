@@ -115,6 +115,10 @@ export class Layout {
     return this.withGroup(isPreview ? this.documents.openPreview(tab) : this.documents.insert(tab, this.documents.tabs.length));
   }
 
+  public keepPreviews(): Layout {
+    return this.groups.flatMap(t => Object.isNull(t.preview) ? [] : [t.preview]).reduce<Layout>((layout, t) => layout.keep(t), this);
+  }
+
   public focusDocuments(groupId: number): Layout {
     return groupId === this.documents.id || !this.documentGroups.some(t => t.id === groupId) ? this : new Layout(this.docks, this.middle, this.bottomSpan, this.toolbars, groupId);
   }
