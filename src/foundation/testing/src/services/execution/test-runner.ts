@@ -12,6 +12,7 @@ import { DiscoveredTestClass } from "../../models/discovery/discovered-test-clas
 import { DiscoveredTestClassOptions } from "../../models/discovery/discovered-test-class-options.js";
 import type { TestProject } from "../../models/discovery/test-project.js";
 import { TestRunResult } from "../../models/results/test-run-result.js";
+import { TestSelection } from "../../models/results/test-selection.js";
 import { Resources } from "../../resources.js";
 import type { TestDiscovery } from "../discovery/test-discovery.js";
 import type { TestExecutor } from "./test-executor.js";
@@ -29,13 +30,17 @@ export class TestRunner {
     const discovered = await this.discovery.discoverAsync(testProjects);
     const selected = this.applyFilters(discovered, filters);
     const classResults = await this.executor.executeAsync(selected, progress);
-    const result = new TestRunResult(classResults);
+    const selectedCount = this.countMethods(selected);
+    const result = new TestRunResult(classResults, new TestSelection(filters, this.countMethods(discovered), selectedCount));
 
-    const selectedCount = selected.reduce((count, testClass) => count + testClass.methods.length, 0);
     if (result.total !== selectedCount)
       throw new TestingException(Resources.formatRunResultCountMismatch(result.total, selectedCount));
 
     return result;
+  }
+
+  private countMethods(testClasses: readonly DiscoveredTestClass[]): number {
+    return testClasses.reduce((count, testClass) => count + testClass.methods.length, 0);
   }
 
   private applyFilters(testClasses: readonly DiscoveredTestClass[], filters: readonly string[]): DiscoveredTestClass[] {

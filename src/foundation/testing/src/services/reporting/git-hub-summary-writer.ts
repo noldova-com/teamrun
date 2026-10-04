@@ -27,11 +27,20 @@ export class GitHubSummaryWriter {
 
   public writeTests(result: TestRunResult): void {
     const files = new Set(result.classResults.map(t => JSON.stringify([t.packageName, t.filePath])));
+    const selection = result.selection.isFiltered
+      ? [
+          Resources.formatSummaryRow(Resources.filtersLabel, result.selection.filters.join(", ")),
+          Resources.formatSummaryRow(Resources.discoveredLabel, result.selection.discovered),
+          Resources.formatSummaryRow(Resources.selectedLabel, result.selection.selected),
+          Resources.formatSummaryRow(Resources.unselectedLabel, result.selection.unselected)
+        ]
+      : [];
     const lines = [
       Resources.summaryTestHeading,
       String.empty,
       Resources.summaryTableHeading,
       Resources.summaryTableSeparator,
+      ...selection,
       Resources.formatSummaryRow(Resources.summaryFilesLabel, files.size),
       Resources.formatSummaryRow(Resources.totalLabel, result.total),
       Resources.formatSummaryRow(Resources.passedLabel, result.passed),

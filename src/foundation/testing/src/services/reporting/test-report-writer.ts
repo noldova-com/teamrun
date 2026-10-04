@@ -71,6 +71,12 @@ export class TestReportWriter implements ITestProgressListener {
   private formatSummaryLines(result: TestRunResult): string[] {
     const lines: string[] = [];
     lines.push(Resources.testReportSeparator);
+    if (result.selection.isFiltered) {
+      lines.push(`${Resources.filtersLabel}    ${result.selection.filters.join(", ")}`);
+      lines.push(`${Resources.discoveredLabel} ${result.selection.discovered}`);
+      lines.push(`${Resources.selectedLabel}   ${result.selection.selected}`);
+      lines.push(`${Resources.unselectedLabel} ${result.selection.unselected}`);
+    }
     lines.push(`${Resources.totalLabel}   ${result.total}`);
     lines.push(`${Resources.timeLabel}    ${this.formatDuration(result.durationMilliseconds)}`);
     lines.push(`${TerminalColor.GREEN}${Resources.passedLabel}  ${result.passed}${TerminalColor.RESET}`);

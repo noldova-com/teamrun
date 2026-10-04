@@ -69,6 +69,11 @@ export class Resources {
   public static readonly failedLabel: string = "Failed:";
   public static readonly skippedLabel: string = "Skipped:";
   public static readonly unreachedLabel: string = "Unreached:";
+  public static readonly filtersLabel: string = "Filters:";
+  public static readonly discoveredLabel: string = "Discovered:";
+  public static readonly selectedLabel: string = "Selected:";
+  public static readonly unselectedLabel: string = "Unselected:";
+  public static readonly noTestMatchedFilters: string = "No test matched the filters; a filter that selects nothing fails the run.\n";
   public static readonly passedMark: string = "✓";
   public static readonly failedMark: string = "✘";
   public static readonly skippedMark: string = "○";

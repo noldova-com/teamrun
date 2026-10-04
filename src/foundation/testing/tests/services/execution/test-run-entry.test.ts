@@ -74,6 +74,25 @@ export class TestRunEntryTests {
   }
 
   @TestMethod
+  public async failsAFilteredRunThatSelectsNothingAndSaysSo(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const testsDirectory = join(directory.path, "tests");
+    await mkdir(testsDirectory);
+    const fixture = new URL("../../fixtures/execution/entry-lifetime.fixture.js", import.meta.url).href;
+    await writeFile(join(testsDirectory, "lifetime.test.js"), `export { EntryLifetimeFixture as EntryLifetimeTests } from ${JSON.stringify(fixture)};\n`);
+    const summaryPath = join(directory.path, "summary.md");
+
+    const result = await this.runEntryArgumentsAsync(["TestPackage", testsDirectory], JSON.stringify(["noTestIsNamedThis"]), summaryPath);
+
+    Assert.areEqual(1, result.exitCode, result.errorOutput);
+    Assert.isTrue(result.errorOutput.includes("No test matched the filters"), result.errorOutput);
+    const summary = await readFile(summaryPath, "utf8");
+    Assert.isTrue(summary.includes("| Filters: | noTestIsNamedThis |"));
+    Assert.isTrue(summary.includes("| Selected: | 0 |"));
+    Assert.isTrue(summary.includes("No test matched the filters"));
+  }
+
+  @TestMethod
   public async endsTheRunAfterATestExceedsItsTimeLimit(): Promise<void> {
     using directory = new TemporaryDirectory();
     const testsDirectory = join(directory.path, "tests");

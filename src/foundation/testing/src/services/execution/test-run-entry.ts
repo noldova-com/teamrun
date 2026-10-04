@@ -51,6 +51,10 @@ export class TestRunEntry {
 
       reporter.writeSummary(result);
       summary.writeTests(result);
+      if (result.selection.isFiltered && result.selection.selected === 0) {
+        console.error(Resources.noTestMatchedFilters.trimEnd());
+        summary.writeFailure(Resources.noTestMatchedFilters);
+      }
       interrupted = result.isInterrupted;
       process.exitCode = Math.min(result.failed + result.unreached + Number(result.total === 0), 1);
     }
