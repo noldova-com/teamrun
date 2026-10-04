@@ -50,10 +50,13 @@ export default class ClassifyChanges {
     const targets = JSON.stringify(matrix.targets.map(t => ClassifyChanges.describe(t)));
     const table = matrix.targets.map(t => [t.name, t.runner, t.operatingSystem, t.architecture].join(ClassifyChanges.CELL_SEPARATOR)).join(ClassifyChanges.ROW_SEPARATOR);
     const uiTargets = matrix.targets.map(t => t.key).join(ClassifyChanges.KEY_SEPARATOR);
-    const uiPlan = JSON.stringify(Object.fromEntries(matrix.targets.map(t => [t.key, {
-      build: [ClassifyChanges.describe(t)],
-      shards: t.uiShards.map(s => ({ ...ClassifyChanges.describe(t), shard: s.index, shards: s.count }))
-    }])));
+    const uiPlan = JSON.stringify(Object.fromEntries(matrix.targets.map(t => {
+      const shards = matrix.uiShards(t);
+      return [t.key, {
+        build: shards.some(s => s.isPrebuilt) ? [ClassifyChanges.describe(t)] : [],
+        shards: shards.map(s => ({ ...ClassifyChanges.describe(t), shard: s.index, shards: s.count, grep: s.grep, prebuilt: s.isPrebuilt }))
+      }];
+    })));
     const deferred = matrix.deferred.map(t => t.name).join(ClassifyChanges.TARGET_SEPARATOR);
     await appendFile(outputPath,
       `run-code=${scope.runCode}\nrun-ui=${scope.runUi}\ntargets=${targets}\ntarget-table=${table}\nui-targets=${uiTargets}\nui-plan=${uiPlan}\ndeferred=${deferred}\n`);
