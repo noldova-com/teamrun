@@ -99,8 +99,10 @@ export class OpenWindow implements IQuitPrompt {
   }
 
   private showWhenReady(): void {
-    if (this.isPainted && this.isSettled && !this.window.isDestroyed() && !this.window.isVisible())
-      this.window.show();
+    if (!this.isPainted || !this.isSettled || this.window.isDestroyed() || this.window.isVisible())
+      return;
+    this.window.show();
+    this.bounds.noteShown();
   }
 
   public show(question: QuitQuestion | null): boolean {

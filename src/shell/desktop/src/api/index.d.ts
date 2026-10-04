@@ -3098,7 +3098,8 @@ export declare class DesktopLog implements IDesktopLog {
  */
 export declare class WindowBoundsKeeper {
   /**
-   * Creates the keeper and listens for the window's changes, which it saves only once it has a store.
+   * Creates the keeper and listens for the window's changes, which it saves once it has a store; changes the person
+   * makes to the shown window before then, after {@link WindowBoundsKeeper.noteShown}, are held.
    *
    * @param window The window.
    * @param displays The displays, for placing restored bounds.
@@ -3116,12 +3117,29 @@ export declare class WindowBoundsKeeper {
   public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog);
 
   /**
+   * Records the window's bounds as the ones it was shown with; a later change that differs from them, made before a
+   * store is set, counts as the person's.
+   *
+   * @example
+   * ```ts
+   * import type { WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function shown(keeper: WindowBoundsKeeper): void {
+   *   keeper.noteShown();
+   * }
+   * ```
+   */
+  public noteShown(): void;
+
+  /**
    * Keeps the bounds in the store from now on, and applies the bounds it holds: the saved position when a display
-   * shows it, otherwise the saved size centered, then maximized when it was.
+   * shows it, otherwise the saved size centered, then maximized when it was. When the person already moved or
+   * resized the shown window, those bounds stay and are saved instead of the saved ones are applied.
    *
    * @param store Where the bounds are kept.
    * @returns A promise that settles once the saved bounds are applied, or at once when none are saved.
    * @throws JsonException as a rejection when the saved bounds are not a window state; the window keeps its bounds.
+   * @throws The store's failure as a rejection when it could not keep the bounds the person set; they stay unsaved.
    * @example
    * ```ts
    * import type { IWindowStateStore, WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
@@ -3134,12 +3152,14 @@ export declare class WindowBoundsKeeper {
   public restoreAsync(store: IWindowStateStore): Promise<void>;
 
   /**
-   * Saves the window's current bounds at once, cancelling a pending save; does nothing before a store is set or
-   * after the window is gone. Bounds that could not be kept stay unsaved for {@link WindowBoundsKeeper.saveUnsavedAsync}.
+   * Saves the window's current bounds at once, cancelling a pending save; does nothing after the window is gone, or
+   * before a store is set unless the person moved the shown window. Bounds that could not be kept stay unsaved for
+   * {@link WindowBoundsKeeper.saveUnsavedAsync}.
    * A save after a move or resize that finds the runtime unreachable keeps the bounds unsaved without reporting it.
    *
    * @returns A promise that settles once the bounds are kept.
    * @throws The store's failure as a rejection.
+   * @throws {WindowStateUnavailableException} Asynchronously when the person moved the shown window before a store was set.
    * @example
    * ```ts
    * import type { WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";

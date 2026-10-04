@@ -1235,6 +1235,47 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async keepsAndSavesWhereThePersonPlacedAWindowShownBeforeTheRuntimeWasReady(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: false });
+    let arrive: (connection: FakeRuntimeConnection) => void = () => undefined;
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new Promise(resolve => {
+      arrive = resolve;
+    })));
+    const window = DesktopApplicationTests.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown);
+
+    window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+    window.change("move");
+    arrive(connection);
+    await Condition.waitAsync(() => connection.calls.includes("shell.writeWindowBounds"));
+
+    Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
+    Assert.areEqual(
+      JSON.stringify({ x: 40, y: 60, width: 900, height: 640, maximized: false }),
+      JSON.stringify(connection.states.get(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`)));
+  }
+
+  @TestMethod
+  public async recordsBoundsLostWhenAWindowMovedBeforeTheRuntimeWasReadyClosesFirst(): Promise<void> {
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new Promise<FakeRuntimeConnection>(() => undefined)), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown);
+    window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+    window.change("move");
+
+    window.close();
+    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
+    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    await Condition.waitAsync(() => window.isGone);
+
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The window closed without saving its bounds, because the runtime could not be reached").length);
+  }
+
+  @TestMethod
   public async savesTheBoundsBeforeTheWindowCloses(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));

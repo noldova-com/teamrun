@@ -85,6 +85,66 @@ export class WindowBoundsKeeperTests {
   }
 
   @TestMethod
+  public async keepsWhereThePersonPlacedTheWindowBeforeTheStoreAndSavesItInsteadOfRestoring(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
+    const store = new MemoryStore({ x: 200, y: 100, width: 1000, height: 700, maximized: false });
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
+    keeper.noteShown();
+
+    window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+    window.change("move");
+    await keeper.restoreAsync(store);
+
+    Assert.areEqual("[]", JSON.stringify(window.calls));
+    Assert.areEqual(JSON.stringify([{ x: 40, y: 60, width: 900, height: 640, maximized: false }]), JSON.stringify(store.writes));
+  }
+
+  @TestMethod
+  public async keepsBoundsMovedBeforeTheStoreUnsavedWhenTheFirstSaveFails(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
+    const store = new MemoryStore(null);
+    store.failure = new WindowStateUnavailableException("TeamRun is not connected to its runtime.");
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
+    keeper.noteShown();
+
+    window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+    window.change("resize");
+    await Assert.throwsAsync(() => keeper.restoreAsync(store), WindowStateUnavailableException);
+    store.failure = null;
+    await keeper.saveUnsavedAsync();
+
+    Assert.areEqual(1, store.writes.length);
+  }
+
+  @TestMethod
+  public async restoresTheSavedBoundsWhenOnlyTheShowingChangedTheWindowBeforeTheStore(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
+    const store = new MemoryStore({ x: 200, y: 100, width: 1000, height: 700, maximized: false });
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
+
+    window.bounds = { x: 0, y: 0, width: 1280, height: 752 };
+    window.change("resize");
+    keeper.noteShown();
+    window.change("move");
+    await keeper.restoreAsync(store);
+
+    Assert.areEqual(JSON.stringify(["setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}"]), JSON.stringify(window.calls));
+    Assert.areEqual(0, store.writes.length);
+  }
+
+  @TestMethod
+  public async refusesToSaveAtCloseBoundsMovedBeforeAnyStoreSoTheyAreReportedLost(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());
+    keeper.noteShown();
+
+    window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+    window.change("move");
+
+    await Assert.throwsAsync(() => keeper.saveAsync(), WindowStateUnavailableException);
+  }
+
+  @TestMethod
   public async restoresSavedBoundsThatADisplayShows(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog());

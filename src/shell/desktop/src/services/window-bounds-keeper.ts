@@ -25,21 +25,30 @@ export class WindowBoundsKeeper {
   private store: IWindowStateStore | null = null;
   private timer: NodeJS.Timeout | null = null;
   private hasUnsaved: boolean = false;
+  private shownBounds: string | null = null;
 
   public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog) {
     this.window = window;
     this.displays = displays;
     this.saveDelay = saveDelay;
     this.log = log;
-    const changed = (): void => this.scheduleSave();
+    const changed = (): void => this.noteChange();
     window.on(Resources.resizeEvent, changed);
     window.on(Resources.moveEvent, changed);
     window.on(Resources.maximizeEvent, changed);
     window.on(Resources.unmaximizeEvent, changed);
   }
 
+  public noteShown(): void {
+    this.shownBounds = this.describe();
+  }
+
   public async restoreAsync(store: IWindowStateStore): Promise<void> {
     this.store = store;
+    if (this.hasUnsaved) {
+      await this.saveAsync();
+      return;
+    }
     const saved = await store.readAsync();
     if (Object.isNull(saved))
       return;
@@ -57,8 +66,13 @@ export class WindowBoundsKeeper {
 
   public async saveAsync(): Promise<void> {
     this.cancelSave();
-    if (Object.isNull(this.store) || this.window.isDestroyed())
+    if (this.window.isDestroyed())
       return;
+    if (Object.isNull(this.store)) {
+      if (this.hasUnsaved)
+        throw new WindowStateUnavailableException(Resources.runtimeNotConnected);
+      return;
+    }
     const bounds = this.window.getNormalBounds();
     this.hasUnsaved = true;
     await this.store.writeAsync(new WindowState(bounds.x, bounds.y, bounds.width, bounds.height, this.window.isMaximized()).toJson());
@@ -76,9 +90,24 @@ export class WindowBoundsKeeper {
     this.timer = null;
   }
 
-  private scheduleSave(): void {
-    if (Object.isNull(this.store))
+  private noteChange(): void {
+    if (Object.isNull(this.store)) {
+      this.hasUnsaved ||= this.isMovedSinceShown();
       return;
+    }
+    this.scheduleSave();
+  }
+
+  private isMovedSinceShown(): boolean {
+    return !Object.isNull(this.shownBounds) && this.describe() !== this.shownBounds;
+  }
+
+  private describe(): string {
+    const bounds = this.window.getNormalBounds();
+    return `${bounds.x},${bounds.y},${bounds.width},${bounds.height},${this.window.isMaximized()}`;
+  }
+
+  private scheduleSave(): void {
     this.cancelSave();
     this.timer = setTimeout(() => void this.saveAsync().catch((error: unknown) => {
       if (!(error instanceof WindowStateUnavailableException))
