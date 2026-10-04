@@ -137,7 +137,7 @@ class BuildAndTestTests {
       }));
     });
 
-    test("the aggregate check names the jobs a passing pull request run left to the merge queue", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+    test("the aggregate check names the targets a passing pull request run left to main and manual runs", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
@@ -145,12 +145,12 @@ class BuildAndTestTests {
 
       const result = await doubles.runAsync(script, {
         TESTED_RESULT: "skipped", VERIFIED: "", TESTED_RUN: "", CHANGES_RESULT: "success", RUN_CODE: "true", VALIDATION_RESULT: "success",
-        EVENT_NAME: "pull_request", DEFERRED: "macOS x64, UI workflows", GITHUB_STEP_SUMMARY: "summary.md"
+        EVENT_NAME: "pull_request", DEFERRED: "Windows ARM64, macOS x64", GITHUB_STEP_SUMMARY: "summary.md"
       });
 
       assert.equal(result.status, 0, result.stderr);
       assert.equal(await doubles.readFileAsync("summary.md"),
-        "The document checks passed, and the build and tests passed on every target. These jobs run only in the merge queue: macOS x64, UI workflows.\n");
+        "The document checks passed, and the build and tests passed on every target this pull request run covers. Skipped here and run on every push to main and in manual runs: Windows ARM64, macOS x64.\n");
     });
 
     test("macOS targets stop Spotlight indexing before checking out", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
@@ -440,9 +440,9 @@ class BuildAndTestTests {
         ["Linux ARM64", "all", "runs"],
         ["Windows x64, tests", "tests", "runs"],
         ["Windows x64, UI workflows", "workflows", "runs"],
-        ["Windows ARM64, tests", "tests", "runs"],
-        ["Windows ARM64, UI workflows", "workflows", "runs"],
-        ["macOS x64, tests", "tests", "runs"],
+        ["Windows ARM64, tests", "tests", "deferred"],
+        ["Windows ARM64, UI workflows", "workflows", "deferred"],
+        ["macOS x64, tests", "tests", "deferred"],
         ["macOS x64, UI workflows", "workflows", "deferred"],
         ["macOS ARM64", "all", "runs"]
       ]);
@@ -459,7 +459,7 @@ class BuildAndTestTests {
       assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [tested, changes, validate]\n    if: always()\n"));
     });
 
-    test("a pull request leaves macOS x64's UI workflows to the merge queue, and every other run lists every job", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+    test("a pull request leaves Windows ARM64 and macOS x64 to main and manual runs, and every other run lists every job", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
       const script = workflow.readStepScript(BuildAndTestTests.LEGS_STEP);
       const all = BuildAndTestTests.readLegs(workflow.text).map(({ label, target, part, runner, architecture }) => ({ label, target, part, runner, architecture }));
@@ -476,8 +476,8 @@ class BuildAndTestTests {
         assert.equal(result.stdout, "", event);
         assert.deepEqual([...outputs.keys()], ["legs", "deferred", "complete"], event);
         if (event === "pull_request") {
-          assert.deepEqual(JSON.parse(outputs.get("legs") ?? ""), all.filter(t => t.label !== "macOS x64, UI workflows"));
-          assert.equal(outputs.get("deferred"), "macOS x64, UI workflows");
+          assert.deepEqual(JSON.parse(outputs.get("legs") ?? ""), all.filter(t => t.target !== "Windows ARM64" && t.target !== "macOS x64"));
+          assert.equal(outputs.get("deferred"), "Windows ARM64, macOS x64");
           assert.equal(outputs.get("complete"), "false");
         }
         else {

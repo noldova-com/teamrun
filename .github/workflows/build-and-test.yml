@@ -173,7 +173,10 @@ jobs:
           deferred=''
           while IFS='|' read -r label target part runner architecture pull_request; do
             if [ "$EVENT_NAME" = pull_request ] && [ "$pull_request" = deferred ]; then
-              deferred="$deferred${deferred:+, }$label"
+              case ", $deferred, " in
+                *", $target, "*) ;;
+                *) deferred="$deferred${deferred:+, }$target" ;;
+              esac
               continue
             fi
             legs="$legs${legs:+,}{\"label\":\"$label\",\"target\":\"$target\",\"part\":\"$part\",\"runner\":\"$runner\",\"architecture\":\"$architecture\"}"
@@ -182,9 +185,9 @@ jobs:
           Linux ARM64|Linux ARM64|all|ubuntu-24.04-arm|arm64|runs
           Windows x64, tests|Windows x64|tests|windows-2025|x64|runs
           Windows x64, UI workflows|Windows x64|workflows|windows-2025|x64|runs
-          Windows ARM64, tests|Windows ARM64|tests|windows-11-arm|arm64|runs
-          Windows ARM64, UI workflows|Windows ARM64|workflows|windows-11-arm|arm64|runs
-          macOS x64, tests|macOS x64|tests|macos-15-intel|x64|runs
+          Windows ARM64, tests|Windows ARM64|tests|windows-11-arm|arm64|deferred
+          Windows ARM64, UI workflows|Windows ARM64|workflows|windows-11-arm|arm64|deferred
+          macOS x64, tests|macOS x64|tests|macos-15-intel|x64|deferred
           macOS x64, UI workflows|macOS x64|workflows|macos-15-intel|x64|deferred
           macOS ARM64|macOS ARM64|all|macos-15|arm64|runs
           LEGS
@@ -717,7 +720,7 @@ jobs:
               ;;
             skipped:::success:true:success | success:false::success:true:success)
               if [ -n "$DEFERRED" ]; then
-                echo "The document checks passed, and the build and tests passed on every target. These jobs run only in the merge queue: $DEFERRED." >> "$GITHUB_STEP_SUMMARY"
+                echo "The document checks passed, and the build and tests passed on every target this pull request run covers. Skipped here and run on every push to main and in manual runs: $DEFERRED." >> "$GITHUB_STEP_SUMMARY"
               else
                 echo 'The document checks passed, and the build and tests passed on every target.' >> "$GITHUB_STEP_SUMMARY"
               fi
