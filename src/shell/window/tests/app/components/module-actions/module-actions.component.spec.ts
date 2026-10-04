@@ -12,6 +12,7 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { ModuleState, ModuleStatus } from "@noldova/teamrun-shell-protocol";
 
 import { ModuleActionsComponent } from "../../../../src/app/components/module-actions/module-actions.component";
+import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 
 describe("ModuleActionsComponent", () => {
@@ -51,6 +52,21 @@ describe("ModuleActionsComponent", () => {
     for (let turn = 0; turn < 10; turn++)
       await Promise.resolve();
   }
+
+  it("centers each action's glyph in its button", async () => {
+    AppearanceFixture.apply();
+    try {
+      await renderAsync();
+      const middle = (element: Element): number => element.getBoundingClientRect().top + element.getBoundingClientRect().height / 2;
+
+      const offsets = ["copy", "logs"].map(name => Math.abs(middle(button(name).querySelector("[trButtonIcon]") as Element) - middle(button(name))));
+
+      expect(Math.max(...offsets)).toBeLessThanOrEqual(1.5);
+    }
+    finally {
+      AppearanceFixture.reset();
+    }
+  });
 
   it("copies the build and the module's id, state and cause, and says Copied for a while", async () => {
     await renderAsync();

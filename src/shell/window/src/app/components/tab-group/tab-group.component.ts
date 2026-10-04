@@ -69,6 +69,7 @@ export class TabGroupComponent {
   protected readonly surface: Signal<PanelSurface> = computed(() => Object.isNull(this.frame().side) ? PanelSurface.Panel : PanelSurface.Shell);
   protected readonly isShell: Signal<boolean> = computed(() => this.surface() === PanelSurface.Shell);
   protected readonly panelId: Signal<string> = computed(() => `${Resources.tabPanelIdPrefix}${this.group().id}`);
+  protected readonly isDropAtEnd: Signal<boolean> = computed(() => this.drag.isDropBefore(this.group().id, this.group().tabs.length));
   protected readonly activeTabId: Signal<string | null> = computed(() => {
     const index = this.group().tabs.findIndex(t => t.equals(this.group().active));
     return index < 0 ? null : this.tabId(index);

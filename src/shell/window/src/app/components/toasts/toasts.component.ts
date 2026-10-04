@@ -35,8 +35,6 @@ export class ToastsComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
   protected readonly toasts: Signal<readonly Notification[]> = this.service.toasts;
-  protected readonly polite: Signal<string> = this.service.politeAnnouncement;
-  protected readonly assertive: Signal<string> = this.service.assertiveAnnouncement;
 
   protected glyph(severity: NotificationSeverity): string {
     return Resources.severityGlyphs[severity];

@@ -6,30 +6,30 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { Bounds } from "./bounds";
 import { DropTarget } from "./drop-target";
 import type { Layout } from "./layout";
+import type { LayoutGeometry } from "./layout-geometry";
 import type { Tab } from "./tab";
 
-export class TabDropTarget extends DropTarget {
+export class GroupDropTarget extends DropTarget {
   public readonly groupId: number;
-  public readonly index: number;
 
-  public constructor(groupId: number, index: number) {
+  public constructor(groupId: number) {
     super();
 
     this.groupId = groupId;
-    this.index = Math.max(0, Math.round(index));
   }
 
   public override place(layout: Layout, tab: Tab): Layout {
-    return layout.moveTab(tab, this.groupId, this.index);
+    return layout.moveTab(tab, this.groupId, layout.group(this.groupId)?.tabs.length ?? 0);
   }
 
-  public override preview(): null {
-    return null;
+  public override preview(geometry: LayoutGeometry): Bounds | null {
+    return geometry.frameOf(this.groupId)?.bounds ?? null;
   }
 
   public override equals(other: DropTarget | null): boolean {
-    return other instanceof TabDropTarget && other.groupId === this.groupId && other.index === this.index;
+    return other instanceof GroupDropTarget && other.groupId === this.groupId;
   }
 }

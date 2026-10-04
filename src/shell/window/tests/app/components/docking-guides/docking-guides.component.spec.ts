@@ -15,6 +15,7 @@ import { DockSide } from "../../../../src/app/enums/dock-side";
 import { DockingOverlay } from "../../../../src/app/models/layout/docking-overlay";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import type { Tab } from "../../../../src/app/models/layout/tab";
+import { TabDropTarget } from "../../../../src/app/models/layout/tab-drop-target";
 import type { LayoutService } from "../../../../src/app/services/layout.service";
 import { TabDragService } from "../../../../src/app/services/tab-drag.service";
 import { Resources } from "../../../../src/resources";
@@ -26,7 +27,7 @@ import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
   imports: [DockingGuidesComponent],
   template: `
     <div class="workspace">
-      <div class="group" data-drop-group="0"></div>
+      <div class="group" data-drop-group="0"><div class="tabs" data-drop-tabs><span class="tab" data-tab-index="0"></span></div></div>
       <div class="group" data-drop-group="1"></div>
       <div class="group" data-drop-group="2"></div>
       <tr-docking-guides />
@@ -138,6 +139,9 @@ describe("DockingGuidesComponent", () => {
     expect(find("tr-docking-plate [data-direction=\"Top\"]")?.classList.contains("tr-docking-guide-chosen")).toBe(true);
     moveOver("tr-docking-plate [data-direction=\"Center\"]");
     expect(find("tr-docking-plate [data-direction=\"Center\"]")?.classList.contains("tr-docking-guide-chosen")).toBe(true);
+    const group = layout.geometry().frameOf(2)?.bounds;
+    expectBox(find(".tr-docking-preview"), group?.x ?? -1, group?.y ?? -1);
+    expectRem(find(".tr-docking-preview")?.style.height, group?.height ?? -1);
     moveOver("tr-docking-plate");
     expect(host.querySelectorAll(".tr-docking-guide-chosen").length).toBe(0);
   });
@@ -178,5 +182,17 @@ describe("DockingGuidesComponent", () => {
     expect(find(".tr-drag-label")?.textContent).toContain(Resources.formatDraggedTab("plan"));
     moveOver(".group[data-drop-group=\"1\"]");
     expect(find("tr-docking-plate")).toBeNull();
+  });
+
+  it("shows neither a plate nor a preview over a group's tab row, where the tab takes a place in the row", () => {
+    layout.openDocument(LayoutFixture.todo);
+    start(LayoutFixture.plan);
+    moveOver(".group[data-drop-group=\"0\"]");
+    expect(find("tr-docking-plate")).not.toBeNull();
+
+    moveOver(".tab");
+
+    expect(TestBed.inject(TabDragService).target()).toBeInstanceOf(TabDropTarget);
+    expect([find("tr-docking-plate"), find(".tr-docking-preview")]).toEqual([null, null]);
   });
 });
