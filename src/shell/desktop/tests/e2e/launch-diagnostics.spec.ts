@@ -6,16 +6,19 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { readdir } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import os from "node:os";
+import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
+import ProcessListFixture from "./fixtures/process-list.fixture.ts";
+
+const listRoots = async (): Promise<string[]> => (await readdir(os.tmpdir())).filter(t => t.startsWith("teamrun-ui-")).sort();
 
 test("a launch that fails says what the window, the data directory's lock, the processes and the processors showed, keeps its trace, windows, pages and logs, and leaves nothing behind", async ({}, testInfo) => {
   test.setTimeout(90_000);
-  const listRoots = async (): Promise<string[]> => (await readdir(os.tmpdir())).filter(t => t.startsWith("teamrun-ui-")).sort();
   const rootsBefore = await listRoots();
 
   const failure = await DesktopApplicationFixture.launchAsync(testInfo, {}, { "ownership.sqlite": "This is not a database." })
@@ -33,5 +36,30 @@ test("a launch that fails says what the window, the data directory's lock, the p
   expect(String(attachments.get("page-0.html")?.body)).toContain("tr-");
   expect([...attachments.keys()].some(t => /^start-.+\.log$/.test(t))).toBe(true);
   expect([...attachments.keys()].filter(t => t.endsWith(".unavailable.txt"))).toEqual([]);
+  expect(attachments.has("cleanup-failure.txt")).toBe(false);
   expect(await listRoots()).toEqual(rootsBefore);
+});
+
+test("a launch that fails on an unreadable discovery file, whose cleanup then fails on it too, closes the application and reports the launch's failure with the cleanup's kept beside it", async ({}, testInfo) => {
+  test.setTimeout(90_000);
+  const rootsBefore = await listRoots();
+
+  const failure = await DesktopApplicationFixture.launchAsync(testInfo, {}, { "discovery/runtime.json": "This is not a discovery file." })
+    .then(() => null, (error: unknown) => error);
+  const kept = (await listRoots()).filter(t => !rootsBefore.includes(t));
+  try {
+    await expect.poll(() => Promise.all(kept.map(t => ProcessListFixture.describeNamingAsync(path.join(os.tmpdir(), t)))), { timeout: 10_000 }).toEqual(kept.map(() => "none"));
+  }
+  finally {
+    await Promise.all(kept.map(t => rm(path.join(os.tmpdir(), t), { recursive: true, force: true, maxRetries: 10 })));
+  }
+
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toMatch(/runtime\.json is not valid: /);
+  expect((failure as Error).stack).toContain("waitForRuntimeAsync");
+  expect((failure as Error).stack).not.toContain("disposeAsync");
+  const cleanup = testInfo.attachments.filter(t => t.name === "cleanup-failure.txt");
+  expect(cleanup).toHaveLength(1);
+  expect(String(cleanup[0]?.body)).toMatch(/runtime\.json is not valid: .*disposeAsync/s);
+  expect(kept).toHaveLength(1);
 });
