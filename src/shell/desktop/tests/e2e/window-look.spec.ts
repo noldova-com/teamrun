@@ -70,9 +70,9 @@ test.describe("the window's look", () => {
     const content = window.locator(`${documentsGroup} tr-tab-content`);
     const scroller = window.locator(`${documentsGroup} .tr-tab-group-scroller`);
 
-    const area = await ScrollAreaFixture.measureAsync(content);
-    const strip = await ScrollAreaFixture.measureAsync(scroller);
-    const quietStrip = await ScrollAreaFixture.measureAsync(window.locator(`${bottomGroup} .tr-tab-group-scroller`));
+    const area = await ScrollAreaFixture.scrollbarSizesAsync(content);
+    const strip = await ScrollAreaFixture.scrollbarSizesAsync(scroller);
+    const quietStrip = await ScrollAreaFixture.scrollbarSizesAsync(window.locator(`${bottomGroup} .tr-tab-group-scroller`));
     expect(area.vertical).toBeCloseTo(0.375 * area.rem, 0);
     expect(strip.horizontal).toBeCloseTo(0.375 * strip.rem, 0);
     expect(quietStrip.horizontal).toBeCloseTo(0.375 * strip.rem, 0);

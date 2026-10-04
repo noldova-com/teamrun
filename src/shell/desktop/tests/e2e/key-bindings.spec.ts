@@ -10,6 +10,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import SettingsFixture from "./fixtures/settings.fixture.ts";
 
 const isMac = process.platform === "darwin";
 const windowColors = { Light: "rgb(248, 248, 248)", Dark: "rgb(24, 24, 24)" };
@@ -31,10 +32,7 @@ function note(window: Page, id: number): Locator {
 }
 
 async function openShortcutsAsync(window: Page): Promise<void> {
-  await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
-  await window.keyboard.press("ControlOrMeta+Comma");
-  await expect(window.locator("tr-settings")).toBeVisible();
-  await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
+  await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
   await expect(keyOf(window, "notes.newNote")).toBeVisible();
 }
 

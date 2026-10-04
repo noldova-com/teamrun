@@ -13,7 +13,7 @@ export default class ScrollAreaFixture {
   private static readonly HOVER_POSITION: Readonly<Record<"x" | "y", number>> = { x: 20, y: 10 };
   private static readonly DRAG_STEPS: number = 5;
 
-  public static measureAsync(area: Locator): Promise<Readonly<Record<"vertical" | "horizontal" | "rem", number>>> {
+  public static scrollbarSizesAsync(area: Locator): Promise<Readonly<Record<"vertical" | "horizontal" | "rem", number>>> {
     return area.evaluate(t => {
       const element = t as HTMLElement;
       const style = getComputedStyle(element);
@@ -25,7 +25,7 @@ export default class ScrollAreaFixture {
     });
   }
 
-  public static async revealThumbAsync(window: Page, area: Locator): Promise<void> {
+  public static async revealThumbColorAsync(window: Page, area: Locator): Promise<void> {
     await ScrollAreaFixture.restAsync(window, area);
     await ScrollAreaFixture.hoverAsync(window, area);
   }
@@ -50,7 +50,7 @@ export default class ScrollAreaFixture {
     return area.evaluate(t => t.scrollTop);
   }
 
-  public static async dragThumbAsync(window: Page, area: Locator, distance: number): Promise<Readonly<Record<"start" | "expected", number>>> {
+  public static async dragVerticalThumbAsync(window: Page, area: Locator, distance: number): Promise<Readonly<Record<"start" | "distance", number>>> {
     const thumb = await area.evaluate(t => {
       const element = t as HTMLElement;
       const box = element.getBoundingClientRect();
@@ -66,7 +66,7 @@ export default class ScrollAreaFixture {
     await window.mouse.down();
     await window.mouse.move(thumb.x, thumb.y + distance, { steps: ScrollAreaFixture.DRAG_STEPS });
     await window.mouse.up();
-    return { start: thumb.start, expected: distance * thumb.ratio };
+    return { start: thumb.start, distance: distance * thumb.ratio };
   }
 
   private static thumbColorAsync(area: Locator): Promise<string> {

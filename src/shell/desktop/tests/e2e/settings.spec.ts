@@ -14,6 +14,7 @@ import type { Locator, Page } from "@playwright/test";
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import ScrollAreaFixture from "./fixtures/scroll-area.fixture.ts";
+import SettingsFixture from "./fixtures/settings.fixture.ts";
 import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
 
 const windowColors = { Light: "rgb(248, 248, 248)", Dark: "rgb(24, 24, 24)" };
@@ -25,17 +26,11 @@ function settingsTab(window: Page): Locator {
 
 async function expectSamePageAsync(window: Page, top: number): Promise<void> {
   await expect(window.locator(".tr-settings-page[aria-current=page]")).toHaveText("Keyboard shortcuts");
-  await expect.poll(() => window.locator(".tr-settings-content").evaluate(t => t.scrollTop)).toBe(top);
+  await expect.poll(() => ScrollAreaFixture.scrollTopAsync(window.locator(".tr-settings-content"))).toBe(top);
 }
 
 function row(window: Page, name: string): Locator {
   return window.locator(`tr-setting-row[data-setting="${name}"]`);
-}
-
-async function openSettingsAsync(window: Page): Promise<void> {
-  await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
-  await window.keyboard.press("ControlOrMeta+Comma");
-  await expect(window.locator("tr-settings")).toBeVisible();
 }
 
 async function otherModeAsync(window: Page): Promise<"Light" | "Dark"> {
@@ -69,7 +64,7 @@ test.describe("settings", () => {
   test("Settings opens by its key as one document, lists its pages and shows the shell's keys", async ({ desktop }) => {
     const window = desktop.window;
 
-    await openSettingsAsync(window);
+    await SettingsFixture.openAsync(window);
     await window.keyboard.press("ControlOrMeta+Comma");
 
     await expect(settingsTab(window)).toHaveCount(1);
@@ -81,25 +76,24 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-shortcuts");
   });
 
-  test("the page list and a long page show their scrollbar's thumb while hovered, and dragging the page's thumb scrolls it", async ({ desktop }) => {
+  test("the page list reveals its scrollbar's thumb colour while hovered, a long page shows its thumb while hovered, and dragging that thumb scrolls the page", async ({ desktop }) => {
     const window = desktop.window;
     const content = window.locator(".tr-settings-content");
-    await openSettingsAsync(window);
-    await window.getByRole("button", { name: "Gallery", exact: true }).click();
+    await SettingsFixture.openGalleryAsync(window);
     await expect(content.locator("tr-quick-input").getByRole("option").first()).toBeAttached();
     await content.evaluate(t => t.scrollTo(0, 0));
     expect(await content.evaluate(t => t.scrollHeight > t.clientHeight)).toBe(true);
 
-    await ScrollAreaFixture.revealThumbAsync(window, window.locator(".tr-settings-pages"));
+    await ScrollAreaFixture.revealThumbColorAsync(window, window.locator(".tr-settings-pages"));
     expect(await ScrollAreaFixture.thumbChangesOnHoverAsync(window, content, "vertical")).toBe(true);
-    const drag = await ScrollAreaFixture.dragThumbAsync(window, content, 100);
+    const drag = await ScrollAreaFixture.dragVerticalThumbAsync(window, content, 100);
 
-    await expect.poll(async () => Math.abs(await ScrollAreaFixture.scrollTopAsync(content) - drag.start - drag.expected)).toBeLessThan(drag.expected / 10);
+    await expect.poll(async () => Math.abs(await ScrollAreaFixture.scrollTopAsync(content) - drag.start - drag.distance)).toBeLessThan(drag.distance / 10);
   });
 
   test("search filters every page by title, description and name, marking the matches, and choosing a page ends it", async ({ desktop }) => {
     const window = desktop.window;
-    await openSettingsAsync(window);
+    await SettingsFixture.openAsync(window);
 
     await window.getByRole("searchbox", { name: "Search settings" }).fill("size");
 
@@ -117,7 +111,7 @@ test.describe("settings", () => {
   test("Settings keeps its page and scroll position when its tab becomes active again and when it moves to another group", async ({ desktop }) => {
     const window = desktop.window;
     const note = "document/notes.note/2";
-    await openSettingsAsync(window);
+    await SettingsFixture.openAsync(window);
     await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
     const top = await window.locator(".tr-settings-content").evaluate(async t => {
       t.scrollTop = 120;
@@ -141,7 +135,7 @@ test.describe("settings", () => {
 
   test("changing the mode, a font and a size repaints the window at once, marks them modified, and Reset returns each", async ({ desktop }) => {
     const window = desktop.window;
-    await openSettingsAsync(window);
+    await SettingsFixture.openAsync(window);
     const mode = await otherModeAsync(window);
     const before = await window.evaluate(() => ({ font: getComputedStyle(document.body).fontFamily, size: getComputedStyle(document.documentElement).fontSize }));
 
@@ -165,7 +159,7 @@ test.describe("settings", () => {
 
   test("the Mode pills are one radio group: the checked pill is the tab stop and the arrow keys move the choice", async ({ desktop }) => {
     const window = desktop.window;
-    await openSettingsAsync(window);
+    await SettingsFixture.openAsync(window);
     const pill = (name: string): Locator => row(window, "shell.mode").getByRole("radiogroup", { name: "Mode" }).getByRole("radio", { name, exact: true });
     const backgroundAsync = (): Promise<string> => window.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
@@ -190,7 +184,7 @@ test.describe("settings", () => {
 
   test("choosing a setting's default by hand removes its Modified marker and Reset, also after a restart", async ({ desktop }) => {
     const window = desktop.window;
-    await openSettingsAsync(window);
+    await SettingsFixture.openAsync(window);
     const mode = row(window, "shell.mode");
 
     await chooseAsync(window, "shell.mode", "Dark");
@@ -202,7 +196,7 @@ test.describe("settings", () => {
     await expect(mode.getByRole("button", { name: /^Reset / })).toHaveCount(0);
     await desktop.checkpointAsync("settings-default-by-hand");
     await desktop.restartAsync();
-    await openSettingsAsync(desktop.window);
+    await SettingsFixture.openAsync(desktop.window);
     await expect(row(desktop.window, "shell.mode").getByRole("radio", { name: "System" })).toBeChecked();
     await expect(row(desktop.window, "shell.mode").locator(".tr-setting-row-marker")).toHaveCount(0);
     await expect(row(desktop.window, "shell.mode").getByRole("button", { name: /^Reset / })).toHaveCount(0);
@@ -210,7 +204,7 @@ test.describe("settings", () => {
 
   test("a restart paints the first frame in the chosen mode, before the runtime has given the window any setting", async ({ desktop }) => {
     const window = desktop.window;
-    await openSettingsAsync(window);
+    await SettingsFixture.openAsync(window);
     const mode = await otherModeAsync(window);
     await chooseAsync(window, "shell.mode", mode);
     await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(windowColors[mode]);
