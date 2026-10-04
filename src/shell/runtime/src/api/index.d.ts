@@ -2696,7 +2696,8 @@ export declare class LaunchSettings {
   public readonly idleGraceMilliseconds: number;
 
   /**
-   * How long attaching may take, including a takeover, in milliseconds.
+   * How long attaching may take, including a takeover, in milliseconds,
+   * unless the data directory is owned.
    */
   public readonly launchTimeout: number;
 
@@ -2711,6 +2712,12 @@ export declare class LaunchSettings {
   public readonly clientSettings: ClientSettings;
 
   /**
+   * How long attaching may take, in milliseconds, while the data directory
+   * is owned, by the runtime the launcher started or by another.
+   */
+  public readonly launchLimit: number;
+
+  /**
    * Creates the settings.
    *
    * @param dataDirectory The data directory.
@@ -2722,8 +2729,11 @@ export declare class LaunchSettings {
    * @param launchTimeout The attach limit in milliseconds. Defaults to 20 seconds.
    * @param pollInterval The polling interval in milliseconds. Defaults to 100 milliseconds.
    * @param clientSettings The clients' settings. Defaults to {@link ClientSettings}' defaults.
+   * @param launchLimit The attach limit, in milliseconds, while the data directory is owned.
+   * Defaults to 60 seconds, or the launch timeout when that is longer.
    * @throws {ArgumentException} When a path is empty or whitespace.
-   * @throws {ArgumentOutOfRangeException} When a duration is not a positive integer.
+   * @throws {ArgumentOutOfRangeException} When a duration is not a positive integer, or the
+   * launch limit is shorter than the launch timeout.
    * @example
    * ```ts
    * import { DataDirectory, LaunchSettings, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
@@ -2745,7 +2755,8 @@ export declare class LaunchSettings {
     idleGraceMilliseconds?: number,
     launchTimeout?: number,
     pollInterval?: number,
-    clientSettings?: ClientSettings);
+    clientSettings?: ClientSettings,
+    launchLimit?: number);
 }
 
 /**
@@ -3414,7 +3425,7 @@ export declare class RuntimeLauncher {
    * @throws {RuntimeHandoverException} Rejected when a newer build's runtime owns the directory.
    * @throws {PreShellDataFoundException} Rejected when the runtime refuses until data from before the shell is moved aside.
    * @throws {WorkInProgressException} Rejected when an older runtime has work in progress and the policy is to stop only if idle.
-   * @throws {LaunchException} Rejected when the runtime cannot start, does not start in time, or an older runtime refuses to stop or does not stop in time.
+   * @throws {LaunchException} Rejected when the runtime cannot start, exits before it is reachable, does not start in time, holds the directory without becoming reachable within the launch limit, or an older runtime refuses to stop or does not stop in time.
    * @throws {ConnectionException} Rejected when the runtime refuses the connection.
    * @example
    * ```ts

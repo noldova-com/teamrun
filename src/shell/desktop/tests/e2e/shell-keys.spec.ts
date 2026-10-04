@@ -8,6 +8,7 @@
 
 import type { Locator, Page } from "@playwright/test";
 
+import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 const isMac = process.platform === "darwin";
@@ -60,9 +61,7 @@ test.describe("the shell's keys", () => {
     await window.keyboard.press("Escape");
     await expect(window.locator(".cdk-overlay-container tr-menu")).toHaveCount(0);
 
-    await window.keyboard.press("ControlOrMeta+Shift+KeyP");
-    await expect(window.getByRole("combobox", { name: "Search commands" })).toBeFocused();
-    await window.keyboard.type("tab");
+    await CommandSearchFixture.searchAsync(window, "tab");
     const row = (name: string): Locator => window.locator(`.tr-command-search-pane [data-item="${name}"] .tr-quick-input-key`);
     await expect(row("shell.nextTab")).toHaveText(isMac ? "⌃⇥" : "Ctrl+Tab");
     await expect(row("shell.previousTab")).toHaveText(isMac ? "⌃⇧⇥" : "Ctrl+Shift+Tab");

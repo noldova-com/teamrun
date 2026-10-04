@@ -7,6 +7,7 @@
  */
 
 import { setTimeout as delay } from "node:timers/promises";
+import { inspect } from "node:util";
 
 import "@noldova/teamrun-foundation-core";
 import { type Event, type RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
@@ -31,6 +32,7 @@ export class RuntimeStartup {
   private readonly handOver: (handover: RuntimeHandover) => boolean;
   private readonly waitInterval: number;
   private readonly forward: (event: Event) => void;
+  private readonly log: (message: string) => void;
   private readonly listener: IRuntimeClientListener;
   private state: StartupState = StartupState.connecting();
   private connectionValue: IRuntimeConnection | null = null;
@@ -41,12 +43,14 @@ export class RuntimeStartup {
     publish: (state: StartupState) => void,
     handOver: (handover: RuntimeHandover) => boolean,
     waitInterval: number,
-    forward: (event: Event) => void) {
+    forward: (event: Event) => void,
+    log: (message: string) => void) {
     this.launcher = launcher;
     this.publish = publish;
     this.handOver = handOver;
     this.waitInterval = waitInterval;
     this.forward = forward;
+    this.log = log;
     this.listener = {
       onEvent: t => this.forward(t),
       onDisconnected: () => this.reconnect()
@@ -133,17 +137,21 @@ export class RuntimeStartup {
       if (!this.handOver(error.handover))
         this.update(StartupState.newerBuild(error.handover.identity.productVersion));
     }
-    else if (error instanceof LaunchException || error instanceof ConnectionException)
+    else if (error instanceof LaunchException || error instanceof ConnectionException) {
+      this.log(Resources.formatRuntimeNotStarted(error.message));
       this.update(StartupState.failed(error.message));
-    else
-      throw error;
+    }
+    else {
+      this.log(Resources.formatRuntimeNotStarted(inspect(error)));
+      this.update(StartupState.failed(String(error)));
+    }
   }
 
   private reconnect(): void {
     if (Object.isNull(this.connectionValue) || this.isClosed)
       return;
     this.connectionValue = null;
-    this.startAsync().catch((error: unknown) => this.update(StartupState.failed(String(error))));
+    void this.startAsync();
   }
 
   private update(state: StartupState): void {

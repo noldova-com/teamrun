@@ -41,24 +41,33 @@ export class FakeRuntimeFixture implements AsyncDisposable {
   }
 
   public static async startAsync(token: string = RuntimeServerFixture.TOKEN, endpoint?: string): Promise<FakeRuntimeFixture> {
+    const fake = await FakeRuntimeFixture.ownAsync();
+    await fake.publishAsync(token, endpoint);
+    return fake;
+  }
+
+  public static async ownAsync(): Promise<FakeRuntimeFixture> {
     const root = await mkdtemp(path.join(tmpdir(), "tr-fake-"));
     const dataDirectory = new DataDirectory(path.join(root, "data"));
     const lock = OwnershipLock.acquire(dataDirectory);
     const server = await RuntimeServerFixture.startAsync();
+    return new FakeRuntimeFixture(root, dataDirectory, lock, server);
+  }
+
+  public async publishAsync(token: string = RuntimeServerFixture.TOKEN, endpoint?: string): Promise<void> {
     const identity = RuntimeServerFixture.IDENTITY;
     const discovery = new RuntimeDiscovery(
-      endpoint ?? String(server.endpoint),
+      endpoint ?? String(this.server.endpoint),
       token,
       process.pid,
       process.execPath,
       identity.productVersion,
       identity.protocolVersion,
       identity.fingerprint);
-    await new DiscoveryPublisher(lock, new FolderProtectorFixture()).publishAsync(discovery);
-    return new FakeRuntimeFixture(root, dataDirectory, lock, server);
+    await new DiscoveryPublisher(this.lock, new FolderProtectorFixture()).publishAsync(discovery);
   }
 
-  public createSettings(launchTimeout: number = 5_000): LaunchSettings {
+  public createSettings(launchTimeout: number = 5_000, launchLimit: number = launchTimeout): LaunchSettings {
     return new LaunchSettings(
       this.dataDirectory,
       process.execPath,
@@ -68,7 +77,8 @@ export class FakeRuntimeFixture implements AsyncDisposable {
       30_000,
       launchTimeout,
       25,
-      new ClientSettings(1_000, 2_000, 500));
+      new ClientSettings(1_000, 2_000, 500),
+      launchLimit);
   }
 
   public release(): void {

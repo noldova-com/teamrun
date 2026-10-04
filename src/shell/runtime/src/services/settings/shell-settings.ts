@@ -21,6 +21,7 @@ export class ShellSettings {
   public static readonly leftDockStyle: QualifiedName = ShellSettings.named(Resources.leftDockStyleSetting);
   public static readonly rightDockStyle: QualifiedName = ShellSettings.named(Resources.rightDockStyleSetting);
   public static readonly menuBar: QualifiedName = ShellSettings.named(Resources.menuBarSetting);
+  public static readonly previewTabs: QualifiedName = ShellSettings.named(Resources.previewTabsSetting);
   public static readonly doNotDisturb: QualifiedName = ShellSettings.named(Resources.doNotDisturbSetting);
   public static readonly mutedModules: QualifiedName = ShellSettings.named(Resources.mutedModulesSetting);
 
@@ -45,6 +46,8 @@ export class ShellSettings {
       ShellSettings.choiceOf(Resources.dockStyleOptions), Resources.defaultDockStyle, SettingLocality.Shared, Resources.layoutGroup),
     ShellSettings.appearance(ShellSettings.menuBar, Resources.menuBarTitle, Resources.menuBarDescription,
       ShellSettings.choiceOf(Resources.menuBarOptions), Resources.defaultMenuBar, SettingLocality.Shared, Resources.layoutGroup),
+    ShellSettings.appearance(ShellSettings.previewTabs, Resources.previewTabsTitle, Resources.previewTabsDescription,
+      SettingType.boolean(), true, SettingLocality.Shared, Resources.layoutGroup),
     new SettingDefinition(ShellSettings.doNotDisturb, Resources.doNotDisturbTitle, Resources.doNotDisturbDescription,
       SettingType.boolean(), false, SettingLocality.Device, [], Resources.notificationsPage, Resources.notificationsGroup),
     new SettingDefinition(ShellSettings.mutedModules, Resources.mutedModulesTitle, Resources.mutedModulesDescription,
@@ -68,7 +71,7 @@ export class ShellSettings {
     title: string,
     description: string,
     type: SettingType,
-    defaultValue: string | number,
+    defaultValue: string | number | boolean,
     locality: SettingLocality,
     group: string
   ): SettingDefinition {

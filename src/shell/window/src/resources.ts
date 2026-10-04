@@ -296,6 +296,7 @@ export class Resources {
   public static readonly regionRole: string = "region";
   public static readonly tabPanelRole: string = "tabpanel";
   public static readonly verticalOrientation: string = "vertical";
+  public static readonly previewTabsSetting: string = "shell.previewTabs";
   public static readonly dockStyleSettings: ReadonlyMap<DockSide, string> = new Map([[DockSide.Left, "shell.leftDockStyle"], [DockSide.Right, "shell.rightDockStyle"]]);
   public static readonly dockStripLabels: Readonly<Record<DockSide, string>> = {
     [DockSide.Left]: "Left dock views",
