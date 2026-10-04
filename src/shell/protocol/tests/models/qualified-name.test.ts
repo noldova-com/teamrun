@@ -45,6 +45,13 @@ export class QualifiedNameTests {
   }
 
   @TestMethod
+  public findsANameWithoutThrowing(): void {
+    Assert.areEqual("work-items.listOpen2", QualifiedName.find("work-items.listOpen2")?.text);
+    for (const text of ["shell", ".handshake", "shell.", "Shell.handshake", "shell.handshake.extra"])
+      Assert.isNull(QualifiedName.find(text), text);
+  }
+
+  @TestMethod
   public reportsTheNameParameterByDefault(): void {
     Assert.areEqual("name", Assert.throws(() => new QualifiedName("shell", "Bad"), ArgumentException).parameterName);
     Assert.areEqual("text", Assert.throws(() => QualifiedName.parse("bad"), ArgumentException).parameterName);

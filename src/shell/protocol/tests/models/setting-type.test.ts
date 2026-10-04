@@ -17,7 +17,7 @@ export class SettingTypeTests {
 
   @TestMethod
   public pinsTheWireFormOfEachKind(): void {
-    const types = [SettingType.boolean(), SettingTypeTests.MODES, SettingType.number(12, 18, 1), SettingType.text(200), SettingType.modules()];
+    const types = [SettingType.boolean(), SettingTypeTests.MODES, SettingType.number(12, 18, 1), SettingType.text(200), SettingType.modules(), SettingType.keyBindings()];
     const texts = types.map(t => JSON.stringify(t.toJson()));
 
     Assert.areEqual(JSON.stringify([
@@ -25,7 +25,8 @@ export class SettingTypeTests {
       "{\"kind\":\"Choice\",\"options\":[{\"value\":\"Light\",\"title\":\"Light\"},{\"value\":\"Dark\",\"title\":\"Dark\"}]}",
       "{\"kind\":\"Number\",\"minimum\":12,\"maximum\":18,\"step\":1}",
       "{\"kind\":\"Text\",\"maxLength\":200}",
-      "{\"kind\":\"Modules\"}"
+      "{\"kind\":\"Modules\"}",
+      "{\"kind\":\"KeyBindings\"}"
     ]), JSON.stringify(texts));
     Assert.areEqual(JSON.stringify(texts), JSON.stringify(texts.map(t => JSON.stringify(SettingType.fromJson(JSON.parse(t)).toJson()))));
     Assert.areEqual("Choice,Number", [SettingTypeTests.MODES.kind, types[2]?.kind].join(","));
@@ -40,7 +41,12 @@ export class SettingTypeTests {
       [SettingTypeTests.MODES, ["Light", "Dark"], ["System", 1, null]],
       [SettingType.number(12, 18, 0.5), [12, 12.5, 18], [11.5, 18.5, 12.25, "12", null]],
       [SettingType.text(3), ["", "abc"], ["abcd", 3, null]],
-      [SettingType.modules(), [[], ["notes", "clock"]], [["notes", "notes"], ["  "], [1], "notes", null]]
+      [SettingType.modules(), [[], ["notes", "clock"]], [["notes", "notes"], ["  "], [1], "notes", null]],
+      [
+        SettingType.keyBindings(),
+        [{}, { "notes.create": "Shift+Alt+N", "shell.closeTab": null }, { "shell.closeTab": "Mod+W" }],
+        [[], null, "Mod+K", { "notes": "Mod+K" }, { "notes.create": "Mod+Ctrl+K" }, { "notes.create": "K" }, { "notes.create": "Mod+C" }, { "notes.create": "Mod+W" }, { "notes.create": 1 }]
+      ]
     ];
 
     for (const [type, accepted, refused] of cases) {

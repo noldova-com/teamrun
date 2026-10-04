@@ -35,6 +35,10 @@ export class KeyName {
     return KeyName.CATALOG.get(token);
   }
 
+  public static fromStroke(stroke: IKeyStroke): KeyName | undefined {
+    return [...KeyName.CATALOG.values()].find(t => t.matches(stroke));
+  }
+
   public matches(stroke: IKeyStroke): boolean {
     if (!Object.isNull(this.eventKey) && stroke.key.toLowerCase() === this.eventKey)
       return true;

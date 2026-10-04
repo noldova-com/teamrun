@@ -9,13 +9,13 @@
 import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
-import { KeyChord } from "@noldova/teamrun-shell-protocol";
-
 import { CommandNotFoundException } from "../../../src/app/exceptions/command-not-found.exception";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
-import { ShortcutBinding } from "../../../src/app/models/shortcut-binding";
+import { WindowPartSource } from "../../../src/app/models/window-part-source";
+import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../src/app/services/command.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
+import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 
 describe("CommandService", () => {
@@ -30,9 +30,16 @@ describe("CommandService", () => {
       return name;
     });
 
+  let bridge: DesktopBridgeFixture;
+
   function start(platform: string): CommandService {
-    DesktopBridgeFixture.install(platform);
-    TestBed.configureTestingModule({ providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }] });
+    bridge = DesktopBridgeFixture.install(platform);
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } },
+        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] }
+      ]
+    });
     return TestBed.inject(CommandService);
   }
 
@@ -100,10 +107,11 @@ describe("CommandService", () => {
     expect([composing.defaultPrevented, repeated.defaultPrevented]).toEqual([false, false]);
   });
 
-  it("applies the person's bindings and reports a command that fails", async () => {
+  it("applies the person's bindings as the setting changes and reports a command that fails", async () => {
     const service = start("linux");
     service.setCommands([command("notes.newNote", "Mod+Alt+N", true)]);
-    service.setBindings([new ShortcutBinding("notes.newNote", KeyChord.parse("F6"))]);
+    const before = service.keyLabel("notes.newNote");
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.keyBindings", value: { "notes.newNote": "F6" }, isSet: true });
 
     press({ key: "n", code: "KeyN", ctrlKey: true, altKey: true });
     press({ key: "F6", code: "F6" });
@@ -111,6 +119,13 @@ describe("CommandService", () => {
     await vi.waitFor(() => expect(errors.map(t => (t as Error).message)).toEqual(["notes.newNote failed"]));
     expect(runs).toEqual(["notes.newNote null"]);
     expect(service.shortcuts().keyOf("notes.newNote")?.text).toBe("F6");
+    expect([before, service.keyLabel("notes.newNote"), service.bindings().has("notes.newNote")]).toEqual(["Ctrl+Alt+N", "F6", true]);
+  });
+
+  it("names a command's owner: the product for the shell's, the module's name, or else its id", () => {
+    const service = start("win32");
+
+    expect(["shell.closeTab", "notes.newNote", "clock.tick"].map(t => service.ownerOf(t))).toEqual([Resources.productName, "Notes", "clock"]);
   });
 
   it("leaves the key of a disabled command to the page, and says which commands are enabled for given arguments", async () => {
@@ -170,6 +185,13 @@ describe("CommandService", () => {
     expect([service.keyLabel("notes.newNote"), service.keyLabel("notes.sync")]).toEqual(["⌥⌘N", null]);
     expect(service.titleOf("notes.sync")).toBe("notes.sync");
     expect(() => service.titleOf("notes.gone")).toThrowError(CommandNotFoundException);
+  });
+
+  it("lists a command's default keys on the platform, the shell's own and a module's", () => {
+    const service = start("darwin");
+    service.setCommands([command("notes.newNote", "Mod+Alt+N"), command("notes.sync", null)]);
+
+    expect(["shell.nextTab", "notes.newNote", "notes.sync"].map(t => service.defaultKeysOf(t).map(u => u.text))).toEqual([["Ctrl+Tab", "Mod+Alt+ArrowRight"], ["Mod+Alt+N"], []]);
   });
 
   it("runs a command by name and reports its failure", async () => {
