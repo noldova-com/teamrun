@@ -59,6 +59,7 @@ export default class DesktopApplicationFixture {
   private static readonly MAIN_PROCESS_TIMEOUT: number = 10_000;
   private static readonly QUIT_TIMEOUT: number = 30_000;
   private static readonly SILENCE_FILE: string = "main-process.txt";
+  private static readonly THREADS_FILE: string = "main-process-threads.txt";
   private static readonly MAIN_WINDOW: string = "main-window";
   private static readonly NO_ANSWER: unique symbol = Symbol("no answer");
 
@@ -284,8 +285,13 @@ export default class DesktopApplicationFixture {
     if (!isRunning)
       return;
     const silence = this.silence;
-    if (silence !== null)
-      await this.keepAsync(DesktopApplicationFixture.SILENCE_FILE, "text/plain", () => this.describeSilenceAsync(silence));
+    if (silence !== null) {
+      const processId = this.mainProcessId;
+      if (processId !== null)
+        await this.keepAsync(DesktopApplicationFixture.THREADS_FILE, "text/plain", () => ProcessListFixture.describeThreadsAsync(processId));
+      await this.keepAsync(DesktopApplicationFixture.SILENCE_FILE, "text/plain", () => this.describeSilenceAsync(silence),
+        DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT + DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT);
+    }
     for (const [index, page] of this.application.windows().entries()) {
       await this.keepAsync(`page-${index}.png`, "image/png", () => page.screenshot());
       await this.keepAsync(`page-${index}.html`, "text/html", () => page.content());
@@ -306,11 +312,11 @@ export default class DesktopApplicationFixture {
     });
   }
 
-  private async keepAsync(name: string, contentType: string, capture: () => Promise<Buffer | string>): Promise<void> {
+  private async keepAsync(name: string, contentType: string, capture: () => Promise<Buffer | string>, limit: number = DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT): Promise<void> {
     try {
-      const body = await DesktopApplicationFixture.withinAsync(capture(), DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT);
+      const body = await DesktopApplicationFixture.withinAsync(capture(), limit);
       if (body === DesktopApplicationFixture.NO_ANSWER)
-        throw new Error(`No answer within ${DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT} ms.`);
+        throw new Error(`No answer within ${limit} ms.`);
       await this.testInfo.attach(name, { body, contentType });
     }
     catch (error) {

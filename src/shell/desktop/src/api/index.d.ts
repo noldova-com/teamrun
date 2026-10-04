@@ -446,6 +446,21 @@ export interface IDisplayHost {
    * ```
    */
   getAllDisplays(): readonly { readonly workArea: Rectangle }[];
+
+  /**
+   * Finds the primary display, where a window without a position opens.
+   *
+   * @returns The primary display, with its work area in screen pixels.
+   * @example
+   * ```ts
+   * import type { IDisplayHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function primaryWidth(displays: IDisplayHost): number {
+   *   return displays.getPrimaryDisplay().workArea.width;
+   * }
+   * ```
+   */
+  getPrimaryDisplay(): { readonly workArea: Rectangle };
 }
 
 /**
@@ -1966,21 +1981,50 @@ export declare class ScreenArea {
   public constructor(x: number, y: number, width: number, height: number);
 
   /**
-   * Tells whether a rectangle shares at least one pixel with the area.
+   * Makes the area of a rectangle, such as a display's work area.
+   *
+   * @param rectangle The rectangle.
+   * @returns The area.
+   * @example
+   * ```ts
+   * import { ScreenArea } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const area: ScreenArea = ScreenArea.of({ x: 0, y: 25, width: 1024, height: 743 });
+   * ```
+   */
+  public static of(rectangle: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): ScreenArea;
+
+  /**
+   * Counts the pixels a rectangle shares with the area.
    *
    * @param x The rectangle's left edge.
    * @param y The rectangle's top edge.
    * @param width The rectangle's width.
    * @param height The rectangle's height.
-   * @returns `true` when the rectangle overlaps the area.
+   * @returns The number of shared pixels, 0 when the rectangle does not overlap the area.
    * @example
    * ```ts
    * import { ScreenArea } from "@noldova/teamrun-shell-desktop";
    *
-   * export const isVisible: boolean = new ScreenArea(0, 0, 1920, 1040).overlaps(1900, 100, 800, 600);
+   * export const shared: number = new ScreenArea(0, 0, 1920, 1040).overlapArea(1900, 100, 800, 600);
    * ```
    */
-  public overlaps(x: number, y: number, width: number, height: number): boolean;
+  public overlapArea(x: number, y: number, width: number, height: number): number;
+
+  /**
+   * Tells whether a size fits in the area.
+   *
+   * @param width The width.
+   * @param height The height.
+   * @returns `true` when neither side is larger than the area's.
+   * @example
+   * ```ts
+   * import { ScreenArea } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const fits: boolean = new ScreenArea(0, 25, 1024, 743).fits(1280, 800);
+   * ```
+   */
+  public fits(width: number, height: number): boolean;
 }
 
 /**
@@ -2268,17 +2312,19 @@ export declare class WindowState {
   public constructor(x: number | null, y: number | null, width: number, height: number, isMaximized: boolean);
 
   /**
-   * The state of a window that has not been placed yet: 1280 by 800 pixels where the operating system puts it.
+   * The state of a window that has not been placed yet: 1280 by 800 pixels, but no more than nine tenths of the work area
+   * on each side and no less than the minimum size, where the operating system puts it.
    *
+   * @param area The work area of the display the window opens on.
    * @returns The default state.
    * @example
    * ```ts
-   * import { WindowState } from "@noldova/teamrun-shell-desktop";
+   * import { ScreenArea, WindowState } from "@noldova/teamrun-shell-desktop";
    *
-   * export const state: WindowState = WindowState.createDefault();
+   * export const state: WindowState = WindowState.createDefault(new ScreenArea(0, 25, 1024, 743));
    * ```
    */
-  public static createDefault(): WindowState;
+  public static createDefault(area: ScreenArea): WindowState;
 
   /**
    * Reads a saved state.
@@ -2296,19 +2342,23 @@ export declare class WindowState {
   public static fromJson(value: unknown): WindowState;
 
   /**
-   * Keeps the saved position when the window would show on one of the displays, and otherwise lets the operating
-   * system place it, keeping its size.
+   * Places a saved state on the connected displays. The window belongs to the display that shows most of it, or to the
+   * primary display when no display shows it, which then loses its position so the operating system centers it. A size
+   * that fits that display's work area is kept; a larger one shrinks to no more than nine tenths of the work area on each
+   * side, centered on that display. The maximized state is kept.
    *
    * @param workAreas The work areas of the connected displays.
-   * @returns This state, or the same size without a position.
+   * @param primary The work area of the primary display.
+   * @returns This state, or the placed one.
    * @example
    * ```ts
    * import { ScreenArea, WindowState } from "@noldova/teamrun-shell-desktop";
    *
-   * export const state: WindowState = new WindowState(3000, 100, 1280, 800, false).placeOn([new ScreenArea(0, 0, 1920, 1040)]);
+   * const primary: ScreenArea = new ScreenArea(0, 0, 1920, 1040);
+   * export const state: WindowState = new WindowState(3000, 100, 1280, 800, false).placeOn([primary], primary);
    * ```
    */
-  public placeOn(workAreas: readonly ScreenArea[]): WindowState;
+  public placeOn(workAreas: readonly ScreenArea[], primary: ScreenArea): WindowState;
 
   /**
    * Writes the state for saving.
@@ -2316,9 +2366,9 @@ export declare class WindowState {
    * @returns The state as JSON.
    * @example
    * ```ts
-   * import { WindowState } from "@noldova/teamrun-shell-desktop";
+   * import { ScreenArea, WindowState } from "@noldova/teamrun-shell-desktop";
    *
-   * export const saved: string = JSON.stringify(WindowState.createDefault().toJson());
+   * export const saved: string = JSON.stringify(WindowState.createDefault(new ScreenArea(0, 0, 1920, 1040)).toJson());
    * ```
    */
   public toJson(): JsonObject;

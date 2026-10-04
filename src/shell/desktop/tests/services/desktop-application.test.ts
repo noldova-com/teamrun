@@ -111,6 +111,17 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async opensItsWindowNoLargerThanNineTenthsOfASmallPrimaryDisplay(): Promise<void> {
+    const electron = new FakeElectron();
+    electron.screen.primaryWorkArea = { x: 0, y: 25, width: 1024, height: 743 };
+
+    await DesktopApplicationTests.startReadyAsync("darwin", new FakeRuntimeLauncher(), electron);
+    const window = DesktopApplicationTests.firstWindow(electron);
+
+    Assert.areEqual("921,668", [window.options.width, window.options.height].join(","));
+  }
+
+  @TestMethod
   public showsItsIconInTheDockOnMacOSAndLeavesTheWindowsIconToTheBundle(): Promise<void> {
     const electron = new FakeElectron();
     const dock = new FakeDockHost();

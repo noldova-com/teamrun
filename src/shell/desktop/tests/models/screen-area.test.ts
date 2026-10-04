@@ -22,14 +22,32 @@ export class ScreenAreaTests {
   }
 
   @TestMethod
-  @TestData(0, 0, 100, 100, true)
-  @TestData(1919, 1039, 100, 100, true)
-  @TestData(-99, -99, 100, 100, true)
-  @TestData(1920, 0, 100, 100, false)
-  @TestData(0, 1040, 100, 100, false)
-  @TestData(-100, 0, 100, 100, false)
-  @TestData(0, -100, 100, 100, false)
-  public overlapsARectangleSharingAPixel(x: number, y: number, width: number, height: number, expected: boolean): void {
-    Assert.areEqual(expected, new ScreenArea(0, 0, 1920, 1040).overlaps(x, y, width, height));
+  public isMadeFromARectangle(): void {
+    const area = ScreenArea.of({ x: 1920, y: 25, width: 1024, height: 743 });
+
+    Assert.areEqual("1920,25,1024,743", [area.x, area.y, area.width, area.height].join(","));
+  }
+
+  @TestMethod
+  @TestData(0, 0, 100, 100, 10_000)
+  @TestData(1919, 1039, 100, 100, 1)
+  @TestData(-99, -99, 100, 100, 1)
+  @TestData(1820, 940, 200, 200, 10_000)
+  @TestData(-100, -100, 3000, 3000, 1920 * 1040)
+  @TestData(1920, 0, 100, 100, 0)
+  @TestData(0, 1040, 100, 100, 0)
+  @TestData(-100, 0, 100, 100, 0)
+  @TestData(0, -100, 100, 100, 0)
+  public countsThePixelsARectangleShares(x: number, y: number, width: number, height: number, expected: number): void {
+    Assert.areEqual(expected, new ScreenArea(0, 0, 1920, 1040).overlapArea(x, y, width, height));
+  }
+
+  @TestMethod
+  @TestData(1920, 1040, true)
+  @TestData(1280, 800, true)
+  @TestData(1921, 800, false)
+  @TestData(1280, 1041, false)
+  public fitsASizeNoLargerThanItself(width: number, height: number, expected: boolean): void {
+    Assert.areEqual(expected, new ScreenArea(0, 0, 1920, 1040).fits(width, height));
   }
 }

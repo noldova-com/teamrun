@@ -39,8 +39,9 @@ export class WindowState {
     this.isMaximized = isMaximized;
   }
 
-  public static createDefault(): WindowState {
-    return new WindowState(null, null, Resources.windowWidth, Resources.windowHeight, false);
+  public static createDefault(area: ScreenArea): WindowState {
+    return new WindowState(null, null, WindowState.shareOf(Resources.windowWidth, area.width, Resources.windowMinimumWidth),
+      WindowState.shareOf(Resources.windowHeight, area.height, Resources.windowMinimumHeight), false);
   }
 
   public static fromJson(value: unknown): WindowState {
@@ -58,11 +59,36 @@ export class WindowState {
     }
   }
 
-  public placeOn(workAreas: readonly ScreenArea[]): WindowState {
+  public placeOn(workAreas: readonly ScreenArea[], primary: ScreenArea): WindowState {
+    const shown = this.displayOf(workAreas);
+    const area = shown ?? primary;
+    if (area.fits(this.width, this.height))
+      return Object.isNull(shown) && !Object.isNull(this.x) ? new WindowState(null, null, this.width, this.height, this.isMaximized) : this;
+    const width = WindowState.shareOf(this.width, area.width, Resources.windowMinimumWidth);
+    const height = WindowState.shareOf(this.height, area.height, Resources.windowMinimumHeight);
+    if (Object.isNull(shown))
+      return new WindowState(null, null, width, height, this.isMaximized);
+    return new WindowState(area.x + Math.floor((area.width - width) / 2), area.y + Math.floor((area.height - height) / 2), width, height, this.isMaximized);
+  }
+
+  private static shareOf(size: number, available: number, minimum: number): number {
+    return Math.max(minimum, Math.min(size, Math.floor(available * Resources.windowAreaShare)));
+  }
+
+  private displayOf(workAreas: readonly ScreenArea[]): ScreenArea | null {
     const { x, y } = this;
-    if (Object.isNull(x) || Object.isNull(y) || workAreas.some(t => t.overlaps(x, y, this.width, this.height)))
-      return this;
-    return new WindowState(null, null, this.width, this.height, this.isMaximized);
+    if (Object.isNull(x) || Object.isNull(y))
+      return null;
+    let shown: ScreenArea | null = null;
+    let most = 0;
+    for (const area of workAreas) {
+      const shared = area.overlapArea(x, y, this.width, this.height);
+      if (shared > most) {
+        shown = area;
+        most = shared;
+      }
+    }
+    return shown;
   }
 
   public toJson(): JsonObject {

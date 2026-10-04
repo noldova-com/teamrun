@@ -43,8 +43,8 @@ export class WindowBoundsKeeper {
     const saved = await store.readAsync();
     if (Object.isNull(saved))
       return;
-    const areas = this.displays.getAllDisplays().map(t => new ScreenArea(t.workArea.x, t.workArea.y, t.workArea.width, t.workArea.height));
-    const state = WindowState.fromJson(saved).placeOn(areas);
+    const areas = this.displays.getAllDisplays().map(t => ScreenArea.of(t.workArea));
+    const state = WindowState.fromJson(saved).placeOn(areas, ScreenArea.of(this.displays.getPrimaryDisplay().workArea));
     if (Object.isNull(state.x) || Object.isNull(state.y)) {
       this.window.setBounds({ width: state.width, height: state.height });
       this.window.center();
