@@ -47,6 +47,16 @@ describe("ModulesComponent", () => {
 
   const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const texts = (selector: string): readonly string[] => [...element().querySelectorAll(selector)].map(t => t.textContent?.replace(/\s+/gu, " ").trim() ?? "");
+  const parts = (selector: string): readonly (readonly string[])[] => [...element().querySelectorAll(selector)].map(t => {
+    const walker = document.createTreeWalker(t, NodeFilter.SHOW_TEXT);
+    const found: string[] = [];
+    while (!Object.isNull(walker.nextNode())) {
+      const text = walker.currentNode.textContent?.trim() ?? "";
+      if (text.length > 0)
+        found.push(text);
+    }
+    return found;
+  });
   const row = (id: string): HTMLButtonElement => element().querySelector(`.tr-modules-row[data-module='${id}']`) as HTMLButtonElement;
   const link = (fact: string, name: string): HTMLButtonElement =>
     [...element().querySelectorAll<HTMLButtonElement>(`.tr-modules-fact-${fact} .tr-modules-link`)].find(t => t.textContent?.trim() === name) as HTMLButtonElement;
@@ -80,10 +90,10 @@ describe("ModulesComponent", () => {
 
     expect(texts(".tr-modules-title")).toEqual(["Modules"]);
     expect(texts(".tr-modules-version")).toEqual([Resources.formatProductVersion("1.2.3")]);
-    expect(texts(".tr-modules-row")).toEqual([
-      "Clock Active clock Tells the time.",
-      "Notes error Failed notes Keeps notes.",
-      "Alarm error Blocked alarm Rings at a time."
+    expect(parts(".tr-modules-row")).toEqual([
+      ["Clock", "Active", "clock", "Tells the time."],
+      ["Notes", "error", "Failed", "notes", "Keeps notes."],
+      ["Alarm", "error", "Blocked", "alarm", "Rings at a time."]
     ]);
     expect(texts("[aria-current=true]")).toEqual([texts(".tr-modules-row")[0]]);
     expect(element().querySelector("nav")?.getAttribute("aria-label")).toBe("Modules");
@@ -92,7 +102,7 @@ describe("ModulesComponent", () => {
     expect(texts(".tr-modules-facts:first-of-type dt")).toEqual(["State", "Depends on", "Needed by"]);
     expect([texts(".tr-modules-fact-state"), texts(".tr-modules-fact-dependencies"), texts(".tr-modules-fact-dependents")]).toEqual([["Active"], ["None"], ["Alarm"]]);
     expect([...element().querySelectorAll(".tr-modules-contributions")].map(t => t.getAttribute("data-kind"))).toEqual(["commands", "settings", "views"]);
-    expect(texts(".tr-modules-contribution")).toEqual(["Tick the clock clock.tick", "clock.gone", "Tick step clock.tickStep", "clock.face"]);
+    expect(parts(".tr-modules-contribution")).toEqual([["Tick the clock", "clock.tick"], ["clock.gone"], ["Tick step", "clock.tickStep"], ["clock.face"]]);
     expect(errors).toEqual([]);
   });
 
@@ -100,14 +110,14 @@ describe("ModulesComponent", () => {
     await renderAsync();
 
     click(row("notes"));
-    const failed = [texts(".tr-modules-fact-state"), texts(".tr-modules-fact-dependents"), texts(".tr-modules-contribution")];
+    const failed = [parts(".tr-modules-fact-state"), texts(".tr-modules-fact-dependents"), texts(".tr-modules-contribution")];
     click(row("alarm"));
 
-    expect(failed).toEqual([["error Failed Its runtime part could not be loaded."], ["Alarm"], ["notes.tools", "notes.saved"]]);
+    expect(failed).toEqual([[["error", "Failed", "Its runtime part could not be loaded."]], ["Alarm"], ["notes.tools", "notes.saved"]]);
     expect(texts("[aria-current=true] .tr-modules-name")).toEqual(["Alarm"]);
     expect(texts(".tr-modules-facts:first-of-type dt")).toEqual(["State", "Blocked by", "Depends on", "Needed by"]);
-    expect([texts(".tr-modules-fact-state"), texts(".tr-modules-fact-blocker"), texts(".tr-modules-fact-dependencies"), texts(".tr-modules-fact-dependents")])
-      .toEqual([["error Blocked It depends on notes, which is not active."], ["Notes"], ["Clock, Notes"], ["None"]]);
+    expect([parts(".tr-modules-fact-state"), texts(".tr-modules-fact-blocker"), texts(".tr-modules-fact-dependencies"), texts(".tr-modules-fact-dependents")])
+      .toEqual([[["error", "Blocked", "It depends on notes, which is not active."]], ["Notes"], ["Clock, Notes"], ["None"]]);
     expect([texts(".tr-modules-contributions"), texts(".tr-modules-none")]).toEqual([[], ["None", "No commands, settings, menus, views or notification kinds."]]);
   });
 
@@ -148,7 +158,7 @@ describe("ModulesComponent", () => {
     click(row("notes"));
 
     expect(active).toBe(0);
-    expect(texts(".tr-modules-detail tr-module-actions button")).toEqual(["content_copy Copy details", "folder_open Open log folder"]);
+    expect(parts(".tr-modules-detail tr-module-actions button")).toEqual([["content_copy", "Copy details"], ["folder_open", "Open log folder"]]);
   });
 
   it("shows the module the selection names, as when the status bar opens the document on a failed module", async () => {

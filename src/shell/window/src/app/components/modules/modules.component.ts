@@ -13,6 +13,7 @@ import {
   ElementRef,
   ErrorHandler,
   Injector,
+  PendingTasks,
   type Signal,
   type WritableSignal,
   afterNextRender,
@@ -64,7 +65,9 @@ export class ModulesComponent {
 
   public constructor() {
     const errors = inject(ErrorHandler);
-    inject(DesktopBridgeService).readBuildAsync().then(t => this.version.set(Resources.formatProductVersion(t.productVersion)), (error: unknown) => errors.handleError(error));
+    const bridge = inject(DesktopBridgeService);
+    void inject(PendingTasks).run(() =>
+      bridge.readBuildAsync().then(t => this.version.set(Resources.formatProductVersion(t.productVersion)), (error: unknown) => errors.handleError(error)));
   }
 
   protected labelOf(state: ModuleState): string {
