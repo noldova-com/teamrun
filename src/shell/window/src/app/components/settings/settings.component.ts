@@ -105,7 +105,11 @@ export class SettingsComponent {
     this.settings.resetAsync(definition.name.text).catch((error: unknown) => this.errors.handleError(error));
   }
 
+  protected run(definition: SettingDefinition): void {
+    this.commands.run(String(definition.type.command));
+  }
+
   private static matches(definition: SettingDefinition, query: string): boolean {
-    return [definition.title, definition.description, definition.name.text].some(t => TextMatch.contains(t, query));
+    return [definition.title, definition.description, definition.name.text, definition.type.label].some(t => !Object.isNull(t) && TextMatch.contains(t, query));
   }
 }

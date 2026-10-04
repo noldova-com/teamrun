@@ -40,6 +40,7 @@ export class SettingRowComponent {
   public readonly isInverse = input<boolean>(false);
   public readonly changed = output<JsonValue>();
   public readonly reset = output<void>();
+  public readonly run = output<void>();
 
   protected readonly current: Signal<JsonValue> = computed(() => this.value() ?? this.definition().defaultValue);
   protected readonly options: Signal<readonly SelectOption[]> = computed(() => this.definition().type.options.map(t => new SelectOption(t.value, t.title)));

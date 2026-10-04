@@ -206,6 +206,25 @@ describe("SettingsComponent", () => {
     expect([(element().querySelector(".tr-settings-search-field") as HTMLInputElement).value, texts(".tr-settings-result-title")]).toEqual(["", []]);
   });
 
+  it("runs an action's command from its row, stores nothing, and finds the row by its label", async () => {
+    const runs: string[] = [];
+    settings.definitions.set([...SettingsFixture.all, SettingsFixture.alarms]);
+    TestBed.inject(CommandService).setCommands([new CommandContribution("clock.openAlarms", "Open alarms", null, null, async () => {
+      runs.push("clock.openAlarms");
+      return null;
+    })]);
+    render();
+
+    await page.getByRole("button", { name: "Clock" }).click();
+    fixture.detectChanges();
+    await page.getByRole("button", { name: "Open alarms" }).click();
+    await searchAsync("open alarms");
+
+    expect(runs).toEqual(["clock.openAlarms"]);
+    expect(settings.calls).toEqual([]);
+    expect([texts(".tr-settings-result-title"), texts(".tr-setting-row-title")]).toEqual([["Keyboard shortcuts", "Clock"], ["Alarms"]]);
+  });
+
   it("changes and resets a setting through the settings service, and reports a change or reset that fails", async () => {
     render();
 

@@ -67,11 +67,32 @@ test.describe("settings", () => {
 
     await expect(settingsTab(window)).toHaveCount(1);
     await expect(settingsTab(window)).toHaveAttribute("aria-selected", "true");
-    await expect(window.locator(".tr-settings-page")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Gallery"]);
+    await expect(window.locator(".tr-settings-page")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Notes", "Gallery"]);
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Theme", "Text", "Layout"]);
     await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
     await expect(window.locator("[data-command=\"shell.openSettings\"] td").first()).toHaveText("Settings…");
     await desktop.checkpointAsync("settings-shortcuts");
+  });
+
+  test("a module's action setting opens the module's own document from its row, and stores nothing", async ({ desktop }) => {
+    const window = desktop.window;
+    const note = (id: number): Locator => window.locator(`tr-tab[data-tab-key="document/notes.note/${id}"]`);
+    const notesPage = window.locator(".tr-settings-pages").getByRole("button", { name: "Notes", exact: true });
+    await expect(note(2)).toBeVisible();
+    await openSettingsAsync(window);
+
+    await notesPage.click();
+    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Writing"]);
+    await expect(row(window, "notes.start").locator(".tr-setting-row-description")).toHaveText("Opens a new note in a tab of its own.");
+    await desktop.checkpointAsync("settings-action");
+    await row(window, "notes.start").getByRole("button", { name: "Start a note" }).click();
+
+    await expect(note(3)).toHaveAttribute("aria-selected", "true");
+    await settingsTab(window).click();
+    await notesPage.click();
+    await expect(row(window, "notes.start").getByRole("button", { name: "Start a note" })).toBeVisible();
+    await expect(row(window, "notes.start").locator(".tr-setting-row-marker, .tr-setting-row-reset")).toHaveCount(0);
+    await expect(note(4)).toHaveCount(0);
   });
 
   test("search filters every page by title, description and name, marking the matches, and choosing a page ends it", async ({ desktop }) => {

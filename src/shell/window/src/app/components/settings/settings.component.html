@@ -46,7 +46,7 @@
         @for (definition of group.definitions; track definition.name.text) {
           <tr-setting-row [definition]="definition" [value]="values().get(definition.name.text)" [isSet]="setFlags().get(definition.name.text)?.() ?? false"
             [query]="query()" [modules]="isMutedModules(definition) ? notifyingModules : modules" [isInverse]="isMutedModules(definition)"
-            (changed)="change(definition, $event)" (reset)="reset(definition)" />
+            (changed)="change(definition, $event)" (reset)="reset(definition)" (run)="run(definition)" />
         }
       </section>
     }
