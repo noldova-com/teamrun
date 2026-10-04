@@ -1,0 +1,50 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: grid;
+  gap: var(--tr-space-4);
+}
+
+.tr-gallery-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tr-space-1);
+}
+
+.tr-gallery-narrow {
+  max-width: 12rem;
+}
+
+.tr-gallery-toolbar {
+  display: flex;
+  gap: var(--tr-space-1);
+}
+
+.tr-gallery-sash-box {
+  display: flex;
+  align-items: stretch;
+  width: 12rem;
+  height: 4rem;
+}
+
+.tr-gallery-sash-box-column {
+  flex-direction: column;
+  height: 8rem;
+}
+
+.tr-gallery-pane {
+  flex: 1 1 0;
+  background-color: var(--tr-raised);
+}
+
+.tr-gallery-card {
+  width: 12rem;
+  padding: var(--tr-space-3);
+  box-sizing: border-box;
+}

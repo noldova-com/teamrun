@@ -26,39 +26,49 @@ export class WindowBoundsKeeper {
   private timer: NodeJS.Timeout | null = null;
   private hasUnsaved: boolean = false;
 
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog) {
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog, holdsPersonsMoves: boolean) {
     this.window = window;
     this.displays = displays;
     this.saveDelay = saveDelay;
     this.log = log;
-    const changed = (): void => this.scheduleSave();
+    const changed = (): void => this.noteChange();
     window.on(Resources.resizeEvent, changed);
     window.on(Resources.moveEvent, changed);
     window.on(Resources.maximizeEvent, changed);
     window.on(Resources.unmaximizeEvent, changed);
+    if (holdsPersonsMoves) {
+      const placed = (): void => this.notePlacedByPerson();
+      window.on(Resources.willMoveEvent, placed);
+      window.on(Resources.willResizeEvent, placed);
+    }
   }
 
   public async restoreAsync(store: IWindowStateStore): Promise<void> {
     this.store = store;
+    if (this.hasUnsaved) {
+      await this.saveAsync();
+      return;
+    }
     const saved = await store.readAsync();
     if (Object.isNull(saved))
       return;
-    const areas = this.displays.getAllDisplays().map(t => new ScreenArea(t.workArea.x, t.workArea.y, t.workArea.width, t.workArea.height));
-    const state = WindowState.fromJson(saved).placeOn(areas);
-    if (Object.isNull(state.x) || Object.isNull(state.y)) {
-      this.window.setBounds({ width: state.width, height: state.height });
-      this.window.center();
-    }
-    else
-      this.window.setBounds({ x: state.x, y: state.y, width: state.width, height: state.height });
+    const areas = this.displays.getAllDisplays().map(t => ScreenArea.of(t.workArea));
+    const state = WindowState.fromJson(saved);
+    const bounds = state.placeOn(areas, ScreenArea.of(this.displays.getPrimaryDisplay().workArea));
+    this.window.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
     if (state.isMaximized)
       this.window.maximize();
   }
 
   public async saveAsync(): Promise<void> {
     this.cancelSave();
-    if (Object.isNull(this.store) || this.window.isDestroyed())
+    if (this.window.isDestroyed())
       return;
+    if (Object.isNull(this.store)) {
+      if (this.hasUnsaved)
+        throw new WindowStateUnavailableException(Resources.runtimeNotConnected);
+      return;
+    }
     const bounds = this.window.getNormalBounds();
     this.hasUnsaved = true;
     await this.store.writeAsync(new WindowState(bounds.x, bounds.y, bounds.width, bounds.height, this.window.isMaximized()).toJson());
@@ -76,9 +86,17 @@ export class WindowBoundsKeeper {
     this.timer = null;
   }
 
-  private scheduleSave(): void {
+  private noteChange(): void {
+    if (!Object.isNull(this.store))
+      this.scheduleSave();
+  }
+
+  private notePlacedByPerson(): void {
     if (Object.isNull(this.store))
-      return;
+      this.hasUnsaved = true;
+  }
+
+  private scheduleSave(): void {
     this.cancelSave();
     this.timer = setTimeout(() => void this.saveAsync().catch((error: unknown) => {
       if (!(error instanceof WindowStateUnavailableException))

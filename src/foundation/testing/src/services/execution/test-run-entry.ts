@@ -8,7 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 
-import { mkdtempSync, readdirSync, rmSync, writeSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -51,6 +51,13 @@ export class TestRunEntry {
 
       reporter.writeSummary(result);
       summary.writeTests(result);
+      if (result.selection.isFiltered && result.selection.selected === 0) {
+        console.error(Resources.noTestMatchedFilters.trimEnd());
+        summary.writeFailure(Resources.noTestMatchedFilters);
+      }
+      const selectionFile = process.env[Resources.selectionFileVariable];
+      if (!Object.isUndefined(selectionFile))
+        writeFileSync(selectionFile, JSON.stringify({ discovered: result.selection.discovered, selected: result.selection.selected }));
       interrupted = result.isInterrupted;
       process.exitCode = Math.min(result.failed + result.unreached + Number(result.total === 0), 1);
     }

@@ -58,7 +58,6 @@ export class Resources {
   public static readonly primaryButton: number = 0;
   public static readonly dragThreshold: number = 4;
   public static readonly escapeKey: string = "Escape";
-  public static readonly popoverPaneClass: string = "tr-popover-pane";
   public static readonly pointerMoveEvent: "pointermove" = "pointermove";
   public static readonly pointerUpEvent: "pointerup" = "pointerup";
   public static readonly pointerCancelEvent: "pointercancel" = "pointercancel";
@@ -212,6 +211,8 @@ export class Resources {
   public static readonly appearanceUnreadable: string = "The appearance preferences could not be read.";
   public static readonly notificationsPage: string = "Notifications";
   public static readonly shortcutsPage: string = "Keyboard shortcuts";
+  public static readonly galleryPage: string = "Gallery";
+  public static readonly galleryComponentToken: string = "GalleryComponent";
   public static readonly leadingSettingsPages: readonly string[] = [Resources.appearancePage, Resources.notificationsPage, Resources.shortcutsPage];
   public static readonly searchSettingsLabel: string = "Search settings";
   public static readonly settingsPagesLabel: string = "Settings pages";

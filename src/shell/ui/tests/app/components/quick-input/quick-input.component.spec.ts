@@ -85,6 +85,24 @@ describe("QuickInputComponent", () => {
     expect(options().map(t => t.getAttribute("aria-selected")).filter(t => t === "true").length).toBe(1);
   });
 
+  it("leaves the focus where it is when it is not asked to take it", async () => {
+    const quiet = TestBed.createComponent(QuickInputComponent);
+    quiet.componentRef.setInput("items", many);
+    quiet.componentRef.setInput("label", "Search commands");
+    quiet.componentRef.setInput("isFocusing", false);
+    document.body.append(quiet.nativeElement);
+    const other = document.createElement("button");
+    document.body.append(other);
+
+    other.focus();
+    quiet.detectChanges();
+    await quiet.whenStable();
+
+    expect(document.activeElement).toBe(other);
+    quiet.destroy();
+    other.remove();
+  });
+
   it("moves through its options with the arrow keys, Home, End and the page keys, stopping at either end, and leaves other keys alone", async () => {
     const visited: number[] = [];
     for (const key of ["ArrowDown", "ArrowDown", "ArrowUp", "End", "ArrowDown", "Home", "ArrowUp", "PageDown"]) {

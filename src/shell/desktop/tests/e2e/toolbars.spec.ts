@@ -200,6 +200,7 @@ test.describe("toolbars", () => {
 
   test("the toolbars are one tab stop that the Focus the toolbars command reaches, moved by the arrow keys, Home and End", async ({ desktop }) => {
     const window = desktop.window;
+    await expect(toolbar(window, "notes.main").getByRole("button", { name: "New note" })).toBeVisible();
 
     await runCommandAsync(window, "Focus the toolbars");
 

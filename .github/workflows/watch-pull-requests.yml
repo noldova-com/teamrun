@@ -1,0 +1,77 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Watch pull requests
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_run:
+    workflows: [Build and test]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  watch:
+    name: Watch pull requests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        id: node
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js again
+        if: steps.node.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js a last time
+        if: steps.node-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js a last time
+        if: steps.node-again.outcome == 'failure'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Watch the open pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/watch-pull-requests.ts

@@ -6,13 +6,15 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { NgTemplateOutlet } from "@angular/common";
-import { ChangeDetectionStrategy, Component, ErrorHandler, type Signal, type WritableSignal, computed, inject, signal } from "@angular/core";
+import { NgComponentOutlet, NgTemplateOutlet } from "@angular/common";
+import { ChangeDetectionStrategy, Component, ErrorHandler, type Signal, type Type, type WritableSignal, computed, inject, signal } from "@angular/core";
 
+import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
 import { SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
 
+import { GalleryTokens } from "../../models/gallery-tokens";
 import { SettingsPage } from "../../models/settings/settings-page";
 import { ShortcutRow } from "../../models/settings/shortcut-row";
 import { TextMatch } from "../../models/settings/text-match";
@@ -27,7 +29,7 @@ import { SettingRowComponent } from "../setting-row/setting-row.component";
 
 @Component({
   selector: "tr-settings",
-  imports: [HighlightedTextComponent, NgTemplateOutlet, SettingRowComponent, TextFieldComponent],
+  imports: [HighlightedTextComponent, NgComponentOutlet, NgTemplateOutlet, SettingRowComponent, TextFieldComponent],
   templateUrl: "./settings.component.html",
   styleUrl: "./settings.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -46,6 +48,8 @@ export class SettingsComponent {
   protected readonly query: WritableSignal<string> = signal("");
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
 
+  protected readonly gallery: Type<unknown> | null = inject(GalleryTokens.component);
+
   protected readonly modules: readonly SelectOption[] = this.sources.map(t => new SelectOption(t.moduleId, t.displayName));
   protected readonly notifyingModules: readonly SelectOption[] = this.sources
     .filter(t => t.notificationKinds.length > 0)
@@ -54,7 +58,10 @@ export class SettingsComponent {
   protected readonly setFlags: Signal<ReadonlyMap<string, Signal<boolean>>> = computed(() =>
     new Map(this.settings.definitions().map(t => [t.name.text, this.settings.isSet(t.name.text)])));
   protected readonly isSearching: Signal<boolean> = computed(() => this.query().trim().length > 0);
-  protected readonly pages: Signal<readonly SettingsPage[]> = computed(() => SettingsPage.pagesOf(this.settings.definitions()));
+  protected readonly pages: Signal<readonly SettingsPage[]> = computed(() => [
+    ...SettingsPage.pagesOf(this.settings.definitions()),
+    ...Object.isNull(this.gallery) ? [] : [SettingsPage.galleryOf(Resources.galleryPage)]
+  ]);
   protected readonly currentPage: Signal<SettingsPage | undefined> = computed(() => this.pages().find(t => t.title === this.selected()) ?? this.pages()[0]);
   protected readonly shortcuts: Signal<readonly ShortcutRow[]> = computed(() => {
     const map = this.commands.shortcuts();

@@ -1,0 +1,32 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.tr-popover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-2);
+  box-sizing: border-box;
+  width: min(var(--tr-popover-width), calc(100vw - var(--tr-space-4)));
+  max-height: calc(100vh - var(--tr-space-6) * 2);
+  padding: var(--tr-space-3);
+  overflow: auto;
+  border: var(--tr-border-width) solid var(--tr-menu-border);
+  border-radius: var(--tr-radius-large);
+  background-color: var(--tr-menu);
+  box-shadow: var(--tr-shadow-large);
+  font-size: var(--tr-text-panel);
+  line-height: var(--tr-line-panel);
+}
+
+.tr-popover > * {
+  color: var(--tr-menu-text);
+}
+
+.tr-popover:focus {
+  outline: none;
+}

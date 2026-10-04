@@ -244,6 +244,8 @@ export class Resources {
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
   public static readonly menuPaneClass: string = "tr-menu-pane";
+  public static readonly popoverClass: string = "tr-popover";
+  public static readonly popoverPaneClass: string = "tr-popover-pane";
   public static readonly dialogPaneClass: string = "tr-dialog-pane";
   public static readonly dialogBackdropClass: string = "tr-dialog-backdrop";
   public static readonly dialogTitleIdPrefix: string = "tr-dialog-title-";

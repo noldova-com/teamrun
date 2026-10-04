@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ErrorHandler, type Signal, type WritableSignal, computed, signal } from "@angular/core";
+import { Component, ErrorHandler, type Signal, type Type, type WritableSignal, computed, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { page, userEvent } from "vitest/browser";
 
@@ -15,6 +15,7 @@ import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
 import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
 import { SettingsComponent } from "../../../../src/app/components/settings/settings.component";
+import { GalleryTokens } from "../../../../src/app/models/gallery-tokens";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { WindowPartSource } from "../../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
@@ -46,10 +47,14 @@ class FakeSettingsService {
   }
 }
 
+@Component({ selector: "tr-fake-gallery", template: "<p class=\"fake-gallery\">Controls</p>" })
+class FakeGalleryComponent {}
+
 describe("SettingsComponent", () => {
   let fixture: ComponentFixture<SettingsComponent>;
   let settings: FakeSettingsService;
   let errors: unknown[];
+  let gallery: Type<unknown> | null;
 
   function render(mode: ThemeMode = ThemeMode.Light): HTMLElement {
     AppearanceFixture.apply(DefaultTheme.theme, mode);
@@ -73,8 +78,10 @@ describe("SettingsComponent", () => {
     DesktopBridgeFixture.install("linux");
     settings = new FakeSettingsService();
     errors = [];
+    gallery = null;
     TestBed.configureTestingModule({
       providers: [
+        { provide: GalleryTokens.component, useFactory: () => gallery },
         { provide: SettingsService, useValue: settings },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } },
         {
@@ -110,6 +117,22 @@ describe("SettingsComponent", () => {
     });
     expect([texts("[aria-current=page]"), texts(".tr-settings-group-title"), texts(".tr-setting-row-title")]).toEqual([["Clock"], ["Words", "Ticks"], ["Greeting", "Tick step"]]);
     expect(markers).toEqual([true, false]);
+  });
+
+  it("shows the Gallery as the last page when the build has one, and leaves it out of a search", async () => {
+    gallery = FakeGalleryComponent;
+    render();
+    const pages = texts(".tr-settings-page");
+
+    await page.getByRole("button", { name: "Gallery", exact: true }).click();
+    fixture.detectChanges();
+    const shown = [texts(".fake-gallery"), texts("[aria-current=page]")];
+    await searchAsync("tick");
+
+    expect(pages).toEqual(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Gallery"]);
+    expect(shown).toEqual([["Controls"], ["Gallery"]]);
+    expect(texts(".tr-settings-result-title")).toEqual(["Keyboard shortcuts", "Clock"]);
+    expect(element().querySelector(".fake-gallery")).toBeNull();
   });
 
   it("lists only the modules that post notifications on Notifications, each checked while its notifications are on", async () => {

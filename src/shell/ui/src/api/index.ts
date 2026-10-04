@@ -12,6 +12,7 @@ export { CheckboxComponent } from "../app/components/checkbox/checkbox.component
 export { DialogComponent } from "../app/components/dialog/dialog.component";
 export { DockingGuideComponent } from "../app/components/docking-guide/docking-guide.component";
 export { DockingPlateComponent } from "../app/components/docking-plate/docking-plate.component";
+export { GalleryComponent } from "../app/components/gallery/gallery.component";
 export { IconButtonComponent } from "../app/components/icon-button/icon-button.component";
 export { ContextMenuTriggerDirective } from "../app/components/menu/context-menu-trigger.directive";
 export { MenuBarItemComponent } from "../app/components/menu-bar/menu-bar-item.component";
@@ -22,6 +23,8 @@ export { MenuTriggerDirective } from "../app/components/menu/menu-trigger.direct
 export { MenuComponent } from "../app/components/menu/menu.component";
 export { ProgressComponent } from "../app/components/progress/progress.component";
 export { PanelCardComponent } from "../app/components/panel-card/panel-card.component";
+export { PopoverDirective } from "../app/components/popover/popover.directive";
+export { PopoverTriggerDirective } from "../app/components/popover/popover-trigger.directive";
 export { QuickInputComponent } from "../app/components/quick-input/quick-input.component";
 export { SashComponent } from "../app/components/sash/sash.component";
 export { SelectComponent } from "../app/components/select/select.component";

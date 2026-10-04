@@ -446,6 +446,21 @@ export interface IDisplayHost {
    * ```
    */
   getAllDisplays(): readonly { readonly workArea: Rectangle }[];
+
+  /**
+   * Finds the primary display, where a window without a position opens.
+   *
+   * @returns The primary display, with its work area in screen pixels.
+   * @example
+   * ```ts
+   * import type { IDisplayHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function primaryWidth(displays: IDisplayHost): number {
+   *   return displays.getPrimaryDisplay().workArea.width;
+   * }
+   * ```
+   */
+  getPrimaryDisplay(): { readonly workArea: Rectangle };
 }
 
 /**
@@ -1439,20 +1454,6 @@ export interface IDesktopWindow {
   setBounds(bounds: Partial<Rectangle>): void;
 
   /**
-   * Centers the window on its display.
-   *
-   * @example
-   * ```ts
-   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
-   *
-   * export function centerOnDisplay(window: IDesktopWindow): void {
-   *   window.center();
-   * }
-   * ```
-   */
-  center(): void;
-
-  /**
    * Whether the window is maximized.
    *
    * @returns `true` when the window is maximized.
@@ -1619,6 +1620,8 @@ export interface IDesktopWindow {
   on(event: "close", listener: (event: IPreventableEvent) => void): unknown;
   on(event: "resize", listener: () => void): unknown;
   on(event: "move", listener: () => void): unknown;
+  on(event: "will-move", listener: () => void): unknown;
+  on(event: "will-resize", listener: () => void): unknown;
   on(event: "maximize", listener: () => void): unknown;
   on(event: "unmaximize", listener: () => void): unknown;
   on(event: "unresponsive", listener: () => void): unknown;
@@ -1966,21 +1969,50 @@ export declare class ScreenArea {
   public constructor(x: number, y: number, width: number, height: number);
 
   /**
-   * Tells whether a rectangle shares at least one pixel with the area.
+   * Makes the area of a rectangle, such as a display's work area.
+   *
+   * @param rectangle The rectangle.
+   * @returns The area.
+   * @example
+   * ```ts
+   * import { ScreenArea } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const area: ScreenArea = ScreenArea.of({ x: 0, y: 25, width: 1024, height: 743 });
+   * ```
+   */
+  public static of(rectangle: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): ScreenArea;
+
+  /**
+   * Counts the pixels a rectangle shares with the area.
    *
    * @param x The rectangle's left edge.
    * @param y The rectangle's top edge.
    * @param width The rectangle's width.
    * @param height The rectangle's height.
-   * @returns `true` when the rectangle overlaps the area.
+   * @returns The number of shared pixels, 0 when the rectangle does not overlap the area.
    * @example
    * ```ts
    * import { ScreenArea } from "@noldova/teamrun-shell-desktop";
    *
-   * export const isVisible: boolean = new ScreenArea(0, 0, 1920, 1040).overlaps(1900, 100, 800, 600);
+   * export const shared: number = new ScreenArea(0, 0, 1920, 1040).overlapArea(1900, 100, 800, 600);
    * ```
    */
-  public overlaps(x: number, y: number, width: number, height: number): boolean;
+  public overlapArea(x: number, y: number, width: number, height: number): number;
+
+  /**
+   * Tells whether a size fits in the area.
+   *
+   * @param width The width.
+   * @param height The height.
+   * @returns `true` when neither side is larger than the area's.
+   * @example
+   * ```ts
+   * import { ScreenArea } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const fits: boolean = new ScreenArea(0, 25, 1024, 743).fits(1280, 800);
+   * ```
+   */
+  public fits(width: number, height: number): boolean;
 }
 
 /**
@@ -2268,17 +2300,19 @@ export declare class WindowState {
   public constructor(x: number | null, y: number | null, width: number, height: number, isMaximized: boolean);
 
   /**
-   * The state of a window that has not been placed yet: 1280 by 800 pixels where the operating system puts it.
+   * The state of a window that has not been placed yet: 1280 by 800 pixels, but no more than nine tenths of the work area
+   * on each side and no less than the minimum size, where the operating system puts it.
    *
+   * @param area The work area of the display the window opens on.
    * @returns The default state.
    * @example
    * ```ts
-   * import { WindowState } from "@noldova/teamrun-shell-desktop";
+   * import { ScreenArea, WindowState } from "@noldova/teamrun-shell-desktop";
    *
-   * export const state: WindowState = WindowState.createDefault();
+   * export const state: WindowState = WindowState.createDefault(new ScreenArea(0, 25, 1024, 743));
    * ```
    */
-  public static createDefault(): WindowState;
+  public static createDefault(area: ScreenArea): WindowState;
 
   /**
    * Reads a saved state.
@@ -2296,19 +2330,23 @@ export declare class WindowState {
   public static fromJson(value: unknown): WindowState;
 
   /**
-   * Keeps the saved position when the window would show on one of the displays, and otherwise lets the operating
-   * system place it, keeping its size.
+   * Places the state's bounds on the connected displays. Bounds that a display shows and that fit its work area are kept,
+   * on the display that shows most of them. Otherwise the window is centered on that display, or on the primary display
+   * when no display shows it or it has no position; a size that fits the work area is kept, and a larger one shrinks to no
+   * more than nine tenths of the work area on each side.
    *
    * @param workAreas The work areas of the connected displays.
-   * @returns This state, or the same size without a position.
+   * @param primary The work area of the primary display.
+   * @returns The bounds to apply.
    * @example
    * ```ts
    * import { ScreenArea, WindowState } from "@noldova/teamrun-shell-desktop";
    *
-   * export const state: WindowState = new WindowState(3000, 100, 1280, 800, false).placeOn([new ScreenArea(0, 0, 1920, 1040)]);
+   * const primary: ScreenArea = new ScreenArea(0, 0, 1920, 1040);
+   * export const bounds: ScreenArea = new WindowState(3000, 100, 1280, 800, false).placeOn([primary], primary);
    * ```
    */
-  public placeOn(workAreas: readonly ScreenArea[]): WindowState;
+  public placeOn(workAreas: readonly ScreenArea[], primary: ScreenArea): ScreenArea;
 
   /**
    * Writes the state for saving.
@@ -2316,9 +2354,9 @@ export declare class WindowState {
    * @returns The state as JSON.
    * @example
    * ```ts
-   * import { WindowState } from "@noldova/teamrun-shell-desktop";
+   * import { ScreenArea, WindowState } from "@noldova/teamrun-shell-desktop";
    *
-   * export const saved: string = JSON.stringify(WindowState.createDefault().toJson());
+   * export const saved: string = JSON.stringify(WindowState.createDefault(new ScreenArea(0, 0, 1920, 1040)).toJson());
    * ```
    */
   public toJson(): JsonObject;
@@ -2415,16 +2453,17 @@ export declare class OpenWindow implements IQuitPrompt {
    * @param log Records why a window was shown unpainted and saves that failed.
    * @param guard Decides whether closing the window may go ahead while work is in progress, and stops the work when
    * the person chose to.
+   * @param platform The operating system's name, as Node reports it.
    * @example
    * ```ts
    * import { type ICloseGuard, type IDesktopLog, type IDesktopWindow, type IDisplayHost, OpenWindow } from "@noldova/teamrun-shell-desktop";
    *
    * export function track(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog, guard: ICloseGuard): OpenWindow {
-   *   return new OpenWindow(window, displays, log, guard);
+   *   return new OpenWindow(window, displays, log, guard, "win32");
    * }
    * ```
    */
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog, guard: ICloseGuard);
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog, guard: ICloseGuard, platform: string);
 
   /**
    * Shows the page the question about work in progress, or takes it away.
@@ -3098,30 +3137,35 @@ export declare class DesktopLog implements IDesktopLog {
  */
 export declare class WindowBoundsKeeper {
   /**
-   * Creates the keeper and listens for the window's changes, which it saves only once it has a store.
+   * Creates the keeper and listens for the window's changes, which it saves once it has a store. A move or resize the
+   * person makes before then is held where the window reports only the person's own as "will-move" and "will-resize", which
+   * is Windows; on macOS the system's own moves report as "will-move" too, and Linux reports neither, so nothing is held there.
    *
    * @param window The window.
    * @param displays The displays, for placing restored bounds.
    * @param saveDelay How long a pause in changes lasts before the bounds are saved, in milliseconds.
    * @param log Records a save that failed.
+   * @param holdsPersonsMoves Whether the window's "will-move" and "will-resize" come only from the person.
    * @example
    * ```ts
    * import { type IDesktopLog, type IDesktopWindow, type IDisplayHost, WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
    *
    * export function keep(window: IDesktopWindow, displays: IDisplayHost, log: IDesktopLog): WindowBoundsKeeper {
-   *   return new WindowBoundsKeeper(window, displays, 500, log);
+   *   return new WindowBoundsKeeper(window, displays, 500, log, true);
    * }
    * ```
    */
-  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog);
+  public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog, holdsPersonsMoves: boolean);
 
   /**
    * Keeps the bounds in the store from now on, and applies the bounds it holds: the saved position when a display
-   * shows it, otherwise the saved size centered, then maximized when it was.
+   * shows it, otherwise the saved size centered, then maximized when it was. When the person already moved or
+   * resized the window, those bounds stay and are saved instead of the saved ones being applied.
    *
    * @param store Where the bounds are kept.
    * @returns A promise that settles once the saved bounds are applied, or at once when none are saved.
    * @throws JsonException as a rejection when the saved bounds are not a window state; the window keeps its bounds.
+   * @throws The store's failure as a rejection when it could not keep the bounds the person set; they stay unsaved.
    * @example
    * ```ts
    * import type { IWindowStateStore, WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
@@ -3134,12 +3178,14 @@ export declare class WindowBoundsKeeper {
   public restoreAsync(store: IWindowStateStore): Promise<void>;
 
   /**
-   * Saves the window's current bounds at once, cancelling a pending save; does nothing before a store is set or
-   * after the window is gone. Bounds that could not be kept stay unsaved for {@link WindowBoundsKeeper.saveUnsavedAsync}.
+   * Saves the window's current bounds at once, cancelling a pending save; does nothing after the window is gone, or
+   * before a store is set unless the person moved or resized the window. Bounds that could not be kept stay unsaved for
+   * {@link WindowBoundsKeeper.saveUnsavedAsync}.
    * A save after a move or resize that finds the runtime unreachable keeps the bounds unsaved without reporting it.
    *
    * @returns A promise that settles once the bounds are kept.
    * @throws The store's failure as a rejection.
+   * @throws {WindowStateUnavailableException} Asynchronously when the person moved or resized the window before a store was set.
    * @example
    * ```ts
    * import type { WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
