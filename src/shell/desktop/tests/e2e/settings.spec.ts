@@ -14,8 +14,8 @@ import type { Locator, Page } from "@playwright/test";
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
+import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 
-const windowColors = { Light: "rgb(248, 248, 248)", Dark: "rgb(24, 24, 24)" };
 const settingsKey = "document/shell.settings";
 
 function settingsTab(window: Page): Locator {
@@ -133,7 +133,7 @@ test.describe("settings", () => {
     await row(window, "shell.panelSize").locator("input").fill("15");
     await row(window, "shell.panelSize").locator("input").press("Enter");
 
-    await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(windowColors[mode]);
+    await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(WindowModeFixture.backgrounds[mode]);
     await expect.poll(() => nativeBackgroundAsync(desktop)).toBe(mode === "Dark" ? "#181818" : "#F8F8F8");
     await expect.poll(() => window.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(16 * 15 / 13, 2);
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).not.toBe(before.font);
@@ -153,11 +153,11 @@ test.describe("settings", () => {
     const backgroundAsync = (): Promise<string> => window.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
     await pill("Light").click();
-    await expect.poll(backgroundAsync).toBe(windowColors.Light);
+    await expect.poll(backgroundAsync).toBe(WindowModeFixture.backgrounds.Light);
     await window.keyboard.press("ArrowRight");
     await expect(pill("Dark")).toBeChecked();
     await expect(pill("Dark")).toBeFocused();
-    await expect.poll(backgroundAsync).toBe(windowColors.Dark);
+    await expect.poll(backgroundAsync).toBe(WindowModeFixture.backgrounds.Dark);
     await window.keyboard.press("ArrowRight");
     await expect(pill("System")).toBeChecked();
     await window.keyboard.press("ArrowRight");
@@ -196,7 +196,7 @@ test.describe("settings", () => {
     await openSettingsAsync(window);
     const mode = await otherModeAsync(window);
     await chooseAsync(window, "shell.mode", mode);
-    await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(windowColors[mode]);
+    await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(WindowModeFixture.backgrounds[mode]);
 
     await desktop.restartAsync(async () => {
       for (const file of ["shell.sqlite", "shell.sqlite-wal", "shell.sqlite-shm"])
@@ -207,7 +207,7 @@ test.describe("settings", () => {
     await expect(desktop.window.getByRole("heading", { name: "Data from an earlier TeamRun" })).toBeVisible();
     await expect(desktop.window.locator("tr-workspace")).toHaveCount(0);
     expect(await desktop.window.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.documentElement).colorScheme]))
-      .toEqual([windowColors[mode], mode.toLowerCase()]);
+      .toEqual([WindowModeFixture.backgrounds[mode], mode.toLowerCase()]);
     expect(await nativeBackgroundAsync(desktop)).toBe(mode === "Dark" ? "#181818" : "#F8F8F8");
     await desktop.checkpointAsync("settings-first-frame");
   });

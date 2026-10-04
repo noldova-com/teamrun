@@ -31,7 +31,7 @@ export class CommandSearchComponent {
 
   private readonly entries: Signal<readonly CommandSearchEntry[]> = computed(() => this.sorted([
     ...this.commands.commands().filter(t => this.commands.isEnabled(t.name)).map(t => this.entryOf(t)),
-    ...this.menuBar.searchRows().map(t => new CommandSearchEntry(new QuickInputItem(t.id, t.title, t.icon, t.menu, t.key), t.menu, () => this.menuBar.run(t.id)))
+    ...this.menuBar.searchRows().map(t => new CommandSearchEntry(new QuickInputItem(t.id, t.title, t.icon, t.menu, t.key), () => this.menuBar.run(t.id)))
   ]));
 
   protected readonly resources: typeof Resources = Resources;
@@ -40,8 +40,8 @@ export class CommandSearchComponent {
   protected readonly items: Signal<readonly QuickInputItem[]> = computed(() => {
     const query = this.query();
     return String.isNullOrWhitespace(query) ? this.entries().map(t => t.item) : this.entries().flatMap(t => {
-      const found = CommandMatcher.match(query, t.category, t.item.title);
-      return Object.isNull(found) ? [] : [new QuickInputItem(t.item.id, t.item.title, t.item.icon, t.item.detail, t.item.keyLabel, found.titleMatches, found.categoryMatches)];
+      const found = CommandMatcher.match(query, t.detail, t.item.title);
+      return Object.isNull(found) ? [] : [new QuickInputItem(t.item.id, t.item.title, t.item.icon, t.item.detail, t.item.keyLabel, found.titleMatches, found.detailMatches)];
     });
   });
 
@@ -58,12 +58,11 @@ export class CommandSearchComponent {
       const index = recent.indexOf(entry.item.id);
       return index < 0 ? recent.length : index;
     };
-    return [...entries].sort((a, b) => rank(a) - rank(b) || a.category.localeCompare(b.category) || a.item.title.localeCompare(b.item.title));
+    return [...entries].sort((a, b) => rank(a) - rank(b) || a.detail.localeCompare(b.detail) || a.item.title.localeCompare(b.item.title));
   }
 
   private entryOf(command: CommandContribution): CommandSearchEntry {
-    const category = this.commands.ownerOf(command.name);
-    return new CommandSearchEntry(new QuickInputItem(command.name, command.title, command.icon, category, this.commands.keyLabel(command.name)), category,
+    return new CommandSearchEntry(new QuickInputItem(command.name, command.title, command.icon, this.commands.ownerOf(command.name), this.commands.keyLabel(command.name)),
       () => this.commands.run(command.name));
   }
 }

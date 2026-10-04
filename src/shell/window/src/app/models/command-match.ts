@@ -8,10 +8,10 @@
 
 export class CommandMatch {
   public readonly titleMatches: readonly number[];
-  public readonly categoryMatches: readonly number[];
+  public readonly detailMatches: readonly number[];
 
-  public constructor(titleMatches: readonly number[], categoryMatches: readonly number[]) {
+  public constructor(titleMatches: readonly number[], detailMatches: readonly number[]) {
     this.titleMatches = [...titleMatches];
-    this.categoryMatches = [...categoryMatches];
+    this.detailMatches = [...detailMatches];
   }
 }

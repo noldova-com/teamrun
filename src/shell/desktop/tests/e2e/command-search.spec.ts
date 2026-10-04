@@ -10,6 +10,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 
 function pane(window: Page): Locator {
   return window.locator(".cdk-overlay-container .tr-command-search-pane");
@@ -119,13 +120,11 @@ test.describe("command search", () => {
     const found = await rows();
 
     expect(found.length).toBeGreaterThan(0);
-    expect(found.map(t => t[0])).toEqual(all.filter(t => `${t[2]} ${t[1]}`.toLowerCase().includes("tab")).map(t => t[0]));
+    expect(found.map(t => t[0])).toEqual(all.filter(t => `${t[1]} ${t[2]}`.toLowerCase().includes("tab")).map(t => t[0]));
     expect(found.map(t => [t[1], t[2]])).toEqual(found.map(t => all.find(u => u[0] === t[0])).map(t => [t?.[1], t?.[2]]));
     expect(found.every(t => t[3].length === 1 && t[3][0]?.toLowerCase() === "tab")).toBe(true);
-    for (const mode of ["Light", "Dark"] as const) {
-      await window.evaluate(value => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
-        .request("shell.setSetting", { name: "shell.mode", value }), mode);
-      await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(mode === "Dark" ? "rgb(24, 24, 24)" : "rgb(248, 248, 248)");
+    for (const mode of WindowModeFixture.modes) {
+      await WindowModeFixture.setAsync(window, mode);
       await desktop.checkpointAsync(`command-search-match-${mode.toLowerCase()}`);
     }
     await window.keyboard.press("Escape");
