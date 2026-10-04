@@ -90,24 +90,21 @@ test.describe("view dialog", () => {
     await expect(tab).toHaveAttribute("aria-selected", "true");
   });
 
-  test("the keys of the module whose view a dialog shows run there as in its tab, while the shell's leave the window behind alone", async ({ desktop }) => {
+  test("the keys of the module whose view a dialog shows run there while the shell's do nothing, and a document one opens closes the dialog and shows its tab", async ({ desktop }) => {
     const window = desktop.window;
-    const note = (id: number): Locator => window.locator(`tr-tab[data-tab-key="document/notes.note/${id}"]`);
+    const note = window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"]");
     await window.locator("[data-fixture-content=notes-list]").click();
     await showAsync(window, "Show the notes list in a dialog");
     await expect(dialog(window).locator(".tr-notes-list-item").first()).toBeFocused();
 
-    await window.keyboard.press("ControlOrMeta+Alt+KeyN");
-    await expect(note(3)).toBeAttached();
     await window.keyboard.press("ControlOrMeta+KeyW");
     await window.keyboard.press("ControlOrMeta+Alt+KeyN");
-    await expect(note(4)).toBeAttached();
 
-    await expect(note(3)).toBeAttached();
-    await expect(window.locator("tr-tab[data-tab-key=\"view/notes.list\"]")).toBeAttached();
-    await expect(dialog(window).locator("[data-fixture-content=notes-list]")).toBeVisible();
-    await window.keyboard.press("Escape");
     await expect(dialog(window)).toHaveCount(0);
+    await expect(note).toHaveAttribute("aria-selected", "true");
+    await expect(note).toBeFocused();
+    await expect(window.locator("tr-tab[data-tab-key=\"view/notes.list\"]")).toBeAttached();
+    await expect(window.locator("tr-workspace [data-fixture-content=notes-list]")).toBeVisible();
   });
 
   test("a module's docked view and the shell's Settings show in a dialog that fits the smallest window and 200% zoom, and a tab that was not open closes with it", async ({ desktop }) => {

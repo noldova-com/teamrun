@@ -18,6 +18,7 @@ import { ViewDialogComponent } from "../components/view-dialog/view-dialog.compo
 import { ViewDialogException } from "../exceptions/view-dialog.exception";
 import { DocumentTab } from "../models/layout/document-tab";
 import type { Tab } from "../models/layout/tab";
+import type { TabReveal } from "../models/layout/tab-reveal";
 import { Resources } from "../../resources";
 import { LayoutService } from "./layout.service";
 import { TabFocusService } from "./tab-focus.service";
@@ -32,6 +33,8 @@ export class ViewDialogService {
   private readonly shownValue: WritableSignal<Tab | null> = signal(null);
   private dialog: DialogRef<unknown, ViewDialogComponent> | null = null;
   private wasOpen: boolean = false;
+  private shownAfter: number = 0;
+  private revealedDocument: Tab | null = null;
 
   public readonly shown: Signal<Tab | null> = this.shownValue.asReadonly();
 
@@ -40,6 +43,11 @@ export class ViewDialogService {
       const tab = this.shownValue();
       if (!Object.isNull(tab) && !this.isShowable(tab))
         untracked(() => this.close());
+    });
+    effect(() => {
+      const reveal = this.layout.revealed();
+      if (!Object.isNull(reveal))
+        untracked(() => this.leaveFor(reveal));
     });
   }
 
@@ -55,13 +63,19 @@ export class ViewDialogService {
     if (!Object.isNull(title))
       this.labels.setTitle(tab, title);
     this.wasOpen = this.layout.layout().isOpen(tab);
+    this.shownAfter = this.layout.revealed()?.sequence ?? 0;
     this.shownValue.set(tab);
     const dialog = this.dialogs.open(ViewDialogComponent);
     this.dialog = dialog;
     return new Promise(resolve => dialog.closed.subscribe(() => {
       this.dialog = null;
       this.shownValue.set(null);
-      this.tabFocus.focusIfLost(tab);
+      const revealed = this.revealedDocument;
+      this.revealedDocument = null;
+      if (Object.isNull(revealed))
+        this.tabFocus.focusIfLost(tab);
+      else
+        this.tabFocus.focus(revealed);
       resolve();
     }));
   }
@@ -76,6 +90,14 @@ export class ViewDialogService {
 
   public close(): void {
     this.dialog?.close();
+  }
+
+  private leaveFor(reveal: TabReveal): void {
+    if (Object.isNull(this.dialog) || reveal.sequence <= this.shownAfter || !(reveal.tab instanceof DocumentTab) || reveal.tab.equals(this.shownValue())
+      || !this.layout.layout().isOpen(reveal.tab))
+      return;
+    this.revealedDocument = reveal.tab;
+    this.close();
   }
 
   private isShowable(tab: Tab): boolean {

@@ -168,6 +168,49 @@ describe("ViewDialogService", () => {
     expect([layout.layout().isOpen(LayoutFixture.todo), layout.layout().isOpen(plan), dialogs.shown()?.key]).toEqual([false, true, plan.key]);
   });
 
+  it("closes when a document is opened or activated from it, and focuses that document's tab", async () => {
+    const layout = TestBed.inject(LayoutService);
+    const tabElements = [LayoutFixture.todo, plan].map(t => {
+      const element = document.createElement("button");
+      element.dataset["tabKey"] = t.key;
+      document.body.append(element);
+      return element;
+    });
+    const opened = dialogs.showAsync(search);
+    await vi.waitFor(() => expect(document.querySelector(".tr-test-search")).not.toBeNull());
+    layout.openDocument(LayoutFixture.todo);
+    TestBed.tick();
+    await opened;
+    await vi.waitFor(() => expect(document.activeElement).toBe(tabElements[0]));
+    const isTodoActive = layout.layout().groupOf(LayoutFixture.todo)?.active?.equals(LayoutFixture.todo);
+
+    const activated = dialogs.showAsync(search);
+    await vi.waitFor(() => expect(document.querySelector(".tr-test-search")).not.toBeNull());
+    layout.activate(plan);
+    TestBed.tick();
+    await activated;
+    await vi.waitFor(() => expect(document.activeElement).toBe(tabElements[1]));
+    tabElements.forEach(t => t.remove());
+
+    expect([isTodoActive, dialogs.shown()]).toEqual([true, null]);
+  });
+
+  it("stays open for its own document, a view, a document that is not open and one revealed before it showed", async () => {
+    const layout = TestBed.inject(LayoutService);
+    layout.openDocument(LayoutFixture.todo);
+    void dialogs.showAsync(plan);
+    await vi.waitFor(() => expect(document.querySelector(".tr-test-note")).not.toBeNull());
+
+    TestBed.tick();
+    const shownAfter = [plan, LayoutFixture.files, new DocumentTab("notes.note", "gone")].map(t => {
+      layout.activate(t);
+      TestBed.tick();
+      return dialogs.shown()?.key;
+    });
+
+    expect(shownAfter).toEqual([plan.key, plan.key, plan.key]);
+  });
+
   it("focuses the tab it came from when the control that opened it is gone, and leaves focus where it returned otherwise", async () => {
     const tabElement = document.createElement("button");
     tabElement.dataset["tabKey"] = plan.key;
