@@ -21,7 +21,7 @@ export default class RepositoryFixture {
   private static readonly REMOVE_LIMIT: number = 10_000;
   private static readonly REMOVE_INTERVAL: number = 250;
   private static readonly LOCKED_CODES: readonly string[] = ["EBUSY", "EPERM", "ENOTEMPTY"];
-  private static readonly WINDOWS_USERS: string = "CimCmdlets\\Get-CimInstance Win32_Process | " +
+  private static readonly WINDOWS_USERS: string = "Microsoft.PowerShell.Management\\Get-WmiObject -Query 'SELECT ProcessId, ExecutablePath, CommandLine FROM Win32_Process' | " +
     "Microsoft.PowerShell.Core\\Where-Object { $_.ProcessId -ne $PID -and ($_.ExecutablePath -like 'FOLDER*' -or $_.CommandLine -like '*FOLDER*') } | " +
     "Microsoft.PowerShell.Core\\ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }";
   private static readonly IDENTITY: readonly string[] = ["-c", "user.name=TeamRun Fixture", "-c", "user.email=fixture@example.invalid"];

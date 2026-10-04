@@ -6,13 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { MatchKind } from "../../../src/app/enums/match-kind";
 import { CommandMatch } from "../../../src/app/models/command-match";
 
 describe("CommandMatch", () => {
-  it("holds how a title matched and which characters", () => {
-    const match = new CommandMatch(MatchKind.WordStarts, [0, 6]);
+  it("holds the matched characters of a title and of its detail", () => {
+    const match = new CommandMatch([0, 1], [4]);
 
-    expect([match.kind, match.matches]).toEqual([MatchKind.WordStarts, [0, 6]]);
+    expect([match.titleMatches, match.detailMatches]).toEqual([[0, 1], [4]]);
   });
 });

@@ -13,6 +13,10 @@ export class PlatformFixture {
     return process.platform === "win32" ? () => undefined : Skip("Windows only");
   }
 
+  public static posixOnly(): (value: Function) => void {
+    return process.platform === "win32" ? Skip("POSIX only") : () => undefined;
+  }
+
   public static linuxOnly(): (value: Function) => void {
     return process.platform === "linux" ? () => undefined : Skip("Linux only");
   }

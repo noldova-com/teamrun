@@ -27,6 +27,7 @@ import type { ModuleDeclaration } from "../../models/module-declaration.js";
 import { Refusal } from "../../models/refusal.js";
 import { RuntimeBuild } from "../../models/runtime-build.js";
 import { RuntimeDiscovery } from "../../models/runtime-discovery.js";
+import type { RunningProgram } from "../../models/running-program.js";
 import type { RuntimeOptions } from "../../models/runtime-options.js";
 import { Resources } from "../../resources.js";
 import { SystemCommand } from "../commands/system-command.js";
@@ -52,6 +53,7 @@ import { PostNotificationMethod } from "../notifications/post-notification-metho
 import { UpdateNotificationMethod } from "../notifications/update-notification-method.js";
 import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
+import { ProcessSupervisor } from "../process/process-supervisor.js";
 import { CommandRegistry } from "../registry/command-registry.js";
 import { EventRegistry } from "../registry/event-registry.js";
 import { MethodRegistry } from "../registry/method-registry.js";
@@ -77,8 +79,11 @@ export class RuntimeHost implements IIdleParticipant {
   private readonly publisher: DiscoveryPublisher;
   private readonly idle: IdleMonitor;
   private readonly stopped: PromiseWithResolvers<string> = Promise.withResolvers<string>();
+  private readonly platform: string;
+  private readonly environment: NodeJS.ProcessEnv;
   private database: ShellDatabase | null;
   private settings: SettingsService | null = null;
+  private processes: ProcessSupervisor | null = null;
   private discovery: RuntimeDiscovery | null = null;
   private movingAside: Promise<void> | null = null;
   private isStopping: boolean = false;
@@ -103,6 +108,8 @@ export class RuntimeHost implements IIdleParticipant {
     database: ShellDatabase | null,
     declarations: readonly ModuleDeclaration[]) {
     this.lock = lock;
+    this.platform = platform;
+    this.environment = environment;
     this.log = log;
     this.database = database;
     this.identity = RuntimeBuild.identity;
@@ -139,6 +146,10 @@ export class RuntimeHost implements IIdleParticipant {
         ShellMethods.moveAside));
       this.methods.register(ShellMethods.moveAside, new MoveAsideMethod(() => this.moveAsideAsync()));
     }
+  }
+
+  public get programs(): readonly RunningProgram[] {
+    return this.processes?.programs ?? [];
   }
 
   public get isIdle(): boolean {
@@ -206,8 +217,9 @@ export class RuntimeHost implements IIdleParticipant {
   }
 
   private async openAsync(platform: string): Promise<void> {
-    if (!Object.isNull(this.settings))
-      await this.modules.activateAsync(this.settings);
+    await this.publisher.withdrawEarlierAsync();
+    if (!Object.isNull(this.database) && !Object.isNull(this.settings))
+      await this.activateModulesAsync(this.database, this.settings);
     const endpoint = await this.listenAsync(platform);
     const discovery = new RuntimeDiscovery(
       endpoint.toString(),
@@ -230,8 +242,15 @@ export class RuntimeHost implements IIdleParticipant {
   private async performMoveAsideAsync(): Promise<void> {
     await DataDirectoryInspector.moveAsideAsync(this.lock);
     this.database = await ShellDatabase.openAsync(this.lock, ShellMigrations.all);
-    await this.modules.activateAsync(this.registerShellFacilities(this.database));
+    await this.activateModulesAsync(this.database, this.registerShellFacilities(this.database));
     setImmediate(() => this.server.admit());
+  }
+
+  private async activateModulesAsync(database: ShellDatabase, settings: SettingsService): Promise<void> {
+    const processes = new ProcessSupervisor(database, this.platform, this.environment, new SystemCommand(), this.log.diagnostics);
+    this.processes = processes;
+    await processes.cleanUpAsync();
+    await this.modules.activateAsync(settings, processes);
   }
 
   private registerShellFacilities(database: ShellDatabase): SettingsService {
@@ -280,6 +299,7 @@ export class RuntimeHost implements IIdleParticipant {
         await this.modules.deactivateAsync();
       }
       finally {
+        await this.processes?.stopAllAsync();
         if (!Object.isNull(this.discovery))
           await this.publisher.withdrawAsync(this.discovery);
       }

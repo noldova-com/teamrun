@@ -8,9 +8,10 @@
 
 import { existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { createInterface } from "node:readline";
 
 import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
-import { type IRuntimePart, type IRuntimePartContext, Migration, RuntimeCommand, type WorkItem } from "@noldova/teamrun-shell-runtime";
+import { type IRuntimePart, type IRuntimePartContext, Migration, ProcessRequest, RuntimeCommand, type WorkItem } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "./resources.js";
 
@@ -62,6 +63,15 @@ export class RuntimePart implements IRuntimePart {
         }, { once: true });
         this.work.push(work);
         return null;
+      }
+    }));
+    context.registerCommand(new RuntimeCommand(Resources.startProgramCommand, Resources.startProgramTitle, null, null, {
+      handleAsync: async () => {
+        const owned = await context.startProcessAsync(new ProcessRequest(
+          process.execPath, [Resources.evaluateArgument, Resources.programScript], await context.getWorkFolderAsync(), { [Resources.nodeVariable]: "1" }, []));
+        for await (const line of createInterface({ input: owned.output }))
+          return { processId: owned.processId, childProcessId: Number(line) };
+        throw new Error(Resources.programEndedMessage);
       }
     }));
     context.registerCommand(new RuntimeCommand(Resources.finishWorkCommand, Resources.finishWorkTitle, null, null, {
