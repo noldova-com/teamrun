@@ -33,6 +33,8 @@ export default class AngularProject {
   private static readonly BROWSER_ARGUMENTS: readonly string[] = ["install", "--only-shell", "chromium"];
   private static readonly TEST_ARGUMENTS: readonly string[] = ["test", "--reporters=default", "--reporters=json"];
   private static readonly OUTPUT_FILE_OPTION: string = "--output-file";
+  private static readonly INCLUDE_OPTION: string = "--include";
+  private static readonly NO_COVERAGE_OPTION: string = "--no-coverage";
   private static readonly REPORT_SEGMENTS: readonly string[] = ["_build", "angular-tests.json"];
   private static readonly TEST_TARGET: string = "test";
   private static readonly OPTIONS_PATH: readonly string[] = ["architect", AngularProject.TEST_TARGET, "options"];
@@ -112,14 +114,14 @@ export default class AngularProject {
       throw new ProcessException(`The window built in ${shown} has no files to check.`);
   }
 
-  public async testAsync(): Promise<AngularTestRun> {
+  public async testAsync(include: readonly string[] = []): Promise<AngularTestRun> {
     const report = path.join(this.root, ...AngularProject.REPORT_SEGMENTS);
     await rm(report, { force: true });
     await rm(path.join(this.directory, AngularProject.DEPENDENCY_CACHE), { recursive: true, force: true });
     await mkdir(path.dirname(report), { recursive: true });
     const exitCode = await this.runner.runLoggedAsync(
       process.execPath,
-      [path.join(this.directory, AngularProject.CLI), ...AngularProject.TEST_ARGUMENTS, AngularProject.OUTPUT_FILE_OPTION, report],
+      [path.join(this.directory, AngularProject.CLI), ...AngularProject.TEST_ARGUMENTS, AngularProject.OUTPUT_FILE_OPTION, report, ...AngularProject.selectionArguments(include)],
       this.directory,
       path.join(this.root, AngularProject.LOG_FILE),
       process.stdout,
@@ -153,6 +155,10 @@ export default class AngularProject {
 
   private specName(file: string): string {
     return path.relative(this.directory, file).split(path.sep).join(path.posix.sep);
+  }
+
+  private static selectionArguments(include: readonly string[]): readonly string[] {
+    return include.length === 0 ? [] : [AngularProject.NO_COVERAGE_OPTION, ...include.flatMap(t => [AngularProject.INCLUDE_OPTION, t])];
   }
 
   private static async readJsonAsync(file: string): Promise<unknown> {

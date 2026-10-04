@@ -851,7 +851,7 @@ export declare class TestRunResult {
    * export const total: number = result.total;
    * ```
    */
-  public constructor(classResults: readonly TestClassResult[], selection?: TestSelection | null);
+  public constructor(classResults: readonly TestClassResult[], selection?: TestSelection);
 }
 
 /**
