@@ -1,0 +1,7 @@
+name: Trial
+on: workflow_dispatch
+jobs:
+  trial:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo trial
