@@ -82,4 +82,22 @@ test.describe("command search", () => {
     await expect(pane(window)).toHaveCount(0);
     await expect(tab).toBeFocused();
   });
+
+  test("lists a menu item that passes arguments after its menu, beside the command it runs, and runs it from the pointer", async ({ desktop }) => {
+    const window = desktop.window;
+    await window.locator("tr-window-row").getByRole("button", { name: "Search commands" }).click();
+    await expect(field(window)).toBeFocused();
+
+    await window.keyboard.type("new note");
+
+    await expect(options(window)).toHaveCount(2);
+    await expect(options(window).first()).toHaveAttribute("data-item", "notes.newNote");
+    await expect(options(window).last().locator(".tr-quick-input-detail")).toHaveText("File › New from template");
+    await expect(options(window).last().locator(".tr-quick-input-key")).toHaveCount(0);
+    await desktop.checkpointAsync("command-search-menu-item");
+    await options(window).last().click();
+
+    await expect(pane(window)).toHaveCount(0);
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"] .tr-tab-label")).toHaveText("Note 3");
+  });
 });
