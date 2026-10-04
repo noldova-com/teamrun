@@ -2946,7 +2946,8 @@ export declare class ModuleDeclaration {
    * @param settings The definitions of its settings, each its own; none by
    * default.
    * @throws {ArgumentException} When the id, the display name or the
-   * description is not valid, or a setting belongs to another owner.
+   * description is not valid, or a setting belongs to another owner or is of
+   * the shell's own kind `KeyBindings`.
    * @example
    * ```ts
    * import { ModuleDeclaration } from "@noldova/teamrun-shell-runtime";

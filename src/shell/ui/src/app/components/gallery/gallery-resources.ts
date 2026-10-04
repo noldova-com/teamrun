@@ -47,6 +47,27 @@ export class GalleryResources {
     progress: "Progress",
     determinate: "Half done",
     indeterminate: "Unknown amount",
+    spinner: "Spinner",
+    spinnerWorking: "Loading the list",
+    spinnerDelayed: "Loading after a short wait",
+    chip: "Badge and key chip",
+    chipCount: "Count",
+    chipAdded: "Added",
+    chipRemoved: "Removed",
+    chipKey: "Ctrl+K",
+    choicePills: "Choice pills",
+    choicePillsLabel: "Mode",
+    choicePillsLong: "Choice with a long title",
+    choicePillOptions: [
+      { value: "system", title: "System" },
+      { value: "light", title: "Light" },
+      { value: "dark", title: "Dark" }
+    ],
+    choicePillOptionsLong: [
+      { value: "short", title: "Short" },
+      { value: "long", title: "An option whose title is far too long to fit the width its group gives it" }
+    ],
+    choicePillInitial: "light",
     tab: "Tab",
     tabNormal: "Notes",
     tabSelected: "Outline",

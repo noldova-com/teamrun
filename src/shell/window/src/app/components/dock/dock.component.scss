@@ -22,10 +22,6 @@
   flex-direction: column;
 }
 
-.tr-dock-strip tr-place-menu {
-  display: none;
-}
-
 .tr-dock-strip-drop-before {
   box-shadow: inset calc(2 * var(--tr-border-width)) 0 0 var(--tr-accent);
 }

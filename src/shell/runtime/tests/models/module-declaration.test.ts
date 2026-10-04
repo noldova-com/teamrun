@@ -105,6 +105,8 @@ export class ModuleDeclarationTests {
     Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, default: 1 }] }), DeclarationsFormatException);
     Assert.areEqual("The module notes declares the setting tasks.size, which it does not own. (Parameter 'settings')",
       Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, name: "tasks.size" }] }), ArgumentException).message);
+    Assert.areEqual("The module notes declares the setting notes.keys of the kind KeyBindings, which only the shell declares. (Parameter 'settings')",
+      Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, name: "notes.keys", type: { kind: "KeyBindings" }, default: {} }] }), ArgumentException).message);
   }
 
   private static without(field: string): Readonly<Record<string, unknown>> {

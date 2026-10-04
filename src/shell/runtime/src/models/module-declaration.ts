@@ -8,7 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException, ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
-import { SettingDefinition } from "@noldova/teamrun-shell-protocol";
+import { SettingDefinition, SettingKind } from "@noldova/teamrun-shell-protocol";
 
 import { DeclarationsFormatException } from "../exceptions/declarations-format.exception.js";
 import { Resources } from "../resources.js";
@@ -37,6 +37,9 @@ export class ModuleDeclaration {
     const foreign = settings.find(t => t.name.owner !== id);
     if (!Object.isUndefined(foreign))
       throw new ArgumentException(Resources.formatSettingOwnerInvalid(id, foreign.name.text), Resources.settingsField);
+    const shellOnly = settings.find(t => t.type.kind === SettingKind.KeyBindings);
+    if (!Object.isUndefined(shellOnly))
+      throw new ArgumentException(Resources.formatSettingKindReserved(id, shellOnly.name.text, shellOnly.type.kind), Resources.settingsField);
 
     this.id = id;
     this.displayName = displayName;
