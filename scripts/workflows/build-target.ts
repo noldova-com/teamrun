@@ -31,7 +31,7 @@ export default class BuildTarget {
   }
 
   public get operatingSystem(): string {
-    return this.name.split(BuildTarget.WORD_SEPARATOR)[0] ?? this.name;
+    return this.name.slice(0, this.name.indexOf(BuildTarget.WORD_SEPARATOR));
   }
 
   public get uiShards(): readonly UiShard[] {
