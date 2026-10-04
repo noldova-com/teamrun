@@ -10,6 +10,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: var(--tr-space-1);
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
@@ -26,10 +27,13 @@
   white-space: nowrap;
 }
 
-.tr-button-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.tr-button-icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.tr-button-icon:empty {
+  display: none;
 }
 
 :host(:not(:disabled):hover) {

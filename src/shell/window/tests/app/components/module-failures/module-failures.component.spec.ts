@@ -138,17 +138,14 @@ describe("ModuleFailuresComponent", () => {
     expect(box.right).toBeCloseTo(anchor.right, 1);
   });
 
-  it("centers each action's glyph on its label inside the button", async () => {
+  it("centers each action's glyph in its button", async () => {
     AppearanceFixture.apply();
     failures.set([clock]);
     const fixture = await renderAsync();
     await openAsync(fixture);
     const middle = (element: Element): number => element.getBoundingClientRect().top + element.getBoundingClientRect().height / 2;
 
-    const offsets = ["copy", "logs"].map(name => {
-      const [glyph, label] = [...button(name).querySelectorAll(".tr-button-label > span")];
-      return Math.abs(middle(glyph as Element) - middle(label as Element));
-    });
+    const offsets = ["copy", "logs"].map(name => Math.abs(middle(button(name).querySelector("[trButtonIcon]") as Element) - middle(button(name))));
 
     expect(Math.max(...offsets)).toBeLessThanOrEqual(1.5);
   });
