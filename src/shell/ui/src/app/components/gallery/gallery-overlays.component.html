@@ -1,0 +1,66 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<tr-gallery-specimen [name]="text.menu">
+  <tr-menu [attr.aria-label]="text.menuLabel" class="tr-gallery-menu">
+    <button type="button" tr-menu-item [label]="text.menuPlain"></button>
+    <button type="button" tr-menu-item [label]="text.menuIcon" [icon]="text.glyphAdd"></button>
+    <button type="button" tr-menu-item [label]="text.menuShortcut" [shortcut]="text.menuShortcutKeys"></button>
+    <button type="button" tr-menu-item [label]="text.menuChecked" [checked]="true"></button>
+    <button type="button" tr-menu-item [label]="text.menuCheckbox" [checkbox]="true" [checked]="isChecked()" (triggered)="isChecked.set(!isChecked())"></button>
+    <tr-menu-separator />
+    <button type="button" tr-menu-item [label]="text.menuDisabled" [disabled]="true"></button>
+    <button type="button" tr-menu-item [label]="text.menuSubmenu" [trMenuTriggerFor]="submenu"></button>
+    <button type="button" tr-menu-item [label]="text.menuLong"></button>
+  </tr-menu>
+  <button type="button" tr-button [variant]="variants.Secondary" [trMenuTriggerFor]="popup">{{ text.menuTrigger }}</button>
+  <div class="tr-gallery-context" tabindex="0" [trContextMenuTriggerFor]="popup">{{ text.contextMenu }}</div>
+  <tr-menu-bar [label]="text.menuBarLabel">
+    <button type="button" tr-menu-bar-item [label]="text.file" [trMenuTriggerFor]="popup"></button>
+    <button type="button" tr-menu-bar-item [label]="text.edit" [trMenuTriggerFor]="popup"></button>
+  </tr-menu-bar>
+  <ng-template #popup>
+    <tr-menu>
+      <button type="button" tr-menu-item [label]="text.menuIcon" [icon]="text.glyphAdd"></button>
+      <button type="button" tr-menu-item [label]="text.menuChecked" [checked]="true"></button>
+      <button type="button" tr-menu-item [label]="text.menuSubmenu" [trMenuTriggerFor]="submenu"></button>
+    </tr-menu>
+  </ng-template>
+  <ng-template #submenu>
+    <tr-menu>
+      <button type="button" tr-menu-item [label]="text.submenuRow"></button>
+    </tr-menu>
+  </ng-template>
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.tooltip">
+  <button type="button" tr-button [variant]="variants.Secondary" [trTooltip]="text.tooltipText" [trTooltipSide]="below">{{ text.tooltipTrigger }}</button>
+  <tr-tooltip [text]="text.tooltipText" />
+  <tr-tooltip class="tr-gallery-narrow" [text]="text.tooltipLong" />
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.dialog">
+  <ng-container [ngTemplateOutlet]="dialog" [ngTemplateOutletInjector]="dialogInjector" />
+  <ng-template #dialog>
+    <tr-dialog [title]="text.dialogTitle">
+      {{ text.dialogBody }}
+      <button type="button" tr-button trDialogAction [variant]="variants.Secondary">{{ text.dialogCancel }}</button>
+      <button type="button" tr-button trDialogAction>{{ text.dialogConfirm }}</button>
+    </tr-dialog>
+  </ng-template>
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.quickInput">
+  <tr-quick-input [items]="items" [label]="text.quickInputLabel" [query]="text.quickInputQuery" [isFocusing]="false" />
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.docking">
+  <tr-docking-guide [direction]="directions.Left" />
+  <tr-docking-guide [direction]="directions.Right" [chosen]="true" />
+  <tr-docking-plate [chosen]="directions.Center" />
+</tr-gallery-specimen>

@@ -18,6 +18,10 @@
   --tr-line-code: 1.5;
   --tr-weight-emphasis: 600;
   --tr-pointer-target: 24px;
+}
+
+:root,
+.tr-theme-scope {
   --tr-inline-code: color-mix(in srgb, var(--tr-text) 12%, transparent);
   --tr-text-tab: var(--tr-text-muted);
   --tr-text-placeholder: var(--tr-text-muted);

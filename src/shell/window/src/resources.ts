@@ -207,6 +207,8 @@ export class Resources {
   public static readonly appearanceUnreadable: string = "The appearance preferences could not be read.";
   public static readonly notificationsPage: string = "Notifications";
   public static readonly shortcutsPage: string = "Keyboard shortcuts";
+  public static readonly galleryPage: string = "Gallery";
+  public static readonly galleryComponentToken: string = "GalleryComponent";
   public static readonly leadingSettingsPages: readonly string[] = [Resources.appearancePage, Resources.notificationsPage, Resources.shortcutsPage];
   public static readonly searchSettingsLabel: string = "Search settings";
   public static readonly settingsPagesLabel: string = "Settings pages";

@@ -15,11 +15,17 @@ export class SettingsPage {
   public readonly title: string;
   public readonly groups: readonly SettingsGroup[];
   public readonly isShortcuts: boolean;
+  public readonly isGallery: boolean;
 
-  public constructor(title: string, groups: readonly SettingsGroup[], isShortcuts: boolean = false) {
+  public constructor(title: string, groups: readonly SettingsGroup[], isShortcuts: boolean = false, isGallery: boolean = false) {
     this.title = title;
     this.groups = [...groups];
     this.isShortcuts = isShortcuts;
+    this.isGallery = isGallery;
+  }
+
+  public static galleryOf(title: string): SettingsPage {
+    return new SettingsPage(title, [], false, true);
   }
 
   public static pagesOf(definitions: readonly SettingDefinition[]): readonly SettingsPage[] {

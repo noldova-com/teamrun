@@ -1,0 +1,49 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<tr-gallery-specimen [name]="text.button">
+  <button type="button" tr-button>{{ text.primary }}</button>
+  <button type="button" tr-button [variant]="variants.Secondary">{{ text.secondary }}</button>
+  <button type="button" tr-button disabled>{{ text.disabled }}</button>
+  <button type="button" tr-button [variant]="variants.Secondary" disabled>{{ text.disabled }}</button>
+  <button type="button" tr-button class="tr-gallery-narrow">{{ text.longText }}</button>
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.iconButton">
+  <button type="button" tr-icon-button [icon]="text.iconGlyph" [label]="text.iconLabel"></button>
+  <button type="button" tr-icon-button [icon]="text.iconGlyph" [label]="text.pressed" [pressed]="isPressed()" (click)="isPressed.set(!isPressed())"></button>
+  <button type="button" tr-icon-button [icon]="text.iconGlyph" [label]="text.disabled" disabled></button>
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.checkbox">
+  <tr-checkbox [checked]="isChecked()" (checkedChange)="isChecked.set($event)">{{ text.checked }}</tr-checkbox>
+  <tr-checkbox>{{ text.unchecked }}</tr-checkbox>
+  <tr-checkbox [checked]="true" [disabled]="true">{{ text.disabled }}</tr-checkbox>
+  <tr-checkbox class="tr-gallery-narrow">{{ text.longText }}</tr-checkbox>
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.textField">
+  <input type="text" tr-text-field [placeholder]="text.placeholder" [attr.aria-label]="text.textField" />
+  <input type="text" tr-text-field [value]="text.longValue" [attr.aria-label]="text.longText" class="tr-gallery-narrow" />
+  <input type="text" tr-text-field [value]="text.disabled" [attr.aria-label]="text.disabled" disabled />
+  <span class="tr-gallery-invalid">
+    <input type="text" tr-text-field [value]="text.invalidField" [attr.aria-label]="text.error" aria-invalid="true" />
+    <span class="tr-gallery-error">{{ text.validationText }}</span>
+  </span>
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.select">
+  <tr-select [options]="options" [value]="choice()" [label]="text.select" (valueChange)="choice.set($event)" />
+  <tr-select [options]="options" value="long" [label]="text.longText" class="tr-gallery-narrow" />
+  <tr-select [options]="options" value="two" [label]="text.disabled" [disabled]="true" />
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.progress">
+  <tr-progress class="tr-gallery-bar" [label]="text.determinate" [value]="0.5" />
+  <tr-progress class="tr-gallery-bar" [label]="text.indeterminate" />
+</tr-gallery-specimen>

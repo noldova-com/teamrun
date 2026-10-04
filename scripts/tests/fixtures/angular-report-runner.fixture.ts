@@ -8,10 +8,12 @@
 
 import { writeFile } from "node:fs/promises";
 
+import GalleryFile from "../../angular/gallery-file.ts";
 import ProcessRunnerFixture from "./process-runner.fixture.ts";
 
 export default class AngularReportRunnerFixture extends ProcessRunnerFixture {
   private static readonly OUTPUT_FILE_OPTION: string = "--output-file";
+  private static readonly PACKAGED_OPTION: string = "--packaged";
 
   private readonly report: string;
 
@@ -25,6 +27,8 @@ export default class AngularReportRunnerFixture extends ProcessRunnerFixture {
     const file = commandArguments[commandArguments.indexOf(AngularReportRunnerFixture.OUTPUT_FILE_OPTION) + 1];
     if (commandArguments.includes(AngularReportRunnerFixture.OUTPUT_FILE_OPTION) && file !== undefined)
       await writeFile(file, this.report);
+    if (commandArguments.includes(AngularReportRunnerFixture.PACKAGED_OPTION))
+      await new GalleryFile(directory).writeAsync(true);
     return super.runAsync(command, commandArguments, directory, environment);
   }
 }

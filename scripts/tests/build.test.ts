@@ -13,11 +13,13 @@ import path from "node:path";
 import { test } from "node:test";
 
 import AngularProject from "../angular/angular-project.ts";
+import GalleryFile from "../angular/gallery-file.ts";
 import ProductFile from "../angular/product-file.ts";
 import Build from "../build.ts";
 import ModuleArtifacts from "../modules/module-artifacts.ts";
 import ModuleCatalog from "../modules/module-catalog.ts";
 import PackageBuild from "../packages/package-build.ts";
+import ProcessException from "../processes/process.exception.ts";
 import ProcessRunner from "../processes/process-runner.ts";
 import NpmCommand from "../toolchain/npm-command.ts";
 import PackageTreeFixture from "./fixtures/package-tree.fixture.ts";
@@ -29,7 +31,7 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 class BuildTests {
   private static readonly BUILD_TIMEOUT: number = 60_000;
   private static readonly ROOT_MANIFEST: string = JSON.stringify({ teamrun: { modules: [], product: ProductIdentityFixture.json } });
-  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>]]\n";
+  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder>]]\n";
 
   public static register(): void {
     test("a tree without packages builds nothing and succeeds", async t => {
@@ -91,6 +93,41 @@ class BuildTests {
       assert.match(testedDeclarations, /"id": "notes"[\s\S]*"id": "clock"/);
     });
 
+    test("a development build brings the Gallery into the window, a packaged one leaves it out and checks the built window for it", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await repository.writeAsync({ "package.json": BuildTests.ROOT_MANIFEST });
+      const gallery = new GalleryFile(repository.directory);
+
+      assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync([]), 0);
+      assert.match(await readFile(gallery.file, "utf8"), /GalleryComponent;\n$/);
+      assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--packaged"]), 0);
+      assert.match(await readFile(gallery.file, "utf8"), /Type<unknown> \| null = null;\n$/);
+
+      const checks: (string | null)[][] = [];
+      let isFound = false;
+      const angular = {
+        prepareAsync: () => Promise.resolve(),
+        buildAsync: () => Promise.resolve(),
+        verifyWithoutAsync: (folder: string | null, texts: readonly string[]) => {
+          checks.push([folder, ...texts]);
+          return isFound ? Promise.reject(new ProcessException("The window contains the Gallery.")) : Promise.resolve();
+        }
+      } as unknown as AngularProject;
+      const run = (buildArguments: readonly string[], output: TextOutputFixture = new TextOutputFixture()): Promise<number> =>
+        BuildTests.createWith(repository.directory, angular, output).runAsync(buildArguments);
+      assert.equal(await run([]), 0);
+      assert.deepEqual(checks, []);
+      assert.equal(await run(["--packaged"]), 0);
+      assert.deepEqual(checks, [[null, ...GalleryFile.MARKERS]]);
+      assert.equal(await run(["--packaged", "--output", path.join(repository.directory, "out")]), 0);
+      assert.deepEqual(checks.at(-1), [path.join(repository.directory, "out", "window"), ...GalleryFile.MARKERS]);
+      isFound = true;
+      const refused = new TextOutputFixture();
+      assert.equal(await run(["--packaged"], refused), 1);
+      assert.match(refused.text, /The window contains the Gallery\.\n$/);
+    });
+
     test("invalid packages and a missing npm fail with the reason, and other errors are not hidden", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
@@ -125,8 +162,8 @@ class BuildTests {
       assert.equal(invalid.text, "The build lists the module notes, but src/modules/notes has no module.json.\n");
     });
 
-    test("arguments other than a test build and its exclusions are refused with the usage", async () => {
-      for (const buildArguments of [["foundation-core"], ["--without", "clock"], ["--output", "variant"], ["--test", "--without"], ["--test", "clock"], ["--test", "--test"], ["--test", "--output", "a", "--output", "b"]]) {
+    test("arguments other than a test build with its exclusions or a packaged build are refused with the usage", async () => {
+      for (const buildArguments of [["foundation-core"], ["--without", "clock"], ["--output", "variant"], ["--test", "--without"], ["--test", "clock"], ["--test", "--test"], ["--test", "--output", "a", "--output", "b"], ["--packaged", "--without", "clock"], ["--packaged", "--packaged"], ["--packaged", "--output"]]) {
         const output = new TextOutputFixture();
 
         assert.equal(await BuildTests.create("unused", output, process.env).runAsync(buildArguments), 2);
@@ -158,7 +195,12 @@ class BuildTests {
   private static create(root: string, output: TextOutputFixture, environment: NodeJS.ProcessEnv): Build {
     const runner = new ProcessRunner();
     const angular = new AngularProject(root, runner, new NpmCommand(runner, environment));
-    return new Build(new PackageBuild(root, runner, environment), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), angular, output);
+    return BuildTests.createWith(root, angular, output, environment);
+  }
+
+  private static createWith(root: string, angular: AngularProject, output: TextOutputFixture, environment: NodeJS.ProcessEnv = process.env): Build {
+    const runner = new ProcessRunner();
+    return new Build(new PackageBuild(root, runner, environment), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, output);
   }
 }
 
