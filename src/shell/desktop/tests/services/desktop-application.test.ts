@@ -1247,7 +1247,7 @@ export class DesktopApplicationTests {
     await Condition.waitAsync(() => window.isShown);
 
     window.bounds = { x: 40, y: 60, width: 900, height: 640 };
-    window.change("move");
+    window.change("will-move");
     arrive(connection);
     await Condition.waitAsync(() => connection.calls.includes("shell.writeWindowBounds"));
 
@@ -1265,7 +1265,7 @@ export class DesktopApplicationTests {
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
     await Condition.waitAsync(() => window.isShown);
     window.bounds = { x: 40, y: 60, width: 900, height: 640 };
-    window.change("move");
+    window.change("will-move");
 
     window.close();
     await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);

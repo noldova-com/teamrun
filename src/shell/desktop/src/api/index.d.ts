@@ -1619,6 +1619,8 @@ export interface IDesktopWindow {
   on(event: "close", listener: (event: IPreventableEvent) => void): unknown;
   on(event: "resize", listener: () => void): unknown;
   on(event: "move", listener: () => void): unknown;
+  on(event: "will-move", listener: () => void): unknown;
+  on(event: "will-resize", listener: () => void): unknown;
   on(event: "maximize", listener: () => void): unknown;
   on(event: "unmaximize", listener: () => void): unknown;
   on(event: "unresponsive", listener: () => void): unknown;
@@ -3098,8 +3100,9 @@ export declare class DesktopLog implements IDesktopLog {
  */
 export declare class WindowBoundsKeeper {
   /**
-   * Creates the keeper and listens for the window's changes, which it saves once it has a store; changes the person
-   * makes to the shown window before then, after {@link WindowBoundsKeeper.noteShown}, are held.
+   * Creates the keeper and listens for the window's changes, which it saves once it has a store. A move or resize the
+   * person makes before then is held; the window reports those as "will-move" and "will-resize" on Windows and macOS only,
+   * so the window manager's own adjustments never count.
    *
    * @param window The window.
    * @param displays The displays, for placing restored bounds.
@@ -3117,24 +3120,9 @@ export declare class WindowBoundsKeeper {
   public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog);
 
   /**
-   * Records the window's bounds as the ones it was shown with; a later change that differs from them, made before a
-   * store is set, counts as the person's.
-   *
-   * @example
-   * ```ts
-   * import type { WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
-   *
-   * export function shown(keeper: WindowBoundsKeeper): void {
-   *   keeper.noteShown();
-   * }
-   * ```
-   */
-  public noteShown(): void;
-
-  /**
    * Keeps the bounds in the store from now on, and applies the bounds it holds: the saved position when a display
    * shows it, otherwise the saved size centered, then maximized when it was. When the person already moved or
-   * resized the shown window, those bounds stay and are saved instead of the saved ones are applied.
+   * resized the window, those bounds stay and are saved instead of the saved ones being applied.
    *
    * @param store Where the bounds are kept.
    * @returns A promise that settles once the saved bounds are applied, or at once when none are saved.
@@ -3153,13 +3141,13 @@ export declare class WindowBoundsKeeper {
 
   /**
    * Saves the window's current bounds at once, cancelling a pending save; does nothing after the window is gone, or
-   * before a store is set unless the person moved the shown window. Bounds that could not be kept stay unsaved for
+   * before a store is set unless the person moved or resized the window. Bounds that could not be kept stay unsaved for
    * {@link WindowBoundsKeeper.saveUnsavedAsync}.
    * A save after a move or resize that finds the runtime unreachable keeps the bounds unsaved without reporting it.
    *
    * @returns A promise that settles once the bounds are kept.
    * @throws The store's failure as a rejection.
-   * @throws {WindowStateUnavailableException} Asynchronously when the person moved the shown window before a store was set.
+   * @throws {WindowStateUnavailableException} Asynchronously when the person moved or resized the window before a store was set.
    * @example
    * ```ts
    * import type { WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";

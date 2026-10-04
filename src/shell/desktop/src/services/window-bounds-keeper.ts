@@ -25,7 +25,6 @@ export class WindowBoundsKeeper {
   private store: IWindowStateStore | null = null;
   private timer: NodeJS.Timeout | null = null;
   private hasUnsaved: boolean = false;
-  private shownBounds: string | null = null;
 
   public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog) {
     this.window = window;
@@ -37,10 +36,9 @@ export class WindowBoundsKeeper {
     window.on(Resources.moveEvent, changed);
     window.on(Resources.maximizeEvent, changed);
     window.on(Resources.unmaximizeEvent, changed);
-  }
-
-  public noteShown(): void {
-    this.shownBounds = this.describe();
+    const placed = (): void => this.notePlacedByPerson();
+    window.on(Resources.willMoveEvent, placed);
+    window.on(Resources.willResizeEvent, placed);
   }
 
   public async restoreAsync(store: IWindowStateStore): Promise<void> {
@@ -91,20 +89,13 @@ export class WindowBoundsKeeper {
   }
 
   private noteChange(): void {
-    if (Object.isNull(this.store)) {
-      this.hasUnsaved ||= this.isMovedSinceShown();
-      return;
-    }
-    this.scheduleSave();
+    if (!Object.isNull(this.store))
+      this.scheduleSave();
   }
 
-  private isMovedSinceShown(): boolean {
-    return !Object.isNull(this.shownBounds) && this.describe() !== this.shownBounds;
-  }
-
-  private describe(): string {
-    const bounds = this.window.getNormalBounds();
-    return `${bounds.x},${bounds.y},${bounds.width},${bounds.height},${this.window.isMaximized()}`;
+  private notePlacedByPerson(): void {
+    if (Object.isNull(this.store))
+      this.hasUnsaved = true;
   }
 
   private scheduleSave(): void {
