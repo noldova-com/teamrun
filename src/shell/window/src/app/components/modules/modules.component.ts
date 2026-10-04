@@ -31,8 +31,8 @@ import { ModuleOverview } from "../../models/modules/module-overview";
 import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { ModuleSelectionService } from "../../services/module-selection.service";
+import { ModuleStatusService } from "../../services/module-status.service";
 import { SettingsService } from "../../services/settings.service";
-import { WindowPartHostService } from "../../services/window-part-host.service";
 import { Resources } from "../../../resources";
 import { ModuleActionsComponent } from "../module-actions/module-actions.component";
 
@@ -51,7 +51,7 @@ export class ModulesComponent {
   private readonly settings: SettingsService = inject(SettingsService);
   private readonly element: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly injector: Injector = inject(Injector);
-  private readonly modules: Signal<readonly ModuleStatus[]> = inject(WindowPartHostService).modules;
+  private readonly modules: Signal<readonly ModuleStatus[]> = inject(ModuleStatusService).modules;
   private readonly selection: ModuleSelectionService = inject(ModuleSelectionService);
 
   protected readonly resources: typeof Resources = Resources;
