@@ -22,6 +22,7 @@ export class LaunchSettings {
   public readonly launchTimeout: number;
   public readonly pollInterval: number;
   public readonly clientSettings: ClientSettings;
+  public readonly launchLimit: number;
 
   public constructor(
     dataDirectory: DataDirectory,
@@ -32,12 +33,16 @@ export class LaunchSettings {
     idleGraceMilliseconds: number = Resources.idleGrace,
     launchTimeout: number = Resources.launchTimeout,
     pollInterval: number = Resources.launchPollInterval,
-    clientSettings: ClientSettings = new ClientSettings()) {
+    clientSettings: ClientSettings = new ClientSettings(),
+    launchLimit: number = Math.max(launchTimeout, Resources.launchLimit)) {
     ArgumentException.throwIfNullOrWhitespace(executablePath, Resources.executablePathParameterName);
     ArgumentException.throwIfNullOrWhitespace(entryPath, Resources.entryPathParameterName);
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(idleGraceMilliseconds, Resources.idleGraceParameterName);
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(launchTimeout, Resources.launchTimeoutParameterName);
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(pollInterval, Resources.pollIntervalParameterName);
+    ArgumentOutOfRangeException.throwIfNotPositiveInteger(launchLimit, Resources.launchLimitParameterName);
+    if (launchLimit < launchTimeout)
+      throw new ArgumentOutOfRangeException(Resources.launchLimitParameterName, launchLimit, Resources.launchLimitTooShort);
 
     this.dataDirectory = dataDirectory;
     this.executablePath = executablePath;
@@ -48,5 +53,6 @@ export class LaunchSettings {
     this.launchTimeout = launchTimeout;
     this.pollInterval = pollInterval;
     this.clientSettings = clientSettings;
+    this.launchLimit = launchLimit;
   }
 }

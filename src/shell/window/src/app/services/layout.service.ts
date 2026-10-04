@@ -50,6 +50,7 @@ export class LayoutService {
   public readonly registry: Signal<ViewRegistry> = this.registryState.asReadonly();
   public readonly iconSides: Signal<ReadonlySet<DockSide>> = computed(() =>
     new Set([...Resources.dockStyleSettings].filter(([, name]) => this.settings.values().get(name) === DockStyle.Icons).map(([side]) => side)));
+  public readonly previewTabs: Signal<boolean> = computed(() => this.settings.values().get(Resources.previewTabsSetting) !== false);
   public readonly geometry: Signal<LayoutGeometry> = computed(() => new LayoutGeometry(this.width(), this.height(), this.layoutState(), this.registryState(), this.iconSides()));
   public readonly currentGroup: Signal<TabGroup> = computed(() => {
     const id = this.currentGroupId();
@@ -61,6 +62,10 @@ export class LayoutService {
     effect(() => {
       if (this.startup.state().kind === StartupStateKind.Ready)
         this.startSave();
+    });
+    effect(() => {
+      if (!this.previewTabs())
+        this.update(this.layoutState().keepPreviews());
     });
   }
 
@@ -89,7 +94,7 @@ export class LayoutService {
   }
 
   public openDocument(tab: DocumentTab, isPreview: boolean = false): void {
-    this.update(this.layoutState().openDocument(tab, isPreview));
+    this.update(this.layoutState().openDocument(tab, isPreview && this.previewTabs()));
   }
 
   public keep(tab: Tab): void {

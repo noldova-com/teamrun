@@ -12,6 +12,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
@@ -60,8 +61,7 @@ test.describe("quitting while a module works", () => {
 
   const beginWorkAsync = async (desktop: DesktopApplicationFixture): Promise<void> => {
     const window = desktop.window;
-    await window.keyboard.press("ControlOrMeta+Shift+KeyP");
-    await window.keyboard.type("Begin work");
+    await CommandSearchFixture.searchAsync(window, "Begin work");
     await expect(window.locator(".tr-command-search-pane [role=option]").first()).toHaveAttribute("data-item", "clock.beginWork");
     await window.keyboard.press("Enter");
     await waitForWorkAsync(desktop);
@@ -112,6 +112,40 @@ test.describe("quitting while a module works", () => {
 
     expect(await exited).toBe(0);
     expect(existsSync(path.join(desktop.dataDirectory, "work", "clock", "stopped"))).toBe(false);
+  });
+
+  test("paints the question's body in the dialog's text color at full opacity as it opens, without a pointer move, in light and in dark mode", async ({ desktop }) => {
+    const window = desktop.window;
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]")).toBeVisible();
+    await beginWorkAsync(desktop);
+    const asking = window.getByRole("dialog", { name: "Work is still running" });
+
+    for (const scheme of ["light", "dark"] as const) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await closeWindowAsync(desktop);
+      await expect(asking).toBeVisible();
+      await expect(asking.locator(".tr-quit-text")).toHaveText(["TeamRun is still working on:", "Wait for it to finish, or stop it now."]);
+
+      const painted = await asking.locator("tr-dialog").evaluate(dialog => {
+        const lines = [...dialog.querySelectorAll<HTMLElement>(".tr-quit-text, .tr-quit-list li")];
+        const opacity = (element: HTMLElement): number => {
+          let value = 1;
+          for (let node: HTMLElement | null = element; node !== null; node = node.parentElement)
+            value *= Number(getComputedStyle(node).opacity);
+          return value;
+        };
+        return { dialog: getComputedStyle(dialog).color, colors: [...new Set(lines.map(t => getComputedStyle(t).color))], opacities: [...new Set(lines.map(opacity))] };
+      });
+      expect(painted.dialog).not.toBe("rgba(0, 0, 0, 0)");
+      expect(painted.colors).toEqual([painted.dialog]);
+      expect(painted.opacities).toEqual([1]);
+      await desktop.checkpointAsync(`quit-asking-${scheme}`);
+      await window.keyboard.press("Escape");
+      await expect(asking).toHaveCount(0);
+    }
+    await runCommandAsync(desktop.dataDirectory, "clock.finishWork");
+    await expect.poll(() => readWorkAsync(desktop.dataDirectory), { timeout: 20_000, intervals: [500] }).toEqual([]);
   });
 
   test("stops the work and quits when the person chooses to, and the runtime stops with it", async ({ desktop }) => {

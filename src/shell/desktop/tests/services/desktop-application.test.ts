@@ -520,6 +520,19 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async logsAnUnexpectedStartFailureInFullAndShowsIt(): Promise<void> {
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new TypeError("A defect.")), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    await Condition.waitAsync(() => process.errors.includes("so the window offers to try again"));
+
+    Assert.isTrue(process.errors.includes("The runtime could not be started or reached, so the window offers to try again: TypeError: A defect."));
+    Assert.isTrue(process.errors.includes("desktop-application.test"), "the log keeps the error's stack");
+    Assert.areEqual(JSON.stringify({ kind: "Failed", details: ["TypeError: A defect."] }), JSON.stringify(electron.ipcMain.invoke("teamrun:readStartup", event)));
+  }
+
+  @TestMethod
   public async writesItsOwnWindowsModuleLinesToItsLogUnderTheModulesId(): Promise<void> {
     const process = new FakeDesktopProcess("linux");
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);

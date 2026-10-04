@@ -89,7 +89,7 @@ describe("kit styles", () => {
   });
 
   for (const theme of AppearanceFixture.themes)
-    it(`give scroll areas thin scrollbars without arrows whose thumb shows on hover, with the ${theme.id} theme`, async () => {
+    it(`give scroll areas thin scrollbars without arrows whose thumb shows on hover while their content keeps the text color, with the ${theme.id} theme`, async () => {
       AppearanceFixture.apply(theme, ThemeMode.Light);
       const area = document.createElement("div");
       area.className = "tr-scroll-reveal";
@@ -104,7 +104,9 @@ describe("kit styles", () => {
         AppearanceFixture.expectLook(scrollbar.width, theme, "scrollbar-size", "width");
         AppearanceFixture.expectLook(scrollbar.height, theme, "scrollbar-size", "height");
         expect(getComputedStyle(area, "::-webkit-scrollbar-button").display).toBe("none");
+        const text = AppearanceFixture.readColor(theme, ThemeMode.Light, "foreground");
         expect(getComputedStyle(area).color).toBe("rgba(0, 0, 0, 0)");
+        expect(getComputedStyle(content).color).toBe(text);
         await userEvent.hover(area);
         const probe = document.createElement("div");
         probe.style.color = "var(--tr-scrollbar)";
@@ -113,6 +115,7 @@ describe("kit styles", () => {
         probe.remove();
         expect(thumb).not.toBe("rgba(0, 0, 0, 0)");
         await vi.waitFor(() => expect(getComputedStyle(area).color).toBe(thumb));
+        expect(getComputedStyle(content).color).toBe(text);
       }
       finally {
         area.remove();

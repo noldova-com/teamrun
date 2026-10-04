@@ -162,6 +162,41 @@ describe("LayoutService", () => {
     expect(service.geometry().handles[0]?.leadingLength).toBeCloseTo(handle.leadingLength + 4);
   });
 
+  it("opens a document as a preview only while Preview tabs is on, even when a module asks for one, and turning it off keeps the open preview", async () => {
+    const readme = new DocumentTab("notes.note", "readme");
+    const third = new DocumentTab("notes.note", "third");
+    const fourth = new DocumentTab("notes.note", "fourth");
+    const setPreviewTabs = (value: boolean): void => {
+      bridge.publishEvent("shell.settingsChanged", { name: "shell.previewTabs", value, isSet: true });
+      TestBed.tick();
+    };
+    await loadAsync(prepared());
+
+    service.openDocument(LayoutFixture.settings, true);
+    expect([service.previewTabs(), service.layout().documents.preview]).toEqual([true, LayoutFixture.settings]);
+    setPreviewTabs(false);
+    expect([service.previewTabs(), service.layout().documents.preview, service.layout().isOpen(LayoutFixture.settings)]).toEqual([false, null, true]);
+    service.openDocument(readme, true);
+    expect([service.layout().documents.preview, service.layout().documents.tabs.at(-1)]).toEqual([null, readme]);
+    service.openDocument(LayoutFixture.settings);
+    expect(service.layout().documents.preview).toBeNull();
+    setPreviewTabs(true);
+    service.openDocument(third, true);
+    service.openDocument(fourth, true);
+    expect([service.previewTabs(), service.layout().documents.preview, service.layout().isOpen(third), service.layout().isOpen(readme)]).toEqual([true, fourth, false, true]);
+  });
+
+  it("keeps the preview of a layout loaded while Preview tabs is off", async () => {
+    const readme = new DocumentTab("notes.note", "readme");
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.previewTabs", value: false, isSet: true });
+    TestBed.tick();
+
+    await loadAsync(prepared().openDocument(readme, true));
+    TestBed.tick();
+
+    expect([service.layout().isOpen(readme), service.layout().documents.preview]).toEqual([true, null]);
+  });
+
   it("restores which documents group is active, so a document opens there", async () => {
     const readme = new DocumentTab("notes.note", "readme");
     const split = prepared().splitGroup(LayoutFixture.todo, 0, PanelEdge.Right);

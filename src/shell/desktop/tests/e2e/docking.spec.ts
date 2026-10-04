@@ -9,6 +9,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
+import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 const notes = "view/notes.list";
@@ -306,9 +307,7 @@ test.describe("docking", () => {
       return (rects["Bottom"]?.left ?? 0) >= (rects["Left"]?.right ?? Infinity) && (rects["Left"]?.bottom ?? 0) > (rects["Bottom"]?.top ?? Infinity);
     };
     const chooseAsync = async (command: string): Promise<void> => {
-      await desktop.window.keyboard.press("ControlOrMeta+Shift+KeyP");
-      await expect(desktop.window.getByRole("combobox", { name: "Search commands" })).toBeFocused();
-      await desktop.window.keyboard.type("bottom dock");
+      await CommandSearchFixture.searchAsync(desktop.window, "bottom dock");
       await desktop.window.locator(`.tr-command-search-pane [data-item="${command}"]`).click();
       await expect(desktop.window.locator(".tr-command-search-pane")).toHaveCount(0);
     };
@@ -367,8 +366,7 @@ test.describe("docking", () => {
     await expect.poll(() => describeGroupsAsync(window)).not.toEqual(initial);
 
     await tab(window, notes).click();
-    await window.keyboard.press("ControlOrMeta+Shift+KeyP");
-    await window.keyboard.type("Reset the layout");
+    await CommandSearchFixture.searchAsync(window, "Reset the layout");
     await expect(window.getByRole("option").first()).toHaveAttribute("data-item", "shell.resetLayout");
     await window.keyboard.press("Enter");
 

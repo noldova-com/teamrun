@@ -8,6 +8,7 @@
 
 import type { Locator, Page } from "@playwright/test";
 
+import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 const notes = "view/notes.list";
@@ -52,8 +53,7 @@ function tabKeysOf(group: Locator): Promise<readonly (string | null)[]> {
 }
 
 async function runCommandAsync(window: Page, title: string, name: string): Promise<void> {
-  await window.keyboard.press("ControlOrMeta+Shift+KeyP");
-  await window.keyboard.type(title);
+  await CommandSearchFixture.searchAsync(window, title);
   await expect(window.getByRole("option").first()).toHaveAttribute("data-item", name);
   await window.keyboard.press("Enter");
 }

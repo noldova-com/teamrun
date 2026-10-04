@@ -8,6 +8,7 @@
 
 import type { Locator, Page } from "@playwright/test";
 
+import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 function pane(window: Page): Locator {
@@ -72,9 +73,7 @@ test.describe("command search", () => {
     await tab.click();
     await expect(tab).toBeFocused();
 
-    await window.keyboard.press("ControlOrMeta+Shift+KeyP");
-    await expect(field(window)).toBeFocused();
-    await window.keyboard.type("keep the tab");
+    await CommandSearchFixture.searchAsync(window, "keep the tab");
     await expect(pane(window).getByRole("status")).toHaveText("No results");
     await expect(options(window)).toHaveCount(0);
     await window.keyboard.press("Escape");

@@ -8,6 +8,7 @@
 
 import type { Locator, Page } from "@playwright/test";
 
+import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 function band(window: Page): Locator {
@@ -97,8 +98,7 @@ function clippingOf(window: Page): Promise<readonly { name: string | undefined; 
 }
 
 async function runCommandAsync(window: Page, title: string): Promise<void> {
-  await window.keyboard.press("ControlOrMeta+Shift+KeyP");
-  await window.keyboard.type(title);
+  await CommandSearchFixture.searchAsync(window, title);
   await window.keyboard.press("Enter");
 }
 
