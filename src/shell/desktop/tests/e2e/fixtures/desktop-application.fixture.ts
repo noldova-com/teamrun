@@ -55,6 +55,7 @@ export default class DesktopApplicationFixture {
   private static readonly LOCKED_CODES: readonly string[] = ["EBUSY", "EPERM", "ENOTEMPTY"];
   private static readonly TRACE_FILE: string = "trace.zip";
   private static readonly WINDOWS_FILE: string = "windows.json";
+  private static readonly CLEANUP_FAILURE_FILE: string = "cleanup-failure.txt";
   private static readonly DIAGNOSTIC_TIMEOUT: number = 10_000;
   private static readonly MAIN_PROCESS_TIMEOUT: number = 10_000;
   private static readonly QUIT_TIMEOUT: number = 30_000;
@@ -112,7 +113,8 @@ export default class DesktopApplicationFixture {
       await fixture.recordEnvironmentAsync();
     }
     catch (error) {
-      await fixture.disposeAsync(true);
+      await fixture.disposeAsync(true).catch((cleanup: unknown) =>
+        testInfo.attach(DesktopApplicationFixture.CLEANUP_FAILURE_FILE, { body: cleanup instanceof Error && cleanup.stack !== undefined ? cleanup.stack : String(cleanup), contentType: "text/plain" }));
       throw error;
     }
     return fixture;
