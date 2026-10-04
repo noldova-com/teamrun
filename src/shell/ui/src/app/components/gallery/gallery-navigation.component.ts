@@ -34,6 +34,16 @@ export class GalleryNavigationComponent {
   protected readonly text: typeof GalleryResources.text = GalleryResources.text;
   protected readonly surfaces: typeof PanelSurface = PanelSurface;
   protected readonly orientations: typeof SashOrientation = SashOrientation;
-  protected readonly treeNodes: readonly TreeNode[] = GalleryResources.treeNodes;
-  protected readonly treeCurrent: WritableSignal<string> = signal(GalleryResources.text.treeCurrent);
+  protected readonly treeNodes: readonly TreeNode[] = [
+    new TreeNode(this.text.treeProject, this.text.treeProject, this.text.glyphFolder, [
+      new TreeNode(this.text.treeSource, this.text.treeSource, this.text.glyphFolder, [
+        new TreeNode(this.text.treeApp, this.text.treeApp, this.text.glyphDescription),
+        new TreeNode(this.text.treeStyles, this.text.treeStyles, this.text.glyphDescription)
+      ]),
+      new TreeNode(this.text.treeReadme, this.text.treeReadme, this.text.glyphDescription)
+    ]),
+    new TreeNode(this.text.treeNotes, this.text.treeNotes, this.text.glyphDescription),
+    new TreeNode(this.text.treeLong, this.text.treeLong, this.text.glyphDescription)
+  ];
+  protected readonly treeCurrent: WritableSignal<string> = signal(GalleryResources.text.treeNotes);
 }
