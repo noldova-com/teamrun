@@ -35,9 +35,8 @@ describe("OverlayBoundsService", () => {
     return anchor;
   }
 
-  function rem(look: string): number {
-    const root = getComputedStyle(document.documentElement);
-    return parseFloat(root.getPropertyValue(`--tr-${look}`)) * parseFloat(root.fontSize);
+  function pixelsOf(look: string): number {
+    return AppearanceFixture.measureLook(look);
   }
 
   it("keeps overlays a gap inside the viewport, below the window row and above the status bar", () => {
@@ -45,9 +44,9 @@ describe("OverlayBoundsService", () => {
     const view = document.documentElement;
     const bounds = service.boundsFor(anchorIn(null));
 
-    expect(service.gap).toBe(rem("space-2"));
+    expect(service.gap).toBe(pixelsOf("space-2"));
     expect([bounds.top, bounds.right, bounds.bottom, bounds.left])
-      .toEqual([rem("window-row-height") + service.gap, view.clientWidth - service.gap, view.clientHeight - rem("status-bar-height") - service.gap, service.gap]);
+      .toEqual([pixelsOf("window-row-height") + service.gap, view.clientWidth - service.gap, view.clientHeight - pixelsOf("status-bar-height") - service.gap, service.gap]);
   });
 
   it("lets an overlay anchored in a chrome band come within a gap of that band's edge only", () => {
@@ -56,8 +55,8 @@ describe("OverlayBoundsService", () => {
     const fromRow = service.boundsFor(anchorIn("top"));
     const fromStatus = service.boundsFor(anchorIn("bottom"));
 
-    expect([fromRow.top, fromRow.bottom]).toEqual([service.gap, view.clientHeight - rem("status-bar-height") - service.gap]);
-    expect([fromStatus.top, fromStatus.bottom]).toEqual([rem("window-row-height") + service.gap, view.clientHeight - service.gap]);
+    expect([fromRow.top, fromRow.bottom]).toEqual([service.gap, view.clientHeight - pixelsOf("status-bar-height") - service.gap]);
+    expect([fromStatus.top, fromStatus.bottom]).toEqual([pixelsOf("window-row-height") + service.gap, view.clientHeight - service.gap]);
   });
 
   it("reads its rem-based bounds again after the text size changes", () => {
@@ -67,7 +66,8 @@ describe("OverlayBoundsService", () => {
     document.documentElement.style.fontSize = "20px";
     const after = service.boundsFor(anchorIn(null));
 
-    expect(after.top).toBeCloseTo(before.top * 20 / 16, 3);
+    expect(after.top).toBeGreaterThan(before.top);
+    expect(after.top).toBeCloseTo(pixelsOf("window-row-height") + pixelsOf("space-2"), 3);
     expect(service.gap).toBe(10);
   });
 });

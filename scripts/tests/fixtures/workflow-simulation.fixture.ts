@@ -18,9 +18,8 @@ export interface SimulatedStep {
 }
 
 export default class WorkflowSimulation {
-  private static readonly STEP_PATTERN: RegExp = /^ {6}- name: (.+)$/;
-  private static readonly KEY_PATTERN: RegExp = /^ {8}([a-z-]+):(?: (.*))?$/;
-  private static readonly SETTING_PATTERN: RegExp = /^ {10}(.+)$/;
+  private static readonly STEP_PATTERN: RegExp = /^( *)- name: (.+)$/;
+  private static readonly KEY_PATTERN: RegExp = /^([a-z-]+):(?: (.*))?$/;
   private static readonly OUTCOME_PATTERN: RegExp = /^steps\.([a-z-]+)\.outcome (==|!=) '([a-z]+)'$/;
   private static readonly MATRIX_PATTERN: RegExp = /^matrix\.([a-z]+) (==|!=) '([a-z]+)'$/;
   private static readonly ALWAYS: string = "always()";
@@ -82,23 +81,24 @@ export default class WorkflowSimulation {
   }
 
   private static parse(lines: readonly string[]): SimulatedStep {
-    const name = WorkflowSimulation.STEP_PATTERN.exec(lines[0] ?? "")?.[1] ?? "";
+    const step = WorkflowSimulation.STEP_PATTERN.exec(lines[0] ?? "");
+    const keyIndentation = " ".repeat((step?.[1]?.length ?? 0) + 2);
+    const settingIndentation = `${keyIndentation}  `;
     const keys = new Map<string, string>();
     const settings: string[] = [];
     let isWith = false;
     for (const line of lines.slice(1)) {
-      const key = WorkflowSimulation.KEY_PATTERN.exec(line);
+      const key = line.startsWith(keyIndentation) && line[keyIndentation.length] !== " " ? WorkflowSimulation.KEY_PATTERN.exec(line.slice(keyIndentation.length)) : null;
       if (key !== null) {
         isWith = key[1] === "with";
         keys.set(key[1] ?? "", key[2] ?? "");
         continue;
       }
-      const setting = WorkflowSimulation.SETTING_PATTERN.exec(line);
-      if (isWith && setting !== null)
-        settings.push(setting[1] ?? "");
+      if (isWith && line.startsWith(settingIndentation))
+        settings.push(line.slice(settingIndentation.length));
     }
     return {
-      name,
+      name: step?.[2] ?? "",
       id: keys.get("id") ?? null,
       condition: keys.get("if") ?? null,
       continueOnError: keys.get("continue-on-error") === "true",

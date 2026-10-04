@@ -16,6 +16,7 @@ import { Resources } from "../resources.js";
 export class ModuleDeclaration {
   public readonly id: string;
   public readonly displayName: string;
+  public readonly description: string;
   public readonly dependencies: readonly string[];
   public readonly runtimePackage: string | null;
   public readonly contributions: ReadonlyMap<string, readonly string[]>;
@@ -24,6 +25,7 @@ export class ModuleDeclaration {
   public constructor(
     id: string,
     displayName: string,
+    description: string,
     dependencies: readonly string[],
     runtimePackage: string | null,
     contributions: ReadonlyMap<string, readonly string[]>,
@@ -31,6 +33,7 @@ export class ModuleDeclaration {
     if (!Resources.moduleIdPattern.test(id) || id === Resources.reservedModuleId)
       throw new ArgumentException(Resources.moduleIdInvalid, Resources.idParameterName);
     ArgumentException.throwIfNullOrWhitespace(displayName, Resources.displayNameParameterName);
+    ArgumentException.throwIfNullOrWhitespace(description, Resources.descriptionParameterName);
     const foreign = settings.find(t => t.name.owner !== id);
     if (!Object.isUndefined(foreign))
       throw new ArgumentException(Resources.formatSettingOwnerInvalid(id, foreign.name.text), Resources.settingsField);
@@ -40,6 +43,7 @@ export class ModuleDeclaration {
 
     this.id = id;
     this.displayName = displayName;
+    this.description = description;
     this.dependencies = [...dependencies];
     this.runtimePackage = runtimePackage;
     this.contributions = new Map([...contributions].map(([kind, names]) => [kind, [...names]]));
@@ -60,6 +64,7 @@ export class ModuleDeclaration {
     return new ModuleDeclaration(
       id,
       ModuleDeclaration.readText("displayName" in value ? value.displayName : undefined, Resources.displayNameParameterName),
+      ModuleDeclaration.readText("description" in value ? value.description : undefined, Resources.descriptionParameterName),
       ModuleDeclaration.readNames("dependencies" in value ? value.dependencies : undefined, Resources.dependenciesParameterName),
       Object.isNull(runtimePackage) ? null : ModuleDeclaration.readText(runtimePackage, Resources.runtimePackageParameterName),
       new Map(Object.entries(contributes).map(([kind, names]) => [kind, ModuleDeclaration.readNames(names, Resources.contributesParameterName)])),
