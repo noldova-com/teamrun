@@ -149,4 +149,24 @@ test.describe("the harness's teardown", () => {
     expect(await ProcessListFixture.waitForSignalsAsync(desktop.recordedProcessIds, 0)).toEqual([]);
     expect(existsSync(desktop.root)).toBe(false);
   });
+
+  test("a main process that stops answering fails the call that waited on it, is reported with what it was asked, and is killed", async ({ desktop }, testInfo) => {
+    const main = await desktop.application.evaluate(() => process.pid);
+    const blocked = desktop.application.evaluate(() => {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 15_000);
+    });
+    blocked.catch(() => undefined);
+
+    const failure = await desktop.isVisibleAsync().then(() => null, (error: unknown) => (error as Error).message);
+    await desktop.disposeAsync(false);
+    const report = testInfo.attachments.find(t => t.name === "main-process.txt")?.body?.toString() ?? "";
+
+    expect(failure).toMatch(/^The main process did not answer within 10 s when asked to say whether a window is visible\. Before the move, the cursor was at -?\d+,-?\d+, /);
+    expect(desktop.acceptFailures(new RegExp(`^The main process ${main} did not answer for \\d+ s after it was asked to say whether a window is visible, so the test killed it\\.$`))).toHaveLength(1);
+    expect(report).toMatch(new RegExp(`^The main process ${main} stopped answering when it was asked to say whether a window is visible, \\d+ s before this report\\.\\n`));
+    expect(report).toMatch(/\nIts processor time was \d+ ms when it stopped answering and \d+ ms now\.\n/);
+    expect(report).toMatch(/\nThe window's request to it, teamrun\.readBuild\(\), was answered in \d+ ms\.\n/);
+    expect(await ProcessListFixture.waitForSignalsAsync(desktop.recordedProcessIds, 0)).toEqual([]);
+    expect(existsSync(desktop.root)).toBe(false);
+  });
 });

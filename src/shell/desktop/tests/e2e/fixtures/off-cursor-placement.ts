@@ -49,7 +49,7 @@ export default class OffCursorPlacement {
       `Each move left the cursor inside: ${attempts.join("; ")}. Displays: ${displays.map(t => OffCursorPlacement.describe(t)).join("; ")}.`);
   }
 
-  private static describe(bounds: Rectangle): string {
+  public static describe(bounds: Rectangle): string {
     return `${bounds.x},${bounds.y} ${bounds.width}x${bounds.height}`;
   }
 }

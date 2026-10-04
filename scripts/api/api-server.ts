@@ -108,22 +108,27 @@ export default class ApiServer {
         return new ApiServer(child, exited, api, pipe, project);
       }
       catch (error) {
+        const outputBeforeClosing = errorOutput;
+        const hasStopped = hasExited;
         await api.close();
         const isConnectionFailure = error instanceof Error && error.message.startsWith(ApiServer.CONNECTION_FAILURE);
         const elapsed = Date.now() - started;
-        if (!isConnectionFailure || hasExited || elapsed >= ApiServer.START_TIMEOUT) {
-          const state = hasExited ? "had stopped" : "was running";
+        if (!isConnectionFailure || hasStopped || elapsed >= ApiServer.START_TIMEOUT) {
           child.kill();
           await exited;
           await pipe.removeAsync();
-          const detail = errorOutput.trim();
-          throw new ApiException(
-            `The TypeScript API server could not open ${projectFile}; after ${elapsed} ms it ${state}.${detail === "" ? "" : `\n${detail}`}`,
+          throw new ApiException(ApiServer.describeFailure(projectFile, elapsed, hasStopped, outputBeforeClosing),
             { cause: error });
         }
       }
       await new Promise(resolve => setTimeout(resolve, ApiServer.CONNECT_INTERVAL));
     }
+  }
+
+  public static describeFailure(projectFile: string, elapsed: number, hasStopped: boolean, serverOutput: string): string {
+    const state = hasStopped ? "had stopped" : "was running";
+    const detail = serverOutput.trim();
+    return `The TypeScript API server could not open ${projectFile}; after ${elapsed} ms it ${state}.${detail === "" ? "" : `\n${detail}`}`;
   }
 
   private async closeAsync(): Promise<void> {

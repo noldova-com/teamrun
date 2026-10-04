@@ -76,6 +76,11 @@ export class Resources {
   public static readonly directionData: string = "direction";
   public static readonly tabIndexSelector: string = "[data-tab-index]";
   public static readonly tabIndexData: string = "tabIndex";
+  public static readonly dropBeforeSelector: string = "[data-drop-before]";
+  public static readonly dropBeforeData: string = "dropBefore";
+  public static readonly dropAfterData: string = "dropAfter";
+  public static readonly dropAxisData: string = "dropAxis";
+  public static readonly dropTargetSeparator: string = ":";
   public static readonly tabKeySelector: string = "[data-tab-key]";
   public static readonly tabKeyData: string = "tabKey";
   public static readonly tabCloseSelector: string = ".tr-tab-close";
@@ -395,6 +400,7 @@ export class Resources {
   public static readonly submenuRowType: string = "submenu";
   public static readonly separatorRowType: string = "separator";
   public static readonly menuRowPathSeparator: string = "/";
+  public static readonly menuTitleSeparator: string = " › ";
   public static readonly menuGlyph: string = "menu";
   public static readonly focusInEvent: string = "focusin";
   public static readonly focusOutEvent: string = "focusout";

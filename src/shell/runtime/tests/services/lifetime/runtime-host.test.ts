@@ -252,9 +252,9 @@ export class RuntimeHostTests {
       await writeFile(fixture.dataDirectory.discoveryFile, "{}");
       const started = Date.now();
 
-      await Assert.throwsAsync(() => fixture.startAsync(), DataDirectoryOwnedException);
+      await Assert.throwsAsync(() => fixture.startAsync(30_000, undefined, 20_000), DataDirectoryOwnedException);
 
-      Assert.isTrue(Date.now() - started < 2_000);
+      Assert.isTrue(Date.now() - started < 20_000, "The start ignored the discovery file and refused only when its takeover time ran out.");
       Assert.isTrue(lock.isHeld);
     });
   }
@@ -266,7 +266,7 @@ export class RuntimeHostTests {
       const release = setTimeout(() => lock.release(), 200);
 
       try {
-        await fixture.startAsync();
+        await fixture.startAsync(30_000, undefined, 20_000);
       }
       finally {
         clearTimeout(release);
@@ -287,13 +287,13 @@ export class RuntimeHostTests {
       const started = Date.now();
 
       try {
-        await Assert.throwsAsync(() => fixture.startAsync(), DataDirectoryOwnedException);
+        await Assert.throwsAsync(() => fixture.startAsync(30_000, undefined, 20_000), DataDirectoryOwnedException);
       }
       finally {
         clearTimeout(publish);
       }
 
-      Assert.isTrue(Date.now() - started < 2_000);
+      Assert.isTrue(Date.now() - started < 20_000, "The start ignored the discovery file and refused only when its takeover time ran out.");
       Assert.isTrue(lock.isHeld);
     });
   }

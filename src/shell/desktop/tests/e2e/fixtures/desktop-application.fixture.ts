@@ -22,6 +22,12 @@ import ErrorOutputClassifier from "./error-output.classifier.ts";
 import OffCursorPlacement from "./off-cursor-placement.ts";
 import ProcessListFixture from "./process-list.fixture.ts";
 
+interface MainProcessSilence {
+  readonly action: string;
+  readonly since: number;
+  readonly processorMilliseconds: number | null;
+}
+
 export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
   private static readonly EXECUTABLE_RECORD: string = path.resolve("_build", "development-app", "path.txt");
@@ -42,7 +48,11 @@ export default class DesktopApplicationFixture {
   private static readonly TRACE_FILE: string = "trace.zip";
   private static readonly WINDOWS_FILE: string = "windows.json";
   private static readonly DIAGNOSTIC_TIMEOUT: number = 10_000;
+  private static readonly MAIN_PROCESS_TIMEOUT: number = 10_000;
+  private static readonly QUIT_TIMEOUT: number = 30_000;
+  private static readonly SILENCE_FILE: string = "main-process.txt";
   private static readonly MAIN_WINDOW: string = "main-window";
+  private static readonly NO_ANSWER: unique symbol = Symbol("no answer");
 
   private readonly testInfo: TestInfo;
   private readonly environment: Readonly<Record<string, string>>;
@@ -53,6 +63,9 @@ export default class DesktopApplicationFixture {
   private childProcess: ChildProcess | null = null;
   private viewport: { width: number; height: number } | null;
   private readonly recorded: Set<number> = new Set();
+  private placement: string = "The window had not been moved off the cursor.";
+  private silence: MainProcessSilence | null = null;
+  private mainProcessId: number | null = null;
 
   public readonly failures: string[] = [];
   public closeMilliseconds: number | null = null;
@@ -157,7 +170,7 @@ export default class DesktopApplicationFixture {
   }
 
   public async isVisibleAsync(): Promise<boolean> {
-    return await this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some(t => t.isVisible()));
+    return await this.answerAsync("say whether a window is visible", this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some(t => t.isVisible())));
   }
 
   public async useViewportAsync(width: number, height: number): Promise<void> {
@@ -182,10 +195,21 @@ export default class DesktopApplicationFixture {
   public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
     const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
-    await this.recordProcessesAsync();
-    const started = Date.now();
-    await this.application.close();
-    this.closeMilliseconds = Date.now() - started;
+    try {
+      await this.recordProcessesAsync();
+      const started = Date.now();
+      await this.answerAsync("quit", this.application.close(), DesktopApplicationFixture.QUIT_TIMEOUT);
+      this.closeMilliseconds = Date.now() - started;
+    }
+    catch (error) {
+      if (this.silence === null)
+        throw error;
+      const processId = this.mainProcessId;
+      if (processId !== null && DesktopApplicationFixture.isAlive(processId))
+        process.kill(processId, "SIGKILL");
+      child.kill("SIGKILL");
+      this.failures.push(`The main process ${processId ?? "(id unknown)"} did not answer for ${Math.round((Date.now() - this.silence.since) / 1000)} s after it was asked to ${this.silence.action}, so the test killed it.`);
+    }
     const exitCode = await exited;
     this.electronApplication = null;
     this.page = null;
@@ -200,9 +224,9 @@ export default class DesktopApplicationFixture {
 
   public async disposeAsync(hasFailed: boolean = this.testInfo.status !== this.testInfo.expectedStatus): Promise<void> {
     const isRunning = this.electronApplication !== null && Object.is(this.requireProcess().exitCode, null);
-    if (isRunning && this.viewport !== null)
-      await this.checkGuardAsync(this.viewport);
-    if (hasFailed)
+    if (isRunning && this.viewport !== null && this.silence === null)
+      await this.checkGuardAsync(this.viewport).catch((error: unknown) => this.failures.push((error as Error).message));
+    if (hasFailed || this.silence !== null)
       await this.keepDiagnosticsAsync(isRunning);
     if (isRunning)
       await this.closeAsync();
@@ -225,9 +249,10 @@ export default class DesktopApplicationFixture {
   }
 
   private async recordProcessesAsync(): Promise<void> {
-    const electron = await this.application.evaluate(({ app }) => app.getAppMetrics().map(t => t.pid));
+    const electron = await this.answerAsync("list its processes", this.application.evaluate(({ app }) => ({ main: process.pid, all: app.getAppMetrics().map(t => t.pid) })));
+    this.mainProcessId = electron.main;
     const runtime = await this.readRuntimeProcessIdAsync();
-    for (const processId of [...electron, ...runtime === undefined ? [] : [runtime]])
+    for (const processId of [...electron.all, ...runtime === undefined ? [] : [runtime]])
       this.recorded.add(processId);
   }
 
@@ -239,44 +264,90 @@ export default class DesktopApplicationFixture {
   }
 
   private async keepDiagnosticsAsync(isRunning: boolean): Promise<void> {
-    if (isRunning) {
-      await this.keepAsync(DesktopApplicationFixture.TRACE_FILE, "application/zip", async () => {
-        const trace = this.testInfo.outputPath(DesktopApplicationFixture.TRACE_FILE);
-        await this.application.context().tracing.stop({ path: trace });
-        return await readFile(trace);
-      });
-      await this.keepAsync(DesktopApplicationFixture.WINDOWS_FILE, "application/json", async () => JSON.stringify(await this.application.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows().map(t => ({
-          id: t.id,
-          isVisible: t.isVisible(),
-          isDestroyed: t.isDestroyed(),
-          url: t.webContents.getURL(),
-          isLoading: t.webContents.isLoading(),
-          isCrashed: t.webContents.isCrashed()
-        }))), null, 2));
-      for (const [index, page] of this.application.windows().entries()) {
-        await this.keepAsync(`page-${index}.png`, "image/png", () => page.screenshot());
-        await this.keepAsync(`page-${index}.html`, "text/html", () => page.content());
-      }
-    }
     const logs = new DataDirectory(this.dataDirectory).logsFolder;
     const files = existsSync(logs) ? (await readdir(logs)).sort() : [];
     for (const file of files)
       await this.keepAsync(file, "text/plain", () => readFile(path.join(logs, file)));
+    if (!isRunning)
+      return;
+    const silence = this.silence;
+    if (silence !== null)
+      await this.keepAsync(DesktopApplicationFixture.SILENCE_FILE, "text/plain", () => this.describeSilenceAsync(silence));
+    for (const [index, page] of this.application.windows().entries()) {
+      await this.keepAsync(`page-${index}.png`, "image/png", () => page.screenshot());
+      await this.keepAsync(`page-${index}.html`, "text/html", () => page.content());
+    }
+    await this.keepAsync(DesktopApplicationFixture.WINDOWS_FILE, "application/json", async () => JSON.stringify(await this.answerAsync("describe its windows", this.application.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().map(t => ({
+        id: t.id,
+        isVisible: t.isVisible(),
+        isDestroyed: t.isDestroyed(),
+        url: t.webContents.getURL(),
+        isLoading: t.webContents.isLoading(),
+        isCrashed: t.webContents.isCrashed()
+      })))), null, 2));
+    await this.keepAsync(DesktopApplicationFixture.TRACE_FILE, "application/zip", async () => {
+      const trace = this.testInfo.outputPath(DesktopApplicationFixture.TRACE_FILE);
+      await this.application.context().tracing.stop({ path: trace });
+      return await readFile(trace);
+    });
   }
 
   private async keepAsync(name: string, contentType: string, capture: () => Promise<Buffer | string>): Promise<void> {
-    let timer: NodeJS.Timeout | undefined;
-    const captured = capture();
-    captured.catch(() => undefined);
-    const deadline = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error(`No answer within ${DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT} ms.`)), DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT);
-    });
     try {
-      await this.testInfo.attach(name, { body: await Promise.race([captured, deadline]), contentType });
+      const body = await DesktopApplicationFixture.withinAsync(capture(), DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT);
+      if (body === DesktopApplicationFixture.NO_ANSWER)
+        throw new Error(`No answer within ${DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT} ms.`);
+      await this.testInfo.attach(name, { body, contentType });
     }
     catch (error) {
       await this.testInfo.attach(`${name}.unavailable.txt`, { body: String(error), contentType: "text/plain" });
+    }
+  }
+
+  private async describeSilenceAsync(silence: MainProcessSilence): Promise<string> {
+    const processorMilliseconds = await this.readProcessorMillisecondsAsync();
+    const started = Date.now();
+    const request = this.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { readBuild(): Promise<unknown> }).readBuild());
+    const answer = await DesktopApplicationFixture.withinAsync(request.then(() => null, (error: unknown) => String(error)), DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT);
+    const described = answer === DesktopApplicationFixture.NO_ANSWER
+      ? `had no answer within ${DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT / 1000} s`
+      : answer === null ? `was answered in ${Date.now() - started} ms` : `failed: ${answer}`;
+    const time = (milliseconds: number | null): string => milliseconds === null ? "unknown" : `${milliseconds} ms`;
+    return [
+      `The main process ${this.mainProcessId ?? "(id unknown)"} stopped answering when it was asked to ${silence.action}, ${Math.round((Date.now() - silence.since) / 1000)} s before this report.`,
+      `Its processor time was ${time(silence.processorMilliseconds)} when it stopped answering and ${time(processorMilliseconds)} now.`,
+      `The window's request to it, teamrun.readBuild(), ${described}.`,
+      this.placement
+    ].join("\n");
+  }
+
+  private async answerAsync<T>(action: string, evaluation: Promise<T>, limit: number = DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT): Promise<T> {
+    if (this.silence !== null) {
+      evaluation.catch(() => undefined);
+      throw new Error(`The main process has not answered since it was asked to ${this.silence.action}, so the test did not wait for it to ${action}.`);
+    }
+    const answer = await DesktopApplicationFixture.withinAsync(evaluation, limit);
+    if (answer !== DesktopApplicationFixture.NO_ANSWER)
+      return answer;
+    const since = Date.now() - limit;
+    const processorMilliseconds = await this.readProcessorMillisecondsAsync();
+    this.silence = { action, since, processorMilliseconds };
+    throw new Error(`The main process did not answer within ${limit / 1000} s when asked to ${action}. ${this.placement}`);
+  }
+
+  private async readProcessorMillisecondsAsync(): Promise<number | null> {
+    return this.mainProcessId === null ? null : await ProcessListFixture.readProcessorMillisecondsAsync(this.mainProcessId).catch(() => null);
+  }
+
+  private static async withinAsync<T>(work: Promise<T>, limit: number): Promise<T | typeof DesktopApplicationFixture.NO_ANSWER> {
+    work.catch(() => undefined);
+    let timer: NodeJS.Timeout | undefined;
+    const deadline = new Promise<typeof DesktopApplicationFixture.NO_ANSWER>(resolve => {
+      timer = setTimeout(() => resolve(DesktopApplicationFixture.NO_ANSWER), limit);
+    });
+    try {
+      return await Promise.race([work, deadline]);
     }
     finally {
       clearTimeout(timer);
@@ -298,6 +369,7 @@ export default class DesktopApplicationFixture {
     });
     this.electronApplication = application;
     this.childProcess = application.process();
+    this.mainProcessId = null;
     application.process().stderr?.on("data", (data: Buffer) => this.readOutput(data.toString()));
     application.on("console", t => {
       if (t.type() === "error")
@@ -335,30 +407,36 @@ export default class DesktopApplicationFixture {
   }
 
   private async moveOffCursorAsync(): Promise<void> {
-    await this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.unmaximize());
-    await expect.poll(() => this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isMaximized())).toBe(false);
-    const state = await this.application.evaluate(({ BrowserWindow, screen }) => {
+    await this.answerAsync("unmaximize the window", this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.unmaximize()));
+    await expect.poll(() => this.answerAsync("say whether the window is maximized", this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isMaximized())))
+      .toBe(false);
+    const state = await this.answerAsync("read the cursor, the window's bounds and the displays", this.application.evaluate(({ BrowserWindow, screen }) => {
       const window = BrowserWindow.getAllWindows()[0];
       return window === undefined ? null : { cursor: screen.getCursorScreenPoint(), bounds: window.getBounds(), displays: screen.getAllDisplays().map(t => t.bounds) };
-    });
-    if (state !== null)
-      await OffCursorPlacement.placeAsync(state.bounds, state.cursor, state.displays, target => this.application.evaluate(({ BrowserWindow }, next) => {
-        const window = BrowserWindow.getAllWindows()[0];
-        if (window === undefined)
-          throw new Error("The window is gone.");
-        window.setBounds(next);
-        return window.getBounds();
-      }, target));
+    }));
+    if (state !== null) {
+      this.placement = `Before the move, the cursor was at ${state.cursor.x},${state.cursor.y}, the window at ${OffCursorPlacement.describe(state.bounds)} ` +
+        `and the displays at ${state.displays.map(t => OffCursorPlacement.describe(t)).join("; ")}.`;
+      const placed = await OffCursorPlacement.placeAsync(state.bounds, state.cursor, state.displays, target => this.answerAsync(`move the window to ${OffCursorPlacement.describe(target)}`,
+        this.application.evaluate(({ BrowserWindow }, next) => {
+          const window = BrowserWindow.getAllWindows()[0];
+          if (window === undefined)
+            throw new Error("The window is gone.");
+          window.setBounds(next);
+          return window.getBounds();
+        }, target)));
+      this.placement += ` After the move, the window was at ${OffCursorPlacement.describe(placed)}.`;
+    }
     await expect.poll(() => this.isCursorInsideAsync()).toBe(false);
     await expect.poll(() => this.window.evaluate(() => document.querySelector(":hover") === null)).toBe(true);
   }
 
   private async isCursorInsideAsync(): Promise<boolean> {
-    return await this.application.evaluate(({ BrowserWindow, screen }) => {
+    return await this.answerAsync("say whether the cursor is inside the window", this.application.evaluate(({ BrowserWindow, screen }) => {
       const cursor = screen.getCursorScreenPoint();
       const bounds = BrowserWindow.getAllWindows()[0]?.getBounds();
       return bounds !== undefined && cursor.x >= bounds.x && cursor.y >= bounds.y && cursor.x < bounds.x + bounds.width && cursor.y < bounds.y + bounds.height;
-    });
+    }));
   }
 
   private requireProcess(): ChildProcess {
@@ -409,7 +487,8 @@ export default class DesktopApplicationFixture {
   }
 
   private async recordEnvironmentAsync(): Promise<void> {
-    const electron = await this.application.evaluate(() => ({ electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome }));
+    const electron = await this.answerAsync("report its versions",
+      this.application.evaluate(() => ({ electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome })));
     const environment = {
       os: `${os.type()} ${os.release()}`,
       cpu: `${os.arch()} ${os.cpus()[0]?.model ?? "unknown"}`,

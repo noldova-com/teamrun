@@ -149,6 +149,72 @@ describe("DockComponent", () => {
     expect(query("tr-sash")).not.toBeNull();
   });
 
+  it("drags an icon like its tab, marking where it lands between icons, at the end of the group above when between two groups", async () => {
+    await renderAsync(DockSide.Left, Layout.createDefault(registry).splitGroup(LayoutFixture.search, 1, PanelEdge.Bottom));
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
+    fixture.detectChanges();
+    const icon = (key: string): HTMLElement => query(`.tr-dock-strip-view[data-view="${key}"]`) as HTMLElement;
+    const treeGroup = layout.layout().groupOf(LayoutFixture.files)?.id ?? -1;
+    const searchGroup = layout.layout().groupOf(LayoutFixture.search)?.id ?? -1;
+    const targets = [icon("view/files.tree"), icon("view/files.search")].map(t => [t.dataset["dropBefore"], t.dataset["dropAfter"], t.dataset["dropAxis"]]);
+    const pointAt = (element: HTMLElement, fraction: number): { clientX: number; clientY: number } => {
+      const bounds = element.getBoundingClientRect();
+      return { clientX: bounds.left + bounds.width / 2, clientY: bounds.top + bounds.height * fraction };
+    };
+
+    icon("view/files.search").dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true, ...pointAt(icon("view/files.search"), 0.5) }));
+    document.dispatchEvent(new PointerEvent("pointermove", pointAt(icon("view/files.tree"), 0.9)));
+    fixture.detectChanges();
+    const marked = [icon("view/files.search").classList.contains("tr-dock-strip-drop-before"), icon("view/files.search").classList.contains("tr-dock-strip-dragged")];
+    document.dispatchEvent(new PointerEvent("pointerup"));
+    fixture.detectChanges();
+
+    expect(targets).toEqual([[`${treeGroup}:0`, `${treeGroup}:1`, "vertical"], [`${treeGroup}:1`, `${searchGroup}:1`, "vertical"]]);
+    expect(marked).toEqual([true, true]);
+    expect(layout.layout().group(treeGroup)?.tabs).toEqual([LayoutFixture.files, LayoutFixture.search]);
+    icon("view/files.tree").dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true, ...pointAt(icon("view/files.tree"), 0.5) }));
+    document.dispatchEvent(new PointerEvent("pointermove", pointAt(icon("view/files.search"), 0.9)));
+    fixture.detectChanges();
+    expect(icon("view/files.search").classList.contains("tr-dock-strip-drop-after")).toBe(true);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+  });
+
+  it("opens the tab menu of an icon's view from the context menu key or a right click, and returns focus to the icon", async () => {
+    await renderAsync(DockSide.Left);
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
+    fixture.detectChanges();
+    const icon = query(".tr-dock-strip-view[data-view=\"view/files.tree\"]") as HTMLElement;
+    const menu = (): HTMLElement | null => document.querySelector<HTMLElement>(".cdk-overlay-container tr-menu[data-place='shell.tab']");
+    const closeAsync = async (): Promise<void> => {
+      document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+    icon.focus();
+    const key = new KeyboardEvent("keydown", { key: "F10", shiftKey: true, bubbles: true, cancelable: true });
+
+    icon.dispatchEvent(key);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(key.defaultPrevented).toBe(true);
+    expect(menu()?.querySelector("[data-command='shell.closeTab']")).not.toBeNull();
+    expect(menu()?.contains(document.activeElement)).toBe(true);
+    await closeAsync();
+    expect(menu()).toBeNull();
+    expect(document.activeElement).toBe(icon);
+
+    const click = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2, clientX: 10, clientY: 10 });
+    icon.dispatchEvent(click);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(click.defaultPrevented).toBe(true);
+    expect(menu()).not.toBeNull();
+    await closeAsync();
+    expect(menu()).toBeNull();
+  });
+
   it("closes the dock from the icon of a view it shows, and opens it at the chosen view from any other", async () => {
     await renderAsync(DockSide.Left, Layout.createDefault(registry).openView(LayoutFixture.search, registry));
     bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });

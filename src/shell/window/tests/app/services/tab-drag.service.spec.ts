@@ -55,10 +55,13 @@ describe("TabDragService", () => {
       "<span class=\"gap\"></span></div>",
       "<div data-drop-plate data-drop-group=\"9\"><span class=\"stale\" data-direction=\"Left\"></span></div>",
       "<span class=\"side\" data-drop-side=\"Bottom\"></span><span class=\"unknown\" data-drop-side=\"Top\"></span>",
-      "<span class=\"outside\"></span>"
+      "<span class=\"outside\"></span>",
+      "<div data-drop-group=\"1\" data-drop-tabs><span class=\"vertical\" data-drop-before=\"1:0\" data-drop-after=\"1:1\" data-drop-axis=\"vertical\"></span>",
+      "<span class=\"horizontal\" data-drop-before=\"2:0\" data-drop-after=\"2:1\" data-drop-axis=\"horizontal\"></span>",
+      "<span class=\"gone\" data-drop-before=\"9:0\" data-drop-after=\"9:1\" data-drop-axis=\"vertical\"></span></div>"
     ].join("");
     document.body.append(root);
-    for (const marker of root.querySelectorAll<HTMLElement>("[data-tab-index]")) {
+    for (const marker of root.querySelectorAll<HTMLElement>("[data-tab-index], [data-drop-before]")) {
       marker.style.display = "inline-block";
       marker.style.width = "100px";
       marker.style.height = "20px";
@@ -83,6 +86,12 @@ describe("TabDragService", () => {
     const event = new PointerEvent("pointerdown", { button, clientX: 10, clientY: 10, bubbles: true });
     from.addEventListener("pointerdown", () => drag.begin(tab, event), { once: true });
     from.dispatchEvent(event);
+  }
+
+  function moveWithin(name: string, x: number, y: number): void {
+    under = element(name);
+    const bounds = under.getBoundingClientRect();
+    document.dispatchEvent(new PointerEvent("pointermove", { clientX: bounds.left + x, clientY: bounds.top + y }));
   }
 
   function moveOver(name: string | null, x: number = 50): void {
@@ -143,6 +152,21 @@ describe("TabDragService", () => {
     moveOver("outside");
     expect(drag.target()).toBeNull();
     moveOver(null);
+    expect(drag.target()).toBeNull();
+  });
+
+  it("targets the place before or after a strip icon along the strip's axis, for a group that takes the tab", () => {
+    start(LayoutFixture.changes);
+    const targets: (unknown)[] = [];
+    for (const [name, x, y] of [["vertical", 90, 5], ["vertical", 10, 15], ["horizontal", 30, 15], ["horizontal", 70, 5], ["gone", 50, 5]] as const) {
+      moveWithin(name, x, y);
+      targets.push(drag.target());
+    }
+    document.dispatchEvent(new PointerEvent("pointerup"));
+    start(LayoutFixture.plan, element("plan"));
+    moveWithin("vertical", 50, 5);
+
+    expect(targets).toEqual([new TabDropTarget(1, 0), new TabDropTarget(1, 1), new TabDropTarget(2, 0), new TabDropTarget(2, 1), null]);
     expect(drag.target()).toBeNull();
   });
 
