@@ -58,7 +58,6 @@ export class Resources {
   public static readonly primaryButton: number = 0;
   public static readonly dragThreshold: number = 4;
   public static readonly escapeKey: string = "Escape";
-  public static readonly popoverPaneClass: string = "tr-popover-pane";
   public static readonly pointerMoveEvent: "pointermove" = "pointermove";
   public static readonly pointerUpEvent: "pointerup" = "pointerup";
   public static readonly pointerCancelEvent: "pointercancel" = "pointercancel";

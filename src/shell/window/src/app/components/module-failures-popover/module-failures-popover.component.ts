@@ -10,18 +10,16 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  ElementRef,
   ErrorHandler,
   type InputSignal,
   type WritableSignal,
-  afterNextRender,
   inject,
   input,
   signal
 } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import { ButtonComponent, ButtonVariant } from "@noldova/teamrun-shell-ui";
+import { ButtonComponent, ButtonVariant, PopoverDirective } from "@noldova/teamrun-shell-ui";
 
 import type { ModuleFailure } from "../../models/module-failure";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
@@ -33,11 +31,9 @@ import { Resources } from "../../../resources";
   templateUrl: "./module-failures-popover.component.html",
   styleUrl: "./module-failures-popover.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
+  hostDirectives: [{ directive: PopoverDirective, inputs: ["label"] }],
   host: {
-    "class": "tr-module-failures-popover tr-scroll-reveal",
-    "role": "dialog",
-    "tabindex": "-1",
-    "[attr.aria-label]": "resources.moduleFailuresTitle"
+    "class": "tr-module-failures-popover"
   }
 })
 export class ModuleFailuresPopoverComponent {
@@ -53,8 +49,6 @@ export class ModuleFailuresPopoverComponent {
   public readonly failures: InputSignal<readonly ModuleFailure[]> = input.required<readonly ModuleFailure[]>();
 
   public constructor() {
-    const host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-    afterNextRender(() => host.focus());
     inject(DestroyRef).onDestroy(() => this.clearCopiedTimer());
   }
 
