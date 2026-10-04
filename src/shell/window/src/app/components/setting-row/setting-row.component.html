@@ -37,7 +37,8 @@ LICENSE file in the root directory of this source tree.
     }
     @case (kinds.Number) {
       <input tr-text-field type="number" class="tr-setting-row-number" [attr.aria-label]="definition().title" [min]="definition().type.minimum" [max]="definition().type.maximum"
-        [step]="definition().type.step" [value]="current()" (change)="commitNumber($event)" />
+        [step]="definition().type.step" [value]="current()" [attr.aria-invalid]="error() ? true : null" [attr.aria-describedby]="error() ? errorId : null"
+        (change)="commitNumber($event)" (keydown.escape)="revertNumber($event)" />
     }
     @case (kinds.Text) {
       <input tr-text-field type="text" [attr.aria-label]="definition().title" [attr.maxlength]="definition().type.maxLength" [value]="asString(current())" (change)="commitText($event)" />
@@ -52,5 +53,5 @@ LICENSE file in the root directory of this source tree.
   }
 </div>
 @if (error(); as message) {
-  <div class="tr-setting-row-error" role="alert">{{ message }}</div>
+  <div class="tr-setting-row-error" role="alert" [id]="errorId">{{ message }}</div>
 }
