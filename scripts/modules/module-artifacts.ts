@@ -50,7 +50,7 @@ export default class ModuleArtifacts {
 
     const sources = declarations
       .filter(t => t.windowEntry !== null)
-      .map(t => `  new WindowPartSource(${JSON.stringify(t.id)}, ${JSON.stringify(t.displayName)}, ${JSON.stringify(t.dependencies)}, `
+      .map(t => `  new WindowPartSource(${JSON.stringify(t.id)}, ${JSON.stringify(t.dependencies)}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.VIEWS_KIND) ?? [])}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.DOCUMENTS_KIND) ?? [])}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.COMMANDS_KIND) ?? [])}, `
