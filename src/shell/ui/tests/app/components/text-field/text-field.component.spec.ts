@@ -19,6 +19,7 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   template: `
     <input class="search" tr-text-field type="search" aria-label="Search settings" placeholder="Search settings" />
     <input class="size" tr-text-field type="number" aria-label="Panel size" min="12" max="18" disabled />
+    <input class="ratio" tr-text-field type="number" aria-label="Ratio" aria-invalid="true" />
   `
 })
 class TextFieldHostComponent {}
@@ -56,6 +57,16 @@ describe("TextFieldComponent", () => {
       AppearanceFixture.expectRem(style.fontSize, 0.8125, panelSize);
       AppearanceFixture.expectRem(style.lineHeight, 1.125, panelSize);
     });
+
+  it("keeps the error border while invalid, focused or not", () => {
+    render();
+    const error = AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "errorForeground");
+    const unfocused = getComputedStyle(field("ratio")).borderTopColor;
+
+    field("ratio").focus();
+
+    expect([unfocused, getComputedStyle(field("ratio")).borderTopColor]).toEqual([error, error]);
+  });
 
   for (const mode of AppearanceFixture.modes)
     for (const theme of AppearanceFixture.themes)

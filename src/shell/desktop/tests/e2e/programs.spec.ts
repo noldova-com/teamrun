@@ -35,7 +35,7 @@ test.describe("the programs modules run", () => {
     }
   };
 
-  test("a runtime that ends abruptly leaves its programs running until the runtime that replaces it ends them", async ({ desktop }) => {
+  test("a runtime that ends abruptly leaves its programs running until the runtime that replaces it ends them @smoke", async ({ desktop }) => {
     const window = desktop.window;
     const note = window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]");
     await expect(note).toBeVisible();
