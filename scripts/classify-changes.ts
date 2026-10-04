@@ -23,6 +23,9 @@ export default class ClassifyChanges {
   private static readonly HEAD_VARIABLE: string = "HEAD_SHA";
   private static readonly PULL_REQUEST_EVENT: string = "pull_request";
   private static readonly TARGET_SEPARATOR: string = ", ";
+  private static readonly CELL_SEPARATOR: string = "|";
+  private static readonly ROW_SEPARATOR: string = ";";
+  private static readonly KEY_SEPARATOR: string = " ";
   private static readonly OUTPUTS_REQUIRED: string = "GITHUB_OUTPUT and GITHUB_STEP_SUMMARY must name the step's output and summary files.\n";
 
   private readonly classifier: ChangeClassifier;
@@ -45,9 +48,15 @@ export default class ClassifyChanges {
     const scope = await this.classifier.classifyAsync(eventName, environment[ClassifyChanges.BASE_VARIABLE], environment[ClassifyChanges.HEAD_VARIABLE]);
     const matrix = new BuildMatrix(eventName === ClassifyChanges.PULL_REQUEST_EVENT);
     const targets = JSON.stringify(matrix.targets.map(t => ClassifyChanges.describe(t)));
-    const shards = JSON.stringify(matrix.uiShards.map(t => ({ ...ClassifyChanges.describe(t.target), shard: t.index, shards: t.count })));
+    const table = matrix.targets.map(t => [t.name, t.runner, t.operatingSystem, t.architecture].join(ClassifyChanges.CELL_SEPARATOR)).join(ClassifyChanges.ROW_SEPARATOR);
+    const uiTargets = matrix.targets.map(t => t.key).join(ClassifyChanges.KEY_SEPARATOR);
+    const uiPlan = JSON.stringify(Object.fromEntries(matrix.targets.map(t => [t.key, {
+      build: [ClassifyChanges.describe(t)],
+      shards: t.uiShards.map(s => ({ ...ClassifyChanges.describe(t), shard: s.index, shards: s.count }))
+    }])));
     const deferred = matrix.deferred.map(t => t.name).join(ClassifyChanges.TARGET_SEPARATOR);
-    await appendFile(outputPath, `run-code=${scope.runCode}\nrun-ui=${scope.runUi}\ntargets=${targets}\nui-shards=${shards}\ndeferred=${deferred}\n`);
+    await appendFile(outputPath,
+      `run-code=${scope.runCode}\nrun-ui=${scope.runUi}\ntargets=${targets}\ntarget-table=${table}\nui-targets=${uiTargets}\nui-plan=${uiPlan}\ndeferred=${deferred}\n`);
     await appendFile(summaryPath, `${scope.summary}\n`);
     this.output.write(`${scope.summary}\n`);
     return 0;

@@ -83,9 +83,13 @@ class ClassifyChangesTests {
         { target: "Windows x64", runner: "windows-2025", architecture: "x64" },
         { target: "macOS ARM64", runner: "macos-15", architecture: "arm64" }
       ]);
-      const shards: unknown[] = JSON.parse(outputs.get("ui-shards") ?? "");
-      assert.equal(shards.length, 12);
-      assert.deepEqual(shards.slice(6, 9), [1, 2, 3].map(t => ({ target: "Windows x64", runner: "windows-2025", architecture: "x64", shard: t, shards: 3 })));
+      assert.equal(outputs.get("target-table"), "Linux x64|ubuntu-24.04|Linux|x64;Linux ARM64|ubuntu-24.04-arm|Linux|arm64;Windows x64|windows-2025|Windows|x64;macOS ARM64|macos-15|macOS|arm64");
+      assert.equal(outputs.get("ui-targets"), "linux-x64 linux-arm64 windows-x64 macos-arm64");
+      const plan: Record<string, { build: unknown[]; shards: unknown[] }> = JSON.parse(outputs.get("ui-plan") ?? "");
+      const windows = { target: "Windows x64", runner: "windows-2025", architecture: "x64" };
+      assert.deepEqual(Object.keys(plan), ["linux-x64", "linux-arm64", "windows-x64", "macos-arm64"]);
+      assert.deepEqual(plan["windows-x64"], { build: [windows], shards: [1, 2, 3].map(t => ({ ...windows, shard: t, shards: 3 })) });
+      assert.deepEqual(plan["linux-x64"]?.shards.length, 2);
       assert.equal(refused.status, 1);
     });
   }

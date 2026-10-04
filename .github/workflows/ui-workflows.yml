@@ -1,0 +1,267 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: UI workflows
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        description: The target's build and shards, as the classification plans them.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    strategy:
+      matrix:
+        include: ${{ fromJSON(inputs.plan).build }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - name: Stop Spotlight indexing before building
+        if: runner.os == 'macOS'
+        run: sudo mdutil -i off /System/Volumes/Data
+
+      - name: Check out the revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare the job
+        uses: ./.github/actions/prepare
+        with:
+          architecture: ${{ matrix.architecture }}
+
+      - name: Build the test build and its variants
+        run: npm run test:ui -- --list
+
+      - name: Pack the builds
+        run: tar -cf ui-build.tar _build/archives _build/modules _build/packages _build/records _build/tests _build/variants _build/window _build/ui-builds.record node_modules/.package-lock.json node_modules/@noldova src/generated
+
+      - name: Keep the builds for the UI workflows
+        id: keep
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-build-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: ui-build.tar
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Wait before keeping the builds again
+        if: steps.keep.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the builds for the UI workflows again
+        id: keep-again
+        if: steps.keep.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-build-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: ui-build.tar
+          retention-days: 3
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Wait before keeping the builds a last time
+        if: steps.keep-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the builds for the UI workflows a last time
+        if: steps.keep-again.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-build-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: ui-build.tar
+          retention-days: 3
+          if-no-files-found: error
+          overwrite: true
+
+  shards:
+    name: Shard ${{ matrix.shard }} of ${{ matrix.shards }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.plan).shards }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - name: Stop Spotlight indexing before the UI workflows
+        if: runner.os == 'macOS'
+        run: sudo mdutil -i off /System/Volumes/Data
+
+      - name: Check out the revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare the job
+        uses: ./.github/actions/prepare
+        with:
+          architecture: ${{ matrix.architecture }}
+
+      - name: Fetch the builds
+        id: fetch
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ui-build-${{ matrix.runner }}-${{ matrix.architecture }}
+
+      - name: Wait before fetching the builds again
+        if: steps.fetch.outcome == 'failure'
+        run: sleep 15
+
+      - name: Fetch the builds again
+        id: fetch-again
+        if: steps.fetch.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ui-build-${{ matrix.runner }}-${{ matrix.architecture }}
+
+      - name: Wait before fetching the builds a last time
+        if: steps.fetch-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Fetch the builds a last time
+        if: steps.fetch-again.outcome == 'failure'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ui-build-${{ matrix.runner }}-${{ matrix.architecture }}
+
+      - name: Unpack the builds
+        run: tar -xf ui-build.tar && rm ui-build.tar
+
+      - name: Let Electron's sandbox start on Linux
+        if: runner.os == 'Linux'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Test the UI workflows
+        id: ui
+        env:
+          SHARD: ${{ matrix.shard }}/${{ matrix.shards }}
+        run: |
+          set -- --require-current --shard "$SHARD"
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui -- "$@"
+          else
+            npm run test:ui -- "$@"
+          fi
+
+      - name: Keep the UI workflow results
+        id: results
+        if: always() && steps.ui.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}
+          path: _build/ui
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Wait before keeping the UI workflow results again
+        if: always() && steps.ui.outcome != 'skipped' && steps.results.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the UI workflow results again
+        id: results-again
+        if: always() && steps.ui.outcome != 'skipped' && steps.results.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}
+          path: _build/ui
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the UI workflow results a last time
+        if: always() && steps.ui.outcome != 'skipped' && steps.results-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the UI workflow results a last time
+        id: results-last
+        if: always() && steps.ui.outcome != 'skipped' && steps.results-again.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}
+          path: _build/ui
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Warn that the UI workflow results were not kept
+        if: always() && steps.ui.outcome != 'skipped' && steps.results-last.outcome == 'failure'
+        run: |
+          echo "::warning title=The UI workflow results were not kept::The upload failed three times, so they are not attached. The tests are not affected."
+
+      - name: Keep the main window screenshot
+        id: screenshot
+        if: always() && steps.ui.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: _build/ui/main-window-*.png
+          archive: false
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Wait before keeping the main window screenshot again
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the main window screenshot again
+        id: screenshot-again
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: _build/ui/main-window-*.png
+          archive: false
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the main window screenshot a last time
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the main window screenshot a last time
+        id: screenshot-last
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-again.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: _build/ui/main-window-*.png
+          archive: false
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Warn that the main window screenshot was not kept
+        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-last.outcome == 'failure'
+        run: |
+          echo "::warning title=The main window screenshot was not kept::The upload failed three times, so it is not attached. The tests are not affected."
+
+      - name: Summarize the UI workflows
+        if: always() && steps.ui.outcome != 'skipped'
+        env:
+          UI_TARGET: ${{ matrix.target }}, ${{ matrix.shard }} of ${{ matrix.shards }}
+          SCREENSHOT_URL: ${{ steps.screenshot-last.outputs.artifact-url || steps.screenshot-again.outputs.artifact-url || steps.screenshot.outputs.artifact-url }}
+          SCREENSHOT_UPLOAD_FAILED: ${{ steps.screenshot-last.outcome == 'failure' }}
+        run: node scripts/ui-summary.ts

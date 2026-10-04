@@ -99,6 +99,7 @@ class ChangeClassifierTests {
       const cases: readonly (readonly [string, boolean])[] = [
         [".github/workflows/watch-pull-requests.yml", false],
         [".github/workflows/build-and-test.yml", true],
+        [".github/workflows/ui-workflows.yml", true],
         [".github/actions/prepare/action.yml", true],
         [".gitignore", false],
         [".gitattributes", true],

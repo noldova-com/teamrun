@@ -30,14 +30,23 @@ class BuildMatrixTests {
       assert.deepEqual(pullRequest.deferred.map(t => t.name), ["Windows ARM64", "macOS x64"]);
     });
 
-    test("each target's UI workflows run in three shards", () => {
-      const shards = new BuildMatrix(true).uiShards;
+    test("Windows and macOS x64 run their UI workflows in three shards, the faster targets in two", () => {
+      const targets = new BuildMatrix(false).targets;
 
-      assert.deepEqual(shards.map(t => `${t.target.name} ${t.index}/${t.count}`), [
-        "Linux x64 1/3", "Linux x64 2/3", "Linux x64 3/3",
-        "Linux ARM64 1/3", "Linux ARM64 2/3", "Linux ARM64 3/3",
-        "Windows x64 1/3", "Windows x64 2/3", "Windows x64 3/3",
-        "macOS ARM64 1/3", "macOS ARM64 2/3", "macOS ARM64 3/3"
+      assert.ok(targets.every(t => t.uiShards.every(s => s.target === t)));
+      assert.deepEqual(targets.map(t => `${t.name}: ${t.uiShards.map(s => `${s.index}/${s.count}`).join(" ")}`), [
+        "Linux x64: 1/2 2/2",
+        "Linux ARM64: 1/2 2/2",
+        "Windows x64: 1/3 2/3 3/3",
+        "Windows ARM64: 1/3 2/3 3/3",
+        "macOS x64: 1/3 2/3 3/3",
+        "macOS ARM64: 1/2 2/2"
+      ]);
+    });
+
+    test("a target's key and operating system come from its name", () => {
+      assert.deepEqual(new BuildMatrix(false).targets.map(t => `${t.key} ${t.operatingSystem}`), [
+        "linux-x64 Linux", "linux-arm64 Linux", "windows-x64 Windows", "windows-arm64 Windows", "macos-x64 macOS", "macos-arm64 macOS"
       ]);
     });
   }
