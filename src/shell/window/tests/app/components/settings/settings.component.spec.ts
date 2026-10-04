@@ -17,12 +17,16 @@ import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
 import { SettingsComponent } from "../../../../src/app/components/settings/settings.component";
 import { GalleryTokens } from "../../../../src/app/models/gallery-tokens";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
+import { Layout } from "../../../../src/app/models/layout/layout";
 import { WindowPartSource } from "../../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../../src/app/services/command.service";
+import type { LayoutService } from "../../../../src/app/services/layout.service";
 import { SettingsService } from "../../../../src/app/services/settings.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
+import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
+import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { SettingsFixture } from "../../../fixtures/settings.fixture";
 
 class FakeSettingsService {
@@ -55,6 +59,7 @@ describe("SettingsComponent", () => {
   let settings: FakeSettingsService;
   let errors: unknown[];
   let gallery: Type<unknown> | null;
+  let layout: LayoutService;
 
   function render(mode: ThemeMode = ThemeMode.Light, height: string = String.empty): HTMLElement {
     AppearanceFixture.apply(DefaultTheme.theme, mode);
@@ -75,7 +80,7 @@ describe("SettingsComponent", () => {
     await fixture.whenStable();
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     DesktopBridgeFixture.install("linux");
     settings = new FakeSettingsService();
     errors = [];
@@ -97,6 +102,8 @@ describe("SettingsComponent", () => {
       new CommandContribution("clock.tick", "Tick the clock", null, "Ctrl+Alt+T", () => Promise.resolve(null)),
       new CommandContribution("clock.stop", "Stop the clock", null, "Ctrl+Alt+T", () => Promise.resolve(null))
     ]);
+    const registry = LayoutFixture.createRegistry();
+    layout = await LayoutServiceFixture.prepareAsync(registry, Layout.createDefault(registry).openDocument(LayoutFixture.settings));
   });
 
   afterEach(async () => {
@@ -177,6 +184,20 @@ describe("SettingsComponent", () => {
 
     expect(left.every(t => t > 0)).toBe(true);
     expect([texts("[aria-current=page]"), scrollers().map(t => t.scrollTop)]).toEqual([["Keyboard shortcuts"], left]);
+  });
+
+  it("opens on its first page with no search once its tab was closed", async () => {
+    render();
+    await page.getByRole("button", { name: "Clock" }).click();
+    await searchAsync("tick");
+    fixture.destroy();
+
+    layout.close(LayoutFixture.settings);
+    TestBed.tick();
+    layout.openDocument(LayoutFixture.settings);
+    render();
+
+    expect([texts("[aria-current=page]"), (element().querySelector(".tr-settings-search-field") as HTMLInputElement).value]).toEqual([["Appearance"], ""]);
   });
 
   it("shows the search it had when it is created again", async () => {

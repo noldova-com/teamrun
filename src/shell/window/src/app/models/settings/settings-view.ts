@@ -15,13 +15,13 @@ export class SettingsView {
 
   public readonly page: string;
   public readonly query: string;
-  public readonly pagesTop: number;
+  public readonly pageListTop: number;
   public readonly contentTop: number;
 
-  public constructor(page: string, query: string, pagesTop: number, contentTop: number) {
+  public constructor(page: string, query: string, pageListTop: number, contentTop: number) {
     this.page = page;
     this.query = query;
-    this.pagesTop = pagesTop;
+    this.pageListTop = pageListTop;
     this.contentTop = contentTop;
   }
 }

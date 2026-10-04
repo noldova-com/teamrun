@@ -45,8 +45,8 @@ export class SettingsComponent {
   private readonly commands: CommandService = inject(CommandService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
-  private readonly views: ViewStateService = inject(ViewStateService);
-  private readonly kept: SettingsView = this.views.find(ShellDocuments.settingsTab.key, SettingsView) ?? SettingsView.initial;
+  private readonly viewStates: ViewStateService = inject(ViewStateService);
+  private readonly kept: SettingsView = this.viewStates.find(ShellDocuments.settingsTab.key, SettingsView) ?? SettingsView.initial;
   private readonly selected: WritableSignal<string> = signal(this.kept.page);
   private readonly pageList: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("pageList");
   private readonly content: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("content");
@@ -91,13 +91,13 @@ export class SettingsComponent {
 
   public constructor() {
     afterNextRender(() => {
-      this.pageList().nativeElement.scrollTop = this.kept.pagesTop;
+      this.pageList().nativeElement.scrollTop = this.kept.pageListTop;
       this.content().nativeElement.scrollTop = this.kept.contentTop;
     });
   }
 
   protected keep(): void {
-    this.views.keep(ShellDocuments.settingsTab.key,
+    this.viewStates.keep(ShellDocuments.settingsTab.key,
       new SettingsView(this.selected(), this.query(), this.pageList().nativeElement.scrollTop, this.content().nativeElement.scrollTop));
   }
 
