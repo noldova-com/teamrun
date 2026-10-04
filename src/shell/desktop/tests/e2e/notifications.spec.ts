@@ -137,7 +137,7 @@ test.describe("notifications", () => {
     await tickWithFocusAsync(desktop);
     await expect(toasts.locator(".tr-toast-title")).toHaveText(["The clock ticked"]);
     await expect(toasts.locator(".tr-toast-text")).toHaveText(["Ticks: 1"]);
-    await expect(window.locator(".tr-toasts-announcement[aria-live=polite]")).toHaveText("The clock ticked. Ticks: 1");
+    await expect(window.locator(".cdk-live-announcer-element[aria-live=polite]")).toHaveText("The clock ticked. Ticks: 1");
     await expect(toasts).toHaveCount(0, { timeout: 15_000 });
     await bell(window).click();
     await list(window).getByRole("checkbox", { name: "Do not disturb" }).check();

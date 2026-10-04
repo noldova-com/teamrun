@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { DOCUMENT } from "@angular/common";
 import { DestroyRef, Injectable, type Signal, type WritableSignal, computed, effect, inject, signal, untracked } from "@angular/core";
 
@@ -19,9 +20,8 @@ import { NotificationService } from "./notification.service";
 export class ToastService {
   private readonly notifications: NotificationService = inject(NotificationService);
   private readonly document: Document = inject(DOCUMENT);
+  private readonly announcer: LiveAnnouncer = inject(LiveAnnouncer);
   private readonly visibleIds: WritableSignal<readonly number[]> = signal([]);
-  private readonly politeValue: WritableSignal<string> = signal("");
-  private readonly assertiveValue: WritableSignal<string> = signal("");
   private readonly lastByKind: Map<string, number> = new Map();
   private readonly timers: Map<number, { handle: ReturnType<typeof setTimeout> | null; remaining: number; startedAt: number }> = new Map();
   private queue: number[] = [];
@@ -32,8 +32,6 @@ export class ToastService {
     const notifications = this.notifications.state().notifications;
     return this.visibleIds().flatMap(t => notifications.filter(u => u.id === t));
   });
-  public readonly politeAnnouncement: Signal<string> = this.politeValue.asReadonly();
-  public readonly assertiveAnnouncement: Signal<string> = this.assertiveValue.asReadonly();
 
   public constructor() {
     effect(() => {
@@ -115,10 +113,7 @@ export class ToastService {
       return false;
     this.visibleIds.update(t => [...t, id]);
     const announcement = Object.isNull(notification.post.text) ? notification.post.title : `${notification.post.title}. ${notification.post.text}`;
-    if (notification.post.severity === NotificationSeverity.Error)
-      this.assertiveValue.set(announcement);
-    else
-      this.politeValue.set(announcement);
+    void this.announcer.announce(announcement, notification.post.severity === NotificationSeverity.Error ? Resources.assertiveAnnouncement : Resources.politeAnnouncement);
     if (ToastService.closesByItself(notification))
       this.startTimer(id, Resources.toastDuration);
     return true;

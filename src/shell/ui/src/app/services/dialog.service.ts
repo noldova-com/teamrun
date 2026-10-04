@@ -50,24 +50,30 @@ export class DialogService {
     });
     if (this.dialog.openDialogs.length === 1)
       this.makeBackgroundInert();
-    reference.closed.subscribe(() => this.returnFocus(opener));
+    reference.closed.subscribe(() => {
+      this.liftInert();
+      this.returnFocus(opener);
+    });
     return reference;
   }
 
   private makeBackgroundInert(): void {
     const container = this.overlays.getContainerElement();
     this.background = [...(container.parentElement as HTMLElement).children]
-      .filter(t => t !== container && !t.hasAttribute(Resources.inertAttribute) && !t.hasAttribute(Resources.ariaLiveAttribute));
+      .filter(t => t !== container && ![Resources.inertAttribute, Resources.ariaLiveAttribute, Resources.popoverAttribute].some(u => t.hasAttribute(u)));
     for (const element of this.background)
       element.setAttribute(Resources.inertAttribute, "");
   }
 
+  private liftInert(): void {
+    if (this.isOpen)
+      return;
+    for (const element of this.background)
+      element.removeAttribute(Resources.inertAttribute);
+    this.background = [];
+  }
+
   private returnFocus(opener: HTMLElement): void {
-    if (!this.isOpen) {
-      for (const element of this.background)
-        element.removeAttribute(Resources.inertAttribute);
-      this.background = [];
-    }
     if (this.document.activeElement === this.document.body)
       this.focus.focusVia(opener, Resources.programFocusOrigin);
   }

@@ -22,6 +22,7 @@ describe("DialogService", () => {
   let opener: HTMLButtonElement;
   let live: HTMLElement;
   let inert: HTMLElement;
+  let popover: HTMLElement;
   let references: DialogRef<unknown, OpenDialogComponent>[];
 
   beforeEach(() => {
@@ -31,7 +32,9 @@ describe("DialogService", () => {
     live.setAttribute("aria-live", "polite");
     inert = document.createElement("div");
     inert.inert = true;
-    document.body.append(opener, live, inert);
+    popover = document.createElement("div");
+    popover.popover = "manual";
+    document.body.append(opener, live, inert, popover);
     opener.focus();
   });
 
@@ -39,7 +42,7 @@ describe("DialogService", () => {
     for (const reference of references.reverse())
       reference.close();
     await vi.waitFor(() => expect(document.querySelector(".inside")).toBeNull());
-    for (const element of [opener, live, inert])
+    for (const element of [opener, live, inert, popover])
       element.remove();
   });
 
@@ -54,16 +57,16 @@ describe("DialogService", () => {
     return document.querySelectorAll<HTMLElement>(`.${name}`)[index] as HTMLElement;
   }
 
-  it("makes the window behind the first dialog inert and hidden from assistive technology until the last one closes, leaving live regions and the dialogs alone", async () => {
+  it("makes the window behind the first dialog inert and hidden from assistive technology until the last one closes, leaving live regions, popovers and the dialogs alone", async () => {
     await openAsync();
-    const whileOne = [opener.inert, opener.getAttribute("aria-hidden"), live.inert, inert.inert, (document.querySelector(".cdk-overlay-container") as HTMLElement).inert];
+    const whileOne = [opener.inert, opener.getAttribute("aria-hidden"), live.inert, popover.inert, inert.inert, (document.querySelector(".cdk-overlay-container") as HTMLElement).inert];
     const second = await openAsync();
     second.close();
     const afterSecond = opener.inert;
     references[0]?.close();
     references = [];
 
-    expect(whileOne).toEqual([true, "true", false, true, false]);
+    expect(whileOne).toEqual([true, "true", false, false, true, false]);
     expect(afterSecond).toBe(true);
     expect([opener.inert, opener.hasAttribute("aria-hidden"), inert.inert]).toEqual([false, false, true]);
   });

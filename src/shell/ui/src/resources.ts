@@ -279,6 +279,7 @@ export class Resources {
   public static readonly noLimit: string = "none";
   public static readonly inertAttribute: string = "inert";
   public static readonly ariaLiveAttribute: string = "aria-live";
+  public static readonly popoverAttribute: string = "popover";
   public static readonly dropdownPaneClass: string = "tr-dropdown-pane";
   public static readonly listboxSelector: string = "[role=listbox]";
   public static readonly tabKey: string = "Tab";
