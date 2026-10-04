@@ -133,22 +133,22 @@ describe("CommandSearchComponent", () => {
     expect(search.recent()).toEqual(["notes.newNote"]);
   });
 
-  it("lists a menu row that passes arguments or shows its own label, with its menu as the detail and no key for arguments, but not one that runs a command alone", async () => {
+  it("lists a menu row that passes arguments, with its menu as the detail and no key, but not one that runs a command alone under any label", async () => {
     const detail = (id: string): string | null | undefined => root().querySelector(`[data-item="${id}"] .tr-quick-input-detail`)?.textContent;
     const key = (id: string): string | null | undefined => root().querySelector(`[data-item="${id}"] .tr-quick-input-key`)?.textContent;
     const rows = menuBar.searchRows();
     const template = rows.find(t => t.title === "New note")?.id ?? "";
-    const labelled = rows.find(t => t.title === "Quick note")?.id ?? "";
 
-    expect(rows.map(t => [t.title, t.menu])).toEqual(expect.arrayContaining([["New note", "File › New from template"], ["Forecast", "View"], ["Quick note", "View"]]));
-    expect(rows.map(t => t.title)).not.toContain("Archive the note");
+    expect(rows.map(t => [t.title, t.menu])).toEqual([["New note", "File › New from template"]]);
     expect(ids().filter(t => t.startsWith("shell.file/"))).toEqual([template]);
-    expect([detail(template), key(template), detail(labelled), key(labelled)]).toEqual(["File › New from template", undefined, "View", "Ctrl+Alt+N"]);
+    expect([detail(template), key(template)]).toEqual(["File › New from template", undefined]);
 
     await typeAsync("new note");
     expect(ids()).toEqual(["notes.newNote", template]);
     await typeAsync("forecast");
-    expect(ids()).toHaveLength(1);
+    expect(ids()).toEqual([]);
+    await typeAsync("quick note");
+    expect(ids()).toEqual([]);
   });
 
   it("runs a chosen menu row with its arguments after closing the search, and remembers it", async () => {

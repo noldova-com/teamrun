@@ -100,6 +100,15 @@ test.describe("command search", () => {
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"] .tr-tab-label")).toHaveText("Note 3");
   });
 
+  test("lists each focus command once, leaving out the View menu items that run them without arguments", async ({ desktop }) => {
+    const window = desktop.window;
+    await CommandSearchFixture.searchAsync(window, "focus");
+
+    await expect(options(window).and(window.locator("[data-item=\"shell.focusNextGroup\"]"))).toHaveCount(1);
+    await expect(options(window).and(window.locator("[data-item=\"shell.focusPreviousGroup\"]"))).toHaveCount(1);
+    await expect(options(window).and(window.locator("[data-item^=\"shell.view/\"]"))).toHaveCount(0);
+  });
+
   test("every result's title starts at the same left edge, with or without an icon", async ({ desktop }) => {
     const window = desktop.window;
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]")).toBeVisible();

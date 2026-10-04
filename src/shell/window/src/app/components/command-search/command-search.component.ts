@@ -31,7 +31,7 @@ export class CommandSearchComponent {
 
   private readonly entries: Signal<readonly CommandSearchEntry[]> = computed(() => [
     ...this.commands.commands().filter(t => this.commands.isEnabled(t.name)).map(t => new CommandSearchEntry(this.itemOf(t), () => this.commands.run(t.name))),
-    ...this.menuBar.searchRows().map(t => new CommandSearchEntry(new QuickInputItem(t.id, t.title, t.icon, t.menu, t.key), () => this.menuBar.run(t.id)))
+    ...this.menuBar.searchRows().map(t => new CommandSearchEntry(new QuickInputItem(t.id, t.title, t.icon, t.menu, null), () => this.menuBar.run(t.id)))
   ]);
 
   protected readonly resources: typeof Resources = Resources;
