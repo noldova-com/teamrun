@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
+
 import type { QuickInputItem } from "@noldova/teamrun-shell-ui";
 
 export class CommandSearchEntry {
@@ -15,5 +17,9 @@ export class CommandSearchEntry {
   public constructor(item: QuickInputItem, run: () => void) {
     this.item = item;
     this.run = run;
+  }
+
+  public get detail(): string {
+    return this.item.detail ?? String.empty;
   }
 }

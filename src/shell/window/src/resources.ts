@@ -23,6 +23,7 @@ import { productName } from "../../../generated/product";
 export class Resources {
   public static readonly contributionNamePattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.[A-Za-z0-9][A-Za-z0-9._-]*$/;
   public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+  public static readonly regExpSpecialPattern: RegExp = /[.*+?^${}()|[\]\\]/gu;
   public static readonly windowPartContextToken: string = "The window part's context";
   public static readonly windowPartSourcesToken: string = "The build's window parts";
   public static readonly documentsGroupId: number = 0;
@@ -313,7 +314,7 @@ export class Resources {
   public static readonly commandSearchLabel: string = "Search commands";
   public static readonly commandSearchPaneClass: string = "tr-command-search-pane";
   public static readonly windowRowSelector: string = "tr-window-row";
-  public static readonly wordSeparatorPattern: RegExp = /[\s\-_./:,]/u;
+  public static readonly detailSeparator: string = " ";
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
   public static readonly hideDockLabels: Readonly<Record<DockSide, string>> = {
@@ -740,7 +741,6 @@ export class Resources {
   public static readonly doNotDisturbLabel: string = "Do not disturb";
   public static readonly noNotifications: string = "No notifications";
   public static readonly dismissLabel: string = "Dismiss";
-  public static readonly checkGlyph: string = "check";
   public static readonly unreadLimit: number = 9;
   public static readonly toastLimit: number = 3;
   public static readonly hoverSelector: string = ":hover";

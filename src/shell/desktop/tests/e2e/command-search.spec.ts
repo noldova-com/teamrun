@@ -10,6 +10,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 
 function pane(window: Page): Locator {
   return window.locator(".cdk-overlay-container .tr-command-search-pane");
@@ -42,9 +43,10 @@ test.describe("command search", () => {
     expect(Math.abs((box?.x ?? 0) + (box?.width ?? 0) / 2 - width / 2)).toBeLessThan(1);
 
     await window.keyboard.type("new n");
-    await expect(options(window).first()).toHaveAttribute("data-item", "notes.newNote");
-    await expect(options(window).first().locator("mark")).toHaveText(["New n"]);
-    await expect(options(window).first().locator(".tr-quick-input-detail")).toHaveText("Notes");
+    await expect(options(window).last()).toHaveAttribute("data-item", "notes.newNote");
+    await expect(options(window).last().locator("mark")).toHaveText(["New n"]);
+    await expect(options(window).last().locator(".tr-quick-input-detail")).toHaveText("Notes");
+    await window.keyboard.press("End");
     await window.keyboard.press("Enter");
 
     await expect(pane(window)).toHaveCount(0);
@@ -82,7 +84,7 @@ test.describe("command search", () => {
     await expect(tab).toBeFocused();
   });
 
-  test("lists a menu item that passes arguments after its menu, beside the command it runs, and runs it from the pointer", async ({ desktop }) => {
+  test("lists a menu item that passes arguments under its menu, beside the command it runs, and runs it from the pointer", async ({ desktop }) => {
     const window = desktop.window;
     await window.locator("tr-window-row").getByRole("button", { name: "Search commands" }).click();
     await expect(field(window)).toBeFocused();
@@ -90,14 +92,42 @@ test.describe("command search", () => {
     await window.keyboard.type("new note");
 
     await expect(options(window)).toHaveCount(2);
-    await expect(options(window).first()).toHaveAttribute("data-item", "notes.newNote");
-    await expect(options(window).last().locator(".tr-quick-input-detail")).toHaveText("File › New from template");
-    await expect(options(window).last().locator(".tr-quick-input-key")).toHaveCount(0);
+    await expect(options(window).last()).toHaveAttribute("data-item", "notes.newNote");
+    await expect(options(window).first().locator(".tr-quick-input-detail")).toHaveText("File › New from template");
+    await expect(options(window).first().locator(".tr-quick-input-key")).toHaveCount(0);
     await desktop.checkpointAsync("command-search-menu-item");
-    await options(window).last().click();
+    await options(window).first().click();
 
     await expect(pane(window)).toHaveCount(0);
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"] .tr-tab-label")).toHaveText("Note 3");
+  });
+
+  test("a query keeps the rows that contain it as one run, in the same order, and marks the run in the title without changing its text", async ({ desktop }) => {
+    const window = desktop.window;
+    const rows = (): Promise<readonly (readonly [string, string, string, readonly string[]])[]> => options(window).evaluateAll(items => items.map(item => [
+      item.getAttribute("data-item") ?? "",
+      item.querySelector(".tr-quick-input-detail")?.textContent ?? "",
+      item.querySelector(".tr-quick-input-title")?.textContent ?? "",
+      [...item.querySelectorAll("mark")].map(t => t.textContent ?? "")
+    ] as const));
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]")).toBeVisible();
+    await CommandSearchFixture.searchAsync(window, String());
+    await expect(options(window).first()).toBeVisible();
+    const all = await rows();
+
+    await window.keyboard.type("tab");
+    await expect.poll(async () => (await rows()).length).toBeLessThan(all.length);
+    const found = await rows();
+
+    expect(found.length).toBeGreaterThan(0);
+    expect(found.map(t => t[0])).toEqual(all.filter(t => `${t[1]} ${t[2]}`.toLowerCase().includes("tab")).map(t => t[0]));
+    expect(found.map(t => [t[1], t[2]])).toEqual(found.map(t => all.find(u => u[0] === t[0])).map(t => [t?.[1], t?.[2]]));
+    expect(found.every(t => t[3].length === 1 && t[3][0]?.toLowerCase() === "tab")).toBe(true);
+    for (const mode of WindowModeFixture.modes) {
+      await WindowModeFixture.setAsync(window, mode);
+      await desktop.checkpointAsync(`command-search-match-${mode.toLowerCase()}`);
+    }
+    await window.keyboard.press("Escape");
   });
 
   test("every result's title starts at the same left edge, with or without an icon", async ({ desktop }) => {
