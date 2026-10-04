@@ -8,9 +8,17 @@
 
 import "@noldova/teamrun-foundation-core";
 
+import { ProductInfo } from "./models/product-info.js";
+
 export class Resources {
-  public static readonly productName: string = "__PRODUCT_NAME__";
-  public static readonly productSlug: string = "__PRODUCT_SLUG__";
+  public static get productName(): string {
+    return ProductInfo.current.name;
+  }
+
+  public static get productSlug(): string {
+    return ProductInfo.current.slug;
+  }
+
   public static readonly folderSeparator: string = "/";
   public static readonly rootParameterName: string = "root";
   public static readonly idParameterName: string = "id";
@@ -132,6 +140,19 @@ export class Resources {
   public static readonly discoveryFormatVersion: number = 1;
   public static readonly declarationsFormatVersion: number = 1;
   public static readonly declarationsFileSegments: readonly string[] = ["_build", "modules", "declarations.json"];
+  public static readonly productFileSegments: readonly string[] = ["_build", "product.json"];
+  public static readonly slugField: string = "slug";
+  public static readonly applicationIdField: string = "applicationId";
+  public static readonly developmentApplicationIdField: string = "developmentApplicationId";
+  public static readonly dataFolderField: string = "dataFolder";
+  public static readonly deviceFoldersField: string = "deviceFolders";
+  public static readonly windowsField: string = "windows";
+  public static readonly macosField: string = "macos";
+  public static readonly linuxField: string = "linux";
+  public static readonly dataDirectoryVariableField: string = "dataDirectoryVariable";
+  public static readonly iconsField: string = "icons";
+  public static readonly versionField: string = "version";
+  public static readonly buildField: string = "build";
   public static readonly installRootSegments: readonly string[] = ["..", "..", "..", ".."];
   public static readonly utf8Encoding: BufferEncoding = "utf8";
   public static readonly missingFileCode: string = "ENOENT";
@@ -211,7 +232,10 @@ export class Resources {
   public static readonly defaultThemeId: string = "shell.default";
   public static readonly defaultThemeTitle: string = "Default";
   public static readonly themeTitle: string = "Theme";
-  public static readonly themeDescription: string = `The colors and look of ${Resources.productName}.`;
+  public static get themeDescription(): string {
+    return `The colors and look of ${Resources.productName}.`;
+  }
+
   public static readonly modeTitle: string = "Mode";
   public static readonly modeDescription: string = "Light, dark, or following the operating system.";
   public static readonly modeOptions: readonly (readonly [string, string])[] = [["Light", "Light"], ["Dark", "Dark"], ["System", "System"]];
@@ -257,12 +281,19 @@ export class Resources {
   public static readonly nameParameterName: string = "name";
   public static readonly defaultKeyParameterName: string = "defaultKey";
   public static readonly isCheckedParameterName: string = "isChecked";
-  public static readonly dataDirectoryVariable: string = "__DATA_DIRECTORY_VARIABLE__";
-  public static readonly defaultDataFolder: readonly string[] = "__DATA_FOLDER__".split(Resources.folderSeparator);
+  public static get dataDirectoryVariable(): string {
+    return ProductInfo.current.dataDirectoryVariable;
+  }
+
+  public static get defaultDataFolder(): readonly string[] {
+    return ProductInfo.current.dataFolder.split(Resources.folderSeparator);
+  }
+
   public static readonly developmentDataFolder: readonly string[] = ["_build", "data"];
-  public static readonly preShellData: string = `This data directory holds data from a ${Resources.productName} release that predates the shell; move it aside to continue.`;
-  public static readonly productVersion: string = "__VERSION__";
-  public static readonly build: string = "__BUILD__";
+  public static get preShellData(): string {
+    return `This data directory holds data from a ${Resources.productName} release that predates the shell; move it aside to continue.`;
+  }
+
   public static readonly linuxPlatform: string = "linux";
   public static readonly loopbackHost: string = "127.0.0.1";
   public static readonly tcpEndpointPrefix: string = "tcp://127.0.0.1:";
@@ -307,14 +338,17 @@ export class Resources {
   public static readonly failureExitCode: number = 1;
   public static readonly launchShell: string = "/bin/bash";
   public static readonly launchDescriptors: string = "/proc/self/fd";
-  public static readonly launchShellArguments: readonly string[] = [
-    "--noprofile",
-    "--norc",
-    "-p",
-    "-c",
-    "set -e; shopt -s failglob; for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done; exec -- \"$@\"",
-    `${Resources.productSlug}-launch`
-  ];
+  public static get launchShellArguments(): readonly string[] {
+    return [
+      "--noprofile",
+      "--norc",
+      "-p",
+      "-c",
+      "set -e; shopt -s failglob; for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done; exec -- \"$@\"",
+      `${Resources.productSlug}-launch`
+    ];
+  }
+
   public static readonly stoppedByIdle: string = "idle";
   public static readonly stoppedByRequest: string = "request";
   public static readonly stoppedBySignal: string = "signal";
@@ -343,7 +377,10 @@ export class Resources {
   public static readonly endpointUnavailable: string = "The runtime's local endpoint has no address.";
   public static readonly handshakeRequired: string = "A connection must begin with a handshake.";
   public static readonly unauthorized: string = "The capability token is not valid for this runtime.";
-  public static readonly buildMismatch: string = `Another build of ${Resources.productName} owns this data directory.`;
+  public static get buildMismatch(): string {
+    return `Another build of ${Resources.productName} owns this data directory.`;
+  }
+
   public static readonly otherBuildMayOnlyStop: string = "A connection from another build may only ask the runtime to stop.";
   public static readonly unexpectedMessage: string = "Only requests and cancellations may follow the handshake.";
   public static readonly invalidFrame: string = "The frame is not a valid message.";
@@ -480,6 +517,10 @@ export class Resources {
 
   public static formatDeclarationField(name: string): string {
     return `A module declaration's ${name} is missing or invalid.`;
+  }
+
+  public static formatProductFileUnreadable(file: string, reason: string): string {
+    return `The build's product file ${file} is not valid: ${reason}`;
   }
 
   public static formatDeclarationsUnreadable(file: string, reason: string): string {

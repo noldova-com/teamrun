@@ -63,7 +63,8 @@ class UiWorkflowsTests {
       const changes: readonly [string, () => Promise<void>][] = [
         ["a source file", () => repository.writeAsync({ "src/shell/source.ts": "export const changed = 2;\n" })],
         ["a missing variant", () => rm(path.join(repository.directory, "_build", "variants", "without-clock"), { recursive: true })],
-        ["a changed declaration", () => repository.writeAsync({ "_build/modules/declarations.json": "{\"modules\":[]}\n" })]
+        ["a changed declaration", () => repository.writeAsync({ "_build/modules/declarations.json": "{\"modules\":[]}\n" })],
+        ["a changed product file", () => repository.writeAsync({ "_build/product.json": "{\"build\":\"2\"}\n" })]
       ];
 
       for (const [reason, change] of changes) {
@@ -149,6 +150,7 @@ class UiWorkflowsTests {
   private static writeOutputsAsync(repository: RepositoryFixture): Promise<void> {
     return repository.writeAsync({
       "_build/modules/declarations.json": "{\"modules\":[1]}\n",
+      "_build/product.json": "{\"build\":\"1\"}\n",
       "_build/window/index.html": "<html></html>\n",
       "_build/variants/no-modules/window/index.html": "<html>none</html>\n",
       "_build/variants/without-clock/window/index.html": "<html>no clock</html>\n"

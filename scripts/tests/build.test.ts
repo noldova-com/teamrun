@@ -17,8 +17,10 @@ import GalleryFile from "../angular/gallery-file.ts";
 import ProductFile from "../angular/product-file.ts";
 import Build from "../build.ts";
 import ElectronBinary from "../desktop/electron-binary.ts";
+import BuildVariant from "../modules/build-variant.ts";
 import ModuleArtifacts from "../modules/module-artifacts.ts";
 import ModuleCatalog from "../modules/module-catalog.ts";
+import BuildProduct from "../packages/build-product.ts";
 import PackageBuild from "../packages/package-build.ts";
 import ProcessException from "../processes/process.exception.ts";
 import ProcessRunner from "../processes/process-runner.ts";
@@ -45,17 +47,30 @@ class BuildTests {
       assert.equal(output.text, "No packages under src/; there is nothing to build.\nModules in the build: 0.\nNo Angular project under src/; there is nothing to prepare.\n");
     });
 
-    test("packages are built and installed, and the build says how many", { timeout: BuildTests.BUILD_TIMEOUT }, async t => {
+    test("packages are built and installed, the build says how many, and its product file holds the product's identity, version and fingerprint", { timeout: BuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await PackageTreeFixture.writeRootAsync(repository);
       await PackageTreeFixture.writePackageAsync(repository, "foundation-alpha", [], false);
       const output = new TextOutputFixture();
+      const variant = path.join(repository.directory, "_build", "variants", "tested");
+      const fingerprint = await new PackageBuild(repository.directory, new ProcessRunner(), process.env).hashFingerprintAsync(BuildVariant.REGULAR);
 
       assert.equal(await BuildTests.create(repository.directory, output, process.env).runAsync([]), 0);
+      assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--test", "--output", variant]), 0);
+      const product = JSON.parse(await readFile(path.join(repository.directory, "_build", "product.json"), "utf8"));
+
       assert.equal(
         output.text,
         "@noldova/teamrun-foundation-alpha: built\nPackages built and installed: 1.\nModules in the build: 0.\nNo Angular project under src/; there is nothing to prepare.\n");
+      assert.deepEqual(Object.keys(product), [
+        "name", "slug", "applicationId", "developmentApplicationId", "dataFolder", "deviceFolders", "dataDirectoryVariable", "icons", "version", "build"
+      ]);
+      assert.equal(product.name, ProductIdentityFixture.json.name);
+      assert.deepEqual(product.deviceFolders, ProductIdentityFixture.json.deviceFolders);
+      assert.equal(product.build, fingerprint);
+      assert.equal(product.version, "0.0.7");
+      assert.deepEqual(JSON.parse(await readFile(path.join(variant, "product.json"), "utf8")), product);
     });
 
     test("a test build adds the fixture modules, leaves out the named ones and writes the module artifacts", async t => {
@@ -201,7 +216,7 @@ class BuildTests {
 
   private static createWith(root: string, angular: AngularProject, output: TextOutputFixture, environment: NodeJS.ProcessEnv = process.env): Build {
     const runner = new ProcessRunner();
-    return new Build(new PackageBuild(root, runner, environment), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, new ElectronBinary(root, runner), output);
+    return new Build(new PackageBuild(root, runner, environment), new BuildProduct(root), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, new ElectronBinary(root, runner), output);
   }
 }
 
