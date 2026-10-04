@@ -42,7 +42,7 @@ export class NotesWindowPart implements IWindowPart {
     "Q4 roadmap", "Draft", "Notes from the launch review", "API", "Sync pricing", "Teammates",
     "Terminal plan", "Keyboard shortcuts and command search, including collisions between modules and the person's own bindings",
     "Fonts", "Themes", "Accessibility audit", "Telemetry", "Crash reports", "Settings", "Search", "Icons",
-    "Translations", "Changelog", "Contributing", "Security", "Merge queue", "CI time", "Release notes", "Signing",
+    "Translations", "Changelog", "Contributing", "Security", "Rate limits", "CI time", "Release notes", "Signing",
     "Updates on Linux", "Packaging", "Menus", "Tooltips", "A very long note title that keeps going so the tab has to truncate somewhere sensible",
     "Help", "FAQ", "Website", "Logo", "Ship it"
   ];

@@ -18,7 +18,7 @@ import RepositoryFixture from "../fixtures/repository.fixture.ts";
 
 class ChangeClassifierTests {
   public static register(): void {
-    test("events other than pull requests, merge groups and pushes verify everything", async t => {
+    test("events other than pull requests and pushes verify everything", async t => {
       const repository = await ChangeClassifierTests.createRepositoryAsync(t);
       const classifier = ChangeClassifierTests.createClassifier(repository);
       const base = ChangeClassifierTests.readHead(repository);
@@ -26,7 +26,7 @@ class ChangeClassifierTests {
       for (const eventName of ["workflow_dispatch", "schedule", undefined]) {
         const scope = await classifier.classifyAsync(eventName, base, base);
         assert.equal(scope.runCode, true);
-        assert.equal(scope.reason, "Events other than pull requests, merge groups and pushes verify everything.");
+        assert.equal(scope.reason, "Events other than pull requests and pushes verify everything.");
       }
     });
 
@@ -43,7 +43,7 @@ class ChangeClassifierTests {
       }
     });
 
-    test("pull requests and merge groups compare with the merge base, so later changes on main do not count", async t => {
+    test("pull requests compare with the merge base, so later changes on main do not count", async t => {
       const repository = await ChangeClassifierTests.createRepositoryAsync(t);
       const classifier = ChangeClassifierTests.createClassifier(repository);
       const base = ChangeClassifierTests.readHead(repository);
@@ -52,11 +52,10 @@ class ChangeClassifierTests {
       repository.git(["switch", "--quiet", "main"]);
       const main = await repository.commitAsync({ "src/index.ts": "export {};\n" });
 
-      for (const eventName of ["pull_request", "merge_group"]) {
-        const scope = await classifier.classifyAsync(eventName, main, head);
-        assert.equal(scope.runCode, false);
-        assert.equal(scope.reason, `Only Markdown documentation changed since the merge base ${base}.`);
-      }
+      const scope = await classifier.classifyAsync("pull_request", main, head);
+
+      assert.equal(scope.runCode, false);
+      assert.equal(scope.reason, `Only Markdown documentation changed since the merge base ${base}.`);
     });
 
     test("pushes compare with the previous revision", async t => {

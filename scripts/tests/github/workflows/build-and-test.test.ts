@@ -7,7 +7,7 @@
  */
 
 import assert from "node:assert/strict";
-import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -18,11 +18,9 @@ import WorkflowSimulation from "../../fixtures/workflow-simulation.fixture.ts";
 
 class BuildAndTestTests {
   private static readonly SCRIPT_TIMEOUT: number = 30_000;
-  private static readonly REPOSITORY_TIMEOUT: number = 60_000;
   private static readonly WORKFLOW: string = "build-and-test.yml";
   private static readonly TOOLCHAIN_STEP: string = "Verify the toolchain";
   private static readonly RESULT_STEP: string = "Require the selected verification to pass";
-  private static readonly LOOKUP_STEP: string = "Look up the merge group run";
   private static readonly PLAN_STEP: string = "List the targets without a current cache";
   private static readonly UI_STEP: string = "Test the UI workflows";
   private static readonly SUMMARY_STEP: string = "Summarize the UI workflows";
@@ -44,10 +42,6 @@ class BuildAndTestTests {
     "name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}", "path: |", "  _build/angular-tests.log", "  _build/angular-tests.json", "retention-days: 14",
     "if-no-files-found: ignore"
   ];
-  private static readonly SHA: string ="0123456789abcdef0123456789abcdef01234567";
-  private static readonly RUNS_QUERY: string = "api repos/noldova-com/teamrun/actions/workflows/build-and-test.yml/runs?event=merge_group" +
-    "&head_sha=0123456789abcdef0123456789abcdef01234567&status=success&per_page=100 --jq .workflow_runs[] | select(.event == \"merge_group\" and " +
-    ".head_sha == env.GITHUB_SHA and .conclusion == \"success\" and .path == \".github/workflows/build-and-test.yml\") | \"\\(.html_url)/attempts/\\(.run_attempt)\"";
   private static readonly CACHE_LIST: string = "api --paginate repos/noldova-com/teamrun/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100 --jq .actions_caches[].key";
   private static readonly TARGETS: readonly (readonly [string, string, string, string])[] = [
     ["Linux x64", "ubuntu-24.04", "Linux", "x64"],
@@ -95,42 +89,27 @@ class BuildAndTestTests {
       assert.ok(script.includes("test \"$(npm --version)\" = 11.19.0\n"));
     });
 
-    test("the aggregate check passes a documentation-only skip, a complete pass or a push the merge queue tested, and fails otherwise", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+    test("the aggregate check passes a documentation-only skip or a complete pass, and fails otherwise", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
-      const run = "https://github.com/noldova-com/teamrun/actions/runs/7/attempts/2";
-      const cases: readonly (readonly [string, string, string, string, string, string, number, RegExp])[] = [
-        ["skipped", "", "", "success", "false", "skipped", 0, /^Only Markdown documentation changed/],
-        ["skipped", "", "", "success", "true", "success", 0, /^The document checks passed, and the build and tests passed on every target/],
-        ["success", "false", "", "success", "false", "skipped", 0, /^Only Markdown documentation changed/],
-        ["success", "false", "", "success", "true", "success", 0, /^The document checks passed, and the build and tests passed on every target/],
-        ["success", "true", run, "skipped", "", "skipped", 0,
-          /^This commit was built and tested by the merge group run https:\/\/github\.com\/noldova-com\/teamrun\/actions\/runs\/7\/attempts\/2; this run only maintains the dependency caches\.\n$/],
-        ["success", "true", run, "skipped", "", "skipped", 0,
-          /^This merge group's tree was built and tested by the pull request run https:\/\/github\.com\/noldova-com\/teamrun\/actions\/runs\/7\/attempts\/2, so this run reused that result\.\n$/],
-        ["success", "true", "", "skipped", "", "skipped", 1, /^$/],
-        ["success", "true", run, "success", "true", "success", 1, /^$/],
-        ["success", "false", run, "success", "true", "success", 1, /^$/],
-        ["failure", "", "", "skipped", "", "skipped", 1, /^$/],
-        ["success", "false", "", "skipped", "", "skipped", 1, /^$/],
-        ["skipped", "", "", "success", "true", "failure", 1, /^$/],
-        ["skipped", "", "", "success", "true", "cancelled", 1, /^$/],
-        ["skipped", "", "", "success", "true", "skipped", 1, /^$/],
-        ["skipped", "", "", "success", "false", "success", 1, /^$/],
-        ["skipped", "", "", "failure", "", "skipped", 1, /^$/],
-        ["skipped", "", "", "cancelled", "", "skipped", 1, /^$/]
+      const cases: readonly (readonly [string, string, string, number, RegExp])[] = [
+        ["success", "false", "skipped", 0, /^Only Markdown documentation changed/],
+        ["success", "true", "success", 0, /^The document checks passed, and the build and tests passed on every target/],
+        ["success", "true", "failure", 1, /^$/],
+        ["success", "true", "cancelled", 1, /^$/],
+        ["success", "true", "skipped", 1, /^$/],
+        ["success", "false", "success", 1, /^$/],
+        ["failure", "", "skipped", 1, /^$/],
+        ["cancelled", "", "skipped", 1, /^$/],
+        ["skipped", "", "skipped", 1, /^$/]
       ];
-      await Promise.all([...cases.entries()].map(async ([index, [tested, verified, testedRun, changes, runCode, validation, status, summary]]) => {
+      await Promise.all(cases.map(async ([changes, runCode, validation, status, summary]) => {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
         await writeFile(path.join(doubles.directory, "summary.md"), "");
 
-        const result = await doubles.runAsync(script, {
-          TESTED_RESULT: tested, VERIFIED: verified, TESTED_RUN: testedRun, CHANGES_RESULT: changes, RUN_CODE: runCode, VALIDATION_RESULT: validation,
-          EVENT_NAME: index === 5 ? "merge_group" : "push", DEFERRED: "",
-          GITHUB_STEP_SUMMARY: "summary.md"
-        });
+        const result = await doubles.runAsync(script, { CHANGES_RESULT: changes, RUN_CODE: runCode, VALIDATION_RESULT: validation, DEFERRED: "", GITHUB_STEP_SUMMARY: "summary.md" });
 
-        assert.equal(result.status, status, `${tested}:${verified}:${changes}:${runCode}:${validation}: ${result.stderr}`);
+        assert.equal(result.status, status, `${changes}:${runCode}:${validation}: ${result.stderr}`);
         assert.match(await doubles.readFileAsync("summary.md"), summary);
         if (status !== 0)
           assert.match(result.stdout, /^::error::/);
@@ -144,8 +123,7 @@ class BuildAndTestTests {
       await writeFile(path.join(doubles.directory, "summary.md"), "");
 
       const result = await doubles.runAsync(script, {
-        TESTED_RESULT: "skipped", VERIFIED: "", TESTED_RUN: "", CHANGES_RESULT: "success", RUN_CODE: "true", VALIDATION_RESULT: "success",
-        EVENT_NAME: "pull_request", DEFERRED: "Windows ARM64, macOS x64", GITHUB_STEP_SUMMARY: "summary.md"
+        CHANGES_RESULT: "success", RUN_CODE: "true", VALIDATION_RESULT: "success", DEFERRED: "Windows ARM64, macOS x64", GITHUB_STEP_SUMMARY: "summary.md"
       });
 
       assert.equal(result.status, 0, result.stderr);
@@ -177,7 +155,7 @@ class BuildAndTestTests {
       assert.equal(workflow.readStepScript("Install dependencies"), "npm ci --no-audit --no-fund\n");
       assert.equal(workflow.readStepScript("Build"), "npm run build\n");
       assert.equal(workflow.readStepScript("Test"), "npm test\n");
-      assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [tested, changes, validate]\n    if: always()\n"));
+      assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [changes, validate]\n    if: always()\n"));
     });
 
     test("runs read the repository only, except the cache cleanup on main, and only pull request runs are cancelled by a newer push", async () => {
@@ -185,14 +163,14 @@ class BuildAndTestTests {
       assert.ok(text.includes("permissions:\n  contents: read\n"));
       assert.deepEqual(text.match(/^ *\S+: write$/gm), ["      actions: write"]);
       assert.deepEqual(text.match(/^ *\S+: read$/gm), [
-        "  contents: read", "      actions: read", "      contents: read", "      pull-requests: read", "      actions: read", "      contents: read", "      contents: read"
+        "  contents: read", "      actions: read", "      contents: read", "      contents: read"
       ]);
       assert.ok(text.includes("    name: Remove outdated dependency caches\n    needs: [cache-plan, cache]\n" +
         "    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.cache-plan.result == 'success' && " +
         "(needs.cache.result == 'success' || needs.cache.result == 'skipped') }}\n"));
-      assert.equal(text.match(/persist-credentials: false/g)?.length, 6);
+      assert.equal(text.match(/persist-credentials: false/g)?.length, 5);
       assert.ok(text.includes("cancel-in-progress: ${{ github.event_name == 'pull_request' }}"));
-      for (const trigger of ["  pull_request:\n    branches: [main]", "  merge_group:\n    types: [checks_requested]", "  push:\n    branches: [main]", "  workflow_dispatch:"])
+      for (const trigger of ["  pull_request:\n    branches: [main]", "  push:\n    branches: [main]", "  workflow_dispatch:"])
         assert.ok(text.includes(trigger), trigger);
       for (const action of text.matchAll(/uses: (\S+)/g))
         assert.match(action[1] ?? "", /^actions\/[a-z-]+(\/[a-z-]+)?@[0-9a-f]{40}$/);
@@ -211,188 +189,6 @@ class BuildAndTestTests {
       assert.ok(validate.includes("      - name: Install dependencies\n        if: steps.root-dependencies.outputs.cache-hit != 'true'\n"));
       assert.ok(validate.includes("      - name: Discard an inexact Angular install\n        if: steps.angular-dependencies.outputs.cache-hit != 'true'\n"));
       assert.doesNotMatch(validate, /actions\/cache\/save/);
-    });
-
-    test("a push builds and tests only when no successful merge group run of this workflow is found for its exact commit", async () => {
-      const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
-      assert.ok(text.includes("  tested:\n    name: Find the run that tested this tree\n" +
-        "    if: github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')\n"));
-      for (const step of ["Check out the merge group", "Look up the pull request run"])
-        assert.ok(text.includes("      - name: " + step + "\n        if: github.event_name == 'merge_group'\n"), step);
-      assert.ok(text.includes("      - name: Look up the merge group run\n        if: github.event_name == 'push'\n"));
-      assert.ok(text.includes("    name: Classify changes\n    needs: tested\n" +
-        "    if: ${{ !cancelled() && (needs.tested.result == 'skipped' || (needs.tested.result == 'success' && needs.tested.outputs.verified != 'true')) }}\n"));
-      assert.ok(text.includes("      verified: ${{ steps.proof.outputs.verified || steps.reuse.outputs.verified }}\n" +
-        "      run: ${{ steps.proof.outputs.run || steps.reuse.outputs.run }}\n"));
-    });
-
-    test("every job that depends on the merge group lookup, directly or through another job, states its own status condition", async () => {
-      const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
-      const jobs = new Map<string, { readonly needs: readonly string[]; readonly condition: string }>();
-      for (const block of text.slice(text.indexOf("\njobs:\n")).split(/\n(?= {2}[a-z-]+:\n)/).slice(1)) {
-        const name = /^ {2}([a-z-]+):\n/.exec(block)?.[1] ?? "";
-        const needs = /^ {4}needs: (?:\[(.+)\]|(.+))$/m.exec(block);
-        jobs.set(name, { needs: (needs?.[1] ?? needs?.[2] ?? "").split(",").map(t => t.trim()).filter(t => t.length > 0), condition: /^ {4}if: (.+)$/m.exec(block)?.[1] ?? "" });
-      }
-      const dependsOnLookup = (name: string): boolean => (jobs.get(name)?.needs ?? []).some(t => t === "tested" || dependsOnLookup(t));
-      const dependents = [...jobs.keys()].filter(dependsOnLookup);
-
-      assert.deepEqual([...jobs.keys()], ["tested", "changes", "validate", "cache-plan", "cache", "caches", "result"]);
-      assert.deepEqual(dependents, ["changes", "validate", "result"]);
-      for (const name of dependents)
-        assert.match(jobs.get(name)?.condition ?? "", /!cancelled\(\)|always\(\)/, name);
-    });
-
-    test("the lookup cites the first successful merge group run that tested the commit, and finds none on an empty or failed answer", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
-      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.LOOKUP_STEP);
-      assert.ok(script.includes("runs=$(timeout 30s gh api "));
-      const first = "https://github.com/noldova-com/teamrun/actions/runs/11/attempts/2";
-      const cases: readonly (readonly [string, number, string, string])[] = [
-        [`${first}\n`, 0, `verified=true\nrun=${first}\n`, `The merge group run ${first} built and tested ${BuildAndTestTests.SHA}.\n`],
-        [`${first}\nhttps://github.com/noldova-com/teamrun/actions/runs/12/attempts/1\n`, 0, `verified=true\nrun=${first}\n`, `The merge group run ${first} built and tested ${BuildAndTestTests.SHA}.\n`],
-        ["", 0, "verified=false\n", `::notice::No successful merge group run of this workflow tested ${BuildAndTestTests.SHA}, so this run builds and tests it.\n`],
-        [`${first}\n`, 1, "verified=false\n", `::notice::No successful merge group run of this workflow tested ${BuildAndTestTests.SHA}, so this run builds and tests it.\n`]
-      ];
-      for (const [answer, exitCode, outputs, message] of cases) {
-        const doubles = await CommandDoublesFixture.createAsync();
-        t.after(() => doubles.disposeAsync());
-        doubles.forward("timeout");
-        doubles.respond("gh", BuildAndTestTests.RUNS_QUERY, answer, exitCode);
-        await doubles.runAsync("touch outputs.txt\n");
-
-        const result = await doubles.runAsync(script, { GITHUB_REPOSITORY: "noldova-com/teamrun", GITHUB_SHA: BuildAndTestTests.SHA, GITHUB_OUTPUT: "outputs.txt" });
-
-        assert.equal(result.status, 0, result.stderr);
-        assert.equal(await doubles.readFileAsync("outputs.txt"), outputs);
-        assert.equal(result.stdout, message);
-        assert.deepEqual((await doubles.readCallsAsync()).filter(call => call.startsWith("gh ")), [`gh ${BuildAndTestTests.RUNS_QUERY}`]);
-      }
-    });
-
-    test("a merge group reuses the pull request's result only when its one squash on main has the tree the pull request's last attempt recorded", { timeout: BuildAndTestTests.REPOSITORY_TIMEOUT }, async t => {
-      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript("Look up the pull request run");
-      const pullRequestHead = "d".repeat(40);
-      const runs = "api repos/noldova-com/teamrun/actions/workflows/build-and-test.yml/runs?event=pull_request&head_sha=" + pullRequestHead + "&per_page=100 --jq " +
-        "[.workflow_runs[] | select(.event == \"pull_request\" and .path == \".github/workflows/build-and-test.yml\")] | max_by(.run_number) // empty | " +
-        "\"\\(.id) \\(.run_attempt) \\(.status) \\(.conclusion) \\(.html_url)\"";
-      const runUrl = "https://github.com/noldova-com/teamrun/actions/runs/123";
-      const commit = "git -c user.name=Fixture -c user.email=fixture@example.com commit -q";
-      const histories: Readonly<Record<string, string>> = {
-        squash: `git init -q -b main\n${commit} --allow-empty -m base\ngit update-ref refs/remotes/origin/main HEAD\ngit tag base\necho change > change.txt\ngit add change.txt\n${commit} -m squash\n`,
-        twoCommits: `git init -q -b main\n${commit} --allow-empty -m base\ngit update-ref refs/remotes/origin/main HEAD\ngit tag base\n${commit} --allow-empty -m first\n` +
-          `echo change > change.txt\ngit add change.txt\n${commit} -m second\n`,
-        merge: `git init -q -b main\n${commit} --allow-empty -m base\ngit update-ref refs/remotes/origin/main HEAD\ngit tag base\ngit switch -q -c side\n${commit} --allow-empty -m side\n` +
-          `git switch -q main\n${commit} --allow-empty -m main\ngit -c user.name=Fixture -c user.email=fixture@example.com merge -q --no-ff -m merge side\ngit reset -q --soft HEAD\ngit tag -d base > /dev/null\ngit tag base HEAD^1\n`,
-        offMain: `git init -q -b main\n${commit} --allow-empty -m other\ngit update-ref refs/remotes/origin/main HEAD\ngit checkout -q --orphan pull\n${commit} --allow-empty -m base\ngit tag base\n` +
-          `echo change > change.txt\ngit add change.txt\n${commit} -m squash\n`,
-        none: ""
-      };
-      const repositories = new Map(await Promise.all(Object.entries(histories).map(async ([name, history]) => {
-        const repository = await CommandDoublesFixture.createAsync();
-        t.after(() => repository.disposeAsync());
-        const prepared = await repository.runAsync(history.length === 0 ? "true\n" : `${history}git rev-parse base 'HEAD^{tree}'\n`);
-        assert.equal(prepared.status, 0, `${name}: ${prepared.stderr}`);
-        const [base = "b".repeat(40), tree = "a".repeat(40)] = prepared.stdout.trim().split("\n").filter(line => line.length > 0);
-        return [name, { directory: repository.directory, base, tree }] as const;
-      })));
-      interface ICase {
-        readonly name: string;
-        readonly history?: string;
-        readonly headRef?: string;
-        readonly pullStatus?: number;
-        readonly latest?: string;
-        readonly runsStatus?: number;
-        readonly downloadStatus?: number;
-        readonly record?: string | null;
-        readonly reason?: string;
-      }
-      const cases: readonly ICase[] = [
-        { name: "a reuse" },
-        { name: "a different tree", record: `${"e".repeat(40)} true true`, reason: "The pull request's last run tested a different tree (main moved or the pull request changed)" },
-        { name: "a failed run", latest: `123 1 completed failure ${runUrl}`, reason: "The pull request's last run did not succeed" },
-        { name: "a cancelled run", latest: `123 1 completed cancelled ${runUrl}`, reason: "The pull request's last run did not succeed" },
-        { name: "a run in progress", latest: `123 1 in_progress null ${runUrl}`, reason: "The pull request's last run has not finished" },
-        { name: "a re-run in progress after a success", latest: `123 3 in_progress null ${runUrl}`, reason: "The pull request's last run has not finished" },
-        { name: "a re-run that failed after a success", latest: `123 3 completed failure ${runUrl}`, reason: "The pull request's last run did not succeed" },
-        { name: "no run for the head", latest: "", reason: "The pull request has no run of this workflow for its head" },
-        { name: "a missing record", downloadStatus: 1, reason: "The pull request's last run left no record of the tree it tested" },
-        { name: "an unreadable record", record: null, reason: "The record of the pull request's last run could not be read" },
-        { name: "a malformed record", record: "not-a-tree true true", reason: "The record of the pull request's last run is malformed" },
-        { name: "a document-only run", record: "TREE false false", reason: "The pull request's last run checked only the documents" },
-        { name: "a run that left jobs to the merge queue", record: "TREE true false", reason: "The pull request's last run did not run every build and test job" },
-        { name: "a record without the jobs it ran", record: "TREE true", reason: "The pull request's last run did not run every build and test job" },
-        { name: "two commits on the base", history: "twoCommits", reason: "The merge group holds more than one commit on its base" },
-        { name: "a merge commit", history: "merge", reason: "The merge group holds more than one commit on its base" },
-        { name: "a base off main", history: "offMain", reason: "The merge group is built on another merge group, not on main" },
-        { name: "an unparseable branch", headRef: "refs/heads/gh-readonly-queue/main/pr-58", reason: "The merge group's branch names no single pull request" },
-        { name: "no commit to read", history: "none", reason: "The merge group's commit could not be read" },
-        { name: "an unreadable pull request", pullStatus: 1, reason: "The pull request could not be read" },
-        { name: "an unlisted run", runsStatus: 1, reason: "The pull request's runs could not be listed" }
-      ];
-      await Promise.all(cases.map(async item => {
-        const doubles = await CommandDoublesFixture.createAsync();
-        t.after(() => doubles.disposeAsync());
-        const repository = repositories.get(item.history ?? "squash");
-        assert.ok(repository !== undefined, item.name);
-        await cp(repository.directory, doubles.directory, { recursive: true });
-        const { base, tree } = repository;
-        const record = item.record === undefined ? `${tree} true true` : item.record?.replace("TREE", tree) ?? null;
-        await writeFile(path.join(doubles.directory, "outputs.txt"), "");
-        if (record !== null) {
-          await mkdir(path.join(doubles.directory, "tested-tree"));
-          await writeFile(path.join(doubles.directory, "tested-tree", "tested-tree.txt"), `${record}\n`);
-        }
-        doubles.forward("timeout");
-        doubles.respond("gh", "api repos/noldova-com/teamrun/pulls/58 --jq .head.sha", `${pullRequestHead}\n`, item.pullStatus ?? 0);
-        doubles.respond("gh", runs, `${item.latest ?? `123 2 completed success ${runUrl}`}\n`, item.runsStatus ?? 0);
-        doubles.respond("gh", "run download 123 --repo noldova-com/teamrun --name tested-tree-2 --dir tested-tree", "", item.downloadStatus ?? 0);
-
-        const result = await doubles.runAsync(script, {
-          GITHUB_REPOSITORY: "noldova-com/teamrun", GITHUB_OUTPUT: "outputs.txt", BASE_SHA: base,
-          HEAD_REF: item.headRef ?? `refs/heads/gh-readonly-queue/main/pr-58-${base}`
-        });
-
-        assert.equal(result.status, 0, `${item.name}: ${result.stderr}`);
-        if (item.reason === undefined) {
-          assert.equal(await doubles.readFileAsync("outputs.txt"), `verified=true\nrun=${runUrl}/attempts/2\n`, item.name);
-          assert.equal(result.stdout, `The pull request run ${runUrl}/attempts/2 built and tested the tree ${tree}.\n`, item.name);
-        }
-        else {
-          assert.equal(await doubles.readFileAsync("outputs.txt"), "verified=false\n", item.name);
-          assert.equal(result.stdout, `::notice::${item.reason}, so this run builds and tests the merge group.\n`, item.name);
-        }
-        const downloads = (await doubles.readCallsAsync()).filter(call => call.startsWith("gh run download"));
-        const reachesDownload = item.latest === undefined && item.history === undefined && item.headRef === undefined && item.pullStatus === undefined && item.runsStatus === undefined;
-        assert.equal(downloads.length, reachesDownload ? 1 : 0, item.name);
-      }));
-    });
-
-    test("a passing pull request run records the tree it tested for its attempt, and an invalid tree fails the record", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
-      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
-      const text = workflow.text;
-      const script = workflow.readStepScript("Write the record of the tested tree");
-      const tree = "a".repeat(40);
-      const doubles = await CommandDoublesFixture.createAsync();
-      t.after(() => doubles.disposeAsync());
-
-      const result = await doubles.runAsync(script, { TREE: tree, RUN_CODE: "true", COMPLETE: "false" });
-      const written = await doubles.readFileAsync("tested-tree/tested-tree.txt");
-      const empty = await CommandDoublesFixture.createAsync();
-      t.after(() => empty.disposeAsync());
-      const invalid = await empty.runAsync(script, { TREE: "", RUN_CODE: "true", COMPLETE: "true" });
-
-      assert.equal(result.status, 0, result.stderr);
-      assert.equal(written, `${tree} true false\n`);
-      assert.equal(invalid.status, 1);
-      assert.equal(invalid.stdout, "::error::The classification did not record the tested tree.\n");
-      assert.equal((await empty.runAsync("test -e tested-tree\n")).status, 1);
-      assert.equal(workflow.readStepScript("Record the tested tree"), "set -euo pipefail\ntree=$(git rev-parse 'HEAD^{tree}')\necho \"tree=$tree\" >> \"$GITHUB_OUTPUT\"\n");
-      const resultJob = text.slice(text.indexOf("  result:\n"));
-      const order = ["Require the selected verification to pass", "Write the record of the tested tree", "Keep the record of the tested tree"].map(step => resultJob.indexOf(`      - name: ${step}\n`));
-      assert.ok(order.every((position, index) => position > 0 && (index === 0 || position > (order[index - 1] ?? 0))), order.join(","));
-      for (const step of ["Write the record of the tested tree", "Keep the record of the tested tree"])
-        assert.ok(resultJob.includes(`      - name: ${step}\n        if: github.event_name == 'pull_request'\n`), step);
-      assert.ok(resultJob.includes("          name: tested-tree-${{ github.run_attempt }}\n          path: tested-tree/tested-tree.txt\n          retention-days: 7\n          if-no-files-found: error\n"));
     });
 
     test("the plan lists only the targets that miss a current root or Angular cache", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
@@ -450,13 +246,13 @@ class BuildAndTestTests {
         assert.equal(leg.label, leg.part === "all" ? leg.target : `${leg.target}, ${leg.part === "tests" ? "tests" : "UI workflows"}`);
       assert.ok(text.includes("    name: Build and test (${{ matrix.label }})\n    needs: changes\n"));
       assert.ok(text.includes("      matrix:\n        include: ${{ fromJSON(needs.changes.outputs.legs) }}\n    runs-on: ${{ matrix.runner }}\n"));
-      assert.ok(text.includes("      legs: ${{ steps.legs.outputs.legs }}\n      deferred: ${{ steps.legs.outputs.deferred }}\n      complete: ${{ steps.legs.outputs.complete }}\n"));
+      assert.ok(text.includes("      legs: ${{ steps.legs.outputs.legs }}\n      deferred: ${{ steps.legs.outputs.deferred }}\n"));
       assert.ok(text.includes("      - name: Build\n        if: matrix.part != 'workflows'\n"));
       assert.ok(text.includes("      - name: Test\n        id: test\n        if: matrix.part != 'workflows'\n"));
       assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n        if: matrix.part != 'tests'\n"));
       for (const step of ["Check out the revision", "Set up Node.js", "Restore the installed dependencies", "Restore the Angular project's installed dependencies", "Install Electron"])
         assert.ok(!new RegExp(`      - name: ${step}\\n        if: [^\\n]*matrix\\.part`).test(text), step);
-      assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [tested, changes, validate]\n    if: always()\n"));
+      assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [changes, validate]\n    if: always()\n"));
     });
 
     test("a pull request leaves Windows ARM64 and macOS x64 to main and manual runs, and every other run lists every job", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
@@ -464,7 +260,7 @@ class BuildAndTestTests {
       const script = workflow.readStepScript(BuildAndTestTests.LEGS_STEP);
       const all = BuildAndTestTests.readLegs(workflow.text).map(({ label, target, part, runner, architecture }) => ({ label, target, part, runner, architecture }));
 
-      for (const event of ["pull_request", "merge_group", "push", "workflow_dispatch"]) {
+      for (const event of ["pull_request", "push", "workflow_dispatch"]) {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
         await writeFile(path.join(doubles.directory, "outputs.txt"), "");
@@ -474,16 +270,14 @@ class BuildAndTestTests {
 
         assert.equal(result.status, 0, `${event}: ${result.stderr}`);
         assert.equal(result.stdout, "", event);
-        assert.deepEqual([...outputs.keys()], ["legs", "deferred", "complete"], event);
+        assert.deepEqual([...outputs.keys()], ["legs", "deferred"], event);
         if (event === "pull_request") {
           assert.deepEqual(JSON.parse(outputs.get("legs") ?? ""), all.filter(t => t.target !== "Windows ARM64" && t.target !== "macOS x64"));
           assert.equal(outputs.get("deferred"), "Windows ARM64, macOS x64");
-          assert.equal(outputs.get("complete"), "false");
         }
         else {
           assert.deepEqual(JSON.parse(outputs.get("legs") ?? ""), all, event);
           assert.equal(outputs.get("deferred"), "", event);
-          assert.equal(outputs.get("complete"), "true", event);
         }
       }
       assert.equal(all.length, 9);
