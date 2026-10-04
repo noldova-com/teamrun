@@ -7,7 +7,7 @@
  */
 
 import assert from "node:assert/strict";
-import { rm } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
@@ -15,18 +15,23 @@ import ProcessRunner from "../../processes/process-runner.ts";
 import Git from "../../repository/git.ts";
 import ChangeClassifier from "../../workflows/change-classifier.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
+import SourceTreeFixture from "../fixtures/source-tree.fixture.ts";
 
 class ChangeClassifierTests {
+  private static readonly RELATIVE_IMPORT: RegExp = /(?:\bfrom |^import )"(\.{1,2}\/[^"]+)";$/gm;
+
   public static register(): void {
-    test("events other than pull requests and pushes verify everything", async t => {
+    test("pushes and events other than pull requests verify everything", async t => {
       const repository = await ChangeClassifierTests.createRepositoryAsync(t);
       const classifier = ChangeClassifierTests.createClassifier(repository);
       const base = ChangeClassifierTests.readHead(repository);
+      const documents = await repository.commitAsync({ "README.md": "# Changed\n" });
 
+      const push = await classifier.classifyAsync("push", base, documents);
+      assert.deepEqual([push.runCode, push.runUi, push.reason], [true, true, "A push to main verifies everything."]);
       for (const eventName of ["workflow_dispatch", "schedule", undefined]) {
-        const scope = await classifier.classifyAsync(eventName, base, base);
-        assert.equal(scope.runCode, true);
-        assert.equal(scope.reason, "Events other than pull requests and pushes verify everything.");
+        const scope = await classifier.classifyAsync(eventName, base, documents);
+        assert.deepEqual([scope.runCode, scope.runUi, scope.reason], [true, true, "Events other than pull requests verify everything."]);
       }
     });
 
@@ -37,9 +42,8 @@ class ChangeClassifierTests {
       const unknown = "1".repeat(40);
 
       for (const [baseRevision, headRevision] of [[undefined, base], [base, undefined], ["", base], [base, "main"], [unknown, base], [base, unknown], ["0".repeat(40), base]]) {
-        const scope = await classifier.classifyAsync("push", baseRevision, headRevision);
-        assert.equal(scope.runCode, true);
-        assert.equal(scope.reason, "The revisions to compare are unavailable.");
+        const scope = await classifier.classifyAsync("pull_request", baseRevision, headRevision);
+        assert.deepEqual([scope.runCode, scope.runUi, scope.reason], [true, true, "The revisions to compare are unavailable."]);
       }
     });
 
@@ -54,21 +58,7 @@ class ChangeClassifierTests {
 
       const scope = await classifier.classifyAsync("pull_request", main, head);
 
-      assert.equal(scope.runCode, false);
-      assert.equal(scope.reason, `Only Markdown documentation changed since the merge base ${base}.`);
-    });
-
-    test("pushes compare with the previous revision", async t => {
-      const repository = await ChangeClassifierTests.createRepositoryAsync(t);
-      const classifier = ChangeClassifierTests.createClassifier(repository);
-      const base = ChangeClassifierTests.readHead(repository);
-      const code = await repository.commitAsync({ "src/index.ts": "export {};\n" });
-      const documents = await repository.commitAsync({ "README.md": "# Changed\n" });
-
-      assert.equal((await classifier.classifyAsync("push", code, documents)).runCode, false);
-      const both = await classifier.classifyAsync("push", base, documents);
-      assert.equal(both.runCode, true);
-      assert.equal(both.reason, `Files other than Markdown documentation changed since the previous revision ${base}.`);
+      assert.deepEqual([scope.runCode, scope.runUi, scope.reason], [false, false, `Only Markdown documentation changed since the merge base ${base}.`]);
     });
 
     test("an empty comparison verifies everything", async t => {
@@ -76,10 +66,9 @@ class ChangeClassifierTests {
       const classifier = ChangeClassifierTests.createClassifier(repository);
       const base = ChangeClassifierTests.readHead(repository);
 
-      const scope = await classifier.classifyAsync("push", base, base);
+      const scope = await classifier.classifyAsync("pull_request", base, base);
 
-      assert.equal(scope.runCode, true);
-      assert.equal(scope.reason, "The comparison found no changed files.");
+      assert.deepEqual([scope.runCode, scope.runUi, scope.reason], [true, true, "The comparison found no changed files."]);
     });
 
     test("only Markdown at the root, under docs or .github, or a module's README counts as documentation", async t => {
@@ -106,6 +95,51 @@ class ChangeClassifierTests {
       }
     });
 
+    test("CI, test tooling and repository configuration outside the app run the builds and tests without the UI workflows", async t => {
+      const cases: readonly (readonly [string, boolean])[] = [
+        [".github/workflows/watch-pull-requests.yml", false],
+        [".github/workflows/build-and-test.yml", true],
+        [".github/actions/prepare/action.yml", true],
+        [".gitignore", false],
+        [".gitattributes", true],
+        ["scripts/api/declarations.ts", false],
+        ["scripts/checks/notes.md", false],
+        ["scripts/documents/links.ts", false],
+        ["scripts/tests/fixtures/new.fixture.ts", false],
+        ["scripts/workflows/new-rule.ts", false],
+        ["scripts/classify-changes.ts", false],
+        ["scripts/test.ts", false],
+        ["scripts/ui-summary.ts", false],
+        ["scripts/build.ts", true],
+        ["scripts/ui-workflows.ts", true],
+        ["scripts/packages/package-build.ts", true],
+        ["scripts/tests.ts", true],
+        ["src/shell/desktop/tests/e2e/new.spec.ts", true],
+        ["package.json", true]
+      ];
+      const repository = await ChangeClassifierTests.createRepositoryAsync(t);
+      const classifier = ChangeClassifierTests.createClassifier(repository);
+      const base = ChangeClassifierTests.readHead(repository);
+      for (const [index, [file, runUi]] of cases.entries()) {
+        repository.git(["switch", "--quiet", "--create", `case-${index}`, base]);
+        const head = await repository.commitAsync({ [file]: "changed\n", "docs/guide.md": "# Guide\n" });
+
+        const scope = await classifier.classifyAsync("pull_request", base, head);
+
+        assert.deepEqual([scope.runCode, scope.runUi], [true, runUi], file);
+        assert.equal(scope.reason, runUi
+          ? `Files the app is built or tested from changed since the merge base ${base}.`
+          : `Only documentation, CI and test tooling or repository configuration changed since the merge base ${base}.`);
+      }
+    });
+
+    test("every script that builds or runs the UI workflows counts as affecting them", async () => {
+      const closure = await ChangeClassifierTests.listImportClosureAsync(["scripts/build.ts", "scripts/ui-workflows.ts"]);
+
+      assert.ok(closure.includes("scripts/packages/package-build.ts"), closure.join("\n"));
+      assert.deepEqual(closure.filter(t => !ChangeClassifier.affectsUiWorkflows(t)), []);
+    });
+
     test("a rename counts both its old and its new path", async t => {
       const repository = await ChangeClassifierTests.createRepositoryAsync(t);
       const classifier = ChangeClassifierTests.createClassifier(repository);
@@ -114,7 +148,9 @@ class ChangeClassifierTests {
       await rm(path.join(repository.directory, "src", "notes.ts"));
       const head = await repository.commitAsync({});
 
-      assert.equal((await classifier.classifyAsync("pull_request", base, head)).runCode, true);
+      const scope = await classifier.classifyAsync("pull_request", base, head);
+
+      assert.deepEqual([scope.runCode, scope.runUi], [true, true]);
     });
   }
 
@@ -131,6 +167,22 @@ class ChangeClassifierTests {
 
   private static readHead(repository: RepositoryFixture): string {
     return repository.git(["rev-parse", "HEAD"]).trim();
+  }
+
+  private static async listImportClosureAsync(entries: readonly string[]): Promise<readonly string[]> {
+    const found = new Set<string>(entries);
+    const pending = [...entries];
+    for (let file = pending.pop(); file !== undefined; file = pending.pop()) {
+      const text = await readFile(path.join(SourceTreeFixture.root, file), "utf8");
+      for (const match of text.matchAll(ChangeClassifierTests.RELATIVE_IMPORT)) {
+        const imported = path.posix.join(path.posix.dirname(file), match[1] ?? "");
+        if (!found.has(imported)) {
+          found.add(imported);
+          pending.push(imported);
+        }
+      }
+    }
+    return [...found].sort();
   }
 }
 

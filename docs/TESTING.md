@@ -59,7 +59,7 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
 - **Flakiness is a bug.** A flaky or racy failure seen anywhere, locally or in CI, gets its own bug issue and a small fix PR right away, never folded into other work.
 - **Stop the line.** Merging stops only while `main` itself fails, or while a flaky failure blocks merging in practice: it failed in two or more pull request runs in a day, or a passing run is rare. A stop that lasts longer than an hour is reassessed, and the reason it continues is recorded on its issue. A pull request held by a stop doesn't hold its author, who moves to their next task.
 - **Other flaky failures.** A flaky failure that doesn't block merging, such as one seen once in CI or only under artificial load, gets its own bug issue and a fix with priority, and merging continues. Once the issue is filed, the failed CI job may run again once so the affected pull request can merge, and never a second time.
-- **Repeated native runs.** A change to startup, shutdown, processes, windows or inter-process messages passes its affected tests five times in a row natively on Windows, Linux and macOS before review.
+- **Repeated native runs.** A change to startup, shutdown, processes, windows or inter-process messages passes its affected tests five times in a row natively on Linux and Windows before merge.
 
 | Test file | Why it pauses |
 |---|---|
@@ -108,20 +108,23 @@ Report covered/executable file counts and percentages against the tested source 
 
 Documentation changes require content, consistency, link and formatting checks. Verified commands and prerequisites belong in README or the owning tooling guide when available; do not invent commands for missing tooling.
 
-Automatic PR and `main` push runs skip the code build/test matrix only when every changed path is Markdown at the root, under `docs/` or under `.github/`, or a module's own `src/modules/<id>/README.md`. All other changes, including another package's README, require the full matrix. Check both rename paths; compare PRs from their merge base and pushes from the previous revision. Empty comparisons, unavailable history and manual runs select the full matrix.
+A PR's run skips the code build/test matrix only when every changed path is Markdown at the root, under `docs/` or under `.github/`, or a module's own `src/modules/<id>/README.md`. It builds and tests but skips the UI workflows when every changed path is that documentation or lies outside what the app is built and its UI workflows run from: CI and repository configuration under `.github/` and `.gitignore`, and the script tooling that neither builds nor runs the UI workflows, which `scripts/workflows/change-classifier.ts` lists. The workflow that defines the UI jobs and the setup it shares, under `.github/actions/`, are not in that list, and a script test fails when a script that `scripts/build.ts` or `scripts/ui-workflows.ts` imports is. All other changes, including another package's README, require the full matrix. Check both rename paths and compare from the PR's merge base. Pushes to `main`, empty comparisons, unavailable history and manual runs select everything.
 
-The aggregate check reports documentation-only skips and fails on classification failure or any failed, cancelled or unexpectedly skipped required target. A target whose tests and UI workflows together take much longer than the others runs them as two parallel jobs, each building natively; the aggregate fails when either fails. A PR's own runs build and test Linux x64, Linux ARM64, Windows x64 and macOS ARM64, each running every test and UI workflow once. Windows ARM64 and macOS x64, whose runners are the slowest and scarcest, are not built or tested on a PR's own runs, which count them as expected skips and name them in the run's summary; they run in full on every push to `main` and in manual runs. A push to `main` is the first run of the combined code and of the targets PRs skip; a failure there belongs to the PR that caused it and stops merging until it is fixed. PR-description/issue validation still runs.
+The aggregate check reports documentation-only and UI-free scopes and fails on classification failure or any failed, cancelled or unexpectedly skipped required job. Each target builds and tests in one job and runs its UI workflows in parallel shards. A build job per target makes the test build and its variants with `npm run test:ui -- --list` and passes them, as an artifact of the same run, to the target's shard jobs, which run their part with Playwright's `--shard` and skip the builds because they are current. The number of shards is one setting in `scripts/workflows/build-matrix.ts`, the same for every target, chosen from measured times so that no shard takes much more than about four minutes; the PR that changes it records those times. A PR's own runs build and test Linux x64, Linux ARM64, Windows x64 and macOS ARM64, each running every test and UI workflow once. Windows ARM64 and macOS x64, whose runners are the slowest and scarcest, are not built or tested on a PR's own runs, which count them as expected skips and name them in the run's summary; they run in full on every push to `main` and in manual runs. A push to `main` is the first run of the combined code and of the targets PRs skip; a failure there belongs to the PR that caused it and stops merging until it is fixed. PR-description/issue validation still runs.
 
-Every run builds and tests in full and reuses no earlier run's result; a push to `main` always builds and tests every target. Packaging and releases remain explicit manual or tag-triggered operations with complete verification.
+Every run builds and tests in full and reuses no earlier run's result; only a target's UI shards share that target's build from the same run. A push to `main` always builds and tests every target and runs every UI workflow. Packaging and releases remain explicit manual or tag-triggered operations with complete verification.
 
 Build, pack and install the selected source before testing its package API; dependencies must resolve to those fresh artifacts. Use targeted checks during development and the complete applicable gate before handoff. Repeat successful checks only after a change, failure or unresolved concern.
 
 Before pushing for review:
 
-- Merge the current `main` into the branch and run the gate on the result.
-- Repeat the tests as [Flakiness and races](#flakiness-and-races) requires: five times in a row for a new or changed test of processes, timing or platform behavior, and for a change to startup, shutdown, processes, windows or inter-process messages. One pass does not show it is stable.
+- Merge the current `main` into the branch and run the gate on the result, natively on Linux.
+- Run the UI workflows a change affects, natively on Linux. A change that does not touch the UI skips this step.
 - Check a configuration change, such as a workflow, with the tool that reads it.
-- Run the UI workflows a change affects natively on Windows, Linux and macOS, and name each machine's OS and CPU in the report. A change that does not touch the UI skips this step.
+
+CI's run on every target is the evidence for "natively on Windows, Linux and macOS"; link it. Native runs on Windows or macOS before review are kept for what CI can't show: elevated Windows, the real cursor, OS notifications, macOS-only behavior, and reproducing a CI failure. Name each machine's OS and CPU in the report.
+
+Repeat the tests as [Flakiness and races](#flakiness-and-races) requires: five times in a row for a new or changed test of processes, timing or platform behavior, and for a change to startup, shutdown, processes, windows or inter-process messages. One pass does not show it is stable. The repeats may run after pushing, while CI and review run, and the PR merges once they are posted.
 
 Name additional evidence according to the claim:
 
@@ -138,7 +141,7 @@ Performance claims require representative workloads, recorded conditions and rep
 
 Required Playwright workflows drive the actual Electron window, preload and runtime using generated data and service fixtures. They complement package/Angular tests; a browser page with a mocked bridge is insufficient. [UI-STANDARDS.md](UI-STANDARDS.md) owns appearance, behavior and accessibility.
 
-Every user workflow is an end-to-end test of the real application and runs natively on every target in the architecture's [delivery matrix](ARCHITECTURE.md#10-build-installation-and-updates). CI runs the complete UI suite on all of them.
+Every user workflow is an end-to-end test of the real application and runs natively on every target in the architecture's [delivery matrix](ARCHITECTURE.md#10-build-installation-and-updates). CI runs the complete UI suite on all of them, each target's in parallel shards, under the scope section 6 selects.
 
 Use one shared suite with explicit platform-specific launch, path, keyboard and display behavior. Record OS, CPU, runner image/environment, application revision, Playwright, Electron and host Node versions; distinguish Electron's embedded Node. Cross-compilation, emulation and another architecture's pass do not certify a native target. Section 4's gate rules apply to every required target; targeted runs establish only their scope.
 
