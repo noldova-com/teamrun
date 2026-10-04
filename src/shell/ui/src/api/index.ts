@@ -20,6 +20,8 @@ export { MenuBarComponent } from "../app/components/menu-bar/menu-bar.component"
 export { MenuItemComponent } from "../app/components/menu/menu-item.component";
 export { MenuSeparatorComponent } from "../app/components/menu/menu-separator.component";
 export { MenuTriggerDirective } from "../app/components/menu/menu-trigger.directive";
+export { PopoverDirective } from "../app/components/popover/popover.directive";
+export { PopoverTriggerDirective } from "../app/components/popover/popover-trigger.directive";
 export { MenuComponent } from "../app/components/menu/menu.component";
 export { ProgressComponent } from "../app/components/progress/progress.component";
 export { PanelCardComponent } from "../app/components/panel-card/panel-card.component";
