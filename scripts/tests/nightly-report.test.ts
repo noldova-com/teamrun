@@ -47,7 +47,7 @@ class NightlyReportTests {
       ]);
       await repository.writeAsync({ "_build/nightly/results/notes.txt": "not a result" });
       const fixture = new GitHubApiFixture();
-      fixture.answer(NightlyReportTests.OPEN_BUGS, [{ number: 41, title: "Nightly: quit.spec.ts › asks" }]);
+      fixture.answer(NightlyReportTests.OPEN_BUGS, [{ number: 41, title: "Nightly: quit.spec.ts › asks", user: { login: "github-actions[bot]" } }]);
       fixture.answer("/issues", { number: 43 });
 
       assert.equal(await new NightlyReport(fixture, new TextOutputFixture(), repository.directory).runAsync(NightlyReportTests.environment(repository)), 0);
@@ -75,6 +75,30 @@ class NightlyReportTests {
       assert.equal(await new NightlyReport(fixture, new TextOutputFixture(), repository.directory).runAsync(NightlyReportTests.environment(repository)), 0);
 
       assert.deepEqual(fixture.fields.filter(t => t.startsWith("title=")), NightlyReportTests.LEGS.map(label => `title=Nightly: ${label} › the run itself`));
+    });
+
+    test("a GitHub request that fails ends the report with exit code 1, after the summary names what it had filed and why it stopped", async t => {
+      const repository = await NightlyReportTests.prepareAsync(t, NightlyReportTests.LEGS.map(label => new NightlyLegResult(label, [new NightlyFailure(`${label} › a test`, "Error", 1)])));
+      const fixture = new GitHubApiFixture();
+      fixture.answer(NightlyReportTests.OPEN_BUGS, [{ number: 41, title: "Nightly: Linux x64, UI workflows › a test", user: { login: "github-actions[bot]" } }]);
+      fixture.answer("/issues", { number: 43 });
+      fixture.fail("/issues/41/comments", "HTTP 502: Bad Gateway (HTTP 502)");
+      const log = new TextOutputFixture();
+
+      assert.equal(await new NightlyReport(fixture, log, repository.directory).runAsync(NightlyReportTests.environment(repository)), 1);
+
+      const summary = await readFile(path.join(repository.directory, "summary.md"), "utf8");
+      assert.equal(log.text, summary);
+      assert.ok(summary.startsWith("Nightly repeats:\n\n- Linux x64, tests › a test: opened #43\n- Filing the nightly failures stopped: \"gh api --method POST repos/noldova-com/teamrun/issues/41/comments "));
+      assert.ok(summary.endsWith("failed with exit code 1: HTTP 502: Bad Gateway (HTTP 502)\n"));
+      assert.deepEqual(fixture.writes, ["POST /issues", "POST /issues/41/comments"]);
+    });
+
+    test("an error that isn't a failed GitHub request is not hidden", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+
+      await assert.rejects(new NightlyReport(new GitHubApiFixture(), new TextOutputFixture(), repository.directory).runAsync(NightlyReportTests.environment(repository)), /No answer recorded/u);
     });
 
     test("a result that isn't a job's result is not hidden", async t => {

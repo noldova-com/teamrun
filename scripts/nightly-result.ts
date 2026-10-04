@@ -34,7 +34,12 @@ export default class NightlyResult {
   private static readonly NOT_A_FILE_NAME: RegExp = /[^a-z0-9]+/gu;
   private static readonly TESTS_PREFIX: string = "npm test › ";
   private static readonly WHOLE_RUN: string = " › the run itself";
-  private static readonly CHECK_FAILED: string = "The check failed in one of the five runs; the job's log names the test and the run.";
+  private static readonly FAILED_TEST: RegExp = /^(?:✘|✖|×|FAIL)\s/u;
+  private static readonly FAILING_TESTS_HEADING: string = "✖ failing tests:";
+  private static readonly DURATION: RegExp = /\s+\(?\d+(?:\.\d+)?\s?m?s\)?$/u;
+  private static readonly MAXIMUM_TESTS_SHOWN: number = 20;
+  private static readonly FAILING_TESTS: string = "The check's failing tests:";
+  private static readonly CHECK_FAILED: string = "The check failed without naming a failing test; the job's log has the details.";
   private static readonly TIMED_OUT: string = "It timed out or was cancelled.";
   private static readonly UNNAMED: string = "It failed without naming a failing check or workflow.";
   private static readonly VARIABLES_REQUIRED: string = "NIGHTLY_LABEL, NIGHTLY_PART (tests or workflows) and NIGHTLY_OUTCOME must describe the job.\n";
@@ -74,8 +79,28 @@ export default class NightlyResult {
     const log = path.join(this.root, ...NightlyResult.TESTS_LOG_SEGMENTS);
     if (!existsSync(log))
       return [];
-    const checks = stripVTControlCharacters(await readFile(log, "utf8")).split(/\r?\n/u).flatMap(t => NightlyResult.FAILED_CHECK.exec(t.trim())?.slice(1, 2) ?? []);
-    return [...new Set(checks)].map(t => new NightlyFailure(`${NightlyResult.TESTS_PREFIX}${t}`, NightlyResult.CHECK_FAILED, 1));
+    const lines = stripVTControlCharacters(await readFile(log, "utf8")).split(/\r?\n/u).map(t => t.trim());
+    const checks = new Map<string, { count: number; tests: Set<string> }>();
+    for (const [index, line] of lines.entries()) {
+      const check = NightlyResult.FAILED_CHECK.exec(line)?.[1];
+      if (check === undefined)
+        continue;
+      const known = checks.get(check) ?? { count: 0, tests: new Set<string>() };
+      const heading = lines.lastIndexOf(check, index);
+      const section = heading < 0 ? [] : lines.slice(heading + 1, index);
+      for (const test of section.filter(t => NightlyResult.FAILED_TEST.test(t) && t !== NightlyResult.FAILING_TESTS_HEADING))
+        known.tests.add(test.replace(NightlyResult.DURATION, ""));
+      checks.set(check, { count: known.count + 1, tests: known.tests });
+    }
+    return [...checks].map(([check, { count, tests }]) => new NightlyFailure(`${NightlyResult.TESTS_PREFIX}${check}`, NightlyResult.describeChecks([...tests]), count));
+  }
+
+  private static describeChecks(tests: readonly string[]): string {
+    if (tests.length === 0)
+      return NightlyResult.CHECK_FAILED;
+    const shown = tests.slice(0, NightlyResult.MAXIMUM_TESTS_SHOWN);
+    const rest = tests.length - shown.length;
+    return [NightlyResult.FAILING_TESTS, ...shown, ...(rest > 0 ? [`and ${rest} more`] : [])].join("\n");
   }
 
   private async readWorkflowsAsync(): Promise<readonly NightlyFailure[]> {

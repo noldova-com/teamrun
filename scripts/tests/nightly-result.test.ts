@@ -20,8 +20,33 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 class NightlyResultTests {
   private static readonly TESTS_LOG: string = "_build/nightly/tests.log";
   private static readonly REPORT: string = "_build/ui/report.json";
-  private static readonly FAILED_LOG: string = "Documents: passed\r\n\u001b[31mAngular tests and coverage: failed\u001b[39m\r\nAngular tests and coverage: failed\nPackages: failed\n";
-  private static readonly CHECK_FAILED: string = "The check failed in one of the five runs; the job's log names the test and the run.";
+  private static readonly FAILED_LOG: string = [
+    "Run 1 of 5",
+    "Documents: passed",
+    "Package tests and coverage",
+    "@noldova/teamrun-shell-runtime/services/log.test.js — LogTests",
+    "  \u001b[31m✘\u001b[39m writesALine (5 ms)",
+    "  \u001b[32m✓\u001b[39m readsALine (1 ms)",
+    "\u001b[31mPackage tests and coverage: failed\u001b[39m",
+    "Packages: failed",
+    "Run 2 of 5",
+    "Script tests and coverage",
+    "✖ a script test fails (12.5ms)",
+    "✖ failing tests:",
+    "✖ a script test fails (12.5ms)",
+    "Script tests and coverage: failed",
+    "Angular tests and coverage",
+    " × WindowComponent > closes 12ms",
+    " FAIL  tests/app/window.spec.ts > WindowComponent > closes",
+    "Angular tests and coverage: failed",
+    "Run 3 of 5",
+    "Package tests and coverage",
+    "  ✘ writesALine (2 ms)",
+    "  ✘ opensTheFile (1 ms)",
+    "Package tests and coverage: failed",
+    ""
+  ].join("\r\n");
+  private static readonly CHECK_FAILED: string = "The check failed without naming a failing test; the job's log has the details.";
 
   public static register(): void {
     test("a passing job records no failure, whatever its log holds", async t => {
@@ -36,7 +61,7 @@ class NightlyResultTests {
       assert.equal(log.text, "Linux x64, tests: passed\n");
     });
 
-    test("a failed tests job records each check that failed once, under npm test", async t => {
+    test("a failed tests job records each check that failed under npm test, with the runs it failed and the failing tests its section of the log names", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({ [NightlyResultTests.TESTS_LOG]: NightlyResultTests.FAILED_LOG });
@@ -47,11 +72,28 @@ class NightlyResultTests {
       assert.deepEqual(await NightlyResultTests.readAsync(repository, "windows-arm64-tests.json"), {
         label: "Windows ARM64, tests",
         failures: [
-          { name: "npm test › Angular tests and coverage", message: NightlyResultTests.CHECK_FAILED, count: 1 },
-          { name: "npm test › Packages", message: NightlyResultTests.CHECK_FAILED, count: 1 }
+          { name: "npm test › Package tests and coverage", message: "The check's failing tests:\n✘ writesALine\n✘ opensTheFile", count: 2 },
+          { name: "npm test › Packages", message: NightlyResultTests.CHECK_FAILED, count: 1 },
+          { name: "npm test › Script tests and coverage", message: "The check's failing tests:\n✖ a script test fails", count: 1 },
+          { name: "npm test › Angular tests and coverage", message: "The check's failing tests:\n× WindowComponent > closes\nFAIL  tests/app/window.spec.ts > WindowComponent > closes", count: 1 }
         ]
       });
-      assert.equal(log.text, "Windows ARM64, tests: npm test › Angular tests and coverage failed; npm test › Packages failed\n");
+      assert.equal(log.text, "Windows ARM64, tests: npm test › Package tests and coverage failed; npm test › Packages failed; npm test › Script tests and coverage failed; "
+        + "npm test › Angular tests and coverage failed\n");
+    });
+
+    test("a check with more than twenty failing tests names the first twenty and how many more failed", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const tests = Array.from({ length: 23 }, (_, index) => `✘ test${index}`);
+      await repository.writeAsync({ [NightlyResultTests.TESTS_LOG]: ["Package tests and coverage", ...tests, "Package tests and coverage: failed", ""].join("\n") });
+
+      assert.equal(await new NightlyResult(repository.directory, new TextOutputFixture()).runAsync({ NIGHTLY_LABEL: "Linux x64, tests", NIGHTLY_PART: "tests", NIGHTLY_OUTCOME: "failure" }), 0);
+
+      assert.deepEqual(await NightlyResultTests.readAsync(repository, "linux-x64-tests.json"), {
+        label: "Linux x64, tests",
+        failures: [{ name: "npm test › Package tests and coverage", message: ["The check's failing tests:", ...tests.slice(0, 20), "and 3 more"].join("\n"), count: 1 }]
+      });
     });
 
     test("a failed UI workflows job records each failed workflow once without its tags, with its first error and how often it failed", async t => {

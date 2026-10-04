@@ -173,7 +173,12 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p _build/nightly
-          npm test -- --repeat 5 2>&1 | tee _build/nightly/tests.log
+          failed=0
+          for run in 1 2 3 4 5; do
+            echo "Run $run of 5"
+            npm test 2>&1 | tee -a _build/nightly/tests.log || failed=1
+          done
+          exit "$failed"
 
       - name: Repeat the UI workflows
         id: workflows
@@ -203,6 +208,7 @@ jobs:
           path: _build/nightly/results
           retention-days: 14
           if-no-files-found: ignore
+          overwrite: true
 
       - name: Wait before keeping the result again
         if: always() && steps.result.outcome == 'failure'
@@ -218,6 +224,7 @@ jobs:
           path: _build/nightly/results
           retention-days: 14
           if-no-files-found: ignore
+          overwrite: true
 
       - name: Wait before keeping the result a last time
         if: always() && steps.result-again.outcome == 'failure'
@@ -231,6 +238,7 @@ jobs:
           path: _build/nightly/results
           retention-days: 14
           if-no-files-found: ignore
+          overwrite: true
 
       - name: Keep what the failures left
         if: failure()
@@ -293,6 +301,34 @@ jobs:
           package-manager-cache: false
 
       - name: Gather the results
+        id: gather
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: nightly-result-*
+          path: _build/nightly/results
+          merge-multiple: true
+
+      - name: Wait before gathering the results again
+        if: steps.gather.outcome == 'failure'
+        run: sleep 30
+
+      - name: Gather the results again
+        id: gather-again
+        if: steps.gather.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: nightly-result-*
+          path: _build/nightly/results
+          merge-multiple: true
+
+      - name: Wait before gathering the results a last time
+        if: steps.gather-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Gather the results a last time
+        if: steps.gather-again.outcome == 'failure'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: nightly-result-*

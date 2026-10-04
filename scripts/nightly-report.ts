@@ -14,6 +14,7 @@ import type { Writable } from "node:stream";
 import ProcessRunner from "./processes/process-runner.ts";
 import GitHubApi from "./repository/github-api.ts";
 import NightlyFailure from "./workflows/nightly-failure.ts";
+import NightlyFilingException from "./workflows/nightly-filing.exception.ts";
 import NightlyFinding from "./workflows/nightly-finding.ts";
 import NightlyIssueFiler from "./workflows/nightly-issue-filer.ts";
 import NightlyLegResult from "./workflows/nightly-leg-result.ts";
@@ -51,12 +52,23 @@ export default class NightlyReport {
     }
 
     const findings = NightlyReport.collect(legs, await NightlyReport.readResultsAsync(path.resolve(this.directory, results)));
-    const lines = findings.length === 0 ? [NightlyReport.PASSED]
-      : await new NightlyIssueFiler(new GitHubApi(repository, this.runner, this.directory), repository, runUrl).fileAsync(findings);
+    if (findings.length === 0)
+      return await this.summarizeAsync(summaryPath, [NightlyReport.PASSED], 0);
+    try {
+      return await this.summarizeAsync(summaryPath, await new NightlyIssueFiler(new GitHubApi(repository, this.runner, this.directory), repository, runUrl).fileAsync(findings), 0);
+    }
+    catch (error) {
+      if (!(error instanceof NightlyFilingException))
+        throw error;
+      return await this.summarizeAsync(summaryPath, [...error.filed, `- ${error.message}`], 1);
+    }
+  }
+
+  private async summarizeAsync(summaryPath: string, lines: readonly string[], exitCode: number): Promise<number> {
     const summary = `${NightlyReport.HEADING}${lines.join("\n")}\n`;
     await appendFile(summaryPath, summary);
     this.output.write(summary);
-    return 0;
+    return exitCode;
   }
 
   private static readLegs(text: string): readonly string[] | null {

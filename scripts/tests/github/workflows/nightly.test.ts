@@ -24,6 +24,7 @@ class NightlyWorkflowTests {
   private static readonly UPLOAD_ACTION: string = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1";
   private static readonly NODE_ACTION: string = "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0";
   private static readonly RESULT_UPLOADS: readonly string[] = ["Keep the result", "Keep the result again", "Keep the result a last time"];
+  private static readonly GATHER_STEPS: readonly [string, string, string] = ["Gather the results", "Gather the results again", "Gather the results a last time"];
   private static readonly SHARED_STEPS: readonly string[] = ["Verify the toolchain", "Discard an inexact Angular install", "Install dependencies", "Install Electron"];
 
   public static register(): void {
@@ -90,11 +91,21 @@ class NightlyWorkflowTests {
       assert.ok(nightly.text.includes("      - name: Let Electron's sandbox start on Linux\n        if: runner.os == 'Linux' && matrix.part == 'workflows'\n        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0\n"));
     });
 
-    test("a tests job builds and runs every test five times into its log, and a UI workflows job runs every workflow five times without retries", async () => {
+    test("a tests job builds and runs every test five times into its log, going on after a failing run, and a UI workflows job runs every workflow five times without retries", async () => {
       const workflow = await WorkflowFileFixture.readAsync(NightlyWorkflowTests.WORKFLOW);
       const simulation = new WorkflowSimulation(workflow.text, NightlyWorkflowTests.FIRST_STEP, NightlyWorkflowTests.LAST_STEP);
 
-      assert.equal(workflow.readStepScript("Repeat the tests"), "set -o pipefail\nmkdir -p _build/nightly\nnpm test -- --repeat 5 2>&1 | tee _build/nightly/tests.log\n");
+      assert.equal(workflow.readStepScript("Repeat the tests"), [
+        "set -o pipefail",
+        "mkdir -p _build/nightly",
+        "failed=0",
+        "for run in 1 2 3 4 5; do",
+        "  echo \"Run $run of 5\"",
+        "  npm test 2>&1 | tee -a _build/nightly/tests.log || failed=1",
+        "done",
+        "exit \"$failed\"",
+        ""
+      ].join("\n"));
       assert.ok(workflow.readStepScript("Repeat the UI workflows").includes("xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui -- --repeat-each 5 --retries 0\n"));
       assert.ok(workflow.readStepScript("Repeat the UI workflows").includes("else\n  npm run test:ui -- --repeat-each 5 --retries 0\n"));
       assert.deepEqual(simulation.run({ part: "tests" }, {}).ran, ["Build", "Repeat the tests", "Record the result", "Keep the result"]);
@@ -113,7 +124,7 @@ class NightlyWorkflowTests {
       assert.deepEqual(unbuilt.ran, ["Build", "Record the result", "Keep the result", "Keep what the failures left"]);
       assert.deepEqual(uploads.map(t => [t.uses, t.continueOnError]), [[NightlyWorkflowTests.UPLOAD_ACTION, true], [NightlyWorkflowTests.UPLOAD_ACTION, true], [NightlyWorkflowTests.UPLOAD_ACTION, false]]);
       assert.deepEqual(uploads.map(t => t.settings), uploads.map(() => [
-        "name: nightly-result-${{ matrix.runner }}-${{ matrix.part }}", "path: _build/nightly/results", "retention-days: 14", "if-no-files-found: ignore"
+        "name: nightly-result-${{ matrix.runner }}-${{ matrix.part }}", "path: _build/nightly/results", "retention-days: 14", "if-no-files-found: ignore", "overwrite: true"
       ]));
       assert.ok(workflow.text.includes("          NIGHTLY_LABEL: ${{ matrix.label }}\n          NIGHTLY_PART: ${{ matrix.part }}\n"
         + "          NIGHTLY_OUTCOME: ${{ matrix.part == 'tests' && steps.tests.outcome || steps.workflows.outcome }}\n        run: node scripts/nightly-result.ts\n"));
@@ -128,6 +139,14 @@ class NightlyWorkflowTests {
 
       assert.ok(text.includes("  report:\n    name: Report the failures\n    needs: [plan, repeat]\n    if: ${{ !cancelled() && needs.plan.result == 'success' }}\n"));
       assert.ok(/uses: actions\/download-artifact@[0-9a-f]{40} # v[\d.]+\n {8}with:\n {10}pattern: nightly-result-\*\n {10}path: _build\/nightly\/results\n {10}merge-multiple: true\n/.test(text));
+      const simulation = new WorkflowSimulation(text, NightlyWorkflowTests.GATHER_STEPS[0], NightlyWorkflowTests.GATHER_STEPS[2]);
+      const attempts = NightlyWorkflowTests.GATHER_STEPS.map(t => simulation.find(t));
+      assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [true, true, false].map(t => [attempts[0]?.uses, t]));
+      assert.deepEqual(attempts.map(t => t.settings), attempts.map(() => attempts[0]?.settings));
+      assert.deepEqual(simulation.run({}, {}).ran, [NightlyWorkflowTests.GATHER_STEPS[0]]);
+      assert.deepEqual(simulation.run({}, { [NightlyWorkflowTests.GATHER_STEPS[0]]: "failure", [NightlyWorkflowTests.GATHER_STEPS[1]]: "failure" }).ran, [
+        NightlyWorkflowTests.GATHER_STEPS[0], "Wait before gathering the results again", NightlyWorkflowTests.GATHER_STEPS[1], "Wait before gathering the results a last time", NightlyWorkflowTests.GATHER_STEPS[2]
+      ]);
       assert.ok(text.includes("        env:\n          GH_TOKEN: ${{ github.token }}\n"
         + "          NIGHTLY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n"
         + "          NIGHTLY_LEGS: ${{ needs.plan.outputs.labels }}\n          NIGHTLY_RESULTS: _build/nightly/results\n        run: node scripts/nightly-report.ts\n"));
