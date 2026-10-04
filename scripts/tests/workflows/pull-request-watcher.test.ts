@@ -17,6 +17,7 @@ import PullRequestFinding from "../../workflows/pull-request-finding.ts";
 import PullRequestNote from "../../workflows/pull-request-note.ts";
 import PullRequestWatcher from "../../workflows/pull-request-watcher.ts";
 import PullRequestReader from "../../workflows/pull-request.reader.ts";
+import RunCancellation from "../../workflows/run-cancellation.ts";
 import GitHubApiFixture from "../fixtures/github-api.fixture.ts";
 import PullRequestScenarioFixture from "../fixtures/pull-request-scenario.fixture.ts";
 
@@ -164,22 +165,69 @@ class PullRequestWatcherTests {
       const head = PullRequestScenarioFixture.head(3);
       assert.deepEqual(lines, ["- #3: cancelled (2 runs, commented)"]);
       assert.deepEqual(scenario.api.writes, ["POST /actions/runs/301/cancel", "POST /actions/runs/302/cancel", "POST /issues/3/comments"]);
-      assert.deepEqual(scenario.api.bodies, [PullRequestNote.compose(PullRequestFinding.cancelled(PullRequestScenarioFixture.NOW, "main", ["docs/a.md", "src/b.ts"], 2), head)]);
-      assert.match(scenario.api.bodies[0] ?? "", /`main` moved, and this pull request now conflicts with it in `docs\/a\.md`, `src\/b\.ts`\. 2 runs of \*\*Build and test\*\* were cancelled, because they test /);
+      assert.deepEqual(scenario.api.bodies, [PullRequestNote.compose(new RunCancellation("main", ["docs/a.md", "src/b.ts"], 2), head)]);
+      assert.match(scenario.api.bodies[0] ?? "", /`main` moved, and this pull request now conflicts with it in these files:\n\n```\ndocs\/a\.md\nsrc\/b\.ts\n```\n\n2 runs of \*\*Build and test\*\* were cancelled/);
       assert.deepEqual(scenario.git.commands, [
         "fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/watch/base +refs/pull/3/head:refs/remotes/watch/head",
-        "merge-tree --write-tree --name-only --no-messages refs/remotes/watch/base refs/remotes/watch/head"
+        "merge-tree --write-tree --name-only --no-messages -z refs/remotes/watch/base refs/remotes/watch/head"
       ]);
     });
 
-    test("a single cancelled run is named as one, and a conflict Git no longer finds names no files", async () => {
+    test("a conflict Git no longer finds, or a file list Git cannot read, still gets the comment without names", async () => {
       const scenario = new PullRequestScenarioFixture();
       scenario.add({ number: 3, mergeState: "dirty", commitMinutesAgo: 5, activeRuns: [301] });
+      scenario.add({ number: 4, mergeState: "dirty", commitMinutesAgo: 5, activeRuns: [401], conflicts: null });
 
       const lines = await PullRequestWatcherTests.watchAsync(scenario);
 
-      assert.deepEqual(lines, ["- #3: cancelled (1 run, commented)"]);
-      assert.match(scenario.api.bodies[0] ?? "", /`main` moved, and this pull request now conflicts with it\. 1 run of \*\*Build and test\*\* was cancelled, because it tests /);
+      assert.deepEqual(lines, ["- #3: cancelled (1 run, commented)", "- #4: cancelled (1 run, commented)"]);
+      assert.deepEqual(scenario.api.bodies, [
+        PullRequestNote.compose(new RunCancellation("main", [], 1), PullRequestScenarioFixture.head(3)),
+        PullRequestNote.compose(new RunCancellation("main", null, 1), PullRequestScenarioFixture.head(4))
+      ]);
+    });
+
+    test("an error other than Git's failure while reading the files fails the run", async () => {
+      const scenario = new PullRequestScenarioFixture();
+      scenario.add({ number: 3, mergeState: "dirty", commitMinutesAgo: 5, activeRuns: [301] });
+      scenario.git.fail(3, new Error("Git could not be started."));
+
+      await assert.rejects(PullRequestWatcherTests.watchAsync(scenario), /^Error: Git could not be started\.$/);
+    });
+
+    test("a run that completed before its cancel arrived counts as cancelled", async () => {
+      const scenario = new PullRequestScenarioFixture();
+      scenario.add({ number: 3, mergeState: "dirty", commitMinutesAgo: 5, activeRuns: [301, 302] });
+      scenario.api.fail("/actions/runs/301/cancel", "gh: Cannot cancel a workflow run that is completed. (HTTP 409)");
+
+      const lines = await PullRequestWatcherTests.watchAsync(scenario);
+
+      assert.deepEqual(lines, ["- #3: cancelled (2 runs, commented)"]);
+      assert.deepEqual(scenario.api.writes, ["POST /actions/runs/301/cancel", "POST /actions/runs/302/cancel", "POST /issues/3/comments"]);
+    });
+
+    test("a head with a cancel comment gets no conflict comment, while other findings and other heads still do", async () => {
+      const scenario = new PullRequestScenarioFixture();
+      const failed = [PullRequestScenarioFixture.failed("Build and test (all targets)", 45), PullRequestScenarioFixture.passed("Require linked issue", 80)];
+      scenario.add({ number: 3, mergeState: "dirty", commitMinutesAgo: 90, activeRuns: [301], checks: failed });
+      scenario.add({
+        number: 4,
+        mergeState: "dirty",
+        commitMinutesAgo: 30,
+        comments: [{ id: 41, login: PullRequestScenarioFixture.BOT, body: `<!-- pull-request-watch:cancelled:${PullRequestScenarioFixture.head(4)} -->\nText` }]
+      });
+      scenario.add({
+        number: 5,
+        mergeState: "dirty",
+        commitMinutesAgo: 30,
+        comments: [{ id: 51, login: PullRequestScenarioFixture.BOT, body: `<!-- pull-request-watch:cancelled:${PullRequestScenarioFixture.head(6)} -->\nText` }]
+      });
+
+      const lines = await PullRequestWatcherTests.watchAsync(scenario);
+
+      assert.deepEqual(lines, ["- #3: cancelled (1 run, commented), failed (commented)", "- #4: nothing to do", "- #5: conflict (commented)"]);
+      assert.deepEqual(scenario.api.writes, ["POST /actions/runs/301/cancel", "POST /issues/3/comments", "POST /issues/3/comments", "POST /issues/5/comments"]);
+      assert.match(scenario.api.bodies[1] ?? "", /^<!-- pull-request-watch:failed:/);
     });
 
     test("runs started again on a head already commented on are cancelled without another comment, and the comment is never cleared", async () => {
@@ -220,19 +268,24 @@ class PullRequestWatcherTests {
       assert.deepEqual(scenario.git.commands, []);
     });
 
-    test("an unknown merge state is read again every 10 seconds until GitHub has computed it", async () => {
+    test("unknown merge states are read again together every 10 seconds until GitHub has computed them", async () => {
       const scenario = new PullRequestScenarioFixture();
-      scenario.add({ number: 3, mergeState: "dirty", unknownMergeStates: 2, commitMinutesAgo: 5, activeRuns: [301], conflicts: ["a.ts"] });
+      scenario.add({ number: 3, mergeState: "dirty", unknownMergeStates: 1, commitMinutesAgo: 5, activeRuns: [301], conflicts: ["a.ts"] });
+      scenario.add({ number: 4, unknownMergeStates: 3 });
+      scenario.add({ number: 5 });
+      scenario.add({ number: 6, isDraft: true });
       const waits: number[] = [];
 
       const lines = await PullRequestWatcherTests.watchAsync(scenario, waits);
 
-      assert.deepEqual(lines, ["- #3: cancelled (1 run, commented)"]);
-      assert.deepEqual(waits, [10_000, 10_000]);
-      assert.deepEqual(scenario.api.requests.filter(t => t === "GET /pulls/3"), ["GET /pulls/3", "GET /pulls/3", "GET /pulls/3", "GET /pulls/3"]);
+      assert.deepEqual(lines, ["- #3: cancelled (1 run, commented)", "- #4: nothing to do", "- #5: nothing to do", "- #6: skipped, a draft"]);
+      assert.deepEqual(waits, [10_000, 10_000, 10_000]);
+      assert.deepEqual(scenario.api.requests.filter(t => /^GET \/pulls\/\d+$/.test(t)), [
+        "GET /pulls/3", "GET /pulls/4", "GET /pulls/5", "GET /pulls/3", "GET /pulls/4", "GET /pulls/4", "GET /pulls/4"
+      ]);
     });
 
-    test("a merge state still unknown after six reads is reported and nothing is cancelled", async () => {
+    test("a merge state still unknown after six reads in 50 seconds is reported and nothing is cancelled", async () => {
       const scenario = new PullRequestScenarioFixture();
       scenario.add({ number: 3, mergeState: "dirty", unknownMergeStates: 7, commitMinutesAgo: 5, activeRuns: [301] });
       const waits: number[] = [];
@@ -241,6 +294,7 @@ class PullRequestWatcherTests {
 
       assert.deepEqual(lines, ["- #3: merge state still unknown"]);
       assert.deepEqual(waits, [10_000, 10_000, 10_000, 10_000, 10_000]);
+      assert.equal(scenario.api.requests.filter(t => t === "GET /pulls/3").length, 6);
       assert.deepEqual(scenario.api.writes, []);
     });
 

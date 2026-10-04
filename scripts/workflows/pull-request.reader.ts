@@ -12,6 +12,7 @@ import OpenPullRequest from "./open-pull-request.ts";
 import PullRequestCheck from "./pull-request-check.ts";
 import PullRequestNote from "./pull-request-note.ts";
 import PullRequestSnapshot from "./pull-request-snapshot.ts";
+import PullRequestState from "./pull-request-state.ts";
 import WatchedRepository from "./watched-repository.ts";
 
 export default class PullRequestReader {
@@ -51,27 +52,30 @@ export default class PullRequestReader {
     });
   }
 
-  public async readAsync(open: OpenPullRequest): Promise<PullRequestSnapshot> {
-    const pull = GitHubJson.object(await this.api.readAsync(`/pulls/${open.number}`), "pull request");
-    const head = GitHubJson.text(GitHubJson.child(pull, "head", "pull request"), "sha", "pull request.head");
-    const checks = await this.readChecksAsync(head);
-    const starts = checks.flatMap(t => t.startedTime === null ? [] : [t.startedTime]);
-    const pushedAt = starts.length === 0 ? await this.readCommitDateAsync(head) : new Date(Math.min(...starts));
-    return new PullRequestSnapshot(
-      open.number,
-      head,
+  public async readStateAsync(number: number): Promise<PullRequestState> {
+    const pull = GitHubJson.object(await this.api.readAsync(`/pulls/${number}`), "pull request");
+    return new PullRequestState(
+      number,
+      GitHubJson.text(GitHubJson.child(pull, "head", "pull request"), "sha", "pull request.head"),
       GitHubJson.text(pull, "mergeable_state", "pull request"),
-      GitHubJson.nullableChild(pull, "auto_merge", "pull request") !== null,
-      await this.readAutoMergeHistoryAsync(open.number),
-      await this.readApprovalAsync(open.number),
-      pushedAt,
-      await this.readBuildRunsAsync(head),
-      checks,
-      await this.readNotesAsync(open.number));
+      GitHubJson.nullableChild(pull, "auto_merge", "pull request") !== null);
   }
 
-  public async readMergeStateAsync(open: OpenPullRequest): Promise<string> {
-    return GitHubJson.text(GitHubJson.object(await this.api.readAsync(`/pulls/${open.number}`), "pull request"), "mergeable_state", "pull request");
+  public async readAsync(state: PullRequestState): Promise<PullRequestSnapshot> {
+    const checks = await this.readChecksAsync(state.head);
+    const starts = checks.flatMap(t => t.startedTime === null ? [] : [t.startedTime]);
+    const pushedAt = starts.length === 0 ? await this.readCommitDateAsync(state.head) : new Date(Math.min(...starts));
+    return new PullRequestSnapshot(
+      state.number,
+      state.head,
+      state.mergeState,
+      state.hasAutoMerge,
+      await this.readAutoMergeHistoryAsync(state.number),
+      await this.readApprovalAsync(state.number),
+      pushedAt,
+      await this.readBuildRunsAsync(state.head),
+      checks,
+      await this.readNotesAsync(state.number));
   }
 
   public async listActiveBuildRunsAsync(head: string): Promise<readonly number[]> {

@@ -52,24 +52,6 @@ class PullRequestFindingTests {
         "Every required check passed more than 15 minutes ago and auto-merge is off. "
         + "A reviewer merges the pull request or turns on auto-merge; if you are waiting for that, ask the reviewer.");
     });
-
-    test("a cancellation is due at once and names the conflicting files and how many runs were cancelled", () => {
-      const since = PullRequestFindingTests.SINCE;
-
-      const cancelled = PullRequestFinding.cancelled(since, "trunk", ["a.ts", "docs/b.md"], 2);
-      const single = PullRequestFinding.cancelled(since, "trunk", [], 1);
-
-      assert.equal(cancelled.kind, "cancelled");
-      assert.equal(cancelled.isDue(since), true);
-      assert.equal(cancelled.text,
-        "`trunk` moved, and this pull request now conflicts with it in `a.ts`, `docs/b.md`. "
-        + "2 runs of **Build and test** were cancelled, because they test a revision that has to be merged again. "
-        + "Merge or rebase `trunk` into the branch, resolve the conflicts and push; the push starts a new run.");
-      assert.equal(single.text,
-        "`trunk` moved, and this pull request now conflicts with it. "
-        + "1 run of **Build and test** was cancelled, because it tests a revision that has to be merged again. "
-        + "Merge or rebase `trunk` into the branch, resolve the conflicts and push; the push starts a new run.");
-    });
   }
 }
 

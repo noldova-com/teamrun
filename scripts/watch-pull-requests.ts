@@ -13,6 +13,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import ProcessRunner from "./processes/process-runner.ts";
 import Git from "./repository/git.ts";
 import GitHubApi from "./repository/github-api.ts";
+import type IWait from "./workflows/interfaces/wait.ts";
 import MergeConflictReader from "./workflows/merge-conflict.reader.ts";
 import PullRequestEvaluator from "./workflows/pull-request-evaluator.ts";
 import PullRequestWatcher from "./workflows/pull-request-watcher.ts";
@@ -28,9 +29,9 @@ export default class WatchPullRequests {
   private readonly output: Writable;
   private readonly directory: string;
   private readonly clock: () => number;
-  private readonly wait: (milliseconds: number) => Promise<void>;
+  private readonly wait: IWait;
 
-  public constructor(runner: ProcessRunner, output: Writable, directory: string, clock: () => number, wait: (milliseconds: number) => Promise<void>) {
+  public constructor(runner: ProcessRunner, output: Writable, directory: string, clock: () => number, wait: IWait) {
     this.runner = runner;
     this.output = output;
     this.directory = directory;

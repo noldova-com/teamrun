@@ -54,6 +54,17 @@ class GitHubApiTests {
       assert.deepEqual((runner.captured[0] ?? []).slice(2), ["api", "--method", "POST", "repos/noldova-com/teamrun/actions/runs/9/cancel"]);
     });
 
+    test("a failed request keeps the HTTP status GitHub answered with, when gh names one", async () => {
+      const runner = new ProcessRunnerFixture([], [
+        new ProcessResult(1, "", "gh: Cannot cancel a workflow run that is completed. (HTTP 409)\n"),
+        new ProcessResult(1, "", "error connecting to api.github.com\n")
+      ]);
+      const api = new GitHubApi(GitHubApiTests.REPOSITORY, runner, "work");
+
+      await assert.rejects(api.postAsync("/actions/runs/9/cancel"), t => t instanceof GitHubException && t.status === 409);
+      await assert.rejects(api.postAsync("/actions/runs/9/cancel"), t => t instanceof GitHubException && t.status === null);
+    });
+
     test("a failed command and an answer that is not JSON are refused with the cause", async () => {
       const failing = new ProcessRunnerFixture([], [new ProcessResult(1, "", "HTTP 403: Resource not accessible\n")]);
       const text = new ProcessRunnerFixture([], [new ProcessResult(0, "<html>", ""), new ProcessResult(0, "<html>", "")]);

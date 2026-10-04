@@ -23,8 +23,8 @@ export default class MergeConflictReader {
   public async readFilesAsync(defaultBranch: string, number: number): Promise<readonly string[]> {
     await this.git.readOutputAsync(["fetch", "--no-tags", "--quiet", MergeConflictReader.REMOTE,
       `+refs/heads/${defaultBranch}:${MergeConflictReader.BASE}`, `+refs/pull/${number}/head:${MergeConflictReader.HEAD}`]);
-    const output = await this.git.readOutputAsync(["merge-tree", "--write-tree", "--name-only", "--no-messages", MergeConflictReader.BASE, MergeConflictReader.HEAD],
+    const output = await this.git.readOutputAsync(["merge-tree", "--write-tree", "--name-only", "--no-messages", "-z", MergeConflictReader.BASE, MergeConflictReader.HEAD],
       MergeConflictReader.MERGE_EXIT_CODES);
-    return output.split("\n").slice(1).filter(t => t.length > 0);
+    return output.split("\0").slice(1).filter(t => t.length > 0);
   }
 }

@@ -69,7 +69,10 @@ export default class PullRequestScenarioFixture {
       total_count: (pull.activeRuns?.length ?? 0) + 1,
       workflow_runs: [...(pull.activeRuns ?? []).map((t, index) => ({ id: t, status: index === 0 ? "in_progress" : "queued" })), { id: 1, status: "completed" }]
     });
-    this.git.conflict(pull.number, pull.conflicts ?? []);
+    if (pull.conflicts === null)
+      this.git.fail(pull.number);
+    else
+      this.git.conflict(pull.number, pull.conflicts ?? []);
     this.api.answer(`/commits/${head}`, { sha: head, commit: { committer: { date: ago(pull.commitMinutesAgo ?? 120) } } });
     this.api.answer(`/commits/${head}/check-runs?per_page=100`, {
       total_count: pull.checks?.length ?? 0,
