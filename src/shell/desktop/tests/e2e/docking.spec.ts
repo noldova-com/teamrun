@@ -6,11 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { Locator, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
 
 const notes = "view/notes.list";
 const outline = "view/notes.outline";
@@ -21,43 +22,6 @@ const withoutClock = "without-clock";
 
 async function listItemAsync(window: Page, week: number): Promise<void> {
   await window.locator(".tr-notes-list-item", { hasText: new RegExp(`^Meeting notes, week ${week}$`) }).click();
-}
-
-function tab(window: Page, key: string): Locator {
-  return window.locator(`tr-tab[data-tab-key="${key}"]`);
-}
-
-function groupOf(window: Page, key: string): Locator {
-  return window.locator("tr-tab-group").filter({ has: tab(window, key) });
-}
-
-async function centerOf(locator: Locator): Promise<{ readonly x: number; readonly y: number }> {
-  const box = await locator.boundingBox();
-  if (box === null)
-    throw new Error("The element is not visible.");
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-}
-
-async function startDragAsync(window: Page, key: string): Promise<void> {
-  const start = await centerOf(tab(window, key));
-  await window.mouse.move(start.x, start.y);
-  await window.mouse.down();
-  await window.mouse.move(start.x + 12, start.y + 12, { steps: 3 });
-}
-
-async function moveOverAsync(window: Page, target: Locator, offsetX: number = 0): Promise<void> {
-  const point = await centerOf(target);
-  await window.mouse.move(point.x + offsetX, point.y, { steps: 6 });
-}
-
-async function dragOntoPlateAsync(window: Page, key: string, groupKey: string, direction: string): Promise<void> {
-  await startDragAsync(window, key);
-  await moveOverAsync(window, groupOf(window, groupKey).locator("[role=tabpanel]"));
-  await moveOverAsync(window, window.locator(`tr-docking-plate [data-direction=${direction}]`));
-}
-
-function tabKeysOf(group: Locator): Promise<readonly (string | null)[]> {
-  return group.locator("tr-tab").evaluateAll(tabs => tabs.map(t => t.getAttribute("data-tab-key")));
 }
 
 async function describePlacesAsync(window: Page): Promise<readonly unknown[]> {
@@ -91,20 +55,20 @@ function contrast(foreground: string, background: string): number {
 
 test.describe("docking", () => {
   test.beforeEach(async ({ desktop }) => {
-    await expect(tab(desktop.window, notes)).toBeVisible();
-    await expect(tab(desktop.window, secondNote)).toBeVisible();
+    await expect(TabDragFixture.tab(desktop.window, notes)).toBeVisible();
+    await expect(TabDragFixture.tab(desktop.window, secondNote)).toBeVisible();
   });
 
   test("dragging a view's tab onto a group's center adds it to that group", async ({ desktop }) => {
     const window = desktop.window;
-    await dragOntoPlateAsync(window, notes, clock, "Center");
+    await TabDragFixture.dragOntoPlateAsync(window, notes, clock, "Center");
 
     await expect(window.locator("tr-docking-plate [data-direction=Center]")).toHaveClass(/tr-docking-guide-chosen/);
     await expect(window.locator(".tr-docking-preview")).toBeVisible();
     await expect(window.locator(".tr-drag-label")).toContainText("Moving Notes");
     await window.mouse.up();
 
-    await expect.poll(() => tabKeysOf(groupOf(window, clock))).toEqual([clock, notes]);
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, clock))).toEqual([clock, notes]);
     await expect(window.locator("tr-docking-guide, .tr-docking-preview, .tr-drag-label")).toHaveCount(0);
     await desktop.checkpointAsync("dropped-on-a-group-center");
   });
@@ -113,12 +77,12 @@ test.describe("docking", () => {
     test(`the ${direction.toLowerCase()} arrow splits the group and places the tab on that side`, async ({ desktop }) => {
       const window = desktop.window;
       const before = await window.locator("tr-tab-group").count();
-      await dragOntoPlateAsync(window, outline, clock, direction);
+      await TabDragFixture.dragOntoPlateAsync(window, outline, clock, direction);
       await window.mouse.up();
 
       await expect(window.locator("tr-tab-group")).toHaveCount(before + 1);
-      const moved = await groupOf(window, outline).boundingBox();
-      const stayed = await groupOf(window, clock).boundingBox();
+      const moved = await TabDragFixture.groupOf(window, outline).boundingBox();
+      const stayed = await TabDragFixture.groupOf(window, clock).boundingBox();
       expect((moved?.[axis] ?? 0) < (stayed?.[axis] ?? 0)).toBe(direction === "Left" || direction === "Top");
       await expect(window.locator("tr-split-sash")).toHaveCount(1);
     });
@@ -126,11 +90,11 @@ test.describe("docking", () => {
 
   test("a side guide docks the tab along that whole side, centered in its landing area", async ({ desktop }) => {
     const window = desktop.window;
-    await startDragAsync(window, notes);
-    await moveOverAsync(window, window.locator("[data-drop-side=Bottom][data-drop-span=Between]"));
+    await TabDragFixture.startAsync(window, notes);
+    await TabDragFixture.moveOverAsync(window, window.locator("[data-drop-side=Bottom][data-drop-span=Between]"));
 
-    const preview = await centerOf(window.locator(".tr-docking-preview"));
-    const guide = await centerOf(window.locator("[data-drop-side=Bottom][data-drop-span=Between]"));
+    const preview = await TabDragFixture.centerOfAsync(window.locator(".tr-docking-preview"));
+    const guide = await TabDragFixture.centerOfAsync(window.locator("[data-drop-side=Bottom][data-drop-span=Between]"));
     expect(Math.abs(preview.x - guide.x)).toBeLessThan(1);
     expect(Math.abs(preview.y - guide.y)).toBeLessThan(1);
     await window.mouse.up();
@@ -148,8 +112,8 @@ test.describe("docking", () => {
         const box = t.getBoundingClientRect();
         return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
       });
-    await startDragAsync(window, notes);
-    await moveOverAsync(window, outer);
+    await TabDragFixture.startAsync(window, notes);
+    await TabDragFixture.moveOverAsync(window, outer);
 
     await expect(outer).toHaveClass(/tr-docking-guide-chosen/);
     const workspace = await rectOf("tr-workspace");
@@ -165,8 +129,8 @@ test.describe("docking", () => {
     await expect.poll(() => rectOf("tr-tab-group[data-side=Bottom]").then(t => t.right - t.left)).toBeGreaterThan(workspace.right - workspace.left - 20);
     expect((await rectOf("tr-tab-group[data-side=Left]")).bottom).toBeLessThan((await rectOf("tr-tab-group[data-side=Bottom]")).top);
 
-    await startDragAsync(window, clock);
-    await moveOverAsync(window, inner);
+    await TabDragFixture.startAsync(window, clock);
+    await TabDragFixture.moveOverAsync(window, inner);
     await expect(inner).toHaveClass(/tr-docking-guide-chosen/);
     await desktop.checkpointAsync("inner-bottom-guide-preview");
     await window.mouse.up();
@@ -179,11 +143,11 @@ test.describe("docking", () => {
     const window = desktop.window;
     const before = await describeGroupsAsync(window);
 
-    await startDragAsync(window, notes);
-    await moveOverAsync(window, window.locator("tr-status-bar"));
+    await TabDragFixture.startAsync(window, notes);
+    await TabDragFixture.moveOverAsync(window, window.locator("tr-status-bar"));
     await window.mouse.up();
-    await startDragAsync(window, notes);
-    await moveOverAsync(window, window.locator("[data-drop-side=Right]"));
+    await TabDragFixture.startAsync(window, notes);
+    await TabDragFixture.moveOverAsync(window, window.locator("[data-drop-side=Right]"));
     await window.keyboard.press("Escape");
     await expect(window.locator("tr-docking-guide")).toHaveCount(0);
     await window.mouse.up();
@@ -194,22 +158,22 @@ test.describe("docking", () => {
 
   test("a document's tab shows no dock guides and reorders within its group", async ({ desktop }) => {
     const window = desktop.window;
-    await startDragAsync(window, firstNote);
-    await moveOverAsync(window, tab(window, secondNote), 30);
+    await TabDragFixture.startAsync(window, firstNote);
+    await TabDragFixture.moveOverAsync(window, TabDragFixture.tab(window, secondNote), 30);
 
     await expect(window.locator(".tr-docking-side")).toHaveCount(0);
     await expect(window.locator(".tr-drag-label")).toContainText("Moving Note 1");
     await window.mouse.up();
 
-    await expect.poll(() => tabKeysOf(groupOf(window, firstNote))).toEqual([secondNote, firstNote]);
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, firstNote))).toEqual([secondNote, firstNote]);
   });
 
   test("a dock's sash resizes it by pointer and keyboard and reports its size", async ({ desktop }) => {
     const window = desktop.window;
     const sash = window.getByRole("separator", { name: "Resize the left dock" });
-    const dock = groupOf(window, notes);
+    const dock = TabDragFixture.groupOf(window, notes);
     const width = (await dock.boundingBox())?.width ?? 0;
-    const grip = await centerOf(sash);
+    const grip = await TabDragFixture.centerOfAsync(sash);
 
     await window.mouse.move(grip.x, grip.y);
     await window.mouse.down();
@@ -240,7 +204,7 @@ test.describe("docking", () => {
       await window.emulateMedia({ colorScheme: scheme });
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
       await expect(bar).toHaveCSS("opacity", "0");
-      const grip = await centerOf(sash);
+      const grip = await TabDragFixture.centerOfAsync(sash);
 
       await window.mouse.move(grip.x, grip.y);
       await window.mouse.down();
@@ -270,25 +234,25 @@ test.describe("docking", () => {
 
   test("the tab menu docks a view and reorders a document from the keyboard", async ({ desktop }) => {
     const window = desktop.window;
-    await tab(window, notes).focus();
+    await TabDragFixture.tab(window, notes).focus();
     await window.keyboard.press("Shift+F10");
     await window.getByRole("menuitem", { name: "Dock", exact: true }).click();
     await window.getByRole("menuitem", { name: "Dock at the bottom" }).click();
     await closeMenusAsync(window);
 
     await expect(window.locator("tr-tab-group[data-side=Bottom] tr-tab")).toHaveAttribute("data-tab-key", notes);
-    await expect(tab(window, notes)).toBeFocused();
+    await expect(TabDragFixture.tab(window, notes)).toBeFocused();
 
-    await tab(window, firstNote).focus();
+    await TabDragFixture.tab(window, firstNote).focus();
     await window.keyboard.press("Shift+F10");
     await window.getByRole("menuitem", { name: "Move right" }).click();
     await closeMenusAsync(window);
-    await expect.poll(() => tabKeysOf(groupOf(window, firstNote))).toEqual([secondNote, firstNote]);
-    await expect(tab(window, firstNote)).toBeFocused();
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, firstNote))).toEqual([secondNote, firstNote]);
+    await expect(TabDragFixture.tab(window, firstNote)).toBeFocused();
 
     await window.keyboard.press("Home");
-    await expect(tab(window, secondNote)).toBeFocused();
-    await expect(tab(window, secondNote)).toHaveAttribute("aria-selected", "true");
+    await expect(TabDragFixture.tab(window, secondNote)).toBeFocused();
+    await expect(TabDragFixture.tab(window, secondNote)).toHaveAttribute("aria-selected", "true");
   });
 
   test("the bottom dock spans the window under the side docks, or stays between them when chosen through its commands, and keeps that choice", async ({ desktop }) => {
@@ -311,7 +275,7 @@ test.describe("docking", () => {
       await desktop.window.locator(`.tr-command-search-pane [data-item="${command}"]`).click();
       await expect(desktop.window.locator(".tr-command-search-pane")).toHaveCount(0);
     };
-    await tab(desktop.window, notes).focus();
+    await TabDragFixture.tab(desktop.window, notes).focus();
     await desktop.window.keyboard.press("Shift+F10");
     await desktop.window.getByRole("menuitem", { name: "Dock", exact: true }).click();
     await desktop.window.getByRole("menuitem", { name: "Dock at the bottom" }).click();
@@ -327,7 +291,7 @@ test.describe("docking", () => {
 
     await desktop.reopenAsync();
 
-    await expect(tab(desktop.window, notes)).toBeVisible();
+    await expect(TabDragFixture.tab(desktop.window, notes)).toBeVisible();
     await expect.poll(staysBetween).toBe(true);
     await chooseAsync("shell.spanBottomDock");
     await expect.poll(spansWindow).toBe(true);
@@ -337,35 +301,35 @@ test.describe("docking", () => {
     const window = desktop.window;
     await listItemAsync(window, 1);
     await window.locator("tr-tab[data-tab-key='document/notes.note/week-1']").dblclick();
-    await expect.poll(() => tabKeysOf(groupOf(window, firstNote))).toEqual([firstNote, secondNote, "document/notes.note/week-1"]);
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, firstNote))).toEqual([firstNote, secondNote, "document/notes.note/week-1"]);
 
-    await tab(window, secondNote).click({ button: "right" });
+    await TabDragFixture.tab(window, secondNote).click({ button: "right" });
     await window.getByRole("menuitem", { name: "Close to the right" }).click();
-    await expect.poll(() => tabKeysOf(groupOf(window, firstNote))).toEqual([firstNote, secondNote]);
-    await tab(window, firstNote).click({ button: "right" });
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, firstNote))).toEqual([firstNote, secondNote]);
+    await TabDragFixture.tab(window, firstNote).click({ button: "right" });
     await window.getByRole("menuitem", { name: "Close others" }).click();
-    await expect.poll(() => tabKeysOf(groupOf(window, firstNote))).toEqual([firstNote]);
-    await tab(window, firstNote).click({ button: "right" });
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, firstNote))).toEqual([firstNote]);
+    await TabDragFixture.tab(window, firstNote).click({ button: "right" });
     await window.getByRole("menuitem", { name: "Close all" }).click();
     await expect(window.locator("tr-tab[data-tab-key^='document/']")).toHaveCount(0);
 
-    await tab(window, outline).click({ button: "right" });
+    await TabDragFixture.tab(window, outline).click({ button: "right" });
     await window.getByRole("menuitem", { name: "Split", exact: true }).click();
     await window.getByRole("menuitem", { name: "Split down" }).click();
     await closeMenusAsync(window);
-    await expect.poll(() => tabKeysOf(groupOf(window, outline))).toEqual([outline]);
-    await expect.poll(() => tabKeysOf(groupOf(window, notes))).toEqual([notes]);
-    await expect(tab(window, outline)).toBeFocused();
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, outline))).toEqual([outline]);
+    await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, notes))).toEqual([notes]);
+    await expect(TabDragFixture.tab(window, outline)).toBeFocused();
   });
 
   test("Reset the layout, run from command search, returns the views to their default places", async ({ desktop }) => {
     const window = desktop.window;
     const initial = await describeGroupsAsync(window);
-    await dragOntoPlateAsync(window, notes, clock, "Bottom");
+    await TabDragFixture.dragOntoPlateAsync(window, notes, clock, "Bottom");
     await window.mouse.up();
     await expect.poll(() => describeGroupsAsync(window)).not.toEqual(initial);
 
-    await tab(window, notes).click();
+    await TabDragFixture.tab(window, notes).click();
     await CommandSearchFixture.searchAsync(window, "Reset the layout");
     await expect(window.getByRole("option").first()).toHaveAttribute("data-item", "shell.resetLayout");
     await window.keyboard.press("Enter");
@@ -375,7 +339,7 @@ test.describe("docking", () => {
 
   for (const reopen of [true, false])
     test(`the layout, its splits and sizes return ${reopen ? "after reopening on the running runtime" : "after a restart that stops the runtime"}`, async ({ desktop }) => {
-      await dragOntoPlateAsync(desktop.window, outline, notes, "Bottom");
+      await TabDragFixture.dragOntoPlateAsync(desktop.window, outline, notes, "Bottom");
       await desktop.window.mouse.up();
       const sash = desktop.window.getByRole("separator", { name: "Resize the right dock" });
       const size = Number(await sash.getAttribute("aria-valuenow"));
@@ -387,30 +351,30 @@ test.describe("docking", () => {
 
       await (reopen ? desktop.reopenAsync() : desktop.restartAsync());
 
-      await expect(tab(desktop.window, outline)).toBeVisible();
+      await expect(TabDragFixture.tab(desktop.window, outline)).toBeVisible();
       await expect.poll(() => describePlacesAsync(desktop.window)).toEqual(before);
     });
 
   test("a view whose module is absent keeps its place and returns there with its module", async ({ desktop }) => {
-    await startDragAsync(desktop.window, clock);
-    await moveOverAsync(desktop.window, desktop.window.locator("[data-drop-side=Bottom][data-drop-span=Between]"));
+    await TabDragFixture.startAsync(desktop.window, clock);
+    await TabDragFixture.moveOverAsync(desktop.window, desktop.window.locator("[data-drop-side=Bottom][data-drop-span=Between]"));
     await desktop.window.mouse.up();
     await expect(desktop.window.locator("tr-tab-group[data-side=Bottom]")).toHaveCount(1);
     const before = await describePlacesAsync(desktop.window);
 
     await desktop.restartAsync(() => BuildVariantFixture.swapInAsync(withoutClock));
-    await expect(tab(desktop.window, notes)).toBeVisible();
-    await expect(tab(desktop.window, clock)).toHaveCount(0);
+    await expect(TabDragFixture.tab(desktop.window, notes)).toBeVisible();
+    await expect(TabDragFixture.tab(desktop.window, clock)).toHaveCount(0);
     await expect(desktop.window.locator("tr-tab-group[data-side=Bottom]")).toHaveCount(0);
 
     await desktop.restartAsync(() => BuildVariantFixture.restoreAsync());
-    await expect(tab(desktop.window, clock)).toBeVisible();
+    await expect(TabDragFixture.tab(desktop.window, clock)).toBeVisible();
     await expect.poll(() => describePlacesAsync(desktop.window)).toEqual(before);
   });
 
   test("tabs, guides, the plate, the preview and sashes follow the component table", async ({ desktop }) => {
     const window = desktop.window;
-    await dragOntoPlateAsync(window, notes, clock, "Center");
+    await TabDragFixture.dragOntoPlateAsync(window, notes, clock, "Center");
     const measured = await window.evaluate(() => {
       const element = (selector: string): Element => {
         const found = document.querySelector(selector);

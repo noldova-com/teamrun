@@ -87,15 +87,16 @@ export class TestRunEntryTests {
     Assert.areEqual(1, result.exitCode, result.errorOutput);
     Assert.isTrue(result.errorOutput.includes("No test matched the filters"), result.errorOutput);
     const summary = await readFile(summaryPath, "utf8");
-    Assert.isTrue(summary.includes("| Filters: | noTestIsNamedThis |"));
+    Assert.isTrue(summary.includes("| Filters: | <code>noTestIsNamedThis</code> |"));
     Assert.isTrue(summary.includes("| Selected: | 0 |"));
     Assert.isTrue(summary.includes("No test matched the filters"));
   }
 
   @TestMethod
+  @TestData("[\"noTestIsNamedThis\"]", 0, 8)
   @TestData("[\"finishesCleanly\"]", 1, 8)
   @TestData("[\"finishesCleanly\",\"keepsTheCoverageFolderOutOfItsEnvironment\"]", 2, 8)
-  public async writesWhatItDiscoveredAndSelectedToTheSelectionFile(filters: string, selected: number, discovered: number): Promise<void> {
+  public async writesWhatItDiscoveredAndSelectedToTheSelectionFileAndLeavesAnEmptySelectionToItsCaller(filters: string, selected: number, discovered: number): Promise<void> {
     using directory = new TemporaryDirectory();
     const testsDirectory = join(directory.path, "tests");
     await mkdir(testsDirectory);
@@ -103,8 +104,10 @@ export class TestRunEntryTests {
     await writeFile(join(testsDirectory, "lifetime.test.js"), `export { EntryLifetimeFixture as EntryLifetimeTests } from ${JSON.stringify(fixture)};\n`);
     const selectionPath = join(directory.path, "selection.json");
 
-    await this.runEntryArgumentsAsync(["TestPackage", testsDirectory], filters, undefined, { TEAMRUN_TEST_SELECTION_FILE: selectionPath });
+    const result = await this.runEntryArgumentsAsync(["TestPackage", testsDirectory], filters, undefined, { TEAMRUN_TEST_SELECTION_FILE: selectionPath });
 
+    Assert.areEqual(0, result.exitCode, result.errorOutput);
+    Assert.isFalse(result.errorOutput.includes("No test matched the filters"), result.errorOutput);
     Assert.areEqual(JSON.stringify({ discovered, selected }), await readFile(selectionPath, "utf8"));
   }
 
@@ -212,7 +215,7 @@ export class TestRunEntryTests {
     const entryRun = await this.runEntryArgumentsAsync([], "not-json");
 
     Assert.areEqual(1, entryRun.exitCode);
-    Assert.isTrue(entryRun.errorOutput.includes("test filters must be a JSON array of strings"));
+    Assert.isTrue(entryRun.errorOutput.includes("test filters must be a JSON array of non-empty strings"));
   }
 
   @TestMethod
@@ -220,7 +223,7 @@ export class TestRunEntryTests {
     const entryRun = await this.runEntryArgumentsAsync([], null);
 
     Assert.areEqual(1, entryRun.exitCode);
-    Assert.isTrue(entryRun.errorOutput.includes("test filters must be a JSON array of strings"));
+    Assert.isTrue(entryRun.errorOutput.includes("test filters must be a JSON array of non-empty strings"));
   }
 
   @TestMethod
@@ -228,7 +231,15 @@ export class TestRunEntryTests {
     const entryRun = await this.runEntryArgumentsAsync([], "{}");
 
     Assert.areEqual(1, entryRun.exitCode);
-    Assert.isTrue(entryRun.errorOutput.includes("test filters must be a JSON array of strings"));
+    Assert.isTrue(entryRun.errorOutput.includes("test filters must be a JSON array of non-empty strings"));
+  }
+
+  @TestMethod
+  public async rejectsEmptyFilters(): Promise<void> {
+    const entryRun = await this.runEntryArgumentsAsync([], "[\"\"]");
+
+    Assert.areEqual(1, entryRun.exitCode);
+    Assert.isTrue(entryRun.errorOutput.includes("test filters must be a JSON array of non-empty strings"));
   }
 
   @TestMethod
@@ -236,7 +247,7 @@ export class TestRunEntryTests {
     const entryRun = await this.runEntryArgumentsAsync([], "[1]");
 
     Assert.areEqual(1, entryRun.exitCode);
-    Assert.isTrue(entryRun.errorOutput.includes("test filters must be a JSON array of strings"));
+    Assert.isTrue(entryRun.errorOutput.includes("test filters must be a JSON array of non-empty strings"));
   }
 
   @TestMethod
@@ -244,7 +255,7 @@ export class TestRunEntryTests {
     const entryRun = await this.runEntryArgumentsAsync([], "[\"sample\"]");
 
     Assert.areEqual(1, entryRun.exitCode);
-    Assert.isFalse(entryRun.errorOutput.includes("test filters must be a JSON array of strings"));
+    Assert.isFalse(entryRun.errorOutput.includes("test filters must be a JSON array of non-empty strings"));
   }
 
   private runEntryAsync(packageName: string, rootDirectory: string): Promise<EntryRun> {
@@ -258,6 +269,7 @@ export class TestRunEntryTests {
       environment["GITHUB_STEP_SUMMARY"] = summaryPath;
     delete environment["TEAMRUN_TEMPORARY_ROOT"];
     delete environment["TEAMRUN_TEST_TIMEOUT_MILLISECONDS"];
+    delete environment["TEAMRUN_TEST_SELECTION_FILE"];
     Object.assign(environment, variables);
     if (Object.isNull(filters))
       delete environment["TEAMRUN_TEST_FILTERS"];

@@ -47,3 +47,21 @@ LICENSE file in the root directory of this source tree.
   <tr-progress class="tr-gallery-bar" [label]="text.determinate" [value]="0.5" />
   <tr-progress class="tr-gallery-bar" [label]="text.indeterminate" />
 </tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.spinner">
+  <tr-spinner [label]="text.spinnerWorking" />
+  <tr-spinner [label]="text.spinnerDelayed" [isDelayed]="true" />
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.chip">
+  <tr-chip [count]="3" />
+  <tr-chip [count]="128" />
+  <tr-chip [kind]="chipKinds.Added" [count]="12" />
+  <tr-chip [kind]="chipKinds.Removed" [count]="4" />
+  <tr-chip [kind]="chipKinds.Key">{{ text.chipKey }}</tr-chip>
+</tr-gallery-specimen>
+
+<tr-gallery-specimen [name]="text.choicePills">
+  <tr-choice-pills [options]="pillOptions" [value]="pill()" [label]="text.choicePillsLabel" (valueChange)="pill.set($event)" />
+  <tr-choice-pills class="tr-gallery-narrow" [options]="longPillOptions" value="long" [label]="text.choicePillsLong" />
+</tr-gallery-specimen>
