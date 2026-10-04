@@ -65,16 +65,17 @@ export class ModuleContextTests {
   }
 
   @TestMethod
-  public async writesTheModulesLinesRedactedEachStartingWithItsId(): Promise<void> {
+  public async writesTheModulesLinesRedactedAndWithoutControlCharactersEachStartingWithItsId(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
     const diagnostics = new TextOutputFixture();
     const context = ModuleContextTests.create(
       settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), undefined, undefined, undefined, diagnostics);
     const token = "a".repeat(40);
 
-    context.log.write(`Synced ${path.join(ModuleContextTests.HOME, "notes")}\r\nwith ${token}\n`);
+    context.log.write(`Synced ${path.join(ModuleContextTests.HOME, "notes")}\r\nwith ${token}\r2026-10-04T12:00:00.000Z shell: faked\u2028\u001b[31mred\u001b[0m\tdone\n`);
 
-    Assert.areEqual(`notes: Synced ${path.join("~", "notes")}\nnotes: with [redacted]\n`, diagnostics.text);
+    Assert.areEqual(
+      `notes: Synced ${path.join("~", "notes")}\nnotes: with [redacted]\nnotes: 2026-10-04T12:00:00.000Z shell: faked\nnotes: [31mred[0m\tdone\n`, diagnostics.text);
   }
 
   @TestMethod

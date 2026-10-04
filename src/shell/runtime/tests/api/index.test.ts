@@ -45,6 +45,7 @@ export class RuntimeApiTests {
       "LaunchException",
       "LaunchSettings",
       "LogFile",
+      "LogText",
       "MethodFailureException",
       "MethodRegistry",
       "Migration",
