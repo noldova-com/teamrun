@@ -14,6 +14,7 @@ import ProcessException from "../processes/process.exception.ts";
 export default class Git {
   private static readonly NAME: string = "git";
   private static readonly TIMEOUT: number = 60_000;
+  private static readonly SUCCESS: readonly number[] = [0];
 
   private readonly directory: string;
   private readonly runner: ProcessRunner;
@@ -25,9 +26,9 @@ export default class Git {
     this.executable = ExecutableLocator.locate(Git.NAME);
   }
 
-  public async readOutputAsync(gitArguments: readonly string[]): Promise<string> {
+  public async readOutputAsync(gitArguments: readonly string[], exitCodes: readonly number[] = Git.SUCCESS): Promise<string> {
     const result = await this.executeAsync(gitArguments);
-    if (!result.isSuccessful)
+    if (!exitCodes.some(t => t === result.exitCode))
       throw new ProcessException(`"git ${gitArguments.join(" ")}" failed with exit code ${result.exitCode}: ${result.errorOutput.trim()}`);
     return result.output;
   }
