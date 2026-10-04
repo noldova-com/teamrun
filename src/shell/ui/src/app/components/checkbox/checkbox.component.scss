@@ -23,6 +23,7 @@
   position: relative;
   display: inline-grid;
   flex: none;
+  color: var(--tr-text);
 }
 
 .tr-checkbox-box {
@@ -53,7 +54,6 @@
   width: var(--tr-icon);
   height: var(--tr-icon);
   margin: auto;
-  color: var(--tr-text);
   fill: none;
   stroke: currentColor;
   stroke-width: 1.5;
