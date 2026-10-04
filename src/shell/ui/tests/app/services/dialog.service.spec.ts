@@ -70,13 +70,14 @@ describe("DialogService", () => {
 
   it("returns the focus to the control focused before a dialog opened once the window behind it is live again", async () => {
     const first = await openAsync();
+    const inside = insideOf(0);
     const second = await openAsync();
     second.close();
     const afterSecond = document.activeElement;
     first.close();
     references = [];
 
-    expect(afterSecond).toBe(insideOf(0));
+    expect(afterSecond).toBe(inside);
     expect(document.activeElement).toBe(opener);
   });
 
