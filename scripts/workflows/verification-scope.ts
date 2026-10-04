@@ -8,17 +8,21 @@
 
 export default class VerificationScope {
   private static readonly FULL_SUMMARY: string = "Full build and test verification selected.";
+  private static readonly WITHOUT_UI_SUMMARY: string = "The builds and tests run; the UI workflows are not required.";
   private static readonly SKIPPED_SUMMARY: string = "Code builds and tests are not required; the document checks still run.";
 
   public readonly runCode: boolean;
+  public readonly runUi: boolean;
   public readonly reason: string;
 
-  public constructor(runCode: boolean, reason: string) {
+  public constructor(runCode: boolean, runUi: boolean, reason: string) {
     this.runCode = runCode;
+    this.runUi = runCode && runUi;
     this.reason = reason;
   }
 
   public get summary(): string {
-    return `${this.runCode ? VerificationScope.FULL_SUMMARY : VerificationScope.SKIPPED_SUMMARY} ${this.reason}`;
+    const scope = this.runUi ? VerificationScope.FULL_SUMMARY : this.runCode ? VerificationScope.WITHOUT_UI_SUMMARY : VerificationScope.SKIPPED_SUMMARY;
+    return `${scope} ${this.reason}`;
   }
 }

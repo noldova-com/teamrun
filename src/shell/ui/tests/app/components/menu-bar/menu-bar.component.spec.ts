@@ -14,6 +14,8 @@ import { MenuBarComponent } from "../../../../src/app/components/menu-bar/menu-b
 import { MenuItemComponent } from "../../../../src/app/components/menu/menu-item.component";
 import { MenuTriggerDirective } from "../../../../src/app/components/menu/menu-trigger.directive";
 import { MenuComponent } from "../../../../src/app/components/menu/menu.component";
+import { ThemeMode } from "../../../../src/app/enums/theme-mode";
+import { DefaultTheme } from "../../../../src/app/themes/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({
@@ -139,4 +141,18 @@ describe("MenuBarComponent", () => {
     expect(item("file").textContent).toBe("Files");
     expect(getComputedStyle(item("view")).opacity).toBe("0.5");
   });
+
+  for (const panelSize of AppearanceFixture.panelSizes)
+    it(`writes its items in the panel text role at weight 400 inside bolder, larger text, at panel size ${panelSize}`, () => {
+      AppearanceFixture.apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
+      const parent = fixture.nativeElement.firstElementChild as HTMLElement;
+      parent.style.fontWeight = "600";
+      parent.style.fontSize = "2rem";
+      parent.style.lineHeight = "3rem";
+      const style = getComputedStyle(item("file"));
+
+      expect(style.fontWeight).toBe("400");
+      AppearanceFixture.expectRem(style.fontSize, 0.8125, panelSize);
+      AppearanceFixture.expectRem(style.lineHeight, 1.125, panelSize);
+    });
 });
