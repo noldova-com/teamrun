@@ -24,6 +24,13 @@ class ContentComponent {
 }
 
 @Component({
+  template: `<p style="margin: 0; max-width: 320px;">{{ text() }}</p>`
+})
+class WrappingComponent {
+  public readonly text = signal("");
+}
+
+@Component({
   template: `
     <div class="scroller" style="position: fixed; top: 0; left: 0; width: 600px; height: 400px; overflow: auto;">
       <button type="button" class="anchor" style="position: absolute; top: 200px; left: 200px; width: 60px; height: 24px;">Anchor</button>
@@ -106,6 +113,35 @@ describe("AnchoredOverlay", () => {
     const limit = overlay.placement?.maxHeight ?? 0;
 
     expect(overlay.element.style.maxHeight).toBe(`${limit}px`);
+  });
+
+  const sides: [string, OverlaySide][] = [["above", OverlaySide.above], ["below", OverlaySide.below], ["start", OverlaySide.start], ["end", OverlaySide.end]];
+  const edges: [string, (anchor: HTMLElement) => void][] = [
+    ["left", t => Object.assign(t.style, { left: "4px", top: "300px" })],
+    ["right", t => Object.assign(t.style, { left: `${window.innerWidth - 64}px`, top: "300px" })],
+    ["top", t => Object.assign(t.style, { left: "400px", top: "4px" })],
+    ["bottom", t => Object.assign(t.style, { left: "400px", top: `${window.innerHeight - 28}px` })]
+  ];
+
+  describe.each(sides)("on its %s side", (_, side) => {
+    it.each(edges)("paints at the size and place it settles at near the %s edge of the window", async (_, move) => {
+      const host = fixture.nativeElement.querySelector(".scroller") as HTMLElement;
+      Object.assign(host.style, { width: "100vw", height: "100vh" });
+      const target = anchor();
+      move(target);
+      const content = overlay.openComponent(new ComponentPortal(WrappingComponent), target, new OverlayAnchoring(side, OverlayAlignment.Center, 8));
+      content.changeDetectorRef.detectChanges();
+      content.instance.text.set("words that need room words that need room words that need room words that need room");
+      content.changeDetectorRef.detectChanges();
+      overlay.reposition();
+      const first = overlay.element.getBoundingClientRect();
+
+      await new Promise(t => requestAnimationFrame(() => requestAnimationFrame(t)));
+      const settled = overlay.element.getBoundingClientRect();
+
+      expect([first.left, first.top, first.width, first.height]).toEqual([settled.left, settled.top, settled.width, settled.height]);
+      expect(first.width).toBeGreaterThan(0);
+    });
   });
 
   it("drops a reposition its content asked for when it closes before the next frame", () => {
