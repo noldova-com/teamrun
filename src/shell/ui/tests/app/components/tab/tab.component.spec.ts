@@ -19,7 +19,7 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   imports: [TabComponent],
   template: `
     <div role="tablist">
-      <tr-tab [label]="label()" [icon]="icon()" [selected]="selected()" [preview]="preview()" [working]="working()" [closable]="closable()"
+      <tr-tab [label]="label()" [icon]="icon()" [selected]="selected()" [preview]="preview()" [working]="working()" [closable]="closable()" [badge]="badge()" [badgeCount]="badgeCount()"
         (activate)="activations = activations + 1" (close)="closes = closes + 1" />
     </div>
   `
@@ -31,6 +31,8 @@ class TabHostComponent {
   public readonly preview = signal(false);
   public readonly working = signal(false);
   public readonly closable = signal(true);
+  public readonly badge = signal<string | null>(null);
+  public readonly badgeCount = signal<number | null>(null);
   public activations: number = 0;
   public closes: number = 0;
 }
@@ -58,6 +60,17 @@ describe("TabComponent", () => {
   function part(selector: string): HTMLElement | null {
     return tab().querySelector<HTMLElement>(selector);
   }
+
+  it("shows a badge after its label and adds its description to its name", () => {
+    const bare = [part("tr-view-badge"), tab().getAttribute("aria-label")];
+    host.badge.set("3 unread");
+    host.badgeCount.set(3);
+    fixture.detectChanges();
+
+    expect(bare).toEqual([null, "Readme"]);
+    expect([part("tr-view-badge")?.textContent?.trim(), tab().getAttribute("aria-label")]).toEqual(["3", "Readme, 3 unread"]);
+    expect((part(".tr-tab-label")?.getBoundingClientRect().right ?? Infinity) <= (part("tr-view-badge")?.getBoundingClientRect().left ?? 0)).toBe(true);
+  });
 
   function update(change: () => void): void {
     change();

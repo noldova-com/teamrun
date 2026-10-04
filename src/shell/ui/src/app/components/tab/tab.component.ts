@@ -9,9 +9,11 @@
 import { ChangeDetectionStrategy, Component, type Signal, ViewEncapsulation, computed, input, output } from "@angular/core";
 
 import { Resources } from "../../../resources";
+import { ViewBadgeComponent } from "../view-badge/view-badge.component";
 
 @Component({
   selector: "tr-tab",
+  imports: [ViewBadgeComponent],
   templateUrl: "./tab.component.html",
   styleUrl: "./tab.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -19,7 +21,7 @@ import { Resources } from "../../../resources";
   host: {
     "class": "tr-tab",
     "role": "tab",
-    "[attr.aria-label]": "label()",
+    "[attr.aria-label]": "accessibleName()",
     "[attr.aria-selected]": "selected()",
     "[attr.aria-busy]": "working() || null",
     "[attr.aria-description]": "preview() ? resources.previewDescription : null",
@@ -44,9 +46,15 @@ export class TabComponent {
   public readonly preview = input<boolean>(false);
   public readonly working = input<boolean>(false);
   public readonly closable = input<boolean>(true);
+  public readonly badge = input<string | null>(null);
+  public readonly badgeCount = input<number | null>(null);
   public readonly activate = output<void>();
   public readonly close = output<void>();
   public readonly closeLabel: Signal<string> = computed(() => Resources.formatCloseTab(this.label()));
+  public readonly accessibleName: Signal<string> = computed(() => {
+    const badge = this.badge();
+    return Object.isNull(badge) ? this.label() : Resources.formatBadged(this.label(), badge);
+  });
 
   public onSpace(event: Event): void {
     event.preventDefault();

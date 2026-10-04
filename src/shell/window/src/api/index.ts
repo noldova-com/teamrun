@@ -26,6 +26,7 @@ export { MenuRowContribution } from "../app/models/menu-row-contribution";
 export { TopBarAction } from "../app/models/top-bar-action";
 export { TopBarActionContribution } from "../app/models/top-bar-action-contribution";
 export { TopBarActionState } from "../app/models/top-bar-action-state";
+export { ViewBadge } from "../app/models/view-badge";
 export { ViewContribution } from "../app/models/view-contribution";
 export { WindowPartSource } from "../app/models/window-part-source";
 export { WindowPartTokens } from "../app/models/window-part-tokens";

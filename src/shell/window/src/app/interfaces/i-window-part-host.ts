@@ -10,6 +10,8 @@ import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { MenuItem } from "../models/menu-item";
 import type { NotificationPost, SettingChange, SettingScope } from "@noldova/teamrun-shell-protocol";
 
+import type { ViewBadge } from "../models/view-badge";
+
 export interface IWindowPartHost {
   requestAsync(method: string, payload: JsonValue): Promise<JsonValue>;
 
@@ -42,6 +44,8 @@ export interface IWindowPartHost {
   resetSettingAsync(name: string, scope: SettingScope | null): Promise<void>;
 
   onSettingChanged(listener: (change: SettingChange) => void): () => void;
+
+  setViewBadge(view: string, badge: ViewBadge | null): void;
 
   refresh(): void;
 }

@@ -93,6 +93,7 @@ describe("TabContentComponent", () => {
     onSettingChanged: () => () => undefined,
     declaresDynamicMenuGroup: () => false,
     provideMenuGroup: () => () => undefined,
+    setViewBadge: () => undefined,
     refresh: () => undefined
   });
   let host: StubWindowPartHost;

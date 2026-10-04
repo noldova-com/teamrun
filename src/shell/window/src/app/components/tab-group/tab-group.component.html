@@ -22,7 +22,8 @@ LICENSE file in the root directory of this source tree.
           @for (tab of group().tabs; track tab.key; let index = $index) {
             @let label = labels.of(tab);
             <tr-place-menu #menu [place]="resources.tabMenu" [context]="{ tab: tab.key }" />
-            <tr-tab [label]="label.title" [icon]="label.icon" [selected]="tab.equals(group().active)" [preview]="tab.equals(group().preview)" [attr.data-tab-index]="index"
+            @let badge = labels.badgeOf(tab);
+            <tr-tab [label]="label.title" [icon]="label.icon" [badge]="badge?.description ?? null" [badgeCount]="badge?.count ?? null" [selected]="tab.equals(group().active)" [preview]="tab.equals(group().preview)" [attr.data-tab-index]="index"
               [attr.id]="tabId(index)" [attr.data-tab-key]="tab.key" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, index)" [class.tr-tab-dragged]="tab.equals(drag.dragging())"
               [trTooltip]="label.title" [trTooltipSide]="below" [trTooltipTruncated]="true"
               [trContextMenuTriggerFor]="menu.menu()" (activate)="layout.activate(tab)" (close)="close(tab)" (pointerdown)="drag.begin(tab, $event)" (dblclick)="keep(tab)" />

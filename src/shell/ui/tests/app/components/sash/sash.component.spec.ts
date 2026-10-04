@@ -12,13 +12,14 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { SashComponent } from "../../../../src/app/components/sash/sash.component";
 import { SashOrientation } from "../../../../src/app/enums/sash-orientation";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
+import { Theme } from "../../../../src/app/models/theme";
 import { DefaultTheme } from "../../../../src/app/themes/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({
   imports: [SashComponent],
   template: `
-    <div class="frame" [style.display]="'flex'" [style.flex-direction]="vertical() ? 'row' : 'column'">
+    <div class="frame" [style.display]="'flex'" [style.flex-direction]="vertical() ? 'row' : 'column'" [style.height.px]="120" [style.width.px]="120">
       @if (shown()) {
         <tr-sash [orientation]="orientation()" label="Resize the left dock" [value]="value()" [minimum]="minimum()" [maximum]="maximum()" (resize)="deltas.push($event)" />
       }
@@ -41,9 +42,14 @@ class SashHostComponent {
 describe("SashComponent", () => {
   let fixture: ComponentFixture<SashHostComponent>;
   let host: SashHostComponent;
+  const styles: HTMLStyleElement[] = [];
 
   beforeEach(() => {
     AppearanceFixture.apply();
+    const style = document.createElement("style");
+    style.textContent = ".tr-sash-bar, .tr-sash-grip { transition: none !important; }";
+    document.head.append(style);
+    styles.push(style);
     fixture = TestBed.createComponent(SashHostComponent);
     host = fixture.componentInstance;
     fixture.detectChanges();
@@ -51,11 +57,16 @@ describe("SashComponent", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    styles.splice(0).forEach(t => t.remove());
     AppearanceFixture.reset();
   });
 
   function sash(): HTMLElement {
     return fixture.nativeElement.querySelector("tr-sash");
+  }
+
+  function bar(): HTMLElement {
+    return sash().querySelector(".tr-sash-bar") as HTMLElement;
   }
 
   function update(change: () => void): void {
@@ -149,22 +160,55 @@ describe("SashComponent", () => {
     expect(release).toHaveBeenCalledOnce();
   });
 
-  it("lights its grip after 300 milliseconds of hover and dims it on leave", () => {
+  it("shows its bar after 300 milliseconds of hover and hides it on leave", () => {
     vi.useFakeTimers();
 
     sash().dispatchEvent(new PointerEvent("pointerenter"));
     sash().dispatchEvent(new PointerEvent("pointerenter"));
     vi.advanceTimersByTime(299);
     fixture.detectChanges();
-    expect(sash().classList.contains("tr-sash-active")).toBe(false);
+    expect(getComputedStyle(bar()).opacity).toBe("0");
 
     vi.advanceTimersByTime(1);
     fixture.detectChanges();
-    expect(sash().classList.contains("tr-sash-active")).toBe(true);
+    expect(getComputedStyle(bar()).opacity).toBe("1");
+    expect(getComputedStyle(sash().querySelector(".tr-sash-grip") ?? sash()).opacity).toBe("0");
 
     sash().dispatchEvent(new PointerEvent("pointerleave"));
     fixture.detectChanges();
-    expect(sash().classList.contains("tr-sash-active")).toBe(false);
+    expect(getComputedStyle(bar()).opacity).toBe("0");
+    expect(getComputedStyle(sash().querySelector(".tr-sash-grip") ?? sash()).opacity).toBe("1");
+  });
+
+  it("shows its bar at once while dragging, keeps it when the pointer leaves and hides it when the drag ends", () => {
+    vi.useFakeTimers();
+    vi.spyOn(sash(), "setPointerCapture").mockImplementation(() => undefined);
+    vi.spyOn(sash(), "releasePointerCapture").mockImplementation(() => undefined);
+
+    sash().dispatchEvent(new PointerEvent("pointerenter"));
+    pointer("pointerdown", 0, 100, 10);
+    fixture.detectChanges();
+    expect(getComputedStyle(bar()).opacity).toBe("1");
+
+    sash().dispatchEvent(new PointerEvent("pointerleave"));
+    vi.advanceTimersByTime(1000);
+    fixture.detectChanges();
+    expect(getComputedStyle(bar()).opacity).toBe("1");
+
+    pointer("pointerup", 0, 100, 10);
+    fixture.detectChanges();
+    expect(getComputedStyle(bar()).opacity).toBe("0");
+  });
+
+  it("shows its bar while the keyboard has focus on it and hides it when the focus leaves", () => {
+    expect(getComputedStyle(bar()).opacity).toBe("0");
+
+    sash().focus();
+    expect(sash().matches(":focus-visible")).toBe(true);
+    expect(getComputedStyle(bar()).opacity).toBe("1");
+
+    sash().blur();
+    expect(getComputedStyle(bar()).opacity).toBe("0");
   });
 
   it("cancels a pending hover when it is destroyed", () => {
@@ -178,7 +222,7 @@ describe("SashComponent", () => {
 
   for (const mode of AppearanceFixture.modes)
     for (const theme of AppearanceFixture.themes)
-      it(`takes its gap, grip and accent from the ${theme.id} theme in ${mode} mode`, () => {
+      it(`takes its gap, grip and bar from the ${theme.id} theme in ${mode} mode`, () => {
         AppearanceFixture.apply(theme, mode);
         const dot = (): CSSStyleDeclaration => getComputedStyle(sash().querySelector(".tr-sash-dot") ?? sash());
 
@@ -190,9 +234,27 @@ describe("SashComponent", () => {
         vi.spyOn(sash(), "setPointerCapture").mockImplementation(() => undefined);
         pointer("pointerdown", 0, 0, 0);
         fixture.detectChanges();
+        const box = bar().getBoundingClientRect();
+        const outer = sash().getBoundingClientRect();
 
-        expect(dot().backgroundColor).toBe(AppearanceFixture.readColor(theme, mode, "focusBorder"));
+        expect(getComputedStyle(bar()).backgroundColor).toBe(AppearanceFixture.readColor(theme, mode, "sash.hoverBorder"));
+        expect([box.left, box.top, box.width, box.height]).toEqual([outer.left, outer.top, outer.width, outer.height]);
+        AppearanceFixture.expectLook(getComputedStyle(bar()).width, theme, "sash", "width");
+        expect(box.height).toBe(120);
       });
+
+  it("takes its bar's color from the accent when the theme names no sash color", () => {
+    const theme = new Theme("fixture.accent-only", "Accent only", new Map([["focusBorder", "#336699"]]), new Map([["focusBorder", "#99CC33"]]), new Map(), new Map());
+
+    for (const mode of AppearanceFixture.modes) {
+      AppearanceFixture.apply(theme, mode);
+      vi.spyOn(sash(), "setPointerCapture").mockImplementation(() => undefined);
+      pointer("pointerdown", 0, 0, 0);
+      fixture.detectChanges();
+
+      expect(getComputedStyle(bar()).backgroundColor).toBe(AppearanceFixture.readColor(theme, mode, "focusBorder"));
+    }
+  });
 
   for (const panelSize of AppearanceFixture.panelSizes)
     it(`scales its gap and grip with panel size ${panelSize}`, () => {

@@ -3,6 +3,9 @@
     <span class="tr-tab-icon material-symbols-rounded" aria-hidden="true">{{ glyph }}</span>
   }
   <span class="tr-tab-label" data-truncates>{{ label() }}</span>
+  @if (badge() !== null) {
+    <tr-view-badge class="tr-tab-badge" [count]="badgeCount()" />
+  }
   @if (closable() || working()) {
     <span class="tr-tab-action">
       @if (working()) {

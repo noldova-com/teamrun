@@ -10,6 +10,7 @@ import { TestBed } from "@angular/core/testing";
 
 import { DocumentTab } from "../../../src/app/models/layout/document-tab";
 import { TabLabel } from "../../../src/app/models/layout/tab-label";
+import { ViewBadge } from "../../../src/app/models/view-badge";
 import { TabLabelService } from "../../../src/app/services/tab-label.service";
 import { Resources } from "../../../src/resources";
 import { LayoutFixture } from "../../fixtures/layout.fixture";
@@ -22,6 +23,19 @@ describe("TabLabelService", () => {
 
     expect(labels.of(LayoutFixture.files)).toEqual(new TabLabel("Files", "folder"));
     expect(labels.of(LayoutFixture.secondTerminal)).toEqual(new TabLabel("Terminal 2", "terminal"));
+  });
+
+  it("keeps one badge per view for each of its tabs, replaces and clears it, and never badges a document", () => {
+    const labels = TestBed.inject(TabLabelService);
+    const unread = new ViewBadge(3, "3 unread");
+    labels.setBadge("terminal.shell", new ViewBadge(null, "Running"));
+    labels.setBadge("terminal.shell", unread);
+    labels.setBadge("files.tree", new ViewBadge(1, "1 change"));
+    labels.setBadge("files.tree", null);
+    labels.setBadge("notes.note", unread);
+
+    expect([labels.badgeOf(LayoutFixture.terminal), labels.badgeOf(LayoutFixture.secondTerminal)]).toEqual([unread, unread]);
+    expect([labels.badgeOf(LayoutFixture.files), labels.badgeOf(LayoutFixture.plan)]).toEqual([null, null]);
   });
 
   it("names a tab by its own title before its registered label", () => {

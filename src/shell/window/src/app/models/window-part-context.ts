@@ -22,6 +22,7 @@ import { StatusBarItem } from "./status-bar-item";
 import type { StatusBarItemContribution } from "./status-bar-item-contribution";
 import { TopBarAction } from "./top-bar-action";
 import type { TopBarActionContribution } from "./top-bar-action-contribution";
+import type { ViewBadge } from "./view-badge";
 import type { ViewContribution } from "./view-contribution";
 import type { WindowPartSource } from "./window-part-source";
 import { Resources } from "../../resources";
@@ -37,6 +38,7 @@ export class WindowPartContext implements IWindowPartContext {
   private readonly viewList: ViewContribution[] = [];
   private readonly documentList: DocumentContribution[] = [];
   private readonly subscriptions: (() => void)[] = [];
+  private readonly badgedViews: Set<string> = new Set();
 
   public readonly moduleId: string;
 
@@ -118,6 +120,17 @@ export class WindowPartContext implements IWindowPartContext {
     return withdraw;
   }
 
+  public setViewBadge(view: string, badge: ViewBadge | null): void {
+    this.requireOwn(view);
+    if (!this.source.viewNames.includes(view))
+      throw new WindowPartAccessException(Resources.formatUndeclaredContribution(this.moduleId, Resources.viewKind, view));
+    if (Object.isNull(badge))
+      this.badgedViews.delete(view);
+    else
+      this.badgedViews.add(view);
+    this.host.setViewBadge(view, badge);
+  }
+
   public runCommandAsync(name: string, commandArguments: JsonValue = null): Promise<JsonValue> {
     this.requireAllowed(name);
     return this.host.runCommandAsync(name, commandArguments);
@@ -192,6 +205,9 @@ export class WindowPartContext implements IWindowPartContext {
     this.commandList.length = 0;
     for (const id of [...this.notificationIds])
       this.dismissNotification(id);
+    for (const view of [...this.badgedViews])
+      this.host.setViewBadge(view, null);
+    this.badgedViews.clear();
     this.statusBarItemList.length = 0;
     this.topBarActionList.length = 0;
     this.host.refresh();

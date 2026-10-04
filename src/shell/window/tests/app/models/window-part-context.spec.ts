@@ -25,6 +25,7 @@ import { StatusBarItemContribution } from "../../../src/app/models/status-bar-it
 import { StatusBarItemState } from "../../../src/app/models/status-bar-item-state";
 import { TopBarActionContribution } from "../../../src/app/models/top-bar-action-contribution";
 import { TopBarActionState } from "../../../src/app/models/top-bar-action-state";
+import { ViewBadge } from "../../../src/app/models/view-badge";
 import { ViewContribution } from "../../../src/app/models/view-contribution";
 import { WindowPartContext } from "../../../src/app/models/window-part-context";
 import { WindowPartSource } from "../../../src/app/models/window-part-source";
@@ -117,6 +118,10 @@ class FakeWindowPartHost implements IWindowPartHost {
   public changeSetting(change: SettingChange): void {
     for (const listener of this.settingListeners)
       listener(change);
+  }
+
+  public setViewBadge(view: string, badge: ViewBadge | null): void {
+    this.calls.push(`badge ${view} ${badge?.count ?? "dot"} ${badge?.description ?? "none"}`);
   }
 
   public refresh(): void {
@@ -327,6 +332,18 @@ describe("WindowPartContext", () => {
   it("refuses to supply another module's group and a group that it does not declare as dynamic", () => {
     expect(() => context.provideMenuGroup("tasks.recent", () => [])).toThrowError(WindowPartAccessException);
     expect(() => context.provideMenuGroup("notes.sorting", () => [])).toThrowError(WindowPartAccessException);
+  });
+
+  it("sets and clears a badge on its own declared views only, and clears what it set when withdrawn", () => {
+    context.setViewBadge("notes.list", new ViewBadge(3, "3 unread"));
+    context.setViewBadge("notes.list", null);
+    context.setViewBadge("notes.list", new ViewBadge(null, "Changed"));
+
+    expect(() => context.setViewBadge("tasks.list", null)).toThrowError(WindowPartAccessException);
+    expect(() => context.setViewBadge("notes.outline", null)).toThrowError(new WindowPartAccessException("The module notes does not declare the view notes.outline."));
+    context.withdraw();
+    context.withdraw();
+    expect(host.calls).toEqual(["badge notes.list 3 3 unread", "badge notes.list dot none", "badge notes.list dot Changed", "badge notes.list dot none", "refresh", "refresh"]);
   });
 
   it("withdraws its contributions and listeners and has the host refresh", () => {

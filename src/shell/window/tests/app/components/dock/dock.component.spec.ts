@@ -14,7 +14,9 @@ import { DockSide } from "../../../../src/app/enums/dock-side";
 import { PanelEdge } from "../../../../src/app/enums/panel-edge";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { ViewTab } from "../../../../src/app/models/layout/view-tab";
+import { ViewBadge } from "../../../../src/app/models/view-badge";
 import type { LayoutService } from "../../../../src/app/services/layout.service";
+import { TabLabelService } from "../../../../src/app/services/tab-label.service";
 import { Resources } from "../../../../src/resources";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
@@ -167,6 +169,20 @@ describe("DockComponent", () => {
     button("view/files.search")?.click();
     fixture.detectChanges();
     expect([layout.layout().dock(DockSide.Left).isCollapsed, pressed()]).toEqual([false, ["false", "true"]]);
+  });
+
+  it("shows a view's badge on its icon and adds its description to the icon's name", async () => {
+    await renderAsync(DockSide.Left, Layout.createDefault(registry).openView(LayoutFixture.search, registry).toggleDock(DockSide.Left));
+    TestBed.inject(TabLabelService).setBadge("files.search", new ViewBadge(120, "120 results"));
+    fixture.detectChanges();
+    const search = query(".tr-dock-strip-view[data-view=\"view/files.search\"]");
+    const tree = query(".tr-dock-strip-view[data-view=\"view/files.tree\"]");
+
+    expect([search?.getAttribute("aria-label"), search?.querySelector("tr-view-badge")?.textContent?.trim()]).toEqual(["files.search, 120 results", "99+"]);
+    expect([tree?.getAttribute("aria-label"), tree?.querySelector("tr-view-badge")]).toEqual(["files.tree", null]);
+    const icon = search?.getBoundingClientRect();
+    const badge = search?.querySelector("tr-view-badge")?.getBoundingClientRect();
+    expect([badge?.top, badge?.right]).toEqual([icon?.top, icon?.right]);
   });
 
   it("lays the bottom strip out in a row", async () => {

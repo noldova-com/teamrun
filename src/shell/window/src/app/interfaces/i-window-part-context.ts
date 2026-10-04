@@ -17,6 +17,7 @@ import type { StatusBarItem } from "../models/status-bar-item";
 import type { StatusBarItemContribution } from "../models/status-bar-item-contribution";
 import type { TopBarAction } from "../models/top-bar-action";
 import type { TopBarActionContribution } from "../models/top-bar-action-contribution";
+import type { ViewBadge } from "../models/view-badge";
 import type { ViewContribution } from "../models/view-contribution";
 import type { IDocumentOptions } from "./i-document-options";
 
@@ -27,6 +28,7 @@ export interface IWindowPartContext {
   registerStatusBarItem(item: StatusBarItemContribution): StatusBarItem;
   registerTopBarAction(action: TopBarActionContribution): TopBarAction;
   provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuRowContribution[]): () => void;
+  setViewBadge(view: string, badge: ViewBadge | null): void;
   isAllowed(name: string): boolean;
   runCommandAsync(name: string, commandArguments?: JsonValue): Promise<JsonValue>;
   postNotificationAsync(post: NotificationPost): Promise<NotificationHandle>;

@@ -338,6 +338,9 @@ export class Resources {
   public static readonly nameParameter: string = "name";
   public static readonly titleParameter: string = "title";
   public static readonly iconParameter: string = "icon";
+  public static readonly countParameter: string = "count";
+  public static readonly descriptionParameter: string = "description";
+  public static readonly badgeCountInvalid: string = "A badge's count must be a whole number from 1, or null for a dot.";
   public static readonly textParameter: string = "text";
   public static readonly tooltipParameter: string = "tooltip";
   public static readonly commandParameter: string = "command";
@@ -645,6 +648,10 @@ export class Resources {
   public static formatNotificationsLabel(unread: number, isQuiet: boolean): string {
     const state = isQuiet ? ", Do not disturb" : "";
     return unread === 0 ? `Notifications${state}` : `Notifications, ${unread} unread${state}`;
+  }
+
+  public static formatBadged(label: string, badge: string): string {
+    return `${label}, ${badge}`;
   }
 
   public static formatUndeclaredContribution(moduleId: string, kind: string, name: string): string {

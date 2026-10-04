@@ -136,7 +136,7 @@ The shell owns registration, collisions, user overrides, persistence and removal
 
 | Mechanism | A module contributes | The shell |
 |---|---|---|
-| Views | Content for a panel, in a dock or in the middle, with its title and icon | Docks, splits, hides and restores it |
+| Views | Content for a panel, in a dock or in the middle, with its title and icon, and from its window part a badge for it: a count or a dot, with a description | Docks, splits, hides and restores it; shows the badge on its icon or after its tab's title, with the description in its accessible name, until the part sets none or is withdrawn |
 | Documents | Content for a tab in the middle, with its title and the breadcrumb the top bar shows for it | Opens, arranges, previews and restores tabs |
 | Commands | Named actions, each with a title, an optional icon and an optional default key, from its window part or its runtime part | Runs them by name, with optional JSON arguments, from shortcuts, the top bar, the status bar, menus and command search |
 | Shortcuts | A default key for a command | Dispatches keys to commands, reports collisions and applies the person's bindings |
