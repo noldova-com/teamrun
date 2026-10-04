@@ -22,6 +22,19 @@ async function openGalleryAsync(window: Page): Promise<void> {
   await expect(window.locator("tr-gallery")).toBeVisible();
 }
 
+async function truncationAsync(control: Locator): Promise<{ isInside: boolean; isCut: boolean; overflow: string }> {
+  return control.evaluate(t => {
+    const box = t.getBoundingClientRect();
+    const label = t.querySelector("[data-truncates]") as HTMLElement;
+    const text = label.getBoundingClientRect();
+    return {
+      isInside: text.left >= box.left - 0.5 && text.right <= box.right + 0.5,
+      isCut: label.scrollWidth > label.clientWidth,
+      overflow: getComputedStyle(label).textOverflow
+    };
+  });
+}
+
 test.describe("gallery", () => {
   test("a development build shows the kit's controls on a Settings page in every theme, in light and in dark", async ({ desktop }) => {
     const window = desktop.window;
@@ -55,6 +68,28 @@ test.describe("gallery", () => {
     expect(new Set(colors).size).toBe(2);
   });
 
+  test("toolbar buttons never overlap, and a label too long for its button ends with an ellipsis inside it and shows in full in its tooltip, in light and in dark", async ({ desktop }) => {
+    const window = desktop.window;
+    await openGalleryAsync(window);
+
+    for (const mode of ["Light", "Dark"] as const) {
+      const specimen = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Toolbar button\"]");
+      await specimen.scrollIntoViewIfNeeded();
+      const overlaps = await specimen.evaluate(t => {
+        const boxes = [...t.querySelectorAll(".tr-toolbar-button")].map(u => u.getBoundingClientRect());
+        return boxes.flatMap((box, i) => boxes.slice(i + 1).filter(other => Math.min(box.right, other.right) - Math.max(box.left, other.left) > 0.5 &&
+          Math.min(box.bottom, other.bottom) - Math.max(box.top, other.top) > 0.5).map(() => i));
+      });
+      expect(overlaps).toEqual([]);
+      const long = specimen.locator(".tr-toolbar-button.tr-gallery-narrow");
+      expect(await truncationAsync(long)).toEqual({ isInside: true, isCut: true, overflow: "ellipsis" });
+      await long.hover();
+      await expect(scope(window, mode).locator(".cdk-overlay-container tr-tooltip")).toHaveText((await long.getAttribute("aria-label")) ?? "");
+      await desktop.checkpointAsync(`toolbar-button-long-label-${mode.toLowerCase()}`);
+      await window.mouse.move(0, 0);
+    }
+  });
+
   test("a button's label too long for it starts at its start padding, ends with an ellipsis and shows in full in its tooltip, in light and in dark", async ({ desktop }) => {
     const window = desktop.window;
     await openGalleryAsync(window);
@@ -62,19 +97,13 @@ test.describe("gallery", () => {
     for (const mode of ["Light", "Dark"] as const) {
       const button = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Button\"] button.tr-gallery-narrow");
       await button.scrollIntoViewIfNeeded();
-      const label = await button.evaluate(t => {
-        const text = t.querySelector("[data-truncates]") as HTMLElement;
+      const start = await button.evaluate(t => {
         const style = getComputedStyle(t);
-        const outer = t.getBoundingClientRect();
-        const inner = text.getBoundingClientRect();
-        return {
-          start: Math.round(inner.left - outer.left - Number.parseFloat(style.borderLeftWidth) - Number.parseFloat(style.paddingLeft)),
-          end: Math.round(outer.right - inner.right - Number.parseFloat(style.borderRightWidth) - Number.parseFloat(style.paddingRight)),
-          isCut: text.scrollWidth > text.clientWidth,
-          overflow: getComputedStyle(text).textOverflow
-        };
+        const label = t.querySelector("[data-truncates]") as HTMLElement;
+        return Math.round(label.getBoundingClientRect().left - t.getBoundingClientRect().left - Number.parseFloat(style.borderLeftWidth) - Number.parseFloat(style.paddingLeft));
       });
-      expect(label).toEqual({ start: 0, end: 0, isCut: true, overflow: "ellipsis" });
+      expect(start).toBe(0);
+      expect(await truncationAsync(button)).toEqual({ isInside: true, isCut: true, overflow: "ellipsis" });
       await button.hover();
       await expect(scope(window, mode).locator(".cdk-overlay-container tr-tooltip")).toHaveText(await button.innerText());
       await desktop.checkpointAsync(`button-long-label-${mode.toLowerCase()}`);

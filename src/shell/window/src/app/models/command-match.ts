@@ -6,14 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { MatchKind } from "../enums/match-kind";
-
 export class CommandMatch {
-  public readonly kind: MatchKind;
-  public readonly matches: readonly number[];
+  public readonly titleMatches: readonly number[];
+  public readonly detailMatches: readonly number[];
 
-  public constructor(kind: MatchKind, matches: readonly number[]) {
-    this.kind = kind;
-    this.matches = [...matches];
+  public constructor(titleMatches: readonly number[], detailMatches: readonly number[]) {
+    this.titleMatches = [...titleMatches];
+    this.detailMatches = [...detailMatches];
   }
 }

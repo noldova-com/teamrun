@@ -28,6 +28,11 @@ test.describe("quitting while a module works", () => {
     await runCliAsync("run", command, "--data-dir", dataDirectory);
   };
 
+  const startProgramAsync = async (dataDirectory: string): Promise<number[]> => {
+    const started = JSON.parse(await runCliAsync("run", "clock.startProgram", "--json", "--data-dir", dataDirectory)) as { processId: number; childProcessId: number };
+    return [started.processId, started.childProcessId];
+  };
+
   const readLogAsync = async (desktop: DesktopApplicationFixture, name: string): Promise<string | null> => {
     const file = path.join(desktop.dataDirectory, "logs", name);
     return existsSync(file) ? await readFile(file, "utf8") : null;
@@ -148,9 +153,11 @@ test.describe("quitting while a module works", () => {
     await expect.poll(() => readWorkAsync(desktop.dataDirectory), { timeout: 20_000, intervals: [500] }).toEqual([]);
   });
 
-  test("stops the work and quits when the person chooses to, and the runtime stops with it", async ({ desktop }) => {
+  test("stops the work and quits when the person chooses to, and the runtime stops with it and ends the programs its modules run", async ({ desktop }) => {
     const window = desktop.window;
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]")).toBeVisible();
+    const programs = await startProgramAsync(desktop.dataDirectory);
+    expect(programs.every(t => DesktopApplicationFixture.isAlive(t))).toBe(true);
     await beginWorkAsync(desktop);
     const runtime = await desktop.readRuntimeProcessIdAsync() ?? 0;
 
@@ -160,6 +167,7 @@ test.describe("quitting while a module works", () => {
 
     expect(await exited).toBe(0);
     await expect.poll(() => DesktopApplicationFixture.isAlive(runtime), { timeout: 30_000 }).toBe(false);
+    await expect.poll(() => programs.filter(t => DesktopApplicationFixture.isAlive(t)), { timeout: 5_000 }).toEqual([]);
     expect(existsSync(path.join(desktop.dataDirectory, "work", "clock", "stopped"))).toBe(true);
     expect(await readFile(path.join(desktop.dataDirectory, "logs", "runtime.log"), "utf8")).toContain("clock: The clock began counting.\n");
   });

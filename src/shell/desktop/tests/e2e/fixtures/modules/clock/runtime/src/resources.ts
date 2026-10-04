@@ -35,6 +35,17 @@ export class Resources {
   public static readonly finishWorkTitle: string = "Finish the work";
   public static readonly workDescription: string = "Counting the ticks";
   public static readonly workBegan: string = "The clock began counting.";
+  public static readonly startProgramCommand: string = "clock.startProgram";
+  public static readonly startProgramTitle: string = "Start a program";
+  public static readonly nodeVariable: string = "ELECTRON_RUN_AS_NODE";
+  public static readonly evaluateArgument: string = "-e";
+  public static readonly programScript: string = [
+    "const child = require(\"node:child_process\").spawn(process.execPath, [\"-e\", \"setInterval(() => undefined, 1000)\"],",
+    "{ detached: process.platform === \"win32\", stdio: \"ignore\", windowsHide: true });",
+    "process.stdout.write(String(child.pid) + \"\\n\");",
+    "setInterval(() => undefined, 1000);"
+  ].join(" ");
+  public static readonly programEndedMessage: string = "The clock's program ended before it named its child.";
   public static readonly stoppedMarker: string = "stopped";
   public static readonly abortEvent: string = "abort";
   public static readonly failureMarker: string = "fail-activation";

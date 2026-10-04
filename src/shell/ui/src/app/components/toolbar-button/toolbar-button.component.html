@@ -10,7 +10,7 @@ LICENSE file in the root directory of this source tree.
   <span class="tr-toolbar-button-glyph material-symbols-rounded" aria-hidden="true">{{ glyph }}</span>
 }
 @if (icon() === null || isShowingLabel()) {
-  <span class="tr-toolbar-button-label">{{ label() }}</span>
+  <span class="tr-toolbar-button-label" data-truncates>{{ label() }}</span>
 }
 @if (hasMenu()) {
   <span class="tr-toolbar-button-chevron material-symbols-rounded" aria-hidden="true">{{ resources.toolbarChevronGlyph }}</span>

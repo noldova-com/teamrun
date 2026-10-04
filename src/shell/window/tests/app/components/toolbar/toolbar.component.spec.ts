@@ -155,6 +155,20 @@ describe("ToolbarComponent", () => {
     expect(document.querySelector("tr-menu[data-place='notes.templates'] button[tr-menu-item]")).not.toBeNull();
   });
 
+  it("shows a submenu item's full title below it while its label is cut short", async () => {
+    await showAsync(1000);
+    const submenu = items()[3] as HTMLButtonElement;
+    submenu.style.display = "inline-flex";
+    const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === "Templates");
+
+    submenu.dispatchEvent(new PointerEvent("pointerenter"));
+    await vi.waitFor(() => expect(tooltip()).toBeDefined());
+
+    expect(tooltip()?.getBoundingClientRect().top).toBeGreaterThanOrEqual(submenu.getBoundingClientRect().bottom);
+    submenu.dispatchEvent(new PointerEvent("pointerleave"));
+    await vi.waitFor(() => expect(tooltip()).toBeUndefined());
+  });
+
   it("moves the sections that do not fit into a menu behind a More actions item", async () => {
     await showAsync(100);
     await vi.waitFor(() => {

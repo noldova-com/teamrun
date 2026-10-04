@@ -70,6 +70,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly generationValue: WritableSignal<number> = signal(0);
   private isReady: boolean = false;
   private isLayoutLoaded: boolean = false;
+  private isActivating: boolean = true;
   private reloading: Promise<void> = Promise.resolve();
 
   public readonly failures: Signal<readonly ModuleFailure[]> = this.failuresValue.asReadonly();
@@ -125,10 +126,10 @@ export class WindowPartHostService implements IWindowPartHost {
   }
 
   public openDocument(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
-    if (this.isLayoutLoaded)
-      this.opener.open(moduleId, name, instance, title, isPreview);
-    else
+    if (this.isActivating)
       this.pendingOpens.push(new PendingDocument(moduleId, name, instance, title, isPreview));
+    else
+      this.opener.open(moduleId, name, instance, title, isPreview);
   }
 
   public log(moduleId: string, message: string): void {
@@ -136,10 +137,9 @@ export class WindowPartHostService implements IWindowPartHost {
   }
 
   public keepDocument(moduleId: string, name: string, instance: string): void {
+    this.pendingOpens = this.pendingOpens.map(t => t.kept(moduleId, name, instance));
     if (this.isLayoutLoaded)
       this.opener.keep(moduleId, name, instance);
-    else
-      this.pendingOpens = this.pendingOpens.map(t => t.kept(moduleId, name, instance));
   }
 
   public async showInDialogAsync(name: string, instance: string | null, title: string | null): Promise<void> {
@@ -216,6 +216,7 @@ export class WindowPartHostService implements IWindowPartHost {
 
   private async reloadAsync(): Promise<void> {
     await this.deactivateAsync();
+    this.isActivating = true;
     this.failuresValue.set([]);
     this.moduleOrder = [];
     this.runtimeCommands = [];
@@ -225,11 +226,18 @@ export class WindowPartHostService implements IWindowPartHost {
     catch (error) {
       this.errors.handleError(error);
     }
-    await Promise.allSettled(this.posting);
-    this.refresh();
-    this.generationValue.update(t => t + 1);
-    if (!this.isLayoutLoaded)
-      await this.loadLayoutAsync();
+    const isReconnect = this.isLayoutLoaded;
+    let isRestored = isReconnect;
+    try {
+      await Promise.allSettled(this.posting);
+      this.refresh();
+      this.generationValue.update(t => t + 1);
+      if (!isReconnect)
+        isRestored = await this.loadLayoutAsync();
+    }
+    finally {
+      this.replayPending(isRestored);
+    }
   }
 
   private async activateReportedAsync(): Promise<void> {
@@ -250,20 +258,27 @@ export class WindowPartHostService implements IWindowPartHost {
     this.failuresValue.set(statuses.filter(t => t.state !== ModuleState.Active).map(t => this.describeFailure(t)));
   }
 
-  private async loadLayoutAsync(): Promise<void> {
+  private async loadLayoutAsync(): Promise<boolean> {
     try {
-      await this.layout.loadAsync();
+      return await this.layout.loadAsync();
     }
     finally {
       this.isLayoutLoaded = true;
-      for (const pending of this.pendingOpens.splice(0))
-        this.openPending(pending);
     }
   }
 
-  private openPending(pending: PendingDocument): void {
+  private replayPending(isRestored: boolean): void {
+    this.isActivating = false;
+    for (const pending of this.pendingOpens.splice(0))
+      this.replay(pending, isRestored);
+  }
+
+  private replay(pending: PendingDocument, isRestored: boolean): void {
     try {
-      this.opener.open(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
+      if (isRestored)
+        this.opener.restore(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
+      else
+        this.opener.open(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
     }
     catch (error) {
       this.errors.handleError(error);
