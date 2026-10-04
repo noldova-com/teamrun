@@ -16,14 +16,14 @@ describe("CommandMatcher", () => {
     ]);
   });
 
-  it("matches a run across the category and the title, joined by a space, when the title alone has none", () => {
-    expect(CommandMatcher.match("run clo", "TeamRun", "Close the tab")).toEqual(new CommandMatch([0, 1, 2], [4, 5, 6]));
-    expect(CommandMatcher.match("team", "TeamRun", "Close the tab")).toEqual(new CommandMatch([], [0, 1, 2, 3]));
+  it("matches a run in the title followed by a space and the category, the title's first", () => {
+    expect(CommandMatcher.match("tab tea", "TeamRun", "Close the tab")).toEqual(new CommandMatch([10, 11, 12], [0, 1, 2]));
+    expect(CommandMatcher.match("run", "TeamRun", "Close the tab")).toEqual(new CommandMatch([], [4, 5, 6]));
     expect(CommandMatcher.match("ab", "Tab", "Close the tab")).toEqual(new CommandMatch([11, 12], []));
   });
 
-  it("matches nothing when the characters are not one run", () => {
+  it("matches nothing when the characters are not one run, or run from the category into the title", () => {
     expect(CommandMatcher.match("ctt", "TeamRun", "Close the tab")).toBeNull();
-    expect(CommandMatcher.match("nc", "TeamRun", "Close the tab")).toBeNull();
+    expect(CommandMatcher.match("run clo", "TeamRun", "Close the tab")).toBeNull();
   });
 });

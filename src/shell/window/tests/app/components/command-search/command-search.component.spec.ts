@@ -104,18 +104,18 @@ describe("CommandSearchComponent", () => {
     expect(ids().slice(0, 2)).toEqual(["notes.newNote", "weather.today"]);
   });
 
-  it("keeps the rows whose title, or category and title, contain the query as one run, in the same order, and marks the run", async () => {
+  it("keeps the rows whose title and category contain the query as one run, in the same order, and marks the run", async () => {
     const marks = (id: string, part: string): readonly (string | null)[] => [...root().querySelectorAll(`[data-item="${id}"] .tr-quick-input-${part} mark`)].map(t => t.textContent);
     search.remember("weather.pluto");
 
     await typeAsync("TO");
     const to = [ids().filter(t => t.startsWith("weather.") || ids().indexOf(t) === 0), marks("weather.tools", "title"), root().querySelector("[data-item=\"weather.tools\"] .tr-quick-input-title")?.textContent];
-    await typeAsync("weather p");
+    await typeAsync("o weather");
     const category = [ids(), marks("weather.photo", "detail"), marks("weather.photo", "title")];
     await typeAsync("nn");
 
     expect(to).toEqual([["weather.pluto", "weather.tools", "weather.photo", "weather.today"], ["to"], "Open the tools"]);
-    expect(category).toEqual([["weather.pluto", "weather.photo"], ["weather"], ["P"]]);
+    expect(category).toEqual([["weather.pluto", "weather.photo"], ["weather"], ["o"]]);
     expect(ids()).toEqual([]);
   });
 
