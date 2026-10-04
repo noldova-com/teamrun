@@ -229,6 +229,7 @@ export class Resources {
   public static readonly noKey: string = "No key";
   public static readonly choicePillMinimum: number = 2;
   public static readonly choicePillLimit: number = 4;
+  public static readonly settingErrorIdPrefix: string = "tr-setting-error-";
   public static readonly shortcutsExplanation: string = "The keys that run commands. Choose a key to record a new one; your keys apply on every device.";
   public static readonly resetAllShortcutsLabel: string = "Reset all shortcuts";
   public static readonly removeKeyLabel: string = "Remove";

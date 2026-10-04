@@ -8,6 +8,7 @@
 
 import { ChangeDetectionStrategy, Component, type Signal, type WritableSignal, computed, input, output, signal } from "@angular/core";
 
+import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { type SettingDefinition, SettingKind } from "@noldova/teamrun-shell-protocol";
 import { ButtonComponent, ButtonVariant, CheckboxComponent, ChoicePillsComponent, SelectComponent, SelectOption, TextFieldComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
@@ -27,7 +28,10 @@ import { HighlightedTextComponent } from "../highlighted-text/highlighted-text.c
   }
 })
 export class SettingRowComponent {
+  private static count: number = 0;
+
   protected readonly resources: typeof Resources = Resources;
+  protected readonly errorId: string = `${Resources.settingErrorIdPrefix}${SettingRowComponent.count++}`;
   protected readonly kinds: typeof SettingKind = SettingKind;
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
   protected readonly error: WritableSignal<string | null> = signal(null);
@@ -63,7 +67,15 @@ export class SettingRowComponent {
       return;
     }
     this.error.set(Resources.formatNumberRange(type.minimum, type.maximum, type.step));
+  }
+
+  protected revertNumber(event: Event): void {
+    const field = event.target as HTMLInputElement;
+    if (Object.isNull(this.error()) && field.valueAsNumber === this.current())
+      return;
+    event.stopPropagation();
     field.value = String(this.current());
+    this.error.set(null);
   }
 
   protected commitText(event: Event): void {

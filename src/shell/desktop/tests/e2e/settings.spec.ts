@@ -146,6 +146,38 @@ test.describe("settings", () => {
     expect(await window.evaluate(() => getComputedStyle(document.body).fontFamily)).toBe(before.font);
   });
 
+  test("a size outside its range stays as typed with its error after focus leaves, applies once corrected, and Escape puts the stored size back", async ({ desktop }) => {
+    const window = desktop.window;
+    await openSettingsAsync(window);
+    const field = row(window, "shell.panelSize").locator("input");
+    const alert = row(window, "shell.panelSize").getByRole("alert");
+    const size = (): Promise<string> => window.evaluate(() => getComputedStyle(document.documentElement).fontSize);
+    const before = await size();
+
+    await field.fill("30");
+    await field.press("Tab");
+
+    await expect(field).not.toBeFocused();
+    await expect(field).toHaveValue("30");
+    await expect(field).toHaveAttribute("aria-invalid", "true");
+    await expect(alert).toHaveText("Enter a whole number from 12 to 18.");
+    await expect(row(window, "shell.panelSize").locator(".tr-setting-row-marker")).toHaveCount(0);
+    expect(await size()).toBe(before);
+    await desktop.checkpointAsync("settings-number-error");
+    await field.fill("15");
+    await field.press("Enter");
+    await expect(alert).toHaveCount(0);
+    await expect(field).not.toHaveAttribute("aria-invalid");
+    await expect.poll(async () => parseFloat(await size())).toBeCloseTo(16 * 15 / 13, 2);
+    await field.fill("40");
+    await field.press("Enter");
+    await expect(alert).toBeVisible();
+    await field.press("Escape");
+    await expect(field).toHaveValue("15");
+    await expect(alert).toHaveCount(0);
+    await expect(window.locator("tr-settings")).toBeVisible();
+  });
+
   test("the Mode pills are one radio group: the checked pill is the tab stop and the arrow keys move the choice", async ({ desktop }) => {
     const window = desktop.window;
     await openSettingsAsync(window);
