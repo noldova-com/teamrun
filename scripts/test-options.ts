@@ -30,7 +30,7 @@ export default class TestOptions {
   }
 
   public static parse(args: readonly string[]): TestOptions {
-    if (args.includes(TestOptions.DOCUMENTS)) {
+    if (args[0] === TestOptions.DOCUMENTS) {
       if (args.length !== 1)
         throw new TestOptionsException(TestOptions.DOCUMENTS_ALONE);
       return new TestOptions(true, [], 1);
