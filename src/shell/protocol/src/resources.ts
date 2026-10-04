@@ -151,6 +151,7 @@ export class Resources {
     [Resources.macPlatform, "macOS", Resources.macSystemKeys],
     [Resources.standardPlatform, "Windows and Linux", Resources.standardSystemKeys]
   ];
+  public static readonly shellCommandKeys: readonly string[] = ["Mod+W", "Mod+Comma"];
   public static readonly stopMember: string = "stop";
   public static readonly moveAsideMember: string = "moveAside";
   public static readonly modulesMember: string = "modules";

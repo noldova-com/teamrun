@@ -13,6 +13,6 @@ import { SettingKind } from "@noldova/teamrun-shell-protocol";
 export class SettingKindTests {
   @TestMethod
   public namesEveryKindByItsMember(): void {
-    Assert.areEqual("Boolean,Choice,Number,Text,Modules", Object.values(SettingKind).join(","));
+    Assert.areEqual("Boolean,Choice,Number,Text,Modules,KeyBindings", Object.values(SettingKind).join(","));
   }
 }

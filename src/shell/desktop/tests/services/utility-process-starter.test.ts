@@ -8,7 +8,7 @@
 
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -29,6 +29,7 @@ import { PlatformFixture } from "../fixtures/platform.fixture.js";
 @TestClass
 export class UtilityProcessStarterTests {
   private static readonly START_TIMEOUT: number = 15_000;
+  private static readonly BINARY_MISSING: string = "Electron's binary is not installed; run npm run build to install it.";
 
   @TestMethod
   public asksAUtilityProcessToStartTheProgram(): Promise<void> {
@@ -130,7 +131,7 @@ export class UtilityProcessStarterTests {
   }
 
   private static async runDesktopAsync(fixture: string, root: string): Promise<{ code: unknown; output: string; errors: string; outputLag: number }> {
-    const electron = String(createRequire(import.meta.url)("electron"));
+    const electron = UtilityProcessStarterTests.findElectron();
     const main = fileURLToPath(new URL(`../fixtures/${fixture}`, import.meta.url));
     const environment = { ...process.env };
     delete environment["ELECTRON_RUN_AS_NODE"];
@@ -147,6 +148,15 @@ export class UtilityProcessStarterTests {
     const endedAt = await ended;
     clearTimeout(timer);
     return { code, output, errors, outputLag: endedAt - exited };
+  }
+
+  private static findElectron(): string {
+    const require = createRequire(import.meta.url);
+    const directory = path.dirname(require.resolve("electron/package.json"));
+    const pathFile = path.join(directory, "path.txt");
+    if (!existsSync(pathFile) || !existsSync(path.join(directory, "dist", readFileSync(pathFile, "utf8"))))
+      Assert.fail(UtilityProcessStarterTests.BINARY_MISSING);
+    return String(require("electron"));
   }
 
   private static readProcessId(output: string, name: string): number {

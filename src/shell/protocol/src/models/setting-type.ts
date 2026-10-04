@@ -13,6 +13,8 @@ import { JsonReader, type JsonObject, type JsonValue } from "@noldova/teamrun-fo
 import { SettingKind } from "../enums/setting-kind.js";
 import { Resources } from "../resources.js";
 import { WireContract } from "../services/wire-contract.js";
+import { KeyChord } from "./key-chord.js";
+import { QualifiedName } from "./qualified-name.js";
 import { SettingOption } from "./setting-option.js";
 
 export class SettingType {
@@ -21,7 +23,8 @@ export class SettingType {
     [SettingKind.Choice]: [Resources.optionsField],
     [SettingKind.Number]: [Resources.minimumField, Resources.maximumField, Resources.stepField],
     [SettingKind.Text]: [Resources.maxLengthField],
-    [SettingKind.Modules]: []
+    [SettingKind.Modules]: [],
+    [SettingKind.KeyBindings]: []
   };
 
   public readonly kind: SettingKind;
@@ -66,6 +69,10 @@ export class SettingType {
     return new SettingType(SettingKind.Modules, [], null, null, null, null);
   }
 
+  public static keyBindings(): SettingType {
+    return new SettingType(SettingKind.KeyBindings, [], null, null, null, null);
+  }
+
   public static fromJson(value: unknown, path?: string): SettingType {
     const reader = JsonReader.fromValue(value, path);
     const kind = reader.readOneOf(Resources.kindField, Object.values(SettingKind));
@@ -80,6 +87,8 @@ export class SettingType {
           return SettingType.text(reader.readInteger(Resources.maxLengthField));
         case SettingKind.Modules:
           return SettingType.modules();
+        case SettingKind.KeyBindings:
+          return SettingType.keyBindings();
         default:
           return SettingType.boolean();
       }
@@ -96,8 +105,10 @@ export class SettingType {
         return typeof value === "number" && this.isInRange(value);
       case SettingKind.Text:
         return typeof value === "string" && value.length <= Number(this.maxLength);
-      default:
+      case SettingKind.Modules:
         return Array.isArray(value) && value.every(t => typeof t === "string" && !String.isNullOrWhitespace(t)) && new Set(value).size === value.length;
+      default:
+        return Object.isObject(value) && !Array.isArray(value) && Object.entries(value).every(([name, key]) => SettingType.isBinding(name, key));
     }
   }
 
@@ -108,6 +119,11 @@ export class SettingType {
       ...this.kind === SettingKind.Number ? { [Resources.minimumField]: this.minimum, [Resources.maximumField]: this.maximum, [Resources.stepField]: this.step } : {},
       ...this.kind === SettingKind.Text ? { [Resources.maxLengthField]: this.maxLength } : {}
     };
+  }
+
+  private static isBinding(name: string, key: JsonValue): boolean {
+    const command = QualifiedName.find(name);
+    return !Object.isNull(command) && (Object.isNull(key) || (Object.isString(key) && KeyChord.find(key)?.canBind(command) === true));
   }
 
   private isInRange(value: number): boolean {
