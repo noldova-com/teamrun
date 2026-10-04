@@ -57,6 +57,11 @@ export class DiscoveryPublisher {
     return true;
   }
 
+  public async withdrawEarlierAsync(): Promise<void> {
+    this.lock.requireHeld();
+    await rm(this.lock.dataDirectory.discoveryFile, { force: true });
+  }
+
   private async replaceAsync(temporary: string, file: string): Promise<void> {
     for (let attempt = 1; ; attempt++) {
       try {

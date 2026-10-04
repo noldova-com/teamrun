@@ -6,14 +6,23 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, signal } from "@angular/core";
+import { Component, type Signal, computed, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { userEvent } from "vitest/browser";
 
 import { QuickInputComponent } from "../../../../src/app/components/quick-input/quick-input.component";
+import { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import { QuickInputItem } from "../../../../src/app/models/quick-input-item";
 import { DefaultTheme } from "../../../../src/app/themes/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
+
+const many: readonly QuickInputItem[] = Array.from({ length: 30 }, (_, index) => new QuickInputItem(`notes.command${index}`, `Command ${index}`, null, null, null));
+
+function press(target: Element, key: string): KeyboardEvent {
+  const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+  target.dispatchEvent(event);
+  return event;
+}
 
 @Component({
   imports: [QuickInputComponent],
@@ -30,10 +39,19 @@ class QuickInputHostComponent {
   public dismissals: number = 0;
 }
 
+@Component({
+  imports: [QuickInputComponent],
+  template: `<tr-quick-input [items]="items()" label="Search commands" [(query)]="query" (chosen)="chosen.push($event.id)" />`
+})
+class FilteringHostComponent {
+  public readonly query = signal("");
+  public readonly items: Signal<readonly QuickInputItem[]> = computed(() => many.filter(t => t.title.includes(this.query())));
+  public readonly chosen: string[] = [];
+}
+
 describe("QuickInputComponent", () => {
   let fixture: ComponentFixture<QuickInputHostComponent>;
   let host: QuickInputHostComponent;
-  const many = Array.from({ length: 30 }, (_, index) => new QuickInputItem(`notes.command${index}`, `Command ${index}`, null, null, null));
 
   beforeEach(async () => {
     AppearanceFixture.apply();
@@ -66,8 +84,7 @@ describe("QuickInputComponent", () => {
   }
 
   async function pressAsync(key: string): Promise<KeyboardEvent> {
-    const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
-    field().dispatchEvent(event);
+    const event = press(field(), key);
     fixture.detectChanges();
     await fixture.whenStable();
     return event;
@@ -131,6 +148,51 @@ describe("QuickInputComponent", () => {
     expect(host.query()).toBe("clo");
   });
 
+  async function filteringAsync(): Promise<ComponentFixture<FilteringHostComponent>> {
+    const filtering = TestBed.createComponent(FilteringHostComponent);
+    filtering.detectChanges();
+    await filtering.whenStable();
+    return filtering;
+  }
+
+  function fieldOf(filtering: ComponentFixture<FilteringHostComponent>): HTMLInputElement {
+    return filtering.nativeElement.querySelector(".tr-quick-input-field");
+  }
+
+  function type(filtering: ComponentFixture<FilteringHostComponent>, text: string): void {
+    fieldOf(filtering).value = text;
+    fieldOf(filtering).dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  it("chooses from the options for the text just typed when Enter comes before they are shown, once however often Enter is pressed", async () => {
+    const filtering = await filteringAsync();
+
+    press(fieldOf(filtering), "ArrowDown");
+    type(filtering, "Command 7");
+    press(fieldOf(filtering), "Enter");
+    press(fieldOf(filtering), "Enter");
+    const before = [...filtering.componentInstance.chosen];
+    filtering.detectChanges();
+    await filtering.whenStable();
+
+    expect(before).toEqual([]);
+    expect(filtering.componentInstance.chosen).toEqual(["notes.command7"]);
+    filtering.destroy();
+  });
+
+  it("chooses at once when Enter comes after the options for its text are shown", async () => {
+    const filtering = await filteringAsync();
+
+    type(filtering, "Command 2");
+    filtering.detectChanges();
+    await filtering.whenStable();
+    press(fieldOf(filtering), "ArrowDown");
+    press(fieldOf(filtering), "Enter");
+
+    expect(filtering.componentInstance.chosen).toEqual(["notes.command20"]);
+    filtering.destroy();
+  });
+
   it("starts at the first option again when its options change, and chooses nothing and announces no results when it has none", async () => {
     await pressAsync("End");
     host.items.set(many.slice(0, 2));
@@ -154,16 +216,18 @@ describe("QuickInputComponent", () => {
     expect(status.textContent?.trim()).toBe("1 result");
   });
 
-  it("shows an option's icon, its title with the matched characters marked, its detail and its key", async () => {
-    host.items.set([new QuickInputItem("shell.closeTab", "Close the tab", "close", "TeamRun", "Ctrl+W", [0, 1]), new QuickInputItem("notes.sync", "Sync", null, null, null)]);
+  it("shows an option's icon, its title and detail with the matched characters marked in the list highlight and no added space, and its key", async () => {
+    host.items.set([new QuickInputItem("shell.closeTab", "Close the tab", "close", "TeamRun", "Ctrl+W", [6, 7, 8], [4, 5, 6]), new QuickInputItem("notes.sync", "Sync", null, null, null)]);
     fixture.detectChanges();
     await fixture.whenStable();
     const [full, bare] = options();
 
     expect(full?.querySelector(".tr-quick-input-icon")?.textContent).toBe("close");
-    expect([...full?.querySelectorAll("mark") ?? []].map(t => t.textContent)).toEqual(["Cl"]);
-    expect(full?.querySelector(".tr-quick-input-title")?.textContent?.replace(/\s+/gu, " ").trim()).toBe("Cl ose the tab");
-    expect([full?.querySelector(".tr-quick-input-detail")?.textContent, full?.querySelector(".tr-quick-input-key")?.textContent]).toEqual(["TeamRun", "Ctrl+W"]);
+    const mark = getComputedStyle(full?.querySelector("mark") as Element);
+    expect([...full?.querySelectorAll("mark") ?? []].map(t => t.textContent)).toEqual(["the", "Run"]);
+    expect([mark.color, mark.fontWeight, mark.backgroundColor]).toEqual([AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "list.highlightForeground"), "600", "rgba(0, 0, 0, 0)"]);
+    expect([full?.querySelector(".tr-quick-input-title")?.textContent, full?.querySelector(".tr-quick-input-detail")?.textContent, full?.querySelector(".tr-quick-input-key")?.textContent])
+      .toEqual(["Close the tab", "TeamRun", "Ctrl+W"]);
     expect([bare?.querySelector(".tr-quick-input-icon")?.textContent, bare?.querySelector(".tr-quick-input-detail"), bare?.querySelector(".tr-quick-input-key")]).toEqual(["", null, null]);
     expect(bare?.querySelector(".tr-quick-input-icon")?.getBoundingClientRect().width).toBe(full?.querySelector(".tr-quick-input-icon")?.getBoundingClientRect().width);
     expect(bare?.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left).toBe(full?.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left);

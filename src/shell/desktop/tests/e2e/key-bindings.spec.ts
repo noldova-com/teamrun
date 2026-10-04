@@ -10,10 +10,10 @@ import type { Locator, Page } from "@playwright/test";
 
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import SettingsFixture from "./fixtures/settings.fixture.ts";
+import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 
 const isMac = process.platform === "darwin";
-const windowColors = { Light: "rgb(248, 248, 248)", Dark: "rgb(24, 24, 24)" };
-
 function label(standard: string, mac: string): string {
   return isMac ? mac : standard;
 }
@@ -31,10 +31,7 @@ function note(window: Page, id: number): Locator {
 }
 
 async function openShortcutsAsync(window: Page): Promise<void> {
-  await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
-  await window.keyboard.press("ControlOrMeta+Comma");
-  await expect(window.locator("tr-settings")).toBeVisible();
-  await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
+  await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
   await expect(keyOf(window, "notes.newNote")).toBeVisible();
 }
 
@@ -101,10 +98,8 @@ test.describe("key bindings", () => {
     await recordAsync(window, "notes.newNote", "ControlOrMeta+Alt+KeyT");
     await expect(shortcut(window, "notes.newNote").getByRole("alert")).toContainText(label("Ctrl+Alt+T is used by Tick", "⌥⌘T is used by Tick"));
     expect((await keyOf(window, "clock.tick").boundingBox())?.x).toBe(keyColumn);
-    for (const mode of ["Light", "Dark"] as const) {
-      await window.evaluate(value => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
-        .request("shell.setSetting", { name: "shell.mode", value }), mode);
-      await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(windowColors[mode]);
+    for (const mode of WindowModeFixture.modes) {
+      await WindowModeFixture.setAsync(window, mode);
       await desktop.checkpointAsync(`key-bindings-collision-${mode.toLowerCase()}`);
     }
     await shortcut(window, "notes.newNote").getByRole("button", { name: "Use it here" }).click();

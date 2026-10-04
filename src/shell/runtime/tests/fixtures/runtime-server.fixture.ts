@@ -24,6 +24,7 @@ export class RuntimeServerFixture implements AsyncDisposable {
   public readonly server: RuntimeServer;
   public changes: number = 0;
   public endpoint: Endpoint | null = null;
+  public onChange: () => void = () => undefined;
 
   public constructor(settings: ServerSettings = new ServerSettings(64 * 1024, 1_000, 1_000, 2_000)) {
     this.server = new RuntimeServer(
@@ -34,6 +35,7 @@ export class RuntimeServerFixture implements AsyncDisposable {
       settings,
       () => {
         this.changes++;
+        this.onChange();
         for (const waiter of [...this.waiters])
           waiter();
       });

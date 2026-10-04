@@ -1197,6 +1197,22 @@ export declare class DiscoveryPublisher {
    * ```
    */
   public withdrawAsync(discovery: RuntimeDiscovery): Promise<boolean>;
+
+  /**
+   * Removes the discovery file that an earlier owner left behind, so clients do not reach this runtime with that owner's token.
+   *
+   * @returns A promise that settles once no discovery file remains.
+   * @throws {OwnershipReleasedException} When the ownership was released.
+   * @example
+   * ```ts
+   * import type { DiscoveryPublisher } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function takeOverAsync(publisher: DiscoveryPublisher): Promise<void> {
+   *   await publisher.withdrawEarlierAsync();
+   * }
+   * ```
+   */
+  public withdrawEarlierAsync(): Promise<void>;
 }
 
 /**

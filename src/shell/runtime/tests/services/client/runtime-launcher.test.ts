@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -300,6 +300,41 @@ export class RuntimeLauncherTests {
 
       Assert.areEqual(FailureCode.Unauthorized, exception.failure?.code);
     }, "wrong-token");
+  }
+
+  @TestMethod
+  public triesAgainWhenTheRuntimeThatRefusedTheTokenHasPublishedAnother(): Promise<void> {
+    return RuntimeLauncherTests.runWithFakeAsync(async fake => {
+      const earlier = readFileSync(fake.dataDirectory.discoveryFile, "utf8");
+      fake.server.onChange = () => writeFileSync(fake.dataDirectory.discoveryFile, earlier.replace("earlier-token", RuntimeServerFixture.TOKEN));
+
+      const client = await new RuntimeLauncher(fake.createSettings(), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture());
+
+      Assert.isTrue(client.isConnected);
+      client.close();
+    }, "earlier-token");
+  }
+
+  @TestMethod
+  public passesOnATokenRefusedAgainAfterEachNewPublication(): Promise<void> {
+    return RuntimeLauncherTests.runWithFakeAsync(async fake => {
+      const earlier = readFileSync(fake.dataDirectory.discoveryFile, "utf8");
+      let publications = 0;
+      let open = 0;
+      let connections = 0;
+      fake.server.onChange = () => {
+        connections += fake.server.server.sessionCount > open ? 1 : 0;
+        open = fake.server.server.sessionCount;
+        writeFileSync(fake.dataDirectory.discoveryFile, earlier.replace("earlier-token", `other-token-${++publications}`));
+      };
+
+      const exception = await Assert.throwsAsync(
+        () => new RuntimeLauncher(fake.createSettings(), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture()),
+        ConnectionException);
+
+      Assert.areEqual(FailureCode.Unauthorized, exception.failure?.code);
+      Assert.areEqual(4, connections);
+    }, "earlier-token");
   }
 
   @TestMethod

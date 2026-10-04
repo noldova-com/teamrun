@@ -250,6 +250,29 @@ describe("TabGroupComponent", () => {
     document.dispatchEvent(new PointerEvent("pointermove", { clientX: bounds.right + 40, clientY: bounds.top + 1 }));
     update();
     expect(group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-tab-drop-before")).toBe(true);
+
+    under = group(0).querySelector(".tr-tab-group-menu");
+    document.dispatchEvent(new PointerEvent("pointermove", { clientX: bounds.right + 60, clientY: bounds.top + 1 }));
+    update();
+    expect([group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-tab-drop-before"), group(0).querySelector(".tr-tab-group-actions")?.classList.contains("tr-tab-drop-before")])
+      .toEqual([true, false]);
+    expect(TestBed.inject(TabDragService).hoveredGroup()).toBeNull();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  });
+
+  it("marks the end of overflowing tabs at the start of the actions, which stay in view", async () => {
+    const many = Array.from({ length: 12 }, (_, index) => new DocumentTab("notes.note", `note ${index}`));
+    await renderAsync(many.reduce((current, t) => current.openDocument(t), Layout.createDefault(registry)), 60);
+    update();
+    await fixture.whenStable();
+    update();
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(group(0).querySelector(".tr-tab-group-actions"));
+    tab(0, 0).dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 0, clientY: 0, bubbles: true }));
+    document.dispatchEvent(new PointerEvent("pointermove", { clientX: 40, clientY: 40 }));
+    update();
+
+    expect([group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-tab-drop-before"), group(0).querySelector(".tr-tab-group-actions")?.classList.contains("tr-tab-drop-before")])
+      .toEqual([false, true]);
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   });
 
@@ -300,6 +323,23 @@ describe("TabGroupComponent", () => {
     layout.activate(LayoutFixture.files);
     update();
     expect(group(corner).querySelector(".tr-tab-group-title")?.textContent?.trim()).toBe("files.tree");
+  });
+
+  it("takes a tab dropped on a header at the group's end and marks it at the start of the actions", async () => {
+    await renderAsync(prepared.splitGroup(LayoutFixture.search, 1, PanelEdge.Bottom));
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
+    update();
+    const drag = TestBed.inject(TabDragService);
+    const corner = layout.layout().dock(DockSide.Left).root?.cornerGroup.id ?? -1;
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(group(corner).querySelector(".tr-tab-group-title"));
+    drag.begin(LayoutFixture.search, new PointerEvent("pointerdown", { button: 0, clientX: 0, clientY: 0 }));
+    document.dispatchEvent(new PointerEvent("pointermove", { clientX: 40, clientY: 40 }));
+    update();
+
+    expect(group(corner).querySelector(".tr-tab-group-header .tr-tab-group-actions")?.classList.contains("tr-tab-drop-before")).toBe(true);
+    expect(drag.hoveredGroup()).toBeNull();
+    document.dispatchEvent(new PointerEvent("pointerup"));
+    expect(layout.layout().group(corner)?.tabs).toEqual([LayoutFixture.files, LayoutFixture.search]);
   });
 
   it("opens the active tab's menu from the panel actions and a tab's menu from the keyboard", async () => {

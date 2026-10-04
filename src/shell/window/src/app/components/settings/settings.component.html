@@ -11,7 +11,7 @@ LICENSE file in the root directory of this source tree.
     [value]="query()" (input)="search($event)" />
 </div>
 <div class="tr-settings-body">
-  <nav #pageList class="tr-settings-pages" [attr.aria-label]="resources.settingsPagesLabel" (scroll)="keep()">
+  <nav #pageList class="tr-settings-pages tr-scroll-reveal" [attr.aria-label]="resources.settingsPagesLabel" (scroll)="keep()">
     @for (page of pages(); track page.title) {
       @let isCurrent = !isSearching() && page.title === currentPage()?.title;
       <button type="button" class="tr-settings-page" [class.tr-settings-page-current]="isCurrent" [attr.aria-current]="isCurrent ? 'page' : null" (click)="select(page)">
@@ -19,7 +19,7 @@ LICENSE file in the root directory of this source tree.
       </button>
     }
   </nav>
-  <div #content class="tr-settings-content" (scroll)="keep()">
+  <div #content class="tr-settings-content tr-scroll-reveal" (scroll)="keep()">
     @if (isSearching()) {
       @for (page of results(); track page.title) {
         <section class="tr-settings-result" [attr.aria-label]="page.title">

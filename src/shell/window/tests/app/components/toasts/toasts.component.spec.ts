@@ -6,10 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ErrorHandler, type WritableSignal, signal } from "@angular/core";
+import { Component, ErrorHandler, type WritableSignal, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { DialogService } from "@noldova/teamrun-shell-ui";
 import { CommandRun, Notification, NotificationAction, NotificationPost, NotificationSeverity, NotificationState, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { ToastsComponent } from "../../../../src/app/components/toasts/toasts.component";
@@ -44,6 +45,16 @@ async function expectTooltipAsync(button: HTMLElement | null | undefined, text: 
   button?.dispatchEvent(new PointerEvent("pointerleave"));
   await vi.waitFor(() => expect(tooltip()).toBeUndefined());
   expect(button?.hasAttribute("title")).toBe(false);
+}
+
+@Component({
+  template: `<button type="button" class="inside">Keep working</button>`
+})
+class OpenDialogComponent {
+}
+
+function announced(): HTMLElement | null {
+  return document.querySelector<HTMLElement>(".cdk-live-announcer-element");
 }
 
 describe("ToastsComponent", () => {
@@ -92,7 +103,6 @@ describe("ToastsComponent", () => {
       toast(2, { severity: NotificationSeverity.Error, text: "The disk is full.", open: "notes.open", actions: ["notes.retry", "clock.reset"] }),
       toast(1, { progress: NotificationPost.indeterminate }));
     const [second, first] = toasts(fixture);
-    const regions = [...(fixture.nativeElement as HTMLElement).querySelectorAll(".tr-toasts-announcement")].map(t => [t.getAttribute("aria-live"), t.textContent]);
 
     expect(toasts(fixture).map(t => t.dataset["notification"])).toEqual(["1", "2"]);
     expect(first?.querySelector(".tr-toast-severity")?.getAttribute("aria-label")).toBe("Error");
@@ -103,7 +113,24 @@ describe("ToastsComponent", () => {
     expect(second?.querySelector("tr-progress")?.hasAttribute("aria-valuenow")).toBe(false);
     expect(second?.querySelector(".tr-toast-close")?.getAttribute("aria-label")).toBe("Close");
     await expectTooltipAsync(second?.querySelector<HTMLElement>(".tr-toast-close"), "Close");
-    expect(regions).toEqual([["polite", "Title 1"], ["assertive", "Title 2. The disk is full."]]);
+    await vi.waitFor(() => expect([announced()?.getAttribute("aria-live"), announced()?.textContent]).toEqual(["assertive", "Title 1. Title 2. The disk is full."]));
+  });
+
+  it("announces a toast from outside the window, so a screen reader still hears it while a dialog holds the window inert", async () => {
+    const fixture = TestBed.createComponent(ToastsComponent);
+    await fixture.whenStable();
+    const dialog = TestBed.inject(DialogService).open(OpenDialogComponent, ".inside");
+    await vi.waitFor(() => expect(document.activeElement?.classList.contains("inside")).toBe(true));
+
+    notifications.stateValue.set(new NotificationState([toast(1, { text: "The clock ticked." })], false, [], 1));
+    await fixture.whenStable();
+    await vi.waitFor(() => expect(announced()?.textContent).toBe("Title 1. The clock ticked."));
+    const isWindowInert = (fixture.nativeElement as HTMLElement).closest("[inert]") !== null;
+    const isRegionLive = announced()?.closest("[inert], [aria-hidden=true]") === null;
+    dialog.close();
+
+    expect(toasts(fixture).length).toBe(1);
+    expect([isWindowInert, isRegionLive, announced()?.getAttribute("aria-live")]).toEqual([true, true, "polite"]);
   });
 
   it("names each toast's module, by its display name when it has a window part, and the time it was posted", async () => {

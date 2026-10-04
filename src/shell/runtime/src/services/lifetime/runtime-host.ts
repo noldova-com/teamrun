@@ -217,6 +217,7 @@ export class RuntimeHost implements IIdleParticipant {
   }
 
   private async openAsync(platform: string): Promise<void> {
+    await this.publisher.withdrawEarlierAsync();
     if (!Object.isNull(this.database) && !Object.isNull(this.settings))
       await this.activateModulesAsync(this.database, this.settings);
     const endpoint = await this.listenAsync(platform);
