@@ -13,6 +13,7 @@ export { TopBarSide } from "../app/enums/top-bar-side";
 export type { IDocumentOptions } from "../app/interfaces/i-document-options";
 export type { IStatusBarItemOptions } from "../app/interfaces/i-status-bar-item-options";
 export type { ITopBarActionOptions } from "../app/interfaces/i-top-bar-action-options";
+export type { IViewDialogOptions } from "../app/interfaces/i-view-dialog-options";
 export type { IWindowPart } from "../app/interfaces/i-window-part";
 export type { IWindowPartContext } from "../app/interfaces/i-window-part-context";
 export { CommandContribution } from "../app/models/command-contribution";

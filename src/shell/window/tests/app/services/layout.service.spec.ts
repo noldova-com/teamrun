@@ -149,6 +149,19 @@ describe("LayoutService", () => {
     expect(service.currentGroup()).toBe(service.layout().documents);
   });
 
+  it("numbers each tab it reveals by opening or activating it", async () => {
+    expect(service.revealed()).toBeNull();
+    await loadAsync(prepared());
+    const start = service.revealed()?.sequence ?? 0;
+
+    service.openDocument(LayoutFixture.plan);
+    const opened = service.revealed();
+    service.activate(LayoutFixture.files);
+
+    expect([opened?.tab.key, opened?.sequence]).toEqual([LayoutFixture.plan.key, start + 1]);
+    expect([service.revealed()?.tab.key, service.revealed()?.sequence]).toEqual([LayoutFixture.files.key, start + 2]);
+  });
+
   it("resizes a split through its handle", async () => {
     await loadAsync(prepared());
     service.setViewport(160, 80);

@@ -9,6 +9,7 @@
 import { Component, ErrorHandler, type Type } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
+import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { ModuleState, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
@@ -38,6 +39,7 @@ import { LayoutStoreService } from "../../../src/app/services/layout-store.servi
 import { LayoutService } from "../../../src/app/services/layout.service";
 import { MenuService } from "../../../src/app/services/menu.service";
 import { TabLabelService } from "../../../src/app/services/tab-label.service";
+import { ViewDialogService } from "../../../src/app/services/view-dialog.service";
 import { SettingsService } from "../../../src/app/services/settings.service";
 import { WindowPartHostService } from "../../../src/app/services/window-part-host.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
@@ -452,6 +454,20 @@ describe("WindowPartHostService", () => {
 
     expect(preview).toEqual(new DocumentTab("notes.note", "2"));
     expect(layout.layout().documents.preview).toBeNull();
+  });
+
+  it("shows a registered document or else a view by name in a dialog, with its instance and title", async () => {
+    const { host } = start([source("notes", notesPart(log))], [status("notes")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const shown = vi.spyOn(TestBed.inject(ViewDialogService), "showAsync").mockResolvedValue();
+
+    await host.showInDialogAsync("notes.note", "2", "Note 2");
+    await host.showInDialogAsync("notes.list", null, null);
+    await host.showInDialogAsync("notes.list", "3", null);
+    await host.showInDialogAsync("shell.settings", null, null);
+
+    await expect(host.showInDialogAsync("Notes", null, null)).rejects.toThrowError(ArgumentException);
+    expect(shown.mock.calls).toEqual([[new DocumentTab("notes.note", "2"), "Note 2"], [new ViewTab("notes.list"), null], [new ViewTab("notes.list", "3"), null], [new DocumentTab("shell.settings"), null]]);
   });
 
   it("writes a window part's log lines through the desktop under its module's id", async () => {

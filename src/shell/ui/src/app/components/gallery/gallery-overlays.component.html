@@ -92,6 +92,14 @@ LICENSE file in the root directory of this source tree.
       <button type="button" tr-button trDialogAction>{{ text.dialogConfirm }}</button>
     </tr-dialog>
   </ng-template>
+  <tr-gallery-cell [caption]="text.largeCaption">
+    <ng-container [ngTemplateOutlet]="largeDialog" [ngTemplateOutletInjector]="largeDialogInjector" />
+  </tr-gallery-cell>
+  <ng-template #largeDialog>
+    <tr-dialog class="tr-gallery-fit tr-gallery-large-dialog" [title]="text.largeDialogTitle" [size]="dialogSizes.Large">
+      <p class="tr-gallery-large-dialog-body">{{ text.largeDialogBody }}</p>
+    </tr-dialog>
+  </ng-template>
 </tr-gallery-specimen>
 
 <tr-gallery-specimen [name]="text.quickInput" [size]="sizes.Full">

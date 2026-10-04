@@ -21,6 +21,7 @@ import { CommandSearchService } from "../../../src/app/services/command-search.s
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
 import { TabStripService } from "../../../src/app/services/tab-strip.service";
 import { ToolbarService } from "../../../src/app/services/toolbar.service";
+import { ViewDialogService } from "../../../src/app/services/view-dialog.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../fixtures/layout-service.fixture";
@@ -69,7 +70,7 @@ describe("ShellCommandsService", () => {
       "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight",
       "shell.dockTabBottom", "shell.moveTabToGroup", "shell.moveTabToNextGroup", "shell.moveTabToPreviousGroup", "shell.focusNextGroup", "shell.focusPreviousGroup",
       "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut",
-      "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.toggleToolbar", "shell.moveToolbarLeft", "shell.moveToolbarRight", "shell.moveToolbarUp", "shell.moveToolbarDown", "shell.hideToolbar",
+      "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.showInDialog", "shell.toggleToolbar", "shell.moveToolbarLeft", "shell.moveToolbarRight", "shell.moveToolbarUp", "shell.moveToolbarDown", "shell.hideToolbar",
       "shell.focusToolbars", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
     expect(service.commands.every(t => t.title.length > 0 && t.icon !== null)).toBe(true);
@@ -85,6 +86,26 @@ describe("ShellCommandsService", () => {
     expect([opened.active?.key, opened.preview]).toEqual([settings.key, null]);
     expect(opened.tabs.filter(t => t.equals(settings)).length).toBe(1);
     expect(enabled("shell.openSettings")).toBe(false);
+  });
+
+  it("shows a registered view or document named by its tab key in a dialog, and is enabled only for one while no dialog is shown", async () => {
+    const dialogs = TestBed.inject(ViewDialogService);
+    const before = layout.layout().documents.tabs.map(t => t.key);
+    const refused = [null, {}, tab("view"), tab("view/Files"), tab("view/files.missing"), tab("panel/files.search"), tab("document/notes.note/ "), tab("document/notes.page/1")]
+      .map(t => enabled("shell.showInDialog", t));
+    const accepted = [tab("view/files.search"), tab("view/terminal.shell/3"), tab("document/notes.note/a/b"), tab("document/shell.settings")].map(t => enabled("shell.showInDialog", t));
+
+    const running = command("shell.showInDialog").runAsync(tab("document/notes.note/a/b"));
+    const shown = dialogs.shown()?.key;
+    const whileShown = enabled("shell.showInDialog", tab("view/files.search"));
+    const ignored = await command("shell.showInDialog").runAsync(tab("view/files.search"));
+    dialogs.close();
+
+    expect(refused.some(t => t)).toBe(false);
+    expect(accepted.every(t => t)).toBe(true);
+    expect([shown, whileShown, ignored, await running]).toEqual(["document/notes.note/a/b", false, null, null]);
+    expect(dialogs.shown()).toBeNull();
+    expect(layout.layout().documents.tabs.map(t => t.key)).toEqual(before);
   });
 
   it("edits the field that had focus before a menu took it, restoring the field and its selection first, and only when the field allows the edit", async () => {
