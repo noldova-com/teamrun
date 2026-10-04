@@ -16,6 +16,14 @@ import { QuickInputItem } from "../../../../src/app/models/quick-input-item";
 import { DefaultTheme } from "../../../../src/app/themes/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
+const many: readonly QuickInputItem[] = Array.from({ length: 30 }, (_, index) => new QuickInputItem(`notes.command${index}`, `Command ${index}`, null, null, null));
+
+function press(target: Element, key: string): KeyboardEvent {
+  const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+  target.dispatchEvent(event);
+  return event;
+}
+
 @Component({
   imports: [QuickInputComponent],
   template: `
@@ -36,16 +44,14 @@ class QuickInputHostComponent {
   template: `<tr-quick-input [items]="items()" label="Search commands" [(query)]="query" (chosen)="chosen.push($event.id)" />`
 })
 class FilteringHostComponent {
-  public readonly options: readonly QuickInputItem[] = Array.from({ length: 30 }, (_, index) => new QuickInputItem(`notes.command${index}`, `Command ${index}`, null, null, null));
   public readonly query = signal("");
-  public readonly items: Signal<readonly QuickInputItem[]> = computed(() => this.options.filter(t => t.title.includes(this.query())));
+  public readonly items: Signal<readonly QuickInputItem[]> = computed(() => many.filter(t => t.title.includes(this.query())));
   public readonly chosen: string[] = [];
 }
 
 describe("QuickInputComponent", () => {
   let fixture: ComponentFixture<QuickInputHostComponent>;
   let host: QuickInputHostComponent;
-  const many = Array.from({ length: 30 }, (_, index) => new QuickInputItem(`notes.command${index}`, `Command ${index}`, null, null, null));
 
   beforeEach(async () => {
     AppearanceFixture.apply();
@@ -78,8 +84,7 @@ describe("QuickInputComponent", () => {
   }
 
   async function pressAsync(key: string): Promise<KeyboardEvent> {
-    const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
-    field().dispatchEvent(event);
+    const event = press(field(), key);
     fixture.detectChanges();
     await fixture.whenStable();
     return event;
@@ -150,23 +155,22 @@ describe("QuickInputComponent", () => {
     return filtering;
   }
 
-  function type(filtering: ComponentFixture<FilteringHostComponent>, text: string): void {
-    const typed = filtering.nativeElement.querySelector(".tr-quick-input-field") as HTMLInputElement;
-    typed.value = text;
-    typed.dispatchEvent(new Event("input", { bubbles: true }));
+  function fieldOf(filtering: ComponentFixture<FilteringHostComponent>): HTMLInputElement {
+    return filtering.nativeElement.querySelector(".tr-quick-input-field");
   }
 
-  function press(filtering: ComponentFixture<FilteringHostComponent>, key: string): void {
-    filtering.nativeElement.querySelector(".tr-quick-input-field").dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+  function type(filtering: ComponentFixture<FilteringHostComponent>, text: string): void {
+    fieldOf(filtering).value = text;
+    fieldOf(filtering).dispatchEvent(new Event("input", { bubbles: true }));
   }
 
   it("chooses from the options for the text just typed when Enter comes before they are shown, once however often Enter is pressed", async () => {
     const filtering = await filteringAsync();
 
-    press(filtering, "ArrowDown");
+    press(fieldOf(filtering), "ArrowDown");
     type(filtering, "Command 7");
-    press(filtering, "Enter");
-    press(filtering, "Enter");
+    press(fieldOf(filtering), "Enter");
+    press(fieldOf(filtering), "Enter");
     const before = [...filtering.componentInstance.chosen];
     filtering.detectChanges();
     await filtering.whenStable();
@@ -182,8 +186,8 @@ describe("QuickInputComponent", () => {
     type(filtering, "Command 2");
     filtering.detectChanges();
     await filtering.whenStable();
-    press(filtering, "ArrowDown");
-    press(filtering, "Enter");
+    press(fieldOf(filtering), "ArrowDown");
+    press(fieldOf(filtering), "Enter");
 
     expect(filtering.componentInstance.chosen).toEqual(["notes.command20"]);
     filtering.destroy();

@@ -49,7 +49,6 @@ export class QuickInputComponent {
       this.activeValue.set(0);
     });
     afterRenderEffect(() => {
-      this.items();
       this.shownQuery = this.query();
     });
     afterRenderEffect(() => {
