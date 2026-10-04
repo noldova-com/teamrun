@@ -72,7 +72,7 @@ test.describe("quitting while a module works", () => {
     const window = desktop.window;
     const content = window.locator("tr-window");
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]")).toBeVisible();
-    await beginWorkAsync(desktop);
+    await ClockWorkFixture.beginAsync(desktop);
     const asking = window.getByRole("dialog", { name: "Work is still running" });
     const wait = asking.getByRole("button", { name: "Wait, then quit" });
 
@@ -93,8 +93,8 @@ test.describe("quitting while a module works", () => {
       await window.keyboard.press("F10");
       await expect(window.locator("tr-menu-bar").getByRole("menuitem").first()).toBeFocused();
     }
-    await runCommandAsync(desktop.dataDirectory, "clock.finishWork");
-    await expect.poll(() => readWorkAsync(desktop.dataDirectory), { timeout: 20_000, intervals: [500] }).toEqual([]);
+    await ClockWorkFixture.finishAsync(desktop.dataDirectory);
+    await expect.poll(() => ClockWorkFixture.readAsync(desktop.dataDirectory), { timeout: ClockWorkFixture.TIMEOUT, intervals: [ClockWorkFixture.INTERVAL] }).toEqual([]);
   });
 
   test("paints the question's body in the dialog's text color at full opacity as it opens, without a pointer move, in light and in dark mode", async ({ desktop }) => {
