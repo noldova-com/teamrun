@@ -9,6 +9,7 @@
 import { ErrorHandler, type WritableSignal, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { ModuleState, ModuleStatus, type SettingDefinition } from "@noldova/teamrun-shell-protocol";
 import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
@@ -62,7 +63,7 @@ describe("ModulesComponent", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: WindowPartHostService, useValue: { modules } },
-        { provide: SettingsService, useValue: { definitions: signal<readonly SettingDefinition[]>(SettingsFixture.all) } },
+        { provide: SettingsService, useValue: { definitions: signal<readonly SettingDefinition[]>(SettingsFixture.all), values: signal<ReadonlyMap<string, JsonValue>>(new Map()) } },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
     });

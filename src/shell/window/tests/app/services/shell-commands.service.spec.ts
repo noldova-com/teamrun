@@ -101,7 +101,7 @@ describe("ShellCommandsService", () => {
     const opened = layout.layout().documents;
 
     expect([unregistered, enabled("shell.openModules")]).toEqual([false, true]);
-    expect([opened.active?.key, opened.preview]).toEqual([modules.key, null]);
+    expect([opened.active?.key, opened.preview?.key]).toEqual([modules.key, settings.key]);
     expect(opened.tabs.filter(t => t.equals(modules)).length).toBe(1);
     expect(command("shell.openModules").title).toBe("Modules…");
   });
