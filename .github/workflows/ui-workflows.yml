@@ -59,6 +59,7 @@ jobs:
           path: ui-build.tar
           retention-days: 3
           if-no-files-found: error
+          overwrite: true
 
       - name: Wait before keeping the builds again
         if: steps.keep.outcome == 'failure'
@@ -172,6 +173,7 @@ jobs:
           path: _build/ui
           retention-days: 14
           if-no-files-found: ignore
+          overwrite: true
 
       - name: Wait before keeping the UI workflow results again
         if: always() && steps.ui.outcome != 'skipped' && steps.results.outcome == 'failure'
@@ -220,6 +222,7 @@ jobs:
           archive: false
           retention-days: 14
           if-no-files-found: ignore
+          overwrite: true
 
       - name: Wait before keeping the main window screenshot again
         if: always() && steps.ui.outcome != 'skipped' && steps.screenshot.outcome == 'failure'

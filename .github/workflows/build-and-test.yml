@@ -132,6 +132,7 @@ jobs:
             _build/angular-tests.json
           retention-days: 14
           if-no-files-found: ignore
+          overwrite: true
 
       - name: Wait before keeping the Angular test output again
         if: always() && steps.test.outcome == 'failure' && steps.angular.outcome == 'failure'
