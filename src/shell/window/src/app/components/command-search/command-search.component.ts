@@ -13,6 +13,7 @@ import { QuickInputComponent, QuickInputItem } from "@noldova/teamrun-shell-ui";
 
 import type { CommandContribution } from "../../models/command-contribution";
 import { CommandMatcher } from "../../models/command-matcher";
+import { CommandSearchEntry } from "../../models/command-search-entry";
 import { WindowPartTokens } from "../../models/window-part-tokens";
 import { CommandSearchService } from "../../services/command-search.service";
 import { CommandService } from "../../services/command.service";
@@ -33,22 +34,24 @@ export class CommandSearchComponent {
     ...inject(WindowPartTokens.sources).map(t => [t.moduleId, t.displayName] as const)
   ]);
 
+  private readonly entries: Signal<readonly CommandSearchEntry[]> = computed(() => [
+    ...this.commands.commands().filter(t => this.commands.isEnabled(t.name)).map(t => new CommandSearchEntry(this.itemOf(t), () => this.commands.run(t.name))),
+    ...this.menuBar.searchRows().map(t => new CommandSearchEntry(new QuickInputItem(t.id, t.title, t.icon, t.menu, t.key), () => this.menuBar.run(t.id)))
+  ]);
+
   protected readonly resources: typeof Resources = Resources;
   protected readonly search: CommandSearchService = inject(CommandSearchService);
   protected readonly query: WritableSignal<string> = signal(String.empty);
   protected readonly items: Signal<readonly QuickInputItem[]> = computed(() => {
-    const enabled = this.commands.commands().filter(t => this.commands.isEnabled(t.name));
-    const entries = [...enabled.map(t => this.itemOf(t)), ...this.menuBar.searchRows().map(t => new QuickInputItem(t.id, t.title, t.icon, t.menu, t.key))];
-    return String.isNullOrWhitespace(this.query()) ? this.unfiltered(entries) : this.filtered(entries, this.query());
+    const items = this.entries().map(t => t.item);
+    return String.isNullOrWhitespace(this.query()) ? this.unfiltered(items) : this.filtered(items, this.query());
   });
 
   protected run(item: QuickInputItem): void {
     this.search.remember(item.id);
     this.search.close();
-    if (item.id.includes(Resources.menuRowPathSeparator))
-      this.menuBar.run(item.id);
-    else
-      this.commands.run(item.id);
+    for (const entry of this.entries().filter(t => t.item.id === item.id).slice(0, 1))
+      entry.run();
   }
 
   private unfiltered(items: readonly QuickInputItem[]): readonly QuickInputItem[] {

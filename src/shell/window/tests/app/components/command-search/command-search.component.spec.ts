@@ -122,11 +122,13 @@ describe("CommandSearchComponent", () => {
 
   it("runs the chosen command after closing the search, and remembers it", async () => {
     const close = vi.spyOn(search, "close");
+    const row = vi.spyOn(menuBar, "run");
     await typeAsync("new note");
 
     root().querySelector<HTMLElement>("[data-item='notes.newNote']")?.click();
 
     await vi.waitFor(() => expect(runs).toEqual(["notes.newNote"]));
+    expect(row).not.toHaveBeenCalled();
     expect(close).toHaveBeenCalledOnce();
     expect(search.recent()).toEqual(["notes.newNote"]);
   });
