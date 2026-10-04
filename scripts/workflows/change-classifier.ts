@@ -11,12 +11,12 @@ import VerificationScope from "./verification-scope.ts";
 
 export default class ChangeClassifier {
   private static readonly PUSH_EVENT: string = "push";
-  private static readonly MERGE_BASE_EVENTS: readonly string[] = ["pull_request", "merge_group"];
+  private static readonly PULL_REQUEST_EVENT: string = "pull_request";
   private static readonly REVISION_PATTERN: RegExp = /^[0-9a-f]{40}$/;
   private static readonly MARKDOWN_EXTENSION: string = ".md";
   private static readonly DOCUMENTATION_FOLDERS: readonly string[] = ["docs/", ".github/"];
   private static readonly MODULE_DOCUMENT_PATTERN: RegExp = /^src\/modules\/[^/]+\/README\.md$/;
-  private static readonly MANUAL_RUN: string = "Events other than pull requests, merge groups and pushes verify everything.";
+  private static readonly MANUAL_RUN: string = "Events other than pull requests and pushes verify everything.";
   private static readonly HISTORY_UNAVAILABLE: string = "The revisions to compare are unavailable.";
   private static readonly EMPTY_COMPARISON: string = "The comparison found no changed files.";
 
@@ -28,7 +28,7 @@ export default class ChangeClassifier {
 
   public async classifyAsync(eventName?: string, baseRevision?: string, headRevision?: string): Promise<VerificationScope> {
     const isPush = eventName === ChangeClassifier.PUSH_EVENT;
-    if (eventName === undefined || !(isPush || ChangeClassifier.MERGE_BASE_EVENTS.includes(eventName)))
+    if (eventName === undefined || !(isPush || eventName === ChangeClassifier.PULL_REQUEST_EVENT))
       return new VerificationScope(true, ChangeClassifier.MANUAL_RUN);
     if (baseRevision === undefined || headRevision === undefined || !await this.existsAsync(baseRevision) || !await this.existsAsync(headRevision))
       return new VerificationScope(true, ChangeClassifier.HISTORY_UNAVAILABLE);
