@@ -18,12 +18,12 @@ export interface SimulatedStep {
 }
 
 export default class WorkflowSimulation {
-  private static readonly STEP_PATTERN: RegExp = /^ {6}- name: (.+)$/;
-  private static readonly KEY_PATTERN: RegExp = /^ {8}([a-z-]+):(?: (.*))?$/;
-  private static readonly SETTING_PATTERN: RegExp = /^ {10}(.+)$/;
+  private static readonly STEP_PATTERN: RegExp = /^( *)- name: (.+)$/;
+  private static readonly KEY_PATTERN: RegExp = /^([a-z-]+):(?: (.*))?$/;
   private static readonly OUTCOME_PATTERN: RegExp = /^steps\.([a-z-]+)\.outcome (==|!=) '([a-z]+)'$/;
   private static readonly MATRIX_PATTERN: RegExp = /^matrix\.([a-z]+) (==|!=) '([a-z]+)'$/;
   private static readonly ALWAYS: string = "always()";
+  private static readonly FAILURE: string = "failure()";
   private static readonly SKIPPED: string = "skipped";
 
   public readonly steps: readonly SimulatedStep[];
@@ -50,7 +50,7 @@ export default class WorkflowSimulation {
     let isJobFailed = false;
     for (const step of this.steps) {
       const terms = step.condition?.split(" && ") ?? [];
-      const isRun = (terms.includes(WorkflowSimulation.ALWAYS) || !isJobFailed) && this.evaluate(terms, matrix, results);
+      const isRun = (terms.includes(WorkflowSimulation.FAILURE) ? isJobFailed : terms.includes(WorkflowSimulation.ALWAYS) || !isJobFailed) && this.evaluate(terms, matrix, results);
       const outcome = isRun ? outcomes[step.name] ?? "success" : WorkflowSimulation.SKIPPED;
       if (step.id !== null)
         results.set(step.id, outcome);
@@ -65,7 +65,7 @@ export default class WorkflowSimulation {
 
   private evaluate(terms: readonly string[], matrix: Readonly<Record<string, string>>, results: ReadonlyMap<string, string>): boolean {
     return terms.every(term => {
-      if (term === WorkflowSimulation.ALWAYS)
+      if (term === WorkflowSimulation.ALWAYS || term === WorkflowSimulation.FAILURE)
         return true;
       const setting = WorkflowSimulation.MATRIX_PATTERN.exec(term);
       if (setting !== null) {
@@ -81,23 +81,24 @@ export default class WorkflowSimulation {
   }
 
   private static parse(lines: readonly string[]): SimulatedStep {
-    const name = WorkflowSimulation.STEP_PATTERN.exec(lines[0] ?? "")?.[1] ?? "";
+    const step = WorkflowSimulation.STEP_PATTERN.exec(lines[0] ?? "");
+    const keyIndentation = " ".repeat((step?.[1]?.length ?? 0) + 2);
+    const settingIndentation = `${keyIndentation}  `;
     const keys = new Map<string, string>();
     const settings: string[] = [];
     let isWith = false;
     for (const line of lines.slice(1)) {
-      const key = WorkflowSimulation.KEY_PATTERN.exec(line);
+      const key = line.startsWith(keyIndentation) && line[keyIndentation.length] !== " " ? WorkflowSimulation.KEY_PATTERN.exec(line.slice(keyIndentation.length)) : null;
       if (key !== null) {
         isWith = key[1] === "with";
         keys.set(key[1] ?? "", key[2] ?? "");
         continue;
       }
-      const setting = WorkflowSimulation.SETTING_PATTERN.exec(line);
-      if (isWith && setting !== null)
-        settings.push(setting[1] ?? "");
+      if (isWith && line.startsWith(settingIndentation))
+        settings.push(line.slice(settingIndentation.length));
     }
     return {
-      name,
+      name: step?.[2] ?? "",
       id: keys.get("id") ?? null,
       condition: keys.get("if") ?? null,
       continueOnError: keys.get("continue-on-error") === "true",
