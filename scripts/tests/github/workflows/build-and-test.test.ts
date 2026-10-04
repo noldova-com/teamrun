@@ -173,24 +173,26 @@ class BuildAndTestTests {
       }
     });
 
-    test("the aggregate check expects no UI workflows from the targets a push leaves to manual and nightly runs, and names them", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+    test("the aggregate check expects no UI workflows from the targets a push leaves to manual and nightly runs, names them, and still requires every planned target", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
       const uiTargets = BuildAndTestTests.ALL_UI_TARGETS.split(" ").filter(t => t !== "macos-x64").join(" ");
-      for (const [macOsX64, status, summary] of [
-        ["skipped", 0, "The document checks passed, and the build, tests and UI workflows passed on every target, with the UI workflows of macOS x64 left to manual and nightly runs.\n"],
-        ["success", 1, ""]
+      for (const [changed, status, summary] of [
+        [{}, 0, "The document checks passed, and the build, tests and UI workflows passed on every target, with the UI workflows of macOS x64 left to manual and nightly runs.\n"],
+        [{ "macos-x64": "success" }, 1, ""],
+        [{ "windows-arm64": "skipped" }, 1, ""]
       ] as const) {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
         await writeFile(path.join(doubles.directory, "summary.md"), "");
-        const uiResults = BuildAndTestTests.ALL_UI_TARGETS.split(" ").map(t => `${t}=${t === "macos-x64" ? macOsX64 : "success"}`).join(" ");
+        const results: Readonly<Record<string, string>> = { "macos-x64": "skipped", ...changed };
+        const uiResults = BuildAndTestTests.ALL_UI_TARGETS.split(" ").map(t => `${t}=${results[t] ?? "success"}`).join(" ");
 
         const result = await doubles.runAsync(script, {
           CHANGES_RESULT: "success", RUN_CODE: "true", RUN_UI: "true", VALIDATION_RESULT: "success", UI_TARGETS: uiTargets, UI_RESULTS: uiResults, DEFERRED: "", UI_DEFERRED: "macOS x64",
           GITHUB_STEP_SUMMARY: "summary.md"
         });
 
-        assert.equal(result.status, status, `${macOsX64}: ${result.stderr}`);
+        assert.equal(result.status, status, `${uiResults}: ${result.stderr}`);
         assert.equal(await doubles.readFileAsync("summary.md"), summary);
       }
     });

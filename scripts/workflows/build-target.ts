@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type IBuildTargetOptions from "./interfaces/build-target-options.ts";
 import UiShard from "./ui-shard.ts";
 
 export default class BuildTarget {
@@ -20,14 +21,14 @@ export default class BuildTarget {
   public readonly runsUiOnPushes: boolean;
   public readonly uiShardCount: number;
 
-  public constructor(name: string, runner: string, architecture: string, runsOnPullRequests: boolean, runsSmokeOnPullRequests: boolean, runsUiOnPushes: boolean, uiShardCount: number) {
+  public constructor(name: string, runner: string, architecture: string, options: IBuildTargetOptions) {
     this.name = name;
     this.runner = runner;
     this.architecture = architecture;
-    this.runsOnPullRequests = runsOnPullRequests;
-    this.runsSmokeOnPullRequests = runsSmokeOnPullRequests;
-    this.runsUiOnPushes = runsUiOnPushes;
-    this.uiShardCount = uiShardCount;
+    this.runsOnPullRequests = options.runsOnPullRequests;
+    this.runsSmokeOnPullRequests = options.runsSmokeOnPullRequests;
+    this.runsUiOnPushes = options.runsUiOnPushes;
+    this.uiShardCount = options.uiShardCount;
   }
 
   public get key(): string {
