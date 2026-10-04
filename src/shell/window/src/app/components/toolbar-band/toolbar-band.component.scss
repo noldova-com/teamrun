@@ -31,7 +31,7 @@
   position: fixed;
   z-index: 1;
   width: calc(var(--tr-border-width) * 2);
-  margin: calc(var(--tr-border-width) * -1);
+  margin-inline: calc(var(--tr-border-width) * -1);
   background-color: var(--tr-accent);
   pointer-events: none;
 }
@@ -39,4 +39,6 @@
 .tr-toolbar-drop-row {
   width: auto;
   height: calc(var(--tr-border-width) * 2);
+  margin-inline: 0;
+  margin-block: calc(var(--tr-border-width) * -1);
 }

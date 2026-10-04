@@ -124,6 +124,7 @@ export class Resources {
     "toolbar-button",
     "toolbar-button-padding",
     "toolbar-gap",
+    "toolbar-grip-gap",
     "menu-separator-spacing",
     "tooltip-width",
     "tooltip-padding",

@@ -49,6 +49,20 @@ export class KeyNameTests {
   }
 
   @TestMethod
+  public findsTheKeyAStrokeReports(): void {
+    Assert.areEqual("K", KeyName.fromStroke(KeyNameTests.stroke("K", "KeyK"))?.token);
+    Assert.areEqual("A", KeyName.fromStroke(KeyNameTests.stroke("a", "KeyQ"))?.token);
+    Assert.areEqual("K", KeyName.fromStroke(KeyNameTests.stroke("\u043B", "KeyK"))?.token);
+    Assert.areEqual("1", KeyName.fromStroke(KeyNameTests.stroke("&", "Digit1"))?.token);
+    Assert.areEqual("Comma", KeyName.fromStroke(KeyNameTests.stroke("<", "Comma"))?.token);
+    Assert.areEqual("Enter", KeyName.fromStroke(KeyNameTests.stroke("Enter", "NumpadEnter"))?.token);
+    Assert.areEqual("F12", KeyName.fromStroke(KeyNameTests.stroke("F12", "F12"))?.token);
+    Assert.areEqual("Quote", KeyName.fromStroke(KeyNameTests.stroke("Dead", "Quote"))?.token);
+    for (const [key, code] of [["Control", "ControlLeft"], ["Shift", "ShiftRight"], ["Meta", "MetaLeft"], ["Unidentified", "IntlBackslash"]])
+      Assert.isUndefined(KeyName.fromStroke(KeyNameTests.stroke(String(key), String(code))), key);
+  }
+
+  @TestMethod
   public labelsByThePlatformsConvention(): void {
     Assert.areEqual("\u21A9", KeyName.find("Enter")?.label(true));
     Assert.areEqual("Enter", KeyName.find("Enter")?.label(false));

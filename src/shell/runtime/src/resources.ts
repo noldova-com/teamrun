@@ -196,12 +196,15 @@ export class Resources {
   public static readonly menuBarSetting: string = "menuBar";
   public static readonly doNotDisturbSetting: string = "doNotDisturb";
   public static readonly mutedModulesSetting: string = "mutedModules";
+  public static readonly keyBindingsSetting: string = "keyBindings";
   public static readonly appearancePage: string = "Appearance";
   public static readonly notificationsPage: string = "Notifications";
+  public static readonly shortcutsPage: string = "Keyboard shortcuts";
   public static readonly themeGroup: string = "Theme";
   public static readonly textGroup: string = "Text";
   public static readonly layoutGroup: string = "Layout";
   public static readonly notificationsGroup: string = "Notifications";
+  public static readonly shortcutsGroup: string = "Keys";
   public static readonly defaultThemeId: string = "shell.default";
   public static readonly defaultThemeTitle: string = "Default";
   public static readonly themeTitle: string = "Theme";
@@ -244,6 +247,8 @@ export class Resources {
   public static readonly doNotDisturbDescription: string = "Holds back notifications on this device; they still collect in the list.";
   public static readonly mutedModulesTitle: string = "Notifications from modules";
   public static readonly mutedModulesDescription: string = "A module turned off still adds its notifications to the list, without toasts or operating system notifications.";
+  public static readonly keyBindingsTitle: string = "Keyboard shortcuts";
+  public static readonly keyBindingsDescription: string = "The keys you chose for commands, in place of their default keys, on every device.";
   public static readonly settingScopesKind: string = "settingScopes";
   public static readonly settingsField: string = "settings";
   public static readonly nameParameterName: string = "name";
@@ -544,6 +549,10 @@ export class Resources {
 
   public static formatSettingOwnerInvalid(moduleId: string, name: string): string {
     return `The module ${moduleId} declares the setting ${name}, which it does not own.`;
+  }
+
+  public static formatSettingKindReserved(moduleId: string, name: string, kind: string): string {
+    return `The module ${moduleId} declares the setting ${name} of the kind ${kind}, which only the shell declares.`;
   }
 
   public static formatNotContributed(moduleId: string, kind: string, name: string): string {

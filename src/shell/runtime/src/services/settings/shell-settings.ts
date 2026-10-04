@@ -24,6 +24,7 @@ export class ShellSettings {
   public static readonly previewTabs: QualifiedName = ShellSettings.named(Resources.previewTabsSetting);
   public static readonly doNotDisturb: QualifiedName = ShellSettings.named(Resources.doNotDisturbSetting);
   public static readonly mutedModules: QualifiedName = ShellSettings.named(Resources.mutedModulesSetting);
+  public static readonly keyBindings: QualifiedName = ShellSettings.named(Resources.keyBindingsSetting);
 
   public static readonly all: readonly SettingDefinition[] = [
     ShellSettings.appearance(ShellSettings.theme, Resources.themeTitle, Resources.themeDescription,
@@ -51,7 +52,9 @@ export class ShellSettings {
     new SettingDefinition(ShellSettings.doNotDisturb, Resources.doNotDisturbTitle, Resources.doNotDisturbDescription,
       SettingType.boolean(), false, SettingLocality.Device, [], Resources.notificationsPage, Resources.notificationsGroup),
     new SettingDefinition(ShellSettings.mutedModules, Resources.mutedModulesTitle, Resources.mutedModulesDescription,
-      SettingType.modules(), [], SettingLocality.Shared, [], Resources.notificationsPage, Resources.notificationsGroup)
+      SettingType.modules(), [], SettingLocality.Shared, [], Resources.notificationsPage, Resources.notificationsGroup),
+    new SettingDefinition(ShellSettings.keyBindings, Resources.keyBindingsTitle, Resources.keyBindingsDescription,
+      SettingType.keyBindings(), {}, SettingLocality.Shared, [], Resources.shortcutsPage, Resources.shortcutsGroup)
   ];
 
   private static named(member: string): QualifiedName {
