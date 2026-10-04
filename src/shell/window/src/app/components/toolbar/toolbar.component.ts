@@ -95,14 +95,14 @@ export class ToolbarComponent {
     if (event.key === Resources.toolbarMenuKey || (event.key === Resources.toolbarMenuShiftKey && event.shiftKey)) {
       event.preventDefault();
       event.stopPropagation();
-      this.gripMenu().open();
+      this.gripMenu().openFocusing(Resources.keyboardFocusOrigin);
     }
   }
 
   protected openMenuAtToolbar(event: MouseEvent): void {
     event.preventDefault();
     event.stopPropagation();
-    this.gripMenu().open();
+    this.gripMenu().openFocusing(Resources.mouseFocusOrigin);
   }
 
   protected tooltipOf(row: CommandRow): string {

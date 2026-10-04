@@ -279,6 +279,7 @@ export class Resources {
   public static readonly windowRowSelector: string = "tr-window-row";
   public static readonly wordSeparatorPattern: RegExp = /[\s\-_./:,]/u;
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
+  public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
   public static readonly hideDockLabels: Readonly<Record<DockSide, string>> = {
     [DockSide.Left]: "Hide the left dock",
     [DockSide.Right]: "Hide the right dock",

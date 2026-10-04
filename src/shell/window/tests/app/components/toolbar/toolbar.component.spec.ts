@@ -211,6 +211,7 @@ describe("ToolbarComponent", () => {
     fixture.detectChanges();
     expect(outer).toHaveBeenCalledTimes(0);
     expect(rowsOf()).toEqual(["Move left", "Move right", "Move to the row above", "Move to the row below", "Hide toolbar"]);
+    expect(document.activeElement?.closest("tr-menu[data-place='shell.toolbar']")).not.toBeNull();
   });
 
   it("opens the toolbar's menu from a context click or the keyboard's context menu event on it, without letting the band's menu open too", async () => {
@@ -225,6 +226,7 @@ describe("ToolbarComponent", () => {
     expect(event.defaultPrevented).toBe(true);
     expect(outer).not.toHaveBeenCalled();
     expect(document.querySelectorAll("tr-menu[data-place='shell.toolbar'] button[tr-menu-item]").length).toBe(5);
+    expect(document.activeElement?.closest("tr-menu[data-place='shell.toolbar']")).not.toBeNull();
   });
 
   it("opens the toolbar's menu from a click on its grip", async () => {
