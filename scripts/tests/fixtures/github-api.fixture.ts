@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import path from "node:path";
+
 import ProcessResult from "../../processes/process-result.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
 
@@ -38,7 +40,7 @@ export default class GitHubApiFixture extends ProcessRunner {
 
   public override async captureAsync(command: string, commandArguments: readonly string[]): Promise<ProcessResult> {
     const endpoint = commandArguments.find(t => t.startsWith(GitHubApiFixture.PREFIX));
-    if (command !== "gh" || commandArguments[0] !== "api" || endpoint === undefined)
+    if (path.parse(command).name !== "gh" || commandArguments[0] !== "api" || endpoint === undefined)
       throw new Error(`Unexpected command ${command} ${commandArguments.join(" ")}.`);
     const resource = endpoint.slice(GitHubApiFixture.PREFIX.length);
     const methodIndex = commandArguments.indexOf("--method");
