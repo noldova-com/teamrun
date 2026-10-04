@@ -16,6 +16,7 @@ import {
 } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../enums/dock-side";
+import { WindowPartFailureException } from "../exceptions/window-part-failure.exception";
 import type { IWindowPart } from "../interfaces/i-window-part";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
 import { CommandContribution } from "../models/command-contribution";
@@ -335,7 +336,7 @@ export class WindowPartHostService implements IWindowPartHost {
       part = await source.load();
     }
     catch (error) {
-      this.errors.handleError(error);
+      this.errors.handleError(new WindowPartFailureException(moduleId, Resources.windowPartLoadFailed, error));
       return new ModuleStatus(moduleId, ModuleState.Failed, Resources.windowPartLoadFailed);
     }
 
@@ -347,7 +348,7 @@ export class WindowPartHostService implements IWindowPartHost {
     catch (error) {
       this.activations.splice(this.activations.indexOf(activation), 1);
       activation.context.withdraw();
-      this.errors.handleError(error);
+      this.errors.handleError(new WindowPartFailureException(moduleId, Resources.windowPartActivationFailed, error));
       return new ModuleStatus(moduleId, ModuleState.Failed, Resources.windowPartActivationFailed);
     }
     return new ModuleStatus(moduleId, ModuleState.Active, null);

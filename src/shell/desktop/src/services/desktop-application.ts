@@ -180,6 +180,7 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
     this.electron.ipcMain.handle(Resources.quitAnswerChannel, (event, choice) => this.answerQuit(event, choice));
     this.electron.ipcMain.on(Resources.moduleLogChannel, (event, moduleId, message) => this.writeModuleLog(event, moduleId, message));
+    this.electron.ipcMain.on(Resources.windowErrorChannel, (event, moduleId, text) => this.writeWindowError(event, moduleId, text));
     this.electron.ipcMain.handle(Resources.readStartupChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.startup.current.toJson());
     this.electron.ipcMain.handle(Resources.startupActionChannel, (event, action) => Object.isNull(this.findTrusted(event)) ? false : this.startup.actAsync(action));
     this.electron.ipcMain.handle(Resources.readLayoutChannel, event => this.readLayoutAsync(event));
@@ -311,6 +312,13 @@ export class DesktopApplication {
       message.length > Resources.moduleLogLimit)
       return;
     this.log.write(message.trimEnd().split(Resources.lineBreakPattern).map(t => Resources.formatModuleLogLine(moduleId, t)).join(Resources.logLineSeparator));
+  }
+
+  private writeWindowError(event: IIpcEvent, moduleId: unknown, text: unknown): void {
+    if (Object.isNull(this.findTrusted(event)) || !(Object.isNull(moduleId) || (Object.isString(moduleId) && Resources.moduleIdPattern.test(moduleId))) ||
+      !Object.isString(text) || text.length > Resources.moduleLogLimit)
+      return;
+    this.log.write(text.trimEnd().split(Resources.lineBreakPattern).map(t => Resources.formatWindowErrorLine(moduleId, t)).join(Resources.logLineSeparator));
   }
 
   private beginNotifier(epoch: number, device: string, response: Response): void {

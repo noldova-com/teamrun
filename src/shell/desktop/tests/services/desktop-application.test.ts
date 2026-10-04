@@ -561,6 +561,29 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async writesItsOwnWindowsErrorsToItsLogRedactedAndUnderTheModulesIdWhenThereIsOne(): Promise<void> {
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    electron.ipcMain.send("teamrun:windowError", event, null, `Error: The layout could not be saved.\n    at save (${process.homeFolder}/teamrun/window.js:1:2)\n`);
+    electron.ipcMain.send("teamrun:windowError", event, "clock", "Error: Its window part failed to activate.");
+    electron.ipcMain.send("teamrun:windowError", { ...event, senderFrame: null }, null, "Untrusted");
+    electron.ipcMain.send("teamrun:windowError", event, "Clock", "Not an id");
+    electron.ipcMain.send("teamrun:windowError", event, 7, "Not an id either");
+    electron.ipcMain.send("teamrun:windowError", event, null, 7);
+    electron.ipcMain.send("teamrun:windowError", event, null, "x".repeat(65_537));
+
+    const lines = process.errors.split("\n").filter(t => t.includes("Window error")).map(t => t.slice(t.indexOf("Window error")));
+    Assert.areEqual(JSON.stringify([
+      "Window error: Error: The layout could not be saved.",
+      "Window error:     at save (~/teamrun/window.js:1:2)",
+      "Window error in clock: Error: Its window part failed to activate."
+    ]), JSON.stringify(lines));
+    Assert.areEqual(0, process.errors.split("\n").filter(t => t.includes("Untrusted") || t.includes("Not an id") || t.includes("xxx")).length);
+  }
+
+  @TestMethod
   public async stopsWaitingForAWindowThatIsGone(): Promise<void> {
     const electron = await DesktopApplicationTests.startReadyAsync("linux");
     const window = DesktopApplicationTests.firstWindow(electron);

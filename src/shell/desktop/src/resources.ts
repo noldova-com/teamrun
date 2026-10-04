@@ -42,6 +42,7 @@ export class Resources {
   public static readonly quitQuestionChannel: string = "teamrun:quitQuestion";
   public static readonly quitAnswerChannel: string = "teamrun:quitAnswer";
   public static readonly moduleLogChannel: string = "teamrun:moduleLog";
+  public static readonly windowErrorChannel: string = "teamrun:windowError";
   public static readonly copyTextLimit: number = 65536;
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
@@ -256,6 +257,10 @@ export class Resources {
 
   public static formatModuleLogLine(moduleId: string, line: string): string {
     return `${moduleId}: ${line}`;
+  }
+
+  public static formatWindowErrorLine(moduleId: string | null, line: string): string {
+    return Object.isNull(moduleId) ? `Window error: ${line}` : `Window error in ${moduleId}: ${line}`;
   }
 
   public static formatBoundsUnsaved(reason: string): string {
