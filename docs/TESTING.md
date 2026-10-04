@@ -29,7 +29,9 @@ Foundation test identities contain package, relative file, class, method and dat
 
 A filtered run reports its selection and discovered/selected/unselected counts. No matches fails; a filtered pass is not the complete gate. Only packages without executable production code may justify an empty inventory; failed discovery or missing builds are errors.
 
-Document markers, data-row rules and filters as public runner contracts. Add only capabilities needed by the accepted suite, without a plugin system or second discovery registry.
+The package runner's markers are `@TestClass`, `@TestMethod`, `@TestData` (each marker is one data row, run as its own test), `@Category` and `@Skip`. Its filters are a JSON array of strings in the `TEAMRUN_TEST_FILTERS` variable. A filter selects a test when it is a substring of the test's package name, file path or class name, or of `Class.method` with the data row in the method's name, or when it is `category:<name>` and a category of the test or its class has exactly that name. A test is selected when any filter selects it. A filtered run lists its filters and the discovered, selected and unselected counts in the console and in the GitHub summary, and fails when it selects no test. When `TEAMRUN_TEST_SELECTION_FILE` names a file, the runner writes the discovered and selected counts to it as JSON, for the commands that report them.
+
+Add only capabilities needed by the accepted suite, without a plugin system or second discovery registry.
 
 ## 3. Execution, isolation and shutdown
 

@@ -103,6 +103,23 @@ export class TestRunnerTests {
   }
 
   @TestMethod
+  public async reportsWhatTheFiltersDiscoveredSelectedAndLeftOut(): Promise<void> {
+    const filtered = await this.runner().runAsync([], ["Alpha"]);
+    const unfiltered = await this.runner().runAsync([]);
+    const nothing = await this.runner().runAsync([], ["Missing"]);
+
+    Assert.areEqual("Alpha", filtered.selection.filters.join(","));
+    Assert.areEqual(4, filtered.selection.discovered);
+    Assert.areEqual(2, filtered.selection.selected);
+    Assert.areEqual(2, filtered.selection.unselected);
+    Assert.areEqual(filtered.total, filtered.selection.selected);
+    Assert.isFalse(unfiltered.selection.isFiltered);
+    Assert.areEqual(0, unfiltered.selection.unselected);
+    Assert.areEqual(0, nothing.selection.selected);
+    Assert.areEqual(4, nothing.selection.unselected);
+  }
+
+  @TestMethod
   public async combinesMultipleFiltersWithOrSemantics(): Promise<void> {
     const result = await this.runner().runAsync([], ["AlphaFixtureTests.first", "BetaFixtureTests.second"]);
 
