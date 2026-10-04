@@ -17,21 +17,27 @@ export class MenuItem {
   public readonly commandArguments: JsonObject;
   public readonly submenu: string | null;
   public readonly label: string | null;
+  public readonly choice: string | null;
 
-  private constructor(command: string | null, commandArguments: JsonObject, submenu: string | null, label: string | null) {
+  private constructor(command: string | null, commandArguments: JsonObject, submenu: string | null, label: string | null, choice: string | null) {
     this.command = command;
     this.commandArguments = commandArguments;
     this.submenu = submenu;
     this.label = label;
+    this.choice = choice;
   }
 
   public static ofCommand(command: string, commandArguments: JsonObject = {}, label: string | null = null): MenuItem {
     if (!Object.isNull(label))
       ArgumentException.throwIfNullOrWhitespace(label, Resources.labelParameter);
-    return new MenuItem(QualifiedName.parse(command, Resources.commandParameter).text, { ...commandArguments }, null, label);
+    return new MenuItem(QualifiedName.parse(command, Resources.commandParameter).text, { ...commandArguments }, null, label, null);
   }
 
   public static ofSubmenu(place: string): MenuItem {
-    return new MenuItem(null, {}, QualifiedName.parse(place, Resources.submenuParameter).text, null);
+    return new MenuItem(null, {}, QualifiedName.parse(place, Resources.submenuParameter).text, null, null);
+  }
+
+  public static ofChoice(place: string): MenuItem {
+    return new MenuItem(null, {}, null, null, QualifiedName.parse(place, Resources.choiceParameter).text);
   }
 }

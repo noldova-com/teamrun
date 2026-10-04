@@ -11,7 +11,29 @@
     {
       "name": "notes.tools",
       "title": "Notes",
-      "menuBar": true
+      "shows": "menuBar"
+    },
+    {
+      "name": "notes.sortChoice",
+      "title": "Sort"
+    },
+    {
+      "name": "notes.main",
+      "title": "Main",
+      "shows": "toolbar"
+    },
+    {
+      "name": "notes.second",
+      "title": "Display",
+      "shows": "toolbar",
+      "newRow": true
+    },
+    {
+      "name": "notes.spare",
+      "title": "Spare",
+      "shows": "toolbar",
+      "shown": false,
+      "after": "notes.main"
     }
   ],
   "groups": [
@@ -83,6 +105,64 @@
         },
         {
           "command": "notes.sortByWeek"
+        }
+      ]
+    },
+    {
+      "name": "notes.sortChoiceItems",
+      "place": "notes.sortChoice",
+      "exclusive": true,
+      "items": [
+        {
+          "command": "notes.sortByTitle"
+        },
+        {
+          "command": "notes.sortByWeek"
+        }
+      ]
+    },
+    {
+      "name": "notes.mainCreate",
+      "place": "notes.main",
+      "items": [
+        {
+          "command": "notes.newNote"
+        },
+        {
+          "submenu": "notes.templates"
+        }
+      ]
+    },
+    {
+      "name": "notes.mainRecent",
+      "place": "notes.main",
+      "dynamic": true
+    },
+    {
+      "name": "notes.mainSort",
+      "place": "notes.main",
+      "items": [
+        {
+          "choice": "notes.sortChoice"
+        }
+      ]
+    },
+    {
+      "name": "notes.secondDisplay",
+      "place": "notes.second",
+      "items": [
+        {
+          "command": "notes.wrapLines"
+        }
+      ]
+    },
+    {
+      "name": "notes.spareCreate",
+      "place": "notes.spare",
+      "items": [
+        {
+          "command": "notes.newNote",
+          "label": "Add"
         }
       ]
     }

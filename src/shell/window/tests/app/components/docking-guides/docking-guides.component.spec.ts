@@ -167,12 +167,16 @@ describe("DockingGuidesComponent", () => {
     expect(find("tr-docking-plate")).not.toBeNull();
   });
 
-  it("shows only the label while a document is dragged", () => {
+  it("shows the label and a plate over a document group, but no side guides and no plate over a views group, while a document is dragged", () => {
+    layout.openDocument(LayoutFixture.todo);
     start(LayoutFixture.plan);
     moveOver(".group[data-drop-group=\"0\"]");
 
-    expect(find("tr-docking-guide")).toBeNull();
+    expect(find(".tr-docking-side")).toBeNull();
+    expect(find("tr-docking-plate")?.dataset["dropGroup"]).toBe("0");
     expect(find(".tr-docking-preview")).toBeNull();
     expect(find(".tr-drag-label")?.textContent).toContain(Resources.formatDraggedTab("plan"));
+    moveOver(".group[data-drop-group=\"1\"]");
+    expect(find("tr-docking-plate")).toBeNull();
   });
 });

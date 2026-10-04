@@ -1,0 +1,99 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: calc(var(--tr-sash-grip) * 2.5 + var(--tr-toolbar-button));
+  height: var(--tr-toolbar-button);
+  overflow: hidden;
+}
+
+:host(.tr-toolbar-dragging) {
+  opacity: 0.5;
+}
+
+.tr-toolbar-grip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(0.25rem - var(--tr-sash-grip));
+  align-self: stretch;
+  flex: none;
+  box-sizing: border-box;
+  width: calc(var(--tr-sash-grip) * 2);
+  margin: 0;
+  margin-inline-end: calc(var(--tr-sash-grip) / 2);
+  padding: 0;
+  border: 0;
+  border-radius: var(--tr-radius-small);
+  background: none;
+  opacity: 0.3;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.tr-toolbar-grip:hover,
+.tr-toolbar-grip:focus-visible {
+  opacity: 1;
+}
+
+.tr-toolbar-grip:focus-visible {
+  outline: var(--tr-border-width) solid var(--tr-accent);
+  outline-offset: calc(var(--tr-border-width) * -1);
+}
+
+.tr-toolbar-dot {
+  flex: none;
+  width: var(--tr-sash-grip);
+  height: var(--tr-sash-grip);
+  border-radius: 50%;
+  background-color: var(--tr-icon-color);
+}
+
+.tr-toolbar-content,
+.tr-toolbar-ghost {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--tr-border-width) * 2);
+}
+
+.tr-toolbar-content {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tr-toolbar-section,
+.tr-toolbar-ghost-section {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: calc(var(--tr-border-width) * 2);
+}
+
+.tr-toolbar-separator {
+  flex: none;
+  align-self: center;
+  width: var(--tr-border-width);
+  height: var(--tr-icon);
+  margin-inline: calc(var(--tr-toolbar-gap) / 2);
+  background-color: var(--tr-menu-separator);
+}
+
+.tr-toolbar-ghost {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  visibility: hidden;
+  pointer-events: none;
+}

@@ -27,7 +27,7 @@ import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 
 describe("MenuService", () => {
   const notes = MenuDeclarations.fromJson("notes", {
-    places: [{ name: "notes.listItem", title: "Note", menuBar: false }, { name: "notes.templates", title: "New from template", menuBar: false }],
+    places: [{ name: "notes.listItem", title: "Note", shows: "menu" }, { name: "notes.templates", title: "New from template", shows: "menu" }],
     groups: [
       { name: "notes.open", place: "notes.listItem", exclusive: false, items: [{ command: "notes.openNote", arguments: { pinned: true, week: 0 } }, { submenu: "notes.templates" }] },
       { name: "notes.sorting", place: "notes.listItem", exclusive: true, items: [{ command: "notes.sortBy", arguments: { by: "title" } }, { command: "notes.sortBy", arguments: { by: "week" } }] },
@@ -100,9 +100,9 @@ describe("MenuService", () => {
   it("offers a submenu with rows by its place's title, and leaves out one whose place has no rows or is not active", () => {
     const filled = MenuDeclarations.fromJson("notes", {
       places: [
-        { name: "notes.listItem", title: "Note", menuBar: false },
-        { name: "notes.templates", title: "New from template", menuBar: false },
-        { name: "notes.archive", title: "Archive", menuBar: false }
+        { name: "notes.listItem", title: "Note", shows: "menu" },
+        { name: "notes.templates", title: "New from template", shows: "menu" },
+        { name: "notes.archive", title: "Archive", shows: "menu" }
       ],
       groups: [
         { name: "notes.open", place: "notes.listItem", exclusive: false, items: [{ submenu: "notes.templates" }, { submenu: "notes.archive" }, { submenu: "notes.gone" }] },
@@ -142,6 +142,37 @@ describe("MenuService", () => {
     expect(describeSections(provided)).toEqual([["Week 3 for Ross"]]);
   });
 
+  it("resolves a choice as a row for its place, labelled by the checked row or else by the place's title, and leaves out a choice with no rows or no place", () => {
+    const choices = MenuDeclarations.fromJson("notes", {
+      places: [{ name: "notes.main", title: "Main", shows: "toolbar", shown: true }, { name: "notes.sortChoice", title: "Sort" }, { name: "notes.emptyChoice", title: "Empty" }],
+      groups: [
+        { name: "notes.mainSort", place: "notes.main", exclusive: false, items: [{ choice: "notes.sortChoice" }, { choice: "notes.emptyChoice" }, { choice: "notes.gone" }] },
+        { name: "notes.sortItems", place: "notes.sortChoice", exclusive: true,
+          items: [{ command: "notes.sortBy", arguments: { by: "title" }, label: "By title" }, { command: "notes.sortBy", arguments: { by: "week" }, label: "By week" }] }
+      ]
+    });
+    const menus = start(choices);
+    menus.setActiveModules(["notes"]);
+
+    const checked = menus.resolve("notes.main");
+    sortBy = "none";
+    const unchecked = menus.resolve("notes.main");
+
+    expect(checked.map(t => t.rows)).toEqual([[new SubmenuRow("notes.sortChoice", "By week")]]);
+    expect(unchecked.map(t => t.rows)).toEqual([[new SubmenuRow("notes.sortChoice", "Sort")]]);
+  });
+
+  it("tells which dynamic groups a module declares", () => {
+    const dynamic = MenuDeclarations.fromJson("notes", {
+      places: [{ name: "notes.recent", title: "Recent" }],
+      groups: [{ name: "notes.recentNotes", place: "notes.recent", exclusive: false, dynamic: true }, { name: "notes.fixed", place: "notes.recent", exclusive: false, items: [{ command: "notes.newNote", arguments: {} }] }]
+    });
+    const menus = start(dynamic, tasks);
+
+    expect([menus.declaresDynamicGroup("notes", "notes.recentNotes"), menus.declaresDynamicGroup("notes", "notes.fixed"), menus.declaresDynamicGroup("tasks", "notes.recentNotes"),
+      menus.declaresDynamicGroup("notes", "notes.gone")]).toEqual([true, false, false, false]);
+  });
+
   it("shows a row whose command's enabled check throws as disabled and reports the failure", () => {
     const menus = start(notes);
     const reported = vi.spyOn(TestBed.inject(ErrorHandler), "handleError").mockImplementation(() => undefined);
@@ -152,5 +183,40 @@ describe("MenuService", () => {
 
     expect(describeSections(menus.resolve("shell.file"))).toEqual([["New note (disabled)"]]);
     expect(reported).toHaveBeenCalledOnce();
+  });
+
+  it("leaves out a dynamic group whose rows function throws, shows a row whose checked state throws as unchecked, and reports each failure", () => {
+    const menus = start(new MenuDeclarations("notes", [new MenuPlace("notes.recent", "Recent", false)], [
+      new MenuGroup("notes.display", "shell.file", false, [MenuItem.ofCommand("notes.wrapLines"), MenuItem.ofCommand("notes.newNote")]),
+      MenuGroup.dynamic("notes.recentNotes", "shell.file", false)
+    ]));
+    const reported = vi.spyOn(TestBed.inject(ErrorHandler), "handleError").mockImplementation(() => undefined);
+    TestBed.inject(CommandService).setCommands([
+      new CommandContribution("notes.wrapLines", "Wrap lines", null, null, () => Promise.resolve(null), () => true, () => {
+        throw new Error("No wrapping state.");
+      }),
+      new CommandContribution("notes.newNote", "New note", null, null, () => Promise.resolve(null))
+    ]);
+    menus.setActiveModules(["notes"]);
+    menus.provideGroup("notes.recentNotes", () => {
+      throw new Error("No recent notes.");
+    });
+
+    expect(describeSections(menus.resolve("shell.file"))).toEqual([["Wrap lines Checkbox:false", "New note"]]);
+    expect(reported).toHaveBeenCalledTimes(2);
+  });
+
+  it("withdraws a dynamic group's rows only while the withdrawing function's own provider is still the one supplying them", () => {
+    const menus = start(new MenuDeclarations("notes", [], [MenuGroup.dynamic("notes.recentNotes", "shell.file", false)]));
+    TestBed.inject(CommandService).setCommands([new CommandContribution("notes.newNote", "New note", null, null, () => Promise.resolve(null))]);
+    menus.setActiveModules(["notes"]);
+
+    const old = menus.provideGroup("notes.recentNotes", () => [MenuItem.ofCommand("notes.newNote", {}, "Old")]);
+    const current = menus.provideGroup("notes.recentNotes", () => [MenuItem.ofCommand("notes.newNote", {}, "Current")]);
+    old();
+
+    expect(describeSections(menus.resolve("shell.file"))).toEqual([["Current"]]);
+    current();
+    expect(menus.resolve("shell.file")).toEqual([]);
   });
 });

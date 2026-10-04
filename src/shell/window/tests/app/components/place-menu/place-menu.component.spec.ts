@@ -15,6 +15,7 @@ import { MenuTriggerDirective } from "@noldova/teamrun-shell-ui";
 import { PlaceMenuComponent } from "../../../../src/app/components/place-menu/place-menu.component";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { MenuDeclarations } from "../../../../src/app/models/menu-declarations";
+import type { MenuSection } from "../../../../src/app/models/menu-section";
 import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { MenuService } from "../../../../src/app/services/menu.service";
@@ -26,6 +27,14 @@ import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 })
 class HostComponent {
   public readonly menu: Signal<PlaceMenuComponent> = viewChild.required(PlaceMenuComponent);
+}
+
+@Component({
+  imports: [PlaceMenuComponent, MenuTriggerDirective],
+  template: `<tr-place-menu #menu [rows]="rows" /><button type="button" class="opener" [trMenuTriggerFor]="menu.menu()">Open</button>`
+})
+class RowsHostComponent {
+  public readonly rows: readonly MenuSection[] = TestBed.inject(MenuService).resolve("notes.listItem").slice(0, 1);
 }
 
 describe("PlaceMenuComponent", () => {
@@ -51,7 +60,7 @@ describe("PlaceMenuComponent", () => {
         },
         {
           provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
-            places: [{ name: "notes.listItem", title: "Note", menuBar: false }, { name: "notes.templates", title: "New from template", menuBar: false }],
+            places: [{ name: "notes.listItem", title: "Note", shows: "menu" }, { name: "notes.templates", title: "New from template", shows: "menu" }],
             groups: [
               { name: "notes.open", place: "notes.listItem", exclusive: false, items: [{ command: "notes.openNote", arguments: {} }, { submenu: "notes.templates" }] },
               { name: "notes.risky", place: "notes.listItem", exclusive: false, items: [{ command: "notes.fail", arguments: {} }, { command: "notes.locked", arguments: {} }] },
@@ -125,6 +134,16 @@ describe("PlaceMenuComponent", () => {
     (submenu.querySelector("button[tr-menu-item]") as HTMLButtonElement).click();
 
     expect(runs).toEqual([JSON.stringify({ week: 3, template: "plan" })]);
+  });
+
+  it("shows the rows it is given instead of resolving a place", () => {
+    const fixture = TestBed.createComponent(RowsHostComponent);
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector(".opener") as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const rows = [...document.querySelectorAll<HTMLButtonElement>("tr-menu[data-place=''] button[tr-menu-item]")];
+
+    expect(rows.map(t => t.querySelector(".tr-menu-item-label")?.textContent)).toEqual(["Open note", "New from template"]);
   });
 
   it("exposes its menu as a template", () => {

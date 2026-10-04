@@ -17,6 +17,7 @@ import { BottomDockSpan } from "../enums/bottom-dock-span";
 import { DockSide } from "../enums/dock-side";
 import { EditAction } from "../enums/edit-action";
 import { PanelEdge } from "../enums/panel-edge";
+import { ToolbarMove } from "../enums/toolbar-move";
 import { CommandContribution } from "../models/command-contribution";
 import { SideDropTarget } from "../models/layout/side-drop-target";
 import { SplitDropTarget } from "../models/layout/split-drop-target";
@@ -30,6 +31,7 @@ import { CommandSearchService } from "./command-search.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { EditTargetService } from "./edit-target.service";
 import { LayoutService } from "./layout.service";
+import { ToolbarService } from "./toolbar.service";
 import { TabStripService } from "./tab-strip.service";
 
 @Injectable({ providedIn: "root" })
@@ -41,6 +43,10 @@ export class ShellCommandsService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly document: Document = inject(DOCUMENT);
   private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
+
+  private get toolbars(): ToolbarService {
+    return this.environment.get(ToolbarService);
+  }
 
   public readonly commands: readonly CommandContribution[] = [
     this.tabCommand(Resources.closeTabCommand, Resources.closeTabTitle, Resources.closeGlyph, t => this.close(t), () => true),
@@ -57,7 +63,7 @@ export class ShellCommandsService {
     this.tabCommand(Resources.nextTabCommand, Resources.nextTabTitle, Resources.nextTabGlyph, t => this.show(t, 1), t => t.group.tabs.length > 1),
     this.tabCommand(Resources.previousTabCommand, Resources.previousTabTitle, Resources.previousTabGlyph, t => this.show(t, -1), t => t.group.tabs.length > 1),
     ...Object.values(PanelEdge).map(edge => this.tabCommand(Resources.splitTabCommands[edge], Resources.splitTabTitles[edge], Resources.splitGlyphs[edge],
-      t => this.place(t.tab, new SplitDropTarget(t.group.id, edge)), t => t.canSplit, t => t.tab.isMovable)),
+      t => this.place(t.tab, new SplitDropTarget(t.group.id, edge)), t => t.canSplit)),
     ...Object.values(DockSide).map(side => this.tabCommand(Resources.dockTabCommands[side], Resources.dockTabTitles[side], Resources.dockGlyphs[side],
       t => this.place(t.tab, new SideDropTarget(side)), t => t.tab.isMovable, t => t.tab.isMovable)),
     new CommandContribution(Resources.moveTabToGroupCommand, Resources.moveTabToGroupTitle, Resources.moveToGlyph, null,
@@ -67,7 +73,14 @@ export class ShellCommandsService {
           this.place(move.target.tab, new TabDropTarget(move.group.id, move.group.tabs.length));
       }),
       commandArguments => !Object.isNull(this.moveOf(commandArguments)), null,
-      commandArguments => this.targetOf(commandArguments)?.tab.isMovable ?? false),
+      commandArguments => !Object.isNull(this.targetOf(commandArguments))),
+    this.tabCommand(Resources.moveTabToNextGroupCommand, Resources.moveTabToNextGroupTitle, Resources.moveToGlyph, t => this.moveToGroup(t, 1), t => this.neighborOf(t, 1).length > 0,
+      t => this.neighborOf(t, 1).length > 0),
+    this.tabCommand(Resources.moveTabToPreviousGroupCommand, Resources.moveTabToPreviousGroupTitle, Resources.moveToGlyph, t => this.moveToGroup(t, -1), t => this.neighborOf(t, -1).length > 0,
+      t => this.neighborOf(t, -1).length > 0),
+    new CommandContribution(Resources.focusNextGroupCommand, Resources.focusNextGroupTitle, Resources.focusNextGroupGlyph, null, () => this.done(() => this.focusGroup(1)), () => this.focusable().length > 1),
+    new CommandContribution(Resources.focusPreviousGroupCommand, Resources.focusPreviousGroupTitle, Resources.focusPreviousGroupGlyph, null, () => this.done(() => this.focusGroup(-1)),
+      () => this.focusable().length > 1),
     ...Object.values(DockSide).map(side => new CommandContribution(Resources.toggleDockCommands[side], Resources.toggleDockTitles[side], Resources.hideDockGlyphs[side], null,
       () => this.done(() => this.layout.toggleDock(side)), () => true, () => this.layout.layout().dock(side).isExpanded)),
     ...Object.values(EditAction).map(action => new CommandContribution(Resources.editCommands[action], Resources.editTitles[action], Resources.editGlyphs[action], null,
@@ -77,6 +90,41 @@ export class ShellCommandsService {
     new CommandContribution(Resources.openSettingsCommand, Resources.openSettingsTitle, Resources.settingsGlyph, null,
       () => this.done(() => this.layout.openDocument(ShellDocuments.settingsTab)),
       () => this.layout.registry().hasDocument(ShellDocuments.settings.name)),
+    new CommandContribution(Resources.toggleToolbarCommand, Resources.toggleToolbarTitle, Resources.focusToolbarsGlyph, null,
+      commandArguments => this.done(() => {
+        const name = this.toolbarOf(commandArguments);
+        if (!Object.isNull(name))
+          this.toolbars.setShown(name, !this.toolbars.isShown(name));
+      }),
+      commandArguments => !Object.isNull(this.toolbarOf(commandArguments)),
+      commandArguments => {
+        const name = this.toolbarOf(commandArguments);
+        return !Object.isNull(name) && this.toolbars.isShown(name);
+      }),
+    ...Object.values(ToolbarMove).map(move => new CommandContribution(Resources.moveToolbarCommands[move], Resources.moveToolbarTitles[move], Resources.moveToolbarGlyphs[move], null,
+      commandArguments => this.done(() => {
+        const name = this.toolbarOf(commandArguments);
+        if (!Object.isNull(name)) {
+          this.toolbars.moveBy(name, move);
+          this.focusGrip(name);
+        }
+      }),
+      commandArguments => {
+        const name = this.toolbarOf(commandArguments);
+        return !Object.isNull(name) && this.toolbars.canMove(name, move);
+      })),
+    new CommandContribution(Resources.hideToolbarCommand, Resources.hideToolbarTitle, Resources.hideToolbarGlyph, null,
+      commandArguments => this.done(() => {
+        const name = this.toolbarOf(commandArguments);
+        if (!Object.isNull(name)) {
+          const index = this.gripsOf().findIndex(t => t.closest<HTMLElement>(Resources.toolbarSelector)?.dataset[Resources.toolbarData] === name);
+          this.toolbars.setShown(name, false);
+          this.focusAfterHide(index);
+        }
+      }),
+      commandArguments => !Object.isNull(this.toolbarOf(commandArguments))),
+    new CommandContribution(Resources.focusToolbarsCommand, Resources.focusToolbarsTitle, Resources.focusToolbarsGlyph, null,
+      () => this.done(() => this.focusToolbars()), () => this.toolbars.hasContent()),
     new CommandContribution(Resources.resetLayoutCommand, Resources.resetLayoutLabel, Resources.resetLayoutGlyph, null, () => this.done(() => this.layout.reset())),
     ...Object.values(BottomDockSpan).map(span => new CommandContribution(Resources.bottomSpanCommands[span], Resources.bottomSpanLabels[span], Resources.bottomSpanGlyphs[span], null,
       () => this.done(() => this.layout.setBottomSpan(span)), () => true, () => this.layout.layout().bottomSpan === span)),
@@ -130,7 +178,32 @@ export class ShellCommandsService {
     const key = this.tabKeyOf(commandArguments);
     const tab = Object.isUndefined(key) ? this.layout.currentGroup().active : layout.groups.flatMap(t => t.tabs).find(t => t.key === key) ?? null;
     const group = Object.isNull(tab) ? null : layout.groupOf(tab);
-    return Object.isNull(tab) || Object.isNull(group) ? null : new TabTarget(tab, group);
+    return Object.isNull(tab) || Object.isNull(group) ? null : new TabTarget(tab, group, layout.canSplit(tab, group.id));
+  }
+
+  private toolbarOf(commandArguments: JsonValue): string | null {
+    const name = Object.isNull(commandArguments) ? undefined : JsonReader.fromValue(commandArguments).readOptionalString(Resources.toolbarArgument);
+    return !Object.isUndefined(name) && this.toolbars.isKnown(name) ? name : null;
+  }
+
+  private focusGrip(name: string): void {
+    afterNextRender(() => [...this.document.querySelectorAll<HTMLElement>(Resources.toolbarSelector)]
+      .find(t => t.dataset[Resources.toolbarData] === name)?.querySelector<HTMLElement>(Resources.toolbarGripSelector)?.focus(), { injector: this.environment });
+  }
+
+  private gripsOf(): readonly HTMLElement[] {
+    return [...this.document.querySelectorAll<HTMLElement>(Resources.toolbarGripSelector)];
+  }
+
+  private focusAfterHide(index: number): void {
+    afterNextRender(() => {
+      const grips = this.gripsOf();
+      (grips[index] ?? grips.at(-1) ?? this.document.querySelector<HTMLElement>(Resources.commandSearchButtonSelector))?.focus();
+    }, { injector: this.environment });
+  }
+
+  private focusToolbars(): void {
+    this.document.querySelector<HTMLElement>(Resources.toolbarItemSelector)?.focus();
   }
 
   private groupOf(commandArguments: JsonValue): number | null {
@@ -141,9 +214,33 @@ export class ShellCommandsService {
     return Object.isNull(commandArguments) ? undefined : JsonReader.fromValue(commandArguments).readOptionalString(Resources.tabArgument);
   }
 
+  private neighborOf(target: TabTarget, step: number): readonly TabGroup[] {
+    const groups = this.layout.layout().groups.filter(t => t.accepts(target.tab));
+    const next = (groups.findIndex(t => t.id === target.group.id) + step + groups.length) % groups.length;
+    return groups.length < 2 ? [] : groups.slice(next, next + 1);
+  }
+
+  private moveToGroup(target: TabTarget, step: number): void {
+    for (const group of this.neighborOf(target, step))
+      this.place(target.tab, new TabDropTarget(group.id, group.tabs.length));
+  }
+
+  private focusable(): readonly (readonly [TabGroup, Tab])[] {
+    return this.layout.geometry().frames.flatMap(t => Object.isNull(t.group.active) ? [] : [[t.group, t.group.active] as const]);
+  }
+
+  private focusGroup(step: number): void {
+    const groups = this.focusable();
+    const next = (groups.findIndex(([group]) => group.id === this.layout.currentGroup().id) + step + groups.length) % groups.length;
+    for (const [group, tab] of groups.slice(next, next + 1)) {
+      this.layout.focusGroup(group.id);
+      this.focus(tab);
+    }
+  }
+
   private close(target: TabTarget): void {
     this.layout.close(target.tab);
-    const next = this.layout.layout().group(target.group.id)?.active ?? null;
+    const next = this.layout.layout().group(target.group.id)?.active ?? this.layout.currentGroup().active;
     if (!Object.isNull(next))
       this.focus(next);
   }

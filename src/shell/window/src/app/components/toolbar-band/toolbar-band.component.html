@@ -1,0 +1,31 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (toolbars.hasContent()) {
+  <tr-place-menu #list [place]="resources.toolbarsMenu" />
+  <ng-template #rows>
+    @for (row of toolbars.rows(); track $index; let rowIndex = $index) {
+      @if (hasContent(row)) {
+        <div class="tr-toolbar-row" [attr.data-toolbar-row]="rowIndex">
+          @for (toolbar of row; track toolbar.name; let index = $index) {
+            @if (toolbar.sections.length > 0) {
+              <tr-toolbar [toolbar]="toolbar" [attr.data-toolbar-index]="index" />
+            }
+          }
+        </div>
+      }
+    }
+  </ng-template>
+  <div class="tr-toolbar-band" [trContextMenuTriggerFor]="list.menu()">
+    <ng-container [ngTemplateOutlet]="rows" />
+  </div>
+  @if (drag.target(); as target) {
+    <div class="tr-toolbar-drop" [class.tr-toolbar-drop-row]="target.isNewRow" [style.left.px]="target.x" [style.top.px]="target.y"
+      [style.width.px]="target.isNewRow ? target.length : null" [style.height.px]="target.isNewRow ? null : target.length"></div>
+  }
+}

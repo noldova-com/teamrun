@@ -39,7 +39,7 @@ describe("MenuDirective", () => {
         { provide: WindowPartTokens.context, useValue: context },
         {
           provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
-            places: [{ name: "notes.listItem", title: "Note", menuBar: false }],
+            places: [{ name: "notes.listItem", title: "Note", shows: "menu" }],
             groups: [{ name: "notes.open", place: "notes.listItem", exclusive: false, items: [{ command: "notes.openNote", arguments: {} }] }]
           })]
         }

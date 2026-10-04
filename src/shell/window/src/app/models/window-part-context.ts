@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { NotificationPost, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import { WindowPartAccessException } from "../exceptions/window-part-access.exception";
@@ -15,6 +15,8 @@ import type { IDocumentOptions } from "../interfaces/i-document-options";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
 import type { CommandContribution } from "./command-contribution";
 import type { DocumentContribution } from "./document-contribution";
+import { MenuItem } from "./menu-item";
+import type { MenuRowContribution } from "./menu-row-contribution";
 import { NotificationHandle } from "./notification-handle";
 import { StatusBarItem } from "./status-bar-item";
 import type { StatusBarItemContribution } from "./status-bar-item-contribution";
@@ -106,6 +108,16 @@ export class WindowPartContext implements IWindowPartContext {
     this.topBarActionList.push(registered);
     this.host.refresh();
     return registered;
+  }
+
+  public provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuRowContribution[]): () => void {
+    this.requireOwn(group);
+    if (!this.host.declaresDynamicMenuGroup(this.moduleId, group))
+      throw new WindowPartAccessException(Resources.formatUndeclaredContribution(this.moduleId, Resources.dynamicMenuGroupKind, group));
+    const withdraw = this.host.provideMenuGroup(group, context => provider(context).filter(t => this.isAllowed(t.command))
+      .map(t => MenuItem.ofCommand(t.command, t.commandArguments, t.label)));
+    this.subscriptions.push(withdraw);
+    return withdraw;
   }
 
   public setViewBadge(view: string, badge: ViewBadge | null): void {

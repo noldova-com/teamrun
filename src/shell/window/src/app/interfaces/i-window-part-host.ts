@@ -6,9 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { NotificationPost, SettingChange, SettingScope } from "@noldova/teamrun-shell-protocol";
 
+import type { MenuItem } from "../models/menu-item";
 import type { ViewBadge } from "../models/view-badge";
 
 export interface IWindowPartHost {
@@ -23,6 +24,10 @@ export interface IWindowPartHost {
   log(moduleId: string, message: string): void;
 
   isCommandRegistered(name: string): boolean;
+
+  declaresDynamicMenuGroup(moduleId: string, group: string): boolean;
+
+  provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuItem[]): () => void;
 
   runCommandAsync(name: string, commandArguments: JsonValue): Promise<JsonValue>;
 

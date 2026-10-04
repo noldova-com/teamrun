@@ -15,10 +15,13 @@ import { SplitAxis } from "../../../../src/app/enums/split-axis";
 import { Bounds } from "../../../../src/app/models/layout/bounds";
 import { Dock } from "../../../../src/app/models/layout/dock";
 import { DocumentGroup } from "../../../../src/app/models/layout/document-group";
+import { DocumentTab } from "../../../../src/app/models/layout/document-tab";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { LayoutReader } from "../../../../src/app/models/layout/layout.reader";
+import { ToolbarLayout } from "../../../../src/app/models/layout/toolbar-layout";
 import { SplitHandle } from "../../../../src/app/models/layout/split-handle";
 import type { SplitNode } from "../../../../src/app/models/layout/split.node";
+import type { Tab } from "../../../../src/app/models/layout/tab";
 import { TabGroup } from "../../../../src/app/models/layout/tab-group";
 import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
 import { ViewTab } from "../../../../src/app/models/layout/view-tab";
@@ -40,11 +43,9 @@ describe("Layout", () => {
     expect(Layout.createDefault(ViewRegistry.createEmpty()).docks.map(t => t.root)).toEqual([null, null, null]);
   });
 
-  it("needs exactly one documents group, in the middle, and one dock per side", () => {
+  it("needs a documents group, in the middle, and one dock per side", () => {
     expect(() => new Layout([], null)).toThrow(ArgumentException);
     expect(() => new Layout([], group(1, files))).toThrow(ArgumentException);
-    expect(() => new Layout([], createSplit(1, SplitAxis.Horizontal, [DocumentGroup.createEmpty(), DocumentGroup.createEmpty()], [1, 1])))
-      .toThrow(ArgumentException);
     expect(() => new Layout([new Dock(DockSide.Left, DocumentGroup.createEmpty(), null, false)], createSplit(1, SplitAxis.Horizontal, [
       group(2, files),
       new DocumentGroup([plan], plan)
@@ -239,6 +240,17 @@ describe("Layout", () => {
     expect(between.withBottomSpan(BottomDockSpan.Full).bottomSpan).toBe(BottomDockSpan.Full);
   });
 
+  it("keeps the toolbar arrangement through every change, writes it only once it holds a choice, and returns to the declared defaults on a reset", () => {
+    const arranged = initial.withToolbars(new ToolbarLayout([["notes.main"]], ["notes.second"]));
+
+    expect(initial.toolbars).toBe(ToolbarLayout.EMPTY);
+    expect(initial.withToolbars(ToolbarLayout.EMPTY)).toBe(initial);
+    expect(arranged.withBottomSpan(BottomDockSpan.Between).openView(terminal, registry).toggleDock(DockSide.Bottom).openDocument(plan).toolbars).toEqual(arranged.toolbars);
+    expect(arranged.toJson()["toolbars"]).toEqual({ rows: [{ toolbars: ["notes.main"] }], hidden: ["notes.second"] });
+    expect(initial.toJson()).not.toHaveProperty("toolbars");
+    expect(arranged.reset(registry).toolbars).toBe(ToolbarLayout.EMPTY);
+  });
+
   it("resizes a split through its handle", () => {
     const split = initial.splitGroup(changes, 1, PanelEdge.Right);
     const root = split.dock(DockSide.Left).root as SplitNode;
@@ -285,7 +297,116 @@ describe("Layout", () => {
         Bottom: { root: null, size: null, collapsed: false }
       },
       middle: { tabs: [{ document: "notes.note", instance: "plan" }], active: 0, documents: true },
-      bottomSpan: "Full"
+      bottomSpan: "Full",
+      activeDocuments: 0
+    });
+  });
+
+  describe("document groups", () => {
+    const readme = new DocumentTab("notes.note", "readme");
+    const opened = initial.openDocument(plan).openDocument(todo).openDocument(settings);
+    const split = opened.splitGroup(todo, 0, PanelEdge.Right);
+    const contents = (layout: Layout): readonly (readonly [number, readonly Tab[]])[] => layout.documentGroups.map(t => [t.id, t.tabs] as const);
+
+    it("holds several documents groups in the middle, the first the active one unless another is named", () => {
+      const middle = createSplit(5, SplitAxis.Horizontal, [new DocumentGroup([plan], plan), new DocumentGroup([todo], todo, null, 6)], [1, 1]);
+
+      expect(new Layout([], middle).documents.id).toBe(0);
+      expect(new Layout([], middle, BottomDockSpan.Full, ToolbarLayout.EMPTY, 6).documents.id).toBe(6);
+      expect(new Layout([], middle, BottomDockSpan.Full, ToolbarLayout.EMPTY, 9).documents.id).toBe(0);
+      expect(new Layout([], middle).documentGroups.map(t => t.id)).toEqual([0, 6]);
+    });
+
+    it("splits a document into a new documents group on any edge, which becomes the active one", () => {
+      const beside = split.middle as SplitNode;
+      const above = opened.splitGroup(todo, 0, PanelEdge.Top);
+
+      expect(contents(split)).toEqual([[0, [plan, settings]], [3, [todo]]]);
+      expect([beside.axis, split.documents.id, split.documents.active]).toEqual([SplitAxis.Horizontal, 3, todo]);
+      expect(contents(opened.splitGroup(todo, 0, PanelEdge.Left))).toEqual([[3, [todo]], [0, [plan, settings]]]);
+      expect([(above.middle as SplitNode).axis, contents(above)]).toEqual([SplitAxis.Vertical, [[3, [todo]], [0, [plan, settings]]]]);
+      expect(split.dock(DockSide.Left).root).toEqual(initial.dock(DockSide.Left).root);
+    });
+
+    it("does not split a document that is alone in its group, into a views group or into a missing group", () => {
+      expect(split.splitGroup(todo, 3, PanelEdge.Right)).toBe(split);
+      expect(split.splitGroup(plan, 1, PanelEdge.Right)).toBe(split);
+      expect(split.splitGroup(plan, 9, PanelEdge.Right)).toBe(split);
+      expect([split.canSplit(plan, 0), split.canSplit(todo, 3), split.canSplit(plan, 1), split.canSplit(plan, 9)]).toEqual([true, false, false, false]);
+      expect([split.canSplit(files, 1), split.canSplit(files, 0), initial.canSplit(files, 1)]).toEqual([false, true, false]);
+      expect(initial.moveTab(files, 0, 0).canSplit(files, 0)).toBe(true);
+      expect(split.moveTab(files, 3, 1).moveTab(todo, 0, 0).canSplit(files, 3)).toBe(false);
+    });
+
+    it("moves a document to another documents group, which becomes the active one, and not to a views group", () => {
+      const moved = split.moveTab(plan, 3, 1);
+
+      expect(contents(moved)).toEqual([[0, [settings]], [3, [todo, plan]]]);
+      expect([moved.documents.id, moved.documents.active]).toEqual([3, plan]);
+      expect(split.moveTab(plan, 1, 0)).toBe(split);
+    });
+
+    it("closes a documents group when its last tab closes or leaves, the active one passing to its neighbor", () => {
+      const closed = split.close(todo);
+      const left = split.moveTab(todo, 0, 0);
+      const first = split.focusDocuments(0).close(settings).close(plan);
+
+      expect([closed.documentGroups.map(t => t.id), closed.documents.id, closed.middle]).toEqual([[0], 0, closed.documents]);
+      expect([left.documentGroups.map(t => t.id), left.documents.id, left.documents.tabs]).toEqual([[0], 0, [todo, plan, settings]]);
+      expect([contents(first), first.documents.id]).toEqual([[[3, [todo]]], 3]);
+      expect(split.focusDocuments(0).close(plan).documents.id).toBe(0);
+    });
+
+    it("keeps the last documents group when its last tab closes", () => {
+      const emptied = split.close(todo).close(plan).close(settings);
+
+      expect([emptied.documentGroups.length, emptied.documents.tabs]).toEqual([1, []]);
+    });
+
+    it("opens a document in the active documents group, or activates it where it is open", () => {
+      expect(contents(split.openDocument(readme))).toEqual([[0, [plan, settings]], [3, [todo, readme]]]);
+      expect(contents(split.focusDocuments(0).openDocument(readme))).toEqual([[0, [plan, settings, readme]], [3, [todo]]]);
+      expect(contents(split.openDocument(readme).openDocument(plan))).toEqual([[0, [plan, settings]], [3, [todo, readme]]]);
+      expect([split.openDocument(plan).documents.id, split.openDocument(plan).documents.active]).toEqual([0, plan]);
+      expect(split.focusDocuments(0).openDocument(readme, true).documents.preview).toEqual(readme);
+    });
+
+    it("makes a documents group active when one of its tabs is activated, and ignores a group that is not one", () => {
+      expect(split.activate(plan).documents.id).toBe(0);
+      expect(split.activate(plan).activate(settings).documents.active).toBe(settings);
+      expect(split.focusDocuments(0).documents.id).toBe(0);
+      expect(split.focusDocuments(3)).toBe(split);
+      expect(split.focusDocuments(1)).toBe(split);
+      expect(split.focusDocuments(9)).toBe(split);
+    });
+
+    it("keeps every documents tab in one group after a reset, with the active group's active tab and a preview that survives", () => {
+      const previewed = split.focusDocuments(0).openDocument(readme, true);
+      const reset = previewed.focusDocuments(3).reset(registry);
+
+      expect(contents(reset)).toEqual([[0, [plan, settings, readme, todo]]]);
+      expect([reset.documents.active, reset.documents.preview]).toEqual([todo, readme]);
+      expect(previewed.reset(registry).documents.preview).toEqual(readme);
+      expect(contents(split.reset(registry))).toEqual([[0, [plan, settings, todo]]]);
+    });
+
+    it("leaves out an empty documents group when its documents are absent, unless it is the last one", () => {
+      const gone = new DocumentTab("gone.document");
+      const another = new DocumentTab("gone.other");
+      const some = new Layout([], createSplit(5, SplitAxis.Horizontal, [new DocumentGroup([plan], plan), new DocumentGroup([gone], gone, null, 6)], [1, 1]));
+      const none = new Layout([], createSplit(5, SplitAxis.Horizontal, [new DocumentGroup([gone], gone), new DocumentGroup([another], another, null, 6)], [1, 1]));
+
+      expect(contents(some.withVisibleTabs(registry))).toEqual([[0, [plan]]]);
+      expect(contents(none.withVisibleTabs(registry))).toEqual([[0, []]]);
+      expect(some.withVisibleTabs(registry).documents.id).toBe(0);
+    });
+
+    it("writes which documents group is active, and reads it back", () => {
+      const written = split.toJson();
+      const read = LayoutReader.read(written);
+
+      expect(written["activeDocuments"]).toBe(1);
+      expect([read.documentGroups.map(t => t.tabs), read.documents.tabs]).toEqual([[[plan, settings], [todo]], [todo]]);
     });
   });
 });

@@ -16,6 +16,7 @@ import { Dock } from "../../../../src/app/models/layout/dock";
 import { DocumentGroup } from "../../../../src/app/models/layout/document-group";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { LayoutReader } from "../../../../src/app/models/layout/layout.reader";
+import { ToolbarLayout } from "../../../../src/app/models/layout/toolbar-layout";
 import { TabGroup } from "../../../../src/app/models/layout/tab-group";
 import { ViewTab } from "../../../../src/app/models/layout/view-tab";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
@@ -29,7 +30,8 @@ describe("LayoutReader", () => {
     version,
     docks: { Left: dock(), Right: dock(), Bottom: dock(), ...docks },
     middle,
-    bottomSpan
+    bottomSpan,
+    activeDocuments: 0
   });
   const group = (...tabs: readonly unknown[]): Record<string, unknown> => ({ tabs, active: 0 });
   const failure = (value: unknown): JsonException => {
@@ -76,9 +78,32 @@ describe("LayoutReader", () => {
     expect(failure(saved({}, documents, 1, "Wide")).path).toBe("$.bottomSpan");
   });
 
+  it("reads the toolbar arrangement when the layout has one, and refuses one that is not valid", () => {
+    const arrangement = { rows: [{ toolbars: ["notes.main", "notes.second"] }], hidden: ["notes.spare"] };
+
+    expect(LayoutReader.read({ ...saved(), toolbars: arrangement }).toolbars).toEqual(new ToolbarLayout([["notes.main", "notes.second"]], ["notes.spare"]));
+    expect(LayoutReader.read(saved()).toolbars).toBe(ToolbarLayout.EMPTY);
+    expect(LayoutReader.read({ ...saved(), toolbars: arrangement }).toJson()).toEqual({ ...saved(), toolbars: arrangement });
+    expect(failure({ ...saved(), toolbars: { rows: [{ toolbars: [] }], hidden: [] } }).path).toBe("$");
+    expect(failure({ ...saved(), toolbars: { rows: [{ toolbars: ["main"] }], hidden: [] } }).message).toBe("$: The value does not describe a valid part of a layout.");
+  });
+
   it("writes back what it read, including views whose modules are absent", () => {
     expect(LayoutReader.read(full).toJson()).toEqual(full);
     expect(LayoutReader.read(JSON.parse(JSON.stringify(LayoutReader.read(full).toJson())))).toEqual(LayoutReader.read(full));
+  });
+
+  it("reads which documents group is active by its position, and the first when the layout names none or a position it lacks", () => {
+    const beside = {
+      axis: "Horizontal",
+      children: [{ tabs: [{ document: "notes.note", instance: "plan" }], active: 0, documents: true, weight: 0.5 }, { tabs: [{ document: "notes.note", instance: "todo" }], active: 0, documents: true, weight: 0.5 }]
+    };
+    const { activeDocuments, ...unnamed } = saved({}, beside);
+    const active = (json: Record<string, unknown>): string | undefined => LayoutReader.read(json).documents.active?.key;
+
+    expect([activeDocuments, active(unnamed)]).toEqual([0, "document/notes.note/plan"]);
+    expect([active({ ...unnamed, activeDocuments: 1 }), active({ ...unnamed, activeDocuments: 7 })]).toEqual(["document/notes.note/todo", "document/notes.note/plan"]);
+    expect(failure({ ...unnamed, activeDocuments: "second" }).path).toBe("$.activeDocuments");
   });
 
   it("reads a group marked as not the documents group as a view group", () => {

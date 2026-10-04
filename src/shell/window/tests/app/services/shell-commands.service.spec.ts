@@ -12,6 +12,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 
 import { BottomDockSpan } from "../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../src/app/enums/dock-side";
+import { ToolbarMove } from "../../../src/app/enums/toolbar-move";
 import type { CommandContribution } from "../../../src/app/models/command-contribution";
 import { Layout } from "../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../src/app/models/layout/view-registry";
@@ -19,6 +20,7 @@ import type { LayoutService } from "../../../src/app/services/layout.service";
 import { CommandSearchService } from "../../../src/app/services/command-search.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
 import { TabStripService } from "../../../src/app/services/tab-strip.service";
+import { ToolbarService } from "../../../src/app/services/toolbar.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../fixtures/layout-service.fixture";
@@ -55,14 +57,20 @@ describe("ShellCommandsService", () => {
     return command(name).isEnabled(commandArguments);
   }
 
+  function checked(name: string, commandArguments: JsonValue): boolean {
+    return command(name).isChecked?.(commandArguments) ?? false;
+  }
+
   const tab = (key: string): JsonValue => ({ tab: key });
 
   it("offers the shell's tab and layout commands, each with a title and an icon and none with a default key", () => {
     expect(service.commands.map(t => t.name)).toEqual([
       "shell.closeTab", "shell.keepTab", "shell.closeOtherTabs", "shell.closeTabsToTheRight", "shell.closeAllTabs", "shell.moveTabLeft", "shell.moveTabRight",
       "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight",
-      "shell.dockTabBottom", "shell.moveTabToGroup", "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut",
-      "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
+      "shell.dockTabBottom", "shell.moveTabToGroup", "shell.moveTabToNextGroup", "shell.moveTabToPreviousGroup", "shell.focusNextGroup", "shell.focusPreviousGroup",
+      "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut",
+      "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.toggleToolbar", "shell.moveToolbarLeft", "shell.moveToolbarRight", "shell.moveToolbarUp", "shell.moveToolbarDown", "shell.hideToolbar",
+      "shell.focusToolbars", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
     expect(service.commands.every(t => t.title.length > 0 && t.icon !== null)).toBe(true);
     expect(service.commands.filter(t => t.defaultKey !== null)).toEqual([]);
@@ -165,12 +173,12 @@ describe("ShellCommandsService", () => {
     expect(layout.layout().sideOf(layout.layout().groupOf(search)?.id ?? -1)).toBe(DockSide.Bottom);
   });
 
-  it("leaves out what can never apply to a tab: Keep open on a kept tab, and moving, splitting or docking a document", () => {
+  it("leaves out what can never apply to a tab: Keep open on a kept tab, and docking a document", () => {
     const applies = (name: string, commandArguments: JsonValue): boolean => command(name).isApplicable(commandArguments);
 
     expect([applies("shell.keepTab", tab(settings.key)), applies("shell.keepTab", tab(plan.key))]).toEqual([true, false]);
     expect(["shell.splitTabLeft", "shell.dockTabLeft", "shell.moveTabToGroup"].map(t => [applies(t, tab(plan.key)), applies(t, tab(search.key))]))
-      .toEqual([[false, true], [false, true], [false, true]]);
+      .toEqual([[true, true], [false, true], [true, true]]);
     expect([applies("shell.closeTab", tab(plan.key)), applies("shell.closeTab", tab("missing")), applies("shell.moveTabToGroup", tab("missing"))])
       .toEqual([true, false, false]);
   });
@@ -181,6 +189,18 @@ describe("ShellCommandsService", () => {
     await runAsync("shell.closeTab", tab(changes.key));
 
     expect([layout.layout().isOpen(changes), layout.layout().group(group)]).toEqual([false, null]);
+  });
+
+  it("passes the focus to the group that remains when a closed tab was the last of its group, and has none to focus when no tab remains", async () => {
+    await runAsync("shell.splitTabRight", tab(todo.key));
+    const remaining = layout.layout().documentGroups[0];
+
+    await runAsync("shell.closeTab", tab(todo.key));
+
+    expect([layout.layout().documentGroups.map(t => t.id), layout.currentGroup().id, layout.currentGroup().active]).toEqual([[remaining?.id], remaining?.id, remaining?.active]);
+    await runAsync("shell.closeTab", tab(plan.key));
+    await runAsync("shell.closeTab", tab(settings.key));
+    expect([layout.layout().documents.tabs, layout.currentGroup().active]).toEqual([[], null]);
   });
 
   it("moves a tab to another group that accepts it, and to no other", async () => {
@@ -196,6 +216,48 @@ describe("ShellCommandsService", () => {
 
     expect(layout.layout().groupOf(search)?.id).toBe(other);
     expect(layout.layout().groupOf(search)?.tabs.at(-1)).toEqual(search);
+  });
+
+  it("splits a document into a documents group, moves a tab between the groups it can join and focuses the next or previous group, wrapping at either end", async () => {
+    const names = ["shell.moveTabToNextGroup", "shell.moveTabToPreviousGroup", "shell.focusNextGroup", "shell.focusPreviousGroup"];
+    const before = names.map(t => enabled(t, t.includes("focus") ? null : tab(plan.key)));
+
+    await runAsync("shell.splitTabRight", tab(todo.key));
+    const [first, second] = layout.layout().documentGroups;
+    const contents = (): number[] => layout.layout().documentGroups.map(t => t.tabs.length);
+
+    expect(before).toEqual([false, false, true, true]);
+    expect([first?.tabs, second?.tabs, layout.layout().documents.id]).toEqual([[plan, settings], [todo], second?.id]);
+    expect([enabled("shell.splitTabRight", tab(todo.key)), enabled("shell.splitTabRight", tab(plan.key))]).toEqual([false, true]);
+    const frames = layout.geometry().frames.filter(t => t.group.active !== null).length;
+    const visited = new Set<number>();
+    for (let step = 0; step < frames; step++) {
+      await runAsync("shell.focusNextGroup");
+      visited.add(layout.currentGroup().id);
+    }
+    expect([visited.size, visited.has(first?.id ?? -1), visited.has(second?.id ?? -1), layout.currentGroup().id]).toEqual([frames, true, true, second?.id]);
+    await runAsync("shell.focusPreviousGroup");
+    await runAsync("shell.focusNextGroup");
+    expect(layout.currentGroup().id).toBe(second?.id);
+    layout.focusGroup(first?.id ?? -1);
+    await runAsync("shell.moveTabToNextGroup", tab(plan.key));
+    expect([contents(), layout.layout().documents.id]).toEqual([[1, 2], second?.id]);
+    await runAsync("shell.moveTabToPreviousGroup", tab(plan.key));
+    await runAsync("shell.moveTabToPreviousGroup", tab(todo.key));
+    expect(contents()).toEqual([3]);
+    expect(names.map(t => enabled(t, t.includes("focus") ? null : tab(plan.key)))).toEqual([false, false, true, true]);
+  });
+
+  it("moves a view to the next or previous group, which may be a documents group, wrapping around every group", async () => {
+    const groups = layout.layout().groups;
+    const own = layout.layout().groupOf(search);
+    const next = groups[(groups.findIndex(t => t.id === own?.id) + 1) % groups.length];
+
+    await runAsync("shell.moveTabToNextGroup", tab(search.key));
+
+    expect(layout.layout().groupOf(search)?.id).toBe(next?.id);
+    await runAsync("shell.moveTabToPreviousGroup", tab(search.key));
+    expect(layout.layout().groupOf(search)?.id).toBe(own?.id);
   });
 
   it("keys the most-used commands by the platform's conventions, each key once and each command one of its own", () => {
@@ -237,6 +299,102 @@ describe("ShellCommandsService", () => {
     await runAsync("shell.showCommands");
 
     expect(open).toHaveBeenCalledOnce();
+  });
+
+  it("shows or hides the toolbar it names, checked while shown, and is enabled only for a toolbar that exists", async () => {
+    const toolbars = TestBed.inject(ToolbarService);
+    const known = vi.spyOn(toolbars, "isKnown").mockImplementation(name => name === "notes.main");
+    const shown = vi.spyOn(toolbars, "isShown").mockReturnValue(true);
+    const setShown = vi.spyOn(toolbars, "setShown").mockImplementation(() => undefined);
+    const main = { toolbar: "notes.main" };
+    const missing = { toolbar: "notes.none" };
+
+    expect([enabled("shell.toggleToolbar", main), enabled("shell.toggleToolbar", missing), enabled("shell.toggleToolbar"), enabled("shell.toggleToolbar", {})]).toEqual([true, false, false, false]);
+    expect([checked("shell.toggleToolbar", main), checked("shell.toggleToolbar", missing), checked("shell.toggleToolbar", null)]).toEqual([true, false, false]);
+    await runAsync("shell.toggleToolbar", main);
+    expect(setShown).toHaveBeenLastCalledWith("notes.main", false);
+    shown.mockReturnValue(false);
+    await runAsync("shell.toggleToolbar", main);
+    expect(setShown).toHaveBeenLastCalledWith("notes.main", true);
+    setShown.mockClear();
+    await runAsync("shell.toggleToolbar", missing);
+    expect(setShown).not.toHaveBeenCalled();
+    expect(known).toHaveBeenCalled();
+  });
+
+  it("moves the toolbar it names one step and returns the focus to its grip, enabled only where that step is possible, and hides it", async () => {
+    const toolbars = TestBed.inject(ToolbarService);
+    vi.spyOn(toolbars, "isKnown").mockImplementation(name => name === "notes.main");
+    const canMove = vi.spyOn(toolbars, "canMove").mockImplementation((_, move) => move === ToolbarMove.Left);
+    const moveBy = vi.spyOn(toolbars, "moveBy").mockImplementation(() => undefined);
+    const setShown = vi.spyOn(toolbars, "setShown").mockImplementation(() => undefined);
+    const main = { toolbar: "notes.main" };
+    const missing = { toolbar: "notes.none" };
+    const frame = document.createElement("div");
+    frame.className = "tr-toolbar";
+    frame.dataset["toolbar"] = "notes.main";
+    const grip = document.createElement("button");
+    grip.className = "tr-toolbar-grip";
+    frame.append(grip);
+    document.body.append(frame);
+
+    expect(Object.values(ToolbarMove).map(t => enabled(`shell.moveToolbar${t[0]?.toUpperCase()}${t.slice(1)}`, main))).toEqual([true, false, false, false]);
+    expect([enabled("shell.moveToolbarLeft", missing), enabled("shell.moveToolbarLeft"), enabled("shell.hideToolbar", main), enabled("shell.hideToolbar", missing)]).toEqual([false, false, true, false]);
+    await runAsync("shell.moveToolbarLeft", main);
+    await vi.waitFor(() => expect(document.activeElement).toBe(grip));
+    expect(moveBy).toHaveBeenLastCalledWith("notes.main", ToolbarMove.Left);
+    moveBy.mockClear();
+    await runAsync("shell.moveToolbarLeft", missing);
+    expect(moveBy).not.toHaveBeenCalled();
+    await runAsync("shell.hideToolbar", main);
+    expect(setShown).toHaveBeenLastCalledWith("notes.main", false);
+    setShown.mockClear();
+    await runAsync("shell.hideToolbar", missing);
+    expect(setShown).not.toHaveBeenCalled();
+    frame.remove();
+    await runAsync("shell.moveToolbarLeft", main);
+    expect(canMove).toHaveBeenCalled();
+  });
+
+  it("moves the focus to the next toolbar's grip, else the previous one's, else Search commands, after hiding a toolbar", async () => {
+    const toolbars = TestBed.inject(ToolbarService);
+    vi.spyOn(toolbars, "isKnown").mockReturnValue(true);
+    const frames = ["notes.first", "notes.second"].map(name => {
+      const frame = document.createElement("div");
+      frame.className = "tr-toolbar";
+      frame.dataset["toolbar"] = name;
+      const grip = document.createElement("button");
+      grip.className = "tr-toolbar-grip";
+      frame.append(grip);
+      document.body.append(frame);
+      return frame;
+    });
+    const search = document.createElement("button");
+    search.className = "tr-window-row-search";
+    document.body.append(search);
+    vi.spyOn(toolbars, "setShown").mockImplementation(name => frames.find(t => t.dataset["toolbar"] === name)?.remove());
+
+    await runAsync("shell.hideToolbar", { toolbar: "notes.first" });
+    await vi.waitFor(() => expect(document.activeElement).toBe(frames[1]?.querySelector("button")));
+    await runAsync("shell.hideToolbar", { toolbar: "notes.second" });
+    await vi.waitFor(() => expect(document.activeElement).toBe(search));
+    search.remove();
+  });
+
+  it("focuses the first toolbar item, and is enabled only while a toolbar is shown", async () => {
+    const hasContent = vi.spyOn(TestBed.inject(ToolbarService), "hasContent");
+    const item = document.createElement("button");
+    item.className = "tr-toolbar-item";
+    item.tabIndex = 0;
+    document.body.append(item);
+
+    expect(enabled("shell.focusToolbars")).toBe(false);
+    hasContent.mockReturnValue(true);
+    expect(enabled("shell.focusToolbars")).toBe(true);
+    await runAsync("shell.focusToolbars");
+    expect(document.activeElement).toBe(item);
+    item.remove();
+    await runAsync("shell.focusToolbars");
   });
 
   it("shows and hides each dock and resets the layout", async () => {

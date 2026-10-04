@@ -17,6 +17,7 @@ import { DockSide } from "./app/enums/dock-side";
 import { EditAction } from "./app/enums/edit-action";
 import { PanelEdge } from "./app/enums/panel-edge";
 import { SplitAxis } from "./app/enums/split-axis";
+import { ToolbarMove } from "./app/enums/toolbar-move";
 import { productName } from "../../../generated/product";
 
 export class Resources {
@@ -148,6 +149,10 @@ export class Resources {
     [BottomDockSpan.Between]: "Bottom dock between the side docks"
   };
   public static readonly documentsGroupLabel: string = "Documents";
+  public static readonly moveToNextGroupLabel: string = "Move to next group";
+  public static readonly moveToPreviousGroupLabel: string = "Move to previous group";
+  public static readonly focusNextGroupLabel: string = "Focus next group";
+  public static readonly focusPreviousGroupLabel: string = "Focus previous group";
   public static readonly groupLabelJoiner: string = ", ";
   public static readonly splitLabels: Readonly<Record<PanelEdge, string>> = {
     [PanelEdge.Left]: "Split left",
@@ -280,6 +285,7 @@ export class Resources {
   public static readonly windowRowSelector: string = "tr-window-row";
   public static readonly wordSeparatorPattern: RegExp = /[\s\-_./:,]/u;
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
+  public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
   public static readonly hideDockLabels: Readonly<Record<DockSide, string>> = {
     [DockSide.Left]: "Hide the left dock",
     [DockSide.Right]: "Hide the right dock",
@@ -325,6 +331,10 @@ export class Resources {
   public static readonly sizeField: string = "size";
   public static readonly collapsedField: string = "collapsed";
   public static readonly bottomSpanField: string = "bottomSpan";
+  public static readonly toolbarsField: string = "toolbars";
+  public static readonly hiddenField: string = "hidden";
+  public static readonly rowsParameter: string = "rows";
+  public static readonly invalidToolbarLayout: string = "A toolbar arrangement names each toolbar once and has no empty row.";
   public static readonly axisField: string = "axis";
   public static readonly childrenField: string = "children";
   public static readonly weightField: string = "weight";
@@ -332,6 +342,7 @@ export class Resources {
   public static readonly activeField: string = "active";
   public static readonly previewField: string = "preview";
   public static readonly documentsField: string = "documents";
+  public static readonly activeDocumentsField: string = "activeDocuments";
   public static readonly viewField: string = "view";
   public static readonly documentField: string = "document";
   public static readonly instanceField: string = "instance";
@@ -350,6 +361,7 @@ export class Resources {
   public static readonly viewKind: string = "view";
   public static readonly documentKind: string = "document";
   public static readonly statusBarItemKind: string = "status bar item";
+  public static readonly dynamicMenuGroupKind: string = "dynamic menu group";
   public static readonly topBarActionKind: string = "top bar action";
   public static readonly notificationKind: string = "notification kind";
   public static readonly statusBarItemEmpty: string = "A status bar item shows text, an icon or both.";
@@ -365,7 +377,18 @@ export class Resources {
   public static readonly groupsField: string = "groups";
   public static readonly nameField: string = "name";
   public static readonly titleField: string = "title";
-  public static readonly menuBarField: string = "menuBar";
+  public static readonly showsField: string = "shows";
+  public static readonly shownField: string = "shown";
+  public static readonly afterField: string = "after";
+  public static readonly beforeField: string = "before";
+  public static readonly newRowField: string = "newRow";
+  public static readonly dynamicField: string = "dynamic";
+  public static readonly choiceField: string = "choice";
+  public static readonly showsMenuBar: string = "menuBar";
+  public static readonly showsToolbar: string = "toolbar";
+  public static readonly afterParameter: string = "after";
+  public static readonly choiceParameter: string = "choice";
+  public static readonly severalToolbarPositions: string = "A toolbar has at most one of a place after another, a place before another and a row of its own.";
   public static readonly placeField: string = "place";
   public static readonly exclusiveField: string = "exclusive";
   public static readonly itemsField: string = "items";
@@ -447,12 +470,89 @@ export class Resources {
   public static readonly tabSplitGroup: string = "shell.tabSplitEdges";
   public static readonly tabDockGroup: string = "shell.tabDockSides";
   public static readonly moveTabToGroupCommand: string = "shell.moveTabToGroup";
+  public static readonly moveTabToNextGroupCommand: string = "shell.moveTabToNextGroup";
+  public static readonly moveTabToPreviousGroupCommand: string = "shell.moveTabToPreviousGroup";
+  public static readonly moveTabToNextGroupTitle: string = "Move the tab to the next group";
+  public static readonly moveTabToPreviousGroupTitle: string = "Move the tab to the previous group";
+  public static readonly focusNextGroupCommand: string = "shell.focusNextGroup";
+  public static readonly focusPreviousGroupCommand: string = "shell.focusPreviousGroup";
+  public static readonly focusNextGroupTitle: string = "Focus the next group";
+  public static readonly focusPreviousGroupTitle: string = "Focus the previous group";
+  public static readonly focusNextGroupGlyph: string = "keyboard_double_arrow_right";
+  public static readonly focusPreviousGroupGlyph: string = "keyboard_double_arrow_left";
+  public static readonly groupsGroup: string = "shell.groups";
   public static readonly moveTabToGroupTitle: string = "Move the tab to another group";
   public static readonly groupArgument: string = "group";
   public static readonly searchGroup: string = "shell.search";
   public static readonly docksGroup: string = "shell.docks";
   public static readonly bottomDockGroup: string = "shell.bottomDock";
   public static readonly layoutGroup: string = "shell.layout";
+  public static readonly toolbarsMenu: string = "shell.toolbars";
+  public static readonly toolbarsMenuTitle: string = "Toolbars";
+  public static readonly noPlace: string = "";
+  public static readonly toolbarListGroup: string = "shell.toolbarList";
+  public static readonly viewToolbarsGroup: string = "shell.viewToolbars";
+  public static readonly toggleToolbarCommand: string = "shell.toggleToolbar";
+  public static readonly toggleToolbarTitle: string = "Show or hide a toolbar";
+  public static readonly toolbarArgument: string = "toolbar";
+  public static readonly focusToolbarsCommand: string = "shell.focusToolbars";
+  public static readonly focusToolbarsTitle: string = "Focus the toolbars";
+  public static readonly focusToolbarsGlyph: string = "toolbar";
+  public static readonly toolbarItemSelector: string = ".tr-toolbar-item[tabindex=\"0\"]";
+  public static readonly toolbarSectionSelector: string = ".tr-toolbar-ghost-section";
+  public static readonly toolbarOverflowSelector: string = ".tr-toolbar-ghost-overflow";
+  public static readonly toolbarFitTolerance: number = 0.5;
+  public static readonly toolbarEdgeFraction: number = 4;
+  public static readonly toolbarBandSelector: string = ".tr-toolbar-band";
+  public static readonly toolbarRowSelector: string = ".tr-toolbar-row";
+  public static readonly toolbarSelector: string = ".tr-toolbar[data-toolbar]";
+  public static readonly toolbarData: string = "toolbar";
+  public static readonly toolbarRowData: string = "toolbarRow";
+  public static readonly toolbarIndexData: string = "toolbarIndex";
+  public static readonly toolbarOverflowLabel: string = "More actions";
+  public static readonly toolbarOverflowGlyph: string = "more_horiz";
+  public static readonly toolbarGripLabel: string = "Move toolbar";
+  public static readonly toolbarMenu: string = "shell.toolbar";
+  public static readonly toolbarMenuTitle: string = "Toolbar";
+  public static readonly toolbarMoveGroup: string = "shell.toolbarMove";
+  public static readonly toolbarHideGroup: string = "shell.toolbarHide";
+  public static readonly moveToolbarCommands: Readonly<Record<ToolbarMove, string>> = {
+    [ToolbarMove.Left]: "shell.moveToolbarLeft",
+    [ToolbarMove.Right]: "shell.moveToolbarRight",
+    [ToolbarMove.Up]: "shell.moveToolbarUp",
+    [ToolbarMove.Down]: "shell.moveToolbarDown"
+  };
+  public static readonly moveToolbarTitles: Readonly<Record<ToolbarMove, string>> = {
+    [ToolbarMove.Left]: "Move the toolbar left",
+    [ToolbarMove.Right]: "Move the toolbar right",
+    [ToolbarMove.Up]: "Move the toolbar to the row above",
+    [ToolbarMove.Down]: "Move the toolbar to the row below"
+  };
+  public static readonly moveToolbarLabels: Readonly<Record<ToolbarMove, string>> = {
+    [ToolbarMove.Left]: "Move left",
+    [ToolbarMove.Right]: "Move right",
+    [ToolbarMove.Up]: "Move to the row above",
+    [ToolbarMove.Down]: "Move to the row below"
+  };
+  public static readonly moveToolbarGlyphs: Readonly<Record<ToolbarMove, string>> = {
+    [ToolbarMove.Left]: "arrow_back",
+    [ToolbarMove.Right]: "arrow_forward",
+    [ToolbarMove.Up]: "arrow_upward",
+    [ToolbarMove.Down]: "arrow_downward"
+  };
+  public static readonly hideToolbarGlyph: string = "visibility_off";
+  public static readonly hideToolbarCommand: string = "shell.hideToolbar";
+  public static readonly hideToolbarTitle: string = "Hide the toolbar";
+  public static readonly hideToolbarLabel: string = "Hide toolbar";
+  public static readonly toolbarGripSelector: string = ".tr-toolbar-grip";
+  public static readonly commandSearchButtonSelector: string = ".tr-window-row-search";
+  public static readonly toolbarsSubmenuGroup: string = "shell.toolbarsSubmenu";
+  public static readonly toolbarContentSectionSelector: string = ".tr-toolbar-section";
+  public static readonly toolbarOverflowItemSelector: string = ".tr-toolbar-overflow";
+  public static readonly toolbarGroupData: string = "group";
+  public static readonly focusedSelector: string = ":focus";
+  public static readonly toolbarMenuKey: string = "ContextMenu";
+  public static readonly toolbarMenuShiftKey: string = "F10";
   public static readonly settingsGroup: string = "shell.settings";
   public static readonly windowPartMenusToken: string = "The build's module menus";
   public static readonly placeInput: string = "place";
@@ -469,9 +569,9 @@ export class Resources {
   public static readonly repeatedTab: string = "A tab appears only once in a layout.";
   public static readonly inactiveTab: string = "The active tab must be one of the group's tabs, and a group with tabs has one.";
   public static readonly previewOutsideGroup: string = "The preview tab must be one of the group's tabs.";
-  public static readonly documentOutsideDocuments: string = "Document tabs stay in the documents group.";
-  public static readonly missingDocumentsGroup: string = "The middle holds exactly one documents group.";
-  public static readonly documentsInDock: string = "The documents group stays in the middle.";
+  public static readonly documentOutsideDocuments: string = "Document tabs stay in document groups.";
+  public static readonly missingDocumentsGroup: string = "The middle holds at least one document group.";
+  public static readonly documentsInDock: string = "Document groups stay in the middle.";
   public static readonly repeatedDock: string = "A layout has one dock for each side.";
   public static readonly repeatedNodeId: string = "Each group and split in a layout has its own id.";
   public static readonly repeatedViewType: string = "A view or document type is registered once.";
@@ -613,6 +713,10 @@ export class Resources {
   public static formatNotificationsLabel(unread: number, isQuiet: boolean): string {
     const state = isQuiet ? ", Do not disturb" : "";
     return unread === 0 ? `Notifications${state}` : `Notifications, ${unread} unread${state}`;
+  }
+
+  public static formatDocumentsGroup(position: number): string {
+    return `${Resources.documentsGroupLabel} ${position}`;
   }
 
   public static formatBadged(label: string, badge: string): string {

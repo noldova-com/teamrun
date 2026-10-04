@@ -191,12 +191,12 @@ test.describe("docking", () => {
     await expect(window.locator(".tr-docking-preview, tr-docking-guide, .tr-drag-label")).toHaveCount(0);
   });
 
-  test("a document's tab shows no guides and only reorders within its group", async ({ desktop }) => {
+  test("a document's tab shows no dock guides and reorders within its group", async ({ desktop }) => {
     const window = desktop.window;
     await startDragAsync(window, firstNote);
     await moveOverAsync(window, tab(window, secondNote), 30);
 
-    await expect(window.locator("tr-docking-guide")).toHaveCount(0);
+    await expect(window.locator(".tr-docking-side")).toHaveCount(0);
     await expect(window.locator(".tr-drag-label")).toContainText("Moving Note 1");
     await window.mouse.up();
 
