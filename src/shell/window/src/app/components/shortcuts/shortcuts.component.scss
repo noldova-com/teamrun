@@ -29,6 +29,19 @@
 .tr-shortcuts-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.tr-shortcuts-table th:nth-child(2) {
+  width: 12%;
+}
+
+.tr-shortcuts-table th:nth-child(3) {
+  width: 26%;
+}
+
+.tr-shortcuts-table th:nth-child(4) {
+  width: 18%;
 }
 
 .tr-shortcuts-table :is(th, td) {

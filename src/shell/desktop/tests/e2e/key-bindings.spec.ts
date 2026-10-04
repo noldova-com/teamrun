@@ -12,6 +12,7 @@ import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 const isMac = process.platform === "darwin";
+const windowColors = { Light: "rgb(248, 248, 248)", Dark: "rgb(24, 24, 24)" };
 
 function label(standard: string, mac: string): string {
   return isMac ? mac : standard;
@@ -97,9 +98,16 @@ test.describe("key bindings", () => {
     await expect(shortcut(window, "notes.newNote").getByRole("alert")).toHaveText(label("Ctrl+C belongs to editing", "⌘C belongs to editing"));
     await expect(keyOf(window, "notes.newNote")).toHaveText(label("Ctrl+Alt+N", "⌥⌘N"));
 
+    const keyColumn = (await keyOf(window, "clock.tick").boundingBox())?.x;
     await recordAsync(window, "notes.newNote", "ControlOrMeta+Alt+KeyT");
     await expect(shortcut(window, "notes.newNote").getByRole("alert")).toContainText(label("Ctrl+Alt+T is used by Tick", "⌥⌘T is used by Tick"));
-    await desktop.checkpointAsync("key-bindings-collision");
+    expect((await keyOf(window, "clock.tick").boundingBox())?.x).toBe(keyColumn);
+    for (const mode of ["Light", "Dark"] as const) {
+      await window.evaluate(value => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
+        .request("shell.setSetting", { name: "shell.mode", value }), mode);
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(windowColors[mode]);
+      await desktop.checkpointAsync(`key-bindings-collision-${mode.toLowerCase()}`);
+    }
     await shortcut(window, "notes.newNote").getByRole("button", { name: "Use it here" }).click();
 
     await expect(keyOf(window, "notes.newNote")).toHaveText(label("Ctrl+Alt+T", "⌥⌘T"));
@@ -112,6 +120,7 @@ test.describe("key bindings", () => {
     await expect(ticks).toHaveText("No ticks");
 
     await window.locator("tr-tab[data-tab-key=\"document/shell.settings\"]").click();
+    await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
     await shortcut(window, "clock.tick").getByRole("button", { name: "Reset Tick" }).click();
     await expect(keyOf(window, "clock.tick")).toHaveText("No key");
     await expect(shortcut(window, "clock.tick").locator(".tr-shortcut-collision")).toHaveText(label("Ctrl+Alt+T is taken by New note", "⌥⌘T is taken by New note"));
