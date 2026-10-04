@@ -23,7 +23,7 @@ export class TestRunResult {
   public readonly total: number;
   public readonly selection: TestSelection;
 
-  public constructor(classResults: readonly TestClassResult[], selection: TestSelection | null = null) {
+  public constructor(classResults: readonly TestClassResult[], selection?: TestSelection) {
     let durationMilliseconds = 0;
     let passed = 0;
     let failed = 0;
@@ -55,6 +55,6 @@ export class TestRunResult {
     this.isInterrupted = isInterrupted;
     this.executed = this.passed + this.failed;
     this.total = this.executed + this.skipped + this.unreached;
-    this.selection = Object.isNull(selection) ? new TestSelection([], this.total, this.total) : selection;
+    this.selection = selection ?? new TestSelection([], this.total, this.total);
   }
 }
