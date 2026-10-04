@@ -66,10 +66,6 @@ export class FakeDesktopWindow implements IDesktopWindow {
     this.bounds = { ...this.bounds, ...bounds };
   }
 
-  public center(): void {
-    this.calls.push("center");
-  }
-
   public isMaximized(): boolean {
     return this.isMaximizedNow;
   }

@@ -167,13 +167,28 @@ export class WindowBoundsKeeperTests {
   }
 
   @TestMethod
+  public async shrinksSavedBoundsLargerThanTheirDisplayAndKeepsThemMaximized(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
+    const displays = new FakeDisplayHost();
+    displays.workAreas = [{ x: 0, y: 25, width: 1024, height: 743 }];
+    displays.primaryWorkArea = { x: 0, y: 25, width: 1024, height: 743 };
+    const keeper = new WindowBoundsKeeper(window, displays, 5, new FakeDesktopLog(), false);
+
+    await keeper.restoreAsync(new MemoryStore({ x: 0, y: 25, width: 1280, height: 800, maximized: true }));
+    await keeper.restoreAsync(new MemoryStore({ x: null, y: null, width: 1280, height: 800, maximized: false }));
+
+    Assert.areEqual(JSON.stringify(["setBounds {\"x\":51,\"y\":62,\"width\":921,\"height\":668}", "maximize", "setBounds {\"x\":51,\"y\":62,\"width\":921,\"height\":668}"]),
+      JSON.stringify(window.calls));
+  }
+
+  @TestMethod
   public async centersSavedBoundsThatNoDisplayShows(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true);
 
     await keeper.restoreAsync(new MemoryStore({ x: 5000, y: 100, width: 1000, height: 700, maximized: false }));
 
-    Assert.areEqual(JSON.stringify(["setBounds {\"width\":1000,\"height\":700}", "center"]), JSON.stringify(window.calls));
+    Assert.areEqual(JSON.stringify(["setBounds {\"x\":460,\"y\":170,\"width\":1000,\"height\":700}"]), JSON.stringify(window.calls));
   }
 
   @TestMethod

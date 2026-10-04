@@ -28,6 +28,7 @@ import type { IWindowContents } from "../interfaces/i-window-contents.js";
 import { StartupStateKind } from "../enums/startup-state-kind.js";
 import { DesktopSettings } from "../models/desktop-settings.js";
 import { MenuBar } from "../models/menu-bar.js";
+import { ScreenArea } from "../models/screen-area.js";
 import { TaskbarIdentity } from "../models/taskbar-identity.js";
 import { SenderInfo } from "../models/sender-info.js";
 import type { StartupState } from "../models/startup-state.js";
@@ -227,7 +228,7 @@ export class DesktopApplication {
   }
 
   private open(): void {
-    const window = this.factory.create(WindowState.createDefault(), this.appearance);
+    const window = this.factory.create(WindowState.createDefault(ScreenArea.of(this.electron.screen.getPrimaryDisplay().workArea)), this.appearance);
     const contentsId = window.webContents.id;
     const open = new OpenWindow(window, this.electron.screen, this.log, this.quit, this.settings.platform);
     window.webContents.on(Resources.didStartLoadingEvent, () => this.notifier.hold());

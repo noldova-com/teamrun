@@ -7,6 +7,9 @@
  */
 
 import { execFile, spawnSync } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 
@@ -14,6 +17,10 @@ export default class ProcessListFixture {
   private static readonly TIMEOUT: number = 30_000;
   private static readonly EXIT_INTERVAL: number = 250;
   private static readonly COMMAND_LINE_TIMEOUT: number = 10_000;
+  private static readonly THREADS_TIMEOUT: number = 15_000;
+  private static readonly SAMPLE_SECONDS: string = "3";
+  private static readonly SAMPLE_PREFIX: string = "teamrun-sample-";
+  private static readonly SAMPLE_FILE: string = "sample.txt";
   private static readonly SIGNAL_INTERVAL: number = 50;
   private static readonly WINDOWS_ROW: RegExp = /^"([^"]*)","(\d+)"/;
   private static readonly POSIX_ROW: RegExp = /^\s*(\d+)\s+(.+)$/;
@@ -112,6 +119,36 @@ export default class ProcessListFixture {
       return null;
     const [days, hours, minutes, seconds] = time.slice(1).map(t => Number(t ?? 0));
     return Math.round(((((days ?? 0) * 24 + (hours ?? 0)) * 60 + (minutes ?? 0)) * 60 + (seconds ?? 0)) * 1000);
+  }
+
+  public static async describeThreadsAsync(processId: number): Promise<string> {
+    if (process.platform === "win32")
+      return await ProcessListFixture.runReportingAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+        `Microsoft.PowerShell.Management\\Get-Process -Id ${processId} -ErrorAction SilentlyContinue | Microsoft.PowerShell.Core\\ForEach-Object { $_.Threads } | ` +
+        "Microsoft.PowerShell.Core\\ForEach-Object { \"$($_.Id) $($_.ThreadState) $(if ($_.ThreadState -eq 'Wait') { $_.WaitReason } else { '-' }) $([long]$_.TotalProcessorTime.TotalMilliseconds) ms\" }"]);
+    if (process.platform !== "darwin")
+      return await ProcessListFixture.runReportingAsync("ps", ["-L", "-o", "tid=,stat=,wchan:32=,time=,comm=", "-p", String(processId)]);
+    const folder = await mkdtemp(path.join(os.tmpdir(), ProcessListFixture.SAMPLE_PREFIX));
+    try {
+      const file = path.join(folder, ProcessListFixture.SAMPLE_FILE);
+      const output = await ProcessListFixture.runReportingAsync("sample", [String(processId), ProcessListFixture.SAMPLE_SECONDS, "-file", file]);
+      return await readFile(file, "utf8").catch(() => output);
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  private static async runReportingAsync(file: string, commandArguments: readonly string[]): Promise<string> {
+    try {
+      const result = await promisify(execFile)(file, [...commandArguments], { encoding: "utf8", windowsHide: true, timeout: ProcessListFixture.THREADS_TIMEOUT, maxBuffer: 16 * 1024 * 1024 });
+      return `${result.stdout}${result.stderr}`;
+    }
+    catch (error) {
+      const failed = error as Error & { killed?: boolean; stdout?: string };
+      const stopped = failed.killed === true ? `\nIt was stopped after ${ProcessListFixture.THREADS_TIMEOUT} ms.` : "";
+      return `${failed.message}${stopped}\n${failed.stdout ?? ""}`;
+    }
   }
 
   private static async describeOnWindowsAsync(processIds: readonly number[]): Promise<string> {

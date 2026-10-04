@@ -171,6 +171,7 @@ export class Resources {
   public static readonly windowMinimumHeight: number = 400;
   public static readonly windowWidth: number = 1280;
   public static readonly windowHeight: number = 800;
+  public static readonly windowAreaShare: number = 0.9;
   public static readonly closeAnswerTimeout: number = 5000;
   public static readonly workQueryTimeout: number = 2000;
   public static readonly moduleLogLimit: number = 65536;
