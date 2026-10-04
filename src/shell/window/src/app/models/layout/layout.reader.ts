@@ -27,6 +27,7 @@ import { ViewTab } from "./view-tab";
 
 export class LayoutReader {
   private nextId: number = Resources.documentsGroupId + 1;
+  private hasDocuments: boolean = false;
 
   private constructor() {
   }
@@ -51,8 +52,10 @@ export class LayoutReader {
     const docks = json.readObject(Resources.docksField);
     const read = Object.values(DockSide).map(t => this.readDock(t, docks.readObject(t)));
     const middle = this.readNode(json.readObject(Resources.middleField));
+    const documents = middle.groups.filter(t => t.isDocuments);
+    const index = json.hasField(Resources.activeDocumentsField) ? json.readInteger(Resources.activeDocumentsField) : 0;
     const span = json.hasField(Resources.bottomSpanField) ? json.readOneOf(Resources.bottomSpanField, Object.values(BottomDockSpan)) : BottomDockSpan.Full;
-    return LayoutReader.construct(json, () => new Layout(read, middle, span));
+    return LayoutReader.construct(json, () => new Layout(read, middle, span, documents[index]?.id));
   }
 
   private readDock(side: DockSide, json: JsonReader): Dock {
@@ -89,8 +92,11 @@ export class LayoutReader {
     if (Object.isUndefined(preview))
       throw new JsonException(Resources.previewOutsideGroup, json.path);
     const isDocuments = json.hasField(Resources.documentsField) && json.readBoolean(Resources.documentsField);
-    if (isDocuments)
-      return LayoutReader.construct(json, () => new DocumentGroup(tabs, active, preview));
+    if (isDocuments) {
+      const documentsId = this.hasDocuments ? this.nextId++ : Resources.documentsGroupId;
+      this.hasDocuments = true;
+      return LayoutReader.construct(json, () => new DocumentGroup(tabs, active, preview, documentsId));
+    }
     const id = this.nextId++;
     return LayoutReader.construct(json, () => new TabGroup(id, tabs, active, preview));
   }

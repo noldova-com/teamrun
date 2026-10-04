@@ -31,10 +31,12 @@ export class TabDestinationsService {
     const layout = this.layout.layout();
     const tab = layout.groups.flatMap(t => t.tabs).find(t => t.key === key);
     return Object.isUndefined(tab) ? [] : layout.groups.filter(t => t.accepts(tab) && !t.has(tab))
-      .map(t => MenuItem.ofCommand(Resources.moveTabToGroupCommand, { [Resources.groupArgument]: t.id }, this.labelOf(t)));
+      .map(t => MenuItem.ofCommand(Resources.moveTabToGroupCommand, { [Resources.groupArgument]: t.id }, this.labelOf(t, layout.documentGroups)));
   }
 
-  private labelOf(group: TabGroup): string {
-    return group.isDocuments ? Resources.documentsGroupLabel : group.tabs.map(t => this.labels.of(t).title).join(Resources.groupLabelJoiner);
+  private labelOf(group: TabGroup, documents: readonly TabGroup[]): string {
+    if (!group.isDocuments)
+      return group.tabs.map(t => this.labels.of(t).title).join(Resources.groupLabelJoiner);
+    return documents.length === 1 ? Resources.documentsGroupLabel : Resources.formatDocumentsGroup(documents.indexOf(group) + 1);
   }
 }

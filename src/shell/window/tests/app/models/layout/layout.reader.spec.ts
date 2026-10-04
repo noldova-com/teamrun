@@ -29,7 +29,8 @@ describe("LayoutReader", () => {
     version,
     docks: { Left: dock(), Right: dock(), Bottom: dock(), ...docks },
     middle,
-    bottomSpan
+    bottomSpan,
+    activeDocuments: 0
   });
   const group = (...tabs: readonly unknown[]): Record<string, unknown> => ({ tabs, active: 0 });
   const failure = (value: unknown): JsonException => {

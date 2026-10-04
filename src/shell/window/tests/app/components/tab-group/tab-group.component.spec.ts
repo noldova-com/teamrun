@@ -302,7 +302,7 @@ describe("TabGroupComponent", () => {
     expect(key.defaultPrevented).toBe(true);
     expect(opened?.getBoundingClientRect().top).toBeGreaterThanOrEqual(tab(0, 0).getBoundingClientRect().bottom);
     expect(opened?.getBoundingClientRect().left).toBeCloseTo(tab(0, 0).getBoundingClientRect().left, 0);
-    expect(document.activeElement?.getAttribute("data-command")).toBe("shell.moveTabLeft");
+    expect(document.activeElement?.textContent).toContain(Resources.splitLabel);
     document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, bubbles: true, cancelable: true }));
     update();
     await fixture.whenStable();
