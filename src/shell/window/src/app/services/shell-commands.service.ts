@@ -90,6 +90,9 @@ export class ShellCommandsService {
     new CommandContribution(Resources.openSettingsCommand, Resources.openSettingsTitle, Resources.settingsGlyph, null,
       () => this.done(() => this.layout.openDocument(ShellDocuments.settingsTab)),
       () => this.layout.registry().hasDocument(ShellDocuments.settings.name)),
+    new CommandContribution(Resources.openModulesCommand, Resources.openModulesTitle, Resources.modulesGlyph, null,
+      () => this.done(() => this.layout.openDocument(ShellDocuments.modulesTab)),
+      () => this.layout.registry().hasDocument(ShellDocuments.modules.name)),
     new CommandContribution(Resources.toggleToolbarCommand, Resources.toggleToolbarTitle, Resources.focusToolbarsGlyph, null,
       commandArguments => this.done(() => {
         const name = this.toolbarOf(commandArguments);

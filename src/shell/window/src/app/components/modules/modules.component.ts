@@ -1,0 +1,94 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import { NgTemplateOutlet } from "@angular/common";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  ErrorHandler,
+  Injector,
+  type Signal,
+  type WritableSignal,
+  afterNextRender,
+  computed,
+  inject,
+  signal
+} from "@angular/core";
+
+import "@noldova/teamrun-foundation-core";
+import { ModuleState, type ModuleStatus } from "@noldova/teamrun-shell-protocol";
+
+import type { ContributionGroup } from "../../models/modules/contribution-group";
+import { ModuleOverview } from "../../models/modules/module-overview";
+import { CommandService } from "../../services/command.service";
+import { DesktopBridgeService } from "../../services/desktop-bridge.service";
+import { SettingsService } from "../../services/settings.service";
+import { WindowPartHostService } from "../../services/window-part-host.service";
+import { Resources } from "../../../resources";
+
+@Component({
+  selector: "tr-modules",
+  imports: [NgTemplateOutlet],
+  templateUrl: "./modules.component.html",
+  styleUrl: "./modules.component.scss",
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    "class": "tr-modules"
+  }
+})
+export class ModulesComponent {
+  private readonly commands: CommandService = inject(CommandService);
+  private readonly settings: SettingsService = inject(SettingsService);
+  private readonly element: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector: Injector = inject(Injector);
+  private readonly modules: Signal<readonly ModuleStatus[]> = inject(WindowPartHostService).modules;
+  private readonly selected: WritableSignal<string | null> = signal(null);
+
+  protected readonly resources: typeof Resources = Resources;
+  protected readonly active: ModuleState = ModuleState.Active;
+  protected readonly version: WritableSignal<string | null> = signal(null);
+  protected readonly overview: Signal<ModuleOverview> = computed(() => new ModuleOverview(this.modules()));
+  protected readonly current: Signal<ModuleStatus | null> = computed(() => this.overview().select(this.selected()));
+  protected readonly dependencies: Signal<readonly ModuleStatus[]> = computed(() => this.listOf(t => this.overview().listDependencies(t)));
+  protected readonly blockers: Signal<readonly ModuleStatus[]> = computed(() => this.dependencies().filter(t => t.id === this.current()?.blockedBy));
+  protected readonly dependents: Signal<readonly ModuleStatus[]> = computed(() => this.listOf(t => this.overview().listDependents(t)));
+  protected readonly contributions: Signal<readonly ContributionGroup[]> = computed(() => this.listOf(t => ModuleOverview.listContributions(t, (kind, name) => this.titleOf(kind, name))));
+
+  public constructor() {
+    const errors = inject(ErrorHandler);
+    inject(DesktopBridgeService).readBuildAsync().then(t => this.version.set(Resources.formatProductVersion(t.productVersion)), (error: unknown) => errors.handleError(error));
+  }
+
+  protected labelOf(state: ModuleState): string {
+    return Resources.moduleStateLabels[state];
+  }
+
+  protected select(id: string): void {
+    this.selected.set(id);
+  }
+
+  protected follow(id: string): void {
+    this.selected.set(id);
+    afterNextRender(() => [...this.element.querySelectorAll<HTMLElement>(Resources.moduleSelector)].find(t => t.dataset[Resources.moduleData] === id)?.focus(),
+      { injector: this.injector });
+  }
+
+  private listOf<T>(list: (module: ModuleStatus) => readonly T[]): readonly T[] {
+    const module = this.current();
+    return Object.isNull(module) ? [] : list(module);
+  }
+
+  private titleOf(kind: string, name: string): string | null {
+    if (kind === Resources.commandsKind)
+      return this.commands.commands().find(t => t.name === name)?.title ?? null;
+    if (kind === Resources.settingsKind)
+      return this.settings.definitions().find(t => t.name.text === name)?.title ?? null;
+    return null;
+  }
+}

@@ -209,6 +209,8 @@ export class FixtureTheme {
     ["settings-search-width", "40rem"],
     ["settings-pages-width", "15rem"],
     ["settings-content-width", "55rem"],
+    ["modules-list-width", "22rem"],
+    ["modules-detail-width", "48rem"],
     ["dropdown-padding", "0.375rem"],
     ["dropdown-row-height", "1.875rem"],
     ["dropdown-row-padding", "0.75rem"],

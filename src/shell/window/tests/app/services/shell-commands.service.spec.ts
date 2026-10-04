@@ -14,6 +14,7 @@ import { BottomDockSpan } from "../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { ToolbarMove } from "../../../src/app/enums/toolbar-move";
 import type { CommandContribution } from "../../../src/app/models/command-contribution";
+import { DocumentTab } from "../../../src/app/models/layout/document-tab";
 import { Layout } from "../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../src/app/models/layout/view-registry";
 import type { LayoutService } from "../../../src/app/services/layout.service";
@@ -69,7 +70,7 @@ describe("ShellCommandsService", () => {
       "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight",
       "shell.dockTabBottom", "shell.moveTabToGroup", "shell.moveTabToNextGroup", "shell.moveTabToPreviousGroup", "shell.focusNextGroup", "shell.focusPreviousGroup",
       "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut",
-      "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.toggleToolbar", "shell.moveToolbarLeft", "shell.moveToolbarRight", "shell.moveToolbarUp", "shell.moveToolbarDown", "shell.hideToolbar",
+      "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.openModules", "shell.toggleToolbar", "shell.moveToolbarLeft", "shell.moveToolbarRight", "shell.moveToolbarUp", "shell.moveToolbarDown", "shell.hideToolbar",
       "shell.focusToolbars", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
     expect(service.commands.every(t => t.title.length > 0 && t.icon !== null)).toBe(true);
@@ -85,6 +86,22 @@ describe("ShellCommandsService", () => {
     expect([opened.active?.key, opened.preview]).toEqual([settings.key, null]);
     expect(opened.tabs.filter(t => t.equals(settings)).length).toBe(1);
     expect(enabled("shell.openSettings")).toBe(false);
+  });
+
+  it("opens Modules as one kept document, revealing the open one, and is enabled only while the document is registered", async () => {
+    const modules = new DocumentTab("shell.modules");
+    const unregistered = enabled("shell.openModules");
+    layout.setRegistry(new ViewRegistry(registry.views, ["notes.note", "shell.settings", "shell.modules"]));
+
+    await runAsync("shell.openModules");
+    layout.activate(plan);
+    await runAsync("shell.openModules");
+    const opened = layout.layout().documents;
+
+    expect([unregistered, enabled("shell.openModules")]).toEqual([false, true]);
+    expect([opened.active?.key, opened.preview]).toEqual([modules.key, null]);
+    expect(opened.tabs.filter(t => t.equals(modules)).length).toBe(1);
+    expect(command("shell.openModules").title).toBe("Modules…");
   });
 
   it("edits the field that had focus before a menu took it, restoring the field and its selection first, and only when the field allows the edit", async () => {

@@ -68,7 +68,7 @@ test.describe("modules", () => {
     const item = window.locator("tr-module-failures button.tr-module-failures-item");
     await expect.poll(() => readKeptLayoutAsync(desktop)).toContain(JSON.stringify({ tabs: [{ view: "notes.list" }, { view: "notes.outline" }], active: 1 }));
 
-    await expect(item).toHaveText(/error\s*1 module didn't start/);
+    await expect(item).toHaveText(/error\s*2 modules didn't start/);
     await expect(window.locator("tr-tab-group[data-side=Right] .tr-tab-label")).toHaveText(["Clock"]);
     await expect(tab(desktop, "view/clock.face").locator(".tr-tab-icon")).toHaveText("error");
     await expect(window.locator("tr-module-failure-card")).toHaveText(/Clock didn't start\s*Its runtime part failed to activate\./);
@@ -98,7 +98,9 @@ test.describe("modules", () => {
     await expect(popover).toBeVisible();
     await expect(popover).toBeFocused();
     await expect(item).toHaveAttribute("aria-expanded", "true");
-    await expect(popover.locator(".tr-module-failures-row")).toHaveText([/Clock\s*Failed\s*Its runtime part failed to activate\./]);
+    await expect(popover.locator(".tr-module-failures-row")).toHaveText([
+      /Clock\s*Failed\s*Its runtime part failed to activate\./, /Alarm\s*Blocked\s*It depends on clock, which is not active\./
+    ]);
     const surface = await popover.evaluate(t => {
       const style = getComputedStyle(t);
       return { width: style.width, border: style.borderTopWidth, borderColor: style.borderTopColor, radius: style.borderTopLeftRadius, background: style.backgroundColor, hasShadow: style.boxShadow !== "none" };
@@ -112,7 +114,7 @@ test.describe("modules", () => {
     await popover.getByRole("button", { name: "Copy details" }).click();
     await expect(popover.getByRole("button", { name: "Copied" })).toBeVisible();
     expect(await desktop.application.evaluate(({ clipboard }) => clipboard.readText())).toBe(
-      `TeamRun ${RuntimeBuild.identity.productVersion}, build ${RuntimeBuild.identity.fingerprint}\nclock: Failed: Its runtime part failed to activate.`);
+      `TeamRun ${RuntimeBuild.identity.productVersion}, build ${RuntimeBuild.identity.fingerprint}\nclock: Failed: Its runtime part failed to activate.\nalarm: Blocked: It depends on clock, which is not active.`);
 
     await desktop.application.evaluate(({ shell }) => {
       shell.openPath = (folder: string): Promise<string> => Promise.resolve(folder.endsWith("logs") ? "" : "unexpected folder");

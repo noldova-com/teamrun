@@ -389,8 +389,8 @@ export class RuntimeHostTests {
 
       Assert.areEqual("{\"text\":\"hi\"}", JSON.stringify(responses[0]?.payload));
       Assert.areEqual(
-        "{\"modules\":[{\"id\":\"notes\",\"state\":\"Active\"},{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its runtime part could not be loaded.\"}]}",
-        JSON.stringify(ModuleStatusList.fromJson(responses[1]?.payload).toJson()));
+        "notes notes Active null,broken broken Failed Its runtime part could not be loaded.",
+        ModuleStatusList.fromJson(responses[1]?.payload).modules.map(t => `${t.id} ${t.description} ${t.state} ${t.cause}`).join(","));
       Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "deactivated")));
       Assert.isTrue(/^\S+Z The module broken: Its runtime part could not be loaded\.\nError \[ERR_MODULE_NOT_FOUND\]/.test(await readFile(fixture.dataDirectory.runtimeLog, "utf8")));
     });

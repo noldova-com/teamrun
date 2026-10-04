@@ -1,0 +1,219 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: var(--tr-space-4) var(--tr-space-6) 0;
+}
+
+.tr-modules-header {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--tr-space-1) var(--tr-space-3);
+  padding-bottom: var(--tr-space-4);
+}
+
+.tr-modules-title {
+  margin: 0;
+  color: var(--tr-setting-title);
+  font-weight: var(--tr-weight-emphasis);
+}
+
+.tr-modules-version {
+  color: var(--tr-text-muted);
+}
+
+.tr-modules-body {
+  display: flex;
+  flex: auto;
+  gap: var(--tr-space-6);
+  min-height: 0;
+}
+
+.tr-modules-list {
+  display: flex;
+  flex: 0 1 var(--tr-modules-list-width);
+  flex-direction: column;
+  gap: var(--tr-space-1);
+  min-width: 0;
+  overflow-y: auto;
+  padding-bottom: var(--tr-space-6);
+}
+
+.tr-modules-row {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--tr-space-1);
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--tr-space-2);
+  border: none;
+  border-radius: var(--tr-radius-small);
+  background-color: transparent;
+  color: var(--tr-text);
+  font: inherit;
+  text-align: start;
+}
+
+.tr-modules-row:hover {
+  background-color: var(--tr-hover);
+}
+
+.tr-modules-row-current,
+.tr-modules-row-current:hover {
+  background-color: var(--tr-selected);
+}
+
+.tr-modules-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 var(--tr-space-2);
+}
+
+.tr-modules-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tr-modules-id,
+.tr-modules-detail-id,
+.tr-modules-contribution-name {
+  color: var(--tr-text-muted);
+  font-size: var(--tr-text-label);
+  line-height: var(--tr-line-label);
+  overflow-wrap: anywhere;
+}
+
+.tr-modules-description {
+  overflow-wrap: anywhere;
+}
+
+.tr-modules-state {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--tr-space-1);
+  color: var(--tr-text-muted);
+  font-size: var(--tr-text-label);
+  line-height: var(--tr-line-label);
+}
+
+.tr-modules-state-down {
+  color: var(--tr-text);
+}
+
+.tr-modules-state-icon {
+  color: var(--tr-error);
+}
+
+.tr-modules-detail {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: var(--tr-modules-detail-width);
+  overflow-y: auto;
+  padding-bottom: var(--tr-space-6);
+}
+
+.tr-modules-detail-title {
+  margin: 0;
+  font-size: var(--tr-text-panel);
+  font-weight: var(--tr-weight-emphasis);
+  line-height: var(--tr-line-panel);
+  overflow-wrap: anywhere;
+}
+
+.tr-modules-detail-id {
+  margin: 0;
+}
+
+.tr-modules-detail-description {
+  margin: var(--tr-space-2) 0 var(--tr-space-4);
+  font-size: var(--tr-text-message);
+  line-height: var(--tr-line-message);
+  overflow-wrap: anywhere;
+}
+
+.tr-modules-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--tr-space-2) var(--tr-space-4);
+  margin: 0;
+}
+
+.tr-modules-facts dt {
+  color: var(--tr-text-muted);
+}
+
+.tr-modules-facts dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.tr-modules-fact-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--tr-space-2);
+}
+
+.tr-modules-section-title {
+  margin: var(--tr-space-6) 0 var(--tr-space-3);
+  font-size: var(--tr-text-label);
+  font-weight: var(--tr-weight-emphasis);
+  line-height: var(--tr-line-label);
+}
+
+.tr-modules-contributions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tr-modules-contribution {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--tr-space-2);
+}
+
+.tr-modules-link {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tr-link);
+  font: inherit;
+  text-align: start;
+}
+
+.tr-modules-link:hover {
+  text-decoration: underline;
+}
+
+.tr-modules-link:focus-visible {
+  outline: var(--tr-border-width) solid var(--tr-accent);
+}
+
+.tr-modules-none,
+.tr-modules-empty {
+  margin: 0;
+  color: var(--tr-text-muted);
+}

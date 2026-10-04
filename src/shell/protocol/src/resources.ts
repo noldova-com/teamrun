@@ -39,6 +39,10 @@ export class Resources {
   public static readonly locationField: string = "location";
   public static readonly stateField: string = "state";
   public static readonly causeField: string = "cause";
+  public static readonly displayNameField: string = "displayName";
+  public static readonly dependenciesField: string = "dependencies";
+  public static readonly contributesField: string = "contributes";
+  public static readonly blockedByField: string = "blockedBy";
   public static readonly modulesField: string = "modules";
   public static readonly deviceField: string = "device";
   public static readonly windowField: string = "window";
@@ -191,6 +195,7 @@ export class Resources {
   public static readonly maximumFrameLengthInvalid: string = "The maximum frame length must be a positive integer.";
   public static readonly responseOutcomeMissing: string = "A response must carry a payload or a failure.";
   public static readonly moduleCauseInvalid: string = "An active module has no cause, and a failed or blocked module has one that is not blank.";
+  public static readonly moduleBlockerInvalid: string = "A blocked module names the dependency that blocks it, and no other module names one.";
   public static readonly responseOutcomeAmbiguous: string = "A response cannot carry both a payload and a failure.";
   public static readonly unknownField: string = "The field is not part of this message, which accepts no unknown fields.";
   public static readonly settingTextInvalid: string = "A setting's title, description, page and group must not be blank.";

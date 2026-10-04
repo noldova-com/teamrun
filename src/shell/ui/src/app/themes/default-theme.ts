@@ -209,6 +209,8 @@ export class DefaultTheme {
       ["settings-search-width", "37.5rem"],
       ["settings-pages-width", "12.5rem"],
       ["settings-content-width", "50rem"],
+      ["modules-list-width", "20rem"],
+      ["modules-detail-width", "45rem"],
       ["dropdown-padding", "0.25rem"],
       ["dropdown-row-height", "1.625rem"],
       ["dropdown-row-padding", "0.5rem"],

@@ -11,6 +11,7 @@ import { TestBed } from "@angular/core/testing";
 
 import { ModuleState, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
+import { ModulesComponent } from "../../../src/app/components/modules/modules.component";
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
@@ -73,7 +74,9 @@ class FakeWindowPart implements IWindowPart {
 
 describe("WindowPartHostService", () => {
   const load = (): Promise<Type<unknown>> => Promise.resolve(ContentComponent);
-  const status = (id: string, state: ModuleState = ModuleState.Active, cause: string | null = null): object => ({ id, state, ...(cause === null ? {} : { cause }) });
+  const status = (id: string, state: ModuleState = ModuleState.Active, cause: string | null = null, dependencies: readonly string[] = []): object => ({
+    id, displayName: `${id[0]?.toUpperCase()}${id.slice(1)}`, description: "Used by the tests.", dependencies, contributes: {}, state, ...(cause === null ? {} : { cause })
+  });
   const source = (
     moduleId: string,
     part: IWindowPart | Error,
@@ -127,21 +130,23 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(loads).toEqual([""]));
 
     expect(bridge.requests).toEqual([["shell.settings", {}], ["shell.modules", null], ["shell.commands", null]]);
-    expect(host.failures()).toEqual([]);
+    expect([host.modules(), host.failures()]).toEqual([[], []]);
     expect(host.generation()).toBe(1);
     expect(layout.layout().documents.tabs).toEqual([]);
     expect(errors).toEqual([]);
   });
 
-  it("registers the shell's Settings document before any module's, finds it without a part's context and labels it", async () => {
+  it("registers the shell's Settings and Modules documents before any module's, finds them without a part's context and labels them", async () => {
     const { host, layout, loads } = start([], []);
     await vi.waitFor(() => expect(loads).toEqual([""]));
+    const labels = TestBed.inject(TabLabelService);
 
-    const match = host.findContribution(new DocumentTab("shell.settings"));
+    const settings = host.findContribution(new DocumentTab("shell.settings"));
+    const modules = host.findContribution(new DocumentTab("shell.modules"));
 
-    expect(layout.registry().hasDocument("shell.settings")).toBe(true);
-    expect([match?.context, await match?.loadComponent()]).toEqual([null, SettingsComponent]);
-    expect(TestBed.inject(TabLabelService).of(new DocumentTab("shell.settings")).title).toBe("Settings");
+    expect(["shell.settings", "shell.modules"].map(t => layout.registry().hasDocument(t))).toEqual([true, true]);
+    expect([settings?.context, await settings?.loadComponent(), modules?.context, await modules?.loadComponent()]).toEqual([null, SettingsComponent, null, ModulesComponent]);
+    expect(["shell.settings", "shell.modules"].map(t => labels.of(new DocumentTab(t))).map(t => [t.title, t.icon])).toEqual([["Settings", "settings"], ["Modules", "extension"]]);
   });
 
   it("reads, sets, resets and follows settings through the settings service", async () => {
@@ -165,7 +170,7 @@ describe("WindowPartHostService", () => {
 
   it("activates the active modules' window parts before loading the layout and finds their contributions", async () => {
 
-    const { host, layout, loads } = start([source("notes", notesPart(log), ["tasks"])], [status("tasks"), status("notes")]);
+    const { host, layout, loads } = start([source("notes", notesPart(log), ["tasks"])], [status("tasks"), status("notes", ModuleState.Active, null, ["tasks"])]);
     const labels = TestBed.inject(TabLabelService);
 
     await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1")]));
@@ -197,7 +202,7 @@ describe("WindowPartHostService", () => {
 
     expect(host.failures().map(t => [t.moduleId, t.displayName, t.state, t.cause, t.viewNames])).toEqual([
       ["clock", "Clock", ModuleState.Failed, "Its runtime part failed to activate.", ["clock.face"]],
-      ["weather", "weather", ModuleState.Failed, "Its runtime part failed to activate.", []]
+      ["weather", "Weather", ModuleState.Failed, "Its runtime part failed to activate.", []]
     ]);
     expect(layout.layout().sideOf(layout.layout().groupOf(face)?.id ?? -1)).toBe(DockSide.Right);
     expect(layout.registry().view("clock.face")).toEqual(new ViewType("clock.face", DockSide.Left, false));
@@ -215,10 +220,17 @@ describe("WindowPartHostService", () => {
     });
     const { host, layout } = start(
       [source("tasks", new Error("No chunk.")), source("clock", failing, [], ["clock.face"]), source("notes", notesPart(log), ["clock"]), source("weather", notesPart(log), ["tasks"])],
-      [status("tasks"), status("clock"), status("notes"), status("weather")]);
+      [status("tasks"), status("clock"), status("notes", ModuleState.Active, null, ["clock"]), status("weather", ModuleState.Active, null, ["tasks"]), status("alarm")]);
 
     await vi.waitFor(() => expect(host.failures().length).toBe(4));
 
+    expect(host.modules().map(t => [t.id, t.state, t.blockedBy, t.description])).toEqual([
+      ["tasks", ModuleState.Failed, null, "Used by the tests."],
+      ["clock", ModuleState.Failed, null, "Used by the tests."],
+      ["notes", ModuleState.Blocked, "clock", "Used by the tests."],
+      ["weather", ModuleState.Blocked, "tasks", "Used by the tests."],
+      ["alarm", ModuleState.Active, null, "Used by the tests."]
+    ]);
     expect(host.failures().map(t => [t.moduleId, t.state, t.cause])).toEqual([
       ["tasks", ModuleState.Failed, "Its window part could not be loaded."],
       ["clock", ModuleState.Failed, "Its window part failed to activate."],
@@ -475,7 +487,7 @@ describe("WindowPartHostService", () => {
     const tasks = new FakeWindowPart("tasks", log);
     const notes = notesPart(log);
     tasks.isDeactivationFailing = true;
-    const { host, loads } = start([source("tasks", tasks), source("notes", notes, ["tasks"])], [status("tasks"), status("notes")]);
+    const { host, loads } = start([source("tasks", tasks), source("notes", notes, ["tasks"])], [status("tasks"), status("notes", ModuleState.Active, null, ["tasks"])]);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
     bridge.publishStartup({ kind: "Ready", details: [] });
