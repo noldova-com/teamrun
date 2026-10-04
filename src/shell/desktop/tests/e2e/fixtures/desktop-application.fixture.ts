@@ -55,6 +55,7 @@ export default class DesktopApplicationFixture {
   private static readonly LOCKED_CODES: readonly string[] = ["EBUSY", "EPERM", "ENOTEMPTY"];
   private static readonly TRACE_FILE: string = "trace.zip";
   private static readonly WINDOWS_FILE: string = "windows.json";
+  private static readonly CLEANUP_FAILURE_FILE: string = "cleanup-failure.txt";
   private static readonly DIAGNOSTIC_TIMEOUT: number = 10_000;
   private static readonly MAIN_PROCESS_TIMEOUT: number = 10_000;
   private static readonly QUIT_TIMEOUT: number = 30_000;
@@ -114,7 +115,8 @@ export default class DesktopApplicationFixture {
       await fixture.recordEnvironmentAsync();
     }
     catch (error) {
-      await fixture.disposeAsync(true);
+      await fixture.disposeAsync(true).catch((cleanup: unknown) =>
+        testInfo.attach(DesktopApplicationFixture.CLEANUP_FAILURE_FILE, { body: cleanup instanceof Error && cleanup.stack !== undefined ? cleanup.stack : String(cleanup), contentType: "text/plain" }));
       throw error;
     }
     return fixture;
@@ -209,8 +211,15 @@ export default class DesktopApplicationFixture {
   public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
     const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
+    let recording: { readonly error: unknown } | null = null;
     try {
       await this.recordProcessesAsync();
+    }
+    catch (error) {
+      if (this.silence === null)
+        recording = { error };
+    }
+    try {
       const started = Date.now();
       await this.answerAsync(DesktopApplicationFixture.QUIT_ACTION, this.application.close(), DesktopApplicationFixture.QUIT_TIMEOUT);
       this.closeMilliseconds = Date.now() - started;
@@ -231,6 +240,8 @@ export default class DesktopApplicationFixture {
     const exitCode = await exited;
     this.electronApplication = null;
     this.page = null;
+    if (recording !== null)
+      throw recording.error;
     if (!keepRuntime)
       await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
     return exitCode;
