@@ -38,7 +38,7 @@ class ClassifyChangesTests {
 
       assert.equal(await readFile(outputPath, "utf8"), "run-code=false\nrun-code=true\n");
       const skipped = `Code builds and tests are not required; the document checks still run. Only Markdown documentation changed since the previous revision ${base}.`;
-      const full = "Full build and test verification selected. Events other than pull requests, merge groups and pushes verify everything.";
+      const full = "Full build and test verification selected. Events other than pull requests and pushes verify everything.";
       assert.equal(await readFile(summaryPath, "utf8"), `${skipped}\n${full}\n`);
       assert.equal(log.text, `${skipped}\n${full}\n`);
     });

@@ -100,4 +100,25 @@ test.describe("command search", () => {
     await expect(pane(window)).toHaveCount(0);
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"] .tr-tab-label")).toHaveText("Note 3");
   });
+
+  test("every result's title starts at the same left edge, with or without an icon", async ({ desktop }) => {
+    const window = desktop.window;
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]")).toBeVisible();
+
+    await window.keyboard.press("ControlOrMeta+Shift+KeyP");
+    await expect(field(window)).toBeFocused();
+    await expect(options(window).first()).toBeVisible();
+
+    const titles = await options(window).evaluateAll(items => items.map(item => ({
+      icon: item.querySelector(".tr-quick-input-icon")?.textContent?.trim() ?? "",
+      left: item.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left ?? -1,
+      iconWidth: item.querySelector(".tr-quick-input-icon")?.getBoundingClientRect().width ?? -1
+    })));
+    expect(titles.some(t => t.icon !== "")).toBe(true);
+    expect(titles.some(t => t.icon === "")).toBe(true);
+    expect(new Set(titles.map(t => t.left)).size).toBe(1);
+    expect(new Set(titles.map(t => t.iconWidth)).size).toBe(1);
+    await desktop.checkpointAsync("command-search-icon-column");
+    await window.keyboard.press("Escape");
+  });
 });

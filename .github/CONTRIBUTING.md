@@ -60,7 +60,7 @@ Use the [PR template](PULL_REQUEST_TEMPLATE.md). Fill `## Summary` with what cha
 
 Keep the change small enough to review coherently. A PR that changes the appearance links its before and after [screenshots](../docs/TESTING.md#ui-screenshots-and-reports), using disposable data. Commit messages describe the concrete change.
 
-An authorized maintainer, or an agent the maintainer designates, reviews and merges changes after the applicable requirements are met. A passing check does not authorize a release or establish that behavior outside the check's scope works.
+An authorized maintainer, or an agent the maintainer designates, reviews each change. Once it is approved, auto-merge squashes it into `main` when its required checks pass: the linked-issue check and **Build and test (all targets)**. The branch need not be up to date with `main`. The push run on `main` is the first run of the combined code and of the targets that pull requests skip; a failure there belongs to the pull request that caused it, and merging stops until it is fixed ([stop the line](../docs/TESTING.md#flakiness-and-races)). A passing check does not authorize a release or establish that behavior outside the check's scope works.
 
 ### AI-assisted changes
 
