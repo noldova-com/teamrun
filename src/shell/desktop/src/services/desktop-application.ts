@@ -229,7 +229,7 @@ export class DesktopApplication {
   private open(): void {
     const window = this.factory.create(WindowState.createDefault(), this.appearance);
     const contentsId = window.webContents.id;
-    const open = new OpenWindow(window, this.electron.screen, this.log, this.quit);
+    const open = new OpenWindow(window, this.electron.screen, this.log, this.quit, this.settings.platform);
     window.webContents.on(Resources.didStartLoadingEvent, () => this.notifier.hold());
     new WindowRecovery(open, this.electron.dialog, this.log, this.process, () => this.electron.app.quit(), () => this.openLogFolderAsync(), Resources.reloadCrashLimit, Resources.rendererEndLimit);
     this.windows.set(contentsId, open);
