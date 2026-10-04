@@ -21,6 +21,7 @@ import {
 } from "@noldova/teamrun-shell-protocol";
 import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
 
+import { ProgramFixture } from "../../fixtures/program.fixture.js";
 import type { RawConnectionFixture } from "../../fixtures/raw-connection.fixture.js";
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 
@@ -179,12 +180,14 @@ export class RuntimeHostTests {
       await mkdir(root, { recursive: true });
       await writeFile(path.join(root, "teamrun.db"), "old data");
       const host = await fixture.startAsync();
+      const programs = host.programs.length;
 
       const [refused, answer] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
       refused.sendMessages(new Request("desktop:1", ShellMethods.stop, new StopRequest(StopPolicy.StopWork).toJson()));
       const stopped = await refused.readResponseAsync();
       const reason = await host.waitForStopAsync();
 
+      Assert.areEqual(0, programs);
       Assert.areEqual(FailureCode.PreShellData, answer.failure?.code);
       Assert.isFalse(stopped.hasFailed);
       Assert.areEqual("request", reason);
@@ -393,6 +396,23 @@ export class RuntimeHostTests {
         ModuleStatusList.fromJson(responses[1]?.payload).modules.map(t => `${t.id} ${t.description} ${t.state} ${t.cause}`).join(","));
       Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "deactivated")));
       Assert.isTrue(/^\S+Z The module broken: Its runtime part could not be loaded\.\nError \[ERR_MODULE_NOT_FOUND\]/.test(await readFile(fixture.dataDirectory.runtimeLog, "utf8")));
+    });
+  }
+
+  @TestMethod
+  public listsTheProgramsItsModulesRunAndEndsThemWhenItStops(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["clock", RuntimeHostTests.createProgramPart()]]));
+
+      const programs = host.programs.map(t => `${t.moduleId} ${t.program}`);
+      const processId = host.programs[0]?.processId ?? 0;
+      host.requestStop("test");
+      await host.waitForStopAsync();
+
+      Assert.areEqual(`clock ${process.execPath}`, programs.join(","));
+      Assert.isTrue(processId > 0);
+      Assert.isFalse(ProgramFixture.isRunning(processId));
+      Assert.areEqual(0, host.programs.length);
     });
   }
 
@@ -716,6 +736,23 @@ export class RuntimeHostTests {
       "      });",
       "      return null;",
       "    } }));",
+      "  }",
+      "",
+      "  async deactivateAsync() {",
+      "  }",
+      "}",
+      ""
+    ].join("\n");
+  }
+
+  private static createProgramPart(): string {
+    const api = pathToFileURL(path.join(path.dirname(RuntimeEntry.entryPath), "..", "api", "index.js")).href;
+    return [
+      `import { ProcessRequest } from ${JSON.stringify(api)};`,
+      "",
+      "export class RuntimePart {",
+      "  async activateAsync(context) {",
+      `    await context.startProcessAsync(new ProcessRequest(${JSON.stringify(process.execPath)}, [${JSON.stringify(ProgramFixture.file)}, "wait"], ${JSON.stringify(path.dirname(ProgramFixture.file))}));`,
       "  }",
       "",
       "  async deactivateAsync() {",

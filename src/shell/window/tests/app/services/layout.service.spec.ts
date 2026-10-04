@@ -70,15 +70,16 @@ describe("LayoutService", () => {
     expect(service.geometry().frames.map(t => t.group.id)).toEqual([0]);
   });
 
-  it("loads the saved layout, the default when nothing is saved and the default for an unreadable one", async () => {
-    await service.loadAsync();
+  it("loads the saved layout, the default when nothing is saved and the default for an unreadable one, and tells whether it restored one", async () => {
+    expect(await service.loadAsync()).toBe(false);
     expect(service.layout().toJson()).toEqual(Layout.createDefault(registry).toJson());
 
-    await loadAsync(prepared());
+    await store.writeAsync(prepared().toJson());
+    expect(await service.loadAsync()).toBe(true);
     expect(service.layout().toJson()).toEqual(prepared().toJson());
 
     await store.writeAsync({ version: 99 });
-    await service.loadAsync();
+    expect(await service.loadAsync()).toBe(false);
     expect(service.layout().toJson()).toEqual(Layout.createDefault(registry).toJson());
   });
 
@@ -147,6 +148,19 @@ describe("LayoutService", () => {
     expect(service.currentGroup()).toBe(left);
     service.focusGroup(service.layout().documents.id);
     expect(service.currentGroup()).toBe(service.layout().documents);
+  });
+
+  it("numbers each tab it reveals by opening or activating it", async () => {
+    expect(service.revealed()).toBeNull();
+    await loadAsync(prepared());
+    const start = service.revealed()?.sequence ?? 0;
+
+    service.openDocument(LayoutFixture.plan);
+    const opened = service.revealed();
+    service.activate(LayoutFixture.files);
+
+    expect([opened?.tab.key, opened?.sequence]).toEqual([LayoutFixture.plan.key, start + 1]);
+    expect([service.revealed()?.tab.key, service.revealed()?.sequence]).toEqual([LayoutFixture.files.key, start + 2]);
   });
 
   it("resizes a split through its handle", async () => {

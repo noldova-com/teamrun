@@ -15,6 +15,7 @@ import { WorkspaceComponent } from "../../../../src/app/components/workspace/wor
 import { PanelEdge } from "../../../../src/app/enums/panel-edge";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
+import { ViewDialogService } from "../../../../src/app/services/view-dialog.service";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
@@ -104,6 +105,24 @@ describe("WorkspaceComponent", () => {
     expect(docked.length).toBeGreaterThan(0);
     expect(fixture.nativeElement.querySelector("tr-empty-window")).toBeNull();
     expect(getComputedStyle(docked[0] ?? fixture.nativeElement).backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "sideBar.background"));
+  });
+
+  it("leaves an open tab's place empty while a dialog shows it and shows it there again once the dialog closes", async () => {
+    const registry = LayoutFixture.createRegistry();
+    const fixture = await renderAsync(registry, Layout.createDefault(registry).openDocument(LayoutFixture.plan));
+    const host: HTMLElement = fixture.nativeElement;
+    const dialogs = TestBed.inject(ViewDialogService);
+    const before = host.querySelectorAll("tr-tab-content").length;
+
+    const shown = dialogs.showAsync(LayoutFixture.plan);
+    await settleAsync(fixture);
+    const whileShown = host.querySelectorAll("tr-tab-content").length;
+    const inDialog = document.querySelectorAll("tr-view-dialog tr-tab-content").length;
+    dialogs.close();
+    await shown;
+    await settleAsync(fixture);
+
+    expect([whileShown, inDialog, host.querySelectorAll("tr-tab-content").length]).toEqual([before - 1, 1, before]);
   });
 
   it("renders the docks with their sashes, the groups, the split sashes and the docking guides", async () => {

@@ -13,10 +13,11 @@ import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { QualifiedName } from "@noldova/teamrun-shell-protocol";
 import {
-  CommandRegistry, DataDirectory, DiagnosticRedactor, EventRegistry, type IRuntimePart, MethodRegistry, Migration, ModuleDatabase, ModuleDatabaseException, ModuleDeclaration, ModuleHost,
-  NotificationCenter, WorkTracker
+  CommandRegistry, DataDirectory, DiagnosticRedactor, EventRegistry, type IRuntimePart, type IRuntimePartContext, MethodRegistry, Migration, ModuleDatabase, ModuleDatabaseException,
+  ModuleDeclaration, ModuleHost, NotificationCenter, type OwnedProcess, WorkTracker
 } from "@noldova/teamrun-shell-runtime";
 
+import { ProgramFixture } from "../../fixtures/program.fixture.js";
 import { RuntimePartFixture } from "../../fixtures/runtime-part.fixture.js";
 import { RuntimePartLoaderFixture } from "../../fixtures/runtime-part-loader.fixture.js";
 import { SettingsFixture } from "../../fixtures/settings.fixture.js";
@@ -44,7 +45,7 @@ export class ModuleHostTests {
     ], parts);
 
     const before = host.report.modules.length;
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
 
     Assert.areEqual(0, before);
     Assert.areEqual("activate tasks,activate notes", log.join(","));
@@ -77,7 +78,7 @@ export class ModuleHostTests {
       ModuleHostTests.declare("second", ["first"], null)
     ], parts, methods, diagnostics);
 
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
     await host.deactivateAsync();
     const written = diagnostics.text;
 
@@ -98,6 +99,39 @@ export class ModuleHostTests {
   }
 
   @TestMethod
+  public async endsTheProgramsOfAPartThatFailsToActivateOrDeactivates(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const log: string[] = [];
+    const started: Promise<OwnedProcess>[] = [];
+    const start = (context: IRuntimePartContext): void => {
+      started.push(context.startProcessAsync(ProgramFixture.request(folder.path, [ProgramFixture.WAIT])));
+    };
+    const parts = new Map<string, IRuntimePart>([
+      ["failing-runtime", new RuntimePartFixture("failing", log, t => {
+        start(t);
+        throw new Error("The failing part gave up.");
+      })],
+      ["notes-runtime", new RuntimePartFixture("notes", log, start)]
+    ]);
+    const host = ModuleHostTests.create([
+      ModuleHostTests.declare("failing", [], "failing-runtime"),
+      ModuleHostTests.declare("notes", [], "notes-runtime")
+    ], parts);
+
+    await host.activateAsync(settings.service, settings.processes);
+    const [failed, notes] = await Promise.all(started) as [OwnedProcess, OwnedProcess];
+    const runningAfterActivation = settings.processes.programs.map(t => t.moduleId).join(",");
+    const failedEnded = failed.hasExited;
+    await host.deactivateAsync();
+
+    Assert.areEqual("notes", runningAfterActivation);
+    Assert.isTrue(failedEnded);
+    Assert.isTrue(notes.hasExited);
+    Assert.areEqual(0, settings.processes.programs.length);
+  }
+
+  @TestMethod
   public async deactivatesInReverseOrderAndWithdrawsEvenWhenAPartFails(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
     const methods = new MethodRegistry();
@@ -112,7 +146,7 @@ export class ModuleHostTests {
       ModuleHostTests.declare("tasks", [], "tasks-runtime", ["tasks.list"]),
       ModuleHostTests.declare("notes", ["tasks"], "notes-runtime", ["notes.list"])
     ], parts, methods, diagnostics);
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
 
     const exception = await Assert.throwsAsync(() => host.deactivateAsync(), AggregateError);
     await host.deactivateAsync();
@@ -138,7 +172,7 @@ export class ModuleHostTests {
       ModuleHostTests.declare("tasks", [], "tasks-runtime")
     ], new Map<string, IRuntimePart>([["notes-runtime", notes], ["tasks-runtime", tasks]]), new MethodRegistry(), new TextOutputFixture(), folder.path);
 
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
     const database = notes.context?.database;
     const missing = Assert.throws(() => tasks.context?.database, ModuleDatabaseException);
     await host.deactivateAsync();
@@ -171,7 +205,7 @@ export class ModuleHostTests {
       ModuleHostTests.declare("newer", [], "newer-runtime")
     ], parts, new MethodRegistry(), diagnostics, folder.path);
 
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
 
     Assert.areEqual("", log.join(","));
     Assert.areEqual(
@@ -198,7 +232,7 @@ export class ModuleHostTests {
     const host = ModuleHostTests.create([ModuleHostTests.declare("notes", [], "notes-runtime")], new Map<string, IRuntimePart>([["notes-runtime", part]]),
       new MethodRegistry(), new TextOutputFixture(), folder.path);
 
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
     const database = part.context?.database;
 
     Assert.areEqual("Failed", host.report.modules[0]?.state);
@@ -226,7 +260,7 @@ export class ModuleHostTests {
       [ModuleHostTests.declare("notes", [], "notes-runtime"), ModuleHostTests.declare("failing", [], "failing-runtime")],
       parts, new MethodRegistry(), diagnostics, path.resolve("teamrun-data"), work);
 
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
     const active = work.descriptions.join(",");
     const failedAborted = signals[1]?.aborted === true;
     await host.deactivateAsync();

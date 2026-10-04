@@ -21,7 +21,7 @@
   display: flex;
   flex-shrink: 0;
   min-height: var(--tr-tab-height);
-  padding-inline: var(--tr-radius-large);
+  padding-inline: var(--tr-tab-inset) var(--tr-radius-large);
 }
 
 .tr-tab-group-header {
@@ -31,7 +31,7 @@
 .tr-tab-group-title {
   flex: 1;
   min-width: 0;
-  padding-inline-start: calc(var(--tr-tab-inset) + var(--tr-tab-label-inset));
+  padding-inline-start: calc(var(--tr-tab-inset) * 2 + var(--tr-tab-label-inset));
   overflow: hidden;
   font-size: var(--tr-text-panel);
   font-weight: 600;

@@ -9,7 +9,7 @@
 import { JsonReader } from "@noldova/teamrun-foundation-json";
 import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 import {
-  CommandContribution, DockSide, DocumentContribution, type IWindowPart, type IWindowPartContext, MenuRowContribution, StatusBarItemContribution, StatusBarItemState, StatusBarSide,
+  CommandContribution, DockSide, DocumentContribution, type IViewDialogOptions, type IWindowPart, type IWindowPartContext, MenuRowContribution, StatusBarItemContribution, StatusBarItemState, StatusBarSide,
   TopBarActionContribution, TopBarActionState, TopBarSide, ViewContribution
 } from "@noldova/teamrun-shell-window";
 
@@ -17,6 +17,11 @@ import { NotesState } from "./notes-state";
 
 export class NotesWindowPart implements IWindowPart {
   private static readonly SORTINGS: readonly [string, string, string][] = [["notes.sortByTitle", "Sort by title", "title"], ["notes.sortByWeek", "Sort by week", "week"]];
+  private static readonly SHOWN_IN_DIALOG: readonly [string, string, string, IViewDialogOptions][] = [
+    ["notes.showListInDialog", "Show the notes list in a dialog", "notes.list", {}],
+    ["notes.showNoteInDialog", "Show note 1 in a dialog", "notes.note", { instance: "1", title: "Note 1" }],
+    ["notes.showSettingsInDialog", "Show Settings in a dialog", "shell.settings", {}]
+  ];
   private static readonly MANY_VIEWS: readonly [string, string, string, DockSide][] = [
     ["notes.search", "Search", "search", DockSide.Left],
     ["notes.changes", "Source control", "account_tree", DockSide.Left],
@@ -80,6 +85,11 @@ export class NotesWindowPart implements IWindowPart {
       NotesState.wrapsLines.update(t => !t);
       return null;
     }, () => true, () => NotesState.wrapsLines()));
+    for (const [name, title, shown, options] of NotesWindowPart.SHOWN_IN_DIALOG)
+      context.registerCommand(new CommandContribution(name, title, "open_in_full", null, async () => {
+        await context.showInDialogAsync(shown, options);
+        return null;
+      }));
     context.provideMenuGroup("notes.mainRecent", () => [1, 2].map(week => new MenuRowContribution("notes.openNote", { week, title: `Week ${week}` }, `Week ${week}`)));
     context.registerTopBarAction(new TopBarActionContribution("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote")));
     context.registerTopBarAction(new TopBarActionContribution("notes.back", new TopBarActionState("arrow_back", "Back", "notes.sortByWeek"), TopBarSide.Start));

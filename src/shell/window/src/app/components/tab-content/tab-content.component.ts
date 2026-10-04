@@ -7,7 +7,7 @@
  */
 
 import { NgComponentOutlet } from "@angular/common";
-import { ChangeDetectionStrategy, Component, Injector, type InputSignal, type ResourceRef, inject, input, resource } from "@angular/core";
+import { ChangeDetectionStrategy, Component, ElementRef, Injector, type InputSignal, type ResourceRef, type Signal, computed, inject, input, resource } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 
@@ -34,12 +34,15 @@ export class TabContentComponent {
   private readonly labels: TabLabelService = inject(TabLabelService);
   private readonly injector: Injector = inject(Injector);
 
+  public readonly element: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   public readonly tab: InputSignal<Tab> = input.required<Tab>();
 
   protected readonly content: ResourceRef<TabContent | null | undefined> = resource({
     params: () => ({ tab: this.tab(), generation: this.host.generation() }),
     loader: ({ params }) => this.loadAsync(params.tab)
   });
+
+  public readonly isLoaded: Signal<boolean> = computed(() => this.content.hasValue());
 
   private async loadAsync(tab: Tab): Promise<TabContent | null> {
     const match = this.host.findContribution(tab);

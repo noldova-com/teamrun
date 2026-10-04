@@ -40,6 +40,21 @@ async function dragAsync(window: Page, source: Locator, target: Locator, down: n
   await window.mouse.up();
 }
 
+function insetsOf(group: Locator): Promise<Readonly<Record<"rem" | "firstTab" | "actions" | "content", number>>> {
+  return group.evaluate(t => {
+    const card = t.querySelector("tr-panel-card");
+    const box = card?.getBoundingClientRect() ?? new DOMRect(Number.NaN, Number.NaN);
+    const [start, end] = [box.left + (card?.clientLeft ?? 0), box.right - (card?.clientLeft ?? 0)];
+    const content = t.querySelector("tr-tab .tr-tab-pill, .tr-tab-group-title");
+    return {
+      rem: Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
+      firstTab: (t.querySelector("tr-tab")?.getBoundingClientRect().left ?? Number.NaN) - start,
+      actions: end - (t.querySelector(".tr-tab-group-actions")?.getBoundingClientRect().right ?? Number.NaN),
+      content: (content?.getBoundingClientRect().left ?? Number.NaN) + Number.parseFloat(content === null ? "" : getComputedStyle(content).paddingLeft) - start
+    };
+  });
+}
+
 test.describe("activity bar", () => {
   test.beforeEach(async ({ desktop }) => {
     await expect(desktop.window.locator(`tr-tab[data-tab-key="${notes}"]`)).toBeVisible();
@@ -129,6 +144,32 @@ test.describe("activity bar", () => {
     await icon(window, notes).click();
     await expect(window.locator("tr-tab-group[data-side=Left] .tr-tab-group-title")).toHaveText("Notes");
     await desktop.checkpointAsync("group-header");
+  });
+
+  test("a tab row's first tab stands 0.25rem from its card's start and its actions 0.5rem from its end, and a header's title starts where a tab's icon starts", async ({ desktop }) => {
+    const window = desktop.window;
+    const group = window.locator("tr-tab-group[data-side=Left]");
+    const schemes = ["light", "dark"] as const;
+    for (const scheme of schemes) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await desktop.checkpointAsync(`tab-row-${scheme}`);
+    }
+    const tabs = await insetsOf(group);
+
+    await setDockStyleAsync(window, "shell.leftDockStyle", "Icons");
+    await expect(group.locator(".tr-tab-group-title")).toHaveText("Notes");
+    for (const scheme of schemes) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await desktop.checkpointAsync(`group-header-${scheme}`);
+    }
+    const header = await insetsOf(group);
+
+    expect(tabs.firstTab).toBeCloseTo(tabs.rem * 0.25, 0);
+    expect(tabs.actions).toBeCloseTo(tabs.rem * 0.5, 0);
+    expect(header.actions).toBeCloseTo(tabs.rem * 0.5, 0);
+    expect(header.content).toBeCloseTo(tabs.content, 0);
   });
 
   test("an icon opens its view's tab menu from the keyboard or a right click, so the view can be docked elsewhere from the strip", async ({ desktop }) => {

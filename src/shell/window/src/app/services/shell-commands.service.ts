@@ -24,6 +24,7 @@ import { SplitDropTarget } from "../models/layout/split-drop-target";
 import type { Tab } from "../models/layout/tab";
 import type { TabGroup } from "../models/layout/tab-group";
 import { TabDropTarget } from "../models/layout/tab-drop-target";
+import { TabKey } from "../models/layout/tab-key";
 import { ShellDocuments } from "../models/shell-documents";
 import { TabTarget } from "../models/tab-target";
 import { Resources } from "../../resources";
@@ -31,8 +32,10 @@ import { CommandSearchService } from "./command-search.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { EditTargetService } from "./edit-target.service";
 import { LayoutService } from "./layout.service";
+import { TabFocusService } from "./tab-focus.service";
 import { ToolbarService } from "./toolbar.service";
 import { TabStripService } from "./tab-strip.service";
+import { ViewDialogService } from "./view-dialog.service";
 
 @Injectable({ providedIn: "root" })
 export class ShellCommandsService {
@@ -41,6 +44,8 @@ export class ShellCommandsService {
   private readonly search: CommandSearchService = inject(CommandSearchService);
   private readonly edits: EditTargetService = inject(EditTargetService);
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
+  private readonly viewDialogs: ViewDialogService = inject(ViewDialogService);
+  private readonly tabFocus: TabFocusService = inject(TabFocusService);
   private readonly document: Document = inject(DOCUMENT);
   private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
 
@@ -93,6 +98,9 @@ export class ShellCommandsService {
     new CommandContribution(Resources.openModulesCommand, Resources.openModulesTitle, Resources.modulesGlyph, null,
       () => this.done(() => this.layout.openDocument(ShellDocuments.modulesTab)),
       () => this.layout.registry().hasDocument(ShellDocuments.modules.name)),
+    new CommandContribution(Resources.showInDialogCommand, Resources.showInDialogTitle, Resources.showInDialogGlyph, null,
+      commandArguments => this.showInDialogAsync(commandArguments),
+      commandArguments => !Object.isNull(this.shownTabOf(commandArguments))),
     new CommandContribution(Resources.toggleToolbarCommand, Resources.toggleToolbarTitle, Resources.focusToolbarsGlyph, null,
       commandArguments => this.done(() => {
         const name = this.toolbarOf(commandArguments);
@@ -184,6 +192,19 @@ export class ShellCommandsService {
     return Object.isNull(tab) || Object.isNull(group) ? null : new TabTarget(tab, group, layout.canSplit(tab, group.id));
   }
 
+  private shownTabOf(commandArguments: JsonValue): Tab | null {
+    const key = this.tabKeyOf(commandArguments);
+    const tab = Object.isUndefined(key) ? null : TabKey.parse(key);
+    return !Object.isNull(tab) && this.viewDialogs.canShow(tab) ? tab : null;
+  }
+
+  private async showInDialogAsync(commandArguments: JsonValue): Promise<JsonValue> {
+    const tab = this.shownTabOf(commandArguments);
+    if (!Object.isNull(tab))
+      await this.viewDialogs.showAsync(tab);
+    return null;
+  }
+
   private toolbarOf(commandArguments: JsonValue): string | null {
     const name = Object.isNull(commandArguments) ? undefined : JsonReader.fromValue(commandArguments).readOptionalString(Resources.toolbarArgument);
     return !Object.isUndefined(name) && this.toolbars.isKnown(name) ? name : null;
@@ -237,7 +258,7 @@ export class ShellCommandsService {
     const next = (groups.findIndex(([group]) => group.id === this.layout.currentGroup().id) + step + groups.length) % groups.length;
     for (const [group, tab] of groups.slice(next, next + 1)) {
       this.layout.focusGroup(group.id);
-      this.focus(tab);
+      this.tabFocus.focus(tab);
     }
   }
 
@@ -245,7 +266,7 @@ export class ShellCommandsService {
     this.layout.close(target.tab);
     const next = this.layout.layout().group(target.group.id)?.active ?? this.layout.currentGroup().active;
     if (!Object.isNull(next))
-      this.focus(next);
+      this.tabFocus.focus(next);
   }
 
   private show(target: TabTarget, step: number): void {
@@ -253,23 +274,18 @@ export class ShellCommandsService {
     const index = (target.index + step + count) % count;
     for (const tab of target.group.tabs.slice(index, index + 1)) {
       this.layout.activate(tab);
-      this.focus(tab);
+      this.tabFocus.focus(tab);
     }
   }
 
   private closeKeeping(tabs: readonly Tab[], kept: Tab): void {
     this.layout.closeTabs(tabs);
-    this.focus(kept);
+    this.tabFocus.focus(kept);
   }
 
   private place(tab: Tab, target: TabDropTarget | SplitDropTarget | SideDropTarget): void {
     this.layout.place(tab, target);
-    this.focus(tab);
-  }
-
-  private focus(tab: Tab): void {
-    afterNextRender(() => [...this.document.querySelectorAll<HTMLElement>(Resources.tabKeySelector)]
-      .find(t => t.dataset[Resources.tabKeyData] === tab.key)?.focus(), { injector: this.environment });
+    this.tabFocus.focus(tab);
   }
 
   private async editAsync(action: EditAction): Promise<JsonValue> {

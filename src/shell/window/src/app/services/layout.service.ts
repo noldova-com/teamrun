@@ -26,6 +26,7 @@ import type { ToolbarLayout } from "../models/layout/toolbar-layout";
 import type { SplitHandle } from "../models/layout/split-handle";
 import type { Tab } from "../models/layout/tab";
 import type { TabGroup } from "../models/layout/tab-group";
+import { TabReveal } from "../models/layout/tab-reveal";
 import { ViewRegistry } from "../models/layout/view-registry";
 import { LayoutStoreService } from "./layout-store.service";
 import { SettingsService } from "./settings.service";
@@ -42,11 +43,13 @@ export class LayoutService {
   private readonly width: WritableSignal<number> = signal(0);
   private readonly height: WritableSignal<number> = signal(0);
   private readonly currentGroupId: WritableSignal<number | null> = signal(null);
+  private readonly revealedState: WritableSignal<TabReveal | null> = signal(null);
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saved: Layout | null = null;
   private writing: Promise<void> = Promise.resolve();
 
   public readonly layout: Signal<Layout> = this.layoutState.asReadonly();
+  public readonly revealed: Signal<TabReveal | null> = this.revealedState.asReadonly();
   public readonly registry: Signal<ViewRegistry> = this.registryState.asReadonly();
   public readonly iconSides: Signal<ReadonlySet<DockSide>> = computed(() =>
     new Set([...Resources.dockStyleSettings].filter(([, name]) => this.settings.values().get(name) === DockStyle.Icons).map(([side]) => side)));
@@ -78,12 +81,14 @@ export class LayoutService {
     this.height.set(height);
   }
 
-  public async loadAsync(): Promise<void> {
+  public async loadAsync(): Promise<boolean> {
     const saved = await this.store.readAsync();
-    const layout = Object.isNull(saved) ? Layout.createDefault(this.registryState()) : this.read(saved);
+    const read = Object.isNull(saved) ? null : this.read(saved);
+    const layout = read ?? Layout.createDefault(this.registryState());
     this.clearSaveTimer();
     this.layoutState.set(layout);
     this.saved = layout;
+    return !Object.isNull(read);
   }
 
   public saveAsync(): Promise<void> {
@@ -95,6 +100,11 @@ export class LayoutService {
 
   public openDocument(tab: DocumentTab, isPreview: boolean = false): void {
     this.update(this.layoutState().openDocument(tab, isPreview && this.previewTabs()));
+    this.reveal(tab);
+  }
+
+  public restoreDocument(tab: DocumentTab, isPreview: boolean): void {
+    this.update(this.layoutState().restoreDocument(tab, isPreview && this.previewTabs()));
   }
 
   public keep(tab: Tab): void {
@@ -107,6 +117,7 @@ export class LayoutService {
 
   public activate(tab: Tab): void {
     this.update(this.layoutState().activate(tab));
+    this.reveal(tab);
     const group = this.layoutState().groupOf(tab);
     if (!Object.isNull(group))
       this.focusGroup(group.id);
@@ -149,6 +160,10 @@ export class LayoutService {
     this.update(this.layoutState().reset(this.registryState()));
   }
 
+  private reveal(tab: Tab): void {
+    this.revealedState.set(new TabReveal(tab, (this.revealedState()?.sequence ?? 0) + 1));
+  }
+
   private async writeLatestAsync(): Promise<void> {
     const layout = this.layoutState();
     if (Object.isNull(this.saved) || layout === this.saved || this.startup.state().kind !== StartupStateKind.Ready)
@@ -157,14 +172,14 @@ export class LayoutService {
       this.saved = layout;
   }
 
-  private read(saved: unknown): Layout {
+  private read(saved: unknown): Layout | null {
     try {
       return LayoutReader.read(saved);
     }
     catch (error) {
       if (!(error instanceof JsonException))
         throw error;
-      return Layout.createDefault(this.registryState());
+      return null;
     }
   }
 

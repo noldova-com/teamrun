@@ -21,6 +21,7 @@ import ApiException from "../api/api.exception.ts";
 import type BuildLayout from "../packages/build-layout.ts";
 import type PackageCatalog from "../packages/package-catalog.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
+import LicenseHeader from "../structure/license-header.ts";
 import TypeScriptCompiler from "../toolchain/typescript-compiler.ts";
 import type ICheck from "./interfaces/check.ts";
 
@@ -28,18 +29,8 @@ export default class ApiExampleCheck implements ICheck {
   private static readonly PURPOSE: string = "api-examples";
   private static readonly NO_PACKAGES: string = "No packages under src/; there are no API examples to compile.\n";
   private static readonly COMPILER_ARGUMENTS: readonly string[] = ["--pretty", "false", "--project"];
-  private static readonly HEADER: string = [
-    "/**",
-    " * @license",
-    " * Copyright (c) Noldova.",
-    " *",
-    " * This source code is licensed under the license found in the",
-    " * LICENSE file in the root directory of this source tree.",
-    " */",
-    "",
-    ""
-  ].join("\n");
-  private static readonly HEADER_LINES: number = 8;
+  private static readonly HEADER: string = `${LicenseHeader.BLOCK}\n`;
+  private static readonly HEADER_LINES: number = ApiExampleCheck.HEADER.split("\n").length - 1;
   private static readonly MODULE_MANIFEST: string = "package.json";
   private static readonly MODULE_TYPE: string = `${JSON.stringify({ type: "module" })}\n`;
   private static readonly DIAGNOSTIC: RegExp = /^(.+?)\((\d+),(\d+)\): (.*)$/;

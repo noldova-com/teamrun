@@ -9,6 +9,7 @@
 import { Component, ErrorHandler, type Type } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
+import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { ModuleState, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { ModulesComponent } from "../../../src/app/components/modules/modules.component";
@@ -39,6 +40,7 @@ import { LayoutStoreService } from "../../../src/app/services/layout-store.servi
 import { LayoutService } from "../../../src/app/services/layout.service";
 import { MenuService } from "../../../src/app/services/menu.service";
 import { TabLabelService } from "../../../src/app/services/tab-label.service";
+import { ViewDialogService } from "../../../src/app/services/view-dialog.service";
 import { SettingsService } from "../../../src/app/services/settings.service";
 import { WindowPartHostService } from "../../../src/app/services/window-part-host.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
@@ -119,7 +121,7 @@ describe("WindowPartHostService", () => {
     const loadAsync = layout.loadAsync.bind(layout);
     vi.spyOn(layout, "loadAsync").mockImplementation(async () => {
       loads.push(layout.registry().views.map(t => t.name).join(","));
-      await loadAsync();
+      return loadAsync();
     });
     return { host: TestBed.inject(WindowPartHostService), layout, loads };
   }
@@ -448,6 +450,41 @@ describe("WindowPartHostService", () => {
     expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1"), new DocumentTab("notes.note", "3")]);
   });
 
+  it("keeps the saved active document when a part opens the saved documents and a new one during activation", async () => {
+    const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
+    const saved = Layout.createDefault(new ViewRegistry([], [])).openDocument(note("1")).openDocument(note("2")).openDocument(note("3")).activate(note("1"));
+    const part = new FakeWindowPart("notes", log, t => {
+      t.registerDocument(new DocumentContribution("notes.note", load));
+      ["1", "2", "3", "4"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
+    });
+    const { layout } = start([source("notes", part)], [status("notes")]);
+    vi.spyOn(TestBed.inject(LayoutStoreService), "readAsync").mockResolvedValue(saved.toJson());
+
+    await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([note("1"), note("2"), note("3"), note("4")]));
+
+    expect(layout.layout().documents.active).toEqual(note("1"));
+    expect(TestBed.inject(TabLabelService).of(note("3")).title).toBe("Note 3");
+  });
+
+  it("keeps the active document when the runtime is ready again and the parts open their documents while reactivating", async () => {
+    const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
+    const part = new FakeWindowPart("notes", log, t => {
+      t.registerDocument(new DocumentContribution("notes.note", load));
+      ["1", "2"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
+    });
+    const { host, layout } = start([source("notes", part)], [status("notes")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    expect(layout.layout().documents.active).toEqual(note("2"));
+    layout.activate(note("1"));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(layout.layout().documents.tabs).toEqual([note("1"), note("2")]);
+    expect(layout.layout().documents.active).toEqual(note("1"));
+  });
+
   it("keeps a preview asked to be kept before the layout loads, and keeps one at once afterwards", async () => {
     const part = new FakeWindowPart("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
@@ -464,6 +501,20 @@ describe("WindowPartHostService", () => {
 
     expect(preview).toEqual(new DocumentTab("notes.note", "2"));
     expect(layout.layout().documents.preview).toBeNull();
+  });
+
+  it("shows a registered document or else a view by name in a dialog, with its instance and title", async () => {
+    const { host } = start([source("notes", notesPart(log))], [status("notes")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const shown = vi.spyOn(TestBed.inject(ViewDialogService), "showAsync").mockResolvedValue();
+
+    await host.showInDialogAsync("notes.note", "2", "Note 2");
+    await host.showInDialogAsync("notes.list", null, null);
+    await host.showInDialogAsync("notes.list", "3", null);
+    await host.showInDialogAsync("shell.settings", null, null);
+
+    await expect(host.showInDialogAsync("Notes", null, null)).rejects.toThrowError(ArgumentException);
+    expect(shown.mock.calls).toEqual([[new DocumentTab("notes.note", "2"), "Note 2"], [new ViewTab("notes.list"), null], [new ViewTab("notes.list", "3"), null], [new DocumentTab("shell.settings"), null]]);
   });
 
   it("writes a window part's log lines through the desktop under its module's id", async () => {

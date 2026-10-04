@@ -6,9 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import type { DatabaseSync, SQLInputValue, SQLOutputValue, StatementResultingChanges } from "node:sqlite";
-import type { Writable } from "node:stream";
+import type { Readable, Writable } from "node:stream";
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
@@ -507,6 +508,8 @@ export declare class SystemCommand {
    * @param file The program's path.
    * @param commandArguments The arguments, passed without shell
    * interpretation.
+   * @param environment The program's environment; the runtime's own by
+   * default.
    * @returns A promise of the program's standard output.
    * @throws {SystemCommandException} The promise rejects when the program
    * cannot start, exits with a nonzero code, times out or writes too much.
@@ -515,11 +518,11 @@ export declare class SystemCommand {
    * import { SystemCommand } from "@noldova/teamrun-shell-runtime";
    *
    * export function readUserAsync(): Promise<string> {
-   *   return new SystemCommand().runAsync("C:\\Windows\\System32\\whoami.exe", ["/user", "/fo", "csv", "/nh"]);
+   *   return new SystemCommand().runAsync("C:\\Windows\\System32\\whoami.exe", ["/user", "/fo", "csv", "/nh"], { SystemRoot: "C:\\Windows" });
    * }
    * ```
    */
-  public runAsync(file: string, commandArguments: readonly string[]): Promise<string>;
+  public runAsync(file: string, commandArguments: readonly string[], environment?: NodeJS.ProcessEnv): Promise<string>;
 }
 
 /**
@@ -1488,6 +1491,27 @@ export declare class LaunchException extends Exception {
 }
 
 /**
+ * The exception thrown when a module's program is not found or cannot be started.
+ */
+export declare class ProcessStartException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { ProcessStartException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new ProcessStartException("The program \"git\" is not on the PATH.");
+   * }
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
  * The exception a method handler throws to answer its request with a specific failure.
  */
 export declare class MethodFailureException extends Exception {
@@ -2209,6 +2233,37 @@ export interface IRuntimePartContext {
    * ```
    */
   beginWork(description: string): WorkItem;
+
+  /**
+   * Starts a program the runtime owns on the module's behalf. The program is
+   * found on the PATH unless it is an absolute path that names its drive or
+   * share on Windows; on Windows each PATHEXT extension among `.com`, `.exe`,
+   * `.bat` and `.cmd` is tried, after the name itself when it has one of
+   * them, and a `.bat` or `.cmd` file runs through `cmd.exe` with its
+   * arguments escaped. The program gets only the system variables
+   * {@link ProcessRequest} lists and the ones the request names. The runtime
+   * records it, ends it
+   * and what it started when the part deactivates or the runtime stops,
+   * giving it 3 seconds to exit first, and ends what a crashed runtime left
+   * running on its next start. Aborting the request's signal stops the
+   * program the same way; a signal already aborted rejects with its reason.
+   *
+   * @param request The program, its arguments, working folder, environment
+   * and abort signal.
+   * @returns A promise of the running program, once it has started.
+   * @throws {ProcessStartException} Rejected when the program is a relative
+   * path, is not found or cannot start, when a batch file's argument holds
+   * a line break or a null character, or once the part is deactivating.
+   * @example
+   * ```ts
+   * import { type IRuntimePartContext, type OwnedProcess, ProcessRequest } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function startStatusAsync(context: IRuntimePartContext, project: string): Promise<OwnedProcess> {
+   *   return context.startProcessAsync(new ProcessRequest("git", ["status", "--porcelain"], project, { GIT_PAGER: "cat" }, ["SSH_AUTH_SOCK"]));
+   * }
+   * ```
+   */
+  startProcessAsync(request: ProcessRequest): Promise<OwnedProcess>;
 
   /**
    * Registers a handler for one of the methods the module's declaration
@@ -3163,6 +3218,295 @@ export declare class WorkItem implements Disposable {
 }
 
 /**
+ * A program a module asks the runtime to start. The program's environment
+ * holds PATH, TEMP, TMP and TMPDIR, then HOME, LANG and LC_ALL, or on Windows
+ * SystemRoot, windir, PATHEXT, ComSpec and USERPROFILE, then the runtime's
+ * variables the request inherits, then the request's own variables.
+ */
+export declare class ProcessRequest {
+  /**
+   * The program: a name searched for on the PATH, or an absolute path.
+   */
+  public readonly program: string;
+
+  /**
+   * The program's arguments.
+   */
+  public readonly arguments: readonly string[];
+
+  /**
+   * The absolute folder the program runs in.
+   */
+  public readonly workingFolder: string;
+
+  /**
+   * The variables set for the program.
+   */
+  public readonly environment: Readonly<Record<string, string>>;
+
+  /**
+   * The names of the runtime's variables the program inherits.
+   */
+  public readonly inherit: readonly string[];
+
+  /**
+   * Stops the program when it aborts.
+   */
+  public readonly signal?: AbortSignal;
+
+  /**
+   * Creates the request.
+   *
+   * @param program A name searched for on the PATH, or an absolute path.
+   * @param launchArguments The program's arguments.
+   * @param workingFolder The absolute folder the program runs in.
+   * @param environment The variables set for the program.
+   * @param inherit The names of the runtime's variables the program inherits.
+   * @param signal Stops the program when it aborts.
+   * @throws {ArgumentException} When the program is empty or whitespace, the
+   * working folder is not absolute, or a variable's name is empty or holds
+   * `=` or a null character.
+   * @example
+   * ```ts
+   * import { ProcessRequest } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function requestStatus(project: string, signal: AbortSignal): ProcessRequest {
+   *   return new ProcessRequest("git", ["status"], project, { GIT_PAGER: "cat" }, ["SSH_AUTH_SOCK"], signal);
+   * }
+   * ```
+   */
+  public constructor(
+    program: string,
+    launchArguments: readonly string[],
+    workingFolder: string,
+    environment?: Readonly<Record<string, string>>,
+    inherit?: readonly string[],
+    signal?: AbortSignal);
+}
+
+/**
+ * How long the runtime waits for its modules' programs to end.
+ */
+export declare class ProcessSettings {
+  /**
+   * How long a program asked to stop may take to exit before it is killed.
+   */
+  public readonly graceMilliseconds: number;
+
+  /**
+   * How long the runtime waits for killed programs to end before it reports
+   * them.
+   */
+  public readonly endMilliseconds: number;
+
+  /**
+   * How often the runtime records that its programs are still running.
+   */
+  public readonly seenMilliseconds: number;
+
+  /**
+   * Creates the settings.
+   *
+   * @param graceMilliseconds How long a program asked to stop may take to
+   * exit; 3 seconds by default.
+   * @param endMilliseconds How long killed programs may take to end; 5
+   * seconds by default.
+   * @param seenMilliseconds How often the runtime records that its programs
+   * are still running; 5 seconds by default.
+   * @throws {ArgumentOutOfRangeException} When a time is not a positive
+   * integer.
+   * @example
+   * ```ts
+   * import { ProcessSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createQuickSettings(): ProcessSettings {
+   *   return new ProcessSettings(500, 1_000);
+   * }
+   * ```
+   */
+  public constructor(graceMilliseconds?: number, endMilliseconds?: number, seenMilliseconds?: number);
+}
+
+/**
+ * How a program exited: with an exit code, or ended by a signal.
+ */
+export declare class ProcessExit {
+  /**
+   * The exit code, or `null` when a signal ended the program.
+   */
+  public readonly code: number | null;
+
+  /**
+   * The signal that ended the program, or `null` when it exited.
+   */
+  public readonly signal: NodeJS.Signals | null;
+
+  /**
+   * Creates the exit.
+   *
+   * @param code The exit code, or `null`.
+   * @param signal The signal, or `null`.
+   * @throws {ArgumentException} When both or neither are `null`.
+   * @example
+   * ```ts
+   * import { ProcessExit } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function endedBySignal(): ProcessExit {
+   *   return new ProcessExit(null, "SIGTERM");
+   * }
+   * ```
+   */
+  public constructor(code: number | null, signal: NodeJS.Signals | null);
+
+  /**
+   * Whether the program exited with code 0.
+   */
+  public get isClean(): boolean;
+}
+
+/**
+ * A program the runtime runs for a module, as the runtime reports it: never
+ * with its arguments or environment.
+ */
+export declare class RunningProgram {
+  /**
+   * The module the program runs for.
+   */
+  public readonly moduleId: string;
+
+  /**
+   * The program's path.
+   */
+  public readonly program: string;
+
+  /**
+   * The program's process id.
+   */
+  public readonly processId: number;
+
+  /**
+   * When the program started.
+   */
+  public readonly started: Date;
+
+  /**
+   * Whether the program itself has exited cleanly on macOS or Linux while
+   * the process group it leads still runs; the process id then names that
+   * group.
+   */
+  public readonly hasExited: boolean;
+
+  /**
+   * Creates the report.
+   *
+   * @param moduleId The module the program runs for.
+   * @param program The program's path.
+   * @param processId The program's process id.
+   * @param started When the program started.
+   * @param hasExited Whether the program has exited while its process group
+   * still runs; `false` by default.
+   * @example
+   * ```ts
+   * import { RunningProgram } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function describeGit(): RunningProgram {
+   *   return new RunningProgram("git", "/usr/bin/git", 4_210, new Date());
+   * }
+   * ```
+   */
+  public constructor(moduleId: string, program: string, processId: number, started: Date, hasExited?: boolean);
+}
+
+/**
+ * A program the runtime started for a module, with its standard streams.
+ */
+export declare class OwnedProcess {
+  /**
+   * The program's process id.
+   */
+  public readonly processId: number;
+
+  /**
+   * The program's path.
+   */
+  public readonly program: string;
+
+  /**
+   * When the program started.
+   */
+  public readonly started: Date;
+
+  /**
+   * Resolves when the program exits.
+   */
+  public readonly exited: Promise<ProcessExit>;
+
+  /**
+   * Creates the process; {@link ProcessSupervisor.startAsync} creates them.
+   *
+   * @param child The started child process.
+   * @param program The program's path.
+   * @param started When the program started.
+   * @param exited Resolves when the program exits.
+   * @param stop Ends the program and what it started.
+   * @example
+   * ```ts
+   * import { once } from "node:events";
+   * import { spawn } from "node:child_process";
+   *
+   * import { OwnedProcess, ProcessExit } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function own(file: string): OwnedProcess {
+   *   const child = spawn(file, [], { stdio: "pipe" });
+   *   const exited = once(child, "exit").then(([code, signal]) => new ProcessExit(code, signal));
+   *   return new OwnedProcess(child, file, new Date(), exited, async () => void child.kill());
+   * }
+   * ```
+   */
+  public constructor(child: ChildProcessWithoutNullStreams, program: string, started: Date, exited: Promise<ProcessExit>, stop: (process: OwnedProcess) => Promise<void>);
+
+  /**
+   * The program's standard input.
+   */
+  public get input(): Writable;
+
+  /**
+   * The program's standard output; a program whose output is not read
+   * blocks once the pipe is full.
+   */
+  public get output(): Readable;
+
+  /**
+   * The program's standard error; a program whose errors are not read
+   * blocks once the pipe is full.
+   */
+  public get errors(): Readable;
+
+  /**
+   * Whether the program has exited.
+   */
+  public get hasExited(): boolean;
+
+  /**
+   * Ends the program and what it started: on Windows it closes the program's
+   * input, and elsewhere it sends its process group SIGTERM; whatever still
+   * runs after the grace period, 3 seconds in the runtime, is killed. Calling
+   * it again returns the same promise.
+   *
+   * @returns A promise of how the program exited.
+   * @example
+   * ```ts
+   * import type { OwnedProcess, ProcessExit } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function cancelAsync(process: OwnedProcess): Promise<ProcessExit> {
+   *   return process.stopAsync();
+   * }
+   * ```
+   */
+  public stopAsync(): Promise<ProcessExit>;
+}
+
+/**
  * Compares builds by product version.
  */
 export declare class BuildComparer {
@@ -3737,7 +4081,13 @@ export declare class RuntimeHost implements IIdleParticipant {
   public get isIdle(): boolean;
 
   /**
-   * Takes ownership, opens the shell's database, listens and publishes discovery. When the directory holds data from before the shell, the runtime refuses instead: every handshake is answered with a {@link FailureCode.PreShellData} failure whose details give the location, and only `shell.moveAside` and `shell.stop` are served until it has moved the data aside and opened the database. Concurrent `shell.moveAside` requests share one move, and a request after the move succeeds without moving anything.
+   * The programs the runtime runs for its modules, in the order they started;
+   * empty until the modules are activated.
+   */
+  public get programs(): readonly RunningProgram[];
+
+  /**
+   * Takes ownership, opens the shell's database, ends the programs an earlier runtime left running, listens and publishes discovery. When the directory holds data from before the shell, the runtime refuses instead: every handshake is answered with a {@link FailureCode.PreShellData} failure whose details give the location, and only `shell.moveAside` and `shell.stop` are served until it has moved the data aside and opened the database. Concurrent `shell.moveAside` requests share one move, and a request after the move succeeds without moving anything.
    *
    * @param options How the runtime runs.
    * @param platform The platform, as in `process.platform`; Windows listens on loopback TCP, others on a socket in the discovery folder.
@@ -3826,6 +4176,7 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * @param settings The shell's settings, which the module reads and writes
    * within its rights.
    * @param work The runtime's work in progress, which the module's work joins.
+   * @param processes The runtime's programs, which the module's programs join.
    * @param diagnostics The runtime's log, which the module's lines join.
    * @param redactor Removes the home folder and opaque values from the module's lines.
    * @param database The module's open database, when its runtime part declares migrations.
@@ -3834,16 +4185,16 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * import { homedir } from "node:os";
    *
    * import {
-   *   CommandRegistry, DataDirectory, DiagnosticRedactor, EventRegistry, MethodRegistry, ModuleContext, ModuleDeclaration, NotificationCenter, NotificationPolicy, ServiceRegistry,
-   *   type SettingsService, WorkTracker
+   *   CommandRegistry, DataDirectory, DiagnosticRedactor, EventRegistry, MethodRegistry, ModuleContext, ModuleDeclaration, NotificationCenter, NotificationPolicy,
+   *   type ProcessSupervisor, ServiceRegistry, type SettingsService, WorkTracker
    * } from "@noldova/teamrun-shell-runtime";
    *
-   * export function createContext(events: EventRegistry, settings: SettingsService): ModuleContext {
+   * export function createContext(events: EventRegistry, settings: SettingsService, processes: ProcessSupervisor): ModuleContext {
    *   const notes = new ModuleDeclaration("notes", "Notes", "Keeps notes.", [], null, new Map());
    *   return new ModuleContext(
    *     notes, new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(),
    *     new NotificationCenter(() => undefined, () => new Date()), new NotificationPolicy([notes], () => true), new ServiceRegistry(), settings,
-   *     new WorkTracker(() => undefined), process.stderr, new DiagnosticRedactor(homedir()));
+   *     new WorkTracker(() => undefined), processes, process.stderr, new DiagnosticRedactor(homedir()));
    * }
    * ```
    */
@@ -3858,6 +4209,7 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
     services: ServiceRegistry,
     settings: SettingsService,
     work: WorkTracker,
+    processes: ProcessSupervisor,
     diagnostics: Writable,
     redactor: DiagnosticRedactor,
     database?: IModuleDatabase);
@@ -3915,6 +4267,23 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * ```
    */
   public beginWork(description: string): WorkItem;
+
+  /**
+   * See {@link IRuntimePartContext.startProcessAsync}.
+   *
+   * @param request The program to start.
+   * @returns A promise of the running program.
+   * @throws {ProcessStartException} Rejected when the program cannot start.
+   * @example
+   * ```ts
+   * import { type ModuleContext, type OwnedProcess, ProcessRequest } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function startStatusAsync(context: ModuleContext, project: string): Promise<OwnedProcess> {
+   *   return context.startProcessAsync(new ProcessRequest("git", ["status"], project));
+   * }
+   * ```
+   */
+  public startProcessAsync(request: ProcessRequest): Promise<OwnedProcess>;
 
   /**
    * See {@link IRuntimePartContext.registerMethod}.
@@ -4329,21 +4698,24 @@ export declare class ModuleHost {
   /**
    * Activates the modules once, each after the modules it depends on; a
    * dependency the build does not include or a cycle blocks the modules that
-   * need it.
+   * need it. A part that fails to activate has the programs it started
+   * ended.
    *
+   * @param settings The shell's settings, which the modules read and write.
+   * @param processes The runtime's programs, which the modules' programs join.
    * @returns A promise that resolves once every module is active, failed or
    * blocked.
    * @example
    * ```ts
-   * import type { ModuleHost, SettingsService } from "@noldova/teamrun-shell-runtime";
+   * import type { ModuleHost, ProcessSupervisor, SettingsService } from "@noldova/teamrun-shell-runtime";
    *
-   * export async function startAsync(host: ModuleHost, settings: SettingsService): Promise<number> {
-   *   await host.activateAsync(settings);
+   * export async function startAsync(host: ModuleHost, settings: SettingsService, processes: ProcessSupervisor): Promise<number> {
+   *   await host.activateAsync(settings, processes);
    *   return host.report.modules.length;
    * }
    * ```
    */
-  public activateAsync(settings: SettingsService): Promise<void>;
+  public activateAsync(settings: SettingsService, processes: ProcessSupervisor): Promise<void>;
 
   /**
    * The definitions of the settings every declared module declares, in
@@ -4362,8 +4734,9 @@ export declare class ModuleHost {
   public get settingDefinitions(): readonly SettingDefinition[];
 
   /**
-   * Deactivates the active runtime parts in reverse order, withdrawing what
-   * each registered even when its deactivation fails.
+   * Deactivates the active runtime parts in reverse order, ending the
+   * programs each started and withdrawing what each registered even when its
+   * deactivation fails.
    *
    * @returns A promise that resolves once every part is deactivated.
    * @throws {AggregateError} Rejected after all parts are deactivated when one
@@ -5152,6 +5525,264 @@ export declare class WorkTracker {
    * ```
    */
   public endOwnedBy(owner: string): void;
+}
+
+/**
+ * The clock the runtime times its programs' starts with, and the boot it
+ * runs in. On Linux the clock counts from boot, as the process table does
+ * there, and the boot is the kernel's boot id; elsewhere the clock is the
+ * wall clock, as the process table's start times are, and the boot is when
+ * the system started, in seconds. On Linux a change of the wall clock does
+ * not affect the clock; elsewhere a record notes the clock's offset, which
+ * shows a later change.
+ */
+export declare class ProcessClock {
+  /**
+   * The boot the clock runs in.
+   */
+  public readonly boot: string;
+
+  /**
+   * Creates the clock.
+   *
+   * @param boot The boot the clock runs in.
+   * @param isBootRelative Whether the clock counts from boot, which makes
+   * the boot an exact id; otherwise it is a time in seconds compared within
+   * a minute.
+   * @example
+   * ```ts
+   * import { ProcessClock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createLinuxClock(bootId: string): ProcessClock {
+   *   return new ProcessClock(bootId, true);
+   * }
+   * ```
+   */
+  public constructor(boot: string, isBootRelative: boolean);
+
+  /**
+   * Creates the clock for a platform.
+   *
+   * @param platform The platform, as in `process.platform`.
+   * @param bootIdFile The file that holds the kernel's boot id on Linux;
+   * `/proc/sys/kernel/random/boot_id` by default.
+   * @returns The clock.
+   * @throws {Error} On Linux, when the boot id file cannot be read.
+   * @example
+   * ```ts
+   * import { ProcessClock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createClock(): ProcessClock {
+   *   return ProcessClock.create(process.platform);
+   * }
+   * ```
+   */
+  public static create(platform: string, bootIdFile?: string): ProcessClock;
+
+  /**
+   * Reads the clock.
+   *
+   * @returns The time in milliseconds.
+   * @example
+   * ```ts
+   * import type { ProcessClock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function elapsed(clock: ProcessClock, since: number): number {
+   *   return clock.now() - since;
+   * }
+   * ```
+   */
+  public now(): number;
+
+  /**
+   * Reads how far the wall clock is from the time since boot.
+   *
+   * @returns The offset in milliseconds; always 0 for a clock that counts
+   * from boot.
+   * @example
+   * ```ts
+   * import type { ProcessClock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function noteOffset(clock: ProcessClock): number {
+   *   return clock.offset();
+   * }
+   * ```
+   */
+  public offset(): number;
+
+  /**
+   * Whether the wall clock was changed since a recorded offset, by more than
+   * 1.5 seconds against the time since boot.
+   *
+   * @param offset The recorded offset.
+   * @returns Whether the times recorded with the offset can no longer be
+   * compared with this clock's.
+   * @example
+   * ```ts
+   * import type { ProcessClock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isComparable(clock: ProcessClock, offset: number): boolean {
+   *   return !clock.hasStepped(offset);
+   * }
+   * ```
+   */
+  public hasStepped(offset: number): boolean;
+
+  /**
+   * Whether a recorded boot is this clock's.
+   *
+   * @param boot The recorded boot.
+   * @returns Whether it is the same boot.
+   * @example
+   * ```ts
+   * import type { ProcessClock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isCurrent(clock: ProcessClock, boot: string): boolean {
+   *   return clock.isSameBoot(boot);
+   * }
+   * ```
+   */
+  public isSameBoot(boot: string): boolean;
+}
+
+/**
+ * Starts, records and ends the programs the runtime runs for its modules. On
+ * Windows a program's tree is found in the process table; elsewhere each
+ * program leads its own process group. Each program's record in the shell's
+ * database lets the next runtime end what a crashed one left running; while
+ * the program runs, the record's time it was last seen running is renewed at
+ * the settings' interval.
+ */
+export declare class ProcessSupervisor {
+  /**
+   * Creates the supervisor.
+   *
+   * @param database The shell's database, which holds the records.
+   * @param platform The platform, as in `process.platform`.
+   * @param environment The runtime's environment, which programs inherit from.
+   * @param command Reads the process table.
+   * @param diagnostics The runtime's log, which receives the programs that
+   * had to be killed or could not be ended.
+   * @param settings How long programs may take to end.
+   * @param clock The clock that times programs' starts and names the boot;
+   * {@link ProcessClock.create} for the platform this process runs on by
+   * default.
+   * @example
+   * ```ts
+   * import { ProcessSettings, ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createSupervisor(database: ShellDatabase): ProcessSupervisor {
+   *   return new ProcessSupervisor(database, process.platform, process.env, new SystemCommand(), process.stderr, new ProcessSettings());
+   * }
+   * ```
+   */
+  public constructor(
+    database: ShellDatabase,
+    platform: string,
+    environment: NodeJS.ProcessEnv,
+    command: SystemCommand,
+    diagnostics: Writable,
+    settings?: ProcessSettings,
+    clock?: ProcessClock);
+
+  /**
+   * The programs running, in the order they started, then the programs that
+   * exited cleanly while their process group still runs, in the order they
+   * exited.
+   */
+  public get programs(): readonly RunningProgram[];
+
+  /**
+   * Starts a program for a module; see
+   * {@link IRuntimePartContext.startProcessAsync}. When a program that is
+   * not on Windows exits with an error, the rest of its process group is
+   * ended; after a clean exit the group is left until the module's programs
+   * are stopped.
+   *
+   * @param moduleId The module the program runs for.
+   * @param request The program to start.
+   * @returns A promise of the running program, once it has started and is
+   * recorded.
+   * @throws {ProcessStartException} Rejected when the program cannot start,
+   * or once the module's programs or all programs are being stopped.
+   * @example
+   * ```ts
+   * import { type OwnedProcess, ProcessRequest, type ProcessSupervisor } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function startStatusAsync(processes: ProcessSupervisor, project: string): Promise<OwnedProcess> {
+   *   return processes.startAsync("notes", new ProcessRequest("git", ["status"], project));
+   * }
+   * ```
+   */
+  public startAsync(moduleId: string, request: ProcessRequest): Promise<OwnedProcess>;
+
+  /**
+   * Refuses the module's further starts, then ends every program it runs and
+   * what they left running, giving them the settings' grace period to exit
+   * before killing them. A process group whose program has exited is ended
+   * only while a process listed in it when the program exited still runs in
+   * it; otherwise the runtime's log names the group's processes and they are
+   * left running.
+   *
+   * @param moduleId The module's id.
+   * @returns A promise that resolves once they have ended or the runtime's
+   * log says which could not be.
+   * @example
+   * ```ts
+   * import type { ProcessSupervisor } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function stopNotesAsync(processes: ProcessSupervisor): Promise<void> {
+   *   return processes.stopOwnedByAsync("notes");
+   * }
+   * ```
+   */
+  public stopOwnedByAsync(moduleId: string): Promise<void>;
+
+  /**
+   * Refuses every further start, then ends every program still running, as
+   * {@link stopOwnedByAsync} does for one module.
+   *
+   * @returns A promise that resolves once they have ended or the runtime's
+   * log says which could not be.
+   * @example
+   * ```ts
+   * import type { ProcessSupervisor } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function stopEverythingAsync(processes: ProcessSupervisor): Promise<void> {
+   *   return processes.stopAllAsync();
+   * }
+   * ```
+   */
+  public stopAllAsync(): Promise<void>;
+
+  /**
+   * Kills what the recorded programs of an earlier runtime left running and
+   * removes their records. Only a recorded program still running is ended,
+   * with its tree on Windows or its process group elsewhere; a process whose
+   * id was reused since, as its start time or, on Windows, its executable
+   * shows, is left alone. A record from another boot is removed without
+   * ending anything, and so is a record whose clock offset shows that the
+   * wall clock changed since, which the runtime's log notes. When a recorded
+   * program is no longer running, its process group is ended while a process
+   * in it certainly started between the request for the program and the time
+   * it was last seen running, given the process table's precision; on Windows
+   * its children that started in that time are ended with their trees, and
+   * only those that started before a process that now holds its id count.
+   * Otherwise nothing is ended, and the runtime's log names the processes in
+   * its group, or on Windows its children that started after that time.
+   *
+   * @returns A promise that resolves once the leftovers have ended or the
+   * runtime's log says which could not be.
+   * @example
+   * ```ts
+   * import type { ProcessSupervisor } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function recoverAsync(processes: ProcessSupervisor): Promise<void> {
+   *   return processes.cleanUpAsync();
+   * }
+   * ```
+   */
+  public cleanUpAsync(): Promise<void>;
 }
 
 /**

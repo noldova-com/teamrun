@@ -9,7 +9,7 @@
 import { Component, type Signal, computed, inject } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
-import { TooltipDirective } from "@noldova/teamrun-shell-ui";
+import { DefaultTheme, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { TabGroupComponent } from "../../../../src/app/components/tab-group/tab-group.component";
 import { DockSide } from "../../../../src/app/enums/dock-side";
@@ -22,6 +22,7 @@ import { LayoutService } from "../../../../src/app/services/layout.service";
 import { TabDragService } from "../../../../src/app/services/tab-drag.service";
 import { TabStripService } from "../../../../src/app/services/tab-strip.service";
 import { Resources } from "../../../../src/resources";
+import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
@@ -127,6 +128,31 @@ describe("TabGroupComponent", () => {
     layout.closeTabs(layout.layout().documents.tabs);
     update();
     expect(group(0).querySelector("[role=tabpanel]")?.hasAttribute("aria-labelledby")).toBe(false);
+  });
+
+  it("sets the first tab 0.25rem from its card's start and the actions the large radius from its end, and lines a one-view header's title up with a tab's label", async () => {
+    AppearanceFixture.apply();
+    await renderAsync();
+    const start = (element: Element | null | undefined): number => element?.getBoundingClientRect().left ?? Number.NaN;
+    const card = (id: number): DOMRect => {
+      const element = group(id).querySelector("tr-panel-card");
+      const bounds = element?.getBoundingClientRect() ?? new DOMRect();
+      const border = element?.clientLeft ?? 0;
+      return new DOMRect(bounds.left + border, bounds.top, bounds.width - border * 2, bounds.height);
+    };
+    const firstTab = start(tab(1, 0)) - card(1).left;
+    const actionsEnd = card(1).right - (group(1).querySelector(".tr-tab-group-actions")?.getBoundingClientRect().right ?? Number.NaN);
+    const pill = tab(1, 0).querySelector(".tr-tab-pill");
+    const label = start(pill) + Number.parseFloat(pill ? getComputedStyle(pill).paddingLeft : "") - card(1).left;
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
+    update();
+    const title = group(1).querySelector<HTMLElement>(".tr-tab-group-title");
+    const titleText = start(title) + Number.parseFloat(title ? getComputedStyle(title).paddingLeft : "") - card(1).left;
+    AppearanceFixture.reset();
+
+    AppearanceFixture.expectPixels(firstTab, AppearanceFixture.toPixels(0.25));
+    AppearanceFixture.expectLook(`${actionsEnd}px`, DefaultTheme.theme, "radius-large", "width");
+    AppearanceFixture.expectPixels(titleText, label);
   });
 
   it("shows a tab's title below it only while its label is cut short", async () => {

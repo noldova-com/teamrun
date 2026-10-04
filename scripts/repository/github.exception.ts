@@ -7,9 +7,12 @@
  */
 
 export default class GitHubException extends Error {
-  public constructor(message: string, options?: ErrorOptions) {
+  public readonly status: number | null;
+
+  public constructor(message: string, options?: ErrorOptions, status: number | null = null) {
     super(message, options);
 
     this.name = GitHubException.name;
+    this.status = status;
   }
 }

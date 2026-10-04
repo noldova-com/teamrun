@@ -10,8 +10,9 @@ import { execFile, spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
+
+import { Wait } from "@noldova/teamrun-foundation-testing";
 
 export default class ProcessListFixture {
   private static readonly TIMEOUT: number = 30_000;
@@ -60,23 +61,22 @@ export default class ProcessListFixture {
   }
 
   public static async waitForExitAsync(processIds: readonly number[], limit: number, onWaiting: (running: readonly number[]) => void = () => undefined): Promise<number[]> {
-    const deadline = Date.now() + limit;
-    let running = await ProcessListFixture.readRunningAsync(processIds);
-    while (running.length > 0 && Date.now() < deadline) {
-      onWaiting(running);
-      await delay(ProcessListFixture.EXIT_INTERVAL);
+    let running = [...processIds];
+    await Wait.untilAsync(async () => {
       running = await ProcessListFixture.readRunningAsync(running);
-    }
+      if (running.length > 0)
+        onWaiting(running);
+      return running.length === 0;
+    }, limit, ProcessListFixture.EXIT_INTERVAL);
     return running;
   }
 
   public static async waitForSignalsAsync(processIds: readonly number[], limit: number): Promise<number[]> {
-    const deadline = Date.now() + limit;
-    let answering = processIds.filter(t => ProcessListFixture.answersSignal(t));
-    while (answering.length > 0 && Date.now() < deadline) {
-      await delay(ProcessListFixture.SIGNAL_INTERVAL);
+    let answering = [...processIds];
+    await Wait.untilAsync(() => {
       answering = answering.filter(t => ProcessListFixture.answersSignal(t));
-    }
+      return answering.length === 0;
+    }, limit, ProcessListFixture.SIGNAL_INTERVAL);
     return answering;
   }
 
