@@ -8,7 +8,7 @@
 
 import {
   ChangeDetectionStrategy, Component, ElementRef, Injector, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, input, model,
-  output, signal
+  output, signal, viewChild
 } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
@@ -27,6 +27,7 @@ export class QuickInputComponent {
 
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly injector: Injector = inject(Injector);
+  private readonly list: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("list");
   private readonly activeValue: WritableSignal<number> = signal(0);
   private shownQuery: string = String.empty;
   private isChoosing: boolean = false;
@@ -52,7 +53,10 @@ export class QuickInputComponent {
       this.shownQuery = this.query();
     });
     afterRenderEffect(() => {
-      this.host.querySelector(`#${this.optionId(this.active())}`)?.scrollIntoView(Resources.revealOptions);
+      const list = this.list().nativeElement;
+      const row = list.querySelector<HTMLElement>(`#${this.optionId(this.active())}`);
+      if (!Object.isNull(row))
+        QuickInputComponent.reveal(list, row);
     });
     afterNextRender(() => {
       if (this.isFocusing())
@@ -123,5 +127,14 @@ export class QuickInputComponent {
     const list = this.host.querySelector<HTMLElement>(Resources.quickInputListSelector);
     const row = list?.querySelector<HTMLElement>(Resources.quickInputOptionSelector);
     return Object.isNullOrUndefined(list) || Object.isNullOrUndefined(row) ? 1 : Math.max(1, Math.floor(list.clientHeight / row.offsetHeight));
+  }
+
+  private static reveal(list: HTMLElement, row: HTMLElement): void {
+    const top = row.getBoundingClientRect().top - list.getBoundingClientRect().top - list.clientTop + list.scrollTop;
+    const bottom = top + row.offsetHeight;
+    if (top < list.scrollTop)
+      list.scrollTop = top;
+    else if (bottom > list.scrollTop + list.clientHeight)
+      list.scrollTop = bottom - list.clientHeight;
   }
 }

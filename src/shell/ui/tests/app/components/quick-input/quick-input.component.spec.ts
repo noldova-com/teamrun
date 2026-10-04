@@ -41,6 +41,22 @@ class QuickInputHostComponent {
 
 @Component({
   imports: [QuickInputComponent],
+  template: `
+    <div class="page" style="height: 300px; overflow-y: auto;">
+      <div style="height: 400px;"></div>
+      <div style="display: flex; height: 200px;">
+        <tr-quick-input [items]="items" label="Search commands" [isFocusing]="false" />
+      </div>
+      <div style="height: 400px;"></div>
+    </div>
+  `
+})
+class PageHostComponent {
+  public readonly items: readonly QuickInputItem[] = many;
+}
+
+@Component({
+  imports: [QuickInputComponent],
   template: `<tr-quick-input [items]="items()" label="Search commands" [(query)]="query" (chosen)="chosen.push($event.id)" />`
 })
 class FilteringHostComponent {
@@ -136,6 +152,38 @@ describe("QuickInputComponent", () => {
     expect(options()[29]?.getBoundingClientRect().bottom).toBeGreaterThan(0);
   });
 
+  it("scrolls only its own list to show the active option, leaving the page around it where it is", async () => {
+    const paged = TestBed.createComponent(PageHostComponent);
+    paged.detectChanges();
+    await paged.whenStable();
+    const page = paged.nativeElement.querySelector(".page") as HTMLElement;
+    const list = paged.nativeElement.querySelector(".tr-quick-input-list") as HTMLElement;
+    const input = paged.nativeElement.querySelector(".tr-quick-input-field") as HTMLInputElement;
+    const rows = [...list.querySelectorAll<HTMLElement>("[role=option]")];
+    const within = (row: HTMLElement | undefined): boolean => {
+      const box = (row ?? list).getBoundingClientRect();
+      const frame = list.getBoundingClientRect();
+      return box.top >= frame.top + list.clientTop - 0.5 && box.bottom <= frame.top + list.clientTop + list.clientHeight + 0.5;
+    };
+    const moveAsync = async (key: string): Promise<readonly [number, number, boolean]> => {
+      press(input, key);
+      paged.detectChanges();
+      await paged.whenStable();
+      return [page.scrollTop, list.scrollTop, within(rows.find(t => t.id === input.getAttribute("aria-activedescendant")))];
+    };
+
+    const opened = [page.scrollTop, list.scrollTop];
+    const end = await moveAsync("End");
+    const up = await moveAsync("ArrowUp");
+    const home = await moveAsync("Home");
+
+    expect(opened).toEqual([0, 0]);
+    expect([end[0], end[1] > 0, end[2]]).toEqual([0, true, true]);
+    expect(up).toEqual([0, end[1], true]);
+    expect(home).toEqual([0, 0, true]);
+    paged.destroy();
+  });
+
   it("chooses the active option with Enter or a clicked one, is dismissed with Escape, and passes typed text on as its query", async () => {
     await pressAsync("ArrowDown");
     await pressAsync("Enter");
@@ -214,6 +262,22 @@ describe("QuickInputComponent", () => {
     host.items.set(many.slice(0, 1));
     fixture.detectChanges();
     expect(status.textContent?.trim()).toBe("1 result");
+  });
+
+  it("opens with no options and no active one when it starts with none", async () => {
+    const empty = TestBed.createComponent(QuickInputComponent);
+    empty.componentRef.setInput("items", []);
+    empty.componentRef.setInput("label", "Search commands");
+    empty.componentRef.setInput("isFocusing", false);
+    document.body.append(empty.nativeElement);
+
+    empty.detectChanges();
+    await empty.whenStable();
+
+    const list = empty.nativeElement.querySelector(".tr-quick-input-list") as HTMLElement;
+    expect([list.children.length, list.scrollTop]).toEqual([0, 0]);
+    expect(empty.nativeElement.querySelector(".tr-quick-input-field")?.hasAttribute("aria-activedescendant")).toBe(false);
+    empty.destroy();
   });
 
   it("shows an option's icon, its title and detail with the matched characters marked in the list highlight and no added space, and its key", async () => {

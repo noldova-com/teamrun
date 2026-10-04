@@ -85,7 +85,6 @@ test.describe("settings", () => {
     const content = window.locator(".tr-settings-content");
     await SettingsFixture.openGalleryAsync(window);
     await expect(content.locator("tr-quick-input").getByRole("option").first()).toBeAttached();
-    await content.evaluate(t => t.scrollTo(0, 0));
     expect(await content.evaluate(t => t.scrollHeight > t.clientHeight)).toBe(true);
 
     await ScrollAreaFixture.revealThumbColorAsync(window, window.locator(".tr-settings-pages"));

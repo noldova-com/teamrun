@@ -295,7 +295,6 @@ export class Resources {
   public static readonly quickInputFieldSelector: string = ".tr-quick-input-field";
   public static readonly quickInputListSelector: string = ".tr-quick-input-list";
   public static readonly quickInputOptionSelector: string = "[role=option]";
-  public static readonly revealOptions: ScrollIntoViewOptions = { block: "nearest" };
   public static readonly arrowDownKey: string = "ArrowDown";
   public static readonly arrowUpKey: string = "ArrowUp";
   public static readonly homeKey: string = "Home";
