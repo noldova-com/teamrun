@@ -126,7 +126,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}
+          name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}
           path: |
             _build/angular-tests.log
             _build/angular-tests.json
@@ -144,7 +144,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}
+          name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}
           path: |
             _build/angular-tests.log
             _build/angular-tests.json
@@ -162,7 +162,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}
+          name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}
           path: |
             _build/angular-tests.log
             _build/angular-tests.json

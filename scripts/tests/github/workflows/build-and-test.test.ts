@@ -32,7 +32,7 @@ class BuildAndTestTests {
   private static readonly DOWNLOAD_ACTION: string = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1";
   private static readonly UPLOADS: readonly (readonly [string, string, string, readonly string[]])[] = [
     ["Keep the UI workflow results", "Keep the UI workflow results again", "Keep the UI workflow results a last time",
-      ["name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}", "path: _build/ui", "retention-days: 14", "if-no-files-found: ignore", "overwrite: true"]],
+      ["name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}", "path: _build/ui", "retention-days: 14", "if-no-files-found: ignore", "overwrite: true"]],
     ["Keep the main window screenshot", "Keep the main window screenshot again", "Keep the main window screenshot a last time",
       ["path: _build/ui/main-window-*.png", "archive: false", "retention-days: 14", "if-no-files-found: ignore", "overwrite: true"]]
   ];
@@ -47,7 +47,7 @@ class BuildAndTestTests {
   private static readonly ANGULAR_UPLOADS: readonly string[] = ["Keep the Angular test output", "Keep the Angular test output again", "Keep the Angular test output a last time"];
   private static readonly ANGULAR_WARNING: string = "Warn that the Angular test output was not kept";
   private static readonly ANGULAR_SETTINGS: readonly string[] = [
-    "name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}", "path: |", "  _build/angular-tests.log", "  _build/angular-tests.json", "retention-days: 14",
+    "name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}", "path: |", "  _build/angular-tests.log", "  _build/angular-tests.json", "retention-days: 14",
     "if-no-files-found: ignore", "overwrite: true"
   ];
   private static readonly CACHE_LIST: string = "api --paginate repos/noldova-com/teamrun/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100 --jq .actions_caches[].key";
@@ -466,7 +466,7 @@ class BuildAndTestTests {
 
         assert.deepEqual(attempts.map(t => t.uses), attempts.map(() => BuildAndTestTests.UPLOAD_ACTION));
         assert.deepEqual(attempts.map(t => t.continueOnError), [true, true, true]);
-        assert.deepEqual(attempts.map(t => t.settings), [settings, settings, settings]);
+        assert.deepEqual(attempts.map(t => t.settings), BuildAndTestTests.threeTimes(settings));
         assert.equal(workflow.readStepScript(`${pause} again`), "sleep 15\n");
         assert.equal(workflow.readStepScript(`${pause} a last time`), "sleep 15\n");
       }
@@ -491,7 +491,7 @@ class BuildAndTestTests {
 
         assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[action, true], [action, true], [action, false]], first);
         assert.deepEqual(selfBuilt.ran, first === "Fetch the builds" ? [] : [first], first);
-        assert.deepEqual(attempts.map(t => t.settings), [settings, settings, settings], first);
+        assert.deepEqual(attempts.map(t => t.settings), BuildAndTestTests.threeTimes(settings), first);
         assert.deepEqual([workflow.readStepScript(`${pause} again`), workflow.readStepScript(`${pause} a last time`)], ["sleep 15\n", "sleep 15\n"], first);
         assert.deepEqual([passed.ran, passed.isJobFailed], [[first], false], first);
         assert.deepEqual([retried.ran, retried.isJobFailed], [[first, `${pause} again`, again], false], first);
@@ -544,7 +544,7 @@ class BuildAndTestTests {
         BuildAndTestTests.ANGULAR_WARNING
       ]);
       assert.deepEqual([first, again, last].map(t => [t?.uses, t?.continueOnError]), [first, again, last].map(() => [BuildAndTestTests.UPLOAD_ACTION, true]));
-      assert.deepEqual([first, again, last].map(t => t?.settings), [BuildAndTestTests.ANGULAR_SETTINGS, BuildAndTestTests.ANGULAR_SETTINGS, BuildAndTestTests.ANGULAR_SETTINGS]);
+      assert.deepEqual([first, again, last].map(t => t?.settings), BuildAndTestTests.threeTimes(BuildAndTestTests.ANGULAR_SETTINGS));
       assert.equal(workflow.readStepScript("Wait before keeping the Angular test output again"), "sleep 15\n");
       assert.equal(workflow.readStepScript("Wait before keeping the Angular test output a last time"), "sleep 15\n");
       assert.deepEqual([warning.status, warning.stdout], [0, "::warning title=The Angular test output was not kept::The upload failed three times, so it is not attached.\n"]);
@@ -698,6 +698,10 @@ class BuildAndTestTests {
       assert.notEqual((await listing.runAsync(script, environment)).status, 0);
       assert.notEqual((await deletion.runAsync(script, environment)).status, 0);
     });
+  }
+
+  private static threeTimes<T>(value: T): readonly T[] {
+    return [value, value, value];
   }
 }
 
