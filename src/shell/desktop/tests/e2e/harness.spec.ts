@@ -23,7 +23,8 @@ test.describe("the harness's viewport and cursor guard", () => {
     const bounds = BrowserWindow.getAllWindows()[0]?.getBounds();
     return bounds !== undefined && cursor.x >= bounds.x && cursor.y >= bounds.y && cursor.x < bounds.x + bounds.width && cursor.y < bounds.y + bounds.height;
   });
-  const emulateAsync = async (desktop: DesktopApplicationFixture, width: number, height: number): Promise<void> => {
+  const isHovered = (desktop: DesktopApplicationFixture): Promise<boolean> => desktop.window.evaluate(() => document.querySelector(":hover") !== null);
+  const emulateAsync =async (desktop: DesktopApplicationFixture, width: number, height: number): Promise<void> => {
     const session = await desktop.window.context().newCDPSession(desktop.window);
     await session.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
     await expect.poll(() => readViewport(desktop)).toEqual([width, height, 1]);
@@ -36,8 +37,18 @@ test.describe("the harness's viewport and cursor guard", () => {
 
     expect(first).toEqual([[1920, 1080, 1], false]);
     expect([await readViewport(desktop), await isCursorInside(desktop)]).toEqual([[1920, 1080, 1], false]);
-    expect(await desktop.window.evaluate(() => document.querySelector(":hover") === null)).toBe(true);
+    expect(await isHovered(desktop)).toBe(false);
     await desktop.checkpointAsync("harness-suite-viewport");
+  });
+
+  test("a workflow starts with nothing hovered even when the pointer left the window without moving", async ({ desktop }) => {
+    await desktop.window.mouse.move(100, 100);
+    const hovered = await isHovered(desktop);
+
+    await desktop.useViewportAsync(1920, 1080);
+
+    expect(hovered).toBe(true);
+    expect(await isHovered(desktop)).toBe(false);
   });
 
   test("a workflow that ends off its viewport fails, while one that chose another size keeps it", async ({ desktop }) => {
