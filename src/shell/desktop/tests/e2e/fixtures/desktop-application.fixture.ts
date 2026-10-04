@@ -49,6 +49,7 @@ export default class DesktopApplicationFixture {
   private static readonly WINDOWS_FILE: string = "windows.json";
   private static readonly DIAGNOSTIC_TIMEOUT: number = 10_000;
   private static readonly MAIN_PROCESS_TIMEOUT: number = 10_000;
+  private static readonly QUIT_TIMEOUT: number = 30_000;
   private static readonly SILENCE_FILE: string = "main-process.txt";
   private static readonly MAIN_WINDOW: string = "main-window";
   private static readonly NO_ANSWER: unique symbol = Symbol("no answer");
@@ -197,17 +198,17 @@ export default class DesktopApplicationFixture {
     try {
       await this.recordProcessesAsync();
       const started = Date.now();
-      await this.answerAsync("quit", this.application.close());
+      await this.answerAsync("quit", this.application.close(), DesktopApplicationFixture.QUIT_TIMEOUT);
       this.closeMilliseconds = Date.now() - started;
     }
     catch (error) {
       if (this.silence === null)
         throw error;
-      const processId = this.readMainProcessId();
-      if (DesktopApplicationFixture.isAlive(processId))
+      const processId = this.mainProcessId;
+      if (processId !== null && DesktopApplicationFixture.isAlive(processId))
         process.kill(processId, "SIGKILL");
       child.kill("SIGKILL");
-      this.failures.push(`The main process ${processId} did not answer for ${Math.round((Date.now() - this.silence.since) / 1000)} s after it was asked to ${this.silence.action}, so the test killed it.`);
+      this.failures.push(`The main process ${processId ?? "(id unknown)"} did not answer for ${Math.round((Date.now() - this.silence.since) / 1000)} s after it was asked to ${this.silence.action}, so the test killed it.`);
     }
     const exitCode = await exited;
     this.electronApplication = null;
@@ -305,8 +306,7 @@ export default class DesktopApplicationFixture {
   }
 
   private async describeSilenceAsync(silence: MainProcessSilence): Promise<string> {
-    const processId = this.readMainProcessId();
-    const processorMilliseconds = await ProcessListFixture.readProcessorMillisecondsAsync(processId).catch(() => null);
+    const processorMilliseconds = await this.readProcessorMillisecondsAsync();
     const started = Date.now();
     const request = this.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { readBuild(): Promise<unknown> }).readBuild());
     const answer = await DesktopApplicationFixture.withinAsync(request.then(() => null, (error: unknown) => String(error)), DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT);
@@ -315,25 +315,29 @@ export default class DesktopApplicationFixture {
       : answer === null ? `was answered in ${Date.now() - started} ms` : `failed: ${answer}`;
     const time = (milliseconds: number | null): string => milliseconds === null ? "unknown" : `${milliseconds} ms`;
     return [
-      `The main process ${processId} stopped answering when it was asked to ${silence.action}, ${Math.round((Date.now() - silence.since) / 1000)} s before this report.`,
+      `The main process ${this.mainProcessId ?? "(id unknown)"} stopped answering when it was asked to ${silence.action}, ${Math.round((Date.now() - silence.since) / 1000)} s before this report.`,
       `Its processor time was ${time(silence.processorMilliseconds)} when it stopped answering and ${time(processorMilliseconds)} now.`,
       `The window's request to it, teamrun.readBuild(), ${described}.`,
       this.placement
     ].join("\n");
   }
 
-  private async answerAsync<T>(action: string, evaluation: Promise<T>): Promise<T> {
+  private async answerAsync<T>(action: string, evaluation: Promise<T>, limit: number = DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT): Promise<T> {
     if (this.silence !== null) {
       evaluation.catch(() => undefined);
       throw new Error(`The main process has not answered since it was asked to ${this.silence.action}, so the test did not wait for it to ${action}.`);
     }
-    const answer = await DesktopApplicationFixture.withinAsync(evaluation, DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT);
+    const answer = await DesktopApplicationFixture.withinAsync(evaluation, limit);
     if (answer !== DesktopApplicationFixture.NO_ANSWER)
       return answer;
-    const since = Date.now() - DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT;
-    const processorMilliseconds = await ProcessListFixture.readProcessorMillisecondsAsync(this.readMainProcessId()).catch(() => null);
+    const since = Date.now() - limit;
+    const processorMilliseconds = await this.readProcessorMillisecondsAsync();
     this.silence = { action, since, processorMilliseconds };
-    throw new Error(`The main process did not answer within ${DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT / 1000} s when asked to ${action}. ${this.placement}`);
+    throw new Error(`The main process did not answer within ${limit / 1000} s when asked to ${action}. ${this.placement}`);
+  }
+
+  private async readProcessorMillisecondsAsync(): Promise<number | null> {
+    return this.mainProcessId === null ? null : await ProcessListFixture.readProcessorMillisecondsAsync(this.mainProcessId).catch(() => null);
   }
 
   private static async withinAsync<T>(work: Promise<T>, limit: number): Promise<T | typeof DesktopApplicationFixture.NO_ANSWER> {
@@ -433,10 +437,6 @@ export default class DesktopApplicationFixture {
       const bounds = BrowserWindow.getAllWindows()[0]?.getBounds();
       return bounds !== undefined && cursor.x >= bounds.x && cursor.y >= bounds.y && cursor.x < bounds.x + bounds.width && cursor.y < bounds.y + bounds.height;
     }));
-  }
-
-  private readMainProcessId(): number {
-    return this.mainProcessId ?? this.requireProcess().pid ?? 0;
   }
 
   private requireProcess(): ChildProcess {
