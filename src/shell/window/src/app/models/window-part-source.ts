@@ -13,7 +13,6 @@ import { Resources } from "../../resources";
 
 export class WindowPartSource {
   public readonly moduleId: string;
-  public readonly displayName: string;
   public readonly dependencies: readonly string[];
   public readonly viewNames: readonly string[];
   public readonly documentNames: readonly string[];
@@ -25,7 +24,6 @@ export class WindowPartSource {
 
   public constructor(
     moduleId: string,
-    displayName: string,
     dependencies: readonly string[],
     viewNames: readonly string[],
     documentNames: readonly string[],
@@ -38,7 +36,6 @@ export class WindowPartSource {
       throw new ArgumentException(Resources.invalidModuleId, "moduleId");
 
     this.moduleId = moduleId;
-    this.displayName = displayName;
     this.dependencies = [...dependencies];
     this.viewNames = [...viewNames];
     this.documentNames = [...documentNames];

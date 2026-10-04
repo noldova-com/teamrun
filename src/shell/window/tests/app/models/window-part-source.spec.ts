@@ -23,7 +23,7 @@ describe("WindowPartSource", () => {
     const statusBarItems = ["notes.count"];
     const topBarActions = ["notes.compose"];
     const notifications = ["notes.saved"];
-    const source = new WindowPartSource("notes", "Notes", dependencies, views, documents, commands, statusBarItems, topBarActions, notifications, load);
+    const source = new WindowPartSource("notes", dependencies, views, documents, commands, statusBarItems, topBarActions, notifications, load);
     dependencies.push("clock");
     views.push("notes.outline");
     documents.push("notes.page");
@@ -32,12 +32,12 @@ describe("WindowPartSource", () => {
     topBarActions.push("notes.share");
     notifications.push("notes.deleted");
 
-    expect([source.moduleId, source.displayName, source.dependencies, source.viewNames, source.documentNames, source.commandNames, source.statusBarItemNames, source.topBarActionNames, source.notificationKinds])
-      .toEqual(["notes", "Notes", ["tasks"], ["notes.list"], ["notes.note"], ["notes.newNote"], ["notes.count"], ["notes.compose"], ["notes.saved"]]);
+    expect([source.moduleId, source.dependencies, source.viewNames, source.documentNames, source.commandNames, source.statusBarItemNames, source.topBarActionNames, source.notificationKinds])
+      .toEqual(["notes", ["tasks"], ["notes.list"], ["notes.note"], ["notes.newNote"], ["notes.count"], ["notes.compose"], ["notes.saved"]]);
     expect(await source.load()).toBe(part);
   });
 
   it("refuses a module id that is not lowercase kebab-case", () => {
-    expect(() => new WindowPartSource("Notes", "Notes", [], [], [], [], [], [], [], load)).toThrowError(ArgumentException);
+    expect(() => new WindowPartSource("Notes", [], [], [], [], [], [], [], load)).toThrowError(ArgumentException);
   });
 });

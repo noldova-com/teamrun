@@ -22,7 +22,7 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 
 class UiWorkflowsTests {
   private static readonly BUILD_ARGUMENTS: readonly (readonly string[])[] = [
-    ["--test", "--without", "notes", "--without", "alarm", "--without", "clock", "--output", "_build/variants/no-modules"],
+    ["--test", "--without", "notes", "--without", "alarm", "--without", "clock", "--without", "reminder", "--output", "_build/variants/no-modules"],
     ["--test", "--without", "alarm", "--without", "clock", "--output", "_build/variants/without-clock"],
     ["--test"]
   ];
