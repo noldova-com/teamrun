@@ -209,8 +209,15 @@ export default class DesktopApplicationFixture {
   public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
     const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
+    let recording: { readonly error: unknown } | null = null;
     try {
       await this.recordProcessesAsync();
+    }
+    catch (error) {
+      if (this.silence === null)
+        recording = { error };
+    }
+    try {
       const started = Date.now();
       await this.answerAsync("quit", this.application.close(), DesktopApplicationFixture.QUIT_TIMEOUT);
       this.closeMilliseconds = Date.now() - started;
@@ -227,6 +234,8 @@ export default class DesktopApplicationFixture {
     const exitCode = await exited;
     this.electronApplication = null;
     this.page = null;
+    if (recording !== null)
+      throw recording.error;
     if (!keepRuntime)
       await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
     return exitCode;
