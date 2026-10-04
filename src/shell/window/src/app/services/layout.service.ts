@@ -97,6 +97,10 @@ export class LayoutService {
     this.update(this.layoutState().openDocument(tab, isPreview && this.previewTabs()));
   }
 
+  public restoreDocument(tab: DocumentTab, isPreview: boolean): void {
+    this.update(this.layoutState().restoreDocument(tab, isPreview && this.previewTabs()));
+  }
+
   public keep(tab: Tab): void {
     this.update(this.layoutState().keep(tab));
   }

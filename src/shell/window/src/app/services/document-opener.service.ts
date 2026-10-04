@@ -25,11 +25,7 @@ export class DocumentOpenerService {
   }
 
   public restore(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
-    const tab = this.titled(moduleId, name, instance, title);
-    if (!this.layout.layout().isOpen(tab))
-      this.layout.openDocument(tab, isPreview);
-    else if (!isPreview)
-      this.layout.keep(tab);
+    this.layout.restoreDocument(this.titled(moduleId, name, instance, title), isPreview);
   }
 
   public keep(moduleId: string, name: string, instance: string): void {

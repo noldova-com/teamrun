@@ -436,20 +436,38 @@ describe("WindowPartHostService", () => {
     expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1"), new DocumentTab("notes.note", "3")]);
   });
 
-  it("keeps the saved active document when a part opens the documents the saved layout already has during activation", async () => {
+  it("keeps the saved active document when a part opens the saved documents and a new one during activation", async () => {
     const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
-    const saved = Layout.createDefault(new ViewRegistry([], [])).openDocument(note("1")).openDocument(note("2")).openDocument(note("3")).activate(note("2"));
+    const saved = Layout.createDefault(new ViewRegistry([], [])).openDocument(note("1")).openDocument(note("2")).openDocument(note("3")).activate(note("1"));
     const part = new FakeWindowPart("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
-      ["1", "2", "3"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
+      ["1", "2", "3", "4"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
     });
     const { layout } = start([source("notes", part)], [status("notes")]);
     vi.spyOn(TestBed.inject(LayoutStoreService), "readAsync").mockResolvedValue(saved.toJson());
 
-    await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([note("1"), note("2"), note("3")]));
+    await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([note("1"), note("2"), note("3"), note("4")]));
 
-    expect(layout.layout().documents.active).toEqual(note("2"));
+    expect(layout.layout().documents.active).toEqual(note("1"));
     expect(TestBed.inject(TabLabelService).of(note("3")).title).toBe("Note 3");
+  });
+
+  it("keeps the active document when the runtime is ready again and the parts open their documents while reactivating", async () => {
+    const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
+    const part = new FakeWindowPart("notes", log, t => {
+      t.registerDocument(new DocumentContribution("notes.note", load));
+      ["1", "2"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
+    });
+    const { host, layout } = start([source("notes", part)], [status("notes")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    expect(layout.layout().documents.active).toEqual(note("1"));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(layout.layout().documents.tabs).toEqual([note("1"), note("2")]);
+    expect(layout.layout().documents.active).toEqual(note("1"));
   });
 
   it("keeps a preview asked to be kept before the layout loads, and keeps one at once afterwards", async () => {

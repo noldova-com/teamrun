@@ -210,21 +210,28 @@ test.describe("document groups", () => {
     test(`each group's active tab returns ${reopen ? "after reopening on the running runtime" : "after a restart that stops the runtime"}`, async ({ desktop }) => {
       const window = desktop.window;
       const outline = "view/notes.outline";
+      const clock = "view/clock.face";
       const thirdNote = "document/notes.note/3";
-      await tab(window, firstNote).click();
+      const tabOf = (key: string): Locator => TabDragFixture.tab(desktop.window, key);
+      await TabDragFixture.dragOntoPlateAsync(window, clock, notes, "Center");
+      await window.mouse.up();
+      await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, notes))).toEqual([notes, outline, clock]);
+      await TabDragFixture.tab(window, firstNote).click();
       await window.keyboard.press("ControlOrMeta+Alt+KeyN");
-      await expect(tab(window, thirdNote)).toHaveAttribute("aria-selected", "true");
-      await tab(window, secondNote).click();
-      await tab(window, outline).click();
-      await expect(tab(window, secondNote)).toHaveAttribute("aria-selected", "true");
-      await expect(tab(window, outline)).toHaveAttribute("aria-selected", "true");
+      await expect(tabOf(thirdNote)).toHaveAttribute("aria-selected", "true");
+      await TabDragFixture.tab(window, firstNote).click();
+      await TabDragFixture.tab(window, outline).click();
+      await expect(tabOf(firstNote)).toHaveAttribute("aria-selected", "true");
+      await expect(tabOf(outline)).toHaveAttribute("aria-selected", "true");
 
       await (reopen ? desktop.reopenAsync() : desktop.restartAsync());
 
-      await expect.poll(() => tabKeysOf(groupOf(desktop.window, firstNote))).toEqual([firstNote, secondNote, thirdNote]);
-      await expect(tab(desktop.window, secondNote)).toHaveAttribute("aria-selected", "true");
-      await expect(tab(desktop.window, outline)).toHaveAttribute("aria-selected", "true");
-      await expect(tab(desktop.window, thirdNote)).toHaveAttribute("aria-selected", "false");
+      await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(desktop.window, firstNote))).toEqual([firstNote, secondNote, thirdNote]);
+      await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(desktop.window, notes))).toEqual([notes, outline, clock]);
+      await expect(tabOf(firstNote)).toHaveAttribute("aria-selected", "true");
+      await expect(tabOf(outline)).toHaveAttribute("aria-selected", "true");
+      await expect(tabOf(secondNote)).toHaveAttribute("aria-selected", "false");
+      await expect(tabOf(clock)).toHaveAttribute("aria-selected", "false");
     });
 
   test("Reset the layout returns the documents to one group", async ({ desktop }) => {
