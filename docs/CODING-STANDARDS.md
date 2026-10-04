@@ -32,7 +32,7 @@ Review speed and memory from the first line:
 
 Canonical package values belong in `Resources`: messages, report labels, protocol tokens, file extensions, environment/command names, regular expressions, formatting values and policy limits. Self-evident local algorithm literals, such as incrementing by `1`, may stay inline; timeouts and size limits need names. Semantic alternatives use enums or concrete value objects.
 
-Use one `src/resources.ts` containing one `Resources` class with camelCase `static readonly` members, without resource directories or parallel classes. Static formatters combine owned text with runtime values. Exceptions use owning resources or diagnostic templates; do not duplicate catalog-owned text.
+Use one `src/resources.ts` containing one `Resources` class with camelCase `static readonly` members, without resource directories or parallel classes. Code left out of packaged builds, such as the kit's Gallery, keeps its strings in its own resources class next to it, reached only from that code, because a bundler cannot drop members of a class the packaged build still uses; the [architecture](ARCHITECTURE.md#build-inputs) names the check. Static formatters combine owned text with runtime values. Exceptions use owning resources or diagnostic templates; do not duplicate catalog-owned text.
 
 Enums own their values. Empty values, ES module specifiers, declarations and configuration keep their required language/toolchain form. Test inputs, expected results and fixtures remain independent of production `Resources` so output changes cannot also change the expected answer.
 
