@@ -1,0 +1,72 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import ProcessResult from "../../processes/process-result.ts";
+import GitHubException from "../../repository/github.exception.ts";
+import GitHubApi from "../../repository/github-api.ts";
+import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
+
+class GitHubApiTests {
+  private static readonly REPOSITORY: string = "noldova-com/teamrun";
+  private static readonly GH_PATTERN: RegExp = /(^|[/\\])gh(\.exe)?$/;
+
+  public static register(): void {
+    test("a read asks the repository's endpoint and returns the parsed answer", async () => {
+      const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "{\"default_branch\":\"main\"}", "")]);
+
+      assert.deepEqual(await new GitHubApi(GitHubApiTests.REPOSITORY, runner, "work").readAsync("/pulls/5"), { default_branch: "main" });
+
+      const [command, directory, ...gitHubArguments] = runner.captured[0] ?? [];
+      assert.match(command ?? "", GitHubApiTests.GH_PATTERN);
+      assert.equal(directory, "work");
+      assert.deepEqual(gitHubArguments, ["api", "repos/noldova-com/teamrun/pulls/5"]);
+    });
+
+    test("a paged read asks for every page and joins them", async () => {
+      const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "[[1,2],[3]]", "")]);
+
+      assert.deepEqual(await new GitHubApi(GitHubApiTests.REPOSITORY, runner, "work").readPagesAsync("/pulls?state=open"), [1, 2, 3]);
+
+      assert.deepEqual((runner.captured[0] ?? []).slice(2), ["api", "--paginate", "--slurp", "repos/noldova-com/teamrun/pulls?state=open"]);
+    });
+
+    test("a write sends the method and the text as a raw field", async () => {
+      const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "{}", "")]);
+
+      await new GitHubApi(GitHubApiTests.REPOSITORY, runner, "work").writeAsync("PATCH", "/issues/comments/9", "line one\nline two");
+
+      assert.deepEqual((runner.captured[0] ?? []).slice(2), ["api", "--method", "PATCH", "repos/noldova-com/teamrun/issues/comments/9", "--raw-field", "body=line one\nline two"]);
+    });
+
+    test("a failed command and an answer that is not JSON are refused with the cause", async () => {
+      const failing = new ProcessRunnerFixture([], [new ProcessResult(1, "", "HTTP 403: Resource not accessible\n")]);
+      const text = new ProcessRunnerFixture([], [new ProcessResult(0, "<html>", ""), new ProcessResult(0, "<html>", "")]);
+
+      await assert.rejects(
+        new GitHubApi(GitHubApiTests.REPOSITORY, failing, "work").readAsync("/pulls/5"),
+        t => t instanceof GitHubException && /^"gh api repos\/noldova-com\/teamrun\/pulls\/5" failed with exit code 1: HTTP 403: Resource not accessible$/.test(t.message));
+      await assert.rejects(
+        new GitHubApi(GitHubApiTests.REPOSITORY, text, "work").readAsync("/pulls/5"),
+        t => t instanceof GitHubException && t.message === "GitHub's answer for /pulls/5 is not JSON." && t.cause instanceof SyntaxError);
+      await assert.rejects(new GitHubApi(GitHubApiTests.REPOSITORY, text, "work").readPagesAsync("/pulls"), new GitHubException("GitHub's answer for /pulls is not JSON."));
+    });
+
+    test("pages that are not arrays are refused", async () => {
+      const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "{}", ""), new ProcessResult(0, "[{}]", "")]);
+      const api = new GitHubApi(GitHubApiTests.REPOSITORY, runner, "work");
+
+      await assert.rejects(api.readPagesAsync("/pulls"), new GitHubException("/pulls must be an array."));
+      await assert.rejects(api.readPagesAsync("/pulls"), new GitHubException("/pulls must be an array."));
+    });
+  }
+}
+
+GitHubApiTests.register();
