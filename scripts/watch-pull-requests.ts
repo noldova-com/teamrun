@@ -24,9 +24,9 @@ export default class WatchPullRequests {
   private readonly runner: ProcessRunner;
   private readonly output: Writable;
   private readonly directory: string;
-  private readonly clock: () => Date;
+  private readonly clock: () => number;
 
-  public constructor(runner: ProcessRunner, output: Writable, directory: string, clock: () => Date) {
+  public constructor(runner: ProcessRunner, output: Writable, directory: string, clock: () => number) {
     this.runner = runner;
     this.output = output;
     this.directory = directory;
@@ -51,4 +51,4 @@ export default class WatchPullRequests {
 }
 
 if (import.meta.main)
-  process.exitCode = await new WatchPullRequests(new ProcessRunner(), process.stdout, process.cwd(), () => new Date()).runAsync(process.env);
+  process.exitCode = await new WatchPullRequests(new ProcessRunner(), process.stdout, process.cwd(), Date.now).runAsync(process.env);

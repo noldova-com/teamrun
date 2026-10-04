@@ -27,7 +27,7 @@ class WatchPullRequestsTests {
       scenario.add({ number: 4, buildRuns: 0, commitMinutesAgo: 30 });
       const summaryPath = path.join(await WatchPullRequestsTests.createFolderAsync(t), "summary.md");
       const log = new TextOutputFixture();
-      const command = new WatchPullRequests(scenario.api, log, "work", () => PullRequestScenarioFixture.NOW);
+      const command = new WatchPullRequests(scenario.api, log, "work", () => PullRequestScenarioFixture.NOW.getTime());
 
       const status = await command.runAsync({ GITHUB_REPOSITORY: GitHubApiFixture.REPOSITORY, GITHUB_STEP_SUMMARY: summaryPath });
 
@@ -41,7 +41,7 @@ class WatchPullRequestsTests {
     test("a run adds to the step summary instead of replacing it", async t => {
       const scenario = new PullRequestScenarioFixture();
       const summaryPath = path.join(await WatchPullRequestsTests.createFolderAsync(t), "summary.md");
-      const command = new WatchPullRequests(scenario.api, new TextOutputFixture(), "work", () => PullRequestScenarioFixture.NOW);
+      const command = new WatchPullRequests(scenario.api, new TextOutputFixture(), "work", () => PullRequestScenarioFixture.NOW.getTime());
       const environment = { GITHUB_REPOSITORY: GitHubApiFixture.REPOSITORY, GITHUB_STEP_SUMMARY: summaryPath };
 
       await command.runAsync(environment);
@@ -55,7 +55,7 @@ class WatchPullRequestsTests {
       for (const environment of [{}, { GITHUB_REPOSITORY: "", GITHUB_STEP_SUMMARY: "summary.md" }, { GITHUB_REPOSITORY: "a/b" }, { GITHUB_REPOSITORY: "a/b", GITHUB_STEP_SUMMARY: "" }]) {
         const log = new TextOutputFixture();
 
-        assert.equal(await new WatchPullRequests(scenario.api, log, "work", () => PullRequestScenarioFixture.NOW).runAsync(environment), 1);
+        assert.equal(await new WatchPullRequests(scenario.api, log, "work", () => PullRequestScenarioFixture.NOW.getTime()).runAsync(environment), 1);
         assert.equal(log.text, "GITHUB_REPOSITORY and GITHUB_STEP_SUMMARY must name the repository and the step's summary file.\n");
       }
       assert.deepEqual(scenario.api.requests, []);

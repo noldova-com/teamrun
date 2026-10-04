@@ -164,7 +164,7 @@ class PullRequestWatcherTests {
 
   private static watchAsync(scenario: PullRequestScenarioFixture): Promise<readonly string[]> {
     const api = new GitHubApi(GitHubApiFixture.REPOSITORY, scenario.api, "work");
-    return new PullRequestWatcher(api, new PullRequestReader(api), new PullRequestEvaluator(), () => PullRequestScenarioFixture.NOW).watchAsync();
+    return new PullRequestWatcher(api, new PullRequestReader(api), new PullRequestEvaluator(), () => PullRequestScenarioFixture.NOW.getTime()).watchAsync();
   }
 }
 

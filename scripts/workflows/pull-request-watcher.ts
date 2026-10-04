@@ -20,9 +20,9 @@ export default class PullRequestWatcher {
   private readonly api: GitHubApi;
   private readonly reader: PullRequestReader;
   private readonly evaluator: PullRequestEvaluator;
-  private readonly clock: () => Date;
+  private readonly clock: () => number;
 
-  public constructor(api: GitHubApi, reader: PullRequestReader, evaluator: PullRequestEvaluator, clock: () => Date) {
+  public constructor(api: GitHubApi, reader: PullRequestReader, evaluator: PullRequestEvaluator, clock: () => number) {
     this.api = api;
     this.reader = reader;
     this.evaluator = evaluator;
@@ -31,7 +31,7 @@ export default class PullRequestWatcher {
 
   public async watchAsync(): Promise<readonly string[]> {
     const repository = await this.reader.readRepositoryAsync();
-    const now = this.clock();
+    const now = new Date(this.clock());
     const lines: string[] = [];
     for (const open of await this.reader.listOpenAsync())
       lines.push(await this.watchPullRequestAsync(repository, open, now));
