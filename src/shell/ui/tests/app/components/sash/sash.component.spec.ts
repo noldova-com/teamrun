@@ -8,6 +8,7 @@
 
 import { Component, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { userEvent } from "vitest/browser";
 
 import { SashComponent } from "../../../../src/app/components/sash/sash.component";
 import { SashOrientation } from "../../../../src/app/enums/sash-orientation";
@@ -200,9 +201,10 @@ describe("SashComponent", () => {
     expect(getComputedStyle(bar()).opacity).toBe("0");
   });
 
-  it("shows its bar while the keyboard has focus on it and hides it when the focus leaves", () => {
+  it("shows its bar while the keyboard has focus on it and hides it when the focus leaves", async () => {
     expect(getComputedStyle(bar()).opacity).toBe("0");
 
+    await userEvent.keyboard("{Shift}");
     sash().focus();
     expect(sash().matches(":focus-visible")).toBe(true);
     expect(getComputedStyle(bar()).opacity).toBe("1");
