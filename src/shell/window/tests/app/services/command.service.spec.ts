@@ -14,13 +14,12 @@ import { DialogService } from "@noldova/teamrun-shell-ui";
 import { EditAction } from "../../../src/app/enums/edit-action";
 import { CommandNotFoundException } from "../../../src/app/exceptions/command-not-found.exception";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
-import { WindowPartSource } from "../../../src/app/models/window-part-source";
-import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../src/app/services/command.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
 import { StartupService } from "../../../src/app/services/startup.service";
 import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
+import { ModuleStatusFixture } from "../../fixtures/module-status.fixture";
 import { ViewDialogFixture } from "../../fixtures/view-dialog.fixture";
 
 describe("CommandService", () => {
@@ -43,8 +42,7 @@ describe("CommandService", () => {
       providers: [
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } },
         { provide: DialogService, useValue: { isOpen: isDialogOpen } },
-        ViewDialogFixture.provideShowing(viewModule),
-        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] }
+        ViewDialogFixture.provideShowing(viewModule)
       ]
     });
     return TestBed.inject(CommandService);
@@ -197,8 +195,9 @@ describe("CommandService", () => {
     expect([before, service.keyLabel("notes.newNote"), service.bindings().has("notes.newNote")]).toEqual(["Ctrl+Alt+N", "F6", true]);
   });
 
-  it("names a command's owner: the product for the shell's, the module's name, or else its id", () => {
+  it("names a command's owner: the product for the shell's, the name the runtime reports for its module, or else its id", () => {
     const service = start("win32");
+    ModuleStatusFixture.report(ModuleStatusFixture.create("notes", "Notes"));
 
     expect(["shell.closeTab", "notes.newNote", "clock.tick"].map(t => service.ownerOf(t))).toEqual([Resources.productName, "Notes", "clock"]);
   });

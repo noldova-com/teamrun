@@ -14,8 +14,7 @@ import "@noldova/teamrun-foundation-core";
 import { type CommandRun, type Notification, NotificationPost, NotificationSeverity } from "@noldova/teamrun-shell-protocol";
 import { ButtonComponent, ButtonVariant, CheckboxComponent, IconButtonComponent, PopoverDirective, ProgressComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
-import { WindowPartTokens } from "../../models/window-part-tokens";
-import type { WindowPartSource } from "../../models/window-part-source";
+import { ModuleStatusService } from "../../services/module-status.service";
 import { NotificationService } from "../../services/notification.service";
 import { Resources } from "../../../resources";
 
@@ -33,7 +32,7 @@ import { Resources } from "../../../resources";
 export class NotificationsPopoverComponent {
   private readonly service: NotificationService = inject(NotificationService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
-  private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
+  private readonly statuses: ModuleStatusService = inject(ModuleStatusService);
   private readonly time: Intl.DateTimeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
   protected readonly resources: typeof Resources = Resources;
@@ -53,8 +52,7 @@ export class NotificationsPopoverComponent {
   }
 
   protected moduleName(notification: Notification): string {
-    const owner = notification.post.kind.owner;
-    return this.sources.find(t => t.moduleId === owner)?.displayName ?? owner;
+    return this.statuses.nameOf(notification.post.kind.owner);
   }
 
   protected timeOf(notification: Notification): string {
