@@ -99,6 +99,10 @@ describe("ChipComponent", () => {
         expect(style.borderTopColor).toBe(AppearanceFixture.readColor(theme, mode, "widget.border"));
         expect(style.backgroundColor).toBe("rgba(0, 0, 0, 0)");
         expect(style.fontWeight).toBe("600");
+        const probe = document.body.appendChild(document.createElement("span"));
+        probe.style.fontSize = "var(--tr-text-panel)";
+        AppearanceFixture.expectPixels(Number.parseFloat(style.fontSize), Number.parseFloat(getComputedStyle(probe).fontSize));
+        probe.remove();
       });
 
   for (const mode of AppearanceFixture.modes)

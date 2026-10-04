@@ -18,7 +18,7 @@
   border-radius: var(--tr-radius-small);
   background: none;
   color: var(--tr-text);
-  font-size: var(--tr-text-label);
+  font-size: var(--tr-text-panel);
   font-weight: var(--tr-weight-emphasis);
   line-height: 1;
   white-space: nowrap;
@@ -34,5 +34,5 @@
 
 :host(.tr-chip-key) {
   background-color: var(--tr-raised);
-  font-weight: inherit;
+  font-weight: 400;
 }

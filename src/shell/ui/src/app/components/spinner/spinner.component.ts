@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, input } from "@angular/core";
+import { ChangeDetectionStrategy, Component, inject, input } from "@angular/core";
 
 import { RevealDelayDirective } from "../progress/reveal-delay.directive";
 
@@ -17,9 +17,11 @@ import { RevealDelayDirective } from "../progress/reveal-delay.directive";
   changeDetection: ChangeDetectionStrategy.OnPush,
   hostDirectives: [{ directive: RevealDelayDirective, inputs: ["isDelayed"] }],
   host: {
-    "role": "status"
+    "[attr.role]": "label() ? 'status' : null"
   }
 })
 export class SpinnerComponent {
-  public readonly label = input.required<string>();
+  protected readonly reveal: RevealDelayDirective = inject(RevealDelayDirective, { self: true });
+
+  public readonly label = input<string>(String.empty);
 }

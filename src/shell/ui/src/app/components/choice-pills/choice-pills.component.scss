@@ -21,6 +21,7 @@
 
 .tr-choice-pill {
   box-sizing: border-box;
+  max-width: 100%;
   min-height: var(--tr-choice-pill);
   margin: 0;
   padding: 0 var(--tr-choice-pill-padding);
@@ -32,12 +33,12 @@
   font-size: var(--tr-text-panel);
   font-weight: var(--tr-weight-emphasis);
   line-height: var(--tr-line-panel);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
 .tr-choice-pill:hover {
-  background-color: var(--tr-hover);
+  background-color: var(--tr-toolbar-hover);
 }
 
 .tr-choice-pill.tr-choice-pill-selected {

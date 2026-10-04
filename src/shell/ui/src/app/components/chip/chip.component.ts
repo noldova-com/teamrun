@@ -41,7 +41,7 @@ export class ChipComponent {
       case ChipKind.Key:
         return String.empty;
       default:
-        return count > Resources.badgeLimit ? Resources.badgeOverflow : String(count);
+        return Resources.formatBadgeCount(count);
     }
   });
 }

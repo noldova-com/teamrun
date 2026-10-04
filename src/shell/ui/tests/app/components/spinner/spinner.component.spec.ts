@@ -15,10 +15,11 @@ import { MotionFixture } from "../../../fixtures/motion.fixture";
 
 @Component({
   imports: [SpinnerComponent],
-  template: `<tr-spinner label="Loading the list" [isDelayed]="isDelayed()" />`
+  template: `<tr-spinner [label]="label()" [isDelayed]="isDelayed()" />`
 })
 class SpinnerHostComponent {
   public readonly isDelayed = signal<boolean>(false);
+  public readonly label = signal<string>("Loading the list");
 }
 
 describe("SpinnerComponent", () => {
@@ -46,6 +47,13 @@ describe("SpinnerComponent", () => {
     expect(getComputedStyle(spinner().querySelector(".tr-spinner-label") as HTMLElement).clipPath).not.toBe("none");
   });
 
+  it("is no status, and shows no text, when it is given no label", () => {
+    fixture.componentInstance.label.set("");
+    fixture.detectChanges();
+
+    expect([spinner().hasAttribute("role"), spinner().textContent?.trim()]).toEqual([false, ""]);
+  });
+
   it("is visible at once when it is not delayed", () => {
     expect(spinner().classList.contains("tr-reveal-pending")).toBe(false);
     expect(getComputedStyle(spinner()).visibility).toBe("visible");
@@ -56,13 +64,13 @@ describe("SpinnerComponent", () => {
     fixture.componentInstance.isDelayed.set(true);
     fixture.detectChanges();
 
-    expect(getComputedStyle(spinner()).visibility).toBe("hidden");
+    expect([getComputedStyle(spinner()).visibility, spinner().textContent?.trim()]).toEqual(["hidden", ""]);
     vi.advanceTimersByTime(299);
     fixture.detectChanges();
-    expect(getComputedStyle(spinner()).visibility).toBe("hidden");
+    expect([getComputedStyle(spinner()).visibility, spinner().textContent?.trim()]).toEqual(["hidden", ""]);
     vi.advanceTimersByTime(1);
     fixture.detectChanges();
-    expect(getComputedStyle(spinner()).visibility).toBe("visible");
+    expect([getComputedStyle(spinner()).visibility, spinner().textContent?.trim()]).toEqual(["visible", "Loading the list"]);
 
     fixture.componentInstance.isDelayed.set(false);
     fixture.detectChanges();

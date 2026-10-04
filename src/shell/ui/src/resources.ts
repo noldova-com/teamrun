@@ -331,6 +331,10 @@ export class Resources {
     return `The ${parameterName} must be from ${Resources.minimumTextSize} to ${Resources.maximumTextSize} CSS pixels; ${size} is outside that range.`;
   }
 
+  public static formatBadgeCount(count: number): string {
+    return count > Resources.badgeLimit ? Resources.badgeOverflow : String(count);
+  }
+
   public static formatBadged(label: string, badge: string): string {
     return `${label}, ${badge}`;
   }

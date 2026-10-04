@@ -18,7 +18,7 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   imports: [ChoicePillsComponent],
   template: `
     <button type="button" class="before">Before</button>
-    <tr-choice-pills label="Mode" [options]="options()" [value]="value()" (valueChange)="choose($event)" />
+    <div class="row" style="background: var(--tr-hover); width: 20rem"><tr-choice-pills label="Mode" [options]="options()" [value]="value()" (valueChange)="choose($event)" /></div>
     <button type="button" class="after">After</button>
   `
 })
@@ -47,6 +47,12 @@ describe("ChoicePillsComponent", () => {
   const pills = (): HTMLButtonElement[] => [...fixture.nativeElement.querySelectorAll(".tr-choice-pill")];
   const group = (): HTMLElement => fixture.nativeElement.querySelector("[role=radiogroup]");
   const selected = (): string[] => pills().filter(t => t.getAttribute("aria-checked") === "true").map(t => t.textContent?.trim() ?? "");
+
+  function blend(over: string, ground: string): string {
+    const [red = 0, green = 0, blue = 0, alpha = 1] = (over.match(/[\d.]+/gu) ?? []).map(Number);
+    const base = (ground.match(/[\d.]+/gu) ?? []).map(Number);
+    return `rgb(${[red, green, blue].map((t, i) => t * alpha + (base[i] ?? 0) * (1 - alpha)).join(", ")})`;
+  }
 
   afterEach(() => AppearanceFixture.reset());
 
@@ -179,6 +185,46 @@ describe("ChoicePillsComponent", () => {
       expect(AppearanceFixture.contrast(getComputedStyle(pills()[1] as HTMLElement).color, getComputedStyle(pills()[1] as HTMLElement).backgroundColor)).toBeGreaterThanOrEqual(4.5);
       expect(AppearanceFixture.contrast(getComputedStyle(pills()[0] as HTMLElement).color, ground)).toBeGreaterThanOrEqual(4.5);
     });
+
+  const channels = (color: string): string[] => (color.match(/[\d.]+/gu) ?? []).slice(0, 3);
+
+  for (const mode of AppearanceFixture.modes)
+    for (const theme of AppearanceFixture.themes)
+      it(`fills a hovered pill with the ${theme.id} theme's toolbar hover color, not the list hover color a row hovers with, in ${mode} mode`, async () => {
+        render(theme, mode);
+        const before = getComputedStyle(pills()[2] as HTMLElement).backgroundColor;
+
+        await userEvent.hover(pills()[2] as HTMLElement);
+        const after = getComputedStyle(pills()[2] as HTMLElement).backgroundColor;
+
+        expect(before).toBe("rgba(0, 0, 0, 0)");
+        expect(channels(after)).toEqual(channels(AppearanceFixture.readColor(theme, mode, "toolbar.hoverBackground")));
+        expect(channels(after)).not.toEqual(channels(AppearanceFixture.readColor(theme, mode, "list.hoverBackground")));
+      });
+
+  for (const mode of AppearanceFixture.modes)
+    it(`shows a hovered pill on a hovered row as a visibly different fill in the default theme in ${mode} mode`, async () => {
+      render(AppearanceFixture.themes[0], mode);
+      const row = getComputedStyle(fixture.nativeElement.querySelector(".row") as HTMLElement).backgroundColor;
+
+      await userEvent.hover(pills()[2] as HTMLElement);
+
+      expect(AppearanceFixture.contrast(blend(getComputedStyle(pills()[2] as HTMLElement).backgroundColor, row), row)).toBeGreaterThanOrEqual(1.05);
+    });
+
+  it("keeps a pill with a long title inside its group, wrapping the title instead of overflowing", () => {
+    render();
+    host.options.set([new SelectOption("short", "Short"), new SelectOption("long", "An option whose title is far too long to fit the width its group gives it")]);
+    host.value.set("long");
+    fixture.nativeElement.querySelector("tr-choice-pills").style.width = "12rem";
+    fixture.detectChanges();
+    const bounds = group().getBoundingClientRect();
+    const [short, long] = pills().map(t => t.getBoundingClientRect()) as [DOMRect, DOMRect];
+
+    expect(long.right).toBeLessThanOrEqual(bounds.right + 1 / 32);
+    expect(long.left).toBeGreaterThanOrEqual(bounds.left - 1 / 32);
+    expect(long.height).toBeGreaterThan(short.height * 1.5);
+  });
 
   it("wraps its pills onto further lines when they do not fit, and none leaves the group", () => {
     render();
