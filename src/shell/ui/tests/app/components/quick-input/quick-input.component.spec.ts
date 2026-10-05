@@ -65,6 +65,18 @@ class FilteringHostComponent {
   public readonly chosen: string[] = [];
 }
 
+@Component({
+  imports: [QuickInputComponent],
+  template: `
+    <div style="display: flex; height: 4000px;">
+      <tr-quick-input [items]="items" label="Search commands" [isFocusing]="false" />
+    </div>
+  `
+})
+class TallHostComponent {
+  public readonly items: readonly QuickInputItem[] = [...many, ...many.map(t => new QuickInputItem(`${t.id}.again`, t.title, t.icon, t.detail, t.keyLabel))];
+}
+
 describe("QuickInputComponent", () => {
   let fixture: ComponentFixture<QuickInputHostComponent>;
   let host: QuickInputHostComponent;
@@ -300,6 +312,40 @@ describe("QuickInputComponent", () => {
     expect([bare?.querySelector(".tr-quick-input-icon")?.textContent, bare?.querySelector(".tr-quick-input-detail"), bare?.querySelector(".tr-quick-input-key")]).toEqual(["", null, null]);
     expect(bare?.querySelector(".tr-quick-input-icon")?.getBoundingClientRect().width).toBe(full?.querySelector(".tr-quick-input-icon")?.getBoundingClientRect().width);
     expect(bare?.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left).toBe(full?.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left);
+  });
+
+  it("labels the first option of each section within the option, draws a line before every section but the first, and shows the first label again on Home", async () => {
+    host.items.set(many.map((t, index) => index === 0 || index === 3 ? new QuickInputItem(t.id, t.title, t.icon, "Notes", null, [], [], index === 0 ? "recently used" : "other commands") : t));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const list = root().querySelector(".tr-quick-input-list") as HTMLElement;
+    const separators = [...list.querySelectorAll<HTMLElement>(".tr-quick-input-separator")];
+    const label = options()[0]?.querySelector(".tr-quick-input-section") as HTMLElement;
+
+    expect(options().map(t => t.querySelector(".tr-quick-input-section")?.textContent ?? null).slice(0, 5)).toEqual(["recently used", null, null, "other commands", null]);
+    expect(options()[0]?.textContent).toContain("recently used");
+    expect(separators.map(t => [t.getAttribute("role"), (t.nextElementSibling as HTMLElement).dataset["item"]])).toEqual([["none", "notes.command3"]]);
+    expect(getComputedStyle(label).color).toBe(getComputedStyle(options()[0]?.querySelector(".tr-quick-input-detail") as Element).color);
+    expect(label.getBoundingClientRect().right).toBeCloseTo((options()[0] as HTMLElement).getBoundingClientRect().right - Number.parseFloat(getComputedStyle(options()[0] as Element).paddingRight), 0);
+
+    await pressAsync("End");
+    const scrolled = list.scrollTop;
+    await pressAsync("Home");
+    const frame = list.getBoundingClientRect();
+
+    expect([scrolled > 0, list.scrollTop, activeIndex()]).toEqual([true, 0, 0]);
+    expect(label.getBoundingClientRect().top).toBeGreaterThanOrEqual(frame.top);
+  });
+
+  it("keeps its list to half the window's height, or ten options when that is more", async () => {
+    const tall = create(TallHostComponent);
+    tall.detectChanges();
+    await tall.whenStable();
+    const list = tall.nativeElement.querySelector(".tr-quick-input-list") as HTMLElement;
+    const row = (list.querySelector("[role=option]") as HTMLElement).offsetHeight;
+
+    expect(list.scrollHeight).toBeGreaterThan(list.clientHeight);
+    expect(list.getBoundingClientRect().height).toBeCloseTo(Math.max(innerHeight / 2, row * 10), 0);
   });
 
   it("takes its outline, margin, padding and gap from the theme and fits its options in its height", () => {

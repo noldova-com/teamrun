@@ -1364,6 +1364,12 @@ export declare class ShellEvents {
    * `CommandList`, with a sequence greater than any list before it.
    */
   public static readonly commandsChanged: QualifiedName;
+
+  /**
+   * `shell.recentCommandsChanged`: a device ran a command from command search; its payload is that device's
+   * `RecentCommands`.
+   */
+  public static readonly recentCommandsChanged: QualifiedName;
 }
 
 /**
@@ -1490,6 +1496,18 @@ export declare class ShellMethods {
    * `shell.setSetting` does.
    */
   public static readonly resetSetting: QualifiedName;
+
+  /**
+   * `shell.recentCommands`: asks for the commands a device ran recently from command search; its payload is a
+   * `RecentCommandsQuery` and its answer that device's `RecentCommands`, without the device.
+   */
+  public static readonly recentCommands: QualifiedName;
+
+  /**
+   * `shell.recordCommand`: records that a device ran a command from command search; its payload is a `RecentCommandUse`.
+   * The runtime keeps each device's 20 newest and publishes `shell.recentCommandsChanged`.
+   */
+  public static readonly recordCommand: QualifiedName;
 }
 
 /**
@@ -3627,6 +3645,195 @@ export declare class NotificationBroadcast {
    * import { NotificationBroadcast } from "@noldova/teamrun-shell-protocol";
    *
    * export const json: JsonObject = new NotificationBroadcast([], [], [], 0).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A device's question for the commands it ran recently: the payload of `shell.recentCommands`, which the desktop sends for
+ * its window, adding its own device.
+ */
+export declare class RecentCommandsQuery {
+  /**
+   * The device whose recent commands the answer lists.
+   */
+  public readonly device: string;
+
+  /**
+   * Creates the query.
+   *
+   * @param device The device's id.
+   * @throws ArgumentException synchronously when the device is blank.
+   *
+   * @example
+   * ```ts
+   * import { RecentCommandsQuery } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const query: RecentCommandsQuery = new RecentCommandsQuery("laptop");
+   * ```
+   */
+  public constructor(device: string);
+
+  /**
+   * Reads the query from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The query.
+   * @throws JsonException synchronously when `device` is missing or invalid, or a field is unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { RecentCommandsQuery } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const query: RecentCommandsQuery = RecentCommandsQuery.fromJson({ device: "laptop" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): RecentCommandsQuery;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `device` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { RecentCommandsQuery } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new RecentCommandsQuery("laptop").toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A command a device ran from command search: the payload of `shell.recordCommand`, which the desktop sends for its window,
+ * adding its own device.
+ */
+export declare class RecentCommandUse {
+  /**
+   * The device that ran the command.
+   */
+  public readonly device: string;
+
+  /**
+   * The command's id, as command search names it.
+   */
+  public readonly id: string;
+
+  /**
+   * Creates the use.
+   *
+   * @param device The device's id.
+   * @param id The command's id.
+   * @throws ArgumentException synchronously when the device or the id is blank.
+   *
+   * @example
+   * ```ts
+   * import { RecentCommandUse } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const use: RecentCommandUse = new RecentCommandUse("laptop", "shell.openSettings");
+   * ```
+   */
+  public constructor(device: string, id: string);
+
+  /**
+   * Reads the use from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The use.
+   * @throws JsonException synchronously when `device` or `id` is missing or invalid, or a field is unknown; its path names
+   * the field.
+   *
+   * @example
+   * ```ts
+   * import { RecentCommandUse } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const use: RecentCommandUse = RecentCommandUse.fromJson({ device: "laptop", id: "shell.openSettings" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): RecentCommandUse;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `device` and `id` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { RecentCommandUse } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new RecentCommandUse("laptop", "shell.openSettings").toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The commands a device ran recently from command search, newest first: the answer of `shell.recentCommands` and the
+ * payload of the `shell.recentCommandsChanged` event. The event names the device; the desktop forwards it only to that
+ * device's windows, without the device.
+ */
+export declare class RecentCommands {
+  /**
+   * The commands' ids, newest first, each once.
+   */
+  public readonly ids: readonly string[];
+
+  /**
+   * The device that ran the commands, or `null` when the list is already that device's.
+   */
+  public readonly device: string | null;
+
+  /**
+   * Creates the list.
+   *
+   * @param ids The commands' ids, newest first.
+   * @param device The device's id, or `null`; `null` by default.
+   * @throws ArgumentException synchronously when an id or the device is blank, or an id is listed twice.
+   *
+   * @example
+   * ```ts
+   * import { RecentCommands } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const recent: RecentCommands = new RecentCommands(["shell.openSettings", "clock.show"], "laptop");
+   * ```
+   */
+  public constructor(ids: readonly string[], device?: string | null);
+
+  /**
+   * Reads the list from its wire form, which accepts no unknown fields; `device` may be left out.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The list.
+   * @throws JsonException synchronously when `ids` is missing, a field is invalid or unknown, or an id is listed twice; its
+   * path names the field.
+   *
+   * @example
+   * ```ts
+   * import { RecentCommands } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const recent: RecentCommands = RecentCommands.fromJson({ ids: ["clock.show"], device: "laptop" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): RecentCommands;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `ids` field, and `device` when there is one.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { RecentCommands } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new RecentCommands(["clock.show"]).toJson();
    * ```
    */
   public toJson(): JsonObject;

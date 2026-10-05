@@ -74,7 +74,7 @@ test.describe("settings", () => {
     await expect(settingsTab(window)).toHaveCount(1);
     await expect(settingsTab(window)).toHaveAttribute("aria-selected", "true");
     await expect(window.locator(".tr-settings-page")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Gallery"]);
-    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Theme", "Text", "Layout"]);
+    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Theme", "Text", "Layout", "Command search"]);
     await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
     await expect(window.locator("[data-command=\"shell.openSettings\"] td").first()).toHaveText("Settings…");
     await desktop.checkpointAsync("settings-shortcuts");

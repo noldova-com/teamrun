@@ -68,12 +68,20 @@ export class Resources {
     ShellMethods.clearNotifications.text,
     ShellMethods.settings.text,
     ShellMethods.setSetting.text,
-    ShellMethods.resetSetting.text
+    ShellMethods.resetSetting.text,
+    ShellMethods.recentCommands.text,
+    ShellMethods.recordCommand.text
   ];
-  public static readonly deviceMethods: readonly string[] = [ShellMethods.settings.text, ShellMethods.setSetting.text, ShellMethods.resetSetting.text];
+  public static readonly deviceMethods: readonly string[] = [
+    ShellMethods.settings.text,
+    ShellMethods.setSetting.text,
+    ShellMethods.resetSetting.text,
+    ShellMethods.recentCommands.text,
+    ShellMethods.recordCommand.text
+  ];
   public static readonly deviceField: string = "device";
-  public static readonly settingsNeedDevice: string = "This device has no identity, so its settings cannot be read or changed.";
-  public static readonly settingsPayloadNotObject: string = "A settings request's payload must be a JSON object.";
+  public static readonly deviceRequestNeedsIdentity: string = "This device has no identity, so a request that belongs to it cannot be made.";
+  public static readonly deviceRequestPayloadNotObject: string = "A request that belongs to this device must have a JSON object as its payload.";
   public static get untrustedRequest(): string {
     return `Only ${Resources.applicationName}'s own window may call the runtime.`;
   }
