@@ -22,6 +22,7 @@ import { CommandService } from "../../../../src/app/services/command.service";
 import { MenuService } from "../../../../src/app/services/menu.service";
 import { ToolbarDragService } from "../../../../src/app/services/toolbar-drag.service";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
+import { TooltipFixture } from "../../../fixtures/tooltip.fixture";
 
 @Component({
   imports: [ToolbarComponent],
@@ -159,14 +160,8 @@ describe("ToolbarComponent", () => {
     await showAsync(1000);
     const submenu = items()[3] as HTMLButtonElement;
     submenu.style.display = "inline-flex";
-    const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === "Templates");
 
-    submenu.dispatchEvent(new PointerEvent("pointerenter"));
-    await vi.waitFor(() => expect(tooltip()).toBeDefined());
-
-    expect(tooltip()?.getBoundingClientRect().top).toBeGreaterThanOrEqual(submenu.getBoundingClientRect().bottom);
-    submenu.dispatchEvent(new PointerEvent("pointerleave"));
-    await vi.waitFor(() => expect(tooltip()).toBeUndefined());
+    await TooltipFixture.expectTooltipAsync(submenu, "Templates", t => expect(t.getBoundingClientRect().top).toBeGreaterThanOrEqual(submenu.getBoundingClientRect().bottom));
   });
 
   it("moves the sections that do not fit into a menu behind a More actions item", async () => {
