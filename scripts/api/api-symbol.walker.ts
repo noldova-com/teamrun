@@ -7,11 +7,11 @@
  */
 
 import { ModifierFlags, type Project, type Symbol, SymbolFlags } from "typescript/unstable/async";
-import type { Node } from "typescript/unstable/ast";
 
 import ApiValue from "./api-value.ts";
 import type ApiVisibility from "./api-visibility.ts";
 import ApiException from "./api.exception.ts";
+import type IApiSymbolVisitor from "./interfaces/api-symbol-visitor.ts";
 
 export default class ApiSymbolWalker {
   private static readonly CONTAINERS: number = SymbolFlags.Class | SymbolFlags.Interface | SymbolFlags.Module | SymbolFlags.Enum;
@@ -31,7 +31,7 @@ export default class ApiSymbolWalker {
     this.hidden = visibility.includesProtected ? ModifierFlags.Private : ModifierFlags.Private | ModifierFlags.Protected;
   }
 
-  public async walkAsync(file: string, visit: (path: string, symbol: Symbol, declarations: readonly Node[]) => Promise<void>): Promise<void> {
+  public async walkAsync(file: string, visit: IApiSymbolVisitor): Promise<void> {
     const source = await this.project.program.getSourceFile(file);
     const module = source === undefined ? undefined : await this.project.checker.getSymbolAtLocation(source);
     if (source === undefined || module === undefined)
@@ -45,7 +45,7 @@ export default class ApiSymbolWalker {
     return special === undefined ? `${path}#${name}` : `${path}${special}`;
   }
 
-  private async visitAsync(path: string, exported: Symbol, fileName: string, visit: (path: string, symbol: Symbol, declarations: readonly Node[]) => Promise<void>): Promise<void> {
+  private async visitAsync(path: string, exported: Symbol, fileName: string, visit: IApiSymbolVisitor): Promise<void> {
     const symbol = (exported.flags & SymbolFlags.Alias) === 0 ? exported : await this.project.checker.getAliasedSymbol(exported);
     if ((symbol.flags & SymbolFlags.TypeParameter) !== 0)
       return;

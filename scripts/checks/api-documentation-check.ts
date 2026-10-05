@@ -6,14 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync } from "node:fs";
 import type { Writable } from "node:stream";
 
 import type ApiCatalog from "../api/api-catalog.ts";
+import ApiDeclarationSession from "../api/api-declaration-session.ts";
 import ApiDocumentationReader from "../api/api-documentation.reader.ts";
 import type ApiPackage from "../api/api-package.ts";
-import ApiProject from "../api/api-project.ts";
-import ApiServer from "../api/api-server.ts";
 import ApiException from "../api/api.exception.ts";
 import type ICheck from "./interfaces/check.ts";
 
@@ -24,16 +22,14 @@ export default class ApiDocumentationCheck implements ICheck {
 
   private readonly root: string;
   private readonly catalog: ApiCatalog;
-  private readonly server: readonly string[];
-  private readonly timeout: number;
+  private readonly session: ApiDeclarationSession;
 
   public readonly title: string = "API documentation";
 
   public constructor(root: string, catalog: ApiCatalog, server: readonly string[], timeout: number) {
     this.root = root;
     this.catalog = catalog;
-    this.server = [...server];
-    this.timeout = timeout;
+    this.session = new ApiDeclarationSession(root, server, timeout);
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
@@ -41,13 +37,9 @@ export default class ApiDocumentationCheck implements ICheck {
   }
 
   private async inspectAsync(apiPackage: ApiPackage): Promise<readonly string[]> {
-    if (!existsSync(apiPackage.declarations))
-      return [apiPackage.missingDeclarationsMessage];
-    const project = new ApiProject(this.root, ApiDocumentationCheck.PURPOSE, apiPackage.id);
-    await project.writeAsync(apiPackage.project, this.root, [apiPackage.declarations]);
     try {
-      return await ApiServer.useAsync(this.server, this.root, project.file, this.timeout,
-        t => new ApiDocumentationReader(t, apiPackage.visibility, this.root).readAsync(apiPackage.declarations));
+      return await this.session.useAsync(apiPackage, ApiDocumentationCheck.PURPOSE,
+        t => new ApiDocumentationReader(t, apiPackage.visibility, this.root).readAsync(apiPackage.declarations, apiPackage.source));
     }
     catch (error) {
       return [ApiException.describe(error)];

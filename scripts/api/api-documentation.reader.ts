@@ -47,9 +47,10 @@ export default class ApiDocumentationReader {
     this.root = root;
   }
 
-  public async readAsync(file: string): Promise<readonly string[]> {
+  public async readAsync(file: string, source: string): Promise<readonly string[]> {
+    const shown = path.relative(this.root, source).split(path.sep).join("/");
     const problems: string[] = [];
-    await this.walker.walkAsync(file, (owner, _symbol, declarations) => this.inspectAsync(owner, declarations, problems));
+    await this.walker.walkAsync(file, (owner, _symbol, declarations) => this.inspectAsync(shown, owner, declarations, problems));
     return problems;
   }
 
@@ -60,7 +61,7 @@ export default class ApiDocumentationReader {
 
   private static readDocs(node: Node): readonly JSDoc[] {
     const owner = isVariableDeclaration(node) ? node.parent.parent : node;
-    return (owner.jsDoc ?? []).filter(t => isJSDoc(t)).filter(t => !(t.tags ?? []).some(u => u.tagName.text ===ApiDocumentationReader.LICENSE_TAG));
+    return (owner.jsDoc ?? []).filter(t => isJSDoc(t)).filter(t => !(t.tags ?? []).some(u => u.tagName.text === ApiDocumentationReader.LICENSE_TAG));
   }
 
   private static isEmpty(comment: NodeArray<JSDocComment> | undefined): boolean {
@@ -71,33 +72,13 @@ export default class ApiDocumentationReader {
     return result !== undefined && (result.kind === SyntaxKind.NeverKeyword || isTypePredicateNode(result) && result.assertsModifier !== undefined);
   }
 
-  private locate(node: Node): string {
+  private static locate(shown: string, node: Node): string {
     const file = node.getSourceFile();
-    const line = file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1;
-    return `${path.relative(this.root, file.fileName).split(path.sep).join("/")}:${line}`;
+    return `${shown}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}`;
   }
 
-  private async inspectAsync(owner: string, declarations: readonly Node[], problems: string[]): Promise<void> {
-    const callables = declarations.filter(t => ApiDocumentationReader.isCallable(t));
-    for (const [index, declaration] of callables.entries()) {
-      const name = callables.length === 1 ? owner : `${owner} overload ${index + 1}`;
-      const docs = ApiDocumentationReader.readDocs(declaration);
-      if (docs.length === 0)
-        problems.push(`${this.locate(declaration)}: ${name} has no JSDoc`);
-      else
-        this.inspectSignature(name, declaration, docs, problems);
-      await this.inspectDocsAsync(name, docs, problems);
-    }
-    const others = declarations.filter(t => !ApiDocumentationReader.isCallable(t));
-    const first = others[0];
-    if (first !== undefined && others.every(t => ApiDocumentationReader.readDocs(t).length === 0))
-      problems.push(`${this.locate(first)}: ${owner} has no JSDoc`);
-    for (const declaration of others)
-      await this.inspectDocsAsync(owner, ApiDocumentationReader.readDocs(declaration), problems);
-  }
-
-  private inspectSignature(name: string, declaration: SignatureDeclaration, docs: readonly JSDoc[], problems: string[]): void {
-    const at = this.locate(declaration);
+  private static inspectSignature(shown: string, name: string, declaration: SignatureDeclaration, docs: readonly JSDoc[], problems: string[]): void {
+    const at = ApiDocumentationReader.locate(shown, declaration);
     const tags = docs.flatMap(t => [...t.tags ?? []]);
     const documented = tags.filter(t => isJSDocParameterTag(t)).map(t => t.name.getText());
     const parameters = declaration.parameters.map(t => t.name.getText()).filter(t => t !== ApiDocumentationReader.THIS_PARAMETER);
@@ -118,29 +99,50 @@ export default class ApiDocumentationReader {
       problems.push(`${at}: ${name} has a @returns, but no result`);
   }
 
-  private async inspectDocsAsync(name: string, docs: readonly JSDoc[], problems: string[]): Promise<void> {
+  private async inspectAsync(shown: string, owner: string, declarations: readonly Node[], problems: string[]): Promise<void> {
+    const callables = declarations.filter(t => ApiDocumentationReader.isCallable(t));
+    for (const [index, declaration] of callables.entries()) {
+      const name = callables.length === 1 ? owner : `${owner} overload ${index + 1}`;
+      const docs = ApiDocumentationReader.readDocs(declaration);
+      if (docs.length === 0)
+        problems.push(`${ApiDocumentationReader.locate(shown, declaration)}: ${name} has no JSDoc`);
+      else
+        ApiDocumentationReader.inspectSignature(shown, name, declaration, docs, problems);
+      await this.inspectDocsAsync(shown, name, docs, problems);
+    }
+    const others = declarations.filter(t => !ApiDocumentationReader.isCallable(t));
+    const first = others[0];
+    if (first !== undefined && others.every(t => ApiDocumentationReader.readDocs(t).length === 0))
+      problems.push(`${ApiDocumentationReader.locate(shown, first)}: ${owner} has no JSDoc`);
+    for (const declaration of others)
+      await this.inspectDocsAsync(shown, owner, ApiDocumentationReader.readDocs(declaration), problems);
+  }
+
+  private async inspectDocsAsync(shown: string, name: string, docs: readonly JSDoc[], problems: string[]): Promise<void> {
     for (const doc of docs) {
       const file = doc.getSourceFile();
       if (file.getLineAndCharacterOfPosition(doc.getStart(file)).line === file.getLineAndCharacterOfPosition(doc.end).line)
-        problems.push(`${this.locate(doc)}: ${name} has a single-line JSDoc`);
+        problems.push(`${ApiDocumentationReader.locate(shown, doc)}: ${name} has a single-line JSDoc`);
+      if (ApiDocumentationReader.isEmpty(doc.comment) && (doc.tags ?? []).length === 0)
+        problems.push(`${ApiDocumentationReader.locate(shown, doc)}: ${name} has an empty JSDoc`);
       const comments: JSDocComment[] = [...doc.comment];
       for (const tag of doc.tags ?? []) {
         const first = tag.comment?.[0];
         if (ApiDocumentationReader.isEmpty(tag.comment))
-          problems.push(`${this.locate(tag)}: ${name} has an empty @${tag.tagName.text}`);
+          problems.push(`${ApiDocumentationReader.locate(shown, tag)}: ${name} has an empty @${tag.tagName.text}`);
         else if (isJSDocParameterTag(tag) && first !== undefined && isJSDocText(first) && first.text.startsWith(ApiDocumentationReader.HYPHEN))
-          problems.push(`${this.locate(tag)}: ${name} has a hyphen after @param ${tag.name.getText()}`);
+          problems.push(`${ApiDocumentationReader.locate(shown, tag)}: ${name} has a hyphen after @param ${tag.name.getText()}`);
         comments.push(...tag.comment ?? []);
       }
       for (const link of comments)
-        await this.inspectLinkAsync(name, link, problems);
+        await this.inspectLinkAsync(shown, name, link, problems);
     }
   }
 
-  private async inspectLinkAsync(name: string, comment: JSDocComment, problems: string[]): Promise<void> {
+  private async inspectLinkAsync(shown: string, name: string, comment: JSDocComment, problems: string[]): Promise<void> {
     if (!isJSDocLink(comment) && !isJSDocLinkCode(comment) && !isJSDocLinkPlain(comment))
       return;
     if (comment.name === undefined || await this.project.checker.getSymbolAtLocation(comment.name) === undefined)
-      problems.push(`${this.locate(comment)}: ${name} has a link that does not resolve: ${comment.getText()}`);
+      problems.push(`${ApiDocumentationReader.locate(shown, comment)}: ${name} has a link that does not resolve: ${comment.getText()}`);
   }
 }

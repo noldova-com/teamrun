@@ -47,7 +47,7 @@ class ApiDocumentationCheckTests {
   ].join("\n");
 
   public static register(): void {
-    test("a part whose public members are documented passes, and a package fails until its protected members are documented too", async t => {
+    test("a part whose public members are documented passes, and a package fails at its source declarations' line until its protected members are documented too", async t => {
       const fixture = await ApiPackageFixture.createAsync();
       t.after(() => fixture.disposeAsync());
       await fixture.writePartAsync("src/shell/counter", ApiDocumentationCheckTests.IMPLEMENTATION, ApiDocumentationCheckTests.DECLARATIONS);
@@ -55,7 +55,7 @@ class ApiDocumentationCheckTests {
       const output = new TextOutputFixture();
 
       assert.equal(await ApiDocumentationCheckTests.createCheck(fixture, ["src/shell/counter"]).runAsync(output), false);
-      assert.equal(output.text, "src/foundation/counter:\n  node_modules/@noldova/teamrun-foundation-counter/api/index.d.ts:5: Counter#step has no JSDoc\nsrc/shell/counter: documents every public member\n");
+      assert.equal(output.text, "src/foundation/counter:\n  src/foundation/counter/src/api/index.d.ts:5: Counter#step has no JSDoc\nsrc/shell/counter: documents every public member\n");
 
       const documented = ApiDocumentationCheckTests.DECLARATIONS.replace("  protected step: number;", "  /**\n   * The step.\n   */\n  protected step: number;");
       await fixture.writePackageAsync("counter", ApiDocumentationCheckTests.IMPLEMENTATION, documented);

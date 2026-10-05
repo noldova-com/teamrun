@@ -7,6 +7,7 @@
  */
 
 import assert from "node:assert/strict";
+import path from "node:path";
 import { test } from "node:test";
 
 import ApiDocumentationReader from "../../api/api-documentation.reader.ts";
@@ -114,6 +115,10 @@ class ApiDocumentationReaderTests {
     "   */",
     "  const meter: string;",
     "}",
+    "/**",
+    " * A size.",
+    " */",
+    "export type Size<T> = T | number;",
     ""
   ];
 
@@ -136,6 +141,7 @@ class ApiDocumentationReaderTests {
       const lines = [
         "export declare function top(): void;",
         "export declare const limit: number;",
+        "export type Size<T> = T | number;",
         "export declare enum Kind {",
         "  First = 0",
         "}",
@@ -162,6 +168,7 @@ class ApiDocumentationReaderTests {
       assert.deepEqual([...problems].sort(), [
         at("export declare function top(): void;", "top"),
         at("export declare const limit: number;", "limit"),
+        at("export type Size<T> = T | number;", "Size"),
         at("export declare enum Kind {", "Kind"),
         at("  First = 0", "Kind.First"),
         at("export interface IContract<T> {", "IContract"),
@@ -273,13 +280,42 @@ class ApiDocumentationReaderTests {
       ]);
     });
 
+    test("a JSDoc without text or tags is refused as empty", async t => {
+      const lines = [
+        "/**",
+        " * Shapes.",
+        " */",
+        "export declare class Shape {",
+        "  /**",
+        "   */",
+        "  public readonly blank: number;",
+        "}",
+        ""
+      ];
+
+      const problems = await ApiDocumentationReaderTests.readAsync(t, lines, ApiVisibility.PUBLIC);
+
+      assert.deepEqual(problems, [`${ApiDocumentationReaderTests.locate(lines, "  /**")}: Shape#blank has an empty JSDoc`]);
+    });
+
+    test("problems are reported at the source the declarations were copied from, relative to the root", async t => {
+      const fixture = await ApiPackageFixture.createAsync();
+      t.after(() => fixture.disposeAsync());
+      const files = { "index.d.ts": "export declare const bare: number;\n" };
+      const source = path.join(fixture.directory, "src", "foundation", "shapes", "src", "api", "index.d.ts");
+
+      const problems = await ApiSessionFixture.useAsync(fixture, files, (project, locate) => new ApiDocumentationReader(project, ApiVisibility.PUBLIC, fixture.directory).readAsync(locate("index.d.ts"), source));
+
+      assert.deepEqual(problems, ["src/foundation/shapes/src/api/index.d.ts:1: bare has no JSDoc"]);
+    });
+
     test("a file outside the project is refused", async t => {
       const fixture = await ApiPackageFixture.createAsync();
       t.after(() => fixture.disposeAsync());
       const files = { "index.d.ts": ApiDocumentationReaderTests.DOCUMENTED.join("\n"), "other.d.ts": "export {};\n" };
 
       await ApiSessionFixture.useAsync(fixture, files, async (project, locate) => {
-        await assert.rejects(new ApiDocumentationReader(project, ApiVisibility.PUBLIC, fixture.directory).readAsync(locate("missing.d.ts")),
+        await assert.rejects(new ApiDocumentationReader(project, ApiVisibility.PUBLIC, fixture.directory).readAsync(locate("missing.d.ts"), locate("missing.d.ts")),
           new ApiException(`${locate("missing.d.ts")} is not an ES module of the project.`));
       });
     });
@@ -295,7 +331,7 @@ class ApiDocumentationReaderTests {
     const fixture = await ApiPackageFixture.createAsync();
     t.after(() => fixture.disposeAsync());
     const files = { "other.d.ts": "export declare function shared(): void;\n", "index.d.ts": lines.join("\n") };
-    return await ApiSessionFixture.useAsync(fixture, files, (project, locate) => new ApiDocumentationReader(project, visibility, fixture.directory).readAsync(locate("index.d.ts")));
+    return await ApiSessionFixture.useAsync(fixture, files, (project, locate) => new ApiDocumentationReader(project, visibility, fixture.directory).readAsync(locate("index.d.ts"), locate("index.d.ts")));
   }
 }
 

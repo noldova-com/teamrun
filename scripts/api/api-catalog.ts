@@ -39,12 +39,12 @@ export default class ApiCatalog {
     return [...packages, ...this.parts.map(t => ApiPackage.forPart(this.root, t, this.angular.projectFile, paths))];
   }
 
-  public async inspectEachAsync(output: Writable, nothing: string, verdict: string, inspectAsync: (apiPackage: ApiPackage) => Promise<readonly string[]>): Promise<boolean> {
+  public async inspectEachAsync(output: Writable, noPackages: string, verdict: string, inspectAsync: (apiPackage: ApiPackage) => Promise<readonly string[]>): Promise<boolean> {
     const apiPackages = await this.listOrReportAsync(output);
     if (apiPackages === undefined)
       return false;
     if (apiPackages.length === 0) {
-      output.write(nothing);
+      output.write(noPackages);
       return true;
     }
     let passed = true;

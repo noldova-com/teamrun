@@ -24,18 +24,20 @@ export default class ApiPackage {
   public readonly project: string;
   public readonly implementation: string;
   public readonly declarations: string;
+  public readonly source: string;
   public readonly missingDeclarationsMessage: string;
   public readonly visibility: ApiVisibility;
   public readonly exampleRoot: string;
   public readonly paths?: Readonly<Record<string, readonly string[]>>;
 
-  private constructor(directory: string, id: string, project: string, implementation: string, declarations: string, missingDeclarationsMessage: string,
+  private constructor(directory: string, id: string, project: string, implementation: string, declarations: string, source: string, missingDeclarationsMessage: string,
     visibility: ApiVisibility, exampleRoot: string, paths?: Readonly<Record<string, readonly string[]>>) {
     this.directory = directory;
     this.id = id;
     this.project = project;
     this.implementation = implementation;
     this.declarations = declarations;
+    this.source = source;
     this.missingDeclarationsMessage = missingDeclarationsMessage;
     this.visibility = visibility;
     this.exampleRoot = exampleRoot;
@@ -46,13 +48,14 @@ export default class ApiPackage {
   public static forPackage(layout: BuildLayout, manifest: PackageManifest): ApiPackage {
     const declarations = path.join(layout.locateInstalled(manifest), ...ApiPackage.DECLARATIONS);
     return new ApiPackage(manifest.directory, manifest.id, layout.locateSource(manifest, ApiPackage.SOURCE_FOLDER, ApiPackage.PROJECT_FILE),
-      layout.locateSource(manifest, ApiPackage.SOURCE_FOLDER, ...ApiPackage.IMPLEMENTATION), declarations, `no installed declarations at ${declarations}; build the packages first`,
+      layout.locateSource(manifest, ApiPackage.SOURCE_FOLDER, ...ApiPackage.IMPLEMENTATION), declarations,
+      layout.locateSource(manifest, ApiPackage.SOURCE_FOLDER, ...ApiPackage.DECLARATIONS), `no installed declarations at ${declarations}; build the packages first`,
       ApiVisibility.PUBLIC_AND_PROTECTED, layout.root);
   }
 
   public static forPart(root: string, directory: string, project: string, paths: Readonly<Record<string, readonly string[]>>): ApiPackage {
     const declarations = ApiPackage.locatePartDeclarations(root, directory);
-    return new ApiPackage(directory, directory.split("/").slice(1).join("-"), project, ApiPackage.locatePartImplementation(root, directory), declarations,
+    return new ApiPackage(directory, directory.split("/").slice(1).join("-"), project, ApiPackage.locatePartImplementation(root, directory), declarations, declarations,
       `no declarations at ${declarations}`, ApiVisibility.PUBLIC, path.join(path.dirname(project), ...ApiPackage.PART_EXAMPLE_ROOT), paths);
   }
 

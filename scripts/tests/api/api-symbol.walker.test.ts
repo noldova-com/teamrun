@@ -20,6 +20,7 @@ class ApiSymbolWalkerTests {
     "export { shared } from \"./other.js\";",
     "export declare function top(): void;",
     "export declare const limit: number;",
+    "export type Size<T> = T | number;",
     "export declare enum Kind {",
     "  First = 0",
     "}",
@@ -44,7 +45,7 @@ class ApiSymbolWalkerTests {
   ].join("\n");
 
   public static register(): void {
-    test("a public walk visits every export and member under a readable path, once each, and skips private, protected, foreign and type parameter symbols", async t => {
+    test("a public walk visits every export, type alias included, and member under a readable path, once each, and skips private, protected, foreign and type parameter symbols", async t => {
       const visited = await ApiSymbolWalkerTests.walkAsync(t, ApiVisibility.PUBLIC);
 
       assert.deepEqual(visited, [
@@ -59,6 +60,7 @@ class ApiSymbolWalkerTests {
         "Shape#size: 2 declarations",
         "Shape.constructor",
         "Shape.create",
+        "Size",
         "Tools",
         "Tools.meter",
         "limit",

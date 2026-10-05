@@ -6,18 +6,17 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync } from "node:fs";
 import { rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
 import type ApiCatalog from "../api/api-catalog.ts";
+import ApiDeclarationSession from "../api/api-declaration-session.ts";
 import type ApiExample from "../api/api-example.ts";
 import ApiExampleReader from "../api/api-example.reader.ts";
 import type ApiExamples from "../api/api-examples.ts";
 import type ApiPackage from "../api/api-package.ts";
 import ApiProject from "../api/api-project.ts";
-import ApiServer from "../api/api-server.ts";
 import ApiException from "../api/api.exception.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import LicenseHeader from "../structure/license-header.ts";
@@ -38,7 +37,7 @@ export default class ApiExampleCheck implements ICheck {
   private readonly root: string;
   private readonly catalog: ApiCatalog;
   private readonly runner: ProcessRunner;
-  private readonly server: readonly string[];
+  private readonly session: ApiDeclarationSession;
   private readonly timeout: number;
 
   public readonly title: string = "API examples";
@@ -47,7 +46,7 @@ export default class ApiExampleCheck implements ICheck {
     this.root = root;
     this.catalog = catalog;
     this.runner = runner;
-    this.server = [...server];
+    this.session = new ApiDeclarationSession(root, server, timeout);
     this.timeout = timeout;
   }
 
@@ -64,12 +63,8 @@ export default class ApiExampleCheck implements ICheck {
   }
 
   private async inspectAsync(apiPackage: ApiPackage): Promise<readonly string[]> {
-    if (!existsSync(apiPackage.declarations))
-      return [apiPackage.missingDeclarationsMessage];
     try {
-      const reading = new ApiProject(this.root, `${ApiExampleCheck.PURPOSE}-reading`, apiPackage.id);
-      await reading.writeAsync(apiPackage.project, this.root, [apiPackage.declarations]);
-      const found = await ApiServer.useAsync(this.server, this.root, reading.file, this.timeout,
+      const found = await this.session.useAsync(apiPackage, `${ApiExampleCheck.PURPOSE}-reading`,
         t => new ApiExampleReader(t, apiPackage.visibility).readAsync(apiPackage.declarations));
       return [...found.undocumented.map(t => `${t} has no @example`), ...await this.compileAsync(apiPackage, found)];
     }
