@@ -8,6 +8,7 @@
 
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
+import { FailureCode } from "@noldova/teamrun-shell-protocol";
 
 export class RuntimeRequestException extends Exception {
   public readonly code: string;
@@ -18,5 +19,15 @@ export class RuntimeRequestException extends Exception {
     this.code = code;
     if (!Object.isUndefined(details))
       this.details = details;
+  }
+
+  public static isDisconnected(error: unknown): boolean {
+    let current: unknown = error;
+    while (current instanceof Error) {
+      if (current instanceof RuntimeRequestException && current.code === FailureCode.Disconnected)
+        return true;
+      current = current.cause;
+    }
+    return false;
   }
 }

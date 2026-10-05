@@ -65,6 +65,20 @@ describe("NotificationService", () => {
     ]);
   });
 
+  it("reports nothing when a read fails because the connection to the runtime ended, and reads again once ready", async () => {
+    bridge.responses.set("shell.notifications", { failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
+    const service = start();
+    await settleAsync(() => bridge.requests.some(t => t[0] === "shell.notifications"));
+
+    bridge.responses.set("shell.notifications", { payload: state(false, notification(1, "First", false)) });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await settleAsync(() => service.state().notifications.length === 1);
+
+    expect(bridge.requests.filter(t => t[0] === "shell.notifications").length).toBe(2);
+    expect(errors).toEqual([]);
+  });
+
   it("reports a first read that fails", async () => {
     bridge.responses.set("shell.notifications", { failure: { code: "Unavailable", message: "Not connected." } });
 

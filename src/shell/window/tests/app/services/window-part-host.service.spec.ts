@@ -16,6 +16,7 @@ import { ModuleState, type ModuleStatus, NotificationPost, NotificationSeverity,
 import { ModulesComponent } from "../../../src/app/components/modules/modules.component";
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
 import { DockSide } from "../../../src/app/enums/dock-side";
+import { RuntimeRequestException } from "../../../src/app/exceptions/runtime-request.exception";
 import { WindowPartFailureException } from "../../../src/app/exceptions/window-part-failure.exception";
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
@@ -457,7 +458,7 @@ describe("WindowPartHostService", () => {
 
   it("still loads the layout when the runtime does not answer with its modules", async () => {
     TestBed.configureTestingModule({ providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }] });
-    bridge.responses.set("shell.modules", { failure: { code: "Unavailable", message: "TeamRun is not connected to its runtime." } });
+    bridge.responses.set("shell.modules", { failure: { code: "Unavailable", message: "The runtime did not answer shell.modules in time." } });
     const layout = TestBed.inject(LayoutService);
     const loaded = vi.spyOn(layout, "loadAsync");
     const host = TestBed.inject(WindowPartHostService);
@@ -465,7 +466,7 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(loaded).toHaveBeenCalledTimes(1));
 
     expect([host.generation(), host.failures()]).toEqual([1, []]);
-    expect(errors.map(t => (t as Error).message)).toEqual(["TeamRun is not connected to its runtime."]);
+    expect(errors.map(t => (t as Error).message)).toEqual(["The runtime did not answer shell.modules in time."]);
   });
 
   it("opens documents asked for during activation after the layout loads, reports refused ones, and opens later ones at once", async () => {
@@ -745,7 +746,7 @@ describe("WindowPartHostService", () => {
     const isHeld = await Promise.all(handles.map(t => t.updateAsync(saved)));
     bridge.responses.set("shell.updateNotification", { failure: { code: "NotFound", message: "Notification n1 is gone; it was dismissed or its module stopped." } });
     const isGone = await Promise.all(handles.map(t => t.updateAsync(saved)));
-    bridge.responses.set("shell.updateNotification", { failure: { code: "Unavailable", message: "TeamRun is not connected to its runtime." } });
+    bridge.responses.set("shell.updateNotification", { failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
     const refusal = host.updateNotificationAsync("n2", saved);
     await expect(refusal).rejects.toThrowError("TeamRun is not connected to its runtime.");
     bridge.responses.set("shell.modules", { payload: { modules: [status("notes", ModuleState.Failed, "It broke.")] } });
@@ -853,6 +854,81 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(host.generation()).toBe(2));
 
     expect(log).toEqual(["activate notes", "reconnect notes"]);
+    expect(errors).toEqual([]);
+  });
+
+  it("keeps a part whose reconnection failed because the connection ended before the window heard so, reports nothing and asks it again once ready", async () => {
+    const notes = notesPart(log);
+    const { host } = start([source("notes", notes)], [status("notes")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    let isDropping = true;
+    notes.onReconnect = () => {
+      if (!isDropping)
+        return true;
+      isDropping = false;
+      throw new Error("Its options were not read.", { cause: new RuntimeRequestException("Disconnected", "TeamRun is not connected to its runtime.") });
+    };
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(log).toEqual(["activate notes", "reconnect notes"]));
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(log).toEqual(["activate notes", "reconnect notes", "reconnect notes"]);
+    expect([errors, host.failures()]).toEqual([[], []]);
+  });
+
+  it("keeps its parts and reports nothing when the runtime's modules are not read because the connection ended before the window heard so", async () => {
+    const notes = notesPart(log);
+    notes.onReconnect = () => true;
+    const { host } = start([source("notes", notes)], [status("notes")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    bridge.responses.set("shell.modules", { failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(bridge.requests.filter(t => t[0] === "shell.modules").length).toBe(2));
+    bridge.responses.set("shell.modules", { payload: { modules: [status("notes")] } });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(log).toEqual(["activate notes", "reconnect notes"]);
+    expect([errors, host.failures()]).toEqual([[], []]);
+  });
+
+  it("activates a part again once ready when its activation failed because the connection ended, without counting it failed", async () => {
+    let isDropping = true;
+    const notes = new FakeWindowPart("notes", log, () => {
+      if (!isDropping)
+        return;
+      isDropping = false;
+      throw new RuntimeRequestException("Disconnected", "TeamRun is not connected to its runtime.");
+    });
+    const { host } = start([source("notes", notes)], [status("notes")]);
+    await vi.waitFor(() => expect(log).toEqual(["activate notes"]));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    expect(log).toEqual(["activate notes", "activate notes"]);
+    expect([errors, host.failures()]).toEqual([[], []]);
+  });
+
+  it("loads the saved layout once ready again when reading it failed because the connection ended", async () => {
+    const read = vi.spyOn(bridge, "readLayout").mockResolvedValueOnce({ failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
+    const { host, loads } = start([], []);
+    await vi.waitFor(() => expect(loads.length).toBe(1));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    await vi.waitFor(() => expect(loads.length).toBe(2));
+    expect(read).toHaveBeenCalledTimes(2);
     expect(errors).toEqual([]);
   });
 

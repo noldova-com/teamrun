@@ -117,6 +117,12 @@ export declare enum FailureCode {
   Unavailable = "Unavailable",
 
   /**
+   * The client has no connection to the runtime, or the connection ended
+   * before the answer. Clients produce it; the runtime never sends it.
+   */
+  Disconnected = "Disconnected",
+
+  /**
    * The runtime failed unexpectedly.
    */
   Internal = "Internal"

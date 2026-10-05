@@ -254,7 +254,7 @@ export class WindowPartHostService implements IWindowPartHost {
         return;
     }
     catch (error) {
-      if (!this.isConnected(connection))
+      if (!this.isConnected(connection) || RuntimeRequestException.isDisconnected(error))
         return;
       this.errors.handleError(error);
       await this.deactivateAsync(this.activations.slice());
@@ -272,6 +272,10 @@ export class WindowPartHostService implements IWindowPartHost {
       this.generationValue.update(t => t + 1);
       if (!isReconnect && await this.loadLayoutAsync())
         openAtStart = (...t) => this.opener.restoreSaved(...t);
+    }
+    catch (error) {
+      if (!RuntimeRequestException.isDisconnected(error))
+        throw error;
     }
     finally {
       this.replayPending(openAtStart);
@@ -324,6 +328,8 @@ export class WindowPartHostService implements IWindowPartHost {
       return await activation.part.reconnectAsync();
     }
     catch (error) {
+      if (RuntimeRequestException.isDisconnected(error))
+        throw error;
       this.errors.handleError(new WindowPartFailureException(activation.context.moduleId, Resources.windowPartReconnectionFailed, error));
       return false;
     }
@@ -353,10 +359,13 @@ export class WindowPartHostService implements IWindowPartHost {
 
   private async loadLayoutAsync(): Promise<boolean> {
     try {
-      return await this.layout.loadAsync();
-    }
-    finally {
+      const isRestored = await this.layout.loadAsync();
       this.isLayoutLoaded = true;
+      return isRestored;
+    }
+    catch (error) {
+      this.isLayoutLoaded = !RuntimeRequestException.isDisconnected(error);
+      throw error;
     }
   }
 
@@ -440,6 +449,8 @@ export class WindowPartHostService implements IWindowPartHost {
     catch (error) {
       this.activations.splice(this.activations.indexOf(activation), 1);
       activation.context.withdraw();
+      if (RuntimeRequestException.isDisconnected(error))
+        throw error;
       this.errors.handleError(new WindowPartFailureException(status.id, Resources.windowPartActivationFailed, error));
       return status.withState(ModuleState.Failed, Resources.windowPartActivationFailed);
     }

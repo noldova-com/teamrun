@@ -90,9 +90,23 @@ describe("RecentCommandsService", () => {
     expect(bridge.requests.filter(t => t[0] === "shell.recordCommand")).toEqual([["shell.recordCommand", { id: "notes.newNote" }]]);
   });
 
+  it("reports nothing when a read fails because the connection to the runtime ended, and reads again once ready", async () => {
+    bridge.responses.set("shell.recentCommands", { failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
+    const service = start();
+    await settleAsync(() => bridge.requests.some(t => t[0] === "shell.recentCommands"));
+
+    bridge.responses.set("shell.recentCommands", { payload: { ids: ["clock.show"] } });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await settleAsync(() => service.ids().length === 1);
+
+    expect(bridge.requests.filter(t => t[0] === "shell.recentCommands").length).toBe(2);
+    expect(errors).toEqual([]);
+  });
+
   it("reports a list it cannot read, an event it cannot understand and a use it cannot record", async () => {
     bridge.responses.set("shell.recentCommands", { failure: { code: "Unavailable", message: "Not connected." } });
-    bridge.responses.set("shell.recordCommand", { failure: { code: "Unavailable", message: "Not connected." } });
+    bridge.responses.set("shell.recordCommand", { failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
     const service = start();
     await settleAsync(() => errors.length === 1);
 
