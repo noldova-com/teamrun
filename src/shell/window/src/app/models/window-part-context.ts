@@ -32,7 +32,7 @@ export class WindowPartContext implements IWindowPartContext {
   private readonly host: IWindowPartHost;
   private readonly owners: readonly string[];
   private readonly source: WindowPartSource;
-  private readonly notificationIds: Set<number> = new Set();
+  private readonly notifications: Set<NotificationHandle> = new Set();
   private readonly commandList: CommandContribution[] = [];
   private readonly statusBarItemList: StatusBarItem[] = [];
   private readonly topBarActionList: TopBarAction[] = [];
@@ -140,8 +140,9 @@ export class WindowPartContext implements IWindowPartContext {
   public async postNotificationAsync(post: NotificationPost): Promise<NotificationHandle> {
     this.requireNotification(post);
     const id = await this.host.postNotificationAsync(post);
-    this.notificationIds.add(id);
-    return new NotificationHandle(id, t => this.updateNotificationAsync(id, t), () => this.dismissNotification(id));
+    const handle: NotificationHandle = new NotificationHandle(id, t => this.updateNotificationAsync(handle, t), () => this.dismissNotification(handle));
+    this.notifications.add(handle);
+    return handle;
   }
 
   public openDocument(name: string, instance: string, title: string, options: IDocumentOptions = {}): void {
@@ -209,8 +210,8 @@ export class WindowPartContext implements IWindowPartContext {
     this.viewList.length = 0;
     this.documentList.length = 0;
     this.commandList.length = 0;
-    for (const id of [...this.notificationIds])
-      this.dismissNotification(id);
+    for (const handle of [...this.notifications])
+      this.dismissNotification(handle);
     for (const view of [...this.badgedViews])
       this.host.setViewBadge(view, null);
     this.badgedViews.clear();
@@ -220,22 +221,22 @@ export class WindowPartContext implements IWindowPartContext {
   }
 
   public forgetNotifications(): void {
-    this.notificationIds.clear();
+    this.notifications.clear();
   }
 
   public isAllowed(name: string): boolean {
     return this.owners.includes(name.substring(0, name.indexOf(Resources.contributionSeparator)));
   }
 
-  private async updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
+  private async updateNotificationAsync(handle: NotificationHandle, post: NotificationPost): Promise<void> {
     this.requireNotification(post);
-    if (this.notificationIds.has(id))
-      await this.host.updateNotificationAsync(id, post);
+    if (this.notifications.has(handle))
+      await this.host.updateNotificationAsync(handle.id, post);
   }
 
-  private dismissNotification(id: number): void {
-    if (this.notificationIds.delete(id))
-      this.host.dismissNotification(id);
+  private dismissNotification(handle: NotificationHandle): void {
+    if (this.notifications.delete(handle))
+      this.host.dismissNotification(handle.id);
   }
 
   private requireNotification(post: NotificationPost): void {

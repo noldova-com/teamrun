@@ -64,6 +64,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
   private readonly activations: WindowPartActivation[] = [];
+  private readonly contexts: Set<WindowPartContext> = new Set();
   private readonly posting: Set<Promise<JsonValue>> = new Set();
   private startOpens: PendingDocument[] = [];
   private pendingOpens: PendingDocument[] = [];
@@ -106,7 +107,7 @@ export class WindowPartHostService implements IWindowPartHost {
   }
 
   public findFailure(tab: Tab): ModuleFailure | null {
-    return tab instanceof ViewTab ? this.failuresValue().find(t => t.viewNames.includes(tab.name)) ?? null : null;
+    return tab instanceof ViewTab ? this.findFailures().find(t => t.viewNames.includes(tab.name)) ?? null : null;
   }
 
   public revisionOf(tab: Tab): number {
@@ -208,12 +209,13 @@ export class WindowPartHostService implements IWindowPartHost {
     ]));
     const ordered = this.moduleOrder.flatMap(t => this.activations.filter(u => u.context.moduleId === t));
     this.bars.set(ordered.flatMap(t => t.context.statusBarItems), ordered.flatMap(t => t.context.topBarActions));
-    const notStarted = new Set(this.failuresValue().map(t => t.moduleId));
+    const failures = this.findFailures();
+    const notStarted = new Set(failures.map(t => t.moduleId));
     this.menus.setActiveModules(this.moduleOrder.filter(t => !notStarted.has(t)));
     const views = this.activations.flatMap(t => t.context.views);
     for (const view of views)
       this.labels.register(view.name, new TabLabel(view.title, view.icon));
-    const failed = this.failuresValue().flatMap(t => t.viewNames.map(u => ({ name: u, failure: t })));
+    const failed = failures.flatMap(t => t.viewNames.map(u => ({ name: u, failure: t })));
     for (const view of failed)
       this.labels.register(view.name, new TabLabel(view.failure.displayName, Resources.moduleFailureGlyph));
     this.layout.setRegistry(new ViewRegistry(
@@ -225,8 +227,8 @@ export class WindowPartHostService implements IWindowPartHost {
     if (!state.isReady)
       this.runtimeStates.set(null);
     if (!state.isReady && this.isReady)
-      for (const activation of this.activations)
-        activation.context.forgetNotifications();
+      for (const context of this.contexts)
+        context.forgetNotifications();
     if (state.isReady && !this.isReady) {
       const connection = ++this.connection;
       this.reloading = this.reloading.then(() => this.reloadAsync(connection)).catch((error: unknown) => this.errors.handleError(error));
@@ -251,7 +253,7 @@ export class WindowPartHostService implements IWindowPartHost {
         return;
       this.errors.handleError(error);
       await this.deactivateAsync(this.activations.slice());
-      this.failuresValue.set([]);
+      this.setFailures([]);
       this.moduleOrder = [];
       this.runtimeCommands = [];
     }
@@ -279,7 +281,6 @@ export class WindowPartHostService implements IWindowPartHost {
     const kept = await this.reconnectPartsAsync(report.modules, connection);
     if (!this.isConnected(connection))
       return false;
-    this.failuresValue.set([]);
     this.moduleOrder = report.modules.map(t => t.id);
     this.applyCommands(commands);
     this.runtimeCommands = commands.commands.map(t => this.describeRuntimeCommand(t));
@@ -295,7 +296,7 @@ export class WindowPartHostService implements IWindowPartHost {
       statuses.push(result);
     }
     this.statuses.set(statuses);
-    this.failuresValue.set(statuses.filter(t => t.state !== ModuleState.Active).map(t => this.describeFailure(t)));
+    this.setFailures(statuses.filter(t => t.state !== ModuleState.Active).map(t => this.describeFailure(t)));
     return this.isConnected(connection);
   }
 
@@ -321,6 +322,21 @@ export class WindowPartHostService implements IWindowPartHost {
       this.errors.handleError(new WindowPartFailureException(activation.context.moduleId, Resources.windowPartReconnectionFailed, error));
       return false;
     }
+  }
+
+  private findFailures(): readonly ModuleFailure[] {
+    return this.failuresValue().filter(t => !this.activations.some(u => u.context.moduleId === t.moduleId));
+  }
+
+  private setFailures(failures: readonly ModuleFailure[]): void {
+    const previous = this.failuresValue();
+    for (const id of new Set([...previous, ...failures].map(t => t.moduleId))) {
+      const before = previous.find(t => t.moduleId === id);
+      const after = failures.find(t => t.moduleId === id);
+      if (before?.state !== after?.state || before?.cause !== after?.cause)
+        this.changedModules.add(id);
+    }
+    this.failuresValue.set(failures);
   }
 
   private revise(): void {
@@ -412,13 +428,14 @@ export class WindowPartHostService implements IWindowPartHost {
 
     const activation = new WindowPartActivation(source, new WindowPartContext(source, this), part);
     this.activations.push(activation);
+    this.contexts.add(activation.context);
     this.changedModules.add(status.id);
     try {
       await part.activateAsync(activation.context);
     }
     catch (error) {
       this.activations.splice(this.activations.indexOf(activation), 1);
-      activation.context.withdraw();
+      this.withdraw(activation);
       this.errors.handleError(new WindowPartFailureException(status.id, Resources.windowPartActivationFailed, error));
       return status.withState(ModuleState.Failed, Resources.windowPartActivationFailed);
     }
@@ -436,8 +453,13 @@ export class WindowPartHostService implements IWindowPartHost {
         this.errors.handleError(error);
       }
       finally {
-        activation.context.withdraw();
+        this.withdraw(activation);
       }
     }
+  }
+
+  private withdraw(activation: WindowPartActivation): void {
+    activation.context.withdraw();
+    this.contexts.delete(activation.context);
   }
 }

@@ -97,7 +97,7 @@ export class NotesWindowPart implements IWindowPart {
     context.provideMenuGroup("notes.mainRecent", () => [1, 2].map(week => new MenuRowContribution("notes.openNote", { week, title: `Week ${week}` }, `Week ${week}`)));
     context.registerTopBarAction(new TopBarActionContribution("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote")));
     context.registerTopBarAction(new TopBarActionContribution("notes.back", new TopBarActionState("arrow_back", "Back", "notes.sortByWeek"), TopBarSide.Start));
-    this.connectAsync = () => NotesWindowPart.connectAsync(context, counter);
+    this.connectAsync = () => NotesWindowPart.readRuntimeAsync(context, counter);
     const options = await this.connectAsync();
     if (!options.readBoolean("isMany"))
       return;
@@ -117,7 +117,7 @@ export class NotesWindowPart implements IWindowPart {
   public async deactivateAsync(): Promise<void> {
   }
 
-  private static async connectAsync(context: IWindowPartContext, counter: StatusBarItem): Promise<JsonReader> {
+  private static async readRuntimeAsync(context: IWindowPartContext, counter: StatusBarItem): Promise<JsonReader> {
     await context.postNotificationAsync(new NotificationPost(
       QualifiedName.parse("notes.saveFailed"), null, "Note 2 couldn't be saved", "The disk is full.", NotificationSeverity.Error, null,
       [new NotificationAction("New note", new CommandRun(QualifiedName.parse("notes.newNote"), null))], null));

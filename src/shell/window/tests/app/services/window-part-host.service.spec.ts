@@ -61,6 +61,7 @@ class FakeWindowPart implements IWindowPart {
   public readonly moduleId: string;
   public isDeactivationFailing: boolean = false;
   public onReconnect: () => boolean = () => false;
+  public onDeactivate: () => void = () => undefined;
 
   public constructor(moduleId: string, log: string[], onActivate: (context: IWindowPartContext) => void = () => undefined) {
     this.moduleId = moduleId;
@@ -82,6 +83,7 @@ class FakeWindowPart implements IWindowPart {
 
   public deactivateAsync(): Promise<void> {
     this.log.push(`deactivate ${this.moduleId}`);
+    this.onDeactivate();
     return this.isDeactivationFailing ? Promise.reject(new Error(`${this.moduleId} did not stop`)) : Promise.resolve();
   }
 }
@@ -657,18 +659,25 @@ describe("WindowPartHostService", () => {
     ]);
   });
 
-  it("withdraws a kept part whose module is no longer active, showing its views' failure, activates a module that became active and moves on no tabs of a module still failed", async () => {
+  it("withdraws a kept part whose module is no longer active, showing its views' failure, activates a module that became active, keeps the revision of a module that stays failed and moves on one whose failure changed", async () => {
+    const tabs = [new ViewTab("notes.list"), new ViewTab("clock.list"), new ViewTab("tasks.list"), new ViewTab("calendar.list")];
+    const during: [number[], (string | null)[]][] = [];
     const notes = new FakeWindowPart("notes", log, t => t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load)));
-    const clock = clockPart(log);
+    const clock = new FakeWindowPart("clock", log, t => {
+      t.registerView(new ViewContribution("clock.list", "Clock", "schedule", DockSide.Right, true, load));
+      const host = TestBed.inject(WindowPartHostService);
+      during.push([tabs.map(u => host.revisionOf(u)), tabs.map(u => host.findFailure(u)?.cause ?? null)]);
+    });
     notes.onReconnect = () => true;
-    const tabs = [new ViewTab("notes.list"), new ViewTab("clock.list"), new ViewTab("tasks.list")];
     const { host } = start(
-      [source("notes", notes), source("clock", clock), source("tasks", new FakeWindowPart("tasks", log))],
-      [status("notes"), status("clock", ModuleState.Failed, "It broke."), status("tasks", ModuleState.Failed, "It is broken.")]);
+      [source("notes", notes), source("clock", clock), source("tasks", new FakeWindowPart("tasks", log)), source("calendar", new FakeWindowPart("calendar", log))],
+      [status("notes"), status("clock", ModuleState.Failed, "It broke."), status("tasks", ModuleState.Failed, "It is broken."), status("calendar", ModuleState.Blocked, "It waits.")]);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
     const revisions = tabs.map(t => host.revisionOf(t));
 
-    bridge.responses.set("shell.modules", { payload: { modules: [status("notes", ModuleState.Failed, "It broke too."), status("clock"), status("tasks", ModuleState.Failed, "It is broken.")] } });
+    bridge.responses.set("shell.modules", { payload: { modules: [
+      status("notes", ModuleState.Failed, "It broke too."), status("clock"), status("tasks", ModuleState.Failed, "It is broken."), status("calendar", ModuleState.Failed, "It broke.")
+    ] } });
     bridge.publishStartup({ kind: "Connecting", details: [] });
     bridge.publishStartup({ kind: "Ready", details: [] });
     await vi.waitFor(() => expect(host.generation()).toBe(2));
@@ -677,8 +686,10 @@ describe("WindowPartHostService", () => {
     expect(host.findFailure(new ViewTab("notes.list"))?.cause).toBe("It broke too.");
     expect(host.findContribution(new ViewTab("notes.list"))).toBeNull();
     expect(host.findContribution(new ViewTab("clock.list"))?.context?.moduleId).toBe("clock");
-    expect(revisions).toEqual([1, 0, 0]);
-    expect(tabs.map(t => host.revisionOf(t))).toEqual([2, 1, 0]);
+    expect(revisions).toEqual([1, 1, 1, 1]);
+    expect(during).toEqual([[[0, 1, 1, 1], [null, null, "It is broken.", "It waits."]]]);
+    expect(tabs.map(t => host.revisionOf(t))).toEqual([2, 2, 1, 2]);
+    expect(host.findFailure(new ViewTab("calendar.list"))?.cause).toBe("It broke.");
   });
 
   it("keeps a part whose dependency has no window part, with its context", async () => {
@@ -727,6 +738,30 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(host.generation()).toBe(3));
 
     expect(log).toEqual(["activate notes", "reconnect notes", "activate clock", "reconnect clock", "deactivate notes"]);
+    expect(bridge.requests.filter(t => t[0].includes("Notification")).map(t => t[0])).toEqual(["shell.postNotification", "shell.postNotification"]);
+    expect(errors).toEqual([]);
+  });
+
+  it("forgets the notifications of a part still deactivating when the runtime drops, so its withdrawal touches none of the new runtime's", async () => {
+    bridge.responses.set("shell.postNotification", { payload: { id: 1 } });
+    bridge.responses.set("shell.dismissNotification", { payload: null });
+    const saved = new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Success, null, [], null);
+    const notes = new FakeWindowPart("notes", log, t => void t.postNotificationAsync(saved));
+    let drops = 1;
+    notes.onDeactivate = () => {
+      if (drops-- === 0)
+        return;
+      bridge.publishStartup({ kind: "Connecting", details: [] });
+      bridge.publishStartup({ kind: "Ready", details: [] });
+    };
+    const { host } = start([source("notes", notes, [], [], [], [], [], ["notes.saved"])], [status("notes")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(log).toEqual(["activate notes", "reconnect notes", "deactivate notes", "activate notes"]);
     expect(bridge.requests.filter(t => t[0].includes("Notification")).map(t => t[0])).toEqual(["shell.postNotification", "shell.postNotification"]);
     expect(errors).toEqual([]);
   });

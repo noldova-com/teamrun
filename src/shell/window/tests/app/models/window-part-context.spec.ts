@@ -36,6 +36,7 @@ class ListComponent {
 
 class FakeWindowPartHost implements IWindowPartHost {
   public readonly calls: string[] = [];
+  public postedId: number | null = null;
   public readonly listeners: Set<(name: string, payload: JsonValue) => void> = new Set();
   public readonly registered: Set<string> = new Set(["notes.taken"]);
   public readonly settingListeners: Set<(change: SettingChange) => void> = new Set();
@@ -89,7 +90,7 @@ class FakeWindowPartHost implements IWindowPartHost {
 
   public postNotificationAsync(post: NotificationPost): Promise<number> {
     this.calls.push(`post ${post.title}`);
-    return Promise.resolve(this.calls.length);
+    return Promise.resolve(this.postedId ?? this.calls.length);
   }
 
   public updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
@@ -181,6 +182,20 @@ describe("WindowPartContext", () => {
     context.withdraw();
 
     expect(host.calls).toEqual(["post Saved", "dismiss 1", "post Saved again", "post Saved later", "update 4 Saved later twice", "dismiss 4", "refresh"]);
+  });
+
+  it("keeps a forgotten handle from touching a later notification that got the same id", async () => {
+    host.postedId = 1;
+    const forgotten = await context.postNotificationAsync(notification("notes.saved", "Saved", null));
+    context.forgetNotifications();
+    const later = await context.postNotificationAsync(notification("notes.saved", "Saved again", null));
+    await forgotten.updateAsync(notification("notes.saved", "Saved twice", null));
+    forgotten.dismiss();
+    await later.updateAsync(notification("notes.saved", "Saved again twice", null));
+    later.dismiss();
+
+    expect([forgotten.id, later.id]).toEqual([1, 1]);
+    expect(host.calls).toEqual(["post Saved", "post Saved again", "update 1 Saved again twice", "dismiss 1"]);
   });
 
   it("refuses a notification of another module, an undeclared kind or another module's command, before and on update", async () => {
