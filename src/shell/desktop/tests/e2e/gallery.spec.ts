@@ -343,7 +343,7 @@ test.describe("gallery", () => {
         const first = document.createRange();
         first.selectNodeContents(find("tbody td"));
         const scope = document.createRange();
-        scope.selectNodeContents(row.children[2] ?? row);
+        scope.selectNodeContents(find("td:nth-child(3)", row));
         const label = baseline(find("td:last-child button [data-truncates]", row));
         return {
           firstLeft: first.getBoundingClientRect().left,

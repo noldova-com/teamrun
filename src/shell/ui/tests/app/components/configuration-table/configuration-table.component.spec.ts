@@ -157,8 +157,8 @@ describe("ConfigurationTableComponent", () => {
   it("scrolls sideways only once the table can shrink no further, keeping the free-text column a text field wide and leaving room for a focus outline at its edges", async () => {
     await renderAsync();
     const remove = find(".remove");
-    for (let step = 0; step < 3 && document.activeElement !== remove; step++)
-      await userEvent.tab();
+    await userEvent.tab();
+    await userEvent.tab();
     const outline = Number.parseFloat(getComputedStyle(remove).outlineWidth) + Number.parseFloat(getComputedStyle(remove).outlineOffset);
     const room = box(".tr-configuration-table-scroll").right - box(".remove").right;
 

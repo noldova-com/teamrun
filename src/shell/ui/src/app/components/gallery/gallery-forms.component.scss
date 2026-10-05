@@ -12,8 +12,8 @@
 }
 
 .tr-gallery-table {
-  width: 36rem;
-  max-width: 100%;
+  width: min(36rem, calc(100% - 2 * var(--tr-space-1)));
+  margin-inline: var(--tr-space-1);
 }
 
 .tr-gallery-narrow {
