@@ -129,6 +129,26 @@ describe("ShortcutsComponent", () => {
     DesktopBridgeFixture.remove();
   });
 
+  it("shows each command's id under its title, muted in the label size like a setting's id, with From and Key on the title's line", async () => {
+    await renderAsync();
+    const probe = document.createElement("span");
+    probe.style.cssText = "color: var(--tr-text-muted); font-size: var(--tr-text-label); line-height: var(--tr-line-label)";
+    row("clock.tick").append(probe);
+    const look = (element: Element): readonly string[] => [getComputedStyle(element).color, getComputedStyle(element).fontSize, getComputedStyle(element).lineHeight];
+    const name = row("clock.tick").querySelector(".tr-shortcut-name") as HTMLElement;
+    const title = (row("clock.tick").querySelector(".tr-shortcut-title") as HTMLElement).getBoundingClientRect();
+    const owner = row("clock.tick").querySelector(".tr-shortcut-owner") as HTMLElement;
+    const ownerLine = owner.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(owner).paddingTop);
+    const key = keyOf("clock.tick").getBoundingClientRect();
+
+    expect([...element().querySelectorAll("tbody tr")].every(t => t.querySelector(".tr-shortcut-name")?.textContent === t.getAttribute("data-command"))).toBe(true);
+    expect(look(name)).toEqual(look(probe));
+    expect(name.getBoundingClientRect().top).toBeCloseTo(title.bottom, 0);
+    expect([ownerLine, key.top].map(Math.round)).toEqual([title.top, title.top].map(Math.round));
+    expect(key.height).toBeCloseTo(title.height, 0);
+    probe.remove();
+  });
+
   it("records a new key from the first key pressed after the modifiers, without running the command it would run, and keeps the focus", async () => {
     await renderAsync();
 

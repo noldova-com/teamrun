@@ -201,6 +201,30 @@ test.describe("settings", () => {
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
   });
 
+  test("Keyboard shortcuts shows each command's id under its title, and a search by a part found only in an id finds the row and underlines that part", async ({ desktop }) => {
+    const window = desktop.window;
+    const split = window.locator("[data-command=\"shell.splitTabUp\"]");
+    await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
+
+    await expect(split.locator(".tr-shortcut-name")).toHaveText("shell.splitTabUp");
+    for (const scheme of ["light", "dark"] as const) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await desktop.checkpointAsync(`settings-shortcut-ids-${scheme}`);
+    }
+    await window.getByRole("searchbox", { name: "Search settings" }).fill("bu");
+
+    await expect(split.locator(".tr-shortcut-title")).toHaveText("Split the tab up");
+    await expect(split.locator(".tr-shortcut-name mark")).toHaveText(["bU"]);
+    await expect(split.locator(".tr-shortcut-title mark")).toHaveCount(0);
+    expect(await split.locator(".tr-shortcut-name mark").evaluate(t => getComputedStyle(t).textDecorationLine)).toBe("underline");
+    for (const scheme of ["light", "dark"] as const) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await desktop.checkpointAsync(`settings-shortcut-id-search-${scheme}`);
+    }
+  });
+
   test("Settings keeps its page and scroll position when its tab becomes active again and when it moves to another group", async ({ desktop }) => {
     const window = desktop.window;
     const note = "document/notes.note/2";
