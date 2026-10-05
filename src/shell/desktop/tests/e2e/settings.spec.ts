@@ -113,8 +113,7 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-narrow-dark");
     await chooseAsync(window, "shell.mode", "Light");
     await expect(row(window, "shell.mode").getByRole("radio", { name: "Light", exact: true })).toBeChecked();
-    await pages.click();
-    await window.getByRole("option", { name: "Gallery", exact: true }).click();
+    await SettingsFixture.choosePageAsync(window, "Gallery");
     await expect(content.locator("tr-quick-input").getByRole("option").first()).toBeAttached();
     const drag = await ScrollAreaFixture.dragVerticalThumbAsync(window, content, 100);
     await expect.poll(async () => Math.abs(await ScrollAreaFixture.scrollTopAsync(content) - drag.start - drag.distance)).toBeLessThan(drag.distance / 10);

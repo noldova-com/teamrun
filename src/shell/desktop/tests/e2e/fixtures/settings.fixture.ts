@@ -11,6 +11,7 @@ import { type Page, expect } from "@playwright/test";
 export default class SettingsFixture {
   private static readonly KEY: string = "ControlOrMeta+Comma";
   private static readonly GALLERY: string = "Gallery";
+  private static readonly PAGES: string = "Settings pages";
 
   public static async openAsync(window: Page): Promise<void> {
     await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
@@ -28,7 +29,7 @@ export default class SettingsFixture {
     const select = settings.locator(".tr-settings-page-select").getByRole("button");
     if (await select.isVisible()) {
       await select.click();
-      await window.getByRole("option", { name: title, exact: true }).click();
+      await window.getByRole("listbox", { name: SettingsFixture.PAGES }).getByRole("option", { name: title, exact: true }).click();
       return;
     }
     await settings.locator(".tr-settings-pages").getByRole("button", { name: title, exact: true }).click();

@@ -156,6 +156,41 @@ describe("SettingsComponent", () => {
     expect(stacked).toBe(true);
   });
 
+  it("moves focus to the page control it now shows when it switches between the page list and the select, and to no control that was not focused", async () => {
+    const host = render();
+    const select = (): HTMLButtonElement => host.querySelector(".tr-settings-page-select .tr-select-button") as HTMLButtonElement;
+    const pages = (): readonly HTMLButtonElement[] => [...host.querySelectorAll<HTMLButtonElement>(".tr-settings-page")];
+    host.style.width = "37rem";
+    await page.getByRole("button", { name: "Clock", exact: true }).click();
+    fixture.detectChanges();
+
+    host.style.width = "15rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(select()));
+    host.style.width = "37rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(host.querySelector(".tr-settings-page-current")));
+    await searchAsync("greeting");
+    (host.querySelector(".tr-settings-search-field") as HTMLInputElement).focus();
+    host.style.width = "15rem";
+    await vi.waitFor(() => expect(select().checkVisibility()).toBe(true));
+    const searching = document.activeElement;
+    select().focus();
+    host.style.width = "37rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(pages()[0]));
+
+    expect(searching).toBe(host.querySelector(".tr-settings-search-field"));
+  });
+
+  it("closes the Settings pages list when the window widens while it is open", async () => {
+    const host = render();
+    host.style.width = "15rem";
+    await userEvent.click(host.querySelector(".tr-settings-page-select .tr-select-button") as HTMLButtonElement);
+    await expect.element(page.getByRole("listbox")).toBeVisible();
+
+    host.style.width = "37rem";
+
+    await vi.waitFor(() => expect(document.querySelector("[role=listbox]")).toBeNull());
+  });
+
   it("reveals the scrollbars of its page list and its content while they are hovered", () => {
     render();
 

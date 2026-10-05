@@ -29,10 +29,6 @@
   min-width: 0;
 }
 
-.tr-settings-page-select {
-  display: none;
-}
-
 .tr-settings-body {
   display: flex;
   flex: auto;
@@ -111,11 +107,13 @@
   color: var(--tr-text);
 }
 
-@container settings (width < 34rem) {
+@container settings (width >= 34rem) {
   .tr-settings-page-select {
-    display: inline-flex;
+    display: none;
   }
+}
 
+@container settings (width < 34rem) {
   .tr-settings-page-select,
   .tr-settings-search-field {
     flex: 1 1 10rem;

@@ -68,7 +68,7 @@ export class SelectComponent {
       event.preventDefault();
       this.closeTo(button);
     });
-    overlay.originScrolls.subscribe(() => this.close());
+    overlay.originLost.subscribe(() => this.close());
     this.overlay = overlay;
     this.isOpen.set(true);
     overlay.openTemplate(new TemplatePortal(list, this.viewContainer), button, new OverlayAnchoring(OverlaySide.below, OverlayAlignment.Start, 0));
