@@ -7,12 +7,11 @@
  */
 
 import assert from "node:assert/strict";
+import path from "node:path";
 import { test } from "node:test";
 
 import ApiServer from "../../api/api-server.ts";
 import ApiDeclarationCheck from "../../checks/api-declaration-check.ts";
-import BuildLayout from "../../packages/build-layout.ts";
-import PackageCatalog from "../../packages/package-catalog.ts";
 import ApiPackageFixture from "../fixtures/api-package.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
@@ -193,12 +192,47 @@ class ApiDeclarationCheckTests {
       assert.ok(output.text.includes("; build the packages first\n"), output.text);
     });
 
+    test("an Angular part's declarations in its source that match its implementation pass, and a drift or a missing member fails", async t => {
+      const fixture = await ApiPackageFixture.createAsync();
+      t.after(() => fixture.disposeAsync());
+      await fixture.writePartAsync("src/shell/shapes", ApiDeclarationCheckTests.IMPLEMENTATION, ApiDeclarationCheckTests.DECLARATIONS);
+      const output = new TextOutputFixture();
+
+      assert.equal(await ApiDeclarationCheckTests.createCheck(fixture, ["src/shell/shapes"]).runAsync(output), true, output.text);
+      assert.equal(output.text, "src/shell/shapes: matches its declarations\n");
+
+      await fixture.writeFilesAsync({ "src/shell/shapes/src/api/index.d.ts": ApiDeclarationCheckTests.DECLARATIONS.replace("factor?: number): number;", "factor?: string): number;").replace("  public get count(): number;\n", "") });
+      const drifted = new TextOutputFixture();
+
+      assert.equal(await ApiDeclarationCheckTests.createCheck(fixture, ["src/shell/shapes"]).runAsync(drifted), false);
+      assert.ok(drifted.text.startsWith("src/shell/shapes:\n  Registry#count: missing from the declarations; the implementation has get : number\n  scale(0): the implementation has"), drifted.text);
+    });
+
+    test("a listed Angular part without its project fails the check with the reason", async t => {
+      const fixture = await ApiPackageFixture.createAsync();
+      t.after(() => fixture.disposeAsync());
+      const output = new TextOutputFixture();
+
+      assert.equal(await ApiDeclarationCheckTests.createCheck(fixture, ["src/shell/shapes"]).runAsync(output), false);
+      assert.equal(output.text, "The Angular project has no src/tsconfig.json.\n");
+    });
+
+    test("an Angular part without declarations fails and names the missing file", async t => {
+      const fixture = await ApiPackageFixture.createAsync();
+      t.after(() => fixture.disposeAsync());
+      await fixture.writePartAsync("src/shell/shapes", ApiDeclarationCheckTests.IMPLEMENTATION, null);
+      const output = new TextOutputFixture();
+
+      assert.equal(await ApiDeclarationCheckTests.createCheck(fixture, ["src/shell/shapes"]).runAsync(output), false);
+      assert.equal(output.text, `src/shell/shapes:\n  no declarations at ${path.join(fixture.directory, "src/shell/shapes/src/api/index.d.ts")}\n`);
+    });
+
     test("a server that cannot start fails the package with the reason", async t => {
       const fixture = await ApiPackageFixture.createAsync();
       t.after(() => fixture.disposeAsync());
       await fixture.writePackageAsync("shapes", ApiDeclarationCheckTests.IMPLEMENTATION, ApiDeclarationCheckTests.DECLARATIONS);
       const output = new TextOutputFixture();
-      const check = new ApiDeclarationCheck(fixture.directory, new PackageCatalog(fixture.directory), new BuildLayout(fixture.directory), [process.execPath, "-e", "process.exit(3)", "--"],
+      const check = new ApiDeclarationCheck(fixture.directory, fixture.createCatalog([]), [process.execPath, "-e", "process.exit(3)", "--"],
         ApiDeclarationCheckTests.TIMEOUT);
 
       assert.equal(await check.runAsync(output), false);
@@ -206,8 +240,8 @@ class ApiDeclarationCheckTests {
     });
   }
 
-  private static createCheck(fixture: ApiPackageFixture): ApiDeclarationCheck {
-    return new ApiDeclarationCheck(fixture.directory, new PackageCatalog(fixture.directory), new BuildLayout(fixture.directory), [ApiServer.locateCompiler()], ApiDeclarationCheckTests.TIMEOUT);
+  private static createCheck(fixture: ApiPackageFixture, parts: readonly string[] = []): ApiDeclarationCheck {
+    return new ApiDeclarationCheck(fixture.directory, fixture.createCatalog(parts), [ApiServer.locateCompiler()], ApiDeclarationCheckTests.TIMEOUT);
   }
 
   private static async runAsync(context: { after: (callback: () => Promise<void>) => void }, declarations: string, expected: boolean): Promise<string> {

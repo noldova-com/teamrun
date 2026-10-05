@@ -10,8 +10,8 @@ import { type Type } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 
+import { GalleryComponent } from "../../../../src/api/gallery";
 import * as kit from "../../../../src/api/index";
-import { GalleryComponent } from "../../../../src/app/components/gallery/gallery.component";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 import { GalleryFixture } from "../../../fixtures/gallery.fixture";
 
@@ -42,8 +42,7 @@ describe("GalleryComponent", () => {
 
   it("shows every component and directive the kit exports, so a new control that is not shown here fails this test", async () => {
     fixture = await GalleryFixture.showAsync();
-    const own = new Set<unknown>([kit.GalleryComponent]);
-    const controls = Object.entries(kit).filter(([, value]) => !own.has(value) && typeof value === "function" && ("ɵcmp" in value || "ɵdir" in value));
+    const controls = Object.entries(kit).filter(([, value]) => typeof value === "function" && ("ɵcmp" in value || "ɵdir" in value));
 
     const missing = controls.filter(([, value]) => fixture.debugElement.queryAll(By.directive(value as Type<unknown>)).length === 0).map(([name]) => name);
 

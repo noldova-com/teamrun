@@ -23,7 +23,7 @@ export default class ModuleArtifacts {
   private static readonly NOTIFICATIONS_KIND: string = "notifications";
   private static readonly STATUS_BAR_ITEMS_KIND: string = "statusBarItems";
   private static readonly TOP_BAR_ACTIONS_KIND: string = "topBarActions";
-  private static readonly SOURCE_IMPORT: string = "import { MenuDeclarations, WindowPartSource } from \"@noldova/teamrun-shell-window\";\n";
+  private static readonly SOURCE_IMPORT: string = "import { MenuDeclarations, WindowPartSource } from \"@noldova/teamrun-shell-window/build\";\n";
   private static readonly OUTPUT_DECLARATIONS_SEGMENTS: readonly string[] = ["modules", "declarations.json"];
 
   private readonly root: string;

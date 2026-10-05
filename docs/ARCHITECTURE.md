@@ -50,7 +50,7 @@ Four rules keep the shell empty:
 
 Everything that belongs to a module lives in its folder, `src/modules/<id>`: its parts and their tests, end-to-end tests, styles, assets, migrations and its document. Adding a module adds its folder and a line in the build's module list; removing it removes both. Its data has its own folder in the data directory (section 3).
 
-The Angular parts, `src/shell/ui`, `src/shell/window` and modules' window parts, are not packages. The Angular project in `src/`, with its own manifest and lockfile, compiles them from source into one application. The kit and the window publish their APIs through their `src/api/index.ts`, which other Angular parts import as `@noldova/teamrun-shell-ui` and `@noldova/teamrun-shell-window`.
+The Angular parts, `src/shell/ui`, `src/shell/window` and modules' window parts, are not packages. The Angular project in `src/`, with its own manifest and lockfile, compiles them from source into one application. The kit and the window publish their APIs through their `src/api/index.ts`, which other Angular parts import as `@noldova/teamrun-shell-ui` and `@noldova/teamrun-shell-window`. The kit's Gallery is not part of its API; only the window's generated Gallery file imports it, through the kit's development entry `@noldova/teamrun-shell-ui/gallery`. `WindowPartSource` and `MenuDeclarations` are not part of the window's API either. Only the build's generated window parts import them, through the window's build entry `@noldova/teamrun-shell-window/build`.
 
 Fixture modules exist only for tests. They live with the tests that use them, in the `fixtures` beside those workflows under the [coding standards](CODING-STANDARDS.md#13-tests), and enter only a test build's module list.
 
@@ -173,7 +173,7 @@ The shell pads the page of every view and document, so a module's content keeps 
 | Declaration | The `padding` argument of a view's or document's contribution | That view or document |
 | Page | `set` and `reset` on the `ContentPaddingRef` its component injects with `WindowPartTokens.contentPadding` | That page while it is shown, until it resets |
 
-Each level chooses `Default`, the shell's padding for where the page shows, or `None`; none sets its own values. The page's choice wins over its declaration's, the declaration's over its module's, and the module's over the shell's default. The shell's own Settings and Modules documents declare `None` and keep their own layout. [The window package's declarations](../src/shell/window/src/api/index.d.ts) show each level.
+Each level chooses `Default`, the shell's padding for where the page shows, or `None`; none sets its own values. The page's choice wins over its declaration's, the declaration's over its module's, and the module's over the shell's default. The shell's own Settings and Modules documents declare `None` and keep their own layout. [The window's declarations](../src/shell/window/src/api/index.d.ts) show each level.
 
 ### Commands and shortcuts
 
@@ -282,7 +282,7 @@ A module declares its notification kinds in `contributes.notifications`. A part 
 
 - Connections begin with an authenticated version handshake. Subsequent framed requests are correlated with responses; events notify connected clients.
 - The runtime client/server boundary owns framing, request size limits, deadlines, cancellation and disconnect handling. Nothing over the frame limit is sent, and the connection stays open. A request or answer over the limit fails its call with `FrameTooLarge`. The runtime logs an event over the limit once and sends it to no client, so clients never see different events. Receiving a frame over the limit ends the connection. The runtime first answers the client with the failure, and the desktop logs why it ended a connection.
-- The desktop answers a request it has no connection for, or whose connection ended before the answer, with `Disconnected`; the runtime never sends it. A call that gets no answer in time on a connection that is still open stays `Unavailable`.
+- The desktop and the command line answer a request they have no connection for, or whose connection ended before the answer, with `Disconnected`; the runtime never sends it. A call that gets no answer in time on a connection that is still open stays `Unavailable`.
 - When its connection ends, the desktop connects again, whatever ended it. A connection that ends within 30 seconds of being ready ends soon. The first end after a connection that stayed ready longer reconnects at once, so a runtime that starts again costs no wait. Each further end soon in a row waits 1, 2, 4 and then 8 seconds first, and the sixth stops: the window shows the start failure with the last cause, and the desktop logs it. Trying again counts afresh, and closing ends a wait at once. Like desktop clients that restart a lost local process at once and give up after a few quick failures, this keeps a fault on every connection from becoming a loop.
 - The shell validates protocol envelopes without knowing module models. Methods and events follow section 3's naming rules, using `shell.<name>` for shell-owned entries.
 - The runtime routes only methods registered by active parts; the owning part validates payloads and reports failures under the [wire contract](CODING-STANDARDS.md#the-wire-contract).

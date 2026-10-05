@@ -9,11 +9,11 @@
 import { TestBed } from "@angular/core/testing";
 
 import { ToolbarMove } from "../../../src/app/enums/toolbar-move";
+import { BuildTokens } from "../../../src/app/models/build-tokens";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { CommandRow } from "../../../src/app/models/command-row";
 import { Layout } from "../../../src/app/models/layout/layout";
 import { MenuDeclarations } from "../../../src/app/models/menu-declarations";
-import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../src/app/services/command.service";
 import type { LayoutService } from "../../../src/app/services/layout.service";
 import { MenuService } from "../../../src/app/services/menu.service";
@@ -46,7 +46,7 @@ describe("ToolbarService", () => {
 
   beforeEach(async () => {
     DesktopBridgeFixture.install();
-    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.menus, useValue: [notes] }] });
+    TestBed.configureTestingModule({ providers: [{ provide: BuildTokens.menus, useValue: [notes] }] });
     layout = await LayoutServiceFixture.prepareAsync(registry, Layout.createDefault(registry));
     TestBed.inject(CommandService).setCommands([
       new CommandContribution("notes.newNote", "New note", null, null, () => Promise.resolve(null)),

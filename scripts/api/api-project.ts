@@ -21,9 +21,9 @@ export default class ApiProject {
     this.file = path.join(this.folder, ApiProject.FILE_NAME);
   }
 
-  public async writeAsync(base: string, root: string, files: readonly string[]): Promise<void> {
+  public async writeAsync(base: string, root: string, files: readonly string[], paths?: Readonly<Record<string, readonly string[]>>): Promise<void> {
     await mkdir(this.folder, { recursive: true });
-    const project = { extends: base, compilerOptions: { noEmit: true, rootDir: root }, files };
+    const project = { extends: base, compilerOptions: { noEmit: true, rootDir: root, ...paths === undefined ? {} : { paths } }, files };
     await writeFile(this.file, `${JSON.stringify(project, null, 2)}\n`);
   }
 }

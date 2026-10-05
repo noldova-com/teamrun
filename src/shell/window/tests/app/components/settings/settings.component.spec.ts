@@ -431,12 +431,23 @@ describe("SettingsComponent", () => {
 
     expect(texts("th")).toEqual(["Command", "From", "Key", ""]);
     expect(rows.filter(t => t[0]?.startsWith("clock."))).toEqual([
-      ["clock.tick", "Tick the clock", "Clock", "Ctrl+Alt+T", "Remove"],
-      ["clock.stop", "Stop the clock", "Clock", "No keyCtrl+Alt+T is taken by Tick the clock", ""]
+      ["clock.tick", "Tick the clockclock.tick", "Clock", "Ctrl+Alt+T", "Remove"],
+      ["clock.stop", "Stop the clockclock.stop", "Clock", "No keyCtrl+Alt+T is taken by Tick the clock", ""]
     ]);
-    expect(rows.find(t => t[0] === "shell.openSettings")?.slice(1, 3)).toEqual(["Settings…", Resources.productName]);
+    expect(rows.find(t => t[0] === "shell.openSettings")?.slice(1, 3)).toEqual(["Settings…shell.openSettings", Resources.productName]);
     expect(rows.find(t => t[0] === "shell.closeTab")?.slice(3)).toEqual(["No key", "Reset"]);
     expect(element().querySelector("[data-command='shell.closeTab'] .tr-shortcut-marker")?.getAttribute("aria-label")).toBe("Modified");
+  });
+
+  it("finds a command by a part of its id found only there, and underlines that part in the id under its title", async () => {
+    render();
+
+    await searchAsync("bu");
+    const split = element().querySelector("[data-command='shell.splitTabUp']");
+
+    expect([split?.querySelector(".tr-shortcut-title")?.textContent?.trim(), split?.querySelector(".tr-shortcut-name")?.textContent]).toEqual(["Split the tab up", "shell.splitTabUp"]);
+    expect([...split?.querySelectorAll(".tr-shortcut-name mark") ?? []].map(t => t.textContent)).toEqual(["bU"]);
+    expect([".tr-shortcut-title", ".tr-shortcut-owner", ".tr-shortcut-key"].map(t => split?.querySelectorAll(`${t} mark`).length)).toEqual([0, 0, 0]);
   });
 
   it("finds commands by their owner", async () => {
@@ -461,7 +472,7 @@ describe("SettingsComponent", () => {
     await page.getByRole("treeitem", { name: "Appearance" }).click();
     fixture.detectChanges();
 
-    expect(hits).toEqual({ pages: ["Keyboard shortcuts", "Clock"], groups: ["Words", "Ticks"], rows: ["Greeting", "Tick step"], marks: 8 });
+    expect(hits).toEqual({ pages: ["Keyboard shortcuts", "Clock"], groups: ["Words", "Ticks"], rows: ["Greeting", "Tick step"], marks: 10 });
     expect(empty).toEqual(["No settings match your search."]);
     expect(current).toEqual([]);
     expect([(element().querySelector(".tr-settings-search-field") as HTMLInputElement).value, texts(".tr-settings-result-title")]).toEqual(["", []]);
