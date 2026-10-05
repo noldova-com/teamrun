@@ -219,13 +219,18 @@ export class WindowPartContext implements IWindowPartContext {
     this.host.refresh();
   }
 
+  public forgetNotifications(): void {
+    this.notificationIds.clear();
+  }
+
   public isAllowed(name: string): boolean {
     return this.owners.includes(name.substring(0, name.indexOf(Resources.contributionSeparator)));
   }
 
   private async updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
     this.requireNotification(post);
-    await this.host.updateNotificationAsync(id, post);
+    if (this.notificationIds.has(id))
+      await this.host.updateNotificationAsync(id, post);
   }
 
   private dismissNotification(id: number): void {

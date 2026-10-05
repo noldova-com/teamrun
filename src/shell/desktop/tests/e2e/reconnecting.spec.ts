@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { Locator, Page } from "@playwright/test";
+
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import SettingsFixture from "./fixtures/settings.fixture.ts";
@@ -16,11 +18,44 @@ interface IReconnectRecord {
   card: string;
 }
 
+interface IReconnectResult {
+  readonly isSameWorkspace: boolean;
+  readonly card: string;
+}
+
 interface IKeptRecord {
-  readonly workspace: Element | null;
   readonly note: Element | null;
   readonly clock: Element | null;
-  wasInert: boolean;
+}
+
+function scrollAsync(content: Locator): Promise<number> {
+  return content.evaluate(async t => {
+    t.scrollTop += 60;
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return t.scrollTop;
+  });
+}
+
+async function watchAsync(window: Page): Promise<void> {
+  await window.evaluate(() => {
+    const record: IReconnectRecord = { workspace: document.querySelector("tr-workspace"), wasInert: false, card: "" };
+    new MutationObserver(() => {
+      record.wasInert ||= record.workspace?.hasAttribute("inert") === true;
+      record.card ||= document.querySelector(".tr-window-reconnecting [role=status]")?.textContent?.trim() ?? "";
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["inert"] });
+    Reflect.set(globalThis, "reconnecting", record);
+  });
+}
+
+async function reconnectAsync(window: Page, dataDirectory: string): Promise<IReconnectResult> {
+  await DesktopApplicationFixture.stopRuntimeAsync(dataDirectory);
+  await expect.poll(() => window.evaluate(() => (Reflect.get(globalThis, "reconnecting") as IReconnectRecord).wasInert)).toBe(true);
+  await expect(window.locator(".tr-window-reconnecting")).toHaveCount(0);
+  await expect(window.locator("tr-workspace")).not.toHaveAttribute("inert");
+  return window.evaluate(() => {
+    const record = Reflect.get(globalThis, "reconnecting") as IReconnectRecord;
+    return { isSameWorkspace: record.workspace === document.querySelector("tr-workspace"), card: record.card };
+  });
 }
 
 test.describe("reconnecting", () => {
@@ -31,32 +66,14 @@ test.describe("reconnecting", () => {
     const content = window.locator(".tr-settings-content");
     const field = content.locator("input[tr-text-field][type=text]").first();
     await field.fill("A draft not saved yet");
-    const top = await content.evaluate(async t => {
-      t.scrollTop += 60;
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      return t.scrollTop;
-    });
+    const top = await scrollAsync(content);
     expect(top).toBeGreaterThan(0);
     await expect(field).toBeFocused();
-    await window.evaluate(() => {
-      const record: IReconnectRecord = { workspace: document.querySelector("tr-workspace"), wasInert: false, card: "" };
-      new MutationObserver(() => {
-        record.wasInert ||= record.workspace?.hasAttribute("inert") === true;
-        record.card ||= document.querySelector(".tr-window-reconnecting [role=status]")?.textContent?.trim() ?? "";
-      }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["inert"] });
-      Reflect.set(globalThis, "reconnecting", record);
-    });
+    await watchAsync(window);
 
-    await DesktopApplicationFixture.stopRuntimeAsync(desktop.dataDirectory);
+    const record = await reconnectAsync(window, desktop.dataDirectory);
 
-    await expect.poll(() => window.evaluate(() => (Reflect.get(globalThis, "reconnecting") as IReconnectRecord).wasInert)).toBe(true);
-    await expect(window.locator(".tr-window-reconnecting")).toHaveCount(0);
-    await expect(window.locator("tr-workspace")).not.toHaveAttribute("inert");
-    const record = await window.evaluate(() => {
-      const kept = Reflect.get(globalThis, "reconnecting") as IReconnectRecord;
-      return [kept.workspace === document.querySelector("tr-workspace"), kept.card];
-    });
-    expect(record).toEqual([true, expect.stringMatching(/^Starting .+…$/)]);
+    expect(record).toEqual({ isSameWorkspace: true, card: expect.stringMatching(/^Starting .+…$/) });
     await expect(field).toBeFocused();
     await expect(field).toHaveValue("A draft not saved yet");
     expect(await content.evaluate(t => t.scrollTop)).toBe(top);
@@ -73,30 +90,21 @@ test.describe("reconnecting", () => {
     const summary = note.locator("textarea");
     await summary.fill("A summary not saved yet");
     const content = window.locator("tr-tab-content", { has: note });
-    const top = await content.evaluate(async t => {
-      t.scrollTop += 60;
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      return t.scrollTop;
-    });
+    const top = await scrollAsync(content);
     expect(top).toBeGreaterThan(0);
     await expect(summary).toBeFocused();
+    await watchAsync(window);
     await window.evaluate(() => {
       const record: IKeptRecord = {
-        workspace: document.querySelector("tr-workspace"),
         note: document.querySelector("tr-notes-note:has([data-fixture-content=notes-note-2])"),
-        clock: document.querySelector("[data-fixture-content=clock-face]"),
-        wasInert: false
+        clock: document.querySelector("[data-fixture-content=clock-face]")
       };
-      new MutationObserver(() => {
-        record.wasInert ||= record.workspace?.hasAttribute("inert") === true;
-      }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["inert"] });
       Reflect.set(globalThis, "kept", record);
     });
 
-    await DesktopApplicationFixture.stopRuntimeAsync(desktop.dataDirectory);
+    const record = await reconnectAsync(window, desktop.dataDirectory);
 
-    await expect.poll(() => window.evaluate(() => (Reflect.get(globalThis, "kept") as IKeptRecord).wasInert)).toBe(true);
-    await expect(window.locator(".tr-window-reconnecting")).toHaveCount(0);
+    expect(record.isSameWorkspace).toBe(true);
     await expect(runtime).toHaveText(/^Runtime \S+$/);
     await expect(runtime).not.toHaveText(first);
     await expect.poll(() => window.evaluate(() => {

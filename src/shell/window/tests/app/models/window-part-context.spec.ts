@@ -168,6 +168,21 @@ describe("WindowPartContext", () => {
     expect(host.calls).toEqual(["post Saved", "post Saved again", "update 1 Saved twice", "dismiss 1", "dismiss 2", "refresh"]);
   });
 
+  it("neither updates nor dismisses a notification it dismissed or forgot, and still handles one posted afterwards", async () => {
+    const dismissed = await context.postNotificationAsync(notification("notes.saved", "Saved", null));
+    dismissed.dismiss();
+    await dismissed.updateAsync(notification("notes.saved", "Saved twice", null));
+    const forgotten = await context.postNotificationAsync(notification("notes.saved", "Saved again", null));
+    context.forgetNotifications();
+    await forgotten.updateAsync(notification("notes.saved", "Saved again twice", null));
+    forgotten.dismiss();
+    const later = await context.postNotificationAsync(notification("notes.saved", "Saved later", null));
+    await later.updateAsync(notification("notes.saved", "Saved later twice", null));
+    context.withdraw();
+
+    expect(host.calls).toEqual(["post Saved", "dismiss 1", "post Saved again", "post Saved later", "update 4 Saved later twice", "dismiss 4", "refresh"]);
+  });
+
   it("refuses a notification of another module, an undeclared kind or another module's command, before and on update", async () => {
     const posted = await context.postNotificationAsync(notification("notes.saved", "Saved", null));
 

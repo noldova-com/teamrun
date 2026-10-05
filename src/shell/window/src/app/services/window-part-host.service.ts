@@ -224,6 +224,9 @@ export class WindowPartHostService implements IWindowPartHost {
   private follow(state: StartupState): void {
     if (!state.isReady)
       this.runtimeStates.set(null);
+    if (!state.isReady && this.isReady)
+      for (const activation of this.activations)
+        activation.context.forgetNotifications();
     if (state.isReady && !this.isReady) {
       const connection = ++this.connection;
       this.reloading = this.reloading.then(() => this.reloadAsync(connection)).catch((error: unknown) => this.errors.handleError(error));
@@ -284,10 +287,9 @@ export class WindowPartHostService implements IWindowPartHost {
     const active = new Set<string>();
     const statuses: ModuleStatus[] = [];
     for (const status of report.modules) {
-      const isKept = kept.has(status.id);
-      if (!isKept && this.sources.some(t => t.moduleId === status.id))
-        this.changedModules.add(status.id);
-      const result = status.state === ModuleState.Active && !isKept ? await this.activateAsync(status, active) : status;
+      if (!this.isConnected(connection))
+        return false;
+      const result = status.state === ModuleState.Active && !kept.has(status.id) ? await this.activateAsync(status, active) : status;
       if (result.state === ModuleState.Active)
         active.add(result.id);
       statuses.push(result);
@@ -410,6 +412,7 @@ export class WindowPartHostService implements IWindowPartHost {
 
     const activation = new WindowPartActivation(source, new WindowPartContext(source, this), part);
     this.activations.push(activation);
+    this.changedModules.add(status.id);
     try {
       await part.activateAsync(activation.context);
     }
