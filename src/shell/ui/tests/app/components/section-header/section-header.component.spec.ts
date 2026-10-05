@@ -18,11 +18,12 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   imports: [SectionHeaderComponent],
   template: `
     <tr-section-header class="plain" [label]="label()" />
-    <tr-section-header class="separated" label="Older" [isSeparated]="true" [level]="2" />
+    <tr-section-header class="separated" [label]="separatedLabel()" [isSeparated]="true" [level]="2" />
   `
 })
 class SectionHeaderHostComponent {
   public readonly label = signal("Recent");
+  public readonly separatedLabel = signal("Older");
 }
 
 describe("SectionHeaderComponent", () => {
@@ -74,12 +75,20 @@ describe("SectionHeaderComponent", () => {
         expect(separated.position).toBe("relative");
       });
 
-  it("grows past its height when its label wraps", async () => {
+  it("grows past its height when its label wraps, keeping the small space above and below the label clear of its separator", async () => {
     await renderAsync();
-    fixture.componentInstance.label.set("A section name that is far too long to fit the width of the header it is in, so it wraps onto a second line and more");
-    header("plain").style.width = "12rem";
+    fixture.componentInstance.separatedLabel.set("A section name that is far too long to fit the width of the header it is in, so it wraps onto a second line and more");
+    header("separated").style.width = "12rem";
     await fixture.whenStable();
+    const box = header("separated").getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(header("separated"));
+    const text = range.getBoundingClientRect();
+    const space = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tr-space-1")) * Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const style = getComputedStyle(header("separated"));
 
-    expect(header("plain").getBoundingClientRect().height).toBeGreaterThan(Number.parseFloat(getComputedStyle(header("plain")).minHeight));
+    expect(box.height).toBeGreaterThan(Number.parseFloat(style.minHeight));
+    expect([style.paddingTop, style.paddingBottom].map(t => Math.round(Number.parseFloat(t)))).toEqual([space, space].map(Math.round));
+    expect(text.top - box.top).toBeGreaterThanOrEqual(space - 1);
   });
 });
