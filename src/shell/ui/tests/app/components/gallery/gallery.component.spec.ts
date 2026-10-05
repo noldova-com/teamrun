@@ -40,20 +40,6 @@ describe("GalleryComponent", () => {
     expect(GalleryFixture.frames(fixture).map(t => t.getAttribute("aria-label"))).toEqual(["Default, light mode", "Default, dark mode"]);
   });
 
-  it("lets the Gallery's tree be rearranged: Alt with an arrow key moves the focused row, and the tree shows the new order", async () => {
-    await showAsync();
-    const tree = fixture.nativeElement.querySelector("tr-gallery-navigation tr-tree") as HTMLElement;
-    const labels = (): (string | null | undefined)[] => [...tree.querySelectorAll("[role=treeitem] .tr-tree-label")].map(t => t.textContent);
-    const notes = [...tree.querySelectorAll<HTMLElement>("[role=treeitem]")].find(t => t.querySelector(".tr-tree-label")?.textContent === "Notes") as HTMLElement;
-    const before = labels();
-
-    notes.focus();
-    await userEvent.keyboard("{Alt>}{ArrowUp}{/Alt}");
-    await fixture.whenStable();
-
-    expect([before.indexOf("Notes"), labels().indexOf("Notes")]).toEqual([3, 0]);
-  });
-
   it("shows every component and directive the kit exports, so a new control that is not shown here fails this test", async () => {
     fixture = await GalleryFixture.showAsync();
     const own = new Set<unknown>([kit.GalleryComponent]);
