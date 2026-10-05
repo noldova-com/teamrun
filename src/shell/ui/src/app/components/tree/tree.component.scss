@@ -9,6 +9,7 @@
 @use "selected-surface" as *;
 
 :host {
+  position: relative;
   display: block;
 }
 
@@ -56,4 +57,38 @@
   flex: auto;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+:host(.tr-tree-movable) .tr-tree-row {
+  user-select: none;
+}
+
+.tr-tree-row-dragging {
+  opacity: 0.5;
+}
+
+.tr-tree-row-drop {
+  outline: var(--tr-border-width) solid var(--tr-accent);
+  outline-offset: calc(-1 * var(--tr-border-width));
+}
+
+.tr-tree-drop-line {
+  position: absolute;
+}
+
+.tr-tree-ghost {
+  position: fixed;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--tr-space-2);
+  box-sizing: border-box;
+  min-height: var(--tr-tree-row-height);
+  padding-inline: var(--tr-space-2);
+  border: var(--tr-border-width) solid var(--tr-card-border);
+  border-radius: var(--tr-radius-small);
+  background-color: var(--tr-window);
+  box-shadow: var(--tr-shadow-large);
+  color: var(--tr-text);
+  pointer-events: none;
 }

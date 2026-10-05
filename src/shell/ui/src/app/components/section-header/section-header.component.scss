@@ -10,6 +10,8 @@
   position: relative;
   display: flex;
   align-items: center;
+  width: fit-content;
+  max-width: 100%;
   box-sizing: border-box;
   min-height: var(--tr-section-header-height);
   padding-inline: var(--tr-section-header-inset);
@@ -23,6 +25,6 @@
   content: "";
   position: absolute;
   inset-block-start: 0;
-  inset-inline: var(--tr-section-header-separator-inset);
+  inset-inline: var(--tr-section-header-inset);
   border-block-start: var(--tr-border-width) solid var(--tr-border);
 }

@@ -120,6 +120,48 @@ test.describe("gallery", () => {
     await expect(tree.getByRole("treeitem")).toHaveCount(3);
   });
 
+  for (const mode of ["Light", "Dark"] as const)
+    test(`a tree row is dragged with a ghost and a drop line and dropped into place, and moved by Alt and the arrow keys, in ${mode.toLowerCase()} mode`, async ({ desktop }) => {
+      const window = desktop.window;
+      await SettingsFixture.openGalleryAsync(window);
+      const tree = scope(window, mode).getByRole("tree", { name: "Gallery files" });
+      const host = scope(window, mode).locator("tr-tree.tr-gallery-tree");
+      const item = (name: string): Locator => tree.getByRole("treeitem", { name, exact: true });
+      const order = (): Promise<(string | null)[]> => tree.locator(".tr-tree-label").evaluateAll(t => t.map(u => u.textContent));
+      const centreOf = async (name: string, fraction: number): Promise<{ x: number; y: number }> => {
+        const box = await item(name).boundingBox() as { x: number; y: number; width: number; height: number };
+        return { x: box.x + box.width / 2, y: box.y + box.height * fraction };
+      };
+      await item("Notes").scrollIntoViewIfNeeded();
+
+      const from = await centreOf("Notes", 0.5);
+      await window.mouse.move(from.x, from.y);
+      await window.mouse.down();
+      await window.mouse.move(from.x + 8, from.y - 8, { steps: 3 });
+      const branch = await centreOf("Project", 0.5);
+      await window.mouse.move(branch.x, branch.y, { steps: 6 });
+      await expect(item("Project")).toHaveClass(/tr-tree-row-drop/u);
+      await desktop.checkpointAsync(`gallery-tree-drag-branch-${mode.toLowerCase()}`);
+      const target = await centreOf("Readme", 0.1);
+      await window.mouse.move(target.x, target.y, { steps: 6 });
+      await expect(host.locator(".tr-tree-ghost")).toHaveText(/Notes/u);
+      await expect(host.locator(".tr-tree-drop-line")).toBeVisible();
+      await desktop.checkpointAsync(`gallery-tree-drag-${mode.toLowerCase()}`);
+      await window.mouse.up();
+
+      await expect(host.locator(".tr-tree-ghost")).toHaveCount(0);
+      await expect.poll(order).toEqual(["Project", "Source", "Notes", "Readme", "A file name that is far too long to fit the width of its tree"]);
+      await expect(item("Readme")).toHaveAttribute("aria-selected", "false");
+      await expect(item("Notes")).toBeFocused();
+      await item("Notes").focus();
+      await window.keyboard.press("Alt+ArrowLeft");
+      await expect.poll(order).toEqual(["Project", "Source", "Readme", "Notes", "A file name that is far too long to fit the width of its tree"]);
+      await expect(item("Notes")).toBeFocused();
+      await window.keyboard.press("Alt+ArrowUp");
+      await expect.poll(order).toEqual(["Notes", "Project", "Source", "Readme", "A file name that is far too long to fit the width of its tree"]);
+      await expect(item("Notes")).toBeFocused();
+    });
+
   test("toolbar buttons never overlap, and a label too long for its button ends with an ellipsis inside it and shows in full in its tooltip, in light and in dark", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openGalleryAsync(window);

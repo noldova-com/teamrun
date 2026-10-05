@@ -65,6 +65,8 @@ describe("ToastService", () => {
   });
 
   afterEach(() => {
+    if (vi.isFakeTimers())
+      vi.runOnlyPendingTimers();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });

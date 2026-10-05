@@ -10,6 +10,8 @@ import { ErrorHandler, Injectable, inject } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 
+import { ActionNotConfirmedException } from "../exceptions/action-not-confirmed.exception";
+import { RuntimeDisconnectedException } from "../exceptions/runtime-disconnected.exception";
 import { WindowPartFailureException } from "../exceptions/window-part-failure.exception";
 import { Resources } from "../../resources";
 import { DesktopBridgeService } from "./desktop-bridge.service";
@@ -20,6 +22,8 @@ export class WindowErrorHandler extends ErrorHandler {
   private readonly handled: WeakSet<object> = new WeakSet();
 
   public override handleError(error: unknown): void {
+    if (!(error instanceof ActionNotConfirmedException) && RuntimeDisconnectedException.isIn(error))
+      return;
     if (Object.isObject(error)) {
       if (this.handled.has(error))
         return;

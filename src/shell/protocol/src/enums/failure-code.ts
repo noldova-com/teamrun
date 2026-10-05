@@ -20,5 +20,6 @@ export enum FailureCode {
   Cancelled = "Cancelled",
   DeadlineExceeded = "DeadlineExceeded",
   Unavailable = "Unavailable",
+  Disconnected = "Disconnected",
   Internal = "Internal"
 }

@@ -16,7 +16,7 @@ import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 @TestClass
 export class ShellSettingsTests {
   @TestMethod
-  public declaresTheShellsSettingsInOrderWithTheirDefaultsAndWhereEachIsKept(): Promise<void> {
+  public declaresTheShellsSettingsInOrderWithTheirDefaultsWhereEachIsKeptAndTheModesInOrder(): Promise<void> {
     return RuntimeHostFixture.runAsync(async fixture => {
       await fixture.startAsync(30_000, await fixture.writeModulesAsync([]));
       const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
@@ -28,6 +28,7 @@ export class ShellSettingsTests {
       Assert.areEqual(
         "\"shell.default\" Shared,\"System\" Shared,\"Noldova\" Device,\"Noldova\" Device,13 Device,14 Device,14 Device,\"Tabs\" Shared,\"Tabs\" Shared,\"Inline\" Shared,true Shared,5 Shared,false Device,[] Shared,{} Shared",
         snapshot.definitions.map(t => `${JSON.stringify(t.defaultValue)} ${t.locality}`).join(","));
+      Assert.areEqual("System,Light,Dark", snapshot.definitions.find(t => t.name.text === "shell.mode")?.type.options.map(t => t.value).join(","));
     });
   }
 }

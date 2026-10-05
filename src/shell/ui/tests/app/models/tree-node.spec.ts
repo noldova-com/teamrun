@@ -26,4 +26,13 @@ describe("TreeNode", () => {
       .toEqual([true, false, ["top", "source"], ["source"], []]);
     expect(new TreeNode("leaf", "Leaf", null, [], true).startOpenBranches).toEqual([]);
   });
+
+  it("contains itself and every row below it, and makes a copy with other children that keeps everything else", () => {
+    const leaf = new TreeNode("app", "App");
+    const branch = TreeNode.open("source", "Source", "folder", [leaf]);
+    const copy = branch.withChildren([]);
+
+    expect([branch.contains("source"), branch.contains("app"), branch.contains("notes"), leaf.contains("source")]).toEqual([true, true, false, false]);
+    expect([copy.id, copy.label, copy.icon, copy.startsOpen, copy.children, copy.isBranch]).toEqual(["source", "Source", "folder", true, [], false]);
+  });
 });

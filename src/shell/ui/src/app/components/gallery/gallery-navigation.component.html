@@ -25,14 +25,17 @@ LICENSE file in the root directory of this source tree.
 </tr-gallery-specimen>
 
 <tr-gallery-specimen [name]="text.tree">
-  <tr-tree class="tr-gallery-tree" [nodes]="treeNodes" [label]="text.treeLabel" [current]="treeCurrent()" (activated)="treeCurrent.set($event.id)" />
+  <tr-tree class="tr-gallery-tree" [nodes]="treeNodes()" [movable]="true" [label]="text.treeLabel" [current]="treeCurrent()" (activated)="treeCurrent.set($event.id)" (moved)="moveTreeNode($event)" />
 </tr-gallery-specimen>
 
 <tr-gallery-specimen [name]="text.sectionHeader">
   <div class="tr-gallery-sections">
     <tr-section-header [label]="text.sectionRecent" />
+    <tr-tree [label]="text.sectionRecent" [nodes]="recentRows" />
     <tr-section-header [label]="text.sectionOlder" [isSeparated]="true" />
+    <tr-tree [label]="text.sectionOlder" [nodes]="olderRows" />
     <tr-section-header [label]="text.sectionLong" [isSeparated]="true" />
+    <tr-tree [label]="text.sectionLong" [nodes]="recentRows" />
   </div>
 </tr-gallery-specimen>
 

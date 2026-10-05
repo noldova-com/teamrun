@@ -25,6 +25,14 @@ export class TreeNode {
     return new TreeNode(id, label, icon, children, true);
   }
 
+  public withChildren(children: readonly TreeNode[]): TreeNode {
+    return new TreeNode(this.id, this.label, this.icon, children, this.startsOpen);
+  }
+
+  public contains(id: string): boolean {
+    return this.id === id || this.children.some(t => t.contains(id));
+  }
+
   public get isBranch(): boolean {
     return this.children.length > 0;
   }

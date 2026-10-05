@@ -56,9 +56,7 @@ export class Resources {
   };
   public static readonly leadingEdges: readonly PanelEdge[] = [PanelEdge.Left, PanelEdge.Top];
   public static readonly layoutSaveDelay: number = 500;
-  public static readonly unavailableCode: string = "Unavailable";
   public static readonly primaryButton: number = 0;
-  public static readonly dragThreshold: number = 4;
   public static readonly escapeKey: string = "Escape";
   public static readonly pointerMoveEvent: "pointermove" = "pointermove";
   public static readonly pointerUpEvent: "pointerup" = "pointerup";
@@ -677,6 +675,7 @@ export class Resources {
   public static readonly codeField: string = "code";
   public static readonly messageField: string = "message";
   public static readonly unknownStartupState: string = "The startup state is not one the window knows.";
+  public static readonly notificationsNotConfirmed: string = "The runtime did not confirm the change to the notifications because the connection to it ended.";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly waitAction: string = "wait";
   public static readonly stopWorkAction: string = "stopWork";
@@ -741,6 +740,14 @@ export class Resources {
 
   public static formatForeignContribution(moduleId: string, name: string): string {
     return `The module ${moduleId} may contribute only names of its own, not ${name}.`;
+  }
+
+  public static formatCommandNotFinished(name: string): string {
+    return `The command ${name} did not finish because the connection to the runtime ended.`;
+  }
+
+  public static formatSettingNotConfirmed(name: string): string {
+    return `The runtime did not confirm the change to the setting ${name} because the connection to it ended.`;
   }
 
   public static formatCommandNotFound(name: string): string {

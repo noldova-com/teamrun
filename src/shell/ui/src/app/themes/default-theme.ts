@@ -217,8 +217,6 @@ export class DefaultTheme {
       ["tree-indent", "1.75rem"],
       ["section-header-height", "1.75rem"],
       ["section-header-inset", "1.5rem"],
-      ["section-header-separator-inset", "0.25rem"],
-      ["settings-search-width", "37.5rem"],
       ["settings-pages-width", "12.5rem"],
       ["settings-content-width", "50rem"],
       ["modules-list-width", "20rem"],
