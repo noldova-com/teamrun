@@ -70,7 +70,7 @@ export default class ApiDeclarationCheck implements ICheck {
         const errors = await ApiDeclarationCheck.readErrorsAsync(t, apiPackage.declarations);
         if (errors.length > 0)
           return errors;
-        const reader = new ApiSurfaceReader(t);
+        const reader = new ApiSurfaceReader(t, apiPackage.visibility);
         return (await reader.readAsync(apiPackage.implementation)).compare(await reader.readAsync(apiPackage.declarations));
       });
     }

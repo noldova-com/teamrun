@@ -94,7 +94,7 @@ export default class ApiExampleCheck implements ICheck {
   private async compileAsync(apiPackage: ApiPackage, found: ApiExamples): Promise<readonly string[]> {
     if (found.examples.length === 0)
       return [];
-    const project = new ApiProject(this.root, ApiExampleCheck.PURPOSE, apiPackage.id);
+    const project = new ApiProject(apiPackage.exampleRoot, ApiExampleCheck.PURPOSE, apiPackage.id);
     await rm(project.folder, { recursive: true, force: true });
     const files = found.examples.map(t => path.join(project.folder, t.fileName));
     await project.writeAsync(apiPackage.project, this.root, files, apiPackage.paths);

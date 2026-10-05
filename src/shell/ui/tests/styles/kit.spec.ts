@@ -17,6 +17,7 @@ import { MenuComponent } from "../../src/app/components/menu/menu.component";
 import { ThemeMode } from "../../src/app/enums/theme-mode";
 import { DefaultTheme } from "../../src/app/themes/default-theme";
 import { AppearanceFixture } from "../fixtures/appearance.fixture";
+import { MotionFixture } from "../fixtures/motion.fixture";
 
 @Component({
   imports: [MenuComponent, MenuItemComponent, MenuSeparatorComponent],
@@ -101,10 +102,9 @@ describe("kit styles", () => {
   });
 
   for (const theme of AppearanceFixture.themes)
-    it(`give scroll areas thin scrollbars without arrows whose thumb shows on hover while their content keeps the text color, with the ${theme.id} theme`, async () => {
+    it(`give every scroll area, without a class, thin scrollbars without arrows whose thumb shows on hover while it and its content keep the text color, with the ${theme.id} theme`, async () => {
       AppearanceFixture.apply(theme, ThemeMode.Light);
       const area = document.createElement("div");
-      area.className = "tr-scroll-reveal";
       area.style.cssText = "position: fixed; top: 0; left: 0; width: 200px; height: 120px; overflow: scroll;";
       const content = document.createElement("div");
       content.style.cssText = "width: 600px; height: 600px;";
@@ -117,22 +117,34 @@ describe("kit styles", () => {
         AppearanceFixture.expectLook(scrollbar.height, theme, "scrollbar-size", "height");
         expect(getComputedStyle(area, "::-webkit-scrollbar-button").display).toBe("none");
         const text = AppearanceFixture.readColor(theme, ThemeMode.Light, "foreground");
-        expect(getComputedStyle(area).color).toBe("rgba(0, 0, 0, 0)");
-        expect(getComputedStyle(content).color).toBe(text);
-        await userEvent.hover(area);
-        const probe = document.createElement("div");
-        probe.style.color = "var(--tr-scrollbar)";
-        document.body.append(probe);
-        const thumb = getComputedStyle(probe).color;
-        probe.remove();
-        expect(thumb).not.toBe("rgba(0, 0, 0, 0)");
-        await vi.waitFor(() => expect(getComputedStyle(area).color).toBe(thumb));
-        expect(getComputedStyle(content).color).toBe(text);
+        await AppearanceFixture.expectThumbRevealsOnHoverAsync(area);
+        expect([getComputedStyle(area).transitionProperty, getComputedStyle(area).color, getComputedStyle(content).color]).toEqual(["--tr-scroll-thumb", text, text]);
       }
       finally {
         area.remove();
       }
     });
+
+  it("fade a scroll area's thumb in over 150 ms, and show it at once when reduced motion is preferred", async () => {
+    AppearanceFixture.apply();
+    const area = document.body.appendChild(document.createElement("div"));
+    area.style.cssText = "position: fixed; top: 0; left: 0; width: 200px; height: 120px; overflow: scroll;";
+    area.appendChild(document.createElement("div")).style.cssText = "height: 600px;";
+    const timing = (): string[] => [getComputedStyle(area).transitionDuration, getComputedStyle(area).transitionTimingFunction];
+
+    try {
+      const fading = timing();
+      await MotionFixture.reduceAsync();
+      const reduced = timing();
+      await AppearanceFixture.expectThumbRevealsOnHoverAsync(area);
+
+      expect([fading, reduced, area.getAnimations()]).toEqual([["0.15s", "linear"], ["0s", "ease"], []]);
+    }
+    finally {
+      area.remove();
+      await MotionFixture.resetAsync();
+    }
+  });
 
   for (const mode of AppearanceFixture.modes)
     for (const theme of AppearanceFixture.themes)
