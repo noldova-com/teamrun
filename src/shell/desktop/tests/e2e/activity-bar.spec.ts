@@ -9,6 +9,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import TabRowFixture from "./fixtures/tab-row.fixture.ts";
 
 const notes = "view/notes.list";
 const outline = "view/notes.outline";
@@ -49,7 +50,7 @@ function insetsOf(group: Locator): Promise<Readonly<Record<"rem" | "firstTab" | 
     return {
       rem: Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
       firstTab: (t.querySelector("tr-tab")?.getBoundingClientRect().left ?? Number.NaN) - start,
-      actions: end - (t.querySelector(".tr-tab-group-actions")?.getBoundingClientRect().right ?? Number.NaN),
+      actions: end - ([...t.querySelectorAll(".tr-tab-group-actions button")].at(-1)?.getBoundingClientRect().right ?? Number.NaN),
       content: (content?.getBoundingClientRect().left ?? Number.NaN) + Number.parseFloat(content === null ? "" : getComputedStyle(content).paddingLeft) - start
     };
   });
@@ -146,7 +147,7 @@ test.describe("activity bar", () => {
     await desktop.checkpointAsync("group-header");
   });
 
-  test("a tab row's first tab stands 0.25rem from its card's start and its actions 0.5rem from its end, and a header's title starts where a tab's icon starts", async ({ desktop }) => {
+  test("a tab row's first tab and last action stand 0.25rem from its card's start and end in both directions, and a header's title starts where a tab's icon starts", async ({ desktop }) => {
     const window = desktop.window;
     const group = window.locator("tr-tab-group[data-side=Left]");
     const schemes = ["light", "dark"] as const;
@@ -156,6 +157,10 @@ test.describe("activity bar", () => {
       await desktop.checkpointAsync(`tab-row-${scheme}`);
     }
     const tabs = await insetsOf(group);
+    await TabRowFixture.setDirectionAsync(window, "rtl");
+    const reversed = await TabRowFixture.insetsOf(group);
+    await desktop.checkpointAsync("tab-row-rtl");
+    await TabRowFixture.setDirectionAsync(window, "ltr");
 
     await setDockStyleAsync(window, "shell.leftDockStyle", "Icons");
     await expect(group.locator(".tr-tab-group-title")).toHaveText("Notes");
@@ -167,8 +172,10 @@ test.describe("activity bar", () => {
     const header = await insetsOf(group);
 
     expect(tabs.firstTab).toBeCloseTo(tabs.rem * 0.25, 0);
-    expect(tabs.actions).toBeCloseTo(tabs.rem * 0.5, 0);
-    expect(header.actions).toBeCloseTo(tabs.rem * 0.5, 0);
+    expect(tabs.actions).toBeCloseTo(tabs.rem * 0.25, 0);
+    expect(reversed.firstTab).toBeCloseTo(tabs.rem * 0.25, 0);
+    expect(reversed.lastAction).toBeCloseTo(tabs.rem * 0.25, 0);
+    expect(header.actions).toBeCloseTo(tabs.rem * 0.25, 0);
     expect(header.content).toBeCloseTo(tabs.content, 0);
   });
 
