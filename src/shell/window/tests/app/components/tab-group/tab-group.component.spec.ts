@@ -254,18 +254,18 @@ describe("TabGroupComponent", () => {
     document.dispatchEvent(new PointerEvent("pointermove", { clientX: bounds.left + 1, clientY: bounds.top + 1 }));
     update();
 
-    expect(tab(0, 1).classList.contains("tr-tab-drop-before")).toBe(true);
+    expect(tab(0, 1).classList.contains("tr-drop-line-before")).toBe(true);
     expect(tab(1, 0).classList.contains("tr-tab-dragged")).toBe(true);
 
     under = group(0).querySelector(".tr-tab-group-end");
     document.dispatchEvent(new PointerEvent("pointermove", { clientX: bounds.right + 40, clientY: bounds.top + 1 }));
     update();
-    expect(group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-tab-drop-before")).toBe(true);
+    expect(group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-drop-line-before")).toBe(true);
 
     under = group(0).querySelector(".tr-tab-group-menu");
     document.dispatchEvent(new PointerEvent("pointermove", { clientX: bounds.right + 60, clientY: bounds.top + 1 }));
     update();
-    expect([group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-tab-drop-before"), group(0).querySelector(".tr-tab-group-actions")?.classList.contains("tr-tab-drop-before")])
+    expect([group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-drop-line-before"), group(0).querySelector(".tr-tab-group-actions")?.classList.contains("tr-drop-line-before")])
       .toEqual([true, false]);
     expect(TestBed.inject(TabDragService).hoveredGroup()).toBeNull();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
@@ -282,7 +282,7 @@ describe("TabGroupComponent", () => {
     document.dispatchEvent(new PointerEvent("pointermove", { clientX: 40, clientY: 40 }));
     update();
 
-    expect([group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-tab-drop-before"), group(0).querySelector(".tr-tab-group-actions")?.classList.contains("tr-tab-drop-before")])
+    expect([group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-drop-line-before"), group(0).querySelector(".tr-tab-group-actions")?.classList.contains("tr-drop-line-before")])
       .toEqual([false, true]);
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   });
@@ -347,7 +347,7 @@ describe("TabGroupComponent", () => {
     document.dispatchEvent(new PointerEvent("pointermove", { clientX: 40, clientY: 40 }));
     update();
 
-    expect(group(corner).querySelector(".tr-tab-group-header .tr-tab-group-actions")?.classList.contains("tr-tab-drop-before")).toBe(true);
+    expect(group(corner).querySelector(".tr-tab-group-header .tr-tab-group-actions")?.classList.contains("tr-drop-line-before")).toBe(true);
     expect(drag.hoveredGroup()).toBeNull();
     document.dispatchEvent(new PointerEvent("pointerup"));
     expect(layout.layout().group(corner)?.tabs).toEqual([LayoutFixture.files, LayoutFixture.search]);

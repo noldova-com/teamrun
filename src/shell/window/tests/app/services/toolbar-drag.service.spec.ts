@@ -63,20 +63,31 @@ describe("ToolbarDragService", () => {
   it("targets a position in a row, counting the others without the dragged toolbar", () => {
     start("a");
     moveTo(120, 20);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 0, false, 100, 8, 24));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 0, false, 100, 20, 0));
     moveTo(150, 20);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 1, false, 200, 8, 24));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 1, false, 200, 20, 0));
     moveTo(151, 20);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 1, false, 200, 8, 24));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 1, false, 200, 20, 0));
 
     start("c");
     moveTo(10, 60);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(1, 0, false, 0, 56, 24));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(1, 0, false, 0, 68, 0));
     start("c");
     moveTo(20, 20);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 0, false, 0, 8, 24));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 0, false, 0, 20, 0));
     moveTo(190, 20);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 2, false, 200, 8, 24));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 2, false, 200, 20, 0));
+  });
+
+  it("targets a position in a right-to-left row by the reading direction, with its line at the next toolbar's right edge", () => {
+    root.querySelector<HTMLElement>(Resources.toolbarBandSelector)?.setAttribute("dir", "rtl");
+    start("c");
+    moveTo(380, 20);
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 0, false, 400, 20, 0));
+    moveTo(300, 20);
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 1, false, 300, 20, 0));
+    moveTo(150, 20);
+    expect(drag.target()).toEqual(new ToolbarDropTarget(0, 2, false, 200, 20, 0));
   });
 
   it("targets a new row at the top and bottom quarter of a row, with its line in the middle of the gap between rows", () => {
@@ -101,7 +112,7 @@ describe("ToolbarDragService", () => {
     band.style.height = "";
     band.insertAdjacentHTML("beforeend", "<div class=\"tr-toolbar-row\" data-toolbar-row=\"5\" style=\"height:40px\"></div>");
     moveTo(50, 116);
-    expect(drag.target()).toEqual(new ToolbarDropTarget(5, 0, false, 0, 96, 40));
+    expect(drag.target()).toEqual(new ToolbarDropTarget(5, 0, false, 0, 116, 0));
   });
 
   it("has no target outside the band or without any row", () => {

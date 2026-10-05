@@ -371,7 +371,7 @@ test.describe("toolbars", () => {
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.main", "notes.spare", "notes.second"]]);
 
     await dragAsync(window, "notes.spare", rows => ({ x: first(rows).left + 20, y: first(rows).top + 2 }));
-    await expect(window.locator(".tr-toolbar-drop-row")).toBeVisible();
+    await expect(window.locator(".tr-drop-line-row")).toBeVisible();
     await window.mouse.up();
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.spare"], ["notes.main", "notes.second"]]);
     await desktop.checkpointAsync("toolbars-stacked");
