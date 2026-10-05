@@ -70,6 +70,10 @@
   line-height: var(--tr-line-heading);
 }
 
+.tr-settings-gallery {
+  padding-inline: var(--tr-settings-heading-inset);
+}
+
 .tr-settings-group + .tr-settings-group,
 .tr-settings-result + .tr-settings-result {
   margin-top: var(--tr-space-6);

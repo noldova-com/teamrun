@@ -317,6 +317,27 @@ describe("SettingsComponent", () => {
     expect([".tr-settings-pages", ".tr-settings-content"].map(t => element().querySelector(t)?.classList.contains("tr-scroll-reveal"))).toEqual([true, true]);
   });
 
+  it("keeps the Gallery's page between the same edges as Keyboard shortcuts' table, at the headings' inset from both ends of the column", async () => {
+    gallery = FakeGalleryComponent;
+    const host = render();
+    host.style.width = "100rem";
+    const edges = (selector: string): readonly number[] => {
+      const box = (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
+      return [Math.round(box.left), Math.round(box.right)];
+    };
+
+    await page.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true }).click();
+    fixture.detectChanges();
+    const table = edges("tr-shortcuts table");
+    const title = Math.round((host.querySelector(".tr-settings-group-title") as HTMLElement).getBoundingClientRect().left
+      + parseFloat(getComputedStyle(host.querySelector(".tr-settings-group-title") as HTMLElement).paddingLeft));
+    await page.getByRole("treeitem", { name: "Gallery", exact: true }).click();
+    fixture.detectChanges();
+
+    expect(edges(".fake-gallery")).toEqual(table);
+    expect(table[0]).toBe(title);
+  });
+
   it("shows the Gallery as the last page when the build has one, and leaves it out of a search", async () => {
     gallery = FakeGalleryComponent;
     render();
