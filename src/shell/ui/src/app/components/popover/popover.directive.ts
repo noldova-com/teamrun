@@ -11,7 +11,7 @@ import { Directive, input } from "@angular/core";
 @Directive({
   selector: "[trPopover]",
   host: {
-    "class": "tr-popover tr-scroll-reveal",
+    "class": "tr-popover",
     "role": "dialog",
     "tabindex": "-1",
     "[attr.aria-label]": "label()"

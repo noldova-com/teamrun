@@ -175,13 +175,11 @@ describe("DialogComponent", () => {
         AppearanceFixture.apply(theme, mode);
         await openAsync();
         const text = AppearanceFixture.readColor(theme, mode, "foreground");
-        const colors = (): string[] => [".tr-dialog-text", ".tr-dialog-probe"].map(t => getComputedStyle(document.querySelector(t) as HTMLElement).color);
+        const colors = (): string[] => [".tr-dialog-body", ".tr-dialog-probe"].map(t => getComputedStyle(document.querySelector(t) as HTMLElement).color);
         const opened = colors();
         const opacity = getComputedStyle(document.querySelector(".tr-dialog-probe") as HTMLElement).opacity;
 
-        await userEvent.hover(document.querySelector(".tr-dialog-probe") as HTMLElement);
-        const body = document.querySelector(".tr-dialog-body") as HTMLElement;
-        await vi.waitFor(() => expect(getComputedStyle(body).color).not.toBe("rgba(0, 0, 0, 0)"));
+        await AppearanceFixture.expectThumbRevealsOnHoverAsync(document.querySelector(".tr-dialog-body") as HTMLElement);
 
         expect([opened, opacity]).toEqual([[text, text], "1"]);
         expect(colors()).toEqual([text, text]);
