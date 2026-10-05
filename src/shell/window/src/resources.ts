@@ -33,6 +33,8 @@ export class Resources {
   public static readonly dockMinimumSize: number = 10;
   public static readonly dockStripSize: number = 2.75;
   public static readonly documentMinimumSize: number = 13.75;
+  public static readonly middlePreferredSize: number = 30;
+  public static readonly dockReopenMargin: number = 2;
   public static readonly groupMinimumLengths: Readonly<Record<SplitAxis, number>> = {
     [SplitAxis.Horizontal]: 10,
     [SplitAxis.Vertical]: 6.25

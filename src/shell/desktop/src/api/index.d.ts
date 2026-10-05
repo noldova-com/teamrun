@@ -2305,7 +2305,7 @@ export declare class WindowState {
    * @param x The left edge, an integer, or `null` together with `y`.
    * @param y The top edge, an integer, or `null` together with `x`.
    * @param width The width; an integer of at least the window's minimum width, 640.
-   * @param height The height; an integer of at least the window's minimum height, 400.
+   * @param height The height; an integer of at least the window's minimum height, 480.
    * @param isMaximized Whether the window is maximized.
    * @throws ArgumentException synchronously when only one coordinate is given.
    * @throws ArgumentOutOfRangeException synchronously for a coordinate that is not an integer or a size below the
@@ -2335,7 +2335,7 @@ export declare class WindowState {
   public static createDefault(area: ScreenArea): WindowState;
 
   /**
-   * Reads a saved state.
+   * Reads a saved state, growing a size below the window's minimum to it.
    *
    * @param value The saved JSON.
    * @returns The state.

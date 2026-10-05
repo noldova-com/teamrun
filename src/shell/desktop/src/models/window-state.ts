@@ -48,8 +48,8 @@ export class WindowState {
     const json = JsonReader.fromValue(value);
     const x = json.readNullableInteger(Resources.xField);
     const y = json.readNullableInteger(Resources.yField);
-    const width = json.readInteger(Resources.widthField);
-    const height = json.readInteger(Resources.heightField);
+    const width = Math.max(Resources.windowMinimumWidth, json.readInteger(Resources.widthField));
+    const height = Math.max(Resources.windowMinimumHeight, json.readInteger(Resources.heightField));
     const isMaximized = json.readBoolean(Resources.maximizedField);
     try {
       return new WindowState(x, y, width, height, isMaximized);

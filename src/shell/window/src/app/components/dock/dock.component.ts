@@ -96,8 +96,10 @@ export class DockComponent {
   protected toggle(group: TabGroup, tab: Tab): void {
     if (this.isShowing(group, tab))
       this.layout.toggleDock(this.side());
-    else
+    else {
       this.layout.activate(tab);
+      this.layout.keepOpen(this.side());
+    }
   }
 
   protected pixels(rem: number): number {
