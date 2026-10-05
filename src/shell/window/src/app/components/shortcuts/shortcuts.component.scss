@@ -72,6 +72,7 @@
 
 .tr-shortcut-name {
   display: block;
+  overflow-wrap: anywhere;
   color: var(--tr-text-muted);
   font-size: var(--tr-text-label);
   line-height: var(--tr-line-label);

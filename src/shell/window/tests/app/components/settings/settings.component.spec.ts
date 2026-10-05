@@ -426,7 +426,7 @@ describe("SettingsComponent", () => {
 
     expect([split?.querySelector(".tr-shortcut-title")?.textContent?.trim(), split?.querySelector(".tr-shortcut-name")?.textContent]).toEqual(["Split the tab up", "shell.splitTabUp"]);
     expect([...split?.querySelectorAll(".tr-shortcut-name mark") ?? []].map(t => t.textContent)).toEqual(["bU"]);
-    expect(split?.querySelector(".tr-shortcut-title mark")).toBeNull();
+    expect([".tr-shortcut-title", ".tr-shortcut-owner", ".tr-shortcut-key"].map(t => split?.querySelectorAll(`${t} mark`).length)).toEqual([0, 0, 0]);
   });
 
   it("finds commands by their owner", async () => {

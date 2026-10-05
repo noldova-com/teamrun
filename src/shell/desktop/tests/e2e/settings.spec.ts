@@ -217,13 +217,37 @@ test.describe("settings", () => {
 
     await expect(split.locator(".tr-shortcut-title")).toHaveText("Split the tab up");
     await expect(split.locator(".tr-shortcut-name mark")).toHaveText(["bU"]);
-    await expect(split.locator(".tr-shortcut-title mark")).toHaveCount(0);
+    await expect(split.locator(".tr-shortcut-title mark, .tr-shortcut-owner mark, .tr-shortcut-key mark")).toHaveCount(0);
     await expect(window.locator(".tr-settings-pages [aria-selected=true]")).toHaveCount(0);
     expect(await split.locator(".tr-shortcut-name mark").evaluate(t => getComputedStyle(t).textDecorationLine)).toBe("underline");
     for (const scheme of ["light", "dark"] as const) {
       await window.emulateMedia({ colorScheme: scheme });
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
       await desktop.checkpointAsync(`settings-shortcut-id-search-${scheme}`);
+    }
+  });
+
+  test("in the narrowest window every command's id wraps within its Command cell, the longest included", async ({ desktop }) => {
+    const window = desktop.window;
+    const longest = window.locator("[data-command=\"shell.moveTabToPreviousGroup\"]");
+    await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
+
+    await desktop.useViewportAsync(640, 480);
+    await window.locator(".tr-settings-content").hover({ position: { x: 4, y: 4 } });
+    const overflows = await window.locator("tr-shortcuts tbody tr").evaluateAll(rows => rows.map(t => {
+      const cell = t.querySelector("td") as HTMLElement;
+      const end = cell.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(cell).paddingRight);
+      return [t.getAttribute("data-command"), Math.max(0, Math.round((t.querySelector(".tr-shortcut-name") as HTMLElement).getBoundingClientRect().right - end))] as const;
+    }));
+
+    expect(overflows.length).toBeGreaterThan(20);
+    expect(overflows.filter(t => t[1] !== 0)).toEqual([]);
+    await longest.scrollIntoViewIfNeeded();
+    expect(await longest.locator(".tr-shortcut-name").evaluate(t => t.getBoundingClientRect().height > Number.parseFloat(getComputedStyle(t).lineHeight))).toBe(true);
+    for (const scheme of ["light", "dark"] as const) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await desktop.checkpointAsync(`settings-shortcut-ids-narrow-${scheme}`);
     }
   });
 

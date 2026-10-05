@@ -144,12 +144,31 @@ describe("ShortcutsComponent", () => {
     const ownerLine = owner.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(owner).paddingTop);
     const key = keyOf("clock.tick").getBoundingClientRect();
 
-    expect([...element().querySelectorAll("tbody tr")].every(t => t.querySelector(".tr-shortcut-name")?.textContent === t.getAttribute("data-command"))).toBe(true);
+    const rows = [...element().querySelectorAll("tbody tr")];
+    expect(rows.length).toBeGreaterThan(2);
+    expect(rows.map(t => t.querySelector(".tr-shortcut-name")?.textContent)).toEqual(rows.map(t => t.getAttribute("data-command")));
     expect(look(name)).toEqual(look(probe));
     expect(name.getBoundingClientRect().top).toBeCloseTo(title.bottom, 0);
-    expect([ownerLine, key.top].map(t => Math.abs(t - title.top) <= 1)).toEqual([true, true]);
+    expect(Math.abs(ownerLine - title.top)).toBeLessThanOrEqual(1);
+    expect(Math.abs(key.top - title.top)).toBeLessThanOrEqual(1);
     expect(key.height).toBeCloseTo(title.height, 0);
     probe.remove();
+  });
+
+  it("wraps a long id within its Command cell when the table is narrow", async () => {
+    AppearanceFixture.apply();
+    await renderAsync();
+    element().style.width = "22rem";
+    await settleAsync();
+    const overflows = [...element().querySelectorAll<HTMLElement>("tbody tr")].map(t => {
+      const cell = t.querySelector("td") as HTMLElement;
+      const end = cell.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(cell).paddingRight);
+      return [t.getAttribute("data-command"), Math.max(0, Math.round((t.querySelector(".tr-shortcut-name") as HTMLElement).getBoundingClientRect().right - end))];
+    });
+    const long = row("shell.moveTabToPreviousGroup").querySelector(".tr-shortcut-name") as HTMLElement;
+
+    expect(overflows.filter(t => t[1] !== 0)).toEqual([]);
+    expect(long.getBoundingClientRect().height).toBeGreaterThan(Number.parseFloat(getComputedStyle(long).lineHeight));
   });
 
   it("records a new key from the first key pressed after the modifiers, without running the command it would run, and keeps the focus", async () => {
