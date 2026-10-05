@@ -54,8 +54,8 @@ export class FakePreloadElectron {
       require(preloadPath);
     }
     finally {
-      Reflect.deleteProperty(require.cache, electronPath);
-      Reflect.deleteProperty(require.cache, preloadPath);
+      delete require.cache[electronPath];
+      delete require.cache[preloadPath];
       process.argv.splice(process.argv.length - argument.length, argument.length);
     }
     return electron;

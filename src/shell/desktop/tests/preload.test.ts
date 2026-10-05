@@ -13,9 +13,14 @@ import { FakePreloadElectron } from "./fixtures/fake-preload-electron.fixture.js
 @TestClass
 export class PreloadTests {
   @TestMethod
-  public exposesItsPlatformAndTheAppearanceItsWindowWasOpenedWith(): void {
+  public exposesExactlyItsMembersWithItsPlatformAndTheAppearanceItsWindowWasOpenedWith(): void {
     const api = FakePreloadElectron.load("{\"background\":\"#181818\"}").api("teamrun");
 
+    Assert.areEqual([
+      "platform", "appearance", "notifyReady", "notifyAppearance", "onCloseRequest", "answerClose", "readStartup", "onStartup", "actOnStartup", "readLayout",
+      "writeLayout", "request", "onEvent", "readBuild", "copyText", "openLogFolder", "keepAppearance", "edit", "setMenuBar", "onMenuCommand", "onNotificationOpened",
+      "onQuitQuestion", "answerQuit", "logModule", "logError"
+    ].join(","), Object.keys(api).join(","));
     Assert.areEqual(process.platform, api["platform"]);
     Assert.areEqual("{\"background\":\"#181818\"}", JSON.stringify(api["appearance"]));
   }
@@ -32,12 +37,12 @@ export class PreloadTests {
     const electron = FakePreloadElectron.load();
     const api = electron.api("teamrun");
 
-    PreloadTests.invoke(api, "notifyReady", "ready");
-    PreloadTests.invoke(api, "notifyAppearance", "appearance");
-    PreloadTests.invoke(api, "keepAppearance", "preferences");
-    PreloadTests.invoke(api, "setMenuBar", "menus");
-    PreloadTests.invoke(api, "logModule", "clock", "line");
-    PreloadTests.invoke(api, "logError", null, "error");
+    PreloadTests.invoke(api["notifyReady"], "ready");
+    PreloadTests.invoke(api["notifyAppearance"], "appearance");
+    PreloadTests.invoke(api["keepAppearance"], "preferences");
+    PreloadTests.invoke(api["setMenuBar"], "menus");
+    PreloadTests.invoke(api["logModule"], "clock", "line");
+    PreloadTests.invoke(api["logError"], null, "error");
 
     Assert.areEqual(JSON.stringify([
       ["teamrun:ready", "ready"],
@@ -55,17 +60,17 @@ export class PreloadTests {
     const api = electron.api("teamrun");
 
     const replies = await Promise.all([
-      PreloadTests.invoke(api, "answerClose", "request", true),
-      PreloadTests.invoke(api, "readStartup"),
-      PreloadTests.invoke(api, "actOnStartup", "retry"),
-      PreloadTests.invoke(api, "readLayout"),
-      PreloadTests.invoke(api, "writeLayout", "layout"),
-      PreloadTests.invoke(api, "request", "notes.open", "payload"),
-      PreloadTests.invoke(api, "readBuild"),
-      PreloadTests.invoke(api, "copyText", "text"),
-      PreloadTests.invoke(api, "openLogFolder"),
-      PreloadTests.invoke(api, "edit", "copy"),
-      PreloadTests.invoke(api, "answerQuit", "wait")
+      PreloadTests.invoke(api["answerClose"], "request", true),
+      PreloadTests.invoke(api["readStartup"]),
+      PreloadTests.invoke(api["actOnStartup"], "retry"),
+      PreloadTests.invoke(api["readLayout"]),
+      PreloadTests.invoke(api["writeLayout"], "layout"),
+      PreloadTests.invoke(api["request"], "notes.open", "payload"),
+      PreloadTests.invoke(api["readBuild"]),
+      PreloadTests.invoke(api["copyText"], "text"),
+      PreloadTests.invoke(api["openLogFolder"]),
+      PreloadTests.invoke(api["edit"], "copy"),
+      PreloadTests.invoke(api["answerQuit"], "wait")
     ]);
 
     Assert.areEqual(JSON.stringify([
@@ -96,18 +101,17 @@ export class PreloadTests {
     const heard: unknown[][] = [];
     const values = ["first", "second"].slice(0, valueCount);
 
-    const remove = PreloadTests.invoke(electron.api("teamrun"), member, (...received: unknown[]) => heard.push(received));
+    const remove = PreloadTests.invoke(electron.api("teamrun")[member], (...received: unknown[]) => heard.push(received));
     electron.emit(channel, ...values);
-    (remove as () => void)();
+    PreloadTests.invoke(remove);
     electron.emit(channel, ...values);
 
     Assert.areEqual(JSON.stringify([values]), JSON.stringify(heard));
     Assert.areEqual(0, electron.count(channel));
   }
 
-  private static invoke(api: Record<string, unknown>, member: string, ...values: unknown[]): unknown {
-    const method = api[member];
-    Assert.isTrue(typeof method === "function", member);
+  private static invoke(method: unknown, ...values: unknown[]): unknown {
+    Assert.isTrue(typeof method === "function", String(method));
     return (method as (...values: unknown[]) => unknown)(...values);
   }
 }
