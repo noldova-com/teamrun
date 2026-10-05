@@ -606,6 +606,7 @@ export class Resources {
   public static readonly invalidModuleId: string = "A module id is lowercase kebab-case.";
   public static readonly windowPartLoadFailed: string = "Its window part could not be loaded.";
   public static readonly windowPartActivationFailed: string = "Its window part failed to activate.";
+  public static readonly windowPartReconnectionFailed: string = "Its window part failed to continue after the runtime started again.";
   public static readonly windowLogLimit: number = 65536;
   public static readonly causeSeparator: string = "\nCaused by: ";
   public static readonly invalidInstance: string = "An instance is a string that is not blank.";
