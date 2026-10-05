@@ -16,21 +16,25 @@ export default class PackageTarget {
     ["macos", new Map([["dmg", "dmg"], ["zip", "zip"]])],
     ["linux", new Map([["AppImage", "AppImage"]])]
   ]);
+  private static readonly UPDATE_EXTENSIONS: ReadonlyMap<string, string> = new Map([["windows", "exe"], ["macos", "zip"], ["linux", "AppImage"]]);
 
   public readonly platform: string;
   public readonly architecture: string;
   public readonly formats: readonly string[];
   public readonly extensions: readonly string[];
+  public readonly updateExtension: string;
 
   public constructor(platform: string, architecture: string) {
     const formats = PackageTarget.FORMATS.get(platform);
-    if (formats === undefined || !PackageTarget.ARCHITECTURES.includes(architecture))
+    const updateExtension = PackageTarget.UPDATE_EXTENSIONS.get(platform);
+    if (formats === undefined || updateExtension === undefined || !PackageTarget.ARCHITECTURES.includes(architecture))
       throw new PackagingException(`Packages are made for windows, macos and linux on x64 and arm64, not for ${platform} on ${architecture}.`);
 
     this.platform = platform;
     this.architecture = architecture;
     this.formats = [...formats.keys()];
     this.extensions = [...formats.values()];
+    this.updateExtension = updateExtension;
   }
 
   public static fromProcess(platform: string, architecture: string): PackageTarget {
@@ -43,5 +47,9 @@ export default class PackageTarget {
 
   public formatFileName(productName: string, extension: string): string {
     return `${productName}-${this.platform}-${this.architecture}.${extension}`;
+  }
+
+  public listFileNames(productName: string): readonly string[] {
+    return this.extensions.map(t => this.formatFileName(productName, t));
   }
 }

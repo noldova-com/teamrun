@@ -44,13 +44,16 @@ class ReleasePublishTests {
       assert.deepEqual(github.releases.map(t => [t.tag, t.isDraft, t.assets.length]), [["v0.0.7", false, 22]]);
     });
 
-    test("a relative folder, missing notes, files that differ from the release or a GitHub failure fails with the reason, and an unexpected error reaches the caller", async t => {
+    test("a relative, missing or #-marked folder, missing notes, files that differ from the release or a GitHub failure fails with the reason, and an unexpected error reaches the caller", async t => {
       const [repository, release] = await ReleasePublishTests.createAsync(t);
       const refusing = new ReleaseGitHubFixture();
       refusing.upload("Fixture Studio-windows-x64.exe", ["is refused"]);
       const cases = [
         [{ RELEASE_FOLDER: "out" }, new ReleaseGitHubFixture(), "RELEASE_FOLDER must be the absolute path of the folder that holds the release's files, not \"out\".\n"],
         [{ RELEASE_FOLDER: undefined }, new ReleaseGitHubFixture(), "RELEASE_FOLDER must be the absolute path of the folder that holds the release's files, not \"\".\n"],
+        [{ RELEASE_FOLDER: release.locate("out#1") }, new ReleaseGitHubFixture(),
+          `RELEASE_FOLDER must not contain #, which gh release upload reads as the start of a file's label: "${release.locate("out#1")}".\n`],
+        [{ RELEASE_FOLDER: release.locate("missing") }, new ReleaseGitHubFixture(), `The release's folder ${release.locate("missing")} does not exist.\n`],
         [{ RELEASE_NOTES: " " }, new ReleaseGitHubFixture(), "RELEASE_NOTES must hold the release's notes.\n"],
         [{ RELEASE_NOTES: undefined }, new ReleaseGitHubFixture(), "RELEASE_NOTES must hold the release's notes.\n"],
         [{ RELEASE_VERSION: "0.0.8" }, new ReleaseGitHubFixture(), "latest-windows-x64.yml does not describe version 0.0.8 with Fixture Studio-windows-x64.exe as they are.\n"],

@@ -56,7 +56,7 @@ export default class PackageConfiguration {
   }
 
   public get fileNames(): readonly string[] {
-    return this.target.extensions.map(t => this.target.formatFileName(this.manifest.product.name, t));
+    return this.target.listFileNames(this.manifest.product.name);
   }
 
   public toJson(): Record<string, unknown> {

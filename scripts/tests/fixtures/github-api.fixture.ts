@@ -15,6 +15,8 @@ export default class GitHubApiFixture extends ProcessRunner {
   public static readonly REPOSITORY: string = "noldova-com/teamrun";
 
   private static readonly PREFIX: string = `repos/${GitHubApiFixture.REPOSITORY}`;
+  private static readonly READ: string = "GET";
+  private static readonly FIELD_OPTIONS: readonly string[] = ["--raw-field", "--field"];
 
   private readonly answers: Map<string, string[]> = new Map<string, string[]>();
   private readonly failures: Map<string, string> = new Map<string, string>();
@@ -49,18 +51,24 @@ export default class GitHubApiFixture extends ProcessRunner {
       throw new Error(`Unexpected command ${command} ${commandArguments.join(" ")}.`);
     const resource = endpoint.slice(GitHubApiFixture.PREFIX.length);
     const methodIndex = commandArguments.indexOf("--method");
-    this.requests.push(`${methodIndex < 0 ? "GET" : commandArguments[methodIndex + 1]} ${resource}`);
-    this.fields.push(...commandArguments.filter((_, index) => commandArguments[index - 1] === "--raw-field"));
+    const method = methodIndex < 0 ? GitHubApiFixture.READ : String(commandArguments[methodIndex + 1]);
+    this.requests.push(`${method} ${resource}`);
+    const fields = commandArguments.filter((_, index) => GitHubApiFixture.FIELD_OPTIONS.includes(String(commandArguments[index - 1])));
+    this.fields.push(...fields);
     const bodyArgument = commandArguments.find(t => t.startsWith("body="));
     if (bodyArgument !== undefined)
       this.bodies.push(bodyArgument.slice("body=".length));
+    return this.respondAsync(method, resource, new Map(fields.map(t => [t.slice(0, t.indexOf("=")), t.slice(t.indexOf("=") + 1)])), commandArguments.includes("--slurp"));
+  }
+
+  protected async respondAsync(method: string, resource: string, _fields: ReadonlyMap<string, string>, isPaged: boolean): Promise<ProcessResult> {
     const failure = this.failures.get(resource);
     if (failure !== undefined)
       return new ProcessResult(1, "", failure);
     const answers = this.answers.get(resource) ?? [];
     const answer = answers.length > 1 ? answers.shift() : answers[0];
-    if (answer === undefined && methodIndex < 0)
+    if (answer === undefined && method === GitHubApiFixture.READ)
       throw new Error(`No answer recorded for ${resource}.`);
-    return new ProcessResult(0, commandArguments.includes("--slurp") ? `[${answer}]` : answer ?? "{}", "");
+    return new ProcessResult(0, isPaged ? `[${answer}]` : answer ?? "{}", "");
   }
 }

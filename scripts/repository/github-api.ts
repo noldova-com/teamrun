@@ -15,6 +15,7 @@ export default class GitHubApi {
   private static readonly NAME: string = "gh";
   private static readonly TIMEOUT: number = 60_000;
   private static readonly UPLOAD_TIMEOUT: number = 900_000;
+  private static readonly NOT_FOUND: number = 404;
   private static readonly STATUS_PATTERN: RegExp = /\bHTTP (\d{3})\b/u;
 
   private readonly repository: string;
@@ -38,29 +39,44 @@ export default class GitHubApi {
     return GitHubJson.array(pages, resource).flatMap(t => GitHubJson.array(t, resource));
   }
 
-  public async writeAsync(method: string, resource: string, body: string): Promise<void> {
-    await this.captureAsync(["api", "--method", method, this.locate(resource), "--raw-field", `body=${body}`]);
+  public async readOptionalAsync(resource: string): Promise<unknown> {
+    try {
+      return await this.readAsync(resource);
+    }
+    catch (error) {
+      if (error instanceof GitHubException && error.status === GitHubApi.NOT_FOUND)
+        return null;
+      throw error;
+    }
   }
 
-  public async createAsync(resource: string, fields: readonly (readonly [string, string])[]): Promise<unknown> {
-    return this.parse(await this.captureAsync(["api", "--method", "POST", this.locate(resource), ...fields.flatMap(([name, value]) => ["--raw-field", `${name}=${value}`])]), resource);
+  public async writeAsync(method: string, resource: string, body: string): Promise<void> {
+    await this.captureAsync(this.formatRequest(method, resource, [["body", body]], []));
+  }
+
+  public createAsync(resource: string, fields: readonly (readonly [string, string])[]): Promise<unknown> {
+    return this.sendAsync("POST", resource, fields, []);
   }
 
   public async postAsync(resource: string): Promise<void> {
-    await this.captureAsync(["api", "--method", "POST", this.locate(resource)]);
+    await this.captureAsync(this.formatRequest("POST", resource, [], []));
   }
 
   public async sendAsync(method: string, resource: string, texts: readonly (readonly [string, string])[], flags: readonly (readonly [string, boolean])[]): Promise<unknown> {
-    return this.parse(await this.captureAsync(["api", "--method", method, this.locate(resource), ...texts.flatMap(([name, value]) => ["--raw-field", `${name}=${value}`]),
-      ...flags.flatMap(([name, value]) => ["--field", `${name}=${value}`])]), resource);
+    return this.parse(await this.captureAsync(this.formatRequest(method, resource, texts, flags)), resource);
   }
 
   public async deleteAsync(resource: string): Promise<void> {
-    await this.captureAsync(["api", "--method", "DELETE", this.locate(resource)]);
+    await this.captureAsync(this.formatRequest("DELETE", resource, [], []));
   }
 
   public async uploadAsync(tag: string, file: string): Promise<void> {
     await this.captureAsync(["release", "upload", tag, file, "--repo", this.repository], GitHubApi.UPLOAD_TIMEOUT);
+  }
+
+  private formatRequest(method: string, resource: string, texts: readonly (readonly [string, string])[], flags: readonly (readonly [string, boolean])[]): readonly string[] {
+    return ["api", "--method", method, this.locate(resource), ...texts.flatMap(([name, value]) => ["--raw-field", `${name}=${value}`]),
+      ...flags.flatMap(([name, value]) => ["--field", `${name}=${value}`])];
   }
 
   private locate(resource: string): string {

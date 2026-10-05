@@ -16,22 +16,22 @@ export default class UpdateMetadata {
   private static readonly RELEASE_DATE: RegExp = /^releaseDate: '([^'\n]+)'$/mu;
 
   private readonly version: string;
-  private readonly files: readonly ReleaseFile[];
   private readonly update: ReleaseFile;
+  private readonly others: readonly ReleaseFile[];
   private readonly releaseDate: string;
 
-  public constructor(version: string, files: readonly ReleaseFile[], releaseDate: string) {
-    const update = files[0];
+  public constructor(version: string, updateName: string, files: readonly ReleaseFile[], releaseDate: string) {
+    const update = files.find(t => t.name === updateName);
     if (update === undefined)
-      throw new ReleaseException(`The update metadata of ${version} names no file.`);
+      throw new ReleaseException(`The update metadata of ${version} needs its update file ${updateName} among its files.`);
 
     this.version = version;
-    this.files = files;
     this.update = update;
+    this.others = files.filter(t => t !== update);
     this.releaseDate = releaseDate;
   }
 
-  public static fileNameOf(target: PackageTarget): string {
+  public static formatFileName(target: PackageTarget): string {
     return `${UpdateMetadata.PREFIX}-${target.platform}-${target.architecture}.${UpdateMetadata.EXTENSION}`;
   }
 
@@ -50,7 +50,7 @@ export default class UpdateMetadata {
     return [
       `version: ${this.version}`,
       "files:",
-      ...this.files.flatMap(t => [`  - url: ${UpdateMetadata.quote(t.name)}`, `    sha512: ${t.digest.sha512}`, `    size: ${t.digest.size}`]),
+      ...[this.update, ...this.others].flatMap(t => [`  - url: ${UpdateMetadata.quote(t.name)}`, `    sha512: ${t.digest.sha512}`, `    size: ${t.digest.size}`]),
       `path: ${UpdateMetadata.quote(this.update.name)}`,
       `sha512: ${this.update.digest.sha512}`,
       `releaseDate: ${UpdateMetadata.quote(this.releaseDate)}`,

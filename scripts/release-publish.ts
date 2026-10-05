@@ -26,6 +26,7 @@ export default class ReleasePublish {
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly FOLDER_VARIABLE: string = "RELEASE_FOLDER";
   private static readonly NOTES_VARIABLE: string = "RELEASE_NOTES";
+  private static readonly LABEL_MARK: string = "#";
 
   private readonly root: string;
   private readonly runner: ProcessRunner;
@@ -61,15 +62,15 @@ export default class ReleasePublish {
     const folder = this.environment[ReleasePublish.FOLDER_VARIABLE] ?? "";
     if (!path.isAbsolute(folder))
       throw new ReleaseException(`${ReleasePublish.FOLDER_VARIABLE} must be the absolute path of the folder that holds the release's files, not "${folder}".`);
+    if (folder.includes(ReleasePublish.LABEL_MARK))
+      throw new ReleaseException(`${ReleasePublish.FOLDER_VARIABLE} must not contain ${ReleasePublish.LABEL_MARK}, which gh release upload reads as the start of a file's label: "${folder}".`);
     const notes = this.environment[ReleasePublish.NOTES_VARIABLE] ?? "";
     if (notes.trim().length === 0)
       throw new ReleaseException(`${ReleasePublish.NOTES_VARIABLE} must hold the release's notes.`);
 
     const manifest = await RootManifest.readAsync(this.root);
-    const files = new ReleaseFileSet(manifest.product.name);
-    await files.verifyAsync(folder, request.version.text);
-    await new ReleasePublisher(new GitHubApi(request.repository, this.runner, this.root), this.output)
-      .publishAsync(request.version, request.revision, folder, files.listAll(), notes);
+    const files = await new ReleaseFileSet(manifest.product.name).verifyAsync(folder, request.version.text);
+    await new ReleasePublisher(new GitHubApi(request.repository, this.runner, this.root), this.output).publishAsync(request.version, request.revision, folder, files, notes);
   }
 }
 

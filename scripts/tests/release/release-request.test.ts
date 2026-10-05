@@ -28,6 +28,9 @@ class ReleaseRequestTests {
       assert.throws(() => ReleaseRequest.read({ ...valid, RELEASE_REPOSITORY: undefined }), new ReleaseException("RELEASE_REPOSITORY must name a repository as owner/name, not \"\"."));
       assert.throws(() => ReleaseRequest.read({ ...valid, RELEASE_REPOSITORY: "noldova-com/teamrun/x" }),
         new ReleaseException("RELEASE_REPOSITORY must name a repository as owner/name, not \"noldova-com/teamrun/x\"."));
+      for (const name of ["noldova-com/..", "noldova-com/."])
+        assert.throws(() => ReleaseRequest.read({ ...valid, RELEASE_REPOSITORY: name }), new ReleaseException(`RELEASE_REPOSITORY must name a repository as owner/name, not "${name}".`));
+      assert.equal(ReleaseRequest.read({ ...valid, RELEASE_REPOSITORY: "noldova-com/.github" }).repository, "noldova-com/.github");
       assert.throws(() => ReleaseRequest.read({ ...valid, RELEASE_VERSION: undefined }), new ReleaseException("RELEASE_VERSION must be a plain version such as 0.0.2, not \"\"."));
       assert.throws(() => ReleaseRequest.read({ ...valid, RELEASE_REVISION: undefined }),
         new ReleaseException("RELEASE_REVISION must be a full commit SHA of 40 lowercase hexadecimal digits, not \"\"."));

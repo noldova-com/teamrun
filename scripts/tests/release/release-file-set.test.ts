@@ -24,8 +24,8 @@ class ReleaseFileSetTests {
       assert.deepEqual(names, [
         "TeamRun-windows-x64.exe", "TeamRun-windows-x64.exe.sha256", "latest-windows-x64.yml",
         "TeamRun-windows-arm64.exe", "TeamRun-windows-arm64.exe.sha256", "latest-windows-arm64.yml",
-        "TeamRun-macos-x64.zip", "TeamRun-macos-x64.dmg", "TeamRun-macos-x64.zip.sha256", "TeamRun-macos-x64.dmg.sha256", "latest-macos-x64.yml",
-        "TeamRun-macos-arm64.zip", "TeamRun-macos-arm64.dmg", "TeamRun-macos-arm64.zip.sha256", "TeamRun-macos-arm64.dmg.sha256", "latest-macos-arm64.yml",
+        "TeamRun-macos-x64.dmg", "TeamRun-macos-x64.zip", "TeamRun-macos-x64.dmg.sha256", "TeamRun-macos-x64.zip.sha256", "latest-macos-x64.yml",
+        "TeamRun-macos-arm64.dmg", "TeamRun-macos-arm64.zip", "TeamRun-macos-arm64.dmg.sha256", "TeamRun-macos-arm64.zip.sha256", "latest-macos-arm64.yml",
         "TeamRun-linux-x64.AppImage", "TeamRun-linux-x64.AppImage.sha256", "latest-linux-x64.yml",
         "TeamRun-linux-arm64.AppImage", "TeamRun-linux-arm64.AppImage.sha256", "latest-linux-arm64.yml"
       ]);
@@ -38,7 +38,7 @@ class ReleaseFileSetTests {
 
       const written = await release.files.writeAsync(release.folder, new PackageTarget("macos", "arm64"), "0.0.2", "2026-10-06T00:00:00.000Z");
 
-      assert.deepEqual(written, ["TeamRun-macos-arm64.zip", "TeamRun-macos-arm64.dmg", "TeamRun-macos-arm64.zip.sha256", "TeamRun-macos-arm64.dmg.sha256", "latest-macos-arm64.yml"]);
+      assert.deepEqual(written, ["TeamRun-macos-arm64.dmg", "TeamRun-macos-arm64.zip", "TeamRun-macos-arm64.dmg.sha256", "TeamRun-macos-arm64.zip.sha256", "latest-macos-arm64.yml"]);
       assert.equal(await readFile(release.locate("TeamRun-macos-arm64.dmg.sha256"), "utf8"), `${createHash("sha256").update(dmg).digest("hex")}  TeamRun-macos-arm64.dmg\n`);
       const metadata = await readFile(release.locate("latest-macos-arm64.yml"), "utf8");
       assert.ok(metadata.startsWith(`version: 0.0.2\nfiles:\n  - url: 'TeamRun-macos-arm64.zip'\n    sha512: ${createHash("sha512").update(zip).digest("base64")}\n    size: ${zip.length}\n`), metadata);
@@ -51,6 +51,23 @@ class ReleaseFileSetTests {
 
       await assert.rejects(release.files.writeAsync(release.folder, new PackageTarget("linux", "x64"), "0.0.2", ReleaseFolderFixture.RELEASE_DATE),
         new ReleaseException(`${release.locate("TeamRun-linux-x64.AppImage")} is missing; npm run package makes it.`));
+    });
+
+    test("the check returns every file of the release with its digest, in the release's order", async t => {
+      const release = await ReleaseFileSetTests.createAsync(t);
+      const exe = "TeamRun-windows-x64.exe\n";
+
+      const files = await release.files.verifyAsync(release.folder, "0.0.2");
+
+      assert.deepEqual(files.map(t => t.name), release.names);
+      assert.deepEqual([files[0]?.digest.sha256, files[0]?.digest.size], [createHash("sha256").update(exe).digest("hex"), exe.length]);
+    });
+
+    test("a missing folder is named", async t => {
+      const release = await ReleaseFileSetTests.createAsync(t);
+      const folder = release.locate("missing");
+
+      await assert.rejects(release.files.verifyAsync(folder, "0.0.2"), new ReleaseException(`The release's folder ${folder} does not exist.`));
     });
 
     test("a complete folder passes the check, and missing or extra files, a checksum or metadata that differs, or a release date that is gone fail it", async t => {

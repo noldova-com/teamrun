@@ -13,7 +13,7 @@ export default class ReleaseRequest {
   private static readonly REPOSITORY_VARIABLE: string = "RELEASE_REPOSITORY";
   private static readonly VERSION_VARIABLE: string = "RELEASE_VERSION";
   private static readonly REVISION_VARIABLE: string = "RELEASE_REVISION";
-  private static readonly REPOSITORY_PATTERN: RegExp = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/u;
+  private static readonly REPOSITORY_PATTERN: RegExp = /^[A-Za-z0-9-]+\/(?!\.+$)[A-Za-z0-9._-]+$/u;
   private static readonly REVISION_PATTERN: RegExp = /^[0-9a-f]{40}$/u;
 
   public readonly repository: string;

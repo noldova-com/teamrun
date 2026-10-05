@@ -87,6 +87,19 @@ class GitHubApiTests {
       await assert.rejects(api.postAsync("/actions/runs/9/cancel"), t => t instanceof GitHubException && t.status === null);
     });
 
+    test("an optional read returns nothing for a missing resource and passes any other failure on", async () => {
+      const runner = new ProcessRunnerFixture([], [
+        new ProcessResult(1, "", "gh: Not Found (HTTP 404)\n"),
+        new ProcessResult(1, "", "gh: Server Error (HTTP 500)\n"),
+        new ProcessResult(0, "{\"status\":\"ahead\"}", "")
+      ]);
+      const api = new GitHubApi(GitHubApiTests.REPOSITORY, runner, "work");
+
+      assert.equal(await api.readOptionalAsync("/git/ref/tags/v0.0.2"), null);
+      await assert.rejects(api.readOptionalAsync("/git/ref/tags/v0.0.2"), t => t instanceof GitHubException && t.status === 500);
+      assert.deepEqual(await api.readOptionalAsync("/compare/a...main"), { status: "ahead" });
+    });
+
     test("a failed command and an answer that is not JSON are refused with the cause", async () => {
       const failing = new ProcessRunnerFixture([], [new ProcessResult(1, "", "HTTP 403: Resource not accessible\n")]);
       const text = new ProcessRunnerFixture([], [new ProcessResult(0, "<html>", ""), new ProcessResult(0, "<html>", "")]);

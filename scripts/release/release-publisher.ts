@@ -11,12 +11,14 @@ import type { Writable } from "node:stream";
 import timers from "node:timers/promises";
 
 import type GitHubApi from "../repository/github-api.ts";
+import ProcessException from "../processes/process.exception.ts";
 import GitHubException from "../repository/github.exception.ts";
 import GitHubJson from "../repository/github-json.ts";
 import GitHubRelease from "./github-release.ts";
 import type GitHubReleaseAsset from "./github-release-asset.ts";
-import PackageDigest from "./package-digest.ts";
+import type PackageDigest from "./package-digest.ts";
 import ReleaseException from "./release.exception.ts";
+import type ReleaseFile from "./release-file.ts";
 import type ReleaseVersion from "./release-version.ts";
 
 export default class ReleasePublisher {
@@ -25,7 +27,6 @@ export default class ReleasePublisher {
   private static readonly DIGEST_PREFIX: string = "sha256:";
   private static readonly RETRIED_STATUSES: readonly number[] = [408, 429];
   private static readonly SERVER_ERROR: number = 500;
-  private static readonly NOT_FOUND: number = 404;
   private static readonly COMMIT_TYPE: string = "commit";
   private static readonly LATEST: string = "true";
 
@@ -37,9 +38,9 @@ export default class ReleasePublisher {
     this.output = output;
   }
 
-  private static isTransient(error: unknown): error is GitHubException {
-    return error instanceof GitHubException
-      && (error.status === null || error.status >= ReleasePublisher.SERVER_ERROR || ReleasePublisher.RETRIED_STATUSES.includes(error.status));
+  private static isTransient(error: unknown): error is GitHubException | ProcessException {
+    return error instanceof ProcessException || (error instanceof GitHubException
+      && (error.status === null || error.status >= ReleasePublisher.SERVER_ERROR || ReleasePublisher.RETRIED_STATUSES.includes(error.status)));
   }
 
   private static requireSame(asset: GitHubReleaseAsset, digest: PackageDigest): void {
@@ -63,10 +64,8 @@ export default class ReleasePublisher {
       throw new ReleaseException(`${release.tag} on GitHub differs from the built files. Missing: ${missing.join(", ") || "none"}. Not part of the release: ${unexpected.join(", ") || "none"}.`);
   }
 
-  public async publishAsync(version: ReleaseVersion, revision: string, folder: string, names: readonly string[], notes: string): Promise<void> {
-    const digests = new Map<string, PackageDigest>();
-    for (const name of names)
-      digests.set(name, await PackageDigest.readAsync(path.join(folder, name)));
+  public async publishAsync(version: ReleaseVersion, revision: string, folder: string, files: readonly ReleaseFile[], notes: string): Promise<void> {
+    const digests = new Map(files.map(t => [t.name, t.digest]));
     const releases = (await this.api.readPagesAsync("/releases")).map((t, index) => GitHubRelease.read(t, `releases[${index}]`)).filter(t => t.tag === version.tag);
     if (releases.length > 1)
       throw new ReleaseException(`${releases.length} releases use the tag ${version.tag}; delete all but one by hand before publishing.`);
@@ -84,6 +83,9 @@ export default class ReleasePublisher {
     for (const [name, digest] of digests)
       await this.uploadAsync(draft, name, path.join(folder, name), digest);
     ReleasePublisher.requireComplete(await this.readAsync(draft.id), digests);
+    const commit = await this.readTagAsync(version.tag);
+    if (commit !== null && commit !== revision)
+      throw new ReleaseException(`The tag ${version.tag} appeared on ${commit}, not on ${revision}, so the draft stays unpublished.`);
     const published = GitHubRelease.read(await this.api.sendAsync("PATCH", `/releases/${draft.id}`, [["make_latest", ReleasePublisher.LATEST]], [["draft", false]]),
       "the published release");
     if (published.isDraft)
@@ -144,16 +146,12 @@ export default class ReleasePublisher {
 
   private async readTagAsync(tag: string): Promise<string | null> {
     const context = `the tag ${tag}`;
-    try {
-      const target = GitHubJson.child(GitHubJson.object(await this.api.readAsync(`/git/ref/tags/${tag}`), context), "object", context);
-      if (GitHubJson.text(target, "type", context) !== ReleasePublisher.COMMIT_TYPE)
-        throw new ReleaseException(`The tag ${tag} is annotated; a release's tag points straight at its commit.`);
-      return GitHubJson.text(target, "sha", context);
-    }
-    catch (error) {
-      if (error instanceof GitHubException && error.status === ReleasePublisher.NOT_FOUND)
-        return null;
-      throw error;
-    }
+    const reference = await this.api.readOptionalAsync(`/git/ref/tags/${tag}`);
+    if (reference === null)
+      return null;
+    const target = GitHubJson.child(GitHubJson.object(reference, context), "object", context);
+    if (GitHubJson.text(target, "type", context) !== ReleasePublisher.COMMIT_TYPE)
+      throw new ReleaseException(`The tag ${tag} is annotated; a release's tag points straight at its commit.`);
+    return GitHubJson.text(target, "sha", context);
   }
 }

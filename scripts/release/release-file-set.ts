@@ -17,8 +17,6 @@ import ReleaseFile from "./release-file.ts";
 import UpdateMetadata from "./update-metadata.ts";
 
 export default class ReleaseFileSet {
-  private static readonly MACOS_PLATFORM: string = "macos";
-  private static readonly MACOS_UPDATE_EXTENSION: string = "zip";
   private static readonly CHECKSUM_EXTENSION: string = "sha256";
   private static readonly CHECKSUM_SEPARATOR: string = "  ";
 
@@ -28,7 +26,7 @@ export default class ReleaseFileSet {
     this.productName = productName;
   }
 
-  private static checksumOf(packageName: string): string {
+  private static formatChecksumName(packageName: string): string {
     return `${packageName}.${ReleaseFileSet.CHECKSUM_EXTENSION}`;
   }
 
@@ -36,15 +34,11 @@ export default class ReleaseFileSet {
     return `${file.digest.sha256}${ReleaseFileSet.CHECKSUM_SEPARATOR}${file.name}\n`;
   }
 
-  private static async readFilesAsync(folder: string, names: readonly string[]): Promise<readonly ReleaseFile[]> {
-    const files: ReleaseFile[] = [];
-    for (const name of names) {
-      const file = path.join(folder, name);
-      if (!existsSync(file))
-        throw new ReleaseException(`${file} is missing; npm run package makes it.`);
-      files.push(new ReleaseFile(name, await PackageDigest.readAsync(file)));
-    }
-    return files;
+  private static async readAsync(folder: string, name: string): Promise<ReleaseFile> {
+    const file = path.join(folder, name);
+    if (!existsSync(file))
+      throw new ReleaseException(`${file} is missing; npm run package makes it.`);
+    return new ReleaseFile(name, await PackageDigest.readAsync(file));
   }
 
   public listAll(): readonly string[] {
@@ -52,14 +46,16 @@ export default class ReleaseFileSet {
   }
 
   public async writeAsync(folder: string, target: PackageTarget, version: string, releaseDate: string): Promise<readonly string[]> {
-    const files = await ReleaseFileSet.readFilesAsync(folder, this.listPackages(target));
-    for (const file of files)
-      await writeFile(path.join(folder, ReleaseFileSet.checksumOf(file.name)), ReleaseFileSet.formatChecksum(file));
-    await writeFile(path.join(folder, UpdateMetadata.fileNameOf(target)), new UpdateMetadata(version, files, releaseDate).format());
+    const packages = await this.readPackagesAsync(folder, target);
+    for (const file of packages)
+      await writeFile(path.join(folder, ReleaseFileSet.formatChecksumName(file.name)), ReleaseFileSet.formatChecksum(file));
+    await writeFile(path.join(folder, UpdateMetadata.formatFileName(target)), this.describe(target, version, packages, releaseDate).format());
     return this.listTarget(target);
   }
 
-  public async verifyAsync(folder: string, version: string): Promise<void> {
+  public async verifyAsync(folder: string, version: string): Promise<readonly ReleaseFile[]> {
+    if (!existsSync(folder))
+      throw new ReleaseException(`The release's folder ${folder} does not exist.`);
     const expected = this.listAll();
     const present = await readdir(folder);
     const missing = expected.filter(t => !present.includes(t));
@@ -67,27 +63,38 @@ export default class ReleaseFileSet {
     if (missing.length > 0 || unexpected.length > 0)
       throw new ReleaseException(`The release's files in ${folder} differ from the files a release has. Missing: ${missing.join(", ") || "none"}. Not part of a release: ${unexpected.join(", ") || "none"}.`);
 
+    const files: ReleaseFile[] = [];
     for (const target of PackageTarget.listAll()) {
-      const files = await ReleaseFileSet.readFilesAsync(folder, this.listPackages(target));
-      for (const file of files) {
-        const checksum = ReleaseFileSet.checksumOf(file.name);
+      const packages = await this.readPackagesAsync(folder, target);
+      const checksums: ReleaseFile[] = [];
+      for (const file of packages) {
+        const checksum = ReleaseFileSet.formatChecksumName(file.name);
         if (await readFile(path.join(folder, checksum), "utf8") !== ReleaseFileSet.formatChecksum(file))
           throw new ReleaseException(`${checksum} does not match ${file.name}.`);
+        checksums.push(await ReleaseFileSet.readAsync(folder, checksum));
       }
-      const metadata = UpdateMetadata.fileNameOf(target);
+      const metadata = UpdateMetadata.formatFileName(target);
       const text = await readFile(path.join(folder, metadata), "utf8");
-      if (text !== new UpdateMetadata(version, files, UpdateMetadata.readReleaseDate(text, metadata)).format())
-        throw new ReleaseException(`${metadata} does not describe version ${version} with ${files.map(t => t.name).join(" and ")} as they are.`);
+      if (text !== this.describe(target, version, packages, UpdateMetadata.readReleaseDate(text, metadata)).format())
+        throw new ReleaseException(`${metadata} does not describe version ${version} with ${packages.map(t => t.name).join(" and ")} as they are.`);
+      files.push(...packages, ...checksums, await ReleaseFileSet.readAsync(folder, metadata));
     }
+    return files;
   }
 
   private listTarget(target: PackageTarget): readonly string[] {
-    const packages = this.listPackages(target);
-    return [...packages, ...packages.map(t => ReleaseFileSet.checksumOf(t)), UpdateMetadata.fileNameOf(target)];
+    const packages = target.listFileNames(this.productName);
+    return [...packages, ...packages.map(t => ReleaseFileSet.formatChecksumName(t)), UpdateMetadata.formatFileName(target)];
   }
 
-  private listPackages(target: PackageTarget): readonly string[] {
-    const isUpdate = (extension: string): boolean => target.platform !== ReleaseFileSet.MACOS_PLATFORM || extension === ReleaseFileSet.MACOS_UPDATE_EXTENSION;
-    return [...target.extensions.filter(t => isUpdate(t)), ...target.extensions.filter(t => !isUpdate(t))].map(t => target.formatFileName(this.productName, t));
+  private async readPackagesAsync(folder: string, target: PackageTarget): Promise<readonly ReleaseFile[]> {
+    const files: ReleaseFile[] = [];
+    for (const name of target.listFileNames(this.productName))
+      files.push(await ReleaseFileSet.readAsync(folder, name));
+    return files;
+  }
+
+  private describe(target: PackageTarget, version: string, packages: readonly ReleaseFile[], releaseDate: string): UpdateMetadata {
+    return new UpdateMetadata(version, target.formatFileName(this.productName, target.updateExtension), packages, releaseDate);
   }
 }

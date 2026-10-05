@@ -457,12 +457,12 @@ A release still contains the shell and every module in its list, and an update r
 - The publisher consumes the exact artifact identified by the successful build, including when only publication is retried; it must not guess the artifact from the retry's attempt number.
 - Upload retries are bounded and verify any existing outcome. Incomplete uploads remain unpublished, and published tags and assets are not silently replaced.
 - A release carries, for each target, its packages, a checksum file `<package>.sha256` in `sha256sum`'s format, and `latest-<platform>-<arch>.yml`, the update metadata in electron-updater's format: the version; each package's name, SHA-512 in base64 and size; the update file again as `path` with its SHA-512; and the release date. The update file is the target's installer or AppImage, and on macOS the ZIP. After `npm run package`, `npm run release:assets` writes the checksums and the metadata beside the machine's packages, with the root manifest's version.
-- `npm run release:check` checks a requested release before anything is built: the version is plain, equals the root manifest's version and is newer than the latest release, and the revision is a full commit SHA that `main` contains.
-- `npm run release:publish` publishes the files of all six targets from one folder:
+- `npm run release:check` checks a requested release before anything is built: the version is the root manifest's, follows the versioning below and has no tag yet, and the revision is a full commit SHA that `main` contains.
+- `npm run release:publish` publishes every target's files from one folder:
   - It first checks that the folder holds exactly a release's files and that every checksum and metadata file matches its packages.
-  - It creates a draft release for the revision and uploads each file. Before each of at most three attempts, it checks whether GitHub already has the file, deletes an incomplete upload, and refuses a different file.
-  - It publishes the draft as the latest release only when GitHub has every file and no other, each with the built file's size and SHA-256.
-  - Run again, it continues the draft, or leaves a published release unchanged when its files and tag match. A second release with the tag, a tag without a release, a draft for another revision or any difference fails with the reason.
+  - It creates a draft release for the revision and uploads each file in at most three attempts, 10 seconds apart.
+  - It publishes the draft only when GitHub has every file and no other, each with the size and SHA-256 the check read, and no tag for the version points at another commit.
+  - Run again, it continues the draft, or changes nothing when the published release's files and tag match. Two releases with the tag, a tag without a release or a draft for another revision fails with the reason.
 - The release scripts take the repository, version and revision from `RELEASE_REPOSITORY`, `RELEASE_VERSION` and `RELEASE_REVISION`, so a trial can publish to another repository; `release:publish` also takes the folder and the release notes from `RELEASE_FOLDER` and `RELEASE_NOTES`.
 - Releases use numbered versions such as `0.0.1` and `0.0.2`, without prerelease suffixes or build metadata, and matching `v`-prefixed tags. Each successful publication becomes the latest release.
 - Published application updates must use a version newer than the installed version.

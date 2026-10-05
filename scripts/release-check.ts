@@ -24,7 +24,6 @@ export default class ReleaseCheck {
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly MAIN: string = "main";
   private static readonly ON_MAIN: readonly string[] = ["identical", "ahead"];
-  private static readonly NOT_FOUND: number = 404;
 
   private readonly root: string;
   private readonly runner: ProcessRunner;
@@ -36,17 +35,6 @@ export default class ReleaseCheck {
     this.runner = runner;
     this.environment = environment;
     this.output = output;
-  }
-
-  private static async readOrNullAsync(api: GitHubApi, resource: string): Promise<unknown> {
-    try {
-      return await api.readAsync(resource);
-    }
-    catch (error) {
-      if (error instanceof GitHubException && error.status === ReleaseCheck.NOT_FOUND)
-        return null;
-      throw error;
-    }
   }
 
   public async runAsync(checkArguments: readonly string[]): Promise<number> {
@@ -73,14 +61,17 @@ export default class ReleaseCheck {
       throw new ReleaseException(`The root manifest's version is ${manifest.productVersion}, not ${request.version.text}; raise it on main first.`);
 
     const api = new GitHubApi(request.repository, this.runner, this.root);
-    const latest = await ReleaseCheck.readOrNullAsync(api, "/releases/latest");
+    const latest = await api.readOptionalAsync("/releases/latest");
     if (latest !== null) {
       const latestVersion = ReleaseVersion.parseTag(GitHubJson.text(GitHubJson.object(latest, "the latest release"), "tag_name", "the latest release"), "The latest release's tag");
       if (!request.version.isNewerThan(latestVersion))
         throw new ReleaseException(`${request.version.text} is not newer than the latest release, ${latestVersion.text}.`);
     }
 
-    const comparison = await ReleaseCheck.readOrNullAsync(api, `/compare/${request.revision}...${ReleaseCheck.MAIN}`);
+    if (await api.readOptionalAsync(`/git/ref/tags/${request.version.tag}`) !== null)
+      throw new ReleaseException(`The tag ${request.version.tag} already exists; a published tag is never moved.`);
+
+    const comparison = await api.readOptionalAsync(`/compare/${request.revision}...${ReleaseCheck.MAIN}`);
     if (comparison === null)
       throw new ReleaseException(`${request.revision} is not a commit of ${request.repository}.`);
     const status = GitHubJson.text(GitHubJson.object(comparison, "the comparison with main"), "status", "the comparison with main");

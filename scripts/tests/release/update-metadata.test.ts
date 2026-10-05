@@ -17,10 +17,10 @@ import UpdateMetadata from "../../release/update-metadata.ts";
 
 class UpdateMetadataTests {
   public static register(): void {
-    test("the metadata lists every file with its SHA-512 and size, names the first as the update and quotes names and the date", () => {
-      const files = [new ReleaseFile("Jo's App-macos-arm64.zip", new PackageDigest("a", "zip512==", 12)), new ReleaseFile("Jo's App-macos-arm64.dmg", new PackageDigest("b", "dmg512==", 34))];
+    test("the metadata lists every file with its SHA-512 and size, the update file first and as the path, and quotes names and the date", () => {
+      const files = [new ReleaseFile("Jo's App-macos-arm64.dmg", new PackageDigest("b", "dmg512==", 34)), new ReleaseFile("Jo's App-macos-arm64.zip", new PackageDigest("a", "zip512==", 12))];
 
-      assert.equal(new UpdateMetadata("0.0.2", files, "2026-10-05T23:00:00.000Z").format(), [
+      assert.equal(new UpdateMetadata("0.0.2", "Jo's App-macos-arm64.zip", files, "2026-10-05T23:00:00.000Z").format(), [
         "version: 0.0.2",
         "files:",
         "  - url: 'Jo''s App-macos-arm64.zip'",
@@ -36,16 +36,19 @@ class UpdateMetadataTests {
       ].join("\n"));
     });
 
-    test("metadata without a file is refused", () => {
-      assert.throws(() => new UpdateMetadata("0.0.2", [], "2026-10-05T23:00:00.000Z"), new ReleaseException("The update metadata of 0.0.2 names no file."));
+    test("metadata whose update file is not among its files is refused", () => {
+      const files = [new ReleaseFile("TeamRun-macos-arm64.dmg", new PackageDigest("b", "dmg512==", 34))];
+
+      assert.throws(() => new UpdateMetadata("0.0.2", "TeamRun-macos-arm64.zip", files, "2026-10-05T23:00:00.000Z"),
+        new ReleaseException("The update metadata of 0.0.2 needs its update file TeamRun-macos-arm64.zip among its files."));
     });
 
     test("each target's metadata file is named after its platform and processor", () => {
-      assert.equal(UpdateMetadata.fileNameOf(new PackageTarget("linux", "arm64")), "latest-linux-arm64.yml");
+      assert.equal(UpdateMetadata.formatFileName(new PackageTarget("linux", "arm64")), "latest-linux-arm64.yml");
     });
 
     test("the release date is read back from the metadata, and metadata without one is refused", () => {
-      const text = new UpdateMetadata("0.0.2", [new ReleaseFile("TeamRun-linux-x64.AppImage", new PackageDigest("a", "b", 1))], "2026-10-05T23:00:00.000Z").format();
+      const text = new UpdateMetadata("0.0.2", "TeamRun-linux-x64.AppImage", [new ReleaseFile("TeamRun-linux-x64.AppImage", new PackageDigest("a", "b", 1))], "2026-10-05T23:00:00.000Z").format();
 
       assert.equal(UpdateMetadata.readReleaseDate(text, "latest-linux-x64.yml"), "2026-10-05T23:00:00.000Z");
       assert.throws(() => UpdateMetadata.readReleaseDate("version: 0.0.2\nreleaseDate: 2026-10-05\n", "latest-linux-x64.yml"),
