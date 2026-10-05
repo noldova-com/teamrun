@@ -24,8 +24,9 @@ import { Resources } from "../../../resources";
   }
 })
 export class DockingGuideComponent {
+  protected readonly glyph: Signal<string> = computed(() => Resources.dockingGlyphs[this.direction()]);
+  protected readonly label: Signal<string> = computed(() => Resources.dockingLabels[this.direction()]);
+
   public readonly direction = input.required<DockingDirection>();
   public readonly chosen = input<boolean>(false);
-  public readonly glyph: Signal<string> = computed(() => Resources.dockingGlyphs[this.direction()]);
-  public readonly label: Signal<string> = computed(() => Resources.dockingLabels[this.direction()]);
 }

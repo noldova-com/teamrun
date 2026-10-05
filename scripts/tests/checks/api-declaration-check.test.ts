@@ -192,16 +192,18 @@ class ApiDeclarationCheckTests {
       assert.ok(output.text.includes("; build the packages first\n"), output.text);
     });
 
-    test("an Angular part's declarations in its source that match its implementation pass, and a drift or a missing member fails", async t => {
+    test("an Angular part's declarations in its source that match its public members pass, and a drift or a missing member fails", async t => {
       const fixture = await ApiPackageFixture.createAsync();
       t.after(() => fixture.disposeAsync());
-      await fixture.writePartAsync("src/shell/shapes", ApiDeclarationCheckTests.IMPLEMENTATION, ApiDeclarationCheckTests.DECLARATIONS);
+      const declarations = ApiDeclarationCheckTests.DECLARATIONS.replace("  protected readonly unit: TUnit;\n", "");
+      assert.notEqual(declarations, ApiDeclarationCheckTests.DECLARATIONS);
+      await fixture.writePartAsync("src/shell/shapes", ApiDeclarationCheckTests.IMPLEMENTATION, declarations);
       const output = new TextOutputFixture();
 
       assert.equal(await ApiDeclarationCheckTests.createCheck(fixture, ["src/shell/shapes"]).runAsync(output), true, output.text);
       assert.equal(output.text, "src/shell/shapes: matches its declarations\n");
 
-      await fixture.writeFilesAsync({ "src/shell/shapes/src/api/index.d.ts": ApiDeclarationCheckTests.DECLARATIONS.replace("factor?: number): number;", "factor?: string): number;").replace("  public get count(): number;\n", "") });
+      await fixture.writeFilesAsync({ "src/shell/shapes/src/api/index.d.ts": declarations.replace("factor?: number): number;", "factor?: string): number;").replace("  public get count(): number;\n", "") });
       const drifted = new TextOutputFixture();
 
       assert.equal(await ApiDeclarationCheckTests.createCheck(fixture, ["src/shell/shapes"]).runAsync(drifted), false);

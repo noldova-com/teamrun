@@ -28,10 +28,7 @@ import { Resources } from "../../../resources";
 })
 export class ChipComponent {
   protected readonly kinds: typeof ChipKind = ChipKind;
-
-  public readonly kind = input<ChipKind>(ChipKind.Count);
-  public readonly count = input<number>(0);
-  public readonly text: Signal<string> = computed(() => {
+  protected readonly text: Signal<string> = computed(() => {
     const count = this.count();
     switch (this.kind()) {
       case ChipKind.Added:
@@ -44,4 +41,7 @@ export class ChipComponent {
         return Resources.formatBadgeCount(count);
     }
   });
+
+  public readonly kind = input<ChipKind>(ChipKind.Count);
+  public readonly count = input<number>(0);
 }

@@ -177,7 +177,7 @@ class ApiExampleCheckTests {
         " * @example",
         " * ```ts",
         " * import { double } from \"@noldova/teamrun-shell-counter\";",
-        " * import type { Length } from \"@noldova/teamrun-fixture-units\";",
+        " * import type { Length } from \"@noldova/teamrun-fixture-units/lengths\";",
         " *",
         " * export const length: Length = double(2);",
         " * ```",
@@ -187,8 +187,8 @@ class ApiExampleCheckTests {
       ].join("\n");
       await fixture.writePartAsync("src/shell/counter", { "api/index.ts": "export const unused: number = 0;\n" }, declarations);
       await fixture.writeFilesAsync({
-        "src/node_modules/@noldova/teamrun-fixture-units/package.json": JSON.stringify({ name: "@noldova/teamrun-fixture-units", exports: { ".": { types: "./types/units.d.ts" } }, typings: "./types/units.d.ts" }),
-        "src/node_modules/@noldova/teamrun-fixture-units/types/units.d.ts": "export type Length = number;\n"
+        "src/node_modules/@noldova/teamrun-fixture-units/package.json": JSON.stringify({ name: "@noldova/teamrun-fixture-units", exports: { "./lengths": { types: "./types/lengths.d.ts" } } }),
+        "src/node_modules/@noldova/teamrun-fixture-units/types/lengths.d.ts": "export type Length = number;\n"
       });
       const output = new TextOutputFixture();
 

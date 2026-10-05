@@ -53,7 +53,7 @@ export default class Test {
   private static readonly NO_MATCH: string = "No test matched the filters.\n";
   private static readonly SUMMARY_VARIABLE: string = "GITHUB_STEP_SUMMARY";
   private static readonly API_TIMEOUT: number = 300_000;
-  private static readonly API_PARTS: readonly string[] = ["src/shell/window"];
+  private static readonly API_PARTS: readonly string[] = ["src/shell/ui", "src/shell/window"];
 
   private readonly root: string;
   private readonly runner: ProcessRunner;

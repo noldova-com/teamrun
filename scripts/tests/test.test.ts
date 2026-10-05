@@ -28,7 +28,7 @@ class TestTests {
   private static readonly PASSING: string = "import { test } from \"node:test\";\n\ntest(\"passes\", () => undefined);\n";
   private static readonly PROJECT: Readonly<Record<string, unknown>> = {
     extends: path.join(SourceTreeFixture.root, "tsconfig.base.json"),
-    compilerOptions: { types: [], module: "preserve", moduleResolution: "bundler", paths: { "@noldova/teamrun-shell-window": ["./shell/window/src/api/index.ts"] } }
+    compilerOptions: { types: [], module: "preserve", moduleResolution: "bundler", paths: { "@noldova/teamrun-shell-ui": ["./shell/ui/src/api/index.ts"], "@noldova/teamrun-shell-window": ["./shell/window/src/api/index.ts"] } }
   };
 
   public static register(): void {
@@ -48,8 +48,10 @@ class TestTests {
       ];
       assert.deepEqual([...output.text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`), titles.map(t => `${t}: passed`));
       assert.ok(output.text.endsWith("\n20 of 20 checks passed.\n"));
-      assert.ok(output.text.includes("\nsrc/shell/window: matches its declarations\n"), output.text);
-      assert.ok(output.text.includes("\nsrc/shell/window: every example compiles\n"), output.text);
+      for (const part of ["src/shell/ui", "src/shell/window"]) {
+        assert.ok(output.text.includes(`\n${part}: matches its declarations\n`), output.text);
+        assert.ok(output.text.includes(`\n${part}: every example compiles\n`), output.text);
+      }
       assert.equal(runner.runs.length, 5);
       assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
     });
@@ -313,6 +315,8 @@ class TestTests {
       "src/modules/checkpoints/README.md": "# Checkpoints\n",
       "src/angular.json": `${JSON.stringify({ projects: { teamrun: { architect: { test: { options: { include: ["shell/*/tests/**/*.spec.ts"] } } } } } })}\n`,
       "src/tsconfig.json": `${JSON.stringify(TestTests.PROJECT)}\n`,
+      "src/shell/ui/src/api/index.ts": `${LicenseHeader.BLOCK}\nexport const gap: number = 1;\n`,
+      "src/shell/ui/src/api/index.d.ts": `${LicenseHeader.BLOCK}\nexport declare const gap: number;\n`,
       "src/shell/window/src/api/index.ts": `${LicenseHeader.BLOCK}\nexport const size: number = 1;\n`,
       "src/shell/window/src/api/index.d.ts": `${LicenseHeader.BLOCK}\nexport declare const size: number;\n`
     });
