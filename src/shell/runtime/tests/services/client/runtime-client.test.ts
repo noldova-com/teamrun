@@ -57,6 +57,7 @@ export class RuntimeClientTests {
       Assert.areEqual(1, listener.disconnections);
       const exception = await Assert.throwsAsync(() => client.callAsync(RuntimeServerFixture.ECHO, null), ConnectionException);
       Assert.areEqual("The connection to the runtime is closed.", exception.message);
+      Assert.areEqual(`${FailureCode.Disconnected}|The connection to the runtime is closed.`, `${exception.failure?.code}|${exception.failure?.message}`);
     });
   }
 
