@@ -8,6 +8,7 @@
 
 :host {
   display: block;
+  padding-inline: var(--tr-settings-heading-inset);
 }
 
 .tr-shortcuts-header {
@@ -16,7 +17,6 @@
   align-items: flex-start;
   gap: var(--tr-space-2) var(--tr-space-4);
   margin-bottom: var(--tr-space-3);
-  padding-inline: var(--tr-settings-heading-inset);
 }
 
 .tr-shortcuts-explanation {
@@ -27,8 +27,7 @@
 }
 
 .tr-shortcuts-table {
-  width: calc(100% - var(--tr-settings-heading-inset) * 2);
-  margin-inline: var(--tr-settings-heading-inset);
+  width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }

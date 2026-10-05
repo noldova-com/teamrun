@@ -15,6 +15,8 @@
   padding-block: var(--tr-space-4) 0;
   padding-inline: var(--tr-space-6) 0;
   container: settings / inline-size;
+  --tr-settings-gap: var(--tr-space-6);
+  --tr-settings-column-end: var(--tr-space-6);
 }
 
 .tr-settings-search {
@@ -22,20 +24,20 @@
   flex: none;
   flex-wrap: wrap;
   gap: var(--tr-space-2);
-  padding-inline-end: calc(var(--tr-space-6) + var(--tr-scrollbar-size) + var(--tr-settings-heading-inset));
+  padding-inline-end: calc(var(--tr-settings-column-end) + var(--tr-scrollbar-size) + var(--tr-settings-heading-inset));
   padding-bottom: var(--tr-space-4);
 }
 
 .tr-settings-search-field {
   flex: 1 1 auto;
   min-width: 0;
-  max-width: calc(var(--tr-settings-pages-width) + var(--tr-space-6) + var(--tr-settings-content-width) - var(--tr-settings-heading-inset));
+  max-width: calc(var(--tr-settings-pages-width) + var(--tr-settings-gap) + var(--tr-settings-content-width) - var(--tr-settings-heading-inset));
 }
 
 .tr-settings-body {
   display: flex;
   flex: auto;
-  gap: var(--tr-space-6);
+  gap: var(--tr-settings-gap);
   min-height: 0;
 }
 
@@ -54,7 +56,7 @@
 
 .tr-settings-column {
   max-width: var(--tr-settings-content-width);
-  padding-inline-end: var(--tr-space-6);
+  padding-inline-end: var(--tr-settings-column-end);
   padding-bottom: var(--tr-space-6);
 }
 

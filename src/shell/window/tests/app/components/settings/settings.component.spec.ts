@@ -196,9 +196,8 @@ describe("SettingsComponent", () => {
     expect(edges).toEqual([[0, 0], [0, 0]]);
   });
 
-  it("starts and ends the shortcuts table's text and Reset all at the headings' inset, its row lines running between the same edges", async () => {
+  it("starts and ends the shortcuts table's text, actions and row lines at the headings' inset, whether or not the column has reached its reading width, and Reset all beside the explanation", async () => {
     const host = render();
-    host.style.width = "100rem";
     await page.getByRole("treeitem", { name: "Keyboard shortcuts" }).click();
     fixture.detectChanges();
     const textLeft = (element: Element): number => {
@@ -207,20 +206,28 @@ describe("SettingsComponent", () => {
       return range.getBoundingClientRect().left;
     };
     const column = host.querySelector(".tr-settings-column") as HTMLElement;
-    const end = column.getBoundingClientRect().right - parseFloat(getComputedStyle(column).paddingRight);
     const heading = host.querySelector(".tr-settings-group-title") as HTMLElement;
     const inset = parseFloat(getComputedStyle(heading).paddingLeft);
-    const table = host.querySelector(".tr-shortcuts-table") as HTMLTableElement;
-    const rows = [...table.rows];
-    const starts = rows.map(t => Math.round(textLeft(t.cells[0] as HTMLTableCellElement)));
-    const ends = rows.flatMap(t => [...(t.cells[t.cells.length - 1] as HTMLTableCellElement).querySelectorAll("button")].slice(-1)).map(t => Math.round(t.getBoundingClientRect().right));
-    const reset = Math.round((host.querySelector(".tr-shortcuts-reset-all") as HTMLElement).getBoundingClientRect().right);
+    const rows = [...(host.querySelector(".tr-shortcuts-table") as HTMLTableElement).rows];
+    const actions = rows.flatMap(t => [...(t.cells[t.cells.length - 1] as HTMLTableCellElement).querySelectorAll("button")].slice(-1));
+    const textEnd = (): number => column.getBoundingClientRect().right - parseFloat(getComputedStyle(column).paddingRight) - inset;
+    const offsets = ["100rem", "60rem"].map(width => {
+      host.style.width = width;
+      const start = textLeft(heading);
+      const end = textEnd();
+      return [
+        ...rows.map(t => textLeft(t.cells[0] as HTMLTableCellElement) - start),
+        ...rows.map(t => (t.cells[0] as HTMLTableCellElement).getBoundingClientRect().left - start),
+        ...rows.map(t => (t.cells[t.cells.length - 1] as HTMLTableCellElement).getBoundingClientRect().right - end),
+        ...actions.map(t => t.getBoundingClientRect().right - end)
+      ].map(t => Math.round(t));
+    });
+    host.style.width = "100rem";
+    const reset = (host.querySelector(".tr-shortcuts-reset-all") as HTMLElement).getBoundingClientRect().right;
 
-    expect([rows.length > 1, ends.length > 0]).toEqual([true, true]);
-    expect(starts).toEqual(rows.map(() => Math.round(textLeft(heading))));
-    expect([reset, ...ends]).toEqual([reset, ...ends].map(() => Math.round(end - inset)));
-    expect(rows.map(t => [t.cells[0]?.getBoundingClientRect().left, t.cells[t.cells.length - 1]?.getBoundingClientRect().right].map(edge => Math.round(edge ?? 0))))
-      .toEqual(rows.map(() => [Math.round(textLeft(heading)), Math.round(end - inset)]));
+    expect([rows.length > 1, actions.length > 0]).toEqual([true, true]);
+    expect(offsets).toEqual(offsets.map(t => t.map(() => 0)));
+    expect(Math.round(reset - textEnd())).toBe(0);
     expect(rows.every(t => getComputedStyle(t.cells[0] as HTMLTableCellElement).borderBottomStyle === "solid")).toBe(true);
   });
 
