@@ -12,6 +12,7 @@ import { JsonException } from "@noldova/teamrun-foundation-json";
 
 import { QuitChoice } from "../../../src/app/enums/quit-choice";
 import { DesktopBridgeException } from "../../../src/app/exceptions/desktop-bridge.exception";
+import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { RuntimeRequestException } from "../../../src/app/exceptions/runtime-request.exception";
 import type { QuitQuestion } from "../../../src/app/models/quit-question";
 import { WindowAppearance } from "../../../src/app/models/window-appearance";
@@ -153,12 +154,11 @@ describe("DesktopBridgeService", () => {
   it("rejects a layout the desktop could not read or write with the runtime's failure", async () => {
     const bridge = DesktopBridgeFixture.install();
     const service = TestBed.inject(DesktopBridgeService);
-    const failure = { failure: { code: "Unavailable", message: "TeamRun is not connected to its runtime." } };
-    vi.spyOn(bridge, "readLayout").mockResolvedValue(failure);
-    vi.spyOn(bridge, "writeLayout").mockResolvedValue(failure);
+    vi.spyOn(bridge, "readLayout").mockResolvedValue({ failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
+    vi.spyOn(bridge, "writeLayout").mockResolvedValue({ failure: { code: "Unavailable", message: "The runtime did not answer shell.writeLayout in time." } });
 
-    await expect(service.readLayoutAsync()).rejects.toThrow(new RuntimeRequestException("Unavailable", "TeamRun is not connected to its runtime."));
-    await expect(service.writeLayoutAsync({ version: 1 })).rejects.toThrow(new RuntimeRequestException("Unavailable", "TeamRun is not connected to its runtime."));
+    await expect(service.readLayoutAsync()).rejects.toThrow(new RuntimeDisconnectedException("TeamRun is not connected to its runtime."));
+    await expect(service.writeLayoutAsync({ version: 1 })).rejects.toThrow(new RuntimeRequestException("Unavailable", "The runtime did not answer shell.writeLayout in time."));
   });
 
   it("passes a request on and resolves the runtime's payload", async () => {
@@ -171,19 +171,23 @@ describe("DesktopBridgeService", () => {
     expect(bridge.requests).toEqual([["notes.open", { path: "/notes/a.md" }]]);
   });
 
-  it("rejects a failed request with the failure's code, message and details", async () => {
+  it("rejects a failed request with the failure's code, message and details, and one whose connection ended as disconnected", async () => {
     const bridge = DesktopBridgeFixture.install();
     const service = TestBed.inject(DesktopBridgeService);
     bridge.answer = { failure: { code: "NotFound", message: "There is no such note.", details: { path: "/notes/a.md" } } };
 
     const failure = await service.requestAsync("notes.open", null).catch((error: unknown) => error);
-    bridge.answer = { failure: { code: "Unavailable", message: "TeamRun is not connected to its runtime." } };
+    bridge.answer = { failure: { code: "Unavailable", message: "The runtime did not answer notes.open in time." } };
     const bare = await service.requestAsync("notes.open", null).catch((error: unknown) => error);
+    bridge.answer = { failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } };
+    const disconnected = await service.requestAsync("notes.open", null).catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(RuntimeRequestException);
     expect([(failure as RuntimeRequestException).code, (failure as RuntimeRequestException).message, (failure as RuntimeRequestException).details])
       .toEqual(["NotFound", "There is no such note.", { path: "/notes/a.md" }]);
     expect([(bare as RuntimeRequestException).code, (bare as RuntimeRequestException).details]).toEqual(["Unavailable", undefined]);
+    expect(bare).not.toBeInstanceOf(RuntimeDisconnectedException);
+    expect(disconnected).toBeInstanceOf(RuntimeDisconnectedException);
   });
 
   it("refuses an answer that is not a JSON object", async () => {

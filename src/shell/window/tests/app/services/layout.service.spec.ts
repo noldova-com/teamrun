@@ -356,7 +356,7 @@ describe("LayoutService", () => {
   });
 
   it("stays unloaded when the kept layout cannot be read, and passes the failure on", async () => {
-    const failure = new Error("The runtime is not connected.");
+    const failure = new Error("The kept layout could not be read.");
     vi.spyOn(store, "readAsync").mockRejectedValue(failure);
     const write = vi.spyOn(store, "writeAsync");
 

@@ -412,6 +412,12 @@ export interface IDesktopProcess {
  */
 export interface IRuntimeConnection {
   /**
+   * Whether the connection is still open; `false` once it has ended, from
+   * either side.
+   */
+  readonly isConnected: boolean;
+
+  /**
    * Sends a request and waits for its response.
    *
    * @param method The method's qualified name.
@@ -2774,13 +2780,18 @@ export declare class RuntimeStartup {
    * @param waitInterval How long to pause between attempts while waiting for an older build's work, in milliseconds.
    * @param forward Receives each event the runtime sends on the current connection.
    * @param log Receives each launch or connection failure, and the full description of any other failure.
+   * @param now Reads the current time, in milliseconds.
+   * @param wait Resolves after the given number of milliseconds, or rejects once the signal aborts.
    * @example
    * ```ts
+   * import { setTimeout as delay } from "node:timers/promises";
+   *
    * import { type IRuntimeLauncher, RuntimeStartup } from "@noldova/teamrun-shell-desktop";
    *
    * export function create(launcher: IRuntimeLauncher): RuntimeStartup {
    *   return new RuntimeStartup(
-   *     launcher, state => console.log(state.kind), () => false, 2000, event => console.log(event.name.text), message => console.error(message));
+   *     launcher, state => console.log(state.kind), () => false, 2000, event => console.log(event.name.text), message => console.error(message),
+   *     Date.now, (milliseconds, signal) => delay(milliseconds, undefined, { signal }));
    * }
    * ```
    */
@@ -2790,7 +2801,9 @@ export declare class RuntimeStartup {
     handOver: (handover: RuntimeHandover) => boolean,
     waitInterval: number,
     forward: (event: Event) => void,
-    log: (message: string) => void);
+    log: (message: string) => void,
+    now: () => number,
+    wait: (milliseconds: number, signal: AbortSignal) => Promise<void>);
 
   /**
    * The latest state.
@@ -2804,9 +2817,11 @@ export declare class RuntimeStartup {
 
   /**
    * Starts or attaches to the runtime, stopping an older build's runtime only when it is idle. Reconnects when the
-   * runtime disconnects until {@link close}. A start or reconnection that fails for any reason other than data from
-   * before the shell, an older build's work or a newer build is logged, an unexpected failure in full, and shows
-   * the failure with an offer to try again.
+   * runtime disconnects until {@link close}. A connection that ends within 30 seconds of being ready ends soon: after
+   * the first such end in a row it reconnects at once, then after 1, 2, 4 and 8 seconds, and the sixth is logged and
+   * shown as a failure with its cause and an offer to try again, which counts afresh. A start or reconnection that
+   * fails for any reason other than data from before the shell, an older build's work or a newer build is logged, an
+   * unexpected failure in full, and shows the failure with an offer to try again.
    *
    * @returns A promise that settles once the state is ready or shows why not.
    * @example
@@ -2838,7 +2853,7 @@ export declare class RuntimeStartup {
   public actAsync(action: unknown): Promise<boolean>;
 
   /**
-   * Closes the connection and stops reconnecting and waiting.
+   * Closes the connection and stops reconnecting and waiting, ending a wait at once.
    *
    * @example
    * ```ts

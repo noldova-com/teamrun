@@ -8,6 +8,9 @@
 
 export class Resources {
   public static readonly optionsMethod: string = "notes.options";
+  public static readonly holdOptionsMethod: string = "notes.holdOptions";
+  public static readonly heldOptionsMethod: string = "notes.heldOptions";
+  public static readonly releaseOptionsMethod: string = "notes.releaseOptions";
   public static readonly manyTabsMarker: string = "many-tabs";
   public static readonly longCountMarker: string = "long-count";
 }
