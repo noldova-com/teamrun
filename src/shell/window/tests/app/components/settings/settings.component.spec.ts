@@ -123,6 +123,39 @@ describe("SettingsComponent", () => {
     expect(markers).toEqual([true, false]);
   });
 
+  it("swaps its page list for a Settings pages select at the start of the search row below 34rem inside its padding, and changes page and leaves a search through it", async () => {
+    const host = render();
+    const select = (): HTMLButtonElement => host.querySelector(".tr-settings-page-select .tr-select-button") as HTMLButtonElement;
+    const shown = (): readonly boolean[] => [".tr-settings-pages", ".tr-settings-page-select"].map(t => getComputedStyle(host.querySelector(t) as Element).display !== "none");
+    const box = (selector: string): DOMRect => (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
+    host.style.width = "37rem";
+    const wide = shown();
+    host.style.width = "calc(37rem - 1px)";
+    const narrow = shown();
+    const row = [box(".tr-settings-page-select").top === box(".tr-settings-search-field").top, box(".tr-settings-page-select").left < box(".tr-settings-search-field").left];
+    const filled = Math.abs(box(".tr-settings-content").width - (box(".tr-settings-body").width)) < 1;
+
+    await userEvent.click(select());
+    await page.getByRole("option", { name: "Clock" }).click();
+    fixture.detectChanges();
+    const clock = [select().getAttribute("aria-label"), texts(".tr-settings-group-title")];
+    await searchAsync("greeting");
+    const searching = select().getAttribute("aria-label");
+    await userEvent.click(select());
+    await page.getByRole("option", { name: "Appearance" }).click();
+    fixture.detectChanges();
+    host.style.width = "15rem";
+    const stacked = box(".tr-settings-page-select").bottom <= box(".tr-settings-search-field").top;
+
+    expect([wide, narrow]).toEqual([[true, false], [false, true]]);
+    expect([row, filled]).toEqual([[true, true], true]);
+    expect(clock).toEqual(["Settings pages, Clock", ["Words", "Ticks"]]);
+    expect(searching).toBe("Settings pages, Search results");
+    expect([(host.querySelector(".tr-settings-search-field") as HTMLInputElement).value, select().getAttribute("aria-label"), texts(".tr-settings-group-title")])
+      .toEqual(["", "Settings pages, Appearance", ["Theme", "Text"]]);
+    expect(stacked).toBe(true);
+  });
+
   it("reveals the scrollbars of its page list and its content while they are hovered", () => {
     render();
 

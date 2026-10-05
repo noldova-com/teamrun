@@ -12,7 +12,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, ErrorHandler, type Sign
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
-import { SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
+import { SelectComponent, SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
 
 import { GalleryTokens } from "../../models/gallery-tokens";
 import { SettingsPage } from "../../models/settings/settings-page";
@@ -31,7 +31,7 @@ import { ShortcutsComponent } from "../shortcuts/shortcuts.component";
 
 @Component({
   selector: "tr-settings",
-  imports: [NgComponentOutlet, NgTemplateOutlet, SettingRowComponent, ShortcutsComponent, TextFieldComponent],
+  imports: [NgComponentOutlet, NgTemplateOutlet, SelectComponent, SettingRowComponent, ShortcutsComponent, TextFieldComponent],
   templateUrl: "./settings.component.html",
   styleUrl: "./settings.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -68,6 +68,8 @@ export class SettingsComponent {
     ...Object.isNull(this.gallery) ? [] : [SettingsPage.galleryOf(Resources.galleryPage)]
   ]);
   protected readonly currentPage: Signal<SettingsPage | undefined> = computed(() => this.pages().find(t => t.title === this.selected()) ?? this.pages()[0]);
+  protected readonly pageOptions: Signal<readonly SelectOption[]> = computed(() => this.pages().map(t => new SelectOption(t.title, t.title)));
+  protected readonly pageChoice: Signal<string> = computed(() => this.isSearching() ? Resources.settingsSearchResults : this.currentPage()?.title ?? String.empty);
   protected readonly shortcuts: Signal<readonly ShortcutRow[]> = computed(() => {
     const map = this.commands.shortcuts();
     const bindings = this.commands.bindings();
@@ -106,9 +108,9 @@ export class SettingsComponent {
     this.keep();
   }
 
-  protected select(page: SettingsPage): void {
+  protected select(title: string): void {
     this.query.set("");
-    this.selected.set(page.title);
+    this.selected.set(title);
     this.keep();
   }
 

@@ -231,6 +231,7 @@ export class Resources {
   public static readonly searchSettingsLabel: string = "Search settings";
   public static readonly settingsPagesLabel: string = "Settings pages";
   public static readonly noSettingsFound: string = "No settings match your search.";
+  public static readonly settingsSearchResults: string = "Search results";
   public static readonly commandColumn: string = "Command";
   public static readonly ownerColumn: string = "From";
   public static readonly keyColumn: string = "Key";

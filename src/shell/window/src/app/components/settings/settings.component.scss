@@ -13,16 +13,39 @@
   min-height: 0;
   box-sizing: border-box;
   padding: var(--tr-space-4) var(--tr-space-6) 0;
+  container: settings / inline-size;
 }
 
 .tr-settings-search {
   display: flex;
   flex: none;
+  flex-wrap: wrap;
+  gap: var(--tr-space-2);
   padding-bottom: var(--tr-space-4);
 }
 
 .tr-settings-search-field {
   width: var(--tr-settings-search-width);
+  min-width: 0;
+}
+
+.tr-settings-page-select {
+  display: none;
+}
+
+@container settings (width < 34rem) {
+  .tr-settings-page-select {
+    display: inline-flex;
+  }
+
+  .tr-settings-page-select,
+  .tr-settings-search-field {
+    flex: 1 1 10rem;
+  }
+
+  .tr-settings-pages {
+    display: none;
+  }
 }
 
 .tr-settings-body {

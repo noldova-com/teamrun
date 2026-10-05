@@ -94,6 +94,32 @@ test.describe("settings", () => {
     await expect.poll(async () => Math.abs(await ScrollAreaFixture.scrollTopAsync(content) - drag.start - drag.distance)).toBeLessThan(drag.distance / 10);
   });
 
+  test("in a 1000 × 600 window Settings swaps its page list for a select, and its content takes the width, its controls work and its scrollbar drags", async ({ desktop }) => {
+    const window = desktop.window;
+    const content = window.locator(".tr-settings-content");
+    const pages = window.locator(".tr-settings-page-select").getByRole("button");
+    await SettingsFixture.openAsync(window);
+    await expect(window.locator(".tr-settings-pages")).toBeVisible();
+    await desktop.checkpointAsync("settings-wide-light");
+
+    await desktop.useViewportAsync(1000, 600);
+
+    await expect(window.locator(".tr-settings-pages")).toBeHidden();
+    await expect(pages).toHaveAccessibleName("Settings pages, Appearance");
+    const [body, filled] = await Promise.all([window.locator(".tr-settings-body").boundingBox(), content.boundingBox()]);
+    expect(Math.abs((filled?.width ?? 0) - (body?.width ?? -1))).toBeLessThan(1);
+    await desktop.checkpointAsync("settings-narrow-light");
+    await WindowModeFixture.setAsync(window, "Dark");
+    await desktop.checkpointAsync("settings-narrow-dark");
+    await chooseAsync(window, "shell.mode", "Light");
+    await expect(row(window, "shell.mode").getByRole("radio", { name: "Light", exact: true })).toBeChecked();
+    await pages.click();
+    await window.getByRole("option", { name: "Gallery", exact: true }).click();
+    await expect(content.locator("tr-quick-input").getByRole("option").first()).toBeAttached();
+    const drag = await ScrollAreaFixture.dragVerticalThumbAsync(window, content, 100);
+    await expect.poll(async () => Math.abs(await ScrollAreaFixture.scrollTopAsync(content) - drag.start - drag.distance)).toBeLessThan(drag.distance / 10);
+  });
+
   test("search filters every page by title, description and name, marking the matches, and choosing a page ends it", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openAsync(window);
