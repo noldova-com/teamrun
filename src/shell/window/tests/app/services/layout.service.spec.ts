@@ -115,11 +115,11 @@ describe("LayoutService", () => {
     expect(service.layout().documents.tabs).toEqual([]);
   });
 
-  it("stops keeping documents once told to open them again without a load, as after a layout that cannot be read", () => {
+  it("stops keeping documents once told to open them again without a load, as after a layout that cannot be read", async () => {
+    service.reopenEarlyDocuments();
     service.openDocument(LayoutFixture.todo);
 
-    service.reopenEarlyDocuments();
-    service.close(LayoutFixture.todo);
+    await service.loadAsync();
     service.reopenEarlyDocuments();
 
     expect(service.layout().documents.tabs).toEqual([]);
