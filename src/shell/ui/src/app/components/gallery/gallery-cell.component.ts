@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, ElementRef, HostAttributeToken, inject, input } from "@angular/core";
+import { ChangeDetectionStrategy, Component, HostAttributeToken, inject, input } from "@angular/core";
 
 import { GalleryResources } from "./gallery-resources";
 
@@ -21,13 +21,6 @@ import { GalleryResources } from "./gallery-resources";
   }
 })
 export class GalleryCellComponent {
-  private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-
   public readonly isLong: boolean = inject(new HostAttributeToken(GalleryResources.longAttribute), { optional: true }) !== null;
   public readonly caption = input.required<string>();
-  public readonly isFocusTarget = input<boolean>(false);
-
-  public focus(): void {
-    this.host.querySelector<HTMLElement>(GalleryResources.focusableSelector)?.focus();
-  }
 }

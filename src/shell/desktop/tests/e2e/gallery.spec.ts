@@ -23,8 +23,8 @@ async function layoutProblemsAsync(window: Page): Promise<readonly string[]> {
     const overlaps = (a: DOMRect, b: DOMRect): boolean => Math.min(a.right, b.right) - Math.max(a.left, b.left) > tolerance && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > tolerance;
     for (const specimen of gallery.querySelectorAll<HTMLElement>(".tr-gallery-specimen")) {
       const name = specimen.getAttribute("aria-label") ?? "";
-      const head = specimen.querySelector<HTMLElement>(".tr-gallery-specimen-head");
-      if (head?.querySelector("h3")?.textContent !== name)
+      const head = specimen.querySelector<HTMLElement>(".tr-gallery-specimen-name");
+      if (head?.textContent !== name)
         problems.push(`${name}: no header with its name`);
       const cells = [...specimen.querySelectorAll<HTMLElement>(".tr-gallery-specimen-cells > tr-gallery-cell")];
       if (cells.length === 0)
@@ -111,16 +111,15 @@ test.describe("gallery", () => {
     expect(await scrollTopAsync(page)).toBe(top);
   });
 
-  test("each specimen with a control shows the keyboard focus on it from the keyboard, and each scope keeps its own colors", async ({ desktop }) => {
+  test("each Focus cell shows the keyboard focus without holding it, and each scope keeps its own colors", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openGalleryAsync(window);
     const dark = scope(window, "Dark");
 
-    for (const name of ["Button", "Icon button", "Checkbox", "Text field", "Select", "Tab", "Tree", "Toolbar", "Toolbar button", "Menu"]) {
-      await dark.getByRole("button", { name: `Show the keyboard focus on the ${name}`, exact: true }).focus();
-      await window.keyboard.press("Enter");
-      await expect(dark.locator(`.tr-gallery-specimen[aria-label="${name}"] :focus-visible`)).toHaveCount(1);
-    }
+    for (const name of ["Button", "Icon button", "Checkbox", "Text field", "Select", "Choice pills", "Tab", "Toolbar button", "Sash"])
+      await expect(dark.locator(`.tr-gallery-specimen[aria-label="${name}"] tr-gallery-cell[aria-label="Focus"] [data-tr-state="focus"]`)).toHaveCount(1);
+    await expect(dark.locator(":focus")).toHaveCount(0);
+    await dark.locator(".tr-gallery-specimen[aria-label=\"Button\"]").scrollIntoViewIfNeeded();
     await desktop.checkpointAsync("gallery-focus");
     const colors = await window.locator("tr-gallery .tr-gallery-scope-frame").evaluateAll(frames => frames.map(t => getComputedStyle(t).color));
     expect(new Set(colors).size).toBe(2);
@@ -158,8 +157,7 @@ test.describe("gallery", () => {
     await SettingsFixture.openGalleryAsync(window);
     const tree = scope(window, "Light").getByRole("tree", { name: "Gallery files" });
     const item = (name: string): Locator => tree.getByRole("treeitem", { name, exact: true });
-    await scope(window, "Light").getByRole("button", { name: "Show the keyboard focus on the Tree", exact: true }).focus();
-    await window.keyboard.press("Enter");
+    await item("Notes").focus();
     await expect(item("Notes")).toBeFocused();
 
     await window.keyboard.press("Home");

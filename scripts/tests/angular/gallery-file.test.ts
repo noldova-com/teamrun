@@ -56,7 +56,7 @@ class GalleryFileTests {
       await file.writeAsync(false);
 
       assert.deepEqual([packaged, await file.isPackagedAsync()], [true, false]);
-      assert.deepEqual(GalleryFile.MARKERS, ["tr-gallery-scope-frame", "tr-gallery-forms", "Show the keyboard focus", "\"data-tr-state\""]);
+      assert.deepEqual(GalleryFile.MARKERS, ["tr-gallery-scope-frame", "tr-gallery-forms", "Plate, center chosen", "\"data-tr-state\""]);
     });
 
     test("every marker the packaged check looks for occurs in the Gallery's own source, so renaming it cannot make the check pass on nothing", async () => {

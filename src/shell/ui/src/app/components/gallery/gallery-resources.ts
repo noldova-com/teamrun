@@ -8,7 +8,6 @@
 
 export class GalleryResources {
   public static readonly scopeClass: string = "tr-theme-scope";
-  public static readonly focusableSelector: string = "button:not(:disabled), input:not(:disabled), [tabindex=\"0\"], [role=\"tab\"][aria-selected=\"true\"]";
   public static readonly overlayContainerClass: string = "cdk-overlay-container";
   public static readonly longAttribute: string = "long";
   public static readonly stateAttribute: string = "data-tr-state";
@@ -30,7 +29,6 @@ export class GalleryResources {
     delayed: "Delayed",
     triggerCaption: "Trigger",
     openCaption: "Open",
-    showFocus: "Show the keyboard focus",
     sample: "Sample",
     primary: "Primary",
     secondary: "Secondary",
@@ -184,10 +182,6 @@ export class GalleryResources {
     dockingChosenCaption: "Chosen guide",
     dockingPlateCaption: "Plate, center chosen"
   } as const;
-
-  public static formatShowFocus(specimen: string): string {
-    return `Show the keyboard focus on the ${specimen}`;
-  }
 
   public static formatScope(themeName: string, mode: string): string {
     return `${themeName}, ${mode.toLowerCase()} mode`;

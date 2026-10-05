@@ -17,15 +17,6 @@
   min-width: 0;
 }
 
-.tr-gallery-specimen-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tr-space-2) var(--tr-space-3);
-  min-height: var(--tr-button-height);
-}
-
 .tr-gallery-specimen-name {
   margin: 0;
   font-size: var(--tr-text-label);

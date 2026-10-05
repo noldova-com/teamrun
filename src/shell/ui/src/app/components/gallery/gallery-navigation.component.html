@@ -28,7 +28,7 @@ LICENSE file in the root directory of this source tree.
   <tr-gallery-cell [caption]="text.tabNotClosableCaption">
     <div class="tr-gallery-strip" role="tablist" [attr.aria-label]="text.tabNotClosableCaption"><tr-tab [label]="text.tabNotClosable" [closable]="false" /></div>
   </tr-gallery-cell>
-  <tr-gallery-cell [caption]="text.focus" [isFocusTarget]="true">
+  <tr-gallery-cell [caption]="text.focus">
     <div class="tr-gallery-strip" role="tablist" [attr.aria-label]="text.focus"><tr-tab trGalleryFocus [label]="text.tabSelected" [icon]="text.glyphDescription" [selected]="true" /></div>
   </tr-gallery-cell>
   <tr-gallery-cell long [caption]="text.longCaption">
@@ -43,13 +43,13 @@ LICENSE file in the root directory of this source tree.
 </tr-gallery-specimen>
 
 <tr-gallery-specimen [name]="text.tree" [size]="sizes.Wide">
-  <tr-gallery-cell [caption]="text.defaultState" [isFocusTarget]="true">
+  <tr-gallery-cell [caption]="text.defaultState">
     <tr-tree class="tr-gallery-tree" [nodes]="treeNodes" [label]="text.treeLabel" [current]="treeCurrent()" (activated)="treeCurrent.set($event.id)" />
   </tr-gallery-cell>
 </tr-gallery-specimen>
 
 <tr-gallery-specimen [name]="text.toolbar" [size]="sizes.Wide">
-  <tr-gallery-cell [caption]="text.defaultState" [isFocusTarget]="true">
+  <tr-gallery-cell [caption]="text.defaultState">
     <div trToolbar [trToolbarLabel]="text.toolbarLabel" class="tr-gallery-toolbar">
       <button type="button" tr-icon-button trToolbarItem [icon]="text.glyphAdd" [label]="text.button"></button>
       <button type="button" tr-icon-button trToolbarItem [icon]="text.glyphSave" [label]="text.pressed" [pressed]="true"></button>
@@ -71,7 +71,7 @@ LICENSE file in the root directory of this source tree.
   <tr-gallery-cell [caption]="text.disabled">
     <button type="button" tr-toolbar-button [icon]="text.glyphAdd" [label]="text.disabled" [isUnavailable]="true"></button>
   </tr-gallery-cell>
-  <tr-gallery-cell [caption]="text.focus" [isFocusTarget]="true"><button type="button" tr-toolbar-button trGalleryFocus [icon]="text.glyphAdd" [label]="text.button"></button></tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.focus"><button type="button" tr-toolbar-button trGalleryFocus [icon]="text.glyphAdd" [label]="text.button"></button></tr-gallery-cell>
   <tr-gallery-cell long [caption]="text.longCaption"><button type="button" tr-toolbar-button class="tr-gallery-narrow" [label]="text.longText" [trTooltip]="text.longText" [trTooltipTruncated]="true"></button></tr-gallery-cell>
 </tr-gallery-specimen>
 
@@ -90,7 +90,7 @@ LICENSE file in the root directory of this source tree.
       <div class="tr-gallery-pane"></div>
     </div>
   </tr-gallery-cell>
-  <tr-gallery-cell [caption]="text.focus" [isFocusTarget]="true">
+  <tr-gallery-cell [caption]="text.focus">
     <div class="tr-gallery-sash-box">
       <div class="tr-gallery-pane"></div>
       <tr-sash trGalleryFocus [orientation]="orientations.Vertical" [label]="text.sashVertical" />
