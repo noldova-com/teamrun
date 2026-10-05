@@ -10,12 +10,25 @@ import "@noldova/teamrun-foundation-core";
 
 export class GalleryResources {
   public static readonly scopeClass: string = "tr-theme-scope";
-  public static readonly focusableSelector: string = "button:not(:disabled), input:not(:disabled), [tabindex=\"0\"], [role=\"tab\"][aria-selected=\"true\"]";
   public static readonly overlayContainerClass: string = "cdk-overlay-container";
+  public static readonly longAttribute: string = "long";
+  public static readonly stateAttribute: string = "data-tr-state";
+  public static readonly hoveredPill: string = ".tr-choice-pill[aria-checked=\"false\"]";
+  public static readonly focusedPill: string = ".tr-choice-pill[aria-checked=\"true\"]";
+  public static readonly focusedCheckbox: string = ".tr-checkbox-box";
+  public static readonly focusedSelect: string = ".tr-select-button";
   public static readonly dialogTitleIdPrefix: string = "tr-gallery-dialog-";
   public static readonly text = {
     gallery: "Gallery",
-    showFocus: "Show the keyboard focus",
+    defaultState: "Default",
+    focus: "Focus",
+    hover: "Hover",
+    secondaryHover: "Secondary, hover",
+    longCaption: "Long text",
+    secondaryDisabled: "Secondary, disabled",
+    delayed: "Delayed",
+    triggerCaption: "Trigger",
+    openCaption: "Open",
     sample: "Sample",
     primary: "Primary",
     secondary: "Secondary",
@@ -49,6 +62,8 @@ export class GalleryResources {
     progress: "Progress",
     determinate: "Half done",
     indeterminate: "Unknown amount",
+    progressDeterminate: "Determinate",
+    progressIndeterminate: "Indeterminate",
     spinner: "Spinner",
     spinnerWorking: "Loading the list",
     spinnerDelayed: "Loading after a short wait",
@@ -56,6 +71,8 @@ export class GalleryResources {
     chipCount: "Count",
     chipAdded: "Added",
     chipRemoved: "Removed",
+    chipLargeCount: "Large count",
+    chipKeyCaption: "Key",
     chipKey: "Ctrl+K",
     choicePills: "Choice pills",
     choicePillsLabel: "Mode",
@@ -78,10 +95,8 @@ export class GalleryResources {
     configurationActions: "Actions",
     configurationEdit: "Edit",
     configurationRemove: "Remove",
-    configurationTables: [
-      { heading: "Environment variables", label: "Environment variables", explanation: "Each variable is set for the programs the shell starts, after the system's own.", rowCount: 3, isNarrow: false, hasAdd: true },
-      { heading: String.empty, label: "Narrow environment variables", explanation: String.empty, rowCount: 2, isNarrow: true, hasAdd: false }
-    ],
+    configurationWideTable: { heading: "Environment variables", label: "Environment variables", explanation: "Each variable is set for the programs the shell starts, after the system's own.", rowCount: 3, isNarrow: false, hasAdd: true },
+    configurationNarrowTable: { heading: String.empty, label: "Narrow environment variables", explanation: String.empty, rowCount: 2, isNarrow: true, hasAdd: false },
     configurationRows: [
       { name: "EDITOR", value: "code --wait", scope: "Every project", edit: "Edit EDITOR", remove: "Remove EDITOR" },
       { name: "LANG", value: "en_GB.UTF-8", scope: "Every project", edit: "Edit LANG", remove: "Remove LANG" },
@@ -95,9 +110,13 @@ export class GalleryResources {
     tabBadge: "Inbox",
     tabLong: "A tab title that is far too long to fit the width of its strip",
     tabNotClosable: "Pinned",
+    tabPreviewCaption: "Preview",
+    tabBadgeCaption: "Badge",
+    tabNotClosableCaption: "Not closable",
     viewBadge: "View badge",
     menuBar: "Menu bar",
     menuBarLabel: "Gallery menus",
+    menuBarHover: "Menu bar, hover",
     toolbar: "Toolbar",
     toolbarLabel: "Gallery toolbar",
     toolbarButtons: "Toolbar button",
@@ -106,6 +125,8 @@ export class GalleryResources {
     sash: "Sash",
     sashVertical: "Resize the side",
     sashHorizontal: "Resize the bottom",
+    sashVerticalCaption: "Vertical",
+    sashHorizontalCaption: "Horizontal",
     panelCard: "Panel card",
     tree: "Tree",
     treeLabel: "Gallery files",
@@ -127,11 +148,16 @@ export class GalleryResources {
     glyphFolder: "folder",
     panelShell: "On the shell surface",
     panelPanel: "On the panel surface",
+    panelShellCaption: "Shell surface",
+    panelPanelCaption: "Panel surface",
     menu: "Menu",
     menuTrigger: "Open a menu",
     contextMenu: "Right-click or press the context-menu key here",
     menuLabel: "Menu rows",
+    menuRowsCaption: "Rows",
+    contextMenuCaption: "Context menu",
     menuPlain: "A plain row",
+    menuHovered: "A hovered row",
     menuIcon: "A row with an icon",
     menuShortcut: "A row with a shortcut",
     menuChecked: "A checked row",
@@ -159,6 +185,7 @@ export class GalleryResources {
     dialogCancel: "Cancel",
     dialogConfirm: "Delete",
     largeDialogTitle: "Notes",
+    largeCaption: "Large",
     largeDialogBody: "A view or document shown large keeps its own layout inside the dialog's body.",
     quickInput: "Quick input",
     quickInputLabel: "Search the gallery",
@@ -173,11 +200,14 @@ export class GalleryResources {
     selectInitial: "one",
     docking: "Docking guides",
     dockingGuide: "A chosen guide",
-    dockingPlate: "A plate with the center chosen"
+    dockingPlate: "A plate with the center chosen",
+    dockingGuideCaption: "Guide",
+    dockingChosenCaption: "Chosen guide",
+    dockingPlateCaption: "Plate, center chosen"
   } as const;
 
-  public static formatShowFocus(specimen: string): string {
-    return `Show the keyboard focus on the ${specimen}`;
+  public static formatMissingPart(part: string): string {
+    return `The Gallery cell has no part that matches ${part}.`;
   }
 
   public static formatScope(themeName: string, mode: string): string {

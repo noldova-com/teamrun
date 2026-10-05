@@ -8,6 +8,7 @@
 
 import { ChangeDetectionStrategy, Component, type WritableSignal, signal } from "@angular/core";
 
+import { GallerySize } from "../../enums/gallery-size";
 import { PanelSurface } from "../../enums/panel-surface";
 import { SashOrientation } from "../../enums/sash-orientation";
 import { TreeMove } from "../../models/tree-move";
@@ -23,18 +24,21 @@ import { ToolbarDirective } from "../toolbar/toolbar.directive";
 import { TooltipDirective } from "../tooltip/tooltip.directive";
 import { TreeComponent } from "../tree/tree.component";
 import { ViewBadgeComponent } from "../view-badge/view-badge.component";
+import { GalleryCellComponent } from "./gallery-cell.component";
 import { GalleryResources } from "./gallery-resources";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
+import { GalleryStateDirective } from "./gallery-state.directive";
 
 @Component({
   selector: "tr-gallery-navigation",
-  imports: [GallerySpecimenComponent, IconButtonComponent, PanelCardComponent, SashComponent, SectionHeaderComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, TreeComponent, ViewBadgeComponent],
+  imports: [GalleryCellComponent, GallerySpecimenComponent, GalleryStateDirective, IconButtonComponent, PanelCardComponent, SashComponent, SectionHeaderComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, TreeComponent, ViewBadgeComponent],
   templateUrl: "./gallery-navigation.component.html",
   styleUrl: "./gallery-navigation.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GalleryNavigationComponent {
   protected readonly text: typeof GalleryResources.text = GalleryResources.text;
+  protected readonly sizes: typeof GallerySize = GallerySize;
   protected readonly surfaces: typeof PanelSurface = PanelSurface;
   protected readonly orientations: typeof SashOrientation = SashOrientation;
   protected readonly recentRows: readonly TreeNode[] = [

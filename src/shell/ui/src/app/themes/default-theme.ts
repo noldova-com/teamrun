@@ -230,7 +230,7 @@ export class DefaultTheme {
       ["settings-item-description-gap", "0.1875rem"],
       ["settings-item-control-gap", "0.5625rem"],
       ["settings-heading-space", "0.625rem"],
-      ["settings-heading-inset", "0.9375rem"]
+      ["settings-content-inset", "0.9375rem"]
     ]),
     new Map([["tab", "pill"]]));
 }

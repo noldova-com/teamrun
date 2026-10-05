@@ -12,6 +12,7 @@ import { ChangeDetectionStrategy, Component, Injector, type WritableSignal, inje
 import { ButtonVariant } from "../../enums/button-variant";
 import { DialogSize } from "../../enums/dialog-size";
 import { DockingDirection } from "../../enums/docking-direction";
+import { GallerySize } from "../../enums/gallery-size";
 import { DialogTokens } from "../../models/dialog-tokens";
 import { OverlaySide } from "../../models/overlay-side";
 import { QueryMatcher } from "../../models/query-matcher";
@@ -32,13 +33,15 @@ import { PopoverTriggerDirective } from "../popover/popover-trigger.directive";
 import { QuickInputComponent } from "../quick-input/quick-input.component";
 import { TooltipComponent } from "../tooltip/tooltip.component";
 import { TooltipDirective } from "../tooltip/tooltip.directive";
+import { GalleryCellComponent } from "./gallery-cell.component";
 import { GalleryResources } from "./gallery-resources";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
+import { GalleryStateDirective } from "./gallery-state.directive";
 
 @Component({
   selector: "tr-gallery-overlays",
   imports: [
-    ButtonComponent, ContextMenuTriggerDirective, DialogComponent, DockingGuideComponent, DockingPlateComponent, GallerySpecimenComponent, MenuBarComponent, MenuBarItemComponent,
+    ButtonComponent, ContextMenuTriggerDirective, DialogComponent, DockingGuideComponent, DockingPlateComponent, GalleryCellComponent, GallerySpecimenComponent, GalleryStateDirective, MenuBarComponent, MenuBarItemComponent,
     MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, PopoverDirective, PopoverTriggerDirective, QuickInputComponent, TooltipComponent, TooltipDirective
   ],
   templateUrl: "./gallery-overlays.component.html",
@@ -53,7 +56,8 @@ export class GalleryOverlaysComponent {
   protected readonly text: typeof GalleryResources.text = GalleryResources.text;
   protected readonly dialogInjector: Injector = this.createDialogInjector();
   protected readonly largeDialogInjector: Injector = this.createDialogInjector();
-  protected readonly sizes: typeof DialogSize = DialogSize;
+  protected readonly sizes: typeof GallerySize = GallerySize;
+  protected readonly dialogSizes: typeof DialogSize = DialogSize;
   protected readonly variants: typeof ButtonVariant = ButtonVariant;
   protected readonly directions: typeof DockingDirection = DockingDirection;
   protected readonly below: OverlaySide = OverlaySide.below;

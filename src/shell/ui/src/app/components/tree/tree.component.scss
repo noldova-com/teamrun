@@ -7,6 +7,7 @@
  */
 
 @use "selected-surface" as *;
+@use "states";
 
 :host {
   position: relative;
@@ -30,12 +31,12 @@
   color: var(--tr-text);
 }
 
-.tr-tree-row:hover {
+.tr-tree-row#{states.$hover} {
   background-color: var(--tr-hover);
 }
 
 .tr-tree-row-current,
-.tr-tree-row-current:hover {
+.tr-tree-row-current#{states.$hover} {
   @include selected-surface;
 }
 
