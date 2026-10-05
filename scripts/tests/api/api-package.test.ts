@@ -17,7 +17,7 @@ import PackageManifest from "../../packages/package-manifest.ts";
 
 class ApiPackageTests {
   public static register(): void {
-    test("a package's API is its directory, id, source project, API source, installed declarations and the repository root for its examples", () => {
+    test("a package's API is its directory, id, source project, API source, installed declarations read from the build, source declarations to report, and the repository root for its examples", () => {
       const root = path.resolve("repository");
       const found = ApiPackage.forPackage(new BuildLayout(root), new PackageManifest("src/foundation/json", "@noldova/teamrun-foundation-json", []));
 
@@ -25,13 +25,14 @@ class ApiPackageTests {
       assert.equal(found.project, path.join(root, "src/foundation/json/src/tsconfig.json"));
       assert.equal(found.implementation, path.join(root, "src/foundation/json/src/api/index.ts"));
       assert.equal(found.declarations, path.join(root, "node_modules/@noldova/teamrun-foundation-json/api/index.d.ts"));
+      assert.equal(found.sourceDeclarations, path.join(root, "src/foundation/json/src/api/index.d.ts"));
       assert.equal(found.missingDeclarationsMessage, `no installed declarations at ${found.declarations}; build the packages first`);
       assert.equal(found.visibility, ApiVisibility.PUBLIC_AND_PROTECTED);
       assert.equal(found.exampleRoot, root);
       assert.equal(found.paths, undefined);
     });
 
-    test("an Angular part's API is its directory, an id from its path, the shared project, its API source and declarations in source, and a root for its examples beside the project's dependencies", () => {
+    test("an Angular part's API is its directory, an id from its path, the shared project, its API source and declarations in source, read and reported in place, and a root for its examples beside the project's dependencies", () => {
       const root = path.resolve("repository");
       const paths = { "@noldova/teamrun-shell-window": [path.join(root, "src/shell/window/src/api/index.d.ts")] };
       const found = ApiPackage.forPart(root, "src/shell/window", path.join(root, "src/tsconfig.json"), paths);
@@ -42,6 +43,7 @@ class ApiPackageTests {
       assert.equal(found.implementation, ApiPackage.locatePartImplementation(root, "src/shell/window"));
       assert.equal(found.declarations, path.join(root, "src/shell/window/src/api/index.d.ts"));
       assert.equal(found.declarations, ApiPackage.locatePartDeclarations(root, "src/shell/window"));
+      assert.equal(found.sourceDeclarations, found.declarations);
       assert.equal(found.missingDeclarationsMessage, `no declarations at ${found.declarations}`);
       assert.equal(found.visibility, ApiVisibility.PUBLIC);
       assert.equal(found.exampleRoot, path.join(root, "src/node_modules/.cache/teamrun"));

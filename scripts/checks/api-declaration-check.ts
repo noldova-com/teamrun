@@ -6,15 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync } from "node:fs";
 import type { Writable } from "node:stream";
 
 import { DiagnosticCategory, type Project } from "typescript/unstable/async";
 
 import type ApiCatalog from "../api/api-catalog.ts";
+import ApiDeclarationSession from "../api/api-declaration-session.ts";
 import type ApiPackage from "../api/api-package.ts";
-import ApiProject from "../api/api-project.ts";
-import ApiServer from "../api/api-server.ts";
 import ApiSurfaceReader from "../api/api-surface.reader.ts";
 import ApiException from "../api/api.exception.ts";
 import type ICheck from "./interfaces/check.ts";
@@ -22,37 +20,20 @@ import type ICheck from "./interfaces/check.ts";
 export default class ApiDeclarationCheck implements ICheck {
   private static readonly PURPOSE: string = "api-declarations";
   private static readonly NO_PACKAGES: string = "No packages under src/; there are no API declarations to compare.\n";
+  private static readonly VERDICT: string = "matches its declarations";
 
-  private readonly root: string;
   private readonly catalog: ApiCatalog;
-  private readonly server: readonly string[];
-  private readonly timeout: number;
+  private readonly session: ApiDeclarationSession;
 
   public readonly title: string = "API declarations";
 
   public constructor(root: string, catalog: ApiCatalog, server: readonly string[], timeout: number) {
-    this.root = root;
     this.catalog = catalog;
-    this.server = [...server];
-    this.timeout = timeout;
+    this.session = new ApiDeclarationSession(root, server, timeout);
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
-    const apiPackages = await this.catalog.listOrReportAsync(output);
-    if (apiPackages === undefined)
-      return false;
-    if (apiPackages.length === 0) {
-      output.write(ApiDeclarationCheck.NO_PACKAGES);
-      return true;
-    }
-
-    let passed = true;
-    for (const apiPackage of apiPackages) {
-      const problems = await this.inspectAsync(apiPackage);
-      output.write(problems.length === 0 ? `${apiPackage.directory}: matches its declarations\n` : `${apiPackage.directory}:\n${problems.map(t => `  ${t}\n`).join("")}`);
-      passed &&= problems.length === 0;
-    }
-    return passed;
+    return await this.catalog.inspectEachAsync(output, ApiDeclarationCheck.NO_PACKAGES, ApiDeclarationCheck.VERDICT, t => this.inspectAsync(t));
   }
 
   private static async readErrorsAsync(project: Project, file: string): Promise<readonly string[]> {
@@ -61,12 +42,8 @@ export default class ApiDeclarationCheck implements ICheck {
   }
 
   private async inspectAsync(apiPackage: ApiPackage): Promise<readonly string[]> {
-    if (!existsSync(apiPackage.declarations))
-      return [apiPackage.missingDeclarationsMessage];
-    const project = new ApiProject(this.root, ApiDeclarationCheck.PURPOSE, apiPackage.id);
-    await project.writeAsync(apiPackage.project, this.root, [apiPackage.implementation, apiPackage.declarations]);
     try {
-      return await ApiServer.useAsync(this.server, this.root, project.file, this.timeout, async t => {
+      return await this.session.useAsync(apiPackage, ApiDeclarationCheck.PURPOSE, [apiPackage.implementation, apiPackage.declarations], async t => {
         const errors = await ApiDeclarationCheck.readErrorsAsync(t, apiPackage.declarations);
         if (errors.length > 0)
           return errors;

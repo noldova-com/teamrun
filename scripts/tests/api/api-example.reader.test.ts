@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import ApiExampleReader from "../../api/api-example.reader.ts";
+import ApiVisibility from "../../api/api-visibility.ts";
 import ApiException from "../../api/api.exception.ts";
 import ApiPackageFixture from "../fixtures/api-package.fixture.ts";
 import ApiSessionFixture from "../fixtures/api-session.fixture.ts";
@@ -40,7 +41,7 @@ class ApiExampleReaderTests {
         ].join("\n")
       };
 
-      const found = await ApiSessionFixture.useAsync(fixture, files, (project, locate) => new ApiExampleReader(project).readAsync(locate("index.d.ts")));
+      const found = await ApiSessionFixture.useAsync(fixture, files, (project, locate) => new ApiExampleReader(project, ApiVisibility.PUBLIC_AND_PROTECTED).readAsync(locate("index.d.ts")));
 
       assert.deepEqual(found.examples.map(t => [t.title, t.code]), [["read example 1", "read();\n"], ["Tools.run example 1", "read();\n"]]);
       assert.deepEqual(found.undocumented, ["IReader#next", "Reader.constructor"]);
@@ -51,7 +52,7 @@ class ApiExampleReaderTests {
       t.after(() => fixture.disposeAsync());
 
       await ApiSessionFixture.useAsync(fixture, { "script.ts": "const value: number = 1;\nvalue.toFixed();\n" }, async (project, locate) => {
-        const reader = new ApiExampleReader(project);
+        const reader = new ApiExampleReader(project, ApiVisibility.PUBLIC_AND_PROTECTED);
 
         await assert.rejects(reader.readAsync(locate("other.ts")), new ApiException(`${locate("other.ts")} is not an ES module of the project.`));
         assert.deepEqual((await reader.readAsync(locate("script.ts"))).examples, []);
