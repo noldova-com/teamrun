@@ -7,12 +7,8 @@
  */
 
 :host {
-  position: relative;
-  display: flex;
-  align-items: center;
-  box-sizing: border-box;
-  min-height: var(--tr-section-header-height);
-  padding-block: var(--tr-space-1);
+  display: block;
+  padding-block: calc((var(--tr-section-header-height) - var(--tr-line-label)) / 2);
   padding-inline: var(--tr-section-header-inset);
   color: var(--tr-text);
   font-size: var(--tr-text-label);
@@ -20,10 +16,6 @@
   line-height: var(--tr-line-label);
 }
 
-:host(.tr-section-header-separated)::before {
-  content: "";
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline: var(--tr-section-header-inset);
-  border-block-start: var(--tr-border-width) solid var(--tr-border);
+:host(:not(:first-child)) {
+  margin-block-start: var(--tr-space-3);
 }

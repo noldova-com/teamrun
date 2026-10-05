@@ -216,7 +216,7 @@ export class FixtureTheme {
     ["tree-row-height", "1.875rem"],
     ["tree-indent", "2rem"],
     ["section-header-height", "2.25rem"],
-    ["section-header-inset", "2.5rem"],
+    ["section-header-inset", "1rem"],
     ["settings-pages-width", "15rem"],
     ["settings-content-width", "55rem"],
     ["modules-list-width", "22rem"],

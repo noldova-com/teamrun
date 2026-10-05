@@ -18,12 +18,10 @@ import { Resources } from "../../../resources";
   host: {
     "class": "tr-section-header",
     "role": "heading",
-    "[attr.aria-level]": "level()",
-    "[class.tr-section-header-separated]": "isSeparated()"
+    "[attr.aria-level]": "level()"
   }
 })
 export class SectionHeaderComponent {
   public readonly label = input.required<string>();
-  public readonly isSeparated = input<boolean>(false);
   public readonly level = input<number>(Resources.sectionHeaderLevel);
 }
