@@ -244,6 +244,12 @@ test.describe("settings", () => {
     expect(overflows.filter(t => t[1] !== 0)).toEqual([]);
     await longest.scrollIntoViewIfNeeded();
     expect(await longest.locator(".tr-shortcut-name").evaluate(t => t.getBoundingClientRect().height > Number.parseFloat(getComputedStyle(t).lineHeight))).toBe(true);
+    expect(await window.locator("[data-command=\"shell.moveTabToNextGroup\"] .tr-shortcut-name").evaluate(t => {
+      const range = document.createRange();
+      const group = [...t.querySelectorAll("tr-highlighted-text")].flatMap(u => [...u.childNodes]).find(u => u.textContent === "Group") as Node;
+      range.selectNodeContents(group);
+      return [Math.round(range.getBoundingClientRect().left - t.getBoundingClientRect().left), range.getBoundingClientRect().top > t.getBoundingClientRect().top, t.textContent];
+    })).toEqual([0, true, "shell.moveTabToNextGroup"]);
     for (const scheme of ["light", "dark"] as const) {
       await window.emulateMedia({ colorScheme: scheme });
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);

@@ -158,7 +158,7 @@ describe("ShortcutsComponent", () => {
   it("wraps a long id within its Command cell when the table is narrow", async () => {
     AppearanceFixture.apply();
     await renderAsync();
-    element().style.width = "22rem";
+    element().style.width = "20rem";
     await settleAsync();
     const overflows = [...element().querySelectorAll<HTMLElement>("tbody tr")].map(t => {
       const cell = t.querySelector("td") as HTMLElement;
@@ -166,9 +166,19 @@ describe("ShortcutsComponent", () => {
       return [t.getAttribute("data-command"), Math.max(0, Math.round((t.querySelector(".tr-shortcut-name") as HTMLElement).getBoundingClientRect().right - end))];
     });
     const long = row("shell.moveTabToPreviousGroup").querySelector(".tr-shortcut-name") as HTMLElement;
+    const next = row("shell.moveTabToNextGroup").querySelector(".tr-shortcut-name") as HTMLElement;
+    const pieces = [...next.querySelectorAll("tr-highlighted-text")].flatMap(t => [...t.childNodes]).filter(t => t.nodeType === Node.TEXT_NODE && !String.isNullOrWhitespace(t.textContent)).map(t => {
+      const range = document.createRange();
+      range.selectNodeContents(t);
+      return [t.textContent, range.getClientRects().length, Math.round(range.getBoundingClientRect().left - next.getBoundingClientRect().left)];
+    });
 
     expect(overflows.filter(t => t[1] !== 0)).toEqual([]);
     expect(long.getBoundingClientRect().height).toBeGreaterThan(Number.parseFloat(getComputedStyle(long).lineHeight));
+    expect(pieces.map(t => t[0])).toEqual(["shell.", "move", "Tab", "To", "Next", "Group"]);
+    expect(pieces.filter(t => t[1] !== 1)).toEqual([]);
+    expect(pieces.at(-1)?.[2]).toBe(0);
+    expect(next.getBoundingClientRect().height).toBeGreaterThan(Number.parseFloat(getComputedStyle(next).lineHeight));
   });
 
   it("records a new key from the first key pressed after the modifiers, without running the command it would run, and keeps the focus", async () => {

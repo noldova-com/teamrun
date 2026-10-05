@@ -32,4 +32,22 @@ describe("HighlightedTextComponent", () => {
     expect(look).toEqual([AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "list.highlightForeground"), "underline"]);
     expect([(fixture.nativeElement as HTMLElement).textContent, (fixture.nativeElement as HTMLElement).querySelectorAll("mark").length]).toEqual(["Code text size", 0]);
   });
+
+  it("gives an id break opportunities at its word boundaries without adding characters, inside a match too, and only when asked", () => {
+    const fixture = TestBed.createComponent(HighlightedTextComponent);
+    const element = fixture.nativeElement as HTMLElement;
+    fixture.componentRef.setInput("text", "shell.splitTabUp");
+    fixture.componentRef.setInput("query", "bu");
+    fixture.detectChanges();
+    const plain = [element.querySelectorAll("wbr").length, element.textContent];
+    fixture.componentRef.setInput("breaksWords", true);
+    fixture.detectChanges();
+    document.getSelection()?.selectAllChildren(element);
+    const copied = document.getSelection()?.toString();
+    document.getSelection()?.removeAllRanges();
+
+    expect(plain).toEqual([0, "shell.splitTabUp"]);
+    expect([element.querySelectorAll("wbr").length, element.textContent, copied]).toEqual([3, "shell.splitTabUp", "shell.splitTabUp"]);
+    expect([...element.querySelectorAll("mark")].map(t => [t.textContent, t.querySelectorAll("wbr").length])).toEqual([["bU", 1]]);
+  });
 });

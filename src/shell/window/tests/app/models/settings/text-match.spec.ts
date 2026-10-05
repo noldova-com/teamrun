@@ -18,6 +18,10 @@ describe("TextMatch", () => {
     expect(split("Mode", "theme")).toBe("Mode");
   });
 
+  it("keeps a part whole as its one piece unless it is given its pieces", () => {
+    expect([TextMatch.split("Mode", "o").map(t => t.pieces), new TextMatch("splitTab", false, ["split", "Tab"]).pieces]).toEqual([[["M"], ["o"], ["de"]], ["split", "Tab"]]);
+  });
+
   it("finds a query in a text only when the query has something to find", () => {
     expect([TextMatch.contains("Interface font", "FONT"), TextMatch.contains("Interface font", "  "), TextMatch.contains("Mode", "theme")]).toEqual([true, false, false]);
   });
