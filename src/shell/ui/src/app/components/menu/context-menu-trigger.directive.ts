@@ -52,7 +52,7 @@ export class ContextMenuTriggerDirective extends CdkMenuTriggerBase {
         this.menuStack.closeAll();
     });
     this.anchored.outsidePointerEvents.pipe(takeUntil(this.destroyed)).subscribe(event => this.closeFromOutside(event));
-    this.anchored.originScrolls.pipe(takeUntil(this.destroyed)).subscribe(() => this.menuStack.closeAll());
+    this.anchored.originLost.pipe(takeUntil(this.destroyed)).subscribe(() => this.menuStack.closeAll());
   }
 
   public open(point: DOMRect, origin: FocusOrigin): void {

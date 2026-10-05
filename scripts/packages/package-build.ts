@@ -14,7 +14,9 @@ import { fileURLToPath } from "node:url";
 
 import type BuildVariant from "../modules/build-variant.ts";
 import ModuleCatalog from "../modules/module-catalog.ts";
+import ModuleException from "../modules/module.exception.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
+import ProcessException from "../processes/process.exception.ts";
 import NpmCommand from "../toolchain/npm-command.ts";
 import BuildLayout from "./build-layout.ts";
 import BuildProduct from "./build-product.ts";
@@ -94,6 +96,19 @@ export default class PackageBuild {
     await this.requireCurrentAsync(variant);
     await this.product.writeAsync(await this.hashFingerprintAsync(variant), outputFolder);
     return packages;
+  }
+
+  public async isCurrentReportedAsync(variant: BuildVariant, output: Writable): Promise<boolean> {
+    try {
+      await this.requireCurrentAsync(variant);
+      return true;
+    }
+    catch (error) {
+      if (!(error instanceof PackageException || error instanceof ProcessException || error instanceof ModuleException))
+        throw error;
+      output.write(`${error.message}\n`);
+      return false;
+    }
   }
 
   public async requireCurrentAsync(variant: BuildVariant): Promise<void> {

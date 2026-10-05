@@ -62,20 +62,16 @@ export default class PullRequestReader {
   }
 
   public async readAsync(state: PullRequestState): Promise<PullRequestSnapshot> {
-    const checks = await this.readChecksAsync(state.head);
+    const [checks, hadAutoMerge, isApproved, buildRuns, notes] = await Promise.all([
+      this.readChecksAsync(state.head),
+      this.readAutoMergeHistoryAsync(state.number),
+      this.readApprovalAsync(state.number),
+      this.readBuildRunsAsync(state.head),
+      this.readNotesAsync(state.number)
+    ]);
     const starts = checks.flatMap(t => t.startedTime === null ? [] : [t.startedTime]);
     const pushedAt = starts.length === 0 ? await this.readCommitDateAsync(state.head) : new Date(Math.min(...starts));
-    return new PullRequestSnapshot(
-      state.number,
-      state.head,
-      state.mergeState,
-      state.hasAutoMerge,
-      await this.readAutoMergeHistoryAsync(state.number),
-      await this.readApprovalAsync(state.number),
-      pushedAt,
-      await this.readBuildRunsAsync(state.head),
-      checks,
-      await this.readNotesAsync(state.number));
+    return new PullRequestSnapshot(state.number, state.head, state.mergeState, state.hasAutoMerge, hadAutoMerge, isApproved, pushedAt, buildRuns, checks, notes);
   }
 
   public async listActiveBuildRunsAsync(head: string): Promise<readonly number[]> {

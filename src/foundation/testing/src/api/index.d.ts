@@ -1698,16 +1698,18 @@ export declare class CoverageExclusion {
 }
 
 /**
- * A package whose installed files a coverage run measures.
+ * A package, or a folder of scripts Node.js runs as TypeScript, whose files
+ * a coverage run measures.
  */
 export declare class CoverageProject {
   /**
-   * The package name shown in coverage reports.
+   * The name shown in coverage reports.
    */
   public readonly name: string;
 
   /**
-   * The folder of the installed JavaScript files.
+   * The folder of the installed JavaScript files, or of the TypeScript
+   * files Node.js runs by stripping their types.
    */
   public readonly productionDirectory: string;
 
@@ -1722,16 +1724,24 @@ export declare class CoverageProject {
   public readonly exclusions: readonly CoverageExclusion[];
 
   /**
+   * The folders inside the production folder, relative to it, that hold the
+   * project's tests. Their files are not measured.
+   */
+  public readonly testFolders: readonly string[];
+
+  /**
    * Creates the project.
    *
-   * @param name The package name; not whitespace only.
-   * @param productionDirectory The installed files' folder; not whitespace
+   * @param name The name; not whitespace only.
+   * @param productionDirectory The measured files' folder; not whitespace
    * only.
    * @param sourceDirectory The source folder; not whitespace only.
    * @param exclusions The files left out of the coverage gate, each named
    * once; none by default. The project keeps its own copy.
-   * @throws ArgumentException synchronously when a name or folder is empty or
-   * whitespace only, or when a file is excluded twice.
+   * @param testFolders The test folders, each not whitespace only; none by
+   * default. The project keeps its own copy.
+   * @throws ArgumentException synchronously when a name, folder or test
+   * folder is empty or whitespace only, or when a file is excluded twice.
    * @example
    * ```ts
    * import { CoverageProject } from "@noldova/teamrun-foundation-testing";
@@ -1751,13 +1761,19 @@ export declare class CoverageProject {
    *   "/repository/src/shell/desktop/src",
    *   [new CoverageExclusion("main.ts", "Runs only inside Electron.")]);
    * ```
+   * @example
+   * ```ts
+   * import { CoverageProject } from "@noldova/teamrun-foundation-testing";
+   *
+   * export const project: CoverageProject = new CoverageProject("scripts", "/repository/scripts", "/repository/scripts", [], ["tests"]);
+   * ```
    */
-  public constructor(name: string, productionDirectory: string, sourceDirectory: string, exclusions?: readonly CoverageExclusion[]);
+  public constructor(name: string, productionDirectory: string, sourceDirectory: string, exclusions?: readonly CoverageExclusion[], testFolders?: readonly string[]);
 }
 
 /**
- * The coverage of one production file. Lengths count the compiled file's
- * characters, as V8 reports them.
+ * The coverage of one production file. Lengths count the characters of the
+ * file V8 ran, as V8 reports them.
  */
 export declare class FileCoverage {
   /**
@@ -1983,25 +1999,31 @@ export declare class CoverageEnvironment {
 }
 
 /**
- * Measures the coverage of installed packages from the V8 coverage reports
- * of a run.
+ * Measures the coverage of installed packages, and of scripts Node.js runs
+ * as TypeScript, from the V8 coverage reports of a run.
  */
 export declare class CoverageAnalyzer {
   /**
-   * Analyzes every report in a folder against every `.js` file of the
-   * packages, merging the coverage of all processes. A file no report
-   * mentions counts as entirely uncovered unless it has no executable text,
-   * and a position no report covers counts as uncovered.
+   * Analyzes every report in a folder against every `.js` file and every
+   * `.ts` file other than a `.d.ts` file of the projects, leaving out their
+   * test folders. A `.js` file is mapped to its source through its source
+   * map; a `.ts` file is measured with its types stripped as Node.js runs
+   * it, without a source map. Each process's coverage counts on its own: a
+   * position is covered when any process covered it, so the order of the
+   * reports never changes the result. A file no report mentions counts as
+   * entirely uncovered unless it has no executable text, and a position no
+   * report covers counts as uncovered.
    *
    * @param coverageDirectory The folder of V8 coverage reports; not
    * whitespace only.
-   * @param projects The packages to measure; at least one.
+   * @param projects The projects to measure; at least one.
    * @returns A promise of the run's coverage.
    * @throws ArgumentException synchronously for an empty folder name or no
-   * packages.
-   * @throws TestingException as a rejection when the packages have no
-   * JavaScript files, or when a report or source map is missing, malformed
-   * or refers to a file outside its package.
+   * projects.
+   * @throws TestingException as a rejection when the projects have no
+   * JavaScript or TypeScript files, when a report or source map is missing,
+   * malformed or refers to a file outside its project, or when Node.js
+   * cannot strip a `.ts` file's types.
    * @example
    * ```ts
    * import { CoverageAnalyzer, CoverageProject, type CoverageResult } from "@noldova/teamrun-foundation-testing";

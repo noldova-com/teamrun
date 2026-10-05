@@ -20,15 +20,13 @@ import PackageException from "../packages/package.exception.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import ProcessException from "../processes/process.exception.ts";
 import CheckSelection from "./check-selection.ts";
+import CoverageRun from "./coverage-run.ts";
 import type ISelectableCheck from "./interfaces/selectable-check.ts";
 
 export default class PackageTestCheck implements ISelectableCheck {
   private static readonly TESTING_PACKAGE: string = "@noldova/teamrun-foundation-testing";
-  private static readonly FRAMEWORK_SEGMENTS: readonly string[] = ["node_modules", "@noldova", "teamrun-foundation-testing", "services"];
   private static readonly TEST_ENTRY_SEGMENTS: readonly string[] = ["execution", "test-run-entry.js"];
-  private static readonly COVERAGE_ENTRY_SEGMENTS: readonly string[] = ["coverage", "coverage-run-entry.js"];
   private static readonly COVERAGE_SEGMENTS: readonly string[] = ["_build", "coverage"];
-  private static readonly COVERAGE_VARIABLE: string = "NODE_V8_COVERAGE";
   private static readonly SOURCE_FOLDER: string = "src";
   private static readonly SOURCE_MAPS_OPTION: string = "--enable-source-maps";
   private static readonly FILTERS_VARIABLE: string = "TEAMRUN_TEST_FILTERS";
@@ -66,7 +64,8 @@ export default class PackageTestCheck implements ISelectableCheck {
   private async checkAsync(output: Writable, filters: readonly string[]): Promise<CheckSelection> {
     const isFiltered = filters.length > 0;
     try {
-      await this.build.requireCurrentAsync(BuildVariant.REGULAR);
+      if (!await this.build.isCurrentReportedAsync(BuildVariant.REGULAR, output))
+        return new CheckSelection(false, PackageTestCheck.UNIT, 0, 0);
       const layout = new BuildLayout(this.root);
       const packages = await new PackageCatalog(this.root).listPackagesAsync(false);
       const tested = packages.filter(t => existsSync(layout.locateTestOutput(t)));
@@ -82,7 +81,7 @@ export default class PackageTestCheck implements ISelectableCheck {
       const coverage = path.join(this.root, ...PackageTestCheck.COVERAGE_SEGMENTS);
       const selectionFile = path.join(this.root, ...PackageTestCheck.SELECTION_SEGMENTS);
       const tests = tested.flatMap(t => [t.name, layout.locateTestOutput(t)]);
-      const environment: NodeJS.ProcessEnv = { ...this.environment, [PackageTestCheck.FILTERS_VARIABLE]: JSON.stringify(filters) };
+      let environment: NodeJS.ProcessEnv = { ...this.environment, [PackageTestCheck.FILTERS_VARIABLE]: JSON.stringify(filters) };
       if (isFiltered) {
         await rm(selectionFile, { force: true });
         environment[PackageTestCheck.SELECTION_VARIABLE] = selectionFile;
@@ -90,13 +89,13 @@ export default class PackageTestCheck implements ISelectableCheck {
       else {
         await rm(coverage, { recursive: true, force: true });
         await mkdir(coverage, { recursive: true });
-        environment[PackageTestCheck.COVERAGE_VARIABLE] = coverage;
+        environment = CoverageRun.recordingIn(environment, coverage);
       }
-      const testsPassed = await this.runner.runAsync(process.execPath, [PackageTestCheck.SOURCE_MAPS_OPTION, this.locateEntry(PackageTestCheck.TEST_ENTRY_SEGMENTS), ...tests], this.root, environment) === 0;
+      const testsPassed = await this.runner.runAsync(process.execPath, [PackageTestCheck.SOURCE_MAPS_OPTION, new CoverageRun(this.root, this.runner).locateService(...PackageTestCheck.TEST_ENTRY_SEGMENTS), ...tests], this.root, environment) === 0;
       if (isFiltered)
         return await this.readSelectionAsync(selectionFile, testsPassed, output);
-      const projects = packages.flatMap(t => [t.name, layout.locateInstalled(t), layout.locateSource(t, PackageTestCheck.SOURCE_FOLDER), t.coverageExclusions]);
-      const coverageComplete = await this.runner.runAsync(process.execPath, [this.locateEntry(PackageTestCheck.COVERAGE_ENTRY_SEGMENTS), coverage, ...projects], this.root, this.environment) === 0;
+      const projects = packages.flatMap(t => CoverageRun.formatProjectArguments(t.name, layout.locateInstalled(t), layout.locateSource(t, PackageTestCheck.SOURCE_FOLDER), t.coverageExclusions, CoverageRun.NO_TEST_FOLDERS));
+      const coverageComplete = await new CoverageRun(this.root, this.runner).measureAsync(coverage, projects, this.environment);
       return new CheckSelection(testsPassed && coverageComplete, PackageTestCheck.UNIT, 0, 0);
     }
     catch (error) {
@@ -127,9 +126,5 @@ export default class PackageTestCheck implements ISelectableCheck {
     const discovered = counts?.discovered;
     const selected = counts?.selected;
     return Number.isInteger(discovered) && Number.isInteger(selected) ? { discovered: discovered as number, selected: selected as number } : null;
-  }
-
-  private locateEntry(segments: readonly string[]): string {
-    return path.join(this.root, ...PackageTestCheck.FRAMEWORK_SEGMENTS, ...segments);
   }
 }

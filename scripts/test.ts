@@ -127,7 +127,7 @@ export default class Test {
     const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
     const checks: readonly ISelectableCheck[] = [
       new PackageTestCheck(this.root, build, this.runner, this.environment),
-      new ScriptTestCheck(this.root, this.runner),
+      new ScriptTestCheck(this.root, build, this.runner, this.environment),
       new AngularTestCheck(angular)
     ];
 
@@ -193,7 +193,7 @@ export default class Test {
       new TypeCheck(this.root, this.runner),
       new ApiDeclarationCheck(this.root, catalog, layout, server, Test.API_TIMEOUT),
       new ApiExampleCheck(this.root, catalog, layout, this.runner, server, Test.API_TIMEOUT),
-      new ScriptTestCheck(this.root, this.runner),
+      new ScriptTestCheck(this.root, build, this.runner, this.environment),
       new AngularTestCheck(angular),
       new PackagedBuildCheck(this.root, this.runner, new GalleryFile(this.root), angular)
     ];
