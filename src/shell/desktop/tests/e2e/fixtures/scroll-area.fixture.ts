@@ -46,6 +46,15 @@ export default class ScrollAreaFixture {
     return !rest.equals(await window.screenshot({ clip }));
   }
 
+  public static panelEdgeGapAsync(area: Locator): Promise<number> {
+    return area.evaluate(t => {
+      const panel = t.closest("tr-panel-card") as HTMLElement;
+      const panelEnd = panel.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(panel).borderRightWidth);
+      const areaEnd = t.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(t).borderRightWidth);
+      return panelEnd - areaEnd;
+    });
+  }
+
   public static scrollTopAsync(area: Locator): Promise<number> {
     return area.evaluate(t => t.scrollTop);
   }
