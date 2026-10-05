@@ -6,25 +6,22 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { type ComponentFixture } from "@angular/core/testing";
 
-import { GalleryOverlaysComponent } from "../../../../src/app/components/gallery/gallery-overlays.component";
+import { type GalleryComponent } from "../../../../src/app/components/gallery/gallery.component";
+import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
+import { GalleryFixture } from "../../../fixtures/gallery.fixture";
 
 describe("GalleryOverlaysComponent", () => {
-  let fixture: ComponentFixture<GalleryOverlaysComponent>;
-
-  beforeEach(async () => {
-    fixture = TestBed.createComponent(GalleryOverlaysComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
-  });
+  let fixture: ComponentFixture<GalleryComponent>;
 
   afterEach(() => {
-    fixture.destroy();
+    AppearanceFixture.reset();
   });
 
   it("lets the checkbox row of a menu be used", async () => {
-    const row = fixture.nativeElement.querySelector("[role='menuitemcheckbox']") as HTMLElement;
+    fixture = await GalleryFixture.showAsync();
+    const row = GalleryFixture.frames(fixture)[0]?.querySelector("tr-gallery-overlays [role='menuitemcheckbox']") as HTMLElement;
 
     row.click();
     fixture.detectChanges();
@@ -33,11 +30,12 @@ describe("GalleryOverlaysComponent", () => {
     expect(row.getAttribute("aria-checked")).toBe("false");
   });
 
-  it("gives each sample dialog its own title id", () => {
-    const ids = [...fixture.nativeElement.querySelectorAll(".tr-dialog-title")].map(t => (t as HTMLElement).id);
+  it("gives each sample dialog in every scope its own title id", async () => {
+    fixture = await GalleryFixture.showAsync();
+    const ids = [...fixture.nativeElement.querySelectorAll("tr-gallery-overlays .tr-dialog-title")].map(t => (t as HTMLElement).id);
 
-    expect(ids).toHaveLength(2);
-    expect(new Set(ids).size).toBe(2);
+    expect(ids).toHaveLength(GalleryFixture.frames(fixture).length * 2);
+    expect(new Set(ids).size).toBe(ids.length);
     expect(ids.every(t => t.startsWith("tr-gallery-dialog-"))).toBe(true);
   });
 });

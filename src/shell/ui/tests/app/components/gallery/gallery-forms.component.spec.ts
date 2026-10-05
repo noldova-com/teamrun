@@ -6,27 +6,25 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { type ComponentFixture } from "@angular/core/testing";
 
-import { GalleryFormsComponent } from "../../../../src/app/components/gallery/gallery-forms.component";
+import { type GalleryComponent } from "../../../../src/app/components/gallery/gallery.component";
+import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
+import { GalleryFixture } from "../../../fixtures/gallery.fixture";
 
 describe("GalleryFormsComponent", () => {
-  let fixture: ComponentFixture<GalleryFormsComponent>;
-
-  beforeEach(async () => {
-    fixture = TestBed.createComponent(GalleryFormsComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
-  });
+  let fixture: ComponentFixture<GalleryComponent>;
 
   afterEach(() => {
-    fixture.destroy();
+    AppearanceFixture.reset();
   });
 
   it("lets the sample controls be used: a toggle button, a checkbox and a select", async () => {
-    const toggle = fixture.nativeElement.querySelector("[aria-pressed]") as HTMLButtonElement;
-    const checkbox = fixture.nativeElement.querySelector("tr-checkbox input") as HTMLInputElement;
-    const select = fixture.nativeElement.querySelector(".tr-select-button") as HTMLButtonElement;
+    fixture = await GalleryFixture.showAsync();
+    const forms = GalleryFixture.frames(fixture)[0]?.querySelector("tr-gallery-forms") as HTMLElement;
+    const toggle = forms.querySelector("[aria-pressed]") as HTMLButtonElement;
+    const checkbox = forms.querySelector("tr-checkbox input") as HTMLInputElement;
+    const select = forms.querySelector(".tr-select-button") as HTMLButtonElement;
 
     toggle.click();
     checkbox.click();
