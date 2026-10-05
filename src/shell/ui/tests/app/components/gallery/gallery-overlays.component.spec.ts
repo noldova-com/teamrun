@@ -30,6 +30,15 @@ describe("GalleryOverlaysComponent", () => {
     expect(row.getAttribute("aria-checked")).toBe("false");
   });
 
+  it("marks the first match of the quick input's query in each of its options", async () => {
+    fixture = await GalleryFixture.showAsync();
+    const quick = GalleryFixture.frames(fixture)[0]?.querySelector("tr-gallery-overlays tr-quick-input") as HTMLElement;
+    const rendered = [...quick.querySelectorAll(".tr-quick-input-title")].map(t => [...t.children].map(c => c.tagName === "MARK" ? `[${c.textContent}]` : c.textContent).join(""));
+
+    expect((quick.querySelector(".tr-quick-input-field") as HTMLInputElement).value).toBe("o");
+    expect(rendered).toEqual(["[O]pen the note", "Sh[o]w the outline", "[O]pen a note whose title is far too long to fit the width of the search surface"]);
+  });
+
   it("gives each sample dialog in every scope its own title id", async () => {
     fixture = await GalleryFixture.showAsync();
     const ids = [...fixture.nativeElement.querySelectorAll("tr-gallery-overlays .tr-dialog-title")].map(t => (t as HTMLElement).id);
