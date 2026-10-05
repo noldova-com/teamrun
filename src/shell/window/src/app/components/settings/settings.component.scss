@@ -22,13 +22,14 @@
   flex: none;
   flex-wrap: wrap;
   gap: var(--tr-space-2);
-  padding-inline-end: var(--tr-space-6);
+  padding-inline-end: calc(var(--tr-space-6) + var(--tr-scrollbar-size) + var(--tr-settings-heading-inset));
   padding-bottom: var(--tr-space-4);
 }
 
 .tr-settings-search-field {
-  width: var(--tr-settings-search-width);
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: calc(var(--tr-settings-pages-width) + var(--tr-space-6) + var(--tr-settings-content-width) - var(--tr-settings-heading-inset));
 }
 
 .tr-settings-body {

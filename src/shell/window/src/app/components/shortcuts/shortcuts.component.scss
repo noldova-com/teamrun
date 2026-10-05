@@ -16,7 +16,7 @@
   align-items: flex-start;
   gap: var(--tr-space-2) var(--tr-space-4);
   margin-bottom: var(--tr-space-3);
-  padding-inline-start: var(--tr-settings-heading-inset);
+  padding-inline: var(--tr-settings-heading-inset);
 }
 
 .tr-shortcuts-explanation {
@@ -27,7 +27,8 @@
 }
 
 .tr-shortcuts-table {
-  width: 100%;
+  width: calc(100% - var(--tr-settings-heading-inset) * 2);
+  margin-inline: var(--tr-settings-heading-inset);
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -49,6 +50,14 @@
   border-bottom: var(--tr-border-width) solid var(--tr-card-border);
   text-align: start;
   vertical-align: top;
+}
+
+.tr-shortcuts-table :is(th, td):first-child {
+  padding-inline-start: 0;
+}
+
+.tr-shortcuts-table :is(th, td):last-child {
+  padding-inline-end: 0;
 }
 
 .tr-shortcuts-table th {

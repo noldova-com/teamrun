@@ -215,7 +215,6 @@ export class DefaultTheme {
       ["setting-marker", "0.625rem"],
       ["tree-row-height", "1.625rem"],
       ["tree-indent", "1.75rem"],
-      ["settings-search-width", "37.5rem"],
       ["settings-pages-width", "12.5rem"],
       ["settings-content-width", "50rem"],
       ["modules-list-width", "20rem"],

@@ -215,7 +215,6 @@ export class FixtureTheme {
     ["setting-marker", "0.75rem"],
     ["tree-row-height", "1.875rem"],
     ["tree-indent", "2rem"],
-    ["settings-search-width", "40rem"],
     ["settings-pages-width", "15rem"],
     ["settings-content-width", "55rem"],
     ["modules-list-width", "22rem"],

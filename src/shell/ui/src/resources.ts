@@ -162,7 +162,6 @@ export class Resources {
     "setting-marker",
     "tree-row-height",
     "tree-indent",
-    "settings-search-width",
     "settings-pages-width",
     "settings-content-width",
     "modules-list-width",
