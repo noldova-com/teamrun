@@ -7,7 +7,7 @@
  */
 
 import type { DialogRef } from "@angular/cdk/dialog";
-import { Component } from "@angular/core";
+import { Component, signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { page, userEvent } from "vitest/browser";
 
@@ -38,13 +38,15 @@ class DialogHostComponent {
 @Component({
   imports: [DialogComponent],
   template: `
-    <tr-dialog title="Notes" [size]="large" (dismissed)="dismissals = dismissals + 1">
+    <tr-dialog [title]="title()" [size]="large" (dismissed)="dismissals = dismissals + 1">
       <input class="tr-dialog-field" aria-label="Draft" (keydown.escape)="$event.preventDefault()" />
     </tr-dialog>
   `
 })
 class LargeDialogHostComponent {
   protected readonly large: DialogSize = DialogSize.Large;
+
+  public readonly title = signal("Notes");
 
   public dismissals: number = 0;
 }
@@ -184,6 +186,21 @@ describe("DialogComponent", () => {
         expect([opened, opacity]).toEqual([[text, text], "1"]);
         expect(colors()).toEqual([text, text]);
       });
+
+  it("keeps a large dialog's long title on one line ending with an ellipsis, and lets a dialog of the default size wrap its title", async () => {
+    const title = "Meeting notes for the quarterly planning review, with every decision, owner and follow-up the team agreed on. ".repeat(4).trim();
+    AppearanceFixture.apply();
+    const large = await openLargeAsync();
+    large.componentInstance?.title.set(title);
+    await vi.waitFor(() => expect(document.querySelector(".tr-dialog-title")?.textContent).toBe(title));
+
+    AppearanceFixture.expectTruncates(document.querySelector(".tr-dialog-title") as HTMLElement);
+    reference?.close();
+    await vi.waitFor(() => expect(document.querySelector("tr-dialog")).toBeNull());
+    await openAsync();
+    const plain = document.querySelector(".tr-dialog-title") as HTMLElement;
+    expect([plain.hasAttribute("data-truncates"), getComputedStyle(plain).whiteSpace]).toEqual([false, "normal"]);
+  });
 
   it("gives a large dialog a title bar whose close button asks its owner to close, and leaves Escape to a control that handled it", async () => {
     AppearanceFixture.apply();

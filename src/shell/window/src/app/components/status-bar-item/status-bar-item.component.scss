@@ -48,8 +48,3 @@ button.tr-status-bar-item:disabled {
 .tr-status-bar-item-icon {
   font-size: var(--tr-icon);
 }
-
-.tr-status-bar-item-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
