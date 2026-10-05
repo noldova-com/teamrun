@@ -47,6 +47,13 @@ class ApiPackageTests {
       assert.equal(found.exampleRoot, path.join(root, "src/node_modules/.cache/teamrun"));
       assert.deepEqual(found.paths, paths);
     });
+
+    test("an Angular part's examples compile beside the dependencies of the project it is given, wherever that project is", () => {
+      const root = path.resolve("repository");
+      const found = ApiPackage.forPart(root, "src/shell/window", path.join(root, "apps/web/tsconfig.json"), {});
+
+      assert.equal(found.exampleRoot, path.join(root, "apps/web/node_modules/.cache/teamrun"));
+    });
   }
 }
 
