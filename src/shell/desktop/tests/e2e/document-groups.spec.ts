@@ -111,7 +111,7 @@ test.describe("document groups", () => {
 
   test("over a tab row a dragged tab shows only an insertion line and drops there, while over the content a guide previews its area", async ({ desktop }) => {
     const window = desktop.window;
-    const line = window.locator(".tr-tab-drop-before");
+    const line = window.locator(".tr-drop-line-before");
     const preview = window.locator(".tr-docking-preview");
     for (const scheme of ["light", "dark"] as const) {
       await window.emulateMedia({ colorScheme: scheme });
@@ -149,7 +149,10 @@ test.describe("document groups", () => {
     await splitFirstNoteAsync(window);
     await TabDragFixture.startAsync(window, secondNote);
     await TabDragFixture.moveOverAsync(window, TabDragFixture.tab(window, firstNote), -30);
-    await expect(TabDragFixture.tab(window, firstNote)).toHaveClass(/tr-tab-drop-before/);
+    await expect(TabDragFixture.tab(window, firstNote)).toHaveClass(/tr-drop-line-before/);
+    const [lineLength, pillHeight] = await TabDragFixture.tab(window, firstNote).evaluate(t =>
+      [getComputedStyle(t, "::after").height, getComputedStyle(t.querySelector(".tr-tab-pill") ?? t).height]);
+    expect(lineLength).toBe(pillHeight);
     await expect(preview).toHaveCount(0);
     await window.mouse.up();
 
