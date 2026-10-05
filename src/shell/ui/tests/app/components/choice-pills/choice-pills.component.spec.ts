@@ -158,12 +158,12 @@ describe("ChoicePillsComponent", () => {
         expect(first.fontWeight).toBe("600");
       });
 
-  it("is at least 1.375rem high, 0.5rem padded and 0.25rem apart in the default theme", () => {
+  it("is at least 1.375rem high, 0.375rem padded and 0.25rem apart in the default theme", () => {
     render();
     const [left, right] = [(pills()[0] as HTMLElement).getBoundingClientRect(), (pills()[1] as HTMLElement).getBoundingClientRect()];
 
     expect(left.height).toBeGreaterThanOrEqual(AppearanceFixture.toPixels(1.375) - 1 / 32);
-    AppearanceFixture.expectRem(getComputedStyle(pills()[0] as HTMLElement).paddingLeft, 0.5);
+    AppearanceFixture.expectRem(getComputedStyle(pills()[0] as HTMLElement).paddingLeft, 0.375);
     AppearanceFixture.expectPixels(right.left - left.right, AppearanceFixture.toPixels(0.25));
   });
 
