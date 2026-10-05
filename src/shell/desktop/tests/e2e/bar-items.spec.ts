@@ -38,14 +38,22 @@ test.describe("the status bar and the top bar", () => {
       const style = (selector: string): CSSStyleDeclaration => getComputedStyle(document.querySelector(selector) as Element);
       const pill = style("tr-status-bar-item[data-tr-item=\"clock.ticks\"] .tr-status-bar-item");
       const row = document.querySelector("tr-window-row") as Element;
+      const lookHeight = (name: string): string => {
+        const probe = document.createElement("div");
+        probe.style.height = `var(--tr-${name})`;
+        document.body.append(probe);
+        const height = getComputedStyle(probe).height;
+        probe.remove();
+        return height;
+      };
       const action = document.querySelector("button[data-tr-item=\"notes.compose\"]") as Element;
       return {
         pill: { height: style("tr-status-bar-item[data-tr-item=\"clock.ticks\"]").height, padding: [pill.paddingLeft, pill.paddingRight], radius: pill.borderTopLeftRadius },
-        row: { height: getComputedStyle(row).height, region: getComputedStyle(action).getPropertyValue("app-region") },
+        row: { height: getComputedStyle(row).height, look: lookHeight("window-row-height"), region: getComputedStyle(action).getPropertyValue("app-region") },
         isInRow: action.getBoundingClientRect().top >= row.getBoundingClientRect().top && action.getBoundingClientRect().bottom <= row.getBoundingClientRect().bottom
       };
     });
-    expect(look).toEqual({ pill: { height: "20px", padding: ["6px", "6px"], radius: "3px" }, row: { height: "35px", region: "no-drag" }, isInRow: true });
+    expect(look).toEqual({ pill: { height: "20px", padding: ["6px", "6px"], radius: "3px" }, row: { height: look.row.look, look: look.row.look, region: "no-drag" }, isInRow: true });
     await desktop.checkpointAsync("bar-items");
   });
 

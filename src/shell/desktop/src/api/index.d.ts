@@ -1422,7 +1422,7 @@ export interface IDesktopWindow {
    * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
    *
    * export function paintControls(window: IDesktopWindow): void {
-   *   window.setTitleBarOverlay({ color: "#181818", symbolColor: "#CCCCCC", height: 35 });
+   *   window.setTitleBarOverlay({ color: "#181818", symbolColor: "#CCCCCC", height: 32 });
    * }
    * ```
    */
@@ -2236,7 +2236,7 @@ export declare class WindowAppearance {
    * ```ts
    * import { WindowAppearance } from "@noldova/teamrun-shell-desktop";
    *
-   * export const appearance: WindowAppearance = new WindowAppearance("#181818", "#181818", "#CCCCCC", 35);
+   * export const appearance: WindowAppearance = new WindowAppearance("#181818", "#181818", "#CCCCCC", 32);
    * ```
    */
   public constructor(background: string, titleBar: string, titleBarText: string, titleBarHeight: number);
@@ -2251,7 +2251,7 @@ export declare class WindowAppearance {
    * ```ts
    * import { WindowAppearance } from "@noldova/teamrun-shell-desktop";
    *
-   * export const appearance: WindowAppearance = WindowAppearance.fromJson({ background: "#F8F8F8", titleBar: "#F8F8F8", titleBarText: "#1E1E1E", titleBarHeight: 35 });
+   * export const appearance: WindowAppearance = WindowAppearance.fromJson({ background: "#F8F8F8", titleBar: "#F8F8F8", titleBarText: "#1E1E1E", titleBarHeight: 32 });
    * ```
    */
   public static fromJson(value: unknown): WindowAppearance;
@@ -2264,7 +2264,7 @@ export declare class WindowAppearance {
    * ```ts
    * import { WindowAppearance } from "@noldova/teamrun-shell-desktop";
    *
-   * export const message: string = JSON.stringify(new WindowAppearance("#181818", "#181818", "#CCCCCC", 35).toJson());
+   * export const message: string = JSON.stringify(new WindowAppearance("#181818", "#181818", "#CCCCCC", 32).toJson());
    * ```
    */
   public toJson(): JsonObject;

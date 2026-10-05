@@ -41,11 +41,12 @@ describe("WindowRowComponent", () => {
     DesktopBridgeFixture.remove();
   });
 
-  function apply(theme: Theme = DefaultTheme.theme, mode: ThemeMode = ThemeMode.Light): void {
-    AppearanceFixture.apply(theme, mode);
+  function apply(theme: Theme = DefaultTheme.theme, mode: ThemeMode = ThemeMode.Light, panelSize?: number): void {
+    AppearanceFixture.apply(theme, mode, panelSize);
     const appearance = TestBed.inject(AppearanceService);
     appearance.setTheme(theme);
     appearance.setModePreference(mode === ThemeMode.Dark ? ModePreference.Dark : ModePreference.Light);
+    appearance.setTypography(new Typography(panelSize));
   }
 
   function render(): HTMLElement {
@@ -147,7 +148,7 @@ describe("WindowRowComponent", () => {
       background: getComputedStyle(document.body).backgroundColor,
       titleBar: AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Dark, "titleBar.activeBackground"),
       titleBarText: AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Dark, "titleBar.activeForeground"),
-      titleBarHeight: Math.round(AppearanceFixture.toPixels(2.1875))
+      titleBarHeight: AppearanceFixture.toPixels(2)
     }]);
   });
 
@@ -197,6 +198,27 @@ describe("WindowRowComponent", () => {
     })]);
     TestBed.inject(MenuService).setActiveModules(["notes"]);
   }
+
+  for (const panelSize of [12, 13, 18])
+    for (const platform of ["win32", "linux", "darwin"])
+      it(`stands as high as its tallest control and 0.25rem above and below it at panel size ${panelSize} on ${platform}`, async () => {
+        DesktopBridgeFixture.install(platform);
+        useNotesMenus([]);
+        apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
+
+        const fixture = TestBed.createComponent(WindowRowComponent);
+        fixture.detectChanges();
+        await settle(fixture);
+        const row: HTMLElement = fixture.nativeElement;
+        const bounds = row.getBoundingClientRect();
+        const controls = [...row.querySelectorAll<HTMLElement>("button")].filter(t => t.checkVisibility({ visibilityProperty: true })).map(t => t.getBoundingClientRect());
+        const gap = AppearanceFixture.toPixels(0.25, panelSize);
+
+        expect(controls.length).toBeGreaterThan(platform === "darwin" ? 0 : 3);
+        AppearanceFixture.expectPixels(bounds.height, Math.max(24, AppearanceFixture.toPixels(1.375, panelSize)) + 2 * gap);
+        AppearanceFixture.expectPixels(bounds.bottom - Math.max(...controls.map(t => t.bottom)), gap);
+        AppearanceFixture.expectPixels(Math.min(...controls.map(t => t.top)) - bounds.top, gap);
+      });
 
   function useMenuBarStyle(style: string): void {
     TestBed.configureTestingModule({ providers: [{ provide: SettingsService, useValue: { values: signal(new Map([["shell.menuBar", style]])) } }] });

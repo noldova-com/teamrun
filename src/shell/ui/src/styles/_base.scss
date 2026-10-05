@@ -24,6 +24,7 @@
 
 :root,
 .tr-theme-scope {
+  --tr-icon-button-target: max(var(--tr-pointer-target), var(--tr-icon-button));
   --tr-inline-code: color-mix(in srgb, var(--tr-text) 12%, transparent);
   --tr-text-tab: var(--tr-text-muted);
   --tr-text-placeholder: var(--tr-text-muted);
