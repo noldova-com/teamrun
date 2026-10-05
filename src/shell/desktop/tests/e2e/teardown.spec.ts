@@ -179,7 +179,7 @@ test.describe("the harness's teardown", () => {
     await desktop.disposeAsync(false);
     const report = testInfo.attachments.find(t => t.name === "main-process.txt")?.body?.toString() ?? "";
 
-    expect(failure).toMatch(/^The main process did not answer within 10 s when asked to say whether a window is visible\.\nThe last call it answered was to .+, \d+ ms before it was asked\.\nThe desktop log shows no main-process failure\.\nBefore the move, the cursor was at -?\d+,-?\d+, /);
+    expect(failure).toMatch(/^The main process did not answer within 10 s when asked to say whether a window is visible\.\nThe last of the harness's own calls it answered was to .+, \d+ ms before this one was asked; the workflow's own calls are not counted\.\nThe desktop log shows no main-process failure\.\nBefore the move, the cursor was at -?\d+,-?\d+, /);
     expect(desktop.acceptFailures(new RegExp(`^The main process ${main} did not answer for \\d+ s after it was asked to say whether a window is visible, so the test killed it\\.$`))).toHaveLength(1);
     expect(report).toMatch(new RegExp(`^The main process ${main} stopped answering when it was asked to say whether a window is visible, \\d+ s before this report\\.\\n`));
     expect(report).toMatch(/\nIts processor time was \d+ ms when it stopped answering and \d+ ms now\.\n/);

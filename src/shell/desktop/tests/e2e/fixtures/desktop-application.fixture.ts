@@ -19,6 +19,7 @@ import { StopPolicy } from "@noldova/teamrun-shell-protocol";
 import { DataDirectory, DiscoveryReader, Endpoint, OwnershipLock, RuntimeBuild, RuntimeClient, type RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
 
 import CleanupSteps from "./cleanup-steps.ts";
+import DesktopLogFixture from "./desktop-log.fixture.ts";
 import ErrorOutputClassifier from "./error-output.classifier.ts";
 import OffCursorPlacement from "./off-cursor-placement.ts";
 import ProcessListFixture from "./process-list.fixture.ts";
@@ -81,8 +82,6 @@ export default class DesktopApplicationFixture {
   private static readonly QUIT_ACTION: string = "quit";
   private static readonly QUIT_QUESTION: string = "tr-quit-dialog";
   private static readonly NO_ANSWER: unique symbol = Symbol("no answer");
-  private static readonly LOG_ENTRY: RegExp = /^\d{4}-\d{2}-\d{2}T\S+ /;
-  private static readonly MAIN_PROCESS_FAILURE: RegExp = /main process failed/;
 
   private readonly testInfo: TestInfo;
   private readonly environment: Readonly<Record<string, string>>;
@@ -429,34 +428,26 @@ export default class DesktopApplicationFixture {
       throw new Error(`The main process has not answered since it was asked to ${this.silence.action}, so the test did not wait for it to ${action}.`);
     }
     const asked = Date.now();
-    const answer = await DesktopApplicationFixture.withinAsync(evaluation, limit);
-    if (answer !== DesktopApplicationFixture.NO_ANSWER) {
+    const answer = await DesktopApplicationFixture.withinAsync(evaluation.finally(() => {
       this.lastAnswer = { action, at: Date.now() };
+    }), limit);
+    if (answer !== DesktopApplicationFixture.NO_ANSWER)
       return answer;
-    }
     const processorMilliseconds = await this.readProcessorMillisecondsAsync();
     this.silence = { action, since: asked, processorMilliseconds };
-    const last = this.lastAnswer;
     throw new Error([
       `The main process did not answer within ${limit / 1000} s when asked to ${action}.`,
-      last === null ? "It had answered no call before." : `The last call it answered was to ${last.action}, ${asked - last.at} ms before it was asked.`,
-      await this.describeMainProcessFailuresAsync(),
+      DesktopApplicationFixture.describeLastAnswer(this.lastAnswer, asked),
+      await DesktopLogFixture.describeMainProcessFailuresAsync(new DataDirectory(this.dataDirectory).desktopLog),
       this.placement
     ].join("\n"));
   }
 
-  private async describeMainProcessFailuresAsync(): Promise<string> {
-    const log = await readFile(new DataDirectory(this.dataDirectory).desktopLog, "utf8").catch(() => "");
-    const entries: string[] = [];
-    for (const line of log.split("\n"))
-      if (DesktopApplicationFixture.LOG_ENTRY.test(line))
-        entries.push(line);
-      else if (entries.length > 0)
-        entries[entries.length - 1] += `\n${line}`;
-    const failures = entries.filter(t => DesktopApplicationFixture.MAIN_PROCESS_FAILURE.test(t)).map(t => t.trimEnd());
-    if (failures.length === 0)
-      return "The desktop log shows no main-process failure.";
-    return `The desktop log shows ${failures.length === 1 ? "this main-process failure" : "these main-process failures"}:\n${failures.join("\n")}`;
+  private static describeLastAnswer(last: MainProcessAnswer | null, asked: number): string {
+    if (last === null)
+      return "It had answered none of the harness's own calls before; the workflow's own calls are not counted.";
+    const gap = last.at <= asked ? `${asked - last.at} ms before` : `${last.at - asked} ms after`;
+    return `The last of the harness's own calls it answered was to ${last.action}, ${gap} this one was asked; the workflow's own calls are not counted.`;
   }
 
   private async readProcessorMillisecondsAsync(): Promise<number | null> {
@@ -493,6 +484,7 @@ export default class DesktopApplicationFixture {
     this.electronApplication = application;
     this.childProcess = application.process();
     this.mainProcessId = null;
+    this.lastAnswer = null;
     application.process().stderr?.on("data", (data: Buffer) => this.readOutput(data.toString()));
     application.on("console", t => {
       if (t.type() === "error")
