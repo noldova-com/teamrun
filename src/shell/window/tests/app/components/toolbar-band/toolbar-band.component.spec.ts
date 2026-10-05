@@ -88,15 +88,15 @@ describe("ToolbarBandComponent", () => {
   it("marks the drop position of a toolbar in a row by a line and of a new row by another", () => {
     expect(element.querySelector(".tr-toolbar-drop")).toBeNull();
 
-    target.set(new ToolbarDropTarget(0, 1, false, 120, 8, 28));
+    target.set(new ToolbarDropTarget(0, 1, false, 120, 20, 0));
     fixture.detectChanges();
     const line = element.querySelector<HTMLElement>(".tr-toolbar-drop");
 
-    expect([line?.classList.contains("tr-toolbar-drop-row"), line?.style.left, line?.style.top, line?.style.height, line?.style.width]).toEqual([false, "120px", "8px", "28px", ""]);
+    expect([line?.classList.contains("tr-drop-line"), line?.classList.contains("tr-drop-line-row"), line?.style.left, line?.style.top, line?.style.width]).toEqual([true, false, "120px", "20px", ""]);
 
     target.set(new ToolbarDropTarget(1, 0, true, 0, 32, 400));
     fixture.detectChanges();
 
-    expect([line?.classList.contains("tr-toolbar-drop-row"), line?.style.width, line?.style.height]).toEqual([true, "400px", ""]);
+    expect([line?.classList.contains("tr-drop-line-row"), line?.style.width]).toEqual([true, "400px"]);
   });
 });

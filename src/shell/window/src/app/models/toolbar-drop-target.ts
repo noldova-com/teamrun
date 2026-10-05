@@ -12,19 +12,19 @@ export class ToolbarDropTarget {
   public readonly isNewRow: boolean;
   public readonly x: number;
   public readonly y: number;
-  public readonly length: number;
+  public readonly rowWidth: number;
 
-  public constructor(row: number, index: number, isNewRow: boolean, x: number, y: number, length: number) {
+  public constructor(row: number, index: number, isNewRow: boolean, x: number, y: number, rowWidth: number) {
     this.row = row;
     this.index = index;
     this.isNewRow = isNewRow;
     this.x = x;
     this.y = y;
-    this.length = length;
+    this.rowWidth = rowWidth;
   }
 
   public equals(other: ToolbarDropTarget | null): boolean {
     return !Object.isNull(other) && other.row === this.row && other.index === this.index && other.isNewRow === this.isNewRow
-      && other.x === this.x && other.y === this.y && other.length === this.length;
+      && other.x === this.x && other.y === this.y && other.rowWidth === this.rowWidth;
   }
 }

@@ -1,0 +1,65 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:where(.tr-drop-line-before, .tr-drop-line-after) {
+  position: relative;
+}
+
+.tr-drop-line,
+.tr-drop-line-before::after,
+.tr-drop-line-after::after {
+  --tr-drop-line-thickness: calc(2 * var(--tr-border-width));
+  --tr-drop-line-length: var(--tr-toolbar-button);
+
+  width: var(--tr-drop-line-thickness);
+  height: var(--tr-drop-line-length);
+  background-color: var(--tr-accent);
+  pointer-events: none;
+}
+
+.tr-drop-line {
+  translate: -50% -50%;
+}
+
+.tr-drop-line-row {
+  height: var(--tr-drop-line-thickness);
+  translate: 0 -50%;
+}
+
+.tr-drop-line-before::after,
+.tr-drop-line-after::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  margin-block: auto;
+}
+
+.tr-drop-line-before::after {
+  inset-inline-start: calc(var(--tr-drop-line-thickness) / -2);
+}
+
+.tr-drop-line-after::after {
+  inset-inline-end: calc(var(--tr-drop-line-thickness) / -2);
+}
+
+.tr-drop-line-vertical:is(.tr-drop-line-before, .tr-drop-line-after)::after {
+  inset-block: auto;
+  inset-inline: 0;
+  width: var(--tr-drop-line-length);
+  height: var(--tr-drop-line-thickness);
+  margin-block: 0;
+  margin-inline: auto;
+}
+
+.tr-drop-line-vertical.tr-drop-line-before::after {
+  inset-block-start: calc(var(--tr-drop-line-thickness) / -2);
+}
+
+.tr-drop-line-vertical.tr-drop-line-after::after {
+  inset-block-end: calc(var(--tr-drop-line-thickness) / -2);
+}
