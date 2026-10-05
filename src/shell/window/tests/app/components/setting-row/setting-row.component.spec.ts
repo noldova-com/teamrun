@@ -65,6 +65,7 @@ describe("SettingRowComponent", () => {
 
     expect([marker.getAttribute("role"), marker.getAttribute("aria-label"), marker.textContent]).toEqual(["img", "Modified", "circle"]);
     expect(getComputedStyle(marker).color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "focusBorder"));
+    expect(getComputedStyle(marker).fontVariationSettings).toBe("\"FILL\" 1");
     expect(getComputedStyle(row.querySelector(".tr-setting-row-title") as Element).fontWeight).toBe("600");
     expect(resets).toBe(1);
   });
@@ -77,31 +78,100 @@ describe("SettingRowComponent", () => {
     expect(changes).toEqual([true]);
   });
 
-  it("changes a choice through its select", async () => {
-    render(SettingsFixture.mode, "System");
+  it("shows a choice of few options as choice pills, and changes it with the pointer and the arrow keys", async () => {
+    const row = render(SettingsFixture.mode, "System");
+    const pills = (): string[] => [...row.querySelectorAll("[role=radio]")].filter(t => t.getAttribute("aria-checked") === "true").map(t => t.textContent?.trim() ?? "");
 
-    await page.getByRole("button", { name: "Mode, System" }).click();
-    await page.getByRole("option", { name: "Dark" }).click();
+    expect(row.querySelector("tr-select")).toBeNull();
+    expect(row.querySelector("[role=radiogroup]")?.getAttribute("aria-label")).toBe("Mode");
+    expect(pills()).toEqual(["System"]);
+    await page.getByRole("radio", { name: "Dark" }).click();
+    fixture.componentRef.setInput("value", "Dark");
+    fixture.detectChanges();
+    (row.querySelector("[role=radio][aria-checked=true]") as HTMLElement).focus();
+    await userEvent.keyboard("{ArrowLeft}");
 
-    expect(changes).toEqual(["Dark"]);
+    expect(changes).toEqual(["Dark", "Light"]);
   });
 
-  it("accepts a number within its range and step, and explains and restores one outside it", async () => {
+  it("shows a choice of more than four options, or of a single one, as a select", async () => {
+    const lone = render(SettingsFixture.theme, "Default");
+    const isLoneSelect = [lone.querySelector("[role=radiogroup]"), lone.querySelector("tr-select")?.tagName];
+    const row = render(SettingsFixture.accent, "Blue");
+
+    expect(isLoneSelect).toEqual([null, "TR-SELECT"]);
+    expect([row.querySelector("[role=radiogroup]"), row.querySelector("tr-select")?.tagName]).toEqual([null, "TR-SELECT"]);
+    await page.getByRole("button", { name: "Accent, Blue" }).click();
+    await page.getByRole("option", { name: "Violet" }).click();
+
+    expect(changes).toEqual(["Violet"]);
+  });
+
+  it("keeps a number outside its range or step as typed, marked invalid and explained, until it is corrected", () => {
     const row = render(SettingsFixture.panelSize, 14);
     const field = row.querySelector("input") as HTMLInputElement;
+    const shown: string[][] = [];
 
     for (const value of ["20", "13.5", "", "16"]) {
       field.value = value;
       field.dispatchEvent(new Event("change"));
       fixture.detectChanges();
-      if (value === "20") {
-        expect(row.querySelector("[role=alert]")?.textContent?.trim()).toBe("Enter a whole number from 12 to 18.");
-        expect(field.value).toBe("14");
-      }
+      const alert = row.querySelector("[role=alert]");
+      shown.push([field.value, alert?.textContent?.trim() ?? "", String(field.getAttribute("aria-invalid")), String(field.getAttribute("aria-describedby") === alert?.id)]);
     }
 
+    expect(shown).toEqual([
+      ["20", "Enter a whole number from 12 to 18.", "true", "true"],
+      ["13.5", "Enter a whole number from 12 to 18.", "true", "true"],
+      ["", "Enter a whole number from 12 to 18.", "true", "true"],
+      ["16", "", "null", "false"]
+    ]);
     expect(changes).toEqual([16]);
-    expect(row.querySelector("[role=alert]")).toBeNull();
+  });
+
+  it("puts the stored number back with Escape, and lets Escape through when there is nothing to put back", async () => {
+    const row = render(SettingsFixture.panelSize, 14);
+    const field = row.querySelector("input") as HTMLInputElement;
+    const passed: string[] = [];
+    const listen = (event: KeyboardEvent): number => passed.push(event.key);
+    document.addEventListener("keydown", listen);
+    let reverted: unknown[] = [];
+
+    try {
+      field.focus();
+      await userEvent.keyboard("{Escape}");
+      field.value = "20";
+      field.dispatchEvent(new Event("change"));
+      fixture.detectChanges();
+      await userEvent.keyboard("{Escape}");
+      fixture.detectChanges();
+      reverted = [field.value, row.querySelector("[role=alert]"), field.getAttribute("aria-invalid")];
+      field.value = "17";
+      await userEvent.keyboard("{Escape}");
+    } finally {
+      document.removeEventListener("keydown", listen);
+    }
+
+    expect(reverted).toEqual(["14", null, null]);
+    expect([field.value, passed, changes]).toEqual(["14", ["Escape"], []]);
+  });
+
+  it("drops a rejected entry and its error when the stored number changes, by Reset or from elsewhere", () => {
+    const row = render(SettingsFixture.panelSize, 14, true);
+    const field = row.querySelector("input") as HTMLInputElement;
+    const shown: string[][] = [];
+
+    for (const value of [undefined, 16]) {
+      field.value = "20";
+      field.dispatchEvent(new Event("change"));
+      fixture.detectChanges();
+      fixture.componentRef.setInput("value", value);
+      fixture.detectChanges();
+      shown.push([field.value, String(row.querySelector("[role=alert]")), String(field.getAttribute("aria-invalid"))]);
+    }
+
+    expect(shown).toEqual([["13", "null", "null"], ["16", "null", "null"]]);
+    expect(changes).toEqual([]);
   });
 
   it("explains a range with another step in its words", () => {

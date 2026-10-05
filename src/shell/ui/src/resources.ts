@@ -114,16 +114,23 @@ export class Resources {
     "view-badge-dot",
     "view-badge-padding",
     "view-badge-text",
+    "chip",
+    "chip-padding",
+    "spinner",
+    "choice-pill",
+    "choice-pill-padding",
+    "choice-pill-gap",
     "menu-padding",
     "menu-label-padding",
     "menu-item-height",
     "menu-item-inset",
     "menu-item-padding",
     "menu-trail-gap",
-    "toolbar-row",
+    "band-gap",
     "toolbar-button",
     "toolbar-button-padding",
     "toolbar-gap",
+    "toolbar-grip-gap",
     "menu-separator-spacing",
     "tooltip-width",
     "tooltip-padding",
@@ -132,6 +139,11 @@ export class Resources {
     "dialog-title-padding",
     "dialog-body-padding",
     "dialog-actions-padding",
+    "dialog-large-width",
+    "dialog-large-height",
+    "dialog-large-min-width",
+    "dialog-large-min-height",
+    "dialog-large-header-padding",
     "quick-input-width",
     "quick-input-margin",
     "quick-input-padding",
@@ -157,6 +169,8 @@ export class Resources {
     "settings-search-width",
     "settings-pages-width",
     "settings-content-width",
+    "modules-list-width",
+    "modules-detail-width",
     "dropdown-padding",
     "dropdown-row-height",
     "dropdown-row-padding",
@@ -222,6 +236,18 @@ export class Resources {
   public static readonly verticalOrientation: string = "vertical";
   public static readonly badgeLimit: number = 99;
   public static readonly badgeOverflow: string = "99+";
+  public static readonly chipAddedSign: string = "+";
+  public static readonly chipRemovedSign: string = "−";
+  public static readonly revealDelay: number = 300;
+  public static readonly choicePillSelector: string = ".tr-choice-pill";
+  public static readonly choicePillTargets: ReadonlyMap<string, (current: number, last: number) => number> = new Map<string, (current: number, last: number) => number>([
+    ["ArrowRight", (current, last) => current >= last ? 0 : current + 1],
+    ["ArrowDown", (current, last) => current >= last ? 0 : current + 1],
+    ["ArrowLeft", (current, last) => current <= 0 ? last : current - 1],
+    ["ArrowUp", (current, last) => current <= 0 ? last : current - 1],
+    ["Home", () => 0],
+    ["End", (_current, last) => last]
+  ]);
   public static readonly horizontalOrientation: string = "horizontal";
   public static readonly toolbarDirection: "ltr" = "ltr";
   public static readonly toolbarMoveKeys: Readonly<Record<ToolbarOrientation, readonly string[]>> = {
@@ -243,6 +269,7 @@ export class Resources {
   public static readonly scrollEvent: string = "scroll";
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
+  public static readonly programFocusOrigin: FocusOrigin = "program";
   public static readonly menuPaneClass: string = "tr-menu-pane";
   public static readonly popoverClass: string = "tr-popover";
   public static readonly popoverPaneClass: string = "tr-popover-pane";
@@ -250,7 +277,12 @@ export class Resources {
   public static readonly dialogBackdropClass: string = "tr-dialog-backdrop";
   public static readonly dialogTitleIdPrefix: string = "tr-dialog-title-";
   public static readonly dialogTitleIdToken: string = "tr-dialog-title-id";
+  public static readonly dialogCloseLabel: string = "Close";
+  public static readonly dialogCloseSelector: string = ".tr-dialog-close";
   public static readonly noLimit: string = "none";
+  public static readonly inertAttribute: string = "inert";
+  public static readonly ariaLiveAttribute: string = "aria-live";
+  public static readonly popoverAttribute: string = "popover";
   public static readonly dropdownPaneClass: string = "tr-dropdown-pane";
   public static readonly listboxSelector: string = "[role=listbox]";
   public static readonly tabKey: string = "Tab";
@@ -265,9 +297,7 @@ export class Resources {
   public static readonly quickInputIdPrefix: string = "tr-quick-input-";
   public static readonly quickInputOptionSeparator: string = "-option-";
   public static readonly quickInputFieldSelector: string = ".tr-quick-input-field";
-  public static readonly quickInputListSelector: string = ".tr-quick-input-list";
   public static readonly quickInputOptionSelector: string = "[role=option]";
-  public static readonly revealOptions: ScrollIntoViewOptions = { block: "nearest" };
   public static readonly arrowDownKey: string = "ArrowDown";
   public static readonly arrowUpKey: string = "ArrowUp";
   public static readonly homeKey: string = "Home";
@@ -287,6 +317,7 @@ export class Resources {
   public static readonly clickEvent: string = "click";
   public static readonly auxclickEvent: string = "auxclick";
   public static readonly mouseenterEvent: "mouseenter" = "mouseenter";
+  public static readonly mousedownEvent: "mousedown" = "mousedown";
   public static readonly pointermoveEvent: "pointermove" = "pointermove";
   public static readonly hoverSelector: string = ":hover";
   public static readonly secondaryButton: number = 2;
@@ -315,6 +346,10 @@ export class Resources {
 
   public static formatTextSizeOutOfRange(parameterName: string, size: number): string {
     return `The ${parameterName} must be from ${Resources.minimumTextSize} to ${Resources.maximumTextSize} CSS pixels; ${size} is outside that range.`;
+  }
+
+  public static formatBadgeCount(count: number): string {
+    return count > Resources.badgeLimit ? Resources.badgeOverflow : String(count);
   }
 
   public static formatBadged(label: string, badge: string): string {

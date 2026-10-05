@@ -15,3 +15,14 @@
   background-color: var(--tr-window);
   color: var(--tr-text);
 }
+
+tr-workspace,
+.tr-window-reconnecting {
+  grid-row: 3;
+  grid-column: 1;
+}
+
+.tr-window-reconnecting {
+  z-index: 1;
+  background-color: var(--tr-backdrop);
+}

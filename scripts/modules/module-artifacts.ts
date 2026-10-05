@@ -9,21 +9,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import LicenseHeader from "../structure/license-header.ts";
 import type ModuleDeclaration from "./module-declaration.ts";
 
 export default class ModuleArtifacts {
   private static readonly DECLARATIONS_FILE: string = "_build/modules/declarations.json";
   private static readonly WINDOW_PARTS_FILE: string = "src/generated/window-parts.ts";
-  private static readonly LICENSE_HEADER: string = [
-    "/**",
-    " * @license",
-    " * Copyright (c) Noldova.",
-    " *",
-    " * This source code is licensed under the license found in the",
-    " * LICENSE file in the root directory of this source tree.",
-    " */",
-    ""
-  ].join("\n");
   private static readonly FORMAT_VERSION: number = 1;
   private static readonly SOURCE_PREFIX: string = "src/";
   private static readonly VIEWS_KIND: string = "views";
@@ -59,7 +50,7 @@ export default class ModuleArtifacts {
 
     const sources = declarations
       .filter(t => t.windowEntry !== null)
-      .map(t => `  new WindowPartSource(${JSON.stringify(t.id)}, ${JSON.stringify(t.displayName)}, ${JSON.stringify(t.dependencies)}, `
+      .map(t => `  new WindowPartSource(${JSON.stringify(t.id)}, ${JSON.stringify(t.dependencies)}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.VIEWS_KIND) ?? [])}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.DOCUMENTS_KIND) ?? [])}, `
         + `${JSON.stringify(t.contributions.get(ModuleArtifacts.COMMANDS_KIND) ?? [])}, `
@@ -72,7 +63,7 @@ export default class ModuleArtifacts {
       .map(t => `  MenuDeclarations.fromJson(${JSON.stringify(t.id)}, ${JSON.stringify(t.menus.toJson())})`);
     await ModuleArtifacts.writeFileAsync(
       this.windowPartsFile,
-      `${ModuleArtifacts.LICENSE_HEADER}\n${ModuleArtifacts.SOURCE_IMPORT}\n`
+      `${LicenseHeader.BLOCK}\n${ModuleArtifacts.SOURCE_IMPORT}\n`
         + `export const windowPartSources: readonly WindowPartSource[] = ${ModuleArtifacts.formatList(sources)};\n\n`
         + `export const moduleMenus: readonly MenuDeclarations[] = ${ModuleArtifacts.formatList(menus)};\n`);
   }

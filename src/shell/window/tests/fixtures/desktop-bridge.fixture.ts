@@ -35,7 +35,8 @@ export class DesktopBridgeFixture implements IDesktopBridge {
     ["shell.modules", { payload: { modules: [] } }],
     ["shell.commands", { payload: { commands: [], sequence: 0 } }],
     ["shell.notifications", { payload: { notifications: [], isDoNotDisturb: false, mutedModules: [], sequence: 0 } }],
-    ["shell.settings", { payload: { definitions: [], entries: [] } }]
+    ["shell.settings", { payload: { definitions: [], entries: [] } }],
+    ["shell.recentCommands", { payload: { ids: [] } }]
   ]);
   public build: unknown = { productVersion: "1.2.3", fingerprint: "abc123" };
   public readonly copied: string[] = [];
@@ -43,6 +44,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public logFolderOpens: number = 0;
   public readonly quitAnswers: string[] = [];
   public readonly logged: string[] = [];
+  public readonly errorsLogged: (readonly [string | null, string])[] = [];
   public logFolderOpened: Promise<boolean> = Promise.resolve(true);
   public readonly menuBars: JsonObject[] = [];
   public readonly edits: string[] = [];
@@ -179,6 +181,10 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public logModule(moduleId: string, message: string): void {
     this.logged.push(`${moduleId}: ${message}`);
+  }
+
+  public logError(moduleId: string | null, text: string): void {
+    this.errorsLogged.push([moduleId, text]);
   }
 
   public askToQuit(question: unknown): void {

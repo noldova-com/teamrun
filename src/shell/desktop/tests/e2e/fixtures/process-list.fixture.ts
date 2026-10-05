@@ -10,8 +10,9 @@ import { execFile, spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
+
+import { Wait } from "@noldova/teamrun-foundation-testing";
 
 export default class ProcessListFixture {
   private static readonly TIMEOUT: number = 30_000;
@@ -60,23 +61,22 @@ export default class ProcessListFixture {
   }
 
   public static async waitForExitAsync(processIds: readonly number[], limit: number, onWaiting: (running: readonly number[]) => void = () => undefined): Promise<number[]> {
-    const deadline = Date.now() + limit;
-    let running = await ProcessListFixture.readRunningAsync(processIds);
-    while (running.length > 0 && Date.now() < deadline) {
-      onWaiting(running);
-      await delay(ProcessListFixture.EXIT_INTERVAL);
+    let running = [...processIds];
+    await Wait.untilAsync(async () => {
       running = await ProcessListFixture.readRunningAsync(running);
-    }
+      if (running.length > 0)
+        onWaiting(running);
+      return running.length === 0;
+    }, limit, ProcessListFixture.EXIT_INTERVAL);
     return running;
   }
 
   public static async waitForSignalsAsync(processIds: readonly number[], limit: number): Promise<number[]> {
-    const deadline = Date.now() + limit;
-    let answering = processIds.filter(t => ProcessListFixture.answersSignal(t));
-    while (answering.length > 0 && Date.now() < deadline) {
-      await delay(ProcessListFixture.SIGNAL_INTERVAL);
+    let answering = [...processIds];
+    await Wait.untilAsync(() => {
       answering = answering.filter(t => ProcessListFixture.answersSignal(t));
-    }
+      return answering.length === 0;
+    }, limit, ProcessListFixture.SIGNAL_INTERVAL);
     return answering;
   }
 
@@ -101,7 +101,7 @@ export default class ProcessListFixture {
   public static async describeNamingAsync(text: string): Promise<string> {
     const output = process.platform === "win32"
       ? await ProcessListFixture.runAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
-        "CimCmdlets\\Get-CimInstance Win32_Process | Microsoft.PowerShell.Core\\ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }"], ProcessListFixture.COMMAND_LINE_TIMEOUT)
+        "Microsoft.PowerShell.Management\\Get-WmiObject -Query 'SELECT ProcessId, CommandLine FROM Win32_Process' | Microsoft.PowerShell.Core\\ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }"], ProcessListFixture.COMMAND_LINE_TIMEOUT)
       : await ProcessListFixture.runAsync("ps", ["-ww", "-A", "-o", "pid=,args="]);
     const naming = output.split(/\r?\n/).map(t => t.trim()).filter(t => t.includes(text));
     return naming.length === 0 ? "none" : naming.join("; ");
@@ -154,7 +154,7 @@ export default class ProcessListFixture {
   private static async describeOnWindowsAsync(processIds: readonly number[]): Promise<string> {
     try {
       return await ProcessListFixture.runAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
-        `CimCmdlets\\Get-CimInstance Win32_Process -Filter "${processIds.map(t => `ProcessId = ${t}`).join(" OR ")}" | Microsoft.PowerShell.Core\\ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" }`],
+        `Microsoft.PowerShell.Management\\Get-WmiObject -Query "SELECT ProcessId, CommandLine FROM Win32_Process WHERE ${processIds.map(t => `ProcessId = ${t}`).join(" OR ")}" |Microsoft.PowerShell.Core\\ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" }`],
         ProcessListFixture.COMMAND_LINE_TIMEOUT);
     }
     catch {

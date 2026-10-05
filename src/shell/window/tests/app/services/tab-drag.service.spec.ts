@@ -10,6 +10,7 @@ import { TestBed } from "@angular/core/testing";
 
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { PanelEdge } from "../../../src/app/enums/panel-edge";
+import { GroupDropTarget } from "../../../src/app/models/layout/group-drop-target";
 import { Layout } from "../../../src/app/models/layout/layout";
 import { SideDropTarget } from "../../../src/app/models/layout/side-drop-target";
 import { SplitDropTarget } from "../../../src/app/models/layout/split-drop-target";
@@ -47,7 +48,7 @@ describe("TabDragService", () => {
     root = document.createElement("div");
     root.innerHTML = [
       "<div data-drop-group=\"1\"><div data-drop-tabs><span class=\"files\" data-tab-index=\"0\"></span><span class=\"search\" data-tab-index=\"1\"></span>",
-      "<span class=\"close tr-tab-close\"></span></div><div class=\"body\"></div></div>",
+      "<span class=\"close tr-tab-close\"></span><span class=\"actions\"></span></div><div class=\"body\"></div></div>",
       "<div data-drop-group=\"0\"><div data-drop-tabs><span class=\"plan\" data-tab-index=\"0\"></span><span class=\"todo\" data-tab-index=\"1\"></span>",
       "<span class=\"rest\"></span></div></div>",
       "<div data-drop-group=\"2\"><div data-drop-tabs><span class=\"changes\" data-tab-index=\"0\"></span></div></div>",
@@ -133,7 +134,7 @@ describe("TabDragService", () => {
     expect(drag.target()).toEqual(new SplitDropTarget(2, PanelEdge.Top));
     expect(drag.hoveredGroup()).toBe(2);
     moveOver("center");
-    expect(drag.target()).toEqual(new TabDropTarget(2, 1));
+    expect(drag.target()).toEqual(new GroupDropTarget(2));
     moveOver("gap");
     expect(drag.target()).toBeNull();
     moveOver("stale");
@@ -142,18 +143,39 @@ describe("TabDragService", () => {
     moveOver("search", 10);
     expect(drag.target()).toEqual(new TabDropTarget(1, 1));
     expect(drag.isDropBefore(1, 1)).toBe(true);
+    expect(drag.hoveredGroup()).toBeNull();
     moveOver("search", 90);
     expect(drag.target()).toEqual(new TabDropTarget(1, 2));
     moveOver("rest");
     expect(drag.target()).toEqual(new TabDropTarget(0, 2));
     moveOver("rest");
     expect(drag.target()).toEqual(new TabDropTarget(0, 2));
+    moveOver("actions");
+    expect([drag.target(), drag.hoveredGroup()]).toEqual([new TabDropTarget(1, 2), null]);
     moveOver("body");
     expect(drag.target()).toBeNull();
+    expect(drag.hoveredGroup()).toBe(1);
     moveOver("outside");
     expect(drag.target()).toBeNull();
+    moveOver("search", 10);
     moveOver(null);
-    expect(drag.target()).toBeNull();
+    expect([drag.target(), drag.hoveredGroup(), drag.dragging()]).toEqual([null, null, LayoutFixture.files]);
+  });
+
+  it("takes the after half of a tab or a horizontal strip icon from the left in a right-to-left row", () => {
+    root.dir = "rtl";
+    start(LayoutFixture.files);
+    const targets: unknown[] = [];
+    for (const [name, x] of [["files", 10], ["files", 90], ["search", 10], ["search", 90]] as const) {
+      moveOver(name, x);
+      targets.push(drag.target());
+    }
+    for (const x of [30, 70]) {
+      moveWithin("horizontal", x, 5);
+      targets.push(drag.target());
+    }
+
+    expect(targets).toEqual([new TabDropTarget(1, 1), new TabDropTarget(1, 0), new TabDropTarget(1, 2), new TabDropTarget(1, 1), new TabDropTarget(2, 1), new TabDropTarget(2, 0)]);
   });
 
   it("targets the place before or after a strip icon along the strip's axis, for a group that takes the tab", () => {
@@ -190,6 +212,14 @@ describe("TabDragService", () => {
     expect(layout.layout()).toBe(before);
   });
 
+  it("moves a tab into another group's row at the place before the tab under the pointer", () => {
+    start(LayoutFixture.files);
+    moveOver("changes", 10);
+    document.dispatchEvent(new PointerEvent("pointerup"));
+
+    expect(layout.layout().group(2)?.tabs).toEqual([LayoutFixture.files, LayoutFixture.changes]);
+  });
+
   it("cancels on Escape, a cancelled pointer and a lost window focus, and ignores other keys", () => {
     const before = layout.layout();
     const cancels: (() => void)[] = [
@@ -198,15 +228,16 @@ describe("TabDragService", () => {
       () => window.dispatchEvent(new FocusEvent("blur"))
     ];
     for (const cancel of cancels) {
-      start(LayoutFixture.files);
-      moveOver("side");
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
-      expect(drag.dragging()).toEqual(LayoutFixture.files);
-      cancel();
-      expect(drag.dragging()).toBeNull();
-      expect(drag.target()).toBeNull();
-      document.dispatchEvent(new PointerEvent("pointerup"));
-      expect(layout.layout()).toBe(before);
+      for (const [name, isDropBefore, hovered] of [["search", true, null], ["body", false, 1]] as const) {
+        start(LayoutFixture.files);
+        moveOver(name, 10);
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+        expect([drag.dragging(), drag.isDropBefore(1, 1), drag.hoveredGroup()]).toEqual([LayoutFixture.files, isDropBefore, hovered]);
+        cancel();
+        expect([drag.dragging(), drag.target(), drag.isDropBefore(1, 1), drag.hoveredGroup()]).toEqual([null, null, false, null]);
+        document.dispatchEvent(new PointerEvent("pointerup"));
+        expect(layout.layout()).toBe(before);
+      }
     }
 
     start(LayoutFixture.files);
@@ -229,7 +260,7 @@ describe("TabDragService", () => {
     moveOver("documents-arrow");
     expect(drag.target()).toEqual(new SplitDropTarget(0, PanelEdge.Left));
     moveOver("documents-center");
-    expect(drag.target()).toEqual(new TabDropTarget(0, 2));
+    expect(drag.target()).toEqual(new GroupDropTarget(0));
     moveOver("todo", 90);
     expect(drag.target()).toEqual(new TabDropTarget(0, 2));
     document.dispatchEvent(new PointerEvent("pointerup"));

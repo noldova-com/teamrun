@@ -1,3 +1,11 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
 <div class="tr-setting-row-heading">
   @if (isSet()) {
     <span class="tr-setting-row-marker material-symbols-rounded" role="img" [attr.aria-label]="resources.modifiedLabel" [trTooltip]="resources.modifiedLabel">{{ resources.modifiedGlyph }}</span>
@@ -21,11 +29,16 @@
       </tr-checkbox>
     }
     @case (kinds.Choice) {
-      <tr-select [label]="definition().title" [options]="options()" [value]="asString(current())" (valueChange)="choose($event)" />
+      @if (isFew()) {
+        <tr-choice-pills [label]="definition().title" [options]="options()" [value]="asString(current())" (valueChange)="choose($event)" />
+      } @else {
+        <tr-select [label]="definition().title" [options]="options()" [value]="asString(current())" (valueChange)="choose($event)" />
+      }
     }
     @case (kinds.Number) {
       <input tr-text-field type="number" class="tr-setting-row-number" [attr.aria-label]="definition().title" [min]="definition().type.minimum" [max]="definition().type.maximum"
-        [step]="definition().type.step" [value]="current()" (change)="commitNumber($event)" />
+        [step]="definition().type.step" [value]="current()" [attr.aria-invalid]="error() ? true : null" [attr.aria-describedby]="error() ? errorId : null"
+        (change)="commitNumber($event)" (keydown.escape)="revertNumber($event)" />
     }
     @case (kinds.Text) {
       <input tr-text-field type="text" [attr.aria-label]="definition().title" [attr.maxlength]="definition().type.maxLength" [value]="asString(current())" (change)="commitText($event)" />
@@ -40,5 +53,5 @@
   }
 </div>
 @if (error(); as message) {
-  <div class="tr-setting-row-error" role="alert">{{ message }}</div>
+  <div class="tr-setting-row-error" role="alert" [id]="errorId">{{ message }}</div>
 }

@@ -49,6 +49,13 @@ test.describe("the window row's menus on Windows and Linux", () => {
     expect((menus?.x ?? 0) + (menus?.width ?? 0)).toBeLessThanOrEqual(start?.x ?? 0);
     expect((start?.x ?? 0) + (start?.width ?? 0)).toBeLessThan(end?.x ?? 0);
     expect([menus?.y, menus?.height].every(t => (t ?? Infinity) <= (row?.height ?? 0))).toBe(true);
+    expect(await menuItem(window, "File").evaluate(t => {
+      const probe = document.body.appendChild(document.createElement("div"));
+      probe.style.fontSize = "var(--tr-text-panel)";
+      const panel = getComputedStyle(probe).fontSize;
+      probe.remove();
+      return [getComputedStyle(t).fontWeight, getComputedStyle(t).fontSize === panel];
+    })).toEqual(["400", true]);
     await desktop.checkpointAsync("menu-bar-inline");
 
     await menuItem(window, "File").focus();
@@ -145,7 +152,7 @@ test.describe("the window row's menus on Windows and Linux", () => {
     await window.keyboard.press("F10");
     await expect(tag).toBeFocused();
     await CommandSearchFixture.searchAsync(window, "new n");
-    await expect(window.locator(".cdk-overlay-container .tr-command-search-pane").getByRole("option").first()).toHaveAttribute("data-item", "notes.newNote");
+    await expect(window.locator(".cdk-overlay-container .tr-command-search-pane [role=option][data-item=\"notes.newNote\"] mark")).toHaveText(["New n"]);
     await desktop.checkpointAsync("menu-bar-hidden");
     await window.keyboard.press("Escape");
 

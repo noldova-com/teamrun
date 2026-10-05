@@ -9,6 +9,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import TabRowFixture from "./fixtures/tab-row.fixture.ts";
 
 const notes = "view/notes.list";
 const outline = "view/notes.outline";
@@ -129,6 +130,38 @@ test.describe("activity bar", () => {
     await icon(window, notes).click();
     await expect(window.locator("tr-tab-group[data-side=Left] .tr-tab-group-title")).toHaveText("Notes");
     await desktop.checkpointAsync("group-header");
+  });
+
+  test("a tab row's first tab and last action stand 0.25rem from its card's start and end in both directions, and a header's title starts where a tab's icon starts", async ({ desktop }) => {
+    const window = desktop.window;
+    const group = window.locator("tr-tab-group[data-side=Left]");
+    const schemes = ["light", "dark"] as const;
+    for (const scheme of schemes) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await desktop.checkpointAsync(`tab-row-${scheme}`);
+    }
+    const tabs = await TabRowFixture.insetsOf(group);
+    await TabRowFixture.setDirectionAsync(window, "rtl");
+    const reversed = await TabRowFixture.insetsOf(group);
+    await desktop.checkpointAsync("tab-row-rtl");
+
+    await setDockStyleAsync(window, "shell.leftDockStyle", "Icons");
+    await expect(group.locator(".tr-tab-group-title")).toHaveText("Notes");
+    for (const scheme of schemes) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await desktop.checkpointAsync(`group-header-${scheme}`);
+    }
+    const header = await TabRowFixture.insetsOf(group);
+    await TabRowFixture.setDirectionAsync(window, "rtl");
+    const headerReversed = await TabRowFixture.insetsOf(group);
+    await TabRowFixture.setDirectionAsync(window, "ltr");
+
+    for (const inset of [tabs.firstTab, tabs.lastAction, reversed.firstTab, reversed.lastAction, header.lastAction, headerReversed.lastAction])
+      expect(inset).toBeCloseTo(tabs.rem * 0.25, 0);
+    expect(header.content).toBeCloseTo(tabs.content, 0);
+    expect(headerReversed.content).toBeCloseTo(reversed.content, 0);
   });
 
   test("an icon opens its view's tab menu from the keyboard or a right click, so the view can be docked elsewhere from the strip", async ({ desktop }) => {

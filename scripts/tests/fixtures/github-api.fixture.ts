@@ -16,18 +16,23 @@ export default class GitHubApiFixture extends ProcessRunner {
 
   private static readonly PREFIX: string = `repos/${GitHubApiFixture.REPOSITORY}`;
 
-  private readonly answers: Map<string, string> = new Map<string, string>();
+  private readonly answers: Map<string, string[]> = new Map<string, string[]>();
   private readonly failures: Map<string, string> = new Map<string, string>();
 
   public readonly requests: string[] = [];
   public readonly bodies: string[] = [];
+  public readonly fields: string[] = [];
 
   public answer(resource: string, value: unknown): void {
-    this.answers.set(resource, JSON.stringify(value));
+    this.answers.set(resource, [JSON.stringify(value)]);
+  }
+
+  public answerInTurn(resource: string, values: readonly unknown[]): void {
+    this.answers.set(resource, values.map(t => JSON.stringify(t)));
   }
 
   public answerText(resource: string, text: string): void {
-    this.answers.set(resource, text);
+    this.answers.set(resource, [text]);
   }
 
   public fail(resource: string, errorOutput: string): void {
@@ -45,13 +50,15 @@ export default class GitHubApiFixture extends ProcessRunner {
     const resource = endpoint.slice(GitHubApiFixture.PREFIX.length);
     const methodIndex = commandArguments.indexOf("--method");
     this.requests.push(`${methodIndex < 0 ? "GET" : commandArguments[methodIndex + 1]} ${resource}`);
+    this.fields.push(...commandArguments.filter((_, index) => commandArguments[index - 1] === "--raw-field"));
     const bodyArgument = commandArguments.find(t => t.startsWith("body="));
     if (bodyArgument !== undefined)
       this.bodies.push(bodyArgument.slice("body=".length));
     const failure = this.failures.get(resource);
     if (failure !== undefined)
       return new ProcessResult(1, "", failure);
-    const answer = this.answers.get(resource);
+    const answers = this.answers.get(resource) ?? [];
+    const answer = answers.length > 1 ? answers.shift() : answers[0];
     if (answer === undefined && methodIndex < 0)
       throw new Error(`No answer recorded for ${resource}.`);
     return new ProcessResult(0, commandArguments.includes("--slurp") ? `[${answer}]` : answer ?? "{}", "");

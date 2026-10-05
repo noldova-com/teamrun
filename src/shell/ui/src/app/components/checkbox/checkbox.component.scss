@@ -23,6 +23,7 @@
   position: relative;
   display: inline-grid;
   flex: none;
+  color: var(--tr-text);
 }
 
 .tr-checkbox-box {
@@ -31,7 +32,7 @@
   height: var(--tr-checkbox-size);
   margin: 0;
   border: var(--tr-border-width) solid var(--tr-checkbox-border);
-  border-radius: var(--tr-radius-small);
+  border-radius: var(--tr-radius-hover);
   background-color: var(--tr-checkbox);
   appearance: none;
   cursor: pointer;
@@ -50,16 +51,24 @@
 .tr-checkbox-mark {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  color: var(--tr-text);
-  font-size: var(--tr-icon);
+  width: var(--tr-icon);
+  height: var(--tr-icon);
+  margin: auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   visibility: hidden;
   pointer-events: none;
 }
 
 .tr-checkbox-box:checked + .tr-checkbox-mark {
   visibility: visible;
+}
+
+.tr-checkbox-box:disabled + .tr-checkbox-mark {
+  opacity: 0.5;
 }
 
 .tr-checkbox-text:empty {

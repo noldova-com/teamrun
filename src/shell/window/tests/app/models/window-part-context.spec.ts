@@ -36,6 +36,7 @@ class ListComponent {
 
 class FakeWindowPartHost implements IWindowPartHost {
   public readonly calls: string[] = [];
+  public postedId: number | null = null;
   public readonly listeners: Set<(name: string, payload: JsonValue) => void> = new Set();
   public readonly registered: Set<string> = new Set(["notes.taken"]);
   public readonly settingListeners: Set<(change: SettingChange) => void> = new Set();
@@ -64,6 +65,11 @@ class FakeWindowPartHost implements IWindowPartHost {
     this.calls.push(`log ${moduleId} ${message}`);
   }
 
+  public showInDialogAsync(name: string, instance: string | null, title: string | null): Promise<void> {
+    this.calls.push(`show ${name} ${instance ?? "-"} ${title ?? "-"}`);
+    return Promise.resolve();
+  }
+
   public isCommandRegistered(name: string): boolean {
     return this.registered.has(name);
   }
@@ -84,7 +90,7 @@ class FakeWindowPartHost implements IWindowPartHost {
 
   public postNotificationAsync(post: NotificationPost): Promise<number> {
     this.calls.push(`post ${post.title}`);
-    return Promise.resolve(this.calls.length);
+    return Promise.resolve(this.postedId ?? this.calls.length);
   }
 
   public updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
@@ -145,7 +151,7 @@ describe("WindowPartContext", () => {
 
   beforeEach(() => {
     host = new FakeWindowPartHost();
-    const source = new WindowPartSource("notes", "Notes", ["tasks"], ["notes.list"], ["notes.note"], ["notes.newNote", "notes.taken"], ["notes.count", "notes.sync"], ["notes.compose", "notes.share"], ["notes.saved"],
+    const source = new WindowPartSource("notes", ["tasks"], ["notes.list"], ["notes.note"], ["notes.newNote", "notes.taken"], ["notes.count", "notes.sync"], ["notes.compose", "notes.share"], ["notes.saved"],
       () => Promise.reject<IWindowPart>(new Error("unused")));
     context = new WindowPartContext(source, host);
   });
@@ -161,6 +167,35 @@ describe("WindowPartContext", () => {
 
     expect([first.id, second.id]).toEqual([1, 2]);
     expect(host.calls).toEqual(["post Saved", "post Saved again", "update 1 Saved twice", "dismiss 1", "dismiss 2", "refresh"]);
+  });
+
+  it("neither updates nor dismisses a notification it dismissed or forgot, and still handles one posted afterwards", async () => {
+    const dismissed = await context.postNotificationAsync(notification("notes.saved", "Saved", null));
+    dismissed.dismiss();
+    await dismissed.updateAsync(notification("notes.saved", "Saved twice", null));
+    const forgotten = await context.postNotificationAsync(notification("notes.saved", "Saved again", null));
+    context.forgetNotifications();
+    await forgotten.updateAsync(notification("notes.saved", "Saved again twice", null));
+    forgotten.dismiss();
+    const later = await context.postNotificationAsync(notification("notes.saved", "Saved later", null));
+    await later.updateAsync(notification("notes.saved", "Saved later twice", null));
+    context.withdraw();
+
+    expect(host.calls).toEqual(["post Saved", "dismiss 1", "post Saved again", "post Saved later", "update 4 Saved later twice", "dismiss 4", "refresh"]);
+  });
+
+  it("keeps a forgotten handle from touching a later notification that got the same id", async () => {
+    host.postedId = 1;
+    const forgotten = await context.postNotificationAsync(notification("notes.saved", "Saved", null));
+    context.forgetNotifications();
+    const later = await context.postNotificationAsync(notification("notes.saved", "Saved again", null));
+    await forgotten.updateAsync(notification("notes.saved", "Saved twice", null));
+    forgotten.dismiss();
+    await later.updateAsync(notification("notes.saved", "Saved again twice", null));
+    later.dismiss();
+
+    expect([forgotten.id, later.id]).toEqual([1, 1]);
+    expect(host.calls).toEqual(["post Saved", "post Saved again", "update 1 Saved again twice", "dismiss 1"]);
   });
 
   it("refuses a notification of another module, an undeclared kind or another module's command, before and on update", async () => {
@@ -288,6 +323,16 @@ describe("WindowPartContext", () => {
     context.keepDocument("notes.note", "2");
 
     expect(host.calls).toEqual(["open notes notes.note 1 Note 1", "open notes notes.note 2 Note 2 as a preview", "open notes notes.note 3 Note 3", "keep notes notes.note 2"]);
+  });
+
+  it("shows its own, its dependencies' and the shell's views and documents in a dialog through the host, and refuses another module's", async () => {
+    await context.showInDialogAsync("notes.list");
+    await context.showInDialogAsync("notes.note", { instance: "1", title: "Note 1" });
+    await context.showInDialogAsync("tasks.board", { title: "Board" });
+    await context.showInDialogAsync("shell.settings");
+
+    await expect(context.showInDialogAsync("clock.face")).rejects.toThrowError(WindowPartAccessException);
+    expect(host.calls).toEqual(["show notes.list - -", "show notes.note 1 Note 1", "show tasks.board - Board", "show shell.settings - -"]);
   });
 
   it("writes its log lines through the host under its module's id", () => {

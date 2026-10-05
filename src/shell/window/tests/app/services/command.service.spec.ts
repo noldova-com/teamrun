@@ -9,14 +9,18 @@
 import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
-import { KeyChord } from "@noldova/teamrun-shell-protocol";
+import { DialogService } from "@noldova/teamrun-shell-ui";
 
+import { EditAction } from "../../../src/app/enums/edit-action";
 import { CommandNotFoundException } from "../../../src/app/exceptions/command-not-found.exception";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
-import { ShortcutBinding } from "../../../src/app/models/shortcut-binding";
 import { CommandService } from "../../../src/app/services/command.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
+import { StartupService } from "../../../src/app/services/startup.service";
+import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
+import { ModuleStatusFixture } from "../../fixtures/module-status.fixture";
+import { ViewDialogFixture } from "../../fixtures/view-dialog.fixture";
 
 describe("CommandService", () => {
   let errors: unknown[];
@@ -30,9 +34,17 @@ describe("CommandService", () => {
       return name;
     });
 
-  function start(platform: string): CommandService {
-    DesktopBridgeFixture.install(platform);
-    TestBed.configureTestingModule({ providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }] });
+  let bridge: DesktopBridgeFixture;
+
+  function start(platform: string, isDialogOpen: boolean = false, viewModule: string | null = null): CommandService {
+    bridge = DesktopBridgeFixture.install(platform);
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } },
+        { provide: DialogService, useValue: { isOpen: isDialogOpen } },
+        ViewDialogFixture.provideShowing(viewModule)
+      ]
+    });
     return TestBed.inject(CommandService);
   }
 
@@ -74,6 +86,42 @@ describe("CommandService", () => {
     expect(other.defaultPrevented).toBe(false);
   });
 
+  it("offers no command and runs none for a key while the runtime starts again", async () => {
+    const service = start("win32");
+    service.setCommands([command("notes.newNote", "Mod+Alt+N")]);
+    await vi.waitFor(() => expect(TestBed.inject(StartupService).hasStarted()).toBe(true));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    const whileStarting = [service.isEnabled("notes.newNote"), press({ key: "n", code: "KeyN", ctrlKey: true, altKey: true }).defaultPrevented];
+    bridge.publishStartup({ kind: "Ready", details: [] });
+
+    expect(whileStarting).toEqual([false, false]);
+    expect(service.isEnabled("notes.newNote")).toBe(true);
+    expect(runs).toEqual([]);
+  });
+
+  it("runs no command from anywhere while the runtime starts again, but keeps the edit commands", async () => {
+    const service = start("win32");
+    service.setCommands([command("notes.newNote", null)]);
+    await vi.waitFor(() => expect(TestBed.inject(StartupService).hasStarted()).toBe(true));
+    const input = document.createElement("input");
+    input.value = "draft";
+    document.body.append(input);
+    input.focus();
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    const ran = await service.runAsync("notes.newNote");
+    service.run("notes.newNote");
+    const whileStarting = [service.isAvailable("notes.newNote"), service.isAvailable(Resources.editCommands[EditAction.SelectAll])];
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    input.remove();
+
+    expect(ran).toBeNull();
+    expect(whileStarting).toEqual([false, true]);
+    expect([service.isAvailable("notes.newNote"), service.isAvailable("clock.tick")]).toEqual([true, false]);
+    expect(runs).toEqual([]);
+  });
+
   it("uses Cmd for Mod on macOS", async () => {
     const service = start("darwin");
     service.setCommands([command("notes.newNote", "Mod+Alt+N")]);
@@ -82,6 +130,38 @@ describe("CommandService", () => {
     press({ key: "n", code: "KeyN", metaKey: true, altKey: true });
 
     await vi.waitFor(() => expect(runs).toEqual(["notes.newNote null"]));
+  });
+
+  it("runs only the edit commands' keys while a modal dialog is open, leaving the rest to the page", async () => {
+    const service = start("win32", true);
+    service.setCommands([command("notes.newNote", "Mod+Alt+N")]);
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.keyBindings", value: { "shell.selectAll": "F7" }, isSet: true });
+    const input = document.createElement("input");
+    input.value = "draft";
+    document.body.append(input);
+    input.focus();
+
+    const module = press({ key: "n", code: "KeyN", ctrlKey: true, altKey: true });
+    const shell = press({ key: ",", code: "Comma", ctrlKey: true });
+    const edit = new KeyboardEvent("keydown", { key: "F7", code: "F7", bubbles: true, cancelable: true });
+    input.dispatchEvent(edit);
+    input.remove();
+
+    expect(runs).toEqual([]);
+    expect([module.defaultPrevented, shell.defaultPrevented, edit.defaultPrevented]).toEqual([false, false, true]);
+  });
+
+  it("runs the keys of the module whose view a dialog shows, as in its tab, but still leaves the shell's to the page", async () => {
+    const service = start("win32", true, "notes");
+    service.setCommands([command("notes.newNote", "Mod+Alt+N"), command("clock.tick", "Mod+Alt+T")]);
+
+    const module = press({ key: "n", code: "KeyN", ctrlKey: true, altKey: true });
+    const other = press({ key: "t", code: "KeyT", ctrlKey: true, altKey: true });
+    const closeTab = press({ key: "w", code: "KeyW", ctrlKey: true });
+
+    await vi.waitFor(() => expect(runs).toEqual(["notes.newNote null"]));
+    expect([module.defaultPrevented, other.defaultPrevented, closeTab.defaultPrevented]).toEqual([true, false, false]);
+    expect(["notes.newNote", "clock.tick", "shell.closeTab", "shell.selectAll"].map(t => service.isHeldByDialog(t))).toEqual([false, true, true, false]);
   });
 
   it("leaves keys an input or editor handled, composed text and repeats alone", () => {
@@ -100,10 +180,11 @@ describe("CommandService", () => {
     expect([composing.defaultPrevented, repeated.defaultPrevented]).toEqual([false, false]);
   });
 
-  it("applies the person's bindings and reports a command that fails", async () => {
+  it("applies the person's bindings as the setting changes and reports a command that fails", async () => {
     const service = start("linux");
     service.setCommands([command("notes.newNote", "Mod+Alt+N", true)]);
-    service.setBindings([new ShortcutBinding("notes.newNote", KeyChord.parse("F6"))]);
+    const before = service.keyLabel("notes.newNote");
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.keyBindings", value: { "notes.newNote": "F6" }, isSet: true });
 
     press({ key: "n", code: "KeyN", ctrlKey: true, altKey: true });
     press({ key: "F6", code: "F6" });
@@ -111,6 +192,14 @@ describe("CommandService", () => {
     await vi.waitFor(() => expect(errors.map(t => (t as Error).message)).toEqual(["notes.newNote failed"]));
     expect(runs).toEqual(["notes.newNote null"]);
     expect(service.shortcuts().keyOf("notes.newNote")?.text).toBe("F6");
+    expect([before, service.keyLabel("notes.newNote"), service.bindings().has("notes.newNote")]).toEqual(["Ctrl+Alt+N", "F6", true]);
+  });
+
+  it("names a command's owner: the product for the shell's, the name the runtime reports for its module, or else its id", () => {
+    const service = start("win32");
+    ModuleStatusFixture.report(ModuleStatusFixture.create("notes", "Notes"));
+
+    expect(["shell.closeTab", "notes.newNote", "clock.tick"].map(t => service.ownerOf(t))).toEqual([Resources.productName, "Notes", "clock"]);
   });
 
   it("leaves the key of a disabled command to the page, and says which commands are enabled for given arguments", async () => {
@@ -170,6 +259,13 @@ describe("CommandService", () => {
     expect([service.keyLabel("notes.newNote"), service.keyLabel("notes.sync")]).toEqual(["⌥⌘N", null]);
     expect(service.titleOf("notes.sync")).toBe("notes.sync");
     expect(() => service.titleOf("notes.gone")).toThrowError(CommandNotFoundException);
+  });
+
+  it("lists a command's default keys on the platform, the shell's own and a module's", () => {
+    const service = start("darwin");
+    service.setCommands([command("notes.newNote", "Mod+Alt+N"), command("notes.sync", null)]);
+
+    expect(["shell.nextTab", "notes.newNote", "notes.sync"].map(t => service.defaultKeysOf(t).map(u => u.text))).toEqual([["Ctrl+Tab", "Mod+Alt+ArrowRight"], ["Mod+Alt+N"], []]);
   });
 
   it("runs a command by name and reports its failure", async () => {

@@ -6,6 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
@@ -17,7 +20,7 @@ const colors = {
 };
 
 test.describe("the empty window", () => {
-  test("TeamRun starts with no module and shows the empty window", async ({ desktop }) => {
+  test("TeamRun starts with no module and shows the empty window @smoke", async ({ desktop }) => {
     const window = desktop.window;
 
     await expect(window).toHaveTitle("TeamRun");
@@ -37,9 +40,42 @@ test.describe("the empty window", () => {
     }));
 
     expect(globals).toEqual({ require: "undefined", process: "undefined", module: "undefined", buffer: "undefined", bridge: [
-      "actOnStartup", "answerClose", "answerQuit", "appearance", "copyText", "edit", "keepAppearance", "logModule", "notifyAppearance", "notifyReady", "onCloseRequest", "onEvent",
+      "actOnStartup", "answerClose", "answerQuit", "appearance", "copyText", "edit", "keepAppearance", "logError", "logModule", "notifyAppearance", "notifyReady", "onCloseRequest", "onEvent",
       "onMenuCommand", "onNotificationOpened", "onQuitQuestion", "onStartup", "openLogFolder", "platform", "readBuild", "readLayout", "readStartup", "request", "setMenuBar", "writeLayout"
     ] });
+  });
+
+  test("an error the window throws and a rejection it leaves unhandled both go to the desktop's log", async ({ desktop }) => {
+    const log = (): Promise<string> => readFile(path.join(desktop.dataDirectory, "logs", "desktop.log"), "utf8");
+
+    await desktop.window.evaluate(() => {
+      setTimeout(() => {
+        throw new Error("An error the window threw.");
+      });
+      void Promise.reject(new Error("A rejection the window left unhandled."));
+    });
+
+    await expect.poll(log).toMatch(/Window error: Error: An error the window threw\./);
+    await expect.poll(log).toMatch(/Window error: Error: A rejection the window left unhandled\./);
+    const text = await log();
+    expect([text.split("Error: An error the window threw.").length, text.split("Error: A rejection the window left unhandled.").length]).toEqual([2, 2]);
+    expect(desktop.acceptFailures(/the window threw\.|the window left unhandled\.|Window error: /).length).toBeGreaterThan(0);
+  });
+
+  test("an error that stops the window's bootstrap goes to the desktop's log once", async ({ desktop }) => {
+    const log = (): Promise<string> => readFile(path.join(desktop.dataDirectory, "logs", "desktop.log"), "utf8");
+    await desktop.window.context().addInitScript(() => {
+      Object.defineProperty(globalThis, "matchMedia", { configurable: true, value: () => {
+        throw new Error("The window's bootstrap stopped.");
+      } });
+    });
+
+    await desktop.window.reload();
+
+    await expect.poll(log).toMatch(/Window error: Error: The window's bootstrap stopped\./);
+    await expect(desktop.window.locator("tr-empty-window")).toHaveCount(0);
+    expect((await log()).split("Error: The window's bootstrap stopped.").length).toBe(2);
+    expect(desktop.acceptFailures(/bootstrap stopped\.|Window error: /).length).toBeGreaterThan(0);
   });
 
   test("the window row, status bar and panel card follow the default theme", async ({ desktop }) => {
@@ -52,9 +88,18 @@ test.describe("the empty window", () => {
       const bar = style("tr-status-bar");
       const side = style(".tr-status-bar-side");
       const card = style("tr-panel-card");
+      const lookHeight = (name: string): string => {
+        const probe = document.createElement("div");
+        probe.style.height = `var(--tr-${name})`;
+        document.body.append(probe);
+        const height = getComputedStyle(probe).height;
+        probe.remove();
+        return height;
+      };
       return {
         isDark: matchMedia("(prefers-color-scheme: dark)").matches,
         body: getComputedStyle(document.body).backgroundColor,
+        rowLook: lookHeight("window-row-height"),
         row: { height: row.height, background: row.backgroundColor, color: row.color, borderBottom: row.borderBottomWidth },
         bar: { height: bar.height, paddingLeft: bar.paddingLeft, paddingRight: bar.paddingRight, gap: side.columnGap, background: bar.backgroundColor, borderTop: bar.borderTopWidth },
         card: { border: card.borderTopWidth, borderColor: card.borderTopColor, radius: card.borderTopLeftRadius, background: card.backgroundColor, color: card.color },
@@ -67,7 +112,7 @@ test.describe("the empty window", () => {
     const expected = measured.isDark ? colors.dark : colors.light;
 
     expect(measured.body).toBe(expected.window);
-    expect(measured.row).toEqual({ height: "35px", background: expected.titleBar, color: expected.titleBarText, borderBottom: "0px" });
+    expect(measured.row).toEqual({ height: measured.rowLook, background: expected.titleBar, color: expected.titleBarText, borderBottom: "0px" });
     expect(measured.bar).toEqual({ height: "28px", paddingLeft: "8px", paddingRight: "8px", gap: "4px", background: expected.window, borderTop: "0px" });
     expect(measured.card).toEqual({ border: "1px", borderColor: expected.cardBorder, radius: "8px", background: expected.panel, color: expected.text });
     expect(measured.cardBounds["x"]).toBe(4);
@@ -93,7 +138,7 @@ test.describe("the empty window", () => {
     }
   });
 
-  test("the window closes cleanly", async ({ desktop }) => {
+  test("the window closes cleanly @smoke", async ({ desktop }) => {
     expect(await desktop.closeAsync()).toBe(0);
   });
 });

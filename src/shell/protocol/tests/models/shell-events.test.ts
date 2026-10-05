@@ -31,4 +31,9 @@ export class ShellEventsTests {
   public namesTheCommandsEvent(): void {
     Assert.areEqual("shell.commandsChanged", ShellEvents.commandsChanged.text);
   }
+
+  @TestMethod
+  public namesTheRecentCommandsEvent(): void {
+    Assert.areEqual("shell.recentCommandsChanged", ShellEvents.recentCommandsChanged.text);
+  }
 }

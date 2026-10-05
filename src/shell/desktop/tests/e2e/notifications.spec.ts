@@ -10,6 +10,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import SettingsFixture from "./fixtures/settings.fixture.ts";
 
 const colors = {
   light: { error: "rgb(161, 38, 13)", menu: "rgb(255, 255, 255)", menuBorder: "rgb(206, 206, 206)" },
@@ -43,9 +44,7 @@ async function tickWithFocusAsync(desktop: DesktopApplicationFixture): Promise<v
 }
 
 async function openNotificationsPageAsync(window: Page): Promise<void> {
-  await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
-  await window.keyboard.press("ControlOrMeta+Comma");
-  await window.locator("tr-settings").getByRole("treeitem", { name: "Notifications", exact: true }).click();
+  await SettingsFixture.openPageAsync(window, "Notifications");
   await expect(window.locator("tr-setting-row[data-setting=\"shell.mutedModules\"]")).toBeVisible();
 }
 
@@ -114,7 +113,7 @@ test.describe("notifications", () => {
     const modules = window.locator("tr-setting-row[data-setting=\"shell.mutedModules\"]");
     await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
     await openNotificationsPageAsync(window);
-    await expect(modules.locator(".tr-checkbox-text")).toHaveText(["Clock notifications", "Notes notifications"]);
+    await expect(modules.locator(".tr-checkbox-text")).toHaveText(["Clock notifications", "Notes notifications", "Reminder notifications"]);
     await expect(modules.getByRole("checkbox", { name: "Clock notifications" })).toBeChecked();
     await desktop.checkpointAsync("settings-notifications");
 
@@ -137,7 +136,7 @@ test.describe("notifications", () => {
     await tickWithFocusAsync(desktop);
     await expect(toasts.locator(".tr-toast-title")).toHaveText(["The clock ticked"]);
     await expect(toasts.locator(".tr-toast-text")).toHaveText(["Ticks: 1"]);
-    await expect(window.locator(".tr-toasts-announcement[aria-live=polite]")).toHaveText("The clock ticked. Ticks: 1");
+    await expect(window.locator(".cdk-live-announcer-element[aria-live=polite]")).toHaveText("The clock ticked. Ticks: 1");
     await expect(toasts).toHaveCount(0, { timeout: 15_000 });
     await bell(window).click();
     await list(window).getByRole("checkbox", { name: "Do not disturb" }).check();

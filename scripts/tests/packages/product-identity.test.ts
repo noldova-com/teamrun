@@ -32,10 +32,6 @@ class ProductIdentityTests {
           product.windowsDeviceFolder, product.macosDeviceFolder, product.linuxDeviceFolder, product.dataDirectoryVariable, product.icons],
         ["Fixture Studio", "Fixture Works", "fixture-studio", "org.fixtureworks.studio", "org.fixtureworks.studio.development", ".fixtureworks/studio",
           "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons"]);
-      assert.deepEqual([...product.placeholders.keys()], [
-        "__PRODUCT_NAME__", "__PRODUCT_SLUG__", "__APPLICATION_ID__", "__DEVELOPMENT_APPLICATION_ID__", "__DATA_FOLDER__",
-        "__WINDOWS_DEVICE_FOLDER__", "__MACOS_DEVICE_FOLDER__", "__LINUX_DEVICE_FOLDER__", "__DATA_DIRECTORY_VARIABLE__", "__ICONS_FOLDER__"
-      ]);
       assert.deepEqual(product.literals, [
         "Fixture Studio", "org.fixtureworks.studio", "org.fixtureworks.studio.development", ".fixtureworks/studio",
         "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons"

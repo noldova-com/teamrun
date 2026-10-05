@@ -1,22 +1,35 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
 <div class="tr-settings-search">
+  <tr-select #pageSelect class="tr-settings-page-select" [label]="resources.settingsPagesLabel" [options]="pageOptions()" [value]="pageChoice()" (valueChange)="select($event)" />
   <input tr-text-field type="search" class="tr-settings-search-field" [attr.aria-label]="resources.searchSettingsLabel" [placeholder]="resources.searchSettingsLabel"
     [value]="query()" (input)="search($event)" />
 </div>
 <div class="tr-settings-body">
-  <tr-tree class="tr-settings-pages" [nodes]="pageNodes()" [label]="resources.settingsPagesLabel" [current]="isSearching() ? null : currentPage()?.title ?? null" (activated)="select($event)" />
-  <div class="tr-settings-content">
-    @if (isSearching()) {
-      @for (page of results(); track page.title) {
-        <section class="tr-settings-result" [attr.aria-label]="page.title">
-          <h2 class="tr-settings-result-title">{{ page.title }}</h2>
-          <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: true }" />
-        </section>
-      } @empty {
-        <p class="tr-settings-empty">{{ resources.noSettingsFound }}</p>
+  <div #pageList class="tr-settings-pages tr-scroll-reveal" (scroll)="keep()">
+    <tr-tree [nodes]="pageNodes()" [label]="resources.settingsPagesLabel" [current]="isSearching() ? null : currentPage()?.title ?? null" (activated)="select($event.id)" />
+  </div>
+  <div #content class="tr-settings-content tr-scroll-reveal" (scroll)="keep()">
+    <div class="tr-settings-column">
+      @if (isSearching()) {
+        @for (page of results(); track page.title) {
+          <section class="tr-settings-result" [attr.aria-label]="page.title">
+            <h2 class="tr-settings-result-title">{{ page.title }}</h2>
+            <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: true }" />
+          </section>
+        } @empty {
+          <p class="tr-settings-empty">{{ resources.noSettingsFound }}</p>
+        }
+      } @else if (currentPage(); as page) {
+        <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: false }" />
       }
-    } @else if (currentPage(); as page) {
-      <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: false }" />
-    }
+    </div>
   </div>
 </div>
 
@@ -27,25 +40,7 @@
     @if (!isResult) {
       <h2 class="tr-settings-group-title">{{ page.title }}</h2>
     }
-    <p class="tr-settings-explanation">{{ resources.shortcutsExplanation }}</p>
-    <table class="tr-settings-shortcuts">
-      <thead>
-        <tr><th scope="col">{{ resources.commandColumn }}</th><th scope="col">{{ resources.keyColumn }}</th></tr>
-      </thead>
-      <tbody>
-        @for (row of matchingShortcuts(); track row.name) {
-          <tr [attr.data-command]="row.name">
-            <td><tr-highlighted-text [text]="row.title" [query]="query()" /></td>
-            <td>
-              <tr-highlighted-text [text]="row.key" [query]="query()" />
-              @if (row.collision; as collision) {
-                <span class="tr-settings-collision">{{ collision }}</span>
-              }
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
+    <tr-shortcuts [rows]="matchingShortcuts()" [query]="query()" />
   } @else {
     @for (group of page.groups; track group.title) {
       <section class="tr-settings-group" [attr.aria-label]="group.title">
@@ -56,7 +51,7 @@
         }
         @for (definition of group.definitions; track definition.name.text) {
           <tr-setting-row [definition]="definition" [value]="values().get(definition.name.text)" [isSet]="setFlags().get(definition.name.text)?.() ?? false"
-            [query]="query()" [modules]="isMutedModules(definition) ? notifyingModules : modules" [isInverse]="isMutedModules(definition)"
+            [query]="query()" [modules]="isMutedModules(definition) ? notifyingModules() : modules()" [isInverse]="isMutedModules(definition)"
             (changed)="change(definition, $event)" (reset)="reset(definition)" />
         }
       </section>

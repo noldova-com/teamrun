@@ -15,7 +15,8 @@
 .tr-toolbar-band {
   display: flex;
   flex-direction: column;
-  padding-inline: var(--tr-toolbar-gap);
+  gap: var(--tr-band-gap);
+  padding: 0 var(--tr-toolbar-gap) var(--tr-band-gap);
 }
 
 .tr-toolbar-row {
@@ -23,7 +24,7 @@
   align-items: center;
   gap: var(--tr-toolbar-gap);
   box-sizing: border-box;
-  height: var(--tr-toolbar-row);
+  height: var(--tr-toolbar-button);
   min-width: 0;
 }
 
@@ -31,7 +32,7 @@
   position: fixed;
   z-index: 1;
   width: calc(var(--tr-border-width) * 2);
-  margin: calc(var(--tr-border-width) * -1);
+  margin-inline: calc(var(--tr-border-width) * -1);
   background-color: var(--tr-accent);
   pointer-events: none;
 }
@@ -39,4 +40,6 @@
 .tr-toolbar-drop-row {
   width: auto;
   height: calc(var(--tr-border-width) * 2);
+  margin-inline: 0;
+  margin-block: calc(var(--tr-border-width) * -1);
 }

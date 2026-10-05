@@ -8,6 +8,7 @@
 
 import { QualifiedName, SettingDefinition, SettingLocality, SettingOption, SettingType } from "@noldova/teamrun-shell-protocol";
 
+import { ProductInfo } from "../../models/product-info.js";
 import { Resources } from "../../resources.js";
 
 export class ShellSettings {
@@ -24,9 +25,11 @@ export class ShellSettings {
   public static readonly previewTabs: QualifiedName = ShellSettings.named(Resources.previewTabsSetting);
   public static readonly doNotDisturb: QualifiedName = ShellSettings.named(Resources.doNotDisturbSetting);
   public static readonly mutedModules: QualifiedName = ShellSettings.named(Resources.mutedModulesSetting);
+  public static readonly keyBindings: QualifiedName = ShellSettings.named(Resources.keyBindingsSetting);
+  public static readonly recentCommandCount: QualifiedName = ShellSettings.named(Resources.recentCommandCountSetting);
 
   public static readonly all: readonly SettingDefinition[] = [
-    ShellSettings.appearance(ShellSettings.theme, Resources.themeTitle, Resources.themeDescription,
+    ShellSettings.appearance(ShellSettings.theme, Resources.themeTitle, Resources.formatThemeDescription(ProductInfo.current.name),
       SettingType.choice([new SettingOption(Resources.defaultThemeId, Resources.defaultThemeTitle)]), Resources.defaultThemeId, SettingLocality.Shared, Resources.themeGroup),
     ShellSettings.appearance(ShellSettings.mode, Resources.modeTitle, Resources.modeDescription,
       ShellSettings.choiceOf(Resources.modeOptions), Resources.defaultMode, SettingLocality.Shared, Resources.themeGroup),
@@ -48,10 +51,14 @@ export class ShellSettings {
       ShellSettings.choiceOf(Resources.menuBarOptions), Resources.defaultMenuBar, SettingLocality.Shared, Resources.layoutGroup),
     ShellSettings.appearance(ShellSettings.previewTabs, Resources.previewTabsTitle, Resources.previewTabsDescription,
       SettingType.boolean(), true, SettingLocality.Shared, Resources.layoutGroup),
+    ShellSettings.appearance(ShellSettings.recentCommandCount, Resources.recentCommandCountTitle, Resources.recentCommandCountDescription,
+      SettingType.number(0, Resources.maximumRecentCommands, 1), Resources.defaultRecentCommands, SettingLocality.Shared, Resources.commandSearchGroup),
     new SettingDefinition(ShellSettings.doNotDisturb, Resources.doNotDisturbTitle, Resources.doNotDisturbDescription,
       SettingType.boolean(), false, SettingLocality.Device, [], Resources.notificationsPage, Resources.notificationsGroup),
     new SettingDefinition(ShellSettings.mutedModules, Resources.mutedModulesTitle, Resources.mutedModulesDescription,
-      SettingType.modules(), [], SettingLocality.Shared, [], Resources.notificationsPage, Resources.notificationsGroup)
+      SettingType.modules(), [], SettingLocality.Shared, [], Resources.notificationsPage, Resources.notificationsGroup),
+    new SettingDefinition(ShellSettings.keyBindings, Resources.keyBindingsTitle, Resources.keyBindingsDescription,
+      SettingType.keyBindings(), {}, SettingLocality.Shared, [], Resources.shortcutsPage, Resources.shortcutsGroup)
   ];
 
   private static named(member: string): QualifiedName {

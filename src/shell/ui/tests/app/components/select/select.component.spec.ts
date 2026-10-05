@@ -8,6 +8,7 @@
 
 import { Component, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 import { page, userEvent } from "vitest/browser";
 
 import { SelectComponent } from "../../../../src/app/components/select/select.component";
@@ -133,6 +134,32 @@ describe("SelectComponent", () => {
     expect(fixture.componentInstance.changes).toEqual([]);
   });
 
+  it("opens with no option marked while its value matches none, and reports the one chosen", async () => {
+    render();
+    fixture.componentInstance.value.set("Sepia");
+    fixture.detectChanges();
+
+    await openAsync();
+    const marked = options().map(t => t.getAttribute("aria-selected"));
+    await userEvent.click(page.getByRole("option", { name: "Dark" }));
+    await expect.poll(() => list()).toBeNull();
+
+    expect(marked).toEqual(["false", "false", "false"]);
+    expect(fixture.componentInstance.changes).toEqual(["Dark"]);
+  });
+
+  it("takes focus on its button and tells whether its list is open", async () => {
+    render();
+    const select = fixture.debugElement.query(By.directive(SelectComponent)).componentInstance as SelectComponent;
+
+    select.focus();
+    const focused = document.activeElement;
+    const closed = select.isExpanded();
+    await openAsync();
+
+    expect([focused, closed, select.isExpanded()]).toEqual([button(), false, true]);
+  });
+
   it("shows an unknown value as itself and cannot open while disabled", () => {
     render();
     fixture.componentInstance.value.set("Sepia");
@@ -143,6 +170,31 @@ describe("SelectComponent", () => {
 
     expect([button().textContent?.includes("Sepia"), list(), getComputedStyle(button()).opacity]).toEqual([true, null, "0.5"]);
   });
+
+  it("shows its list's scrollbar thumb while the pointer is over the list", async () => {
+    render(DefaultTheme.theme, ThemeMode.Dark);
+    await openAsync();
+    const surface = list() as HTMLElement;
+
+    expect(surface.classList.contains("tr-scroll-reveal")).toBe(true);
+    expect(getComputedStyle(surface).color).toBe("rgba(0, 0, 0, 0)");
+    await userEvent.hover(surface);
+    await vi.waitFor(() => expect(getComputedStyle(surface).color).toBe(resolve("--tr-scrollbar")));
+    expect(getComputedStyle(surface).color).not.toBe("rgba(0, 0, 0, 0)");
+  });
+
+  for (const panelSize of AppearanceFixture.panelSizes)
+    it(`writes its value and options in the panel text role at panel size ${panelSize}`, async () => {
+      AppearanceFixture.apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
+      fixture = TestBed.createComponent(SelectHostComponent);
+      fixture.detectChanges();
+      await openAsync();
+
+      for (const element of [button(), options()[0] as HTMLElement]) {
+        AppearanceFixture.expectRem(getComputedStyle(element).fontSize, 0.8125, panelSize);
+        AppearanceFixture.expectRem(getComputedStyle(element).lineHeight, 1.125, panelSize);
+      }
+    });
 
   for (const mode of AppearanceFixture.modes)
     for (const theme of AppearanceFixture.themes)
@@ -166,6 +218,7 @@ describe("SelectComponent", () => {
         AppearanceFixture.expectLook(surface.paddingTop, theme, "dropdown-padding", "padding-top");
         expect([chosen.backgroundColor, chosen.color]).toEqual([AppearanceFixture.readColor(theme, mode, "list.activeSelectionBackground"), AppearanceFixture.readColor(theme, mode, "list.activeSelectionForeground")]);
         expect(other.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+        expect([surface.color, other.color]).toEqual(["rgba(0, 0, 0, 0)", AppearanceFixture.readColor(theme, mode, "input.foreground")]);
         AppearanceFixture.expectLook(other.minHeight, theme, "dropdown-row-height", "min-height");
         AppearanceFixture.expectLook(other.paddingLeft, theme, "dropdown-row-padding", "padding-left");
       });

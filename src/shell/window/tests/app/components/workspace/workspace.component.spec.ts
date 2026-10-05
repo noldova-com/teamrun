@@ -15,6 +15,8 @@ import { WorkspaceComponent } from "../../../../src/app/components/workspace/wor
 import { PanelEdge } from "../../../../src/app/enums/panel-edge";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
+import { ViewDialogService } from "../../../../src/app/services/view-dialog.service";
+import { WindowPartHostService } from "../../../../src/app/services/window-part-host.service";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
@@ -31,15 +33,21 @@ class WorkspaceHostComponent {
 }
 
 describe("WorkspaceComponent", () => {
+  let bridge: DesktopBridgeFixture;
+  let parts: WindowPartHostFixture;
+
   beforeEach(() => {
-    DesktopBridgeFixture.install();
+    bridge = DesktopBridgeFixture.install();
   });
 
   afterEach(() => {
     DesktopBridgeFixture.remove();
   });
 
-  beforeEach(() => TestBed.configureTestingModule({ providers: [WindowPartHostFixture.provide()] }));
+  beforeEach(() => {
+    parts = new WindowPartHostFixture();
+    TestBed.configureTestingModule({ providers: [{ provide: WindowPartHostService, useValue: parts }] });
+  });
 
   afterEach(() => AppearanceFixture.reset());
 
@@ -67,6 +75,61 @@ describe("WorkspaceComponent", () => {
     const bounds = element.getBoundingClientRect();
     return [bounds.x - workspace.x, bounds.y - workspace.y, bounds.width, bounds.height];
   }
+
+  it("is inert while the runtime starts again and gives the focus back where it was once it is ready", async () => {
+    const fixture = await renderAsync(ViewRegistry.createEmpty());
+    const workspace = (fixture.nativeElement as HTMLElement).querySelector("tr-workspace") as HTMLElement;
+    const focused = workspace.appendChild(document.createElement("button"));
+    focused.focus();
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    await settleAsync(fixture);
+    const whileStarting = [workspace.hasAttribute("inert"), document.activeElement === focused];
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await settleAsync(fixture);
+
+    expect(whileStarting).toEqual([true, false]);
+    expect(workspace.hasAttribute("inert")).toBe(false);
+    expect(document.activeElement).toBe(focused);
+  });
+
+  it("focuses the active tab of the group that held the focus when its place is gone once the parts load again", async () => {
+    const registry = LayoutFixture.createRegistry();
+    const fixture = await renderAsync(registry, Layout.createDefault(registry).openDocument(LayoutFixture.plan));
+    const host = fixture.nativeElement as HTMLElement;
+    const tab = host.querySelector<HTMLElement>(`[data-tab-key="${LayoutFixture.plan.key}"]`) as HTMLElement;
+    const focused = (tab.closest("tr-tab-group") as HTMLElement).appendChild(document.createElement("button"));
+    focused.focus();
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    await settleAsync(fixture);
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await settleAsync(fixture);
+    const whileLoading = document.activeElement === focused;
+    focused.remove();
+    parts.generation.update(t => t + 1);
+    await settleAsync(fixture);
+
+    expect(whileLoading).toBe(true);
+    expect(document.activeElement).toBe(tab);
+  });
+
+  it("leaves the focus where it is when the person moved it while the runtime started again", async () => {
+    const fixture = await renderAsync(ViewRegistry.createEmpty());
+    const workspace = (fixture.nativeElement as HTMLElement).querySelector("tr-workspace") as HTMLElement;
+    workspace.appendChild(document.createElement("button")).focus();
+    const outside = document.body.appendChild(document.createElement("input"));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    await settleAsync(fixture);
+    outside.focus();
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await settleAsync(fixture);
+    const active = document.activeElement;
+    outside.remove();
+
+    expect(active).toBe(outside);
+  });
 
   it("shows only the middle, with the empty-window card, when there are no modules", async () => {
     const fixture = await renderAsync(ViewRegistry.createEmpty());
@@ -104,6 +167,24 @@ describe("WorkspaceComponent", () => {
     expect(docked.length).toBeGreaterThan(0);
     expect(fixture.nativeElement.querySelector("tr-empty-window")).toBeNull();
     expect(getComputedStyle(docked[0] ?? fixture.nativeElement).backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "sideBar.background"));
+  });
+
+  it("leaves an open tab's place empty while a dialog shows it and shows it there again once the dialog closes", async () => {
+    const registry = LayoutFixture.createRegistry();
+    const fixture = await renderAsync(registry, Layout.createDefault(registry).openDocument(LayoutFixture.plan));
+    const host: HTMLElement = fixture.nativeElement;
+    const dialogs = TestBed.inject(ViewDialogService);
+    const before = host.querySelectorAll("tr-tab-content").length;
+
+    const shown = dialogs.showAsync(LayoutFixture.plan);
+    await settleAsync(fixture);
+    const whileShown = host.querySelectorAll("tr-tab-content").length;
+    const inDialog = document.querySelectorAll("tr-view-dialog tr-tab-content").length;
+    dialogs.close();
+    await shown;
+    await settleAsync(fixture);
+
+    expect([whileShown, inDialog, host.querySelectorAll("tr-tab-content").length]).toEqual([before - 1, 1, before]);
   });
 
   it("renders the docks with their sashes, the groups, the split sashes and the docking guides", async () => {

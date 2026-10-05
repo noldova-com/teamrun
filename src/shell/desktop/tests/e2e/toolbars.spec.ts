@@ -10,6 +10,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 
 function band(window: Page): Locator {
   return window.locator(".tr-toolbar-band");
@@ -75,13 +76,35 @@ function first(rows: readonly DOMRect[]): DOMRect {
   return row;
 }
 
+function clippingOf(window: Page): Promise<readonly { name: string | undefined; outside: readonly (string | null)[]; scrolls: boolean; corners: readonly string[] }[]> {
+  return window.evaluate(() => {
+    const radius = `${Number.parseFloat(getComputedStyle(document.documentElement).fontSize) * 0.25}px`;
+    return [...document.querySelectorAll<HTMLElement>("tr-toolbar")].map(bar => {
+      const content = bar.querySelector<HTMLElement>(".tr-toolbar-content");
+      const box = content?.getBoundingClientRect();
+      const items = [...bar.querySelectorAll<HTMLElement>(".tr-toolbar-content .tr-toolbar-item")];
+      const last = items.at(-1);
+      const style = last === undefined ? null : getComputedStyle(last);
+      return {
+        name: bar.dataset["toolbar"],
+        outside: items.filter(t => {
+          const item = t.getBoundingClientRect();
+          return box === undefined || item.left < box.left - 0.5 || item.right > box.right + 0.5 || item.top < box.top - 0.5 || item.bottom > box.bottom + 0.5;
+        }).map(t => t.getAttribute("aria-label")),
+        scrolls: content === null || content.scrollWidth > content.clientWidth,
+        corners: style === null ? [] : [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomRightRadius, style.borderBottomLeftRadius].filter(t => t !== radius)
+      };
+    });
+  });
+}
+
 async function runCommandAsync(window: Page, title: string): Promise<void> {
   await CommandSearchFixture.searchAsync(window, title);
   await window.keyboard.press("Enter");
 }
 
 test.describe("toolbars", () => {
-  test("a module's toolbars stand in rows under the window row, 2rem high, with their groups apart and each kind of item", async ({ desktop }) => {
+  test("a module's toolbars stand in rows under the window row, a button high, with their groups apart, each kind of item and nothing clipped", async ({ desktop }) => {
     const window = desktop.window;
     const main = toolbar(window, "notes.main");
 
@@ -97,13 +120,11 @@ test.describe("toolbars", () => {
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const rows = [...document.querySelectorAll(".tr-toolbar-row")].map(t => t.getBoundingClientRect());
       const button = document.querySelector(".tr-toolbar-item")?.getBoundingClientRect();
-      const row = document.querySelector("tr-window-row")?.getBoundingClientRect();
-      return { rem, heights: rows.map(t => t.height), top: rows[0]?.top, windowRowBottom: row?.bottom, button: [button?.width, button?.height], stacked: rows[1]?.top === rows[0]?.bottom };
+      return { rem, heights: rows.map(t => t.height), button: [button?.width, button?.height] };
     });
-    expect(measured.heights).toEqual([measured.rem * 2, measured.rem * 2]);
-    expect(measured.top).toBe(measured.windowRowBottom);
-    expect(measured.button).toEqual([measured.rem * 1.75, measured.rem * 1.75]);
-    expect(measured.stacked).toBe(true);
+    expect(measured.heights).toEqual([measured.rem * 1.5, measured.rem * 1.5]);
+    expect(measured.button).toEqual([measured.rem * 1.5, measured.rem * 1.5]);
+    expect(await clippingOf(window)).toEqual(["notes.main", "notes.second"].map(name => ({ name, outside: [], scrolls: false, corners: [] })));
     await expect(window.locator(".tr-toolbar-row").first().locator("tr-toolbar").first().locator(".tr-toolbar-grip")).toHaveAttribute("aria-label", "Move toolbar");
     const grips = await window.evaluate(() => {
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
@@ -131,6 +152,7 @@ test.describe("toolbars", () => {
         rem,
         sizes: boxes.map(t => [t.width, t.height]),
         gaps: boxes.slice(1).map((t, i) => t.top - (boxes[i]?.bottom ?? 0)),
+        centres: boxes.slice(1).map((t, i) => (t.top + t.height / 2) - ((boxes[i]?.top ?? 0) + (boxes[i]?.height ?? 0) / 2)),
         above: (boxes[0]?.top ?? 0) - (grip?.top ?? 0),
         below: (grip?.bottom ?? 0) - (boxes.at(-1)?.bottom ?? 0),
         left: (boxes[0]?.left ?? 0) - (grip?.left ?? 0),
@@ -138,10 +160,41 @@ test.describe("toolbars", () => {
       };
     });
     expect(dots.sizes).toEqual([[dots.rem * 0.125, dots.rem * 0.125], [dots.rem * 0.125, dots.rem * 0.125], [dots.rem * 0.125, dots.rem * 0.125]]);
-    expect(dots.gaps).toEqual([dots.rem * 0.125, dots.rem * 0.125]);
+    expect(dots.gaps.map(t => Math.abs(t - dots.rem * 0.2) < 0.5)).toEqual([true, true]);
+    expect(dots.centres.map(t => Math.abs(t - dots.rem * 0.325) < 0.5)).toEqual([true, true]);
     expect(Math.abs(dots.above - dots.below)).toBeLessThan(0.5);
+    expect(dots.above).toBeGreaterThan(dots.rem * 0.25);
     expect(Math.abs(dots.left - dots.right)).toBeLessThan(0.5);
     await desktop.checkpointAsync("toolbars");
+  });
+
+  test("the window row's controls, each toolbar row and the panels stand 0.25rem apart, with two rows, one row and none @smoke", async ({ desktop }) => {
+    const window = desktop.window;
+    const gapsOf = (): Promise<readonly number[]> => window.evaluate(() => {
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const row = document.querySelector("tr-window-row") as HTMLElement;
+      const controls = [...row.querySelectorAll<HTMLElement>("button")].filter(t => t.checkVisibility({ visibilityProperty: true })).map(t => t.getBoundingClientRect().bottom);
+      const bands = [...document.querySelectorAll(".tr-toolbar-row")].map(t => t.getBoundingClientRect());
+      const panel = Math.min(...[...document.querySelectorAll("tr-tab-group")].map(t => t.getBoundingClientRect().top));
+      const edges = [{ top: Number.NaN, bottom: Math.max(...controls) }, ...bands, { top: panel, bottom: Number.NaN }];
+      return edges.slice(1).map((t, index) => Math.round((t.top - (edges[index]?.bottom ?? Number.NaN)) / rem * 1000) / 1000);
+    });
+
+    await expect.poll(() => arrangementOf(window)).toEqual([["notes.main"], ["notes.second"]]);
+    expect(await gapsOf()).toEqual([0.25, 0.25, 0.25]);
+    for (const mode of WindowModeFixture.modes) {
+      await WindowModeFixture.setAsync(window, mode);
+      await desktop.checkpointAsync(`toolbars-gaps-two-rows-${mode.toLowerCase()}`);
+    }
+    await WindowModeFixture.setAsync(window, "Light");
+    await setShownAsync(window, "Display", false);
+    await expect.poll(() => arrangementOf(window)).toEqual([["notes.main"]]);
+    expect(await gapsOf()).toEqual([0.25, 0.25]);
+    await desktop.checkpointAsync("toolbars-gaps-one-row");
+    await setShownAsync(window, "Main", false);
+    await expect(band(window)).toHaveCount(0);
+    expect(await gapsOf()).toEqual([0.25]);
+    await desktop.checkpointAsync("toolbars-gaps-no-row");
   });
 
   test("a button runs its command, a dropdown opens its place, a choice shows and changes the checked row, a toggle shows its state and a dynamic group's rows run", async ({ desktop }) => {
@@ -277,6 +330,13 @@ test.describe("toolbars", () => {
 
     await dragAsync(window, "notes.second", rows => ({ x: first(rows).right - 40, y: first(rows).top + first(rows).height / 2 }));
     await expect(window.locator(".tr-toolbar-drop")).toBeVisible();
+    const line = await window.evaluate(() => {
+      const drop = document.querySelector(".tr-toolbar-drop")?.getBoundingClientRect();
+      const button = document.querySelector(".tr-toolbar-item")?.getBoundingClientRect();
+      return { top: (drop?.top ?? 0) - (button?.top ?? 0), height: (drop?.height ?? 0) - (button?.height ?? 0) };
+    });
+    expect(Math.abs(line.top)).toBeLessThan(0.5);
+    expect(Math.abs(line.height)).toBeLessThan(0.5);
     await expect(toolbar(window, "notes.second")).toHaveClass(/tr-toolbar-dragging/);
     await window.keyboard.press("Escape");
     await window.mouse.up();
@@ -325,6 +385,8 @@ test.describe("toolbars", () => {
     const window = desktop.window;
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.second", "notes.main", "notes.spare"]]);
     expect(await window.evaluate(() => [document.documentElement.scrollWidth <= innerWidth, [...document.querySelectorAll(".tr-toolbar-row")].every(t => t.scrollWidth <= t.clientWidth)])).toEqual([true, true]);
+    await expect(window.locator(".tr-toolbar-overflow")).not.toHaveCount(0);
+    expect(await clippingOf(window)).toEqual(["notes.second", "notes.main", "notes.spare"].map(name => ({ name, outside: [], scrolls: false, corners: [] })));
     const expected: Readonly<Record<string, readonly string[]>> = {
       "notes.second": ["Wrap lines"],
       "notes.main": ["New from template", "New note", "Sort by week", "Week 1", "Week 2"],
@@ -336,12 +398,12 @@ test.describe("toolbars", () => {
       const [box, overflow, grip] = await Promise.all([bar.boundingBox(), hasOverflow ? bar.locator(".tr-toolbar-overflow").boundingBox() : Promise.resolve(null), bar.locator(".tr-toolbar-grip").boundingBox()]);
       const rem = await window.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).fontSize));
       expect(grip?.width).toBeGreaterThan(0);
-      expect((box?.width ?? 0) + 0.5).toBeGreaterThanOrEqual(rem * 0.3125 + rem * 1.75);
+      expect((box?.width ?? 0) + 0.5).toBeGreaterThanOrEqual(rem * 0.3125 + rem * 1.5);
       const shown = await labelsOf(bar.locator(".tr-toolbar-item:not(.tr-toolbar-overflow)"));
       let hidden: readonly (string | null)[] = [];
       if (overflow !== null) {
         expect((overflow.x + overflow.width) - ((box?.x ?? 0) + (box?.width ?? 0))).toBeLessThanOrEqual(0.5);
-        expect(overflow.width).toBeGreaterThanOrEqual(rem * 1.75 - 0.5);
+        expect(overflow.width).toBeGreaterThanOrEqual(rem * 1.5 - 0.5);
         await bar.locator(".tr-toolbar-overflow").click();
         const rows = window.locator(".cdk-overlay-container tr-menu button[tr-menu-item]");
         hidden = await rows.evaluateAll(t => t.map(u => u.querySelector(".tr-menu-item-label")?.textContent ?? null));

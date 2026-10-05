@@ -22,6 +22,7 @@ import { LayoutService } from "../../../../src/app/services/layout.service";
 import { TabDragService } from "../../../../src/app/services/tab-drag.service";
 import { TabStripService } from "../../../../src/app/services/tab-strip.service";
 import { Resources } from "../../../../src/resources";
+import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
@@ -129,6 +130,42 @@ describe("TabGroupComponent", () => {
     expect(group(0).querySelector("[role=tabpanel]")?.hasAttribute("aria-labelledby")).toBe(false);
   });
 
+  it("sets the first tab and the last action 0.25rem from its card's start and end in both directions, and lines a one-view header's title up with a tab's label", async () => {
+    AppearanceFixture.apply();
+    await renderAsync();
+    const card = (id: number): DOMRect => {
+      const element = group(id).querySelector("tr-panel-card");
+      const bounds = element?.getBoundingClientRect() ?? new DOMRect();
+      const border = element?.clientLeft ?? 0;
+      return new DOMRect(bounds.left + border, bounds.top, bounds.width - border * 2, bounds.height);
+    };
+    const lastAction = (id: number): Element | undefined => [...group(id).querySelectorAll(".tr-tab-group-actions button")].at(-1);
+    const insets = (): readonly [number, number] => {
+      const isReversed = document.documentElement.dir === "rtl";
+      const first = tab(1, 0).getBoundingClientRect();
+      const last = lastAction(1)?.getBoundingClientRect() ?? new DOMRect(Number.NaN, Number.NaN);
+      const frame = card(1);
+      return isReversed ? [frame.right - first.right, last.left - frame.left] : [first.left - frame.left, frame.right - last.right];
+    };
+    const [firstTab, lastActionEnd] = insets();
+    document.documentElement.dir = "rtl";
+    const [firstTabReversed, lastActionEndReversed] = insets();
+    document.documentElement.removeAttribute("dir");
+    const start = (element: Element | null | undefined): number => element?.getBoundingClientRect().left ?? Number.NaN;
+    const pill = tab(1, 0).querySelector(".tr-tab-pill");
+    const label = start(pill) + Number.parseFloat(pill ? getComputedStyle(pill).paddingLeft : "") - card(1).left;
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
+    update();
+    const title = group(1).querySelector<HTMLElement>(".tr-tab-group-title");
+    const titleText = start(title) + Number.parseFloat(title ? getComputedStyle(title).paddingLeft : "") - card(1).left;
+    const headerActionEnd = card(1).right - (lastAction(1)?.getBoundingClientRect().right ?? Number.NaN);
+    AppearanceFixture.reset();
+
+    for (const inset of [firstTab, lastActionEnd, firstTabReversed, lastActionEndReversed, headerActionEnd])
+      AppearanceFixture.expectPixels(inset, AppearanceFixture.toPixels(0.25));
+    AppearanceFixture.expectPixels(titleText, label);
+  });
+
   it("shows a tab's title below it only while its label is cut short", async () => {
     await renderAsync();
     const target = tab(1, 1);
@@ -224,6 +261,29 @@ describe("TabGroupComponent", () => {
     document.dispatchEvent(new PointerEvent("pointermove", { clientX: bounds.right + 40, clientY: bounds.top + 1 }));
     update();
     expect(group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-tab-drop-before")).toBe(true);
+
+    under = group(0).querySelector(".tr-tab-group-menu");
+    document.dispatchEvent(new PointerEvent("pointermove", { clientX: bounds.right + 60, clientY: bounds.top + 1 }));
+    update();
+    expect([group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-tab-drop-before"), group(0).querySelector(".tr-tab-group-actions")?.classList.contains("tr-tab-drop-before")])
+      .toEqual([true, false]);
+    expect(TestBed.inject(TabDragService).hoveredGroup()).toBeNull();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  });
+
+  it("marks the end of overflowing tabs at the start of the actions, which stay in view", async () => {
+    const many = Array.from({ length: 12 }, (_, index) => new DocumentTab("notes.note", `note ${index}`));
+    await renderAsync(many.reduce((current, t) => current.openDocument(t), Layout.createDefault(registry)), 60);
+    update();
+    await fixture.whenStable();
+    update();
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(group(0).querySelector(".tr-tab-group-actions"));
+    tab(0, 0).dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 0, clientY: 0, bubbles: true }));
+    document.dispatchEvent(new PointerEvent("pointermove", { clientX: 40, clientY: 40 }));
+    update();
+
+    expect([group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-tab-drop-before"), group(0).querySelector(".tr-tab-group-actions")?.classList.contains("tr-tab-drop-before")])
+      .toEqual([false, true]);
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   });
 
@@ -274,6 +334,23 @@ describe("TabGroupComponent", () => {
     layout.activate(LayoutFixture.files);
     update();
     expect(group(corner).querySelector(".tr-tab-group-title")?.textContent?.trim()).toBe("files.tree");
+  });
+
+  it("takes a tab dropped on a header at the group's end and marks it at the start of the actions", async () => {
+    await renderAsync(prepared.splitGroup(LayoutFixture.search, 1, PanelEdge.Bottom));
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
+    update();
+    const drag = TestBed.inject(TabDragService);
+    const corner = layout.layout().dock(DockSide.Left).root?.cornerGroup.id ?? -1;
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(group(corner).querySelector(".tr-tab-group-title"));
+    drag.begin(LayoutFixture.search, new PointerEvent("pointerdown", { button: 0, clientX: 0, clientY: 0 }));
+    document.dispatchEvent(new PointerEvent("pointermove", { clientX: 40, clientY: 40 }));
+    update();
+
+    expect(group(corner).querySelector(".tr-tab-group-header .tr-tab-group-actions")?.classList.contains("tr-tab-drop-before")).toBe(true);
+    expect(drag.hoveredGroup()).toBeNull();
+    document.dispatchEvent(new PointerEvent("pointerup"));
+    expect(layout.layout().group(corner)?.tabs).toEqual([LayoutFixture.files, LayoutFixture.search]);
   });
 
   it("opens the active tab's menu from the panel actions and a tab's menu from the keyboard", async () => {

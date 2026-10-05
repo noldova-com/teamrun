@@ -1,12 +1,14 @@
 {
   "id": "clock",
+  "version": "0.0.1",
   "displayName": "Clock",
+  "description": "Tells the time, ticks and runs a program that starts one of its own, for the UI workflows.",
   "parts": ["runtime", "window"],
   "dependencies": [],
   "contributes": {
     "methods": ["clock.time", "clock.record"],
     "events": ["clock.ticked"],
-    "commands": ["clock.tick", "clock.pause", "clock.beginWork", "clock.finishWork"],
+    "commands": ["clock.tick", "clock.pause", "clock.beginWork", "clock.finishWork", "clock.startProgram"],
     "notifications": ["clock.alarm", "clock.sync"],
     "views": ["clock.face"],
     "statusBarItems": ["clock.ticks"],

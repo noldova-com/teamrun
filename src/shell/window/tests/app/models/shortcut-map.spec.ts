@@ -78,5 +78,6 @@ describe("ShortcutMap", () => {
     expect(map.keyOf("clock.tick")).toBeNull();
     expect(map.find(new KeyboardEvent("keydown", press("F5", "F5", {})))).toBeUndefined();
     expect(map.collisions.map(t => [t.keptBy, t.refused])).toEqual([["tasks.today", "clock.tick"]]);
+    expect([map.holderOf(KeyChord.parse("Ctrl+Alt+T")), map.holderOf(KeyChord.parse("F5"))]).toEqual(["tasks.today", undefined]);
   });
 });

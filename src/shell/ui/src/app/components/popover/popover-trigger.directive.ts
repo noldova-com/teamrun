@@ -70,11 +70,14 @@ export class PopoverTriggerDirective {
         this.close();
     });
     overlay.keydownEvents.subscribe(event => this.closeFromKeyboard(event));
-    overlay.originScrolls.subscribe(() => this.close());
+    overlay.originLost.subscribe(() => this.close());
     this.overlay = overlay;
     this.open.set(true);
     overlay.openTemplate(new TemplatePortal(this.template(), this.viewContainer), this.host, new OverlayAnchoring(this.side(), this.alignment(), this.bounds.gap));
-    afterNextRender(() => overlay.element.querySelector<HTMLElement>(`.${Resources.popoverClass}`)?.focus(), { injector: this.injector });
+    afterNextRender(() => {
+      if (overlay.isOpen)
+        overlay.element.querySelector<HTMLElement>(`.${Resources.popoverClass}`)?.focus();
+    }, { injector: this.injector });
     this.opened.emit();
   }
 

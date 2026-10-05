@@ -9,7 +9,7 @@
 import { JsonReader } from "@noldova/teamrun-foundation-json";
 import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 import {
-  CommandContribution, DockSide, DocumentContribution, type IWindowPart, type IWindowPartContext, MenuRowContribution, StatusBarItemContribution, StatusBarItemState, StatusBarSide,
+  CommandContribution, DockSide, DocumentContribution, type IViewDialogOptions, type IWindowPart, type IWindowPartContext, MenuRowContribution, type StatusBarItem, StatusBarItemContribution, StatusBarItemState, StatusBarSide,
   TopBarActionContribution, TopBarActionState, TopBarSide, ViewContribution
 } from "@noldova/teamrun-shell-window";
 
@@ -17,6 +17,11 @@ import { NotesState } from "./notes-state";
 
 export class NotesWindowPart implements IWindowPart {
   private static readonly SORTINGS: readonly [string, string, string][] = [["notes.sortByTitle", "Sort by title", "title"], ["notes.sortByWeek", "Sort by week", "week"]];
+  private static readonly SHOWN_IN_DIALOG: readonly [string, string, string, IViewDialogOptions][] = [
+    ["notes.showListInDialog", "Show the notes list in a dialog", "notes.list", {}],
+    ["notes.showNoteInDialog", "Show note 1 in a dialog", "notes.note", { instance: "1", title: "Note 1" }],
+    ["notes.showSettingsInDialog", "Show Settings in a dialog", "shell.settings", {}]
+  ];
   private static readonly MANY_VIEWS: readonly [string, string, string, DockSide][] = [
     ["notes.search", "Search", "search", DockSide.Left],
     ["notes.changes", "Source control", "account_tree", DockSide.Left],
@@ -46,6 +51,10 @@ export class NotesWindowPart implements IWindowPart {
     "Updates on Linux", "Packaging", "Menus", "Tooltips", "A very long note title that keeps going so the tab has to truncate somewhere sensible",
     "Help", "FAQ", "Website", "Logo", "Ship it"
   ];
+
+  private static readonly LONG_COUNT: string = "2 notes, neither pinned nor archived, both last changed today by the person who wrote them, and both waiting for review";
+
+  private connectAsync: () => Promise<JsonReader> = () => Promise.reject(new Error("The notes window part is not active."));
 
   public readonly moduleId: string = "notes";
 
@@ -80,13 +89,17 @@ export class NotesWindowPart implements IWindowPart {
       NotesState.wrapsLines.update(t => !t);
       return null;
     }, () => true, () => NotesState.wrapsLines()));
+    for (const [name, title, shown, options] of NotesWindowPart.SHOWN_IN_DIALOG)
+      context.registerCommand(new CommandContribution(name, title, "open_in_full", null, async () => {
+        await context.showInDialogAsync(shown, options);
+        return null;
+      }));
     context.provideMenuGroup("notes.mainRecent", () => [1, 2].map(week => new MenuRowContribution("notes.openNote", { week, title: `Week ${week}` }, `Week ${week}`)));
     context.registerTopBarAction(new TopBarActionContribution("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote")));
     context.registerTopBarAction(new TopBarActionContribution("notes.back", new TopBarActionState("arrow_back", "Back", "notes.sortByWeek"), TopBarSide.Start));
-    await context.postNotificationAsync(new NotificationPost(
-      QualifiedName.parse("notes.saveFailed"), null, "Note 2 couldn't be saved", "The disk is full.", NotificationSeverity.Error, null,
-      [new NotificationAction("New note", new CommandRun(QualifiedName.parse("notes.newNote"), null))], null));
-    if (!JsonReader.fromValue(await context.requestAsync("notes.manyTabs", null)).readBoolean("isMany"))
+    this.connectAsync = () => NotesWindowPart.readRuntimeAsync(context, counter);
+    const options = await this.connectAsync();
+    if (!options.readBoolean("isMany"))
       return;
     for (const [name, title, icon, side] of NotesWindowPart.MANY_VIEWS)
       context.registerView(new ViewContribution(name, title, icon, side, true,
@@ -96,6 +109,22 @@ export class NotesWindowPart implements IWindowPart {
     counter.update(new StatusBarItemState(`${count} notes`));
   }
 
+  public async reconnectAsync(): Promise<boolean> {
+    await this.connectAsync();
+    return true;
+  }
+
   public async deactivateAsync(): Promise<void> {
+  }
+
+  private static async readRuntimeAsync(context: IWindowPartContext, counter: StatusBarItem): Promise<JsonReader> {
+    await context.postNotificationAsync(new NotificationPost(
+      QualifiedName.parse("notes.saveFailed"), null, "Note 2 couldn't be saved", "The disk is full.", NotificationSeverity.Error, null,
+      [new NotificationAction("New note", new CommandRun(QualifiedName.parse("notes.newNote"), null))], null));
+    const options = JsonReader.fromValue(await context.requestAsync("notes.options", null));
+    NotesState.runtime.set(options.readString("runtime"));
+    if (options.readBoolean("isLongCount"))
+      counter.update(new StatusBarItemState(NotesWindowPart.LONG_COUNT, { command: "notes.newNote" }));
+    return options;
   }
 }

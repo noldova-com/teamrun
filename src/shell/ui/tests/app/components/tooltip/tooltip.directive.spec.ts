@@ -285,9 +285,7 @@ describe("TooltipDirective", () => {
   });
 
   it("keeps below the top chrome and above the bottom chrome, except next to its own chrome", async () => {
-    const root = getComputedStyle(document.documentElement);
-    const rem = parseFloat(root.fontSize);
-    const rowHeight = parseFloat(root.getPropertyValue("--tr-window-row-height")) * rem;
+    const rowHeight = AppearanceFixture.measureLook("window-row-height");
     const container = anchor().parentElement as HTMLElement;
     container.style.top = "2px";
     host.tooltip().show();

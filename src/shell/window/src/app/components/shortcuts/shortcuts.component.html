@@ -1,0 +1,73 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="tr-shortcuts-header">
+  <p class="tr-shortcuts-explanation">{{ resources.shortcutsExplanation }}</p>
+  <button type="button" class="tr-shortcuts-reset-all" tr-button [variant]="secondary" [disabled]="!isModified()" (click)="resetAll()">{{ resources.resetAllShortcutsLabel }}</button>
+</div>
+<table class="tr-shortcuts-table">
+  <thead>
+    <tr>
+      <th scope="col">{{ resources.commandColumn }}</th>
+      <th scope="col">{{ resources.ownerColumn }}</th>
+      <th scope="col">{{ resources.keyColumn }}</th>
+      <th scope="col" [attr.aria-label]="resources.actionsColumn"></th>
+    </tr>
+  </thead>
+  <tbody>
+    @for (row of rows(); track row.name) {
+      @let isRecording = recording() === row.name;
+      @let rowNotice = notice()?.command === row.name ? notice() : null;
+      <tr [attr.data-command]="row.name">
+        <td>
+          <span class="tr-shortcut-title">
+            @if (row.isModified) {
+              <span class="tr-shortcut-marker material-symbols-rounded" role="img" [attr.aria-label]="resources.modifiedLabel" [trTooltip]="resources.modifiedLabel">{{ resources.modifiedGlyph }}</span>
+            }
+            <tr-highlighted-text [text]="row.title" [query]="query()" />
+          </span>
+        </td>
+        <td class="tr-shortcut-owner"><tr-highlighted-text [text]="row.owner" [query]="query()" /></td>
+        <td>
+          <button type="button" class="tr-shortcut-key" tr-button [variant]="secondary" [class.tr-shortcut-key-recording]="isRecording"
+            [attr.aria-label]="formatKeyLabel(row, isRecording)" (click)="record(row)" (keydown)="press(row, $event)" (keyup)="release(row, $event)" (blur)="stopRecording(row)">
+            @if (isRecording) {
+              {{ hint() }}
+            } @else {
+              <tr-highlighted-text [text]="row.key" [query]="query()" />
+            }
+          </button>
+          @if (row.collision; as collision) {
+            <span class="tr-shortcut-collision">{{ collision }}</span>
+          }
+          @if (rowNotice) {
+            <div class="tr-shortcut-notice" role="alert">
+              <span class="tr-shortcut-notice-text">{{ rowNotice.text }}</span>
+              @if (rowNotice.holder; as holder) {
+                <span class="tr-shortcut-notice-actions">
+                  <button type="button" tr-button [variant]="primary" (click)="useHere(rowNotice, holder)">{{ resources.useKeyHereLabel }}</button>
+                  <button type="button" tr-button [variant]="secondary" (click)="dismiss(rowNotice)">{{ resources.cancelLabel }}</button>
+                </span>
+              }
+            </div>
+          }
+        </td>
+        <td>
+          <div class="tr-shortcut-actions">
+            @if (row.hasKey) {
+              <button type="button" tr-button [variant]="secondary" [attr.aria-label]="resources.formatRemoveKeyLabel(row.title)" (click)="remove(row)">{{ resources.removeKeyLabel }}</button>
+            }
+            @if (row.isModified) {
+              <button type="button" tr-button [variant]="secondary" [attr.aria-label]="resources.formatResetLabel(row.title)" (click)="reset(row)">{{ resources.resetLabel }}</button>
+            }
+          </div>
+        </td>
+      </tr>
+    }
+  </tbody>
+</table>

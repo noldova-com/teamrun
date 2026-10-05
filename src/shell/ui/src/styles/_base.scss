@@ -9,8 +9,10 @@
 :root {
   --tr-text-panel: 0.8125rem;
   --tr-text-label: max(12px, calc(var(--tr-text-panel) - 0.0625rem));
+  --tr-text-title: calc(var(--tr-text-panel) + 0.125rem);
   --tr-text-heading: calc(var(--tr-text-panel) * 2);
   --tr-line-panel: max(1.125rem, calc(var(--tr-text-panel) + 0.3125rem));
+  --tr-line-title: calc(var(--tr-text-title) + 0.3125rem);
   --tr-line-label: calc(var(--tr-text-label) + 0.25rem);
   --tr-line-tooltip: calc(var(--tr-text-label) + 0.4375rem);
   --tr-line-heading: calc(var(--tr-text-heading) * 1.25);
@@ -22,11 +24,19 @@
 
 :root,
 .tr-theme-scope {
+  --tr-icon-button-target: max(var(--tr-pointer-target), var(--tr-icon-button));
   --tr-inline-code: color-mix(in srgb, var(--tr-text) 12%, transparent);
   --tr-text-tab: var(--tr-text-muted);
   --tr-text-placeholder: var(--tr-text-muted);
   --tr-added-background: color-mix(in srgb, var(--tr-added) 12%, transparent);
   --tr-removed-background: color-mix(in srgb, var(--tr-removed) 12%, transparent);
+}
+
+:where([data-truncates]) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 body {

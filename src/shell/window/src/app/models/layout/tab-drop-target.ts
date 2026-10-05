@@ -6,10 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { Bounds } from "./bounds";
 import { DropTarget } from "./drop-target";
 import type { Layout } from "./layout";
-import type { LayoutGeometry } from "./layout-geometry";
 import type { Tab } from "./tab";
 
 export class TabDropTarget extends DropTarget {
@@ -27,8 +25,8 @@ export class TabDropTarget extends DropTarget {
     return layout.moveTab(tab, this.groupId, this.index);
   }
 
-  public override preview(geometry: LayoutGeometry): Bounds | null {
-    return geometry.frameOf(this.groupId)?.bounds ?? null;
+  public override preview(): null {
+    return null;
   }
 
   public override equals(other: DropTarget | null): boolean {

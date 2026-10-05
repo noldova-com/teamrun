@@ -8,7 +8,9 @@
 
 export default interface IModuleDeclarationJson {
   readonly id: string;
+  readonly version: string;
   readonly displayName: string;
+  readonly description: string;
   readonly dependencies: readonly string[];
   readonly runtimePackage: string | null;
   readonly contributes: Readonly<Record<string, readonly string[]>>;

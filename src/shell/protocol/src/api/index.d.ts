@@ -209,7 +209,15 @@ export declare enum SettingKind {
   /**
    * A list of distinct module ids.
    */
-  Modules = "Modules"
+  Modules = "Modules",
+
+  /**
+   * The person's key bindings: an object from a command's name to the key
+   * bound to it, or to `null` when the person removed the command's key.
+   * Each key is one `KeyChord.canBind` accepts for its command. Only the
+   * shell's `shell.keyBindings` has this kind.
+   */
+  KeyBindings = "KeyBindings"
 }
 
 /**
@@ -321,6 +329,22 @@ export declare class QualifiedName {
    * ```
    */
   public static parse(text: string, parameterName?: string): QualifiedName;
+
+  /**
+   * Reads `owner.member` text without throwing, for checks that only need to
+   * know whether the text is a name.
+   *
+   * @param text The name's text.
+   * @returns The name, or `null` when `parse` would refuse the text.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const isName: boolean = QualifiedName.find("notes.create") !== null;
+   * ```
+   */
+  public static find(text: string): QualifiedName | null;
 
   /**
    * Compares two names.
@@ -1022,15 +1046,41 @@ export declare class WorkReport {
 }
 
 /**
- * Where one module stands in the runtime: an active module has no cause; a
- * failed or blocked one has a cause that is safe to show, without a stack or
- * a path outside the data directory.
+ * One module of the runtime's build: what its declaration says about it and
+ * where it stands. An active module has no cause; a failed or blocked one has
+ * a cause that is safe to show, without a stack or a path outside the data
+ * directory, and a blocked one also names the dependency that blocks it.
  */
 export declare class ModuleStatus {
   /**
    * The module's id.
    */
   public readonly id: string;
+
+  /**
+   * The module's own version, `<major>.<minor>.<patch>`, as it declares it.
+   */
+  public readonly version: string;
+
+  /**
+   * The name people see.
+   */
+  public readonly displayName: string;
+
+  /**
+   * What the module does, in a sentence people see.
+   */
+  public readonly description: string;
+
+  /**
+   * The ids of the modules it depends on, as it declares them.
+   */
+  public readonly dependencies: readonly string[];
+
+  /**
+   * The names it declares, by kind, such as `commands` or `views`.
+   */
+  public readonly contributions: ReadonlyMap<string, readonly string[]>;
 
   /**
    * Where the module stands.
@@ -1043,23 +1093,50 @@ export declare class ModuleStatus {
   public readonly cause: string | null;
 
   /**
+   * The dependency that is not active, for a blocked module; otherwise
+   * `null`.
+   */
+  public readonly blockedBy: string | null;
+
+  /**
    * Creates the status.
    *
    * @param id The module's id; not whitespace only.
+   * @param version The module's version, `<major>.<minor>.<patch>`: three
+   * whole numbers of up to nine digits without leading zeros, such as `0.0.1`.
+   * @param displayName The name people see; not whitespace only.
+   * @param description What the module does; not whitespace only.
+   * @param dependencies The ids of the modules it depends on.
+   * @param contributions The names it declares, by kind.
    * @param state Where the module stands.
    * @param cause `null` for an active module; otherwise text that is not
    * whitespace only.
-   * @throws ArgumentException synchronously when the id is blank, an active
-   * module has a cause, or a failed or blocked module has none or a blank one.
+   * @param blockedBy For a blocked module, the dependency that blocks it;
+   * otherwise `null`, the default.
+   * @throws ArgumentException synchronously when the id, the display name or
+   * the description is blank, the version does not have that form, an active module has a cause, a failed or
+   * blocked module has none or a blank one, or `blockedBy` is not one of the
+   * dependencies of a blocked module.
    *
    * @example
    * ```ts
    * import { ModuleState, ModuleStatus } from "@noldova/teamrun-shell-protocol";
    *
-   * export const status: ModuleStatus = new ModuleStatus("notes", ModuleState.Blocked, "It depends on tasks, which is not active.");
+   * export const status: ModuleStatus = new ModuleStatus(
+   *   "notes", "0.0.1", "Notes", "Keeps notes.", ["tasks"], new Map([["commands", ["notes.newNote"]]]), ModuleState.Blocked,
+   *   "It depends on tasks, which is not active.", "tasks");
    * ```
    */
-  public constructor(id: string, state: ModuleState, cause: string | null);
+  public constructor(
+    id: string,
+    version: string,
+    displayName: string,
+    description: string,
+    dependencies: readonly string[],
+    contributions: ReadonlyMap<string, readonly string[]>,
+    state: ModuleState,
+    cause: string | null,
+    blockedBy?: string | null);
 
   /**
    * Reads the status from its wire form. Unknown fields are ignored.
@@ -1067,30 +1144,73 @@ export declare class ModuleStatus {
    * @param value The untrusted value.
    * @param path The path a failure reports; `$` by default.
    * @returns The status.
-   * @throws JsonException synchronously when `id` or `state` is missing or
-   * invalid, or `cause` is not a string or does not match the state; its path
-   * names the field.
+   * @throws JsonException synchronously when a field is missing or invalid,
+   * or `cause` or `blockedBy` does not match the state; its path names the
+   * field.
    *
    * @example
    * ```ts
    * import { ModuleStatus } from "@noldova/teamrun-shell-protocol";
    *
-   * export const status: ModuleStatus = ModuleStatus.fromJson({ id: "notes", state: "Active" });
+   * export const status: ModuleStatus = ModuleStatus.fromJson({
+   *   id: "notes", version: "0.0.1", displayName: "Notes", description: "Keeps notes.", dependencies: [], contributes: {}, state: "Active"
+   * });
    * ```
    */
   public static fromJson(value: unknown, path?: string): ModuleStatus;
 
   /**
+   * Lists the names the module declares of one kind.
+   *
+   * @param kind The kind, such as `commands`.
+   * @returns The names, in declared order; none when it declares none.
+   *
+   * @example
+   * ```ts
+   * import type { ModuleStatus } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function listCommands(status: ModuleStatus): readonly string[] {
+   *   return status.listContributions("commands");
+   * }
+   * ```
+   */
+  public listContributions(kind: string): readonly string[];
+
+  /**
+   * Returns the same module in another state.
+   *
+   * @param state Where the module stands.
+   * @param cause `null` for an active module; otherwise text that is not
+   * whitespace only.
+   * @param blockedBy For a blocked module, the dependency that blocks it;
+   * otherwise `null`, the default.
+   * @returns The new status.
+   * @throws ArgumentException synchronously as the constructor does.
+   *
+   * @example
+   * ```ts
+   * import { ModuleState, type ModuleStatus } from "@noldova/teamrun-shell-protocol";
+   *
+   * export function fail(status: ModuleStatus): ModuleStatus {
+   *   return status.withState(ModuleState.Failed, "Its window part could not be loaded.");
+   * }
+   * ```
+   */
+  public withState(state: ModuleState, cause: string | null, blockedBy?: string | null): ModuleStatus;
+
+  /**
    * Returns the wire form.
    *
-   * @returns The `id` and `state` fields, and `cause` when there is one.
+   * @returns The `id`, `version`, `displayName`, `description`, `dependencies`,
+   * `contributes` and `state` fields, `cause` when there is one and
+   * `blockedBy` when there is one.
    *
    * @example
    * ```ts
    * import type { JsonObject } from "@noldova/teamrun-foundation-json";
    * import { ModuleState, ModuleStatus } from "@noldova/teamrun-shell-protocol";
    *
-   * export const json: JsonObject = new ModuleStatus("notes", ModuleState.Active, null).toJson();
+   * export const json: JsonObject = new ModuleStatus("notes", "0.0.1", "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null).toJson();
    * ```
    */
   public toJson(): JsonObject;
@@ -1115,7 +1235,7 @@ export declare class ModuleStatusList {
    * ```ts
    * import { ModuleState, ModuleStatus, ModuleStatusList } from "@noldova/teamrun-shell-protocol";
    *
-   * export const list: ModuleStatusList = new ModuleStatusList([new ModuleStatus("notes", ModuleState.Active, null)]);
+   * export const list: ModuleStatusList = new ModuleStatusList([new ModuleStatus("notes", "0.0.1", "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null)]);
    * ```
    */
   public constructor(modules: readonly ModuleStatus[]);
@@ -1133,7 +1253,9 @@ export declare class ModuleStatusList {
    * ```ts
    * import { ModuleStatusList } from "@noldova/teamrun-shell-protocol";
    *
-   * export const list: ModuleStatusList = ModuleStatusList.fromJson({ modules: [{ id: "notes", state: "Active" }] });
+   * export const list: ModuleStatusList = ModuleStatusList.fromJson({
+   *   modules: [{ id: "notes", version: "0.0.1", displayName: "Notes", description: "Keeps notes.", dependencies: [], contributes: {}, state: "Active" }]
+   * });
    * ```
    */
   public static fromJson(value: unknown, path?: string): ModuleStatusList;
@@ -1242,6 +1364,12 @@ export declare class ShellEvents {
    * `CommandList`, with a sequence greater than any list before it.
    */
   public static readonly commandsChanged: QualifiedName;
+
+  /**
+   * `shell.recentCommandsChanged`: a device ran a command from command search; its payload is that device's
+   * `RecentCommands`.
+   */
+  public static readonly recentCommandsChanged: QualifiedName;
 }
 
 /**
@@ -1261,8 +1389,9 @@ export declare class ShellMethods {
   public static readonly moveAside: QualifiedName;
 
   /**
-   * `shell.modules`: asks the runtime where every module of its build
-   * stands; it answers with a `ModuleStatusList`. A client that never asks
+   * `shell.modules`: asks the runtime for every module of its build, what
+   * its declaration says and where it stands; it answers with a
+   * `ModuleStatusList`. A client that never asks
    * is unaffected.
    */
   public static readonly modules: QualifiedName;
@@ -1367,6 +1496,18 @@ export declare class ShellMethods {
    * `shell.setSetting` does.
    */
   public static readonly resetSetting: QualifiedName;
+
+  /**
+   * `shell.recentCommands`: asks for the commands a device ran recently from command search; its payload is a
+   * `RecentCommandsQuery` and its answer that device's `RecentCommands`, without the device.
+   */
+  public static readonly recentCommands: QualifiedName;
+
+  /**
+   * `shell.recordCommand`: records that a device ran a command from command search; its payload is a `RecentCommandUse`.
+   * The runtime keeps each device's 20 newest and publishes `shell.recentCommandsChanged`.
+   */
+  public static readonly recordCommand: QualifiedName;
 }
 
 /**
@@ -1591,6 +1732,20 @@ export declare class SettingType {
   public static modules(): SettingType;
 
   /**
+   * Creates the type of the setting that holds the person's key bindings.
+   *
+   * @returns The key bindings type.
+   *
+   * @example
+   * ```ts
+   * import { SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const type: SettingType = SettingType.keyBindings();
+   * ```
+   */
+  public static keyBindings(): SettingType;
+
+  /**
    * Reads a type from its wire form: `kind` and the fields of that kind.
    *
    * @param value The untrusted value.
@@ -1611,7 +1766,9 @@ export declare class SettingType {
   /**
    * Tells whether a value fits the type: a boolean; one of the options'
    * values; a number within the limits on a step; a string within the
-   * length; or a list of distinct, non-blank strings.
+   * length; a list of distinct, non-blank strings; or an object from
+   * command names to `null` or a key `KeyChord.canBind` accepts for the
+   * command.
    *
    * @param value The value.
    * @returns Whether the type accepts it.
@@ -2313,6 +2470,22 @@ export declare class KeyName {
   public static find(token: string): KeyName | undefined;
 
   /**
+   * Finds the key a keyboard event reports, by the same rules as `matches`.
+   *
+   * @param stroke The key a keyboard event reports.
+   * @returns The key, or `undefined` for a key no chord names, such as a
+   * modifier pressed alone.
+   *
+   * @example
+   * ```ts
+   * import { KeyName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const pressed: KeyName | undefined = KeyName.fromStroke({ key: "<", code: "Comma", ctrlKey: false, altKey: false, shiftKey: true, metaKey: false });
+   * ```
+   */
+  public static fromStroke(stroke: IKeyStroke): KeyName | undefined;
+
+  /**
    * Tells whether a stroke is this key, whatever modifiers it has.
    *
    * @param stroke The key a keyboard event reports.
@@ -2381,7 +2554,29 @@ export declare class KeyChord {
    */
   public readonly text: string;
 
+  /**
+   * Whether the chord could take typing: it has no Mod, Ctrl or Alt and is
+   * not a function key, such as `K`, `Shift+K` or `Enter`.
+   */
+  public get isTypingKey(): boolean;
+
   private constructor();
+
+  /**
+   * Reads a chord from its text without throwing, for checks that only need
+   * to know whether the text is a chord.
+   *
+   * @param text The chord, such as `Mod+Shift+K`.
+   * @returns The chord, or `null` when `parse` would refuse the text.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const chord: KeyChord | null = KeyChord.find("Mod+Shift+K");
+   * ```
+   */
+  public static find(text: string): KeyChord | null;
 
   /**
    * Reads a chord from its text, with its modifiers in any order.
@@ -2424,6 +2619,63 @@ export declare class KeyChord {
    * ```
    */
   public static parseDefault(text: string, parameterName?: string): KeyChord;
+
+  /**
+   * Reads the chord a keyboard event presses on a platform, as the person
+   * records a key. On Windows and Linux Ctrl reads as Mod; on macOS Cmd reads
+   * as Mod and Control as Ctrl.
+   *
+   * @param stroke The key a keyboard event reports.
+   * @param platform The platform, as in `process.platform`.
+   * @returns The chord, or `null` when no chord can name the stroke: a key
+   * the chords do not name, such as a modifier pressed alone, the Windows,
+   * Super or Meta key on Windows and Linux, or Control and Cmd together on
+   * macOS.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const chord: KeyChord | null = KeyChord.fromStroke({ key: "k", code: "KeyK", ctrlKey: false, altKey: false, shiftKey: true, metaKey: true }, "darwin");
+   * ```
+   */
+  public static fromStroke(stroke: IKeyStroke, platform: string): KeyChord | null;
+
+  /**
+   * Finds who owns the chord when editing or an operating system reserves it
+   * on any platform.
+   *
+   * @param command The command the chord would be bound to, whose being a
+   * shell command frees Mod+W and Mod+Comma; `null` for a module's default.
+   * @returns `editing`, `macOS` or `Windows and Linux`, or `null` when the
+   * chord is free.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const owner: string | null = KeyChord.parse("Ctrl+C").findReservedOwner(null);
+   * ```
+   */
+  public findReservedOwner(command: QualifiedName | null): string | null;
+
+  /**
+   * Tells whether the person may bind the chord to a command. A binding
+   * follows the rules of `parseDefault`, except that a shell command may also
+   * take Mod+W and Mod+Comma, which the shell handles itself.
+   *
+   * @param command The command.
+   * @returns `true` when the chord does not take typing and nothing reserves
+   * it for the command.
+   *
+   * @example
+   * ```ts
+   * import { KeyChord, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const isAllowed: boolean = KeyChord.parse("Mod+Comma").canBind(QualifiedName.parse("notes.create"));
+   * ```
+   */
+  public canBind(command: QualifiedName): boolean;
 
   /**
    * Tells whether a keyboard event is this chord on a platform. The
@@ -3393,6 +3645,195 @@ export declare class NotificationBroadcast {
    * import { NotificationBroadcast } from "@noldova/teamrun-shell-protocol";
    *
    * export const json: JsonObject = new NotificationBroadcast([], [], [], 0).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A device's question for the commands it ran recently: the payload of `shell.recentCommands`, which the desktop sends for
+ * its window, adding its own device.
+ */
+export declare class RecentCommandsQuery {
+  /**
+   * The device whose recent commands the answer lists.
+   */
+  public readonly device: string;
+
+  /**
+   * Creates the query.
+   *
+   * @param device The device's id.
+   * @throws ArgumentException synchronously when the device is blank.
+   *
+   * @example
+   * ```ts
+   * import { RecentCommandsQuery } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const query: RecentCommandsQuery = new RecentCommandsQuery("laptop");
+   * ```
+   */
+  public constructor(device: string);
+
+  /**
+   * Reads the query from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The query.
+   * @throws JsonException synchronously when `device` is missing or invalid, or a field is unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { RecentCommandsQuery } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const query: RecentCommandsQuery = RecentCommandsQuery.fromJson({ device: "laptop" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): RecentCommandsQuery;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `device` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { RecentCommandsQuery } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new RecentCommandsQuery("laptop").toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A command a device ran from command search: the payload of `shell.recordCommand`, which the desktop sends for its window,
+ * adding its own device.
+ */
+export declare class RecentCommandUse {
+  /**
+   * The device that ran the command.
+   */
+  public readonly device: string;
+
+  /**
+   * The command's id, as command search names it.
+   */
+  public readonly id: string;
+
+  /**
+   * Creates the use.
+   *
+   * @param device The device's id.
+   * @param id The command's id.
+   * @throws ArgumentException synchronously when the device or the id is blank.
+   *
+   * @example
+   * ```ts
+   * import { RecentCommandUse } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const use: RecentCommandUse = new RecentCommandUse("laptop", "shell.openSettings");
+   * ```
+   */
+  public constructor(device: string, id: string);
+
+  /**
+   * Reads the use from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The use.
+   * @throws JsonException synchronously when `device` or `id` is missing or invalid, or a field is unknown; its path names
+   * the field.
+   *
+   * @example
+   * ```ts
+   * import { RecentCommandUse } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const use: RecentCommandUse = RecentCommandUse.fromJson({ device: "laptop", id: "shell.openSettings" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): RecentCommandUse;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `device` and `id` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { RecentCommandUse } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new RecentCommandUse("laptop", "shell.openSettings").toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The commands a device ran recently from command search, newest first: the answer of `shell.recentCommands` and the
+ * payload of the `shell.recentCommandsChanged` event. The event names the device; the desktop forwards it only to that
+ * device's windows, without the device.
+ */
+export declare class RecentCommands {
+  /**
+   * The commands' ids, newest first, each once.
+   */
+  public readonly ids: readonly string[];
+
+  /**
+   * The device that ran the commands, or `null` when the list is already that device's.
+   */
+  public readonly device: string | null;
+
+  /**
+   * Creates the list.
+   *
+   * @param ids The commands' ids, newest first.
+   * @param device The device's id, or `null`; `null` by default.
+   * @throws ArgumentException synchronously when an id or the device is blank, or an id is listed twice.
+   *
+   * @example
+   * ```ts
+   * import { RecentCommands } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const recent: RecentCommands = new RecentCommands(["shell.openSettings", "clock.show"], "laptop");
+   * ```
+   */
+  public constructor(ids: readonly string[], device?: string | null);
+
+  /**
+   * Reads the list from its wire form, which accepts no unknown fields; `device` may be left out.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The list.
+   * @throws JsonException synchronously when `ids` is missing, a field is invalid or unknown, or an id is listed twice; its
+   * path names the field.
+   *
+   * @example
+   * ```ts
+   * import { RecentCommands } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const recent: RecentCommands = RecentCommands.fromJson({ ids: ["clock.show"], device: "laptop" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): RecentCommands;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `ids` field, and `device` when there is one.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { RecentCommands } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new RecentCommands(["clock.show"]).toJson();
    * ```
    */
   public toJson(): JsonObject;

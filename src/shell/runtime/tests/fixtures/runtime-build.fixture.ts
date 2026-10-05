@@ -10,7 +10,7 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { BuildIdentity } from "@noldova/teamrun-shell-protocol";
-import { RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+import { ProductInfo, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 export class RuntimeBuildFixture implements AsyncDisposable {
   private readonly folder: string;
@@ -31,7 +31,7 @@ export class RuntimeBuildFixture implements AsyncDisposable {
     await mkdir(packageFolder, { recursive: true });
     await writeFile(path.join(packageFolder, "package.json"), JSON.stringify({ name: runtimePackage, version: productVersion, type: "module", main: "index.js" }));
     await writeFile(path.join(packageFolder, "index.js"), runtimePart);
-    const declaration = { id: moduleId, displayName: moduleId, dependencies: [], runtimePackage, contributes: { methods: [method] } };
+    const declaration = { id: moduleId, version: "0.0.1", displayName: moduleId, description: moduleId, dependencies: [], runtimePackage, contributes: { methods: [method] } };
     await writeFile(path.join(build.folder, "_build", "modules", "declarations.json"), JSON.stringify({ formatVersion: 1, modules: [declaration] }));
     return build;
   }
@@ -42,12 +42,9 @@ export class RuntimeBuildFixture implements AsyncDisposable {
     const copy = path.join(folder, "node_modules", "@noldova", "teamrun-shell-runtime");
     await cp(installed, copy, { recursive: true });
     const identity = new BuildIdentity(productVersion, RuntimeBuild.identity.protocolVersion, `${RuntimeBuild.identity.fingerprint}-${productVersion}`);
-    const resources = path.join(copy, "resources.js");
-    const text = (await readFile(resources, "utf8"))
-      .replace(`productVersion = "${RuntimeBuild.identity.productVersion}"`, `productVersion = "${identity.productVersion}"`)
-      .replace(`build = "${RuntimeBuild.identity.fingerprint}"`, `build = "${identity.fingerprint}"`);
-    await writeFile(resources, text);
     await mkdir(path.join(folder, "_build", "modules"), { recursive: true });
+    const product = { ...JSON.parse(await readFile(ProductInfo.file, "utf8")), version: identity.productVersion, build: identity.fingerprint };
+    await writeFile(path.join(folder, "_build", "product.json"), JSON.stringify(product));
     await writeFile(path.join(folder, "_build", "modules", "declarations.json"), "{\"formatVersion\":1,\"modules\":[]}\n");
     return new RuntimeBuildFixture(folder, identity, path.join(copy, "services", "runtime-entry.js"));
   }

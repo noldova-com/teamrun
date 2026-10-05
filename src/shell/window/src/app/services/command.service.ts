@@ -11,26 +11,38 @@ import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal,
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { KeyChord } from "@noldova/teamrun-shell-protocol";
+import { DialogService } from "@noldova/teamrun-shell-ui";
 
 import { CommandNotFoundException } from "../exceptions/command-not-found.exception";
 import type { CommandContribution } from "../models/command-contribution";
-import type { ShortcutBinding } from "../models/shortcut-binding";
+import { KeyBindings } from "../models/key-bindings";
 import { ShortcutMap } from "../models/shortcut-map";
 import { Resources } from "../../resources";
 import { DesktopBridgeService } from "./desktop-bridge.service";
+import { ModuleStatusService } from "./module-status.service";
+import { SettingsService } from "./settings.service";
 import { ShellCommandsService } from "./shell-commands.service";
+import { StartupService } from "./startup.service";
+import { ViewDialogService } from "./view-dialog.service";
 
 @Injectable({ providedIn: "root" })
 export class CommandService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
+  private readonly dialogs: DialogService = inject(DialogService);
+  private readonly viewDialogs: ViewDialogService = inject(ViewDialogService);
   private readonly shell: ShellCommandsService = inject(ShellCommandsService);
+  private readonly startup: StartupService = inject(StartupService);
   private readonly shellCommands: readonly CommandContribution[] = this.shell.commands;
   private readonly moduleCommands: WritableSignal<readonly CommandContribution[]> = signal([]);
-  private readonly bindingsValue: WritableSignal<readonly ShortcutBinding[]> = signal([]);
+  private readonly settingValues: Signal<ReadonlyMap<string, JsonValue>> = inject(SettingsService).values;
+  private readonly bindingsValue: Signal<JsonValue | undefined> = computed(() => this.settingValues().get(Resources.keyBindingsSetting));
+  private readonly statuses: ModuleStatusService = inject(ModuleStatusService);
 
   public readonly commands: Signal<readonly CommandContribution[]> = computed(() => [...this.shellCommands, ...this.moduleCommands()]);
-  public readonly shortcuts: Signal<ShortcutMap> = computed(() => new ShortcutMap(this.shell.keys(this.bridge.platform), this.commands(), this.bindingsValue(), this.bridge.platform));
+  public readonly bindings: Signal<KeyBindings> = computed(() => KeyBindings.fromJson(this.bindingsValue()));
+  public readonly shortcuts: Signal<ShortcutMap> = computed(() => new ShortcutMap(this.shell.keys(this.bridge.platform), this.commands(), this.bindings().list, this.bridge.platform));
 
   public constructor() {
     const document = inject(DOCUMENT);
@@ -45,12 +57,9 @@ export class CommandService {
     this.moduleCommands.set([...commands]);
   }
 
-  public setBindings(bindings: readonly ShortcutBinding[]): void {
-    this.bindingsValue.set([...bindings]);
-  }
-
   public async runAsync(name: string, commandArguments: JsonValue = null): Promise<JsonValue> {
-    return this.find(name).runAsync(commandArguments);
+    const command = this.find(name);
+    return this.isHeldByReconnect(command.name) ? null : command.runAsync(commandArguments);
   }
 
   public run(name: string, commandArguments: JsonValue = null): void {
@@ -59,6 +68,11 @@ export class CommandService {
 
   public isEnabled(name: string, commandArguments: JsonValue = null): boolean {
     return this.canRun(this.find(name), commandArguments);
+  }
+
+  public isAvailable(name: string, commandArguments: JsonValue = null): boolean {
+    const command = this.commands().find(t => t.name === name);
+    return !Object.isUndefined(command) && this.canRun(command, commandArguments);
   }
 
   public isChecked(name: string, commandArguments: JsonValue = null): boolean {
@@ -73,8 +87,22 @@ export class CommandService {
     return this.find(name).title;
   }
 
+  public ownerOf(name: string): string {
+    const owner = name.slice(0, name.indexOf(Resources.contributionSeparator));
+    return this.statuses.nameOf(owner);
+  }
+
+  public defaultKeysOf(name: string): readonly KeyChord[] {
+    const command = this.find(name);
+    return [...this.shell.keys(this.bridge.platform).filter(t => t[1] === command.name).map(t => t[0]), ...Object.isNull(command.defaultKey) ? [] : [command.defaultKey]];
+  }
+
   public keyLabel(name: string): string | null {
     return this.shortcuts().keyOf(this.find(name).name)?.label(this.bridge.platform) ?? null;
+  }
+
+  public isHeldByDialog(name: string): boolean {
+    return this.dialogs.isOpen && !Resources.modalCommands.includes(name) && !this.viewDialogs.ownsCommand(name);
   }
 
   public dispatch(event: KeyboardEvent): boolean {
@@ -82,7 +110,7 @@ export class CommandService {
       return false;
     const name = this.shortcuts().find(event);
     const command = this.commands().find(t => t.name === name);
-    if (Object.isUndefined(command) || !this.canRun(command, null))
+    if (Object.isUndefined(command) || this.isHeldByDialog(command.name) || !this.canRun(command, null))
       return false;
 
     event.preventDefault();
@@ -91,7 +119,11 @@ export class CommandService {
   }
 
   private canRun(command: CommandContribution, commandArguments: JsonValue): boolean {
-    return this.ask(() => command.isEnabled(commandArguments));
+    return !this.isHeldByReconnect(command.name) && this.ask(() => command.isEnabled(commandArguments));
+  }
+
+  private isHeldByReconnect(name: string): boolean {
+    return this.startup.isReconnecting() && !Resources.modalCommands.includes(name);
   }
 
   private ask(question: () => boolean): boolean {

@@ -13,10 +13,11 @@ import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { QualifiedName } from "@noldova/teamrun-shell-protocol";
 import {
-  CommandRegistry, DataDirectory, DiagnosticRedactor, EventRegistry, type IRuntimePart, MethodRegistry, Migration, ModuleDatabase, ModuleDatabaseException, ModuleDeclaration, ModuleHost,
-  NotificationCenter, WorkTracker
+  CommandRegistry, DataDirectory, DiagnosticRedactor, EventRegistry, type IRuntimePart, type IRuntimePartContext, MethodRegistry, Migration, ModuleDatabase, ModuleDatabaseException,
+  ModuleDeclaration, ModuleHost, NotificationCenter, type OwnedProcess, WorkTracker
 } from "@noldova/teamrun-shell-runtime";
 
+import { ProgramFixture } from "../../fixtures/program.fixture.js";
 import { RuntimePartFixture } from "../../fixtures/runtime-part.fixture.js";
 import { RuntimePartLoaderFixture } from "../../fixtures/runtime-part-loader.fixture.js";
 import { SettingsFixture } from "../../fixtures/settings.fixture.js";
@@ -44,14 +45,15 @@ export class ModuleHostTests {
     ], parts);
 
     const before = host.report.modules.length;
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
 
     Assert.areEqual(0, before);
     Assert.areEqual("activate tasks,activate notes", log.join(","));
     Assert.areEqual<unknown>(store, found);
+    Assert.areEqual("tasks Active,theme Active,notes Active", ModuleHostTests.describe(host));
     Assert.areEqual(
-      "{\"modules\":[{\"id\":\"tasks\",\"state\":\"Active\"},{\"id\":\"theme\",\"state\":\"Active\"},{\"id\":\"notes\",\"state\":\"Active\"}]}",
-      JSON.stringify(host.report.toJson()));
+      "{\"id\":\"notes\",\"version\":\"0.0.1\",\"displayName\":\"notes\",\"description\":\"notes\",\"dependencies\":[\"tasks\",\"theme\"],\"contributes\":{\"methods\":[\"notes.run\"]},\"state\":\"Active\"}",
+      JSON.stringify(host.report.modules[2]?.toJson()));
   }
 
   @TestMethod
@@ -76,24 +78,57 @@ export class ModuleHostTests {
       ModuleHostTests.declare("second", ["first"], null)
     ], parts, methods, diagnostics);
 
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
     await host.deactivateAsync();
     const written = diagnostics.text;
 
     Assert.areEqual(
       [
-        "{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its runtime part could not be loaded.\"}",
-        "{\"id\":\"failing\",\"state\":\"Failed\",\"cause\":\"Its runtime part failed to activate.\"}",
-        "{\"id\":\"orphan\",\"state\":\"Blocked\",\"cause\":\"It depends on missing, which is not active.\"}",
-        "{\"id\":\"notes\",\"state\":\"Blocked\",\"cause\":\"It depends on broken, which is not active.\"}",
-        "{\"id\":\"first\",\"state\":\"Blocked\",\"cause\":\"It depends on second, which is not active.\"}",
-        "{\"id\":\"second\",\"state\":\"Blocked\",\"cause\":\"It depends on first, which is not active.\"}"
+        "broken Failed Its runtime part could not be loaded.",
+        "failing Failed Its runtime part failed to activate.",
+        "orphan Blocked It depends on missing, which is not active. missing",
+        "notes Blocked It depends on broken, which is not active. broken",
+        "first Blocked It depends on second, which is not active. second",
+        "second Blocked It depends on first, which is not active. first"
       ].join(","),
-      host.report.modules.map(t => JSON.stringify(t.toJson())).join(","));
+      ModuleHostTests.describe(host));
     Assert.isUndefined(methods.find(new QualifiedName("failing", "run")));
     Assert.areEqual("activate failing", log.join(","));
-    Assert.isTrue(written.startsWith("The module broken: Its runtime part could not be loaded.\nError: Cannot find module /home/person/secret/broken.js\n"), written);
-    Assert.isTrue(written.includes("The module failing: Its runtime part failed to activate.\nError: at /home/person/secret/failing.js:3\n"), written);
+    Assert.isTrue(written.startsWith("The module broken 0.0.1: Its runtime part could not be loaded.\nError: Cannot find module /home/person/secret/broken.js\n"), written);
+    Assert.isTrue(written.includes("The module failing 0.0.1: Its runtime part failed to activate.\nError: at /home/person/secret/failing.js:3\n"), written);
+  }
+
+  @TestMethod
+  public async endsTheProgramsOfAPartThatFailsToActivateOrDeactivates(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const log: string[] = [];
+    const started: Promise<OwnedProcess>[] = [];
+    const start = (context: IRuntimePartContext): void => {
+      started.push(context.startProcessAsync(ProgramFixture.request(folder.path, [ProgramFixture.WAIT])));
+    };
+    const parts = new Map<string, IRuntimePart>([
+      ["failing-runtime", new RuntimePartFixture("failing", log, t => {
+        start(t);
+        throw new Error("The failing part gave up.");
+      })],
+      ["notes-runtime", new RuntimePartFixture("notes", log, start)]
+    ]);
+    const host = ModuleHostTests.create([
+      ModuleHostTests.declare("failing", [], "failing-runtime"),
+      ModuleHostTests.declare("notes", [], "notes-runtime")
+    ], parts);
+
+    await host.activateAsync(settings.service, settings.processes);
+    const [failed, notes] = await Promise.all(started) as [OwnedProcess, OwnedProcess];
+    const runningAfterActivation = settings.processes.programs.map(t => t.moduleId).join(",");
+    const failedEnded = failed.hasExited;
+    await host.deactivateAsync();
+
+    Assert.areEqual("notes", runningAfterActivation);
+    Assert.isTrue(failedEnded);
+    Assert.isTrue(notes.hasExited);
+    Assert.areEqual(0, settings.processes.programs.length);
   }
 
   @TestMethod
@@ -111,7 +146,7 @@ export class ModuleHostTests {
       ModuleHostTests.declare("tasks", [], "tasks-runtime", ["tasks.list"]),
       ModuleHostTests.declare("notes", ["tasks"], "notes-runtime", ["notes.list"])
     ], parts, methods, diagnostics);
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
 
     const exception = await Assert.throwsAsync(() => host.deactivateAsync(), AggregateError);
     await host.deactivateAsync();
@@ -121,7 +156,7 @@ export class ModuleHostTests {
     Assert.areEqual<unknown>(failure, exception.errors[0]);
     Assert.isUndefined(methods.find(new QualifiedName("notes", "list")));
     Assert.isUndefined(methods.find(new QualifiedName("tasks", "list")));
-    Assert.isTrue(diagnostics.text.startsWith("The module notes: Its runtime part failed to deactivate.\nError: The notes cannot be saved.\n"));
+    Assert.isTrue(diagnostics.text.startsWith("The module notes 0.0.1: Its runtime part failed to deactivate.\nError: The notes cannot be saved.\n"));
   }
 
   @TestMethod
@@ -137,7 +172,7 @@ export class ModuleHostTests {
       ModuleHostTests.declare("tasks", [], "tasks-runtime")
     ], new Map<string, IRuntimePart>([["notes-runtime", notes], ["tasks-runtime", tasks]]), new MethodRegistry(), new TextOutputFixture(), folder.path);
 
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
     const database = notes.context?.database;
     const missing = Assert.throws(() => tasks.context?.database, ModuleDatabaseException);
     await host.deactivateAsync();
@@ -170,13 +205,13 @@ export class ModuleHostTests {
       ModuleHostTests.declare("newer", [], "newer-runtime")
     ], parts, new MethodRegistry(), diagnostics, folder.path);
 
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
 
     Assert.areEqual("", log.join(","));
     Assert.areEqual(
-      "{\"modules\":[{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its database could not be opened or migrated.\"}," +
-      "{\"id\":\"newer\",\"state\":\"Failed\",\"cause\":\"Its database was written by a newer build or is not one this build recognizes.\"}]}",
-      JSON.stringify(host.report.toJson()));
+      "broken Failed Its database could not be opened or migrated.," +
+      "newer Failed Its database was written by a newer build or is not one this build recognizes.",
+      ModuleHostTests.describe(host));
     Assert.isTrue(diagnostics.text.includes("The migration create-broken of the database of the module broken failed and was rolled back."));
     using kept = await ModuleDatabase.openAsync(directory, "newer", [
       new Migration("create-items", ["CREATE TABLE items (name TEXT) STRICT"]),
@@ -197,7 +232,7 @@ export class ModuleHostTests {
     const host = ModuleHostTests.create([ModuleHostTests.declare("notes", [], "notes-runtime")], new Map<string, IRuntimePart>([["notes-runtime", part]]),
       new MethodRegistry(), new TextOutputFixture(), folder.path);
 
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
     const database = part.context?.database;
 
     Assert.areEqual("Failed", host.report.modules[0]?.state);
@@ -225,7 +260,7 @@ export class ModuleHostTests {
       [ModuleHostTests.declare("notes", [], "notes-runtime"), ModuleHostTests.declare("failing", [], "failing-runtime")],
       parts, new MethodRegistry(), diagnostics, path.resolve("teamrun-data"), work);
 
-    await host.activateAsync(settings.service);
+    await host.activateAsync(settings.service, settings.processes);
     const active = work.descriptions.join(",");
     const failedAborted = signals[1]?.aborted === true;
     await host.deactivateAsync();
@@ -238,8 +273,12 @@ export class ModuleHostTests {
     Assert.isTrue(diagnostics.text.startsWith(`notes: Opened ${path.join("~", "notes")}\n`), diagnostics.text);
   }
 
+  private static describe(host: ModuleHost): string {
+    return host.report.modules.map(t => [t.id, t.state, t.cause, t.blockedBy].filter(u => !Object.isNull(u)).join(" ")).join(",");
+  }
+
   private static declare(id: string, dependencies: readonly string[], runtimePackage: string | null, methods: readonly string[] = []): ModuleDeclaration {
-    return new ModuleDeclaration(id, id, dependencies, runtimePackage, new Map([["methods", [...methods, `${id}.run`]]]));
+    return new ModuleDeclaration(id, "0.0.1", id, id, dependencies, runtimePackage, new Map([["methods", [...methods, `${id}.run`]]]));
   }
 
   private static create(

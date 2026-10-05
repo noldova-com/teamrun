@@ -16,11 +16,12 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import {
   BuildIdentity, CommandList, CommandRun, Event, FailureCode, ModuleStatusList, NotificationBroadcast, NotificationPost, NotificationReference, NotificationSeverity,
-  NotificationState, NotificationUpdate, NotificationsQuery, QualifiedName, Request, Response, SettingKey, SettingValue, SettingsQuery, SettingsSnapshot, ShellMethods, StopPolicy, StopRequest,
+  NotificationState, NotificationUpdate, NotificationsQuery, QualifiedName, RecentCommandUse, RecentCommands, RecentCommandsQuery, Request, Response, SettingKey, SettingValue, SettingsQuery, SettingsSnapshot, ShellMethods, StopPolicy, StopRequest,
   WindowStateKey, WindowStateWrite, WireDecoder
 } from "@noldova/teamrun-shell-protocol";
 import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
 
+import { ProgramFixture } from "../../fixtures/program.fixture.js";
 import type { RawConnectionFixture } from "../../fixtures/raw-connection.fixture.js";
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 
@@ -179,12 +180,14 @@ export class RuntimeHostTests {
       await mkdir(root, { recursive: true });
       await writeFile(path.join(root, "teamrun.db"), "old data");
       const host = await fixture.startAsync();
+      const programs = host.programs.length;
 
       const [refused, answer] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
       refused.sendMessages(new Request("desktop:1", ShellMethods.stop, new StopRequest(StopPolicy.StopWork).toJson()));
       const stopped = await refused.readResponseAsync();
       const reason = await host.waitForStopAsync();
 
+      Assert.areEqual(0, programs);
       Assert.areEqual(FailureCode.PreShellData, answer.failure?.code);
       Assert.isFalse(stopped.hasFailed);
       Assert.areEqual("request", reason);
@@ -241,6 +244,53 @@ export class RuntimeHostTests {
       reader.sendMessages(new Request("desktop:2", ShellMethods.readWindowBounds, key.toJson()));
 
       Assert.areEqual("{\"value\":{\"width\":900,\"height\":600}}", JSON.stringify((await reader.readResponseAsync()).payload));
+    });
+  }
+
+  @TestMethod
+  public keepsEachDevicesTwentyNewestCommandsNewestFirstAndPublishesEachUse(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      await fixture.startAsync();
+      const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      const uses = [...Array.from({ length: 22 }, (_, index) => `c${index}`), "c5"];
+
+      connection.sendMessages(
+        new Request("desktop:0", ShellMethods.recentCommands, new RecentCommandsQuery("d1").toJson()),
+        ...uses.map((t, index) => new Request(`desktop:${index + 1}`, ShellMethods.recordCommand, new RecentCommandUse("d1", t).toJson())),
+        new Request("desktop:24", ShellMethods.recordCommand, new RecentCommandUse("d2", "c0").toJson()),
+        new Request("desktop:25", ShellMethods.recentCommands, new RecentCommandsQuery("d1").toJson()),
+        new Request("desktop:26", ShellMethods.recentCommands, new RecentCommandsQuery("d2").toJson()),
+        new Request("desktop:27", ShellMethods.recordCommand, { device: "d1" }));
+      const [responses, events] = await RuntimeHostTests.readMessagesAsync(connection, 28 + 24);
+      const expected = ["c5", "c21", "c20", "c19", "c18", "c17", "c16", "c15", "c14", "c13", "c12", "c11", "c10", "c9", "c8", "c7", "c6", "c4", "c3", "c2"];
+
+      Assert.areEqual(JSON.stringify({ ids: [] }), JSON.stringify(responses.get("desktop:0")?.payload));
+      Assert.areEqual(JSON.stringify({ ids: expected }), JSON.stringify(responses.get("desktop:25")?.payload));
+      Assert.areEqual(JSON.stringify({ ids: ["c0"] }), JSON.stringify(responses.get("desktop:26")?.payload));
+      Assert.areEqual("InvalidParams", responses.get("desktop:27")?.failure?.code);
+      Assert.areEqual(24, events.filter(t => t.name.text === "shell.recentCommandsChanged").length);
+      Assert.areEqual(JSON.stringify({ ids: ["c0"], device: "d2" }), JSON.stringify(events.at(-1)?.payload));
+      Assert.areEqual(JSON.stringify({ ids: expected, device: "d1" }), JSON.stringify(events.at(-2)?.payload));
+    });
+  }
+
+  @TestMethod
+  public keepsRecentCommandsAcrossRuntimes(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const first = await fixture.startAsync();
+      const [writer] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      writer.sendMessages(
+        new Request("desktop:1", ShellMethods.recordCommand, new RecentCommandUse("d1", "notes.newNote").toJson()),
+        new Request("desktop:2", ShellMethods.recordCommand, new RecentCommandUse("d1", "shell.openSettings").toJson()));
+      await RuntimeHostTests.readMessagesAsync(writer, 4);
+      first.requestStop("test");
+      await first.waitForStopAsync();
+
+      await fixture.startAsync();
+      const [reader] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      reader.sendMessages(new Request("desktop:3", ShellMethods.recentCommands, new RecentCommandsQuery("d1").toJson()));
+
+      Assert.areEqual("shell.openSettings,notes.newNote", RecentCommands.fromJson((await reader.readResponseAsync()).payload).ids.join(","));
     });
   }
 
@@ -389,10 +439,48 @@ export class RuntimeHostTests {
 
       Assert.areEqual("{\"text\":\"hi\"}", JSON.stringify(responses[0]?.payload));
       Assert.areEqual(
-        "{\"modules\":[{\"id\":\"notes\",\"state\":\"Active\"},{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its runtime part could not be loaded.\"}]}",
-        JSON.stringify(ModuleStatusList.fromJson(responses[1]?.payload).toJson()));
+        "notes notes Active null,broken broken Failed Its runtime part could not be loaded.",
+        ModuleStatusList.fromJson(responses[1]?.payload).modules.map(t => `${t.id} ${t.description} ${t.state} ${t.cause}`).join(","));
       Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "deactivated")));
-      Assert.isTrue(/^\S+Z The module broken: Its runtime part could not be loaded\.\nError \[ERR_MODULE_NOT_FOUND\]/.test(await readFile(fixture.dataDirectory.runtimeLog, "utf8")));
+      Assert.isTrue(/^\S+Z The module broken 0\.0\.1: Its runtime part could not be loaded\.\nError \[ERR_MODULE_NOT_FOUND\]/.test(await readFile(fixture.dataDirectory.runtimeLog, "utf8")));
+    });
+  }
+
+  @TestMethod
+  public removesTheDiscoveryAnEarlierOwnerLeftBeforeItActivatesItsModulesAndListens(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      await mkdir(fixture.dataDirectory.discoveryFolder, { recursive: true });
+      await writeFile(fixture.dataDirectory.discoveryFile, "{\"token\":\"earlier-token\"}");
+      const probed = process.platform === "win32"
+        ? [fixture.dataDirectory.discoveryFile]
+        : [fixture.dataDirectory.discoveryFile, path.join(fixture.dataDirectory.discoveryFolder, "runtime.sock")];
+
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["notes", RuntimeHostTests.createDiscoveryProbePart(probed)]]));
+      const discovery = await fixture.readDiscoveryAsync();
+      host.requestStop("test");
+      await host.waitForStopAsync();
+
+      Assert.areEqual(probed.map(() => "absent").join(","), await readFile(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "probe"), "utf8"));
+      Assert.areNotEqual("earlier-token", discovery.token);
+      if (process.platform !== "win32")
+        Assert.areEqual(probed[1], discovery.endpoint);
+    });
+  }
+
+  @TestMethod
+  public listsTheProgramsItsModulesRunAndEndsThemWhenItStops(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["clock", RuntimeHostTests.createProgramPart()]]));
+
+      const programs = host.programs.map(t => `${t.moduleId} ${t.program}`);
+      const processId = host.programs[0]?.processId ?? 0;
+      host.requestStop("test");
+      await host.waitForStopAsync();
+
+      Assert.areEqual(`clock ${process.execPath}`, programs.join(","));
+      Assert.isTrue(processId > 0);
+      Assert.isFalse(ProgramFixture.isRunning(processId));
+      Assert.areEqual(0, host.programs.length);
     });
   }
 
@@ -615,7 +703,7 @@ export class RuntimeHostTests {
       Assert.isTrue(["desktop:1", "desktop:2", "desktop:4"].every(t => responses.get(t)?.hasFailed === false));
       Assert.areEqual("{\"name\":\"shell.mode\",\"value\":\"Dark\",\"isSet\":true}", entry("shell.mode"));
       Assert.areEqual("{\"name\":\"shell.doNotDisturb\",\"value\":true,\"isSet\":true}", entry("shell.doNotDisturb"));
-      Assert.areEqual("shell.theme,shell.mode,shell.interfaceFont,shell.codeFont,shell.panelSize,shell.messageSize,shell.codeSize,shell.leftDockStyle,shell.rightDockStyle,shell.menuBar,shell.previewTabs,shell.doNotDisturb,shell.mutedModules",
+      Assert.areEqual("shell.theme,shell.mode,shell.interfaceFont,shell.codeFont,shell.panelSize,shell.messageSize,shell.codeSize,shell.leftDockStyle,shell.rightDockStyle,shell.menuBar,shell.previewTabs,shell.recentCommandCount,shell.doNotDisturb,shell.mutedModules,shell.keyBindings",
         snapshot.definitions.map(t => t.name.text).join(","));
       Assert.areEqual("InvalidParams,NotFound,InvalidParams", ["desktop:5", "desktop:6", "desktop:7"].map(t => responses.get(t)?.failure?.code).join(","));
       Assert.areEqual(JSON.stringify([
@@ -716,6 +804,42 @@ export class RuntimeHostTests {
       "      });",
       "      return null;",
       "    } }));",
+      "  }",
+      "",
+      "  async deactivateAsync() {",
+      "  }",
+      "}",
+      ""
+    ].join("\n");
+  }
+
+  private static createProgramPart(): string {
+    const api = pathToFileURL(path.join(path.dirname(RuntimeEntry.entryPath), "..", "api", "index.js")).href;
+    return [
+      `import { ProcessRequest } from ${JSON.stringify(api)};`,
+      "",
+      "export class RuntimePart {",
+      "  async activateAsync(context) {",
+      `    await context.startProcessAsync(new ProcessRequest(${JSON.stringify(process.execPath)}, [${JSON.stringify(ProgramFixture.file)}, "wait"], ${JSON.stringify(path.dirname(ProgramFixture.file))}));`,
+      "  }",
+      "",
+      "  async deactivateAsync() {",
+      "  }",
+      "}",
+      ""
+    ].join("\n");
+  }
+
+  private static createDiscoveryProbePart(files: readonly string[]): string {
+    return [
+      "import { existsSync } from \"node:fs\";",
+      "import { mkdir, writeFile } from \"node:fs/promises\";",
+      "import path from \"node:path\";",
+      "",
+      "export class RuntimePart {",
+      "  async activateAsync(context) {",
+      "    await mkdir(context.moduleFolder, { recursive: true });",
+      `    await writeFile(path.join(context.moduleFolder, "probe"), ${JSON.stringify(files)}.map(t => existsSync(t) ? "present" : "absent").join(","));`,
       "  }",
       "",
       "  async deactivateAsync() {",

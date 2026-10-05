@@ -22,8 +22,8 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 
 class UiWorkflowsTests {
   private static readonly BUILD_ARGUMENTS: readonly (readonly string[])[] = [
-    ["--test", "--without", "notes", "--without", "clock", "--output", "_build/variants/no-modules"],
-    ["--test", "--without", "clock", "--output", "_build/variants/without-clock"],
+    ["--test", "--without", "notes", "--without", "alarm", "--without", "clock", "--without", "reminder", "--output", "_build/variants/no-modules"],
+    ["--test", "--without", "alarm", "--without", "clock", "--output", "_build/variants/without-clock"],
     ["--test"]
   ];
 
@@ -57,13 +57,33 @@ class UiWorkflowsTests {
       assert.equal(output.text, "The builds of the UI workflows are current.\nprepared\n");
     });
 
+    test("--require-current runs current builds without passing the option on, and fails without building or running when they are not current", async t => {
+      const repository = await UiWorkflowsTests.createRepositoryAsync(t);
+      const stale = new ProcessRunnerFixture();
+      const staleOutput = new TextOutputFixture();
+
+      const staleExitCode = await new UiWorkflows(repository.directory, stale, staleOutput, new PreparedBinaryFixture()).runAsync(["--require-current", "--shard", "1/2"]);
+      await new UiWorkflows(repository.directory, new ProcessRunnerFixture(), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
+      const current = new ProcessRunnerFixture();
+      const currentOutput = new TextOutputFixture();
+      const currentExitCode = await new UiWorkflows(repository.directory, current, currentOutput, new PreparedBinaryFixture()).runAsync(["--require-current", "--shard", "1/2"]);
+
+      assert.deepEqual([staleExitCode, stale.runs.length], [1, 0]);
+      assert.equal(staleOutput.text, "The builds of the UI workflows are not current, and --require-current forbids building them here, so nothing ran.\n");
+      assert.equal(currentExitCode, 0);
+      assert.equal(UiWorkflowsTests.describeRuns(current, repository.directory).at(-1),
+        "node_modules/playwright/cli.js test --config src/shell/desktop/tests/e2e/playwright.config.ts --shard 1/2");
+      assert.equal(currentOutput.text, "The builds of the UI workflows are current.\nprepared\n");
+    });
+
     test("a changed source file or a missing or changed output rebuilds all three", async t => {
       const repository = await UiWorkflowsTests.createRepositoryAsync(t);
       await new UiWorkflows(repository.directory, new ProcessRunnerFixture(), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
       const changes: readonly [string, () => Promise<void>][] = [
         ["a source file", () => repository.writeAsync({ "src/shell/source.ts": "export const changed = 2;\n" })],
         ["a missing variant", () => rm(path.join(repository.directory, "_build", "variants", "without-clock"), { recursive: true })],
-        ["a changed declaration", () => repository.writeAsync({ "_build/modules/declarations.json": "{\"modules\":[]}\n" })]
+        ["a changed declaration", () => repository.writeAsync({ "_build/modules/declarations.json": "{\"modules\":[]}\n" })],
+        ["a changed product file", () => repository.writeAsync({ "_build/product.json": "{\"build\":\"2\"}\n" })]
       ];
 
       for (const [reason, change] of changes) {
@@ -149,6 +169,7 @@ class UiWorkflowsTests {
   private static writeOutputsAsync(repository: RepositoryFixture): Promise<void> {
     return repository.writeAsync({
       "_build/modules/declarations.json": "{\"modules\":[1]}\n",
+      "_build/product.json": "{\"build\":\"1\"}\n",
       "_build/window/index.html": "<html></html>\n",
       "_build/variants/no-modules/window/index.html": "<html>none</html>\n",
       "_build/variants/without-clock/window/index.html": "<html>no clock</html>\n"

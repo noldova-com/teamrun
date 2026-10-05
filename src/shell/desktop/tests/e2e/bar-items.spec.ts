@@ -38,14 +38,22 @@ test.describe("the status bar and the top bar", () => {
       const style = (selector: string): CSSStyleDeclaration => getComputedStyle(document.querySelector(selector) as Element);
       const pill = style("tr-status-bar-item[data-tr-item=\"clock.ticks\"] .tr-status-bar-item");
       const row = document.querySelector("tr-window-row") as Element;
+      const lookHeight = (name: string): string => {
+        const probe = document.createElement("div");
+        probe.style.height = `var(--tr-${name})`;
+        document.body.append(probe);
+        const height = getComputedStyle(probe).height;
+        probe.remove();
+        return height;
+      };
       const action = document.querySelector("button[data-tr-item=\"notes.compose\"]") as Element;
       return {
         pill: { height: style("tr-status-bar-item[data-tr-item=\"clock.ticks\"]").height, padding: [pill.paddingLeft, pill.paddingRight], radius: pill.borderTopLeftRadius },
-        row: { height: getComputedStyle(row).height, region: getComputedStyle(action).getPropertyValue("app-region") },
+        row: { height: getComputedStyle(row).height, look: lookHeight("window-row-height"), region: getComputedStyle(action).getPropertyValue("app-region") },
         isInRow: action.getBoundingClientRect().top >= row.getBoundingClientRect().top && action.getBoundingClientRect().bottom <= row.getBoundingClientRect().bottom
       };
     });
-    expect(look).toEqual({ pill: { height: "20px", padding: ["6px", "6px"], radius: "3px" }, row: { height: "35px", region: "no-drag" }, isInRow: true });
+    expect(look).toEqual({ pill: { height: "20px", padding: ["6px", "6px"], radius: "3px" }, row: { height: look.row.look, look: look.row.look, region: "no-drag" }, isInRow: true });
     await desktop.checkpointAsync("bar-items");
   });
 
@@ -62,5 +70,31 @@ test.describe("the status bar and the top bar", () => {
     await expect(window.locator("tr-status-bar-item[data-tr-item=\"clock.ticks\"]")).toHaveCount(0);
     await expect(window.locator("tr-status-bar-item[data-tr-item=\"notes.count\"]")).toHaveText("2 notes");
     expect(await window.locator(".tr-status-bar-right > *").evaluateAll(t => t.map(u => u.tagName.toLowerCase()))).toEqual(["tr-notifications", "tr-module-failures"]);
+  });
+});
+
+test.describe("a status bar item cut short", () => {
+  test.use({ desktopDataFiles: { "modules/notes/long-count": "" } });
+
+  test("shows its full text in a tooltip on hover and keyboard focus, and is named by it", async ({ desktop }) => {
+    const window = desktop.window;
+    const text = "2 notes, neither pinned nor archived, both last changed today by the person who wrote them, and both waiting for review";
+    const item = window.locator("tr-status-bar-item[data-tr-item=\"notes.count\"]").getByRole("button");
+    const tooltip = window.locator(".cdk-overlay-container tr-tooltip");
+    await desktop.useViewportAsync(640, 480);
+    await expect(item).toHaveAccessibleName(text);
+    expect(await item.locator(".tr-status-bar-item-text").evaluate(t => t.scrollWidth > t.clientWidth)).toBe(true);
+
+    await item.hover();
+    await expect(tooltip).toHaveText(text);
+    await window.mouse.move(320, 200);
+    await expect(tooltip).toHaveCount(0);
+    await item.focus();
+    await window.keyboard.press("Tab");
+    await window.keyboard.press("Shift+Tab");
+
+    await expect(item).toBeFocused();
+    await expect(tooltip).toHaveText(text);
+    await desktop.checkpointAsync("status-bar-item-cut-short");
   });
 });

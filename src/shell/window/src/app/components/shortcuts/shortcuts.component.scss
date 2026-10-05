@@ -1,0 +1,108 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+}
+
+.tr-shortcuts-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--tr-space-2) var(--tr-space-4);
+  margin-bottom: var(--tr-space-3);
+  padding-inline-start: var(--tr-settings-heading-inset);
+}
+
+.tr-shortcuts-explanation {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--tr-text);
+}
+
+.tr-shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.tr-shortcuts-table th:nth-child(2) {
+  width: 12%;
+}
+
+.tr-shortcuts-table th:nth-child(3) {
+  width: 26%;
+}
+
+.tr-shortcuts-table th:nth-child(4) {
+  width: 18%;
+}
+
+.tr-shortcuts-table :is(th, td) {
+  padding: var(--tr-space-2);
+  border-bottom: var(--tr-border-width) solid var(--tr-card-border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.tr-shortcuts-table th {
+  font-weight: 600;
+}
+
+.tr-shortcut-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tr-space-2);
+  min-height: var(--tr-button-height);
+}
+
+.tr-shortcut-marker {
+  flex: none;
+  color: var(--tr-accent);
+  font-size: var(--tr-setting-marker);
+  font-variation-settings: "FILL" 1;
+}
+
+.tr-shortcut-owner {
+  color: var(--tr-text-muted);
+  line-height: var(--tr-button-height);
+}
+
+.tr-shortcut-key-recording {
+  border-color: var(--tr-accent);
+}
+
+.tr-shortcut-collision,
+.tr-shortcut-notice {
+  display: block;
+  margin-top: var(--tr-space-1);
+  font-size: var(--tr-text-label);
+  line-height: var(--tr-line-label);
+}
+
+.tr-shortcut-collision {
+  color: var(--tr-text-muted);
+}
+
+.tr-shortcut-notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-1);
+}
+
+.tr-shortcut-notice-actions,
+.tr-shortcut-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tr-space-2);
+}
+
+.tr-shortcut-actions {
+  justify-content: flex-end;
+}

@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
@@ -13,20 +14,23 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { CommandSearchComponent } from "../../../../src/app/components/command-search/command-search.component";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { MenuDeclarations } from "../../../../src/app/models/menu-declarations";
-import { WindowPartSource } from "../../../../src/app/models/window-part-source";
 import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { CommandSearchService } from "../../../../src/app/services/command-search.service";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { MenuBarService } from "../../../../src/app/services/menu-bar.service";
 import { MenuService } from "../../../../src/app/services/menu.service";
+import { RecentCommandsService } from "../../../../src/app/services/recent-commands.service";
+import { WindowPartHostService } from "../../../../src/app/services/window-part-host.service";
 import { Resources } from "../../../../src/resources";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
+import { ModuleStatusFixture } from "../../../fixtures/module-status.fixture";
 
 describe("CommandSearchComponent", () => {
   let fixture: ComponentFixture<CommandSearchComponent>;
   let commands: CommandService;
   let search: CommandSearchService;
   let menuBar: MenuBarService;
+  let bridge: DesktopBridgeFixture;
   let runs: string[];
   let received: JsonValue[];
 
@@ -40,10 +44,10 @@ describe("CommandSearchComponent", () => {
   beforeEach(async () => {
     runs = [];
     received = [];
-    DesktopBridgeFixture.install("win32");
+    bridge = DesktopBridgeFixture.install("win32");
     TestBed.configureTestingModule({
       providers: [
-        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], ["notes.newNote"], [], [], [], () => Promise.reject(new Error("Not loaded.")))] },
+        { provide: WindowPartHostService, useValue: { generation: signal(1) } },
         {
           provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
             places: [{ name: "notes.templates", title: "New from template", menuBar: false }],
@@ -57,6 +61,7 @@ describe("CommandSearchComponent", () => {
         }
       ]
     });
+    ModuleStatusFixture.report(ModuleStatusFixture.create("notes", "Notes"));
     commands = TestBed.inject(CommandService);
     search = TestBed.inject(CommandSearchService);
     menuBar = TestBed.inject(MenuBarService);
@@ -79,6 +84,23 @@ describe("CommandSearchComponent", () => {
     return [...root().querySelectorAll<HTMLElement>("[role=option]")].map(t => t.dataset["item"] ?? "");
   }
 
+  async function showAsync(limit: number, recent: readonly string[]): Promise<void> {
+    await vi.waitFor(() => expect(bridge.requests.map(t => t[0])).toContain("shell.recentCommands"));
+    await fixture.whenStable();
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.recentCommandCount", value: limit, isSet: true });
+    bridge.publishEvent("shell.recentCommandsChanged", { ids: recent });
+    fixture.detectChanges();
+    await fixture.whenStable();
+  }
+
+  function sections(): (string | null)[] {
+    return [...root().querySelectorAll("[role=option]")].map(t => t.querySelector(".tr-quick-input-section")?.textContent?.trim() ?? null);
+  }
+
+  function separatedIds(): string[] {
+    return [...root().querySelectorAll<HTMLElement>(".tr-quick-input-separator + [role=option]")].map(t => t.dataset["item"] ?? "");
+  }
+
   async function typeAsync(text: string): Promise<void> {
     const field = root().querySelector<HTMLInputElement>(".tr-quick-input-field");
     if (field === null)
@@ -89,26 +111,56 @@ describe("CommandSearchComponent", () => {
     await fixture.whenStable();
   }
 
-  it("lists every enabled command and menu row alphabetically by title, with the ones run this session first, and leaves out a disabled one", async () => {
-    const entries = [...commands.commands().filter(t => t.isEnabled(null)).map(t => [t.name, t.title]), ...menuBar.searchRows().map(t => [t.id, t.title])];
-    expect(ids()).toEqual(entries.sort((a, b) => String(a[1]).localeCompare(String(b[1]))).map(t => t[0]));
+  it("lists every enabled command and menu row once, by title, without sections while nothing was run, and leaves out a disabled one", () => {
+    const rows = [...root().querySelectorAll("[role=option]")].map(t => [t.querySelector(".tr-quick-input-title")?.textContent?.trim(), t.querySelector(".tr-quick-input-detail")?.textContent?.trim()]);
+
+    expect(new Set(ids()).size).toBe(ids().length);
+    expect(rows).toEqual([...rows].sort((a, b) => String(a[0]).localeCompare(String(b[0])) || String(a[1]).localeCompare(String(b[1]))));
+    expect(rows.filter(t => t[1] === "weather")).toEqual([["Open the tools", "weather"], ["Photo", "weather"], ["Pluto", "weather"], ["Today's weather", "weather"]]);
     expect(ids()).not.toContain("notes.archive");
-
-    search.remember("weather.today");
-    search.remember("notes.newNote");
-    fixture.detectChanges();
-    await fixture.whenStable();
-
-    expect(ids().slice(0, 2)).toEqual(["notes.newNote", "weather.today"]);
+    expect([sections().filter(t => t !== null), separatedIds()]).toEqual([[], []]);
   });
 
-  it("filters by the query, ranking prefix matches, then word starts, then letters anywhere, and shorter titles first within each", async () => {
-    await typeAsync("to");
+  it("lists the recent commands first, newest first and within the limit, then a line and the others by title, labelling the first of each", async () => {
+    await showAsync(2, ["weather.pluto", "gone.command", "notes.archive", "notes.newNote", "weather.today"]);
 
-    expect(ids().filter(t => t.startsWith("weather."))).toEqual(["weather.today", "weather.tools", "weather.photo", "weather.pluto"]);
+    expect(ids().slice(0, 2)).toEqual(["weather.pluto", "notes.newNote"]);
+    expect(ids().filter(t => t === "weather.pluto" || t === "notes.newNote")).toHaveLength(2);
+    expect(sections().slice(0, 3)).toEqual([Resources.recentlyUsedSection, null, Resources.otherCommandsSection]);
+    expect(sections().slice(3).every(t => t === null)).toBe(true);
+    expect(separatedIds()).toEqual([ids()[2]]);
+    const others = [...root().querySelectorAll("[role=option]")].slice(2).map(t => t.querySelector(".tr-quick-input-title")?.textContent?.trim() ?? "");
+    expect(others).toEqual([...others].sort((a, b) => a.localeCompare(b)));
+    expect(root().querySelector("[role=option]")?.textContent).toContain(Resources.recentlyUsedSection);
+  });
+
+  it("follows the Recent commands setting, and shows no recent section at 0", async () => {
+    await showAsync(5, ["weather.pluto", "notes.newNote", "weather.today"]);
+    const five = ids().slice(0, 3);
+    await showAsync(1, ["weather.pluto", "notes.newNote", "weather.today"]);
+    const one = [ids()[0], sections().filter(t => t !== null)];
+    await showAsync(0, ["weather.pluto", "notes.newNote", "weather.today"]);
+
+    expect(five).toEqual(["weather.pluto", "notes.newNote", "weather.today"]);
+    expect(one).toEqual(["weather.pluto", [Resources.recentlyUsedSection, Resources.otherCommandsSection]]);
+    expect([sections().filter(t => t !== null), separatedIds()]).toEqual([[], []]);
+    expect(ids()[0]).not.toBe("weather.pluto");
+  });
+
+  it("keeps the rows whose title, or category followed by the title, contains the query as one run, recent ones first, without sections, and marks the run", async () => {
+    const marks = (id: string, part: string): readonly (string | null)[] => [...root().querySelectorAll(`[data-item="${id}"] .tr-quick-input-${part} mark`)].map(t => t.textContent);
+    await showAsync(5, ["weather.today", "weather.pluto"]);
+
+    await typeAsync("TO");
+    const to = [ids().filter(t => t.startsWith("weather.")), marks("weather.tools", "title"), root().querySelector("[data-item=\"weather.tools\"] .tr-quick-input-title")?.textContent];
+    const plain = [sections().filter(t => t !== null), separatedIds()];
+    await typeAsync("weather p");
+    const category = [ids(), marks("weather.photo", "detail"), marks("weather.photo", "title")];
     await typeAsync("nn");
-    expect(ids()).toEqual(["notes.newNote", menuBar.searchRows().find(u => u.title === "New note")?.id]);
-    await typeAsync("zzz");
+
+    expect(to).toEqual([["weather.today", "weather.pluto", "weather.tools", "weather.photo"], ["to"], "Open the tools"]);
+    expect(plain).toEqual([[], []]);
+    expect(category).toEqual([["weather.pluto", "weather.photo"], ["weather"], ["P"]]);
     expect(ids()).toEqual([]);
   });
 
@@ -120,7 +172,7 @@ describe("CommandSearchComponent", () => {
     expect([key("notes.newNote"), key("shell.showCommands"), key("shell.closeTab")]).toEqual(["Ctrl+Alt+N", "Ctrl+Shift+P", undefined]);
   });
 
-  it("runs the chosen command after closing the search, and remembers it", async () => {
+  it("runs the chosen command after closing the search, and records it", async () => {
     const close = vi.spyOn(search, "close");
     const row = vi.spyOn(menuBar, "run");
     await typeAsync("new note");
@@ -130,28 +182,29 @@ describe("CommandSearchComponent", () => {
     await vi.waitFor(() => expect(runs).toEqual(["notes.newNote"]));
     expect(row).not.toHaveBeenCalled();
     expect(close).toHaveBeenCalledOnce();
-    expect(search.recent()).toEqual(["notes.newNote"]);
+    expect(TestBed.inject(RecentCommandsService).ids()).toEqual(["notes.newNote"]);
+    expect(bridge.requests.filter(t => t[0] === "shell.recordCommand")).toEqual([["shell.recordCommand", { id: "notes.newNote" }]]);
   });
 
-  it("lists a menu row that passes arguments or shows its own label, with its menu as the detail and no key for arguments, but not one that runs a command alone", async () => {
+  it("lists a menu row that passes arguments, with its menu as the detail and no key, but not one that runs a command alone under any label", async () => {
     const detail = (id: string): string | null | undefined => root().querySelector(`[data-item="${id}"] .tr-quick-input-detail`)?.textContent;
     const key = (id: string): string | null | undefined => root().querySelector(`[data-item="${id}"] .tr-quick-input-key`)?.textContent;
     const rows = menuBar.searchRows();
     const template = rows.find(t => t.title === "New note")?.id ?? "";
-    const labelled = rows.find(t => t.title === "Quick note")?.id ?? "";
 
-    expect(rows.map(t => [t.title, t.menu])).toEqual(expect.arrayContaining([["New note", "File › New from template"], ["Forecast", "View"], ["Quick note", "View"]]));
-    expect(rows.map(t => t.title)).not.toContain("Archive the note");
+    expect(rows.map(t => [t.title, t.menu])).toEqual([["New note", "File › New from template"]]);
     expect(ids().filter(t => t.startsWith("shell.file/"))).toEqual([template]);
-    expect([detail(template), key(template), detail(labelled), key(labelled)]).toEqual(["File › New from template", undefined, "View", "Ctrl+Alt+N"]);
+    expect([detail(template), key(template)]).toEqual(["File › New from template", undefined]);
 
     await typeAsync("new note");
-    expect(ids()).toEqual(["notes.newNote", template]);
+    expect(ids()).toEqual([template, "notes.newNote"]);
     await typeAsync("forecast");
-    expect(ids()).toHaveLength(1);
+    expect(ids()).toEqual([]);
+    await typeAsync("quick note");
+    expect(ids()).toEqual([]);
   });
 
-  it("runs a chosen menu row with its arguments after closing the search, and remembers it", async () => {
+  it("runs a chosen menu row with its arguments after closing the search, and records it", async () => {
     const close = vi.spyOn(search, "close");
     const template = menuBar.searchRows().find(t => t.title === "New note")?.id ?? "";
     await typeAsync("new note");
@@ -161,7 +214,7 @@ describe("CommandSearchComponent", () => {
     await vi.waitFor(() => expect(received).toEqual([{ template: "plan" }]));
     expect(runs).toEqual(["notes.newNote"]);
     expect(close).toHaveBeenCalledOnce();
-    expect(search.recent()).toEqual([template]);
+    expect(TestBed.inject(RecentCommandsService).ids()).toEqual([template]);
   });
 
   it("closes the search when it is dismissed", () => {

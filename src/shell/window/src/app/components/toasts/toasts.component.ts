@@ -12,8 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import { type CommandRun, type Notification, NotificationPost, type NotificationSeverity } from "@noldova/teamrun-shell-protocol";
 import { ButtonComponent, ButtonVariant, IconButtonComponent, ProgressComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
-import type { WindowPartSource } from "../../models/window-part-source";
-import { WindowPartTokens } from "../../models/window-part-tokens";
+import { ModuleStatusService } from "../../services/module-status.service";
 import { NotificationService } from "../../services/notification.service";
 import { ToastService } from "../../services/toast.service";
 import { Resources } from "../../../resources";
@@ -29,14 +28,12 @@ export class ToastsComponent {
   private readonly notifications: NotificationService = inject(NotificationService);
   private readonly service: ToastService = inject(ToastService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
-  private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
+  private readonly statuses: ModuleStatusService = inject(ModuleStatusService);
   private readonly time: Intl.DateTimeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
   protected readonly toasts: Signal<readonly Notification[]> = this.service.toasts;
-  protected readonly polite: Signal<string> = this.service.politeAnnouncement;
-  protected readonly assertive: Signal<string> = this.service.assertiveAnnouncement;
 
   protected glyph(severity: NotificationSeverity): string {
     return Resources.severityGlyphs[severity];
@@ -47,8 +44,7 @@ export class ToastsComponent {
   }
 
   protected moduleName(notification: Notification): string {
-    const owner = notification.post.kind.owner;
-    return this.sources.find(t => t.moduleId === owner)?.displayName ?? owner;
+    return this.statuses.nameOf(notification.post.kind.owner);
   }
 
   protected timeOf(notification: Notification): string {

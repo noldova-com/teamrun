@@ -6,12 +6,9 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-@if (failures().length > 0) {
-  <button type="button" class="tr-module-failures-item" [trPopoverTrigger]="popover">
+@if (failures()[0]; as first) {
+  <button type="button" class="tr-module-failures-item" (click)="open(first.moduleId)">
     <span class="material-symbols-rounded tr-module-failures-icon" aria-hidden="true">{{ resources.moduleFailureGlyph }}</span>
     <span>{{ resources.formatModulesDidNotStart(failures().length) }}</span>
   </button>
-  <ng-template #popover>
-    <tr-module-failures-popover [label]="resources.moduleFailuresTitle" [failures]="failures()" />
-  </ng-template>
 }

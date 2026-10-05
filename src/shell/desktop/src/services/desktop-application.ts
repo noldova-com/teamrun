@@ -13,10 +13,10 @@ import { fileURLToPath } from "node:url";
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
-  type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, Response, type RuntimeHandover, SettingChange, SettingKey,
+  type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, RecentCommands, Response, type RuntimeHandover, SettingChange, SettingKey,
   ShellEvents, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
 } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, LogText, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
@@ -26,6 +26,7 @@ import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import type { IWindowContents } from "../interfaces/i-window-contents.js";
 import { StartupStateKind } from "../enums/startup-state-kind.js";
+import { WindowErrorAdmission } from "../enums/window-error-admission.js";
 import { DesktopSettings } from "../models/desktop-settings.js";
 import { MenuBar } from "../models/menu-bar.js";
 import { ScreenArea } from "../models/screen-area.js";
@@ -180,6 +181,7 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
     this.electron.ipcMain.handle(Resources.quitAnswerChannel, (event, choice) => this.answerQuit(event, choice));
     this.electron.ipcMain.on(Resources.moduleLogChannel, (event, moduleId, message) => this.writeModuleLog(event, moduleId, message));
+    this.electron.ipcMain.on(Resources.windowErrorChannel, (event, moduleId, text) => this.writeWindowError(event, moduleId, text));
     this.electron.ipcMain.handle(Resources.readStartupChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.startup.current.toJson());
     this.electron.ipcMain.handle(Resources.startupActionChannel, (event, action) => Object.isNull(this.findTrusted(event)) ? false : this.startup.actAsync(action));
     this.electron.ipcMain.handle(Resources.readLayoutChannel, event => this.readLayoutAsync(event));
@@ -260,7 +262,8 @@ export class DesktopApplication {
     if (event.name.text === ShellEvents.work.text)
       this.receiveWork(event);
     const payload = event.name.text === ShellEvents.notifications.text ? this.readStateForDevice(event)
-      : event.name.text === ShellEvents.settingsChanged.text ? this.readSettingForDevice(event) : event.payload;
+      : event.name.text === ShellEvents.settingsChanged.text ? this.readSettingForDevice(event)
+        : event.name.text === ShellEvents.recentCommandsChanged.text ? this.readRecentCommandsForDevice(event) : event.payload;
     if (Object.isUndefined(payload))
       return;
     for (const open of this.windows.values())
@@ -307,10 +310,23 @@ export class DesktopApplication {
   }
 
   private writeModuleLog(event: IIpcEvent, moduleId: unknown, message: unknown): void {
-    if (Object.isNull(this.findTrusted(event)) || !Object.isString(moduleId) || !Resources.moduleIdPattern.test(moduleId) || !Object.isString(message) ||
-      message.length > Resources.moduleLogLimit)
+    if (!Object.isNull(this.findTrusted(event)) && DesktopApplication.isModuleId(moduleId) && Object.isString(message))
+      this.writeWindowText(message, t => Resources.formatModuleLogLine(moduleId, t));
+  }
+
+  private writeWindowError(event: IIpcEvent, moduleId: unknown, text: unknown): void {
+    const open = this.findTrusted(event);
+    if (Object.isNull(open) || !(Object.isNull(moduleId) || DesktopApplication.isModuleId(moduleId)) || !Object.isString(text))
       return;
-    this.log.write(message.trimEnd().split(Resources.lineBreakPattern).map(t => Resources.formatModuleLogLine(moduleId, t)).join(Resources.logLineSeparator));
+    const admission = open.errors.admit();
+    if (admission === WindowErrorAdmission.Write)
+      this.writeWindowText(text, t => Resources.formatWindowErrorLine(moduleId, t));
+    else if (admission === WindowErrorAdmission.Notice)
+      this.log.write(Resources.windowErrorsLeftOut);
+  }
+
+  private writeWindowText(text: string, format: (line: string) => string): void {
+    this.log.write(LogText.lines(text.slice(0, Resources.windowLogLimit)).map(format).join(Resources.logLineSeparator));
   }
 
   private beginNotifier(epoch: number, device: string, response: Response): void {
@@ -346,7 +362,7 @@ export class DesktopApplication {
     if (name.text === ShellMethods.notifications.text)
       return await this.readNotificationsAsync(name);
     if (Resources.deviceMethods.includes(name.text))
-      return await this.requestSettingsForDeviceAsync(name, value);
+      return await this.requestForDeviceAsync(name, value);
     return (await this.callAsync(name, value)).toJson();
   }
 
@@ -363,12 +379,12 @@ export class DesktopApplication {
     }
   }
 
-  private async requestSettingsForDeviceAsync(name: QualifiedName, value: JsonValue): Promise<JsonObject> {
+  private async requestForDeviceAsync(name: QualifiedName, value: JsonValue): Promise<JsonObject> {
     if (!Object.isObject(value) || Array.isArray(value))
-      return DesktopApplication.fail(FailureCode.InvalidMessage, Resources.settingsPayloadNotObject);
+      return DesktopApplication.fail(FailureCode.InvalidMessage, Resources.deviceRequestPayloadNotObject);
     const device = await this.device;
     if (Object.isNull(device))
-      return DesktopApplication.fail(FailureCode.Unavailable, Resources.settingsNeedDevice);
+      return DesktopApplication.fail(FailureCode.Unavailable, Resources.deviceRequestNeedsIdentity);
     return (await this.callAsync(name, { ...value, [Resources.deviceField]: device })).toJson();
   }
 
@@ -377,6 +393,17 @@ export class DesktopApplication {
       const broadcast = NotificationBroadcast.fromJson(event.payload);
       this.notifier.receive(broadcast);
       return (Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.mutedModules, broadcast.sequence) : broadcast.stateFor(this.knownDevice)).toJson();
+    }
+    catch (error) {
+      this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
+      return undefined;
+    }
+  }
+
+  private readRecentCommandsForDevice(event: Event): JsonObject | undefined {
+    try {
+      const recent = RecentCommands.fromJson(event.payload);
+      return recent.device === this.knownDevice ? new RecentCommands(recent.ids).toJson() : undefined;
     }
     catch (error) {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
@@ -575,6 +602,10 @@ export class DesktopApplication {
 
   private static isPackagedBuild(electron: IElectron, process: IDesktopProcess): boolean {
     return electron.app.isPackaged && !process.isDefaultApp;
+  }
+
+  private static isModuleId(value: unknown): value is string {
+    return Object.isString(value) && Resources.moduleIdPattern.test(value);
   }
 
   private static readArgument(argv: readonly string[], prefix: string): string | undefined {
