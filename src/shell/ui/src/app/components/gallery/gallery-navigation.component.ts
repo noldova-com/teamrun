@@ -36,13 +36,13 @@ export class GalleryNavigationComponent {
   protected readonly surfaces: typeof PanelSurface = PanelSurface;
   protected readonly orientations: typeof SashOrientation = SashOrientation;
   protected readonly treeNodes: readonly TreeNode[] = [
-    new TreeNode(this.text.treeProject, this.text.treeProject, this.text.glyphFolder, [
+    TreeNode.open(this.text.treeProject, this.text.treeProject, this.text.glyphFolder, [
       new TreeNode(this.text.treeSource, this.text.treeSource, this.text.glyphFolder, [
         new TreeNode(this.text.treeApp, this.text.treeApp, this.text.glyphDescription),
         new TreeNode(this.text.treeStyles, this.text.treeStyles, this.text.glyphDescription)
       ]),
       new TreeNode(this.text.treeReadme, this.text.treeReadme, this.text.glyphDescription)
-    ], true),
+    ]),
     new TreeNode(this.text.treeNotes, this.text.treeNotes, this.text.glyphDescription),
     new TreeNode(this.text.treeLong, this.text.treeLong, this.text.glyphDescription)
   ];

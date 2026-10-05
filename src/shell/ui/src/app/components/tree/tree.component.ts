@@ -28,6 +28,8 @@ export class TreeComponent {
   private readonly tree: Signal<CdkTree<TreeNode, string>> = viewChild.required<CdkTree<TreeNode, string>>(CdkTree);
   private readonly rows: Signal<readonly CdkTreeNode<TreeNode, string>[]> = viewChildren<CdkTreeNode<TreeNode, string>>(CdkTreeNode);
 
+  private readonly opened: Set<string> = new Set();
+
   public readonly nodes = input.required<readonly TreeNode[]>();
   public readonly label = input.required<string>();
   public readonly current = input<string | null>(null);
@@ -42,23 +44,29 @@ export class TreeComponent {
 
   public constructor() {
     afterRenderEffect(() => {
-      for (const branch of this.nodes().flatMap(t => t.openBranches))
+      for (const branch of this.nodes().flatMap(t => t.startOpenBranches).filter(t => !this.opened.has(t.id))) {
+        this.opened.add(branch.id);
         this.tree().expand(branch);
+      }
     });
     afterRenderEffect(() => {
       const row = this.rowOf(this.current());
-      if (row === undefined || this.host.contains(this.document.activeElement))
+      if (Object.isUndefined(row) || this.host.contains(this.document.activeElement))
         return;
-      for (const other of this.rows())
-        if (other === row)
-          other.makeFocusable();
-        else
-          other.unfocus();
+      this.take(row);
     });
   }
 
   public focus(): void {
     (this.rowOf(this.current()) ?? this.rows()[0])?.focus();
+  }
+
+  protected take(row: CdkTreeNode<TreeNode, string>): void {
+    for (const other of this.rows())
+      if (other === row)
+        other.makeFocusable();
+      else
+        other.unfocus();
   }
 
   protected choose(node: TreeNode): void {
