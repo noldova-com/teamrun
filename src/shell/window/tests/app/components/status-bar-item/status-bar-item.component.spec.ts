@@ -153,6 +153,14 @@ describe("StatusBarItemComponent", () => {
         expect([long, short]).toEqual("tooltip" in tooltip ? [tooltip.tooltip, tooltip.tooltip] : [LONG, null]);
       });
 
+  it("ends text too long for its width with an ellipsis", () => {
+    AppearanceFixture.apply();
+    const [fixture] = render(new StatusBarItemState(LONG));
+    (fixture.nativeElement as HTMLElement).style.width = "6rem";
+
+    AppearanceFixture.expectTruncates((fixture.nativeElement as HTMLElement).querySelector(".tr-status-bar-item-text") as HTMLElement);
+  });
+
   for (const theme of AppearanceFixture.themes)
     it(`is a pill with the ${theme.id} theme's status bar item geometry`, () => {
       AppearanceFixture.apply(theme);

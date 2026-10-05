@@ -7,7 +7,7 @@
  */
 
 import "@noldova/teamrun-foundation-core";
-import { QualifiedName, Response } from "@noldova/teamrun-shell-protocol";
+import { Response } from "@noldova/teamrun-shell-protocol";
 import { ClientSettings, type Endpoint, RuntimeClient } from "@noldova/teamrun-shell-runtime";
 
 import { ClientListenerFixture } from "./client-listener.fixture.js";
@@ -15,8 +15,6 @@ import { RawServerFixture } from "./raw-server.fixture.js";
 import { RuntimeServerFixture } from "./runtime-server.fixture.js";
 
 export class RuntimeClientFixture {
-  public static readonly ECHO: QualifiedName = new QualifiedName("notes", "echo");
-  public static readonly WAIT: QualifiedName = new QualifiedName("notes", "wait");
   public static readonly SETTINGS: ClientSettings = new ClientSettings(300, 1_000, 50);
   public static readonly AUTHENTICATED: string = Response.success("desktop:0", RuntimeServerFixture.IDENTITY.toJson()).toText();
 

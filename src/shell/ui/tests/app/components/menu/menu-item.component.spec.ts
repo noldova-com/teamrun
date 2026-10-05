@@ -80,6 +80,13 @@ describe("MenuItemComponent", () => {
         expect(shortcut()).toBe(getComputedStyle(row("plain")).color);
       });
 
+  it("ends a label too long for the window with an ellipsis", () => {
+    fixture.componentInstance.label.set("Reopen the closed tab with every note, outline and draft it held ".repeat(20));
+    fixture.detectChanges();
+
+    AppearanceFixture.expectTruncates(row("plain").querySelector(".tr-menu-item-label") as HTMLElement);
+  });
+
   it("shows its icon, its label marked for truncation, and a chevron only when it opens a submenu", () => {
     expect(parts("plain")).toEqual(["tr-menu-item-label"]);
     expect(parts("iconic")).toEqual(["tr-menu-item-icon", "tr-menu-item-label"]);

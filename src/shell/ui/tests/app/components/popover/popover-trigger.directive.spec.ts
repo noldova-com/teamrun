@@ -29,9 +29,6 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
         <button type="button" class="inside">Inside</button>
       </div>
     </ng-template>
-    <div trPopover class="static" label="Static" style="margin-top: 20rem">
-      <span class="child">Static content</span>
-    </div>
   `
 })
 class PopoverHostComponent {
@@ -41,7 +38,7 @@ class PopoverHostComponent {
   public opens: number = 0;
 }
 
-describe("PopoverTriggerDirective and PopoverDirective", () => {
+describe("PopoverTriggerDirective", () => {
   let fixture: ComponentFixture<PopoverHostComponent>;
 
   async function renderAsync(side: OverlaySide = OverlaySide.above, alignment: OverlayAlignment = OverlayAlignment.End): Promise<void> {
@@ -215,15 +212,4 @@ describe("PopoverTriggerDirective and PopoverDirective", () => {
         AppearanceFixture.expectLook(style.rowGap, theme, "space-2", "row-gap");
         expect(getComputedStyle(surface()?.querySelector(".title") as Element).color).toBe(AppearanceFixture.readColor(theme, mode, "menu.foreground"));
       });
-
-  it("is no wider than the window less a margin, and shows no outline when focused", async () => {
-    await renderAsync();
-    const popover = fixture.nativeElement.querySelector(".static") as HTMLElement;
-    popover.style.setProperty("--tr-popover-width", "500vw");
-    await userEvent.keyboard("{Shift}");
-    popover.focus();
-
-    expect(popover.getBoundingClientRect().width).toBeLessThanOrEqual(window.innerWidth);
-    expect([document.activeElement, getComputedStyle(popover).outlineStyle]).toEqual([popover, "none"]);
-  });
 });

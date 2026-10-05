@@ -85,12 +85,6 @@
   font-size: var(--tr-icon);
 }
 
-.tr-quick-input-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .tr-quick-input-match {
   background: none;
   color: var(--tr-list-highlight);
