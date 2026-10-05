@@ -38,7 +38,7 @@ import { ShortcutsComponent } from "../shortcuts/shortcuts.component";
   host: {
     "class": "tr-settings",
     "(focusin)": "noteFocus($event)",
-    "(focusout)": "noteBlur($event)"
+    "(focusout)": "noteBlur()"
   }
 })
 export class SettingsComponent {
@@ -51,6 +51,7 @@ export class SettingsComponent {
   private readonly selected: WritableSignal<string> = signal(this.kept.page);
   private readonly pageList: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("pageList");
   private readonly pageSelect: Signal<ElementRef<HTMLElement>> = viewChild.required("pageSelect", { read: ElementRef<HTMLElement> });
+  private readonly pageChooser: Signal<SelectComponent> = viewChild.required("pageSelect", { read: SelectComponent });
   private readonly content: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("content");
   private focusedControl: HTMLElement | null = null;
 
@@ -109,11 +110,12 @@ export class SettingsComponent {
   }
 
   protected noteFocus(event: FocusEvent): void {
-    this.focusedControl = [this.pageList().nativeElement, this.pageSelect().nativeElement].find(t => t.contains(event.target as Node)) ?? null;
+    const path = event.composedPath();
+    this.focusedControl = [this.pageList().nativeElement, this.pageSelect().nativeElement].find(t => path.includes(t)) ?? null;
   }
 
-  protected noteBlur(event: FocusEvent): void {
-    if ((event.target as Element).checkVisibility())
+  protected noteBlur(): void {
+    if (this.focusedControl?.checkVisibility() && !this.pageChooser().isExpanded())
       this.focusedControl = null;
   }
 
@@ -149,11 +151,13 @@ export class SettingsComponent {
     const list = this.pageList().nativeElement;
     const select = this.pageSelect().nativeElement;
     const hidden = list.checkVisibility() ? select : list;
-    if (this.focusedControl !== hidden)
+    const active = document.activeElement;
+    if (this.focusedControl !== hidden || !(active === document.body || hidden.contains(active) || this.pageChooser().isExpanded()))
       return;
-    const shown = hidden === list ? select.querySelector<HTMLElement>(Resources.buttonSelector)
-      : list.querySelector<HTMLElement>(Resources.currentSettingsPageSelector) ?? list.querySelector<HTMLElement>(Resources.settingsPageSelector);
-    shown?.focus();
+    if (hidden === list)
+      this.pageChooser().focus();
+    else
+      (list.querySelector<HTMLElement>(Resources.currentSettingsPageSelector) ?? list.querySelector<HTMLElement>(Resources.settingsPageSelector))?.focus();
   }
 
   private static matches(definition: SettingDefinition, query: string): boolean {

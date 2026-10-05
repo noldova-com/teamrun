@@ -80,6 +80,20 @@ describe("SettingsComponent", () => {
     await fixture.whenStable();
   }
 
+  function pageSelect(host: HTMLElement): HTMLButtonElement {
+    return host.querySelector(".tr-settings-page-select .tr-select-button") as HTMLButtonElement;
+  }
+
+  async function chooseClockAsync(host: HTMLElement): Promise<void> {
+    host.style.width = "37rem";
+    await page.getByRole("button", { name: "Clock", exact: true }).click();
+    fixture.detectChanges();
+  }
+
+  function framesAsync(): Promise<void> {
+    return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  }
+
   beforeEach(async () => {
     DesktopBridgeFixture.install("linux");
     settings = new FakeSettingsService();
@@ -158,37 +172,54 @@ describe("SettingsComponent", () => {
 
   it("moves focus to the page control it now shows when it switches between the page list and the select, and to no control that was not focused", async () => {
     const host = render();
-    const select = (): HTMLButtonElement => host.querySelector(".tr-settings-page-select .tr-select-button") as HTMLButtonElement;
-    const pages = (): readonly HTMLButtonElement[] => [...host.querySelectorAll<HTMLButtonElement>(".tr-settings-page")];
-    host.style.width = "37rem";
-    await page.getByRole("button", { name: "Clock", exact: true }).click();
-    fixture.detectChanges();
+    const field = host.querySelector(".tr-settings-search-field") as HTMLInputElement;
+    await chooseClockAsync(host);
 
     host.style.width = "15rem";
-    await vi.waitFor(() => expect(document.activeElement).toBe(select()));
+    await vi.waitFor(() => expect(document.activeElement).toBe(pageSelect(host)));
     host.style.width = "37rem";
     await vi.waitFor(() => expect(document.activeElement).toBe(host.querySelector(".tr-settings-page-current")));
-    await searchAsync("greeting");
-    (host.querySelector(".tr-settings-search-field") as HTMLInputElement).focus();
     host.style.width = "15rem";
-    await vi.waitFor(() => expect(select().checkVisibility()).toBe(true));
-    const searching = document.activeElement;
-    select().focus();
+    (document.activeElement as HTMLElement).blur();
+    await vi.waitFor(() => expect(document.activeElement).toBe(pageSelect(host)));
+    await searchAsync("greeting");
+    field.focus();
     host.style.width = "37rem";
-    await vi.waitFor(() => expect(document.activeElement).toBe(pages()[0]));
+    await framesAsync();
+    const searching = document.activeElement;
+    host.style.width = "15rem";
+    await framesAsync();
+    pageSelect(host).focus();
+    host.style.width = "37rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(host.querySelector(".tr-settings-page")));
 
-    expect(searching).toBe(host.querySelector(".tr-settings-search-field"));
+    expect(searching).toBe(field);
   });
 
-  it("closes the Settings pages list when the window widens while it is open", async () => {
+  it("closes the Settings pages list when it widens while the list is open, moving focus to the current page, and leaves focus that moved elsewhere", async () => {
     const host = render();
+    const outside = document.body.appendChild(document.createElement("button"));
+    await chooseClockAsync(host);
     host.style.width = "15rem";
-    await userEvent.click(host.querySelector(".tr-settings-page-select .tr-select-button") as HTMLButtonElement);
+    await vi.waitFor(() => expect(document.activeElement).toBe(pageSelect(host)));
+    await userEvent.click(pageSelect(host));
     await expect.element(page.getByRole("listbox")).toBeVisible();
 
     host.style.width = "37rem";
-
     await vi.waitFor(() => expect(document.querySelector("[role=listbox]")).toBeNull());
+    await vi.waitFor(() => expect(document.activeElement).toBe(host.querySelector(".tr-settings-page-current")));
+    host.style.width = "15rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(pageSelect(host)));
+    await userEvent.click(pageSelect(host));
+    await expect.element(page.getByRole("listbox")).toBeVisible();
+    await userEvent.click(outside);
+    await vi.waitFor(() => expect(document.querySelector("[role=listbox]")).toBeNull());
+    host.style.width = "37rem";
+    await framesAsync();
+    const kept = document.activeElement;
+    outside.remove();
+
+    expect(kept).toBe(outside);
   });
 
   it("reveals the scrollbars of its page list and its content while they are hovered", () => {

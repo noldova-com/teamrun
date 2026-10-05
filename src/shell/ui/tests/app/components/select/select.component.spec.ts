@@ -8,6 +8,7 @@
 
 import { Component, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 import { page, userEvent } from "vitest/browser";
 
 import { SelectComponent } from "../../../../src/app/components/select/select.component";
@@ -145,6 +146,18 @@ describe("SelectComponent", () => {
 
     expect(marked).toEqual(["false", "false", "false"]);
     expect(fixture.componentInstance.changes).toEqual(["Dark"]);
+  });
+
+  it("takes focus on its button and tells whether its list is open", async () => {
+    render();
+    const select = fixture.debugElement.query(By.directive(SelectComponent)).componentInstance as SelectComponent;
+
+    select.focus();
+    const focused = document.activeElement;
+    const closed = select.isExpanded();
+    await openAsync();
+
+    expect([focused, closed, select.isExpanded()]).toEqual([button(), false, true]);
   });
 
   it("shows an unknown value as itself and cannot open while disabled", () => {
