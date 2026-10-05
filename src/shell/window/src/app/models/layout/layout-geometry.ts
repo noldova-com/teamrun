@@ -14,6 +14,7 @@ import { DockSide } from "../../enums/dock-side";
 import { SplitAxis } from "../../enums/split-axis";
 import { Bounds } from "./bounds";
 import type { Dock } from "./dock";
+import { DockYield } from "./dock-yield";
 import type { GroupFrame } from "./group-frame";
 import type { Layout } from "./layout";
 import { LayoutFit } from "./layout-fit";
@@ -29,13 +30,14 @@ export class LayoutGeometry {
   private readonly down: LayoutFit;
   private readonly dockBounds: Readonly<Record<DockSide, Bounds>>;
   private readonly iconSides: ReadonlySet<DockSide>;
+  private readonly yielded: DockYield;
   private readonly railBounds: ReadonlyMap<DockSide, Bounds>;
   public readonly area: Bounds;
   public readonly middle: Bounds;
   public readonly frames: readonly GroupFrame[];
   public readonly handles: readonly SplitHandle[];
 
-  public constructor(width: number, height: number, layout: Layout, registry: ViewRegistry, iconSides: ReadonlySet<DockSide> = new Set()) {
+  public constructor(width: number, height: number, layout: Layout, registry: ViewRegistry, iconSides: ReadonlySet<DockSide> = new Set(), yielded: DockYield = DockYield.none) {
     const visible = layout.withVisibleTabs(registry);
     const margin = Resources.panelMargin;
     const gap = Resources.panelGap;
@@ -43,7 +45,7 @@ export class LayoutGeometry {
     const railed = new Set(sides.filter(t => iconSides.has(t.side) && !Object.isNull(t.root)).map(t => t.side));
     const rail = (side: DockSide): number => railed.has(side) ? Resources.dockStripSize + gap : 0;
     const isFull = visible.bottomSpan === BottomDockSpan.Full;
-    const across = LayoutFit.of(width, 2 * margin + rail(DockSide.Left) + rail(DockSide.Right), sides, visible.middle.minimumLength(SplitAxis.Horizontal), railed);
+    const across = LayoutFit.of(width, 2 * margin + rail(DockSide.Left) + rail(DockSide.Right), sides, visible.middle.minimumLength(SplitAxis.Horizontal), railed, yielded);
     const upright = Math.max(visible.middle.minimumLength(SplitAxis.Vertical), ...(isFull ? this.uprightMinimums(sides, across) : []));
     const down = LayoutFit.of(height, margin, [visible.dock(DockSide.Bottom)], upright);
     const inner = Math.max(0, height - margin);
@@ -63,6 +65,7 @@ export class LayoutGeometry {
     this.down = down;
     this.area = area;
     this.iconSides = iconSides;
+    this.yielded = yielded;
     this.railBounds = new Map([...railed].map(t => [t, new Bounds(t === DockSide.Left ? margin : width - margin - Resources.dockStripSize, 0, Resources.dockStripSize, sideHeight)]));
     this.dockBounds = {
       [DockSide.Left]: new Bounds(margin + rail(DockSide.Left), 0, left, sideHeight),
@@ -77,6 +80,14 @@ export class LayoutGeometry {
     this.handles = handles;
   }
 
+  public get closedSides(): ReadonlySet<DockSide> {
+    return this.across.collapsed;
+  }
+
+  public get isKeeping(): boolean {
+    return this.across.isKeeping;
+  }
+
   public dock(side: DockSide): Bounds {
     return this.dockBounds[side];
   }
@@ -86,7 +97,7 @@ export class LayoutGeometry {
   }
 
   public withBottomSpan(span: BottomDockSpan): LayoutGeometry {
-    return span === this.layout.bottomSpan ? this : new LayoutGeometry(this.width, this.height, this.layout.withBottomSpan(span), this.registry, this.iconSides);
+    return span === this.layout.bottomSpan ? this : new LayoutGeometry(this.width, this.height, this.layout.withBottomSpan(span), this.registry, this.iconSides, this.yielded);
   }
 
   public isShown(side: DockSide): boolean {

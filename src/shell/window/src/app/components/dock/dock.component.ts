@@ -52,7 +52,7 @@ export class DockComponent {
   protected readonly isShown: Signal<boolean> = computed(() => this.layout.geometry().isShown(this.side()));
   protected readonly isCollapsed: Signal<boolean> = computed(() => this.layout.geometry().isCollapsed(this.side()));
   protected readonly orientation: Signal<SashOrientation> = computed(() => this.side() === DockSide.Bottom ? SashOrientation.Horizontal : SashOrientation.Vertical);
-  protected readonly size: Signal<number> = computed(() => this.dock().size ?? this.bounds().length(this.dock().axis));
+  protected readonly size: Signal<number> = computed(() => this.bounds().length(this.dock().axis));
   protected readonly isVertical: Signal<boolean> = computed(() => this.side() !== DockSide.Bottom);
   protected readonly tooltipSide: Signal<OverlaySide> = computed(() => Resources.dockStripTooltipSides[this.side()]);
   protected readonly isRail: Signal<boolean> = computed(() => !Object.isNull(this.layout.geometry().rail(this.side())));
@@ -96,8 +96,10 @@ export class DockComponent {
   protected toggle(group: TabGroup, tab: Tab): void {
     if (this.isShowing(group, tab))
       this.layout.toggleDock(this.side());
-    else
+    else {
       this.layout.activate(tab);
+      this.layout.keepOpen(this.side());
+    }
   }
 
   protected pixels(rem: number): number {

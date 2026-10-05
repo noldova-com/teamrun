@@ -106,7 +106,8 @@ test.describe("view dialog", () => {
 
   test("a module's docked view and the shell's Settings show in a dialog that fits the smallest window and 200% zoom, and a tab that was not open closes with it", async ({ desktop }) => {
     const window = desktop.window;
-    await desktop.useViewportAsync(640, 400);
+    await desktop.useViewportAsync(640, 480);
+    await window.locator("tr-dock[data-side=Left] .tr-dock-strip-view").first().click();
     await window.locator("[data-fixture-content=notes-list]").click();
 
     await showAsync(window, "Show the notes list in a dialog");

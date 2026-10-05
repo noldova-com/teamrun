@@ -87,7 +87,7 @@ export class ShellCommandsService {
     new CommandContribution(Resources.focusPreviousGroupCommand, Resources.focusPreviousGroupTitle, Resources.focusPreviousGroupGlyph, null, () => this.done(() => this.focusGroup(-1)),
       () => this.focusable().length > 1),
     ...Object.values(DockSide).map(side => new CommandContribution(Resources.toggleDockCommands[side], Resources.toggleDockTitles[side], Resources.hideDockGlyphs[side], null,
-      () => this.done(() => this.layout.toggleDock(side)), () => true, () => this.layout.layout().dock(side).isExpanded)),
+      () => this.done(() => this.layout.toggleDock(side)), () => true, () => this.layout.layout().dock(side).isExpanded && !this.layout.geometry().closedSides.has(side))),
     ...Object.values(EditAction).map(action => new CommandContribution(Resources.editCommands[action], Resources.editTitles[action], Resources.editGlyphs[action], null,
       () => this.editAsync(action), () => this.edits.canRun(action))),
     new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, null,

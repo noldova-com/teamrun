@@ -43,7 +43,7 @@ export class WindowStateTests {
   @TestData(1366, 728, 1229, 655)
   @TestData(1400, 900, 1260, 800)
   @TestData(1280, 800, 1152, 720)
-  @TestData(600, 380, 640, 400)
+  @TestData(600, 460, 640, 480)
   public defaultsToNoMoreThanNineTenthsOfTheWorkAreaOnEachSide(areaWidth: number, areaHeight: number, width: number, height: number): void {
     const state = WindowState.createDefault(new ScreenArea(0, 25, areaWidth, areaHeight));
 
@@ -60,7 +60,7 @@ export class WindowStateTests {
   @TestData(10.5, 0, 1280, 800)
   @TestData(0, 0.5, 1280, 800)
   @TestData(0, 0, 639, 800)
-  @TestData(0, 0, 1280, 399)
+  @TestData(0, 0, 1280, 479)
   @TestData(0, 0, 1280.5, 800)
   @TestData(0, 0, 1280, 800.5)
   public rejectsFractionalCoordinatesAndSizesBelowTheMinimum(x: number, y: number, width: number, height: number): void {
@@ -69,7 +69,7 @@ export class WindowStateTests {
 
   @TestMethod
   public acceptsTheMinimumSize(): void {
-    Assert.areEqual(640, new WindowState(null, null, 640, 400, false).width);
+    Assert.areEqual(640, new WindowState(null, null, 640, 480, false).width);
   }
 
   @TestMethod
@@ -79,6 +79,13 @@ export class WindowStateTests {
     Assert.areEqual(JSON.stringify({ x: -1, y: 2, width: 1000, height: 700, maximized: true }), JSON.stringify(json));
     Assert.areEqual(JSON.stringify(json), JSON.stringify(WindowState.fromJson(json).toJson()));
     Assert.isNull(WindowState.fromJson({ x: null, y: null, width: 1280, height: 800, maximized: false }).x);
+  }
+
+  @TestMethod
+  public growsASavedSizeBelowTheMinimumToIt(): void {
+    const state = WindowState.fromJson({ x: 10, y: 20, width: 600, height: 400, maximized: false });
+
+    Assert.areEqual("10,20,640,480", [state.x, state.y, state.width, state.height].join(","));
   }
 
   @TestMethod

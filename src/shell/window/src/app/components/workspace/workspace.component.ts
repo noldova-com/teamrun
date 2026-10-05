@@ -69,6 +69,10 @@ export class WorkspaceComponent {
       if (!this.startup.isReconnecting())
         untracked(() => this.restoreFocus());
     });
+    afterRenderEffect(() => {
+      this.layout.geometry();
+      untracked(() => this.keepDockFocus());
+    });
   }
 
   protected remember(event: FocusEvent): void {
@@ -93,5 +97,15 @@ export class WorkspaceComponent {
     const tab = this.layout.layout().groups.find(t => t.id === this.focusedGroup)?.active;
     if (!Object.isNullOrUndefined(tab))
       this.tabFocus.focus(tab);
+  }
+
+  private keepDockFocus(): void {
+    const document = this.element.ownerDocument;
+    const layout = this.layout.layout();
+    const tab = layout.groups.find(t => t.id === this.focusedGroup)?.active;
+    const side = this.sides.find(t => layout.dock(t).root?.groups.some(u => u.id === this.focusedGroup) === true);
+    if (document.activeElement !== document.body || Object.isNullOrUndefined(tab) || Object.isUndefined(side) || !this.layout.geometry().isCollapsed(side))
+      return;
+    this.element.querySelectorAll<HTMLElement>(Resources.formatDockStripView(side, tab.key)).forEach(t => t.focus());
   }
 }
