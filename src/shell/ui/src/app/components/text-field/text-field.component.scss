@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "states";
+
 :host {
   box-sizing: border-box;
   width: var(--tr-text-field-width);
@@ -29,7 +31,7 @@
   opacity: 1;
 }
 
-:host(:focus) {
+:host(#{states.$focus}) {
   border-color: var(--tr-accent);
   outline: none;
 }

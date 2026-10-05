@@ -1,0 +1,32 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-content: start;
+  gap: var(--tr-space-2);
+  min-width: 0;
+}
+
+.tr-gallery-cell-caption {
+  overflow: hidden;
+  color: var(--tr-text-muted);
+  font-size: var(--tr-text-label);
+  line-height: var(--tr-line-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-gallery-cell-specimen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--tr-space-2);
+  min-width: 0;
+}
