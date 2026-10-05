@@ -81,6 +81,20 @@ test.describe("activity bar", () => {
     await expect(icon(window, clock)).toBeVisible();
     expect(await strip(window).locator(".tr-dock-strip-view").evaluateAll(t => t.map(u => u.getAttribute("data-view")))).toEqual([notes, clock, outline]);
 
+    const into = await icon(window, clock).boundingBox();
+    const start = await icon(window, outline).boundingBox();
+    if (into === null || start === null)
+      throw new Error("The strip's icons are not visible.");
+    await window.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+    await window.mouse.down();
+    await window.mouse.move(start.x + start.width / 2 + 12, start.y + start.height / 2 + 12, { steps: 3 });
+    await window.mouse.move(into.x + into.width / 2, into.y + into.height * 0.25, { steps: 6 });
+    await expect(icon(window, clock)).toHaveClass(/tr-drop-line-before/);
+    const [lineLength, iconWidth] = await icon(window, clock).evaluate(t => [getComputedStyle(t, "::after").width, getComputedStyle(t).width]);
+    expect(lineLength).toBe(iconWidth);
+    await window.keyboard.press("Escape");
+    await window.mouse.up();
+
     await dragAsync(window, icon(window, outline), window.locator("[data-drop-side=Right]"), 0.5);
     await expect(window.locator(`tr-tab-group[data-side=Right] tr-tab[data-tab-key="${outline}"]`)).toBeVisible();
     await expect(icon(window, outline)).toHaveCount(0);
