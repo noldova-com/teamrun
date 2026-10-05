@@ -6,14 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { TestBed } from "@angular/core/testing";
-
 import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 
 describe("WindowPartTokens", () => {
-  it("provides no window parts unless the build gives them", () => {
-    expect(TestBed.inject(WindowPartTokens.sources)).toEqual([]);
-    expect(TestBed.inject(WindowPartTokens.menus)).toEqual([]);
+  it("names the context and the page padding a window part's components inject", () => {
     expect(WindowPartTokens.context.toString()).toContain("The window part's context");
     expect(WindowPartTokens.contentPadding.toString()).toContain("The padding of the page a tab shows");
   });

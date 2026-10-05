@@ -14,8 +14,8 @@ import { Notification, NotificationPost, NotificationSeverity, NotificationState
 
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
 import type { IWindowPartContext } from "../../../src/app/interfaces/i-window-part-context";
+import { BuildTokens } from "../../../src/app/models/build-tokens";
 import { WindowPartSource } from "../../../src/app/models/window-part-source";
-import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { NotificationService } from "../../../src/app/services/notification.service";
 import { ToastService } from "../../../src/app/services/toast.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
@@ -247,7 +247,7 @@ describe("ToastService with the window parts", () => {
     };
     const source = new WindowPartSource("notes", [], [], [], [], [], [], ["notes.saved"], () => Promise.resolve(part));
     TestBed.configureTestingModule({
-      providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }, { provide: WindowPartTokens.sources, useValue: [source] }]
+      providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }, { provide: BuildTokens.sources, useValue: [source] }]
     });
     const service = TestBed.inject(ToastService);
     TestBed.tick();

@@ -14,7 +14,6 @@ export { ChoicePillsComponent } from "../app/components/choice-pills/choice-pill
 export { DialogComponent } from "../app/components/dialog/dialog.component";
 export { DockingGuideComponent } from "../app/components/docking-guide/docking-guide.component";
 export { DockingPlateComponent } from "../app/components/docking-plate/docking-plate.component";
-export { GalleryComponent } from "../app/components/gallery/gallery.component";
 export { IconButtonComponent } from "../app/components/icon-button/icon-button.component";
 export { ContextMenuTriggerDirective } from "../app/components/menu/context-menu-trigger.directive";
 export { MenuBarItemComponent } from "../app/components/menu-bar/menu-bar-item.component";

@@ -50,7 +50,7 @@ Four rules keep the shell empty:
 
 Everything that belongs to a module lives in its folder, `src/modules/<id>`: its parts and their tests, end-to-end tests, styles, assets, migrations and its document. Adding a module adds its folder and a line in the build's module list; removing it removes both. Its data has its own folder in the data directory (section 3).
 
-The Angular parts, `src/shell/ui`, `src/shell/window` and modules' window parts, are not packages. The Angular project in `src/`, with its own manifest and lockfile, compiles them from source into one application. The kit and the window publish their APIs through their `src/api/index.ts`, which other Angular parts import as `@noldova/teamrun-shell-ui` and `@noldova/teamrun-shell-window`.
+The Angular parts, `src/shell/ui`, `src/shell/window` and modules' window parts, are not packages. The Angular project in `src/`, with its own manifest and lockfile, compiles them from source into one application. The kit and the window publish their APIs through their `src/api/index.ts`, which other Angular parts import as `@noldova/teamrun-shell-ui` and `@noldova/teamrun-shell-window`. The kit's Gallery is not part of its API; only the window's generated Gallery file imports it, through the kit's development entry `@noldova/teamrun-shell-ui/gallery`. `WindowPartSource` and `MenuDeclarations` are not part of the window's API either. Only the build's generated window parts import them, through the window's build entry `@noldova/teamrun-shell-window/build`.
 
 Fixture modules exist only for tests. They live with the tests that use them, in the `fixtures` beside those workflows under the [coding standards](CODING-STANDARDS.md#13-tests), and enter only a test build's module list.
 
@@ -173,7 +173,7 @@ The shell pads the page of every view and document, so a module's content keeps 
 | Declaration | The `padding` argument of a view's or document's contribution | That view or document |
 | Page | `set` and `reset` on the `ContentPaddingRef` its component injects with `WindowPartTokens.contentPadding` | That page while it is shown, until it resets |
 
-Each level chooses `Default`, the shell's padding for where the page shows, or `None`; none sets its own values. The page's choice wins over its declaration's, the declaration's over its module's, and the module's over the shell's default. The shell's own Settings and Modules documents declare `None` and keep their own layout. [The window package's declarations](../src/shell/window/src/api/index.d.ts) show each level.
+Each level chooses `Default`, the shell's padding for where the page shows, or `None`; none sets its own values. The page's choice wins over its declaration's, the declaration's over its module's, and the module's over the shell's default. The shell's own Settings and Modules documents declare `None` and keep their own layout. [The window's declarations](../src/shell/window/src/api/index.d.ts) show each level.
 
 ### Commands and shortcuts
 

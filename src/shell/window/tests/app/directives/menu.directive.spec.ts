@@ -11,6 +11,7 @@ import { TestBed } from "@angular/core/testing";
 
 import { MenuDirective } from "../../../src/app/directives/menu.directive";
 import type { IWindowPartContext } from "../../../src/app/interfaces/i-window-part-context";
+import { BuildTokens } from "../../../src/app/models/build-tokens";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { MenuDeclarations } from "../../../src/app/models/menu-declarations";
 import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
@@ -38,7 +39,7 @@ describe("MenuDirective", () => {
       providers: [
         { provide: WindowPartTokens.context, useValue: context },
         {
-          provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
+          provide: BuildTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
             places: [{ name: "notes.listItem", title: "Note", shows: "menu" }],
             groups: [{ name: "notes.open", place: "notes.listItem", exclusive: false, items: [{ command: "notes.openNote", arguments: {} }] }]
           })]
