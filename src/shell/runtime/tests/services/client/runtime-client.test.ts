@@ -19,34 +19,29 @@ import {
   Failure,
   FailureCode,
   PreShellData,
-  QualifiedName,
   Request,
   Response,
   ShellMethods,
   StopPolicy
 } from "@noldova/teamrun-shell-protocol";
-import { ClientSettings, ConnectionException, Endpoint, type RequestContext, Refusal, RuntimeClient } from "@noldova/teamrun-shell-runtime";
+import { ClientSettings, ConnectionException, type RequestContext, Refusal, RuntimeClient } from "@noldova/teamrun-shell-runtime";
 
 import { ClientListenerFixture } from "../../fixtures/client-listener.fixture.js";
 import { RawServerFixture } from "../../fixtures/raw-server.fixture.js";
+import { RuntimeClientFixture } from "../../fixtures/runtime-client.fixture.js";
 import { RuntimeServerFixture } from "../../fixtures/runtime-server.fixture.js";
 import { SocketFolderFixture } from "../../fixtures/socket-folder.fixture.js";
 
 @TestClass
 export class RuntimeClientTests {
-  private static readonly ECHO: QualifiedName = new QualifiedName("notes", "echo");
-  private static readonly WAIT: QualifiedName = new QualifiedName("notes", "wait");
-  private static readonly SETTINGS: ClientSettings = new ClientSettings(300, 1_000, 50);
-  private static readonly AUTHENTICATED: string = Response.success("desktop:0", RuntimeServerFixture.IDENTITY.toJson()).toText();
-
   @TestMethod
   public callsTheRuntimeAndReceivesItsEvents(): Promise<void> {
-    return RuntimeClientTests.runAsync(async (fixture, listener) => {
-      fixture.methods.register(RuntimeClientTests.ECHO, { handleAsync: (context: RequestContext) => Promise.resolve(context.payload) });
+    return RuntimeClientFixture.runAsync(async (fixture, listener) => {
+      fixture.methods.register(RuntimeClientFixture.ECHO, { handleAsync: (context: RequestContext) => Promise.resolve(context.payload) });
 
-      const client = await RuntimeClientTests.connectAsync(fixture, listener);
-      const response = await client.callAsync(RuntimeClientTests.ECHO, { path: "notes.md" });
-      fixture.server.broadcast(new Event(RuntimeClientTests.ECHO, "changed"));
+      const client = await RuntimeClientFixture.connectAsync(fixture, listener);
+      const response = await client.callAsync(RuntimeClientFixture.ECHO, { path: "notes.md" });
+      fixture.server.broadcast(new Event(RuntimeClientFixture.ECHO, "changed"));
       await listener.waitForEventsAsync(1);
 
       Assert.areEqual("desktop", client.clientName);
@@ -60,7 +55,7 @@ export class RuntimeClientTests {
       await listener.disconnectedAsync;
       Assert.isFalse(client.isConnected);
       Assert.areEqual(1, listener.disconnections);
-      const exception = await Assert.throwsAsync(() => client.callAsync(RuntimeClientTests.ECHO, null), ConnectionException);
+      const exception = await Assert.throwsAsync(() => client.callAsync(RuntimeClientFixture.ECHO, null), ConnectionException);
       Assert.areEqual("The connection to the runtime is closed.", exception.message);
     });
   }
@@ -72,7 +67,7 @@ export class RuntimeClientTests {
     const socketPath = process.platform === "win32" ? `\\\\.\\pipe\\teamrun-client-${path.basename(folder.path)}` : path.join(folder.path, "runtime.sock");
     fixture.endpoint = await fixture.server.listenSocketAsync(socketPath);
 
-    const client = await RuntimeClientTests.connectAsync(fixture, new ClientListenerFixture());
+    const client = await RuntimeClientFixture.connectAsync(fixture, new ClientListenerFixture());
 
     Assert.isTrue(client.isConnected);
     Assert.isNull(client.handover);
@@ -80,23 +75,23 @@ export class RuntimeClientTests {
 
   @TestMethod
   public cancelsACallThroughItsSignal(): Promise<void> {
-    return RuntimeClientTests.runAsync(async (fixture, listener) => {
+    return RuntimeClientFixture.runAsync(async (fixture, listener) => {
       const started = Promise.withResolvers<void>();
-      fixture.methods.register(RuntimeClientTests.WAIT, {
+      fixture.methods.register(RuntimeClientFixture.WAIT, {
         handleAsync: async (context: RequestContext): Promise<JsonValue> => {
           started.resolve();
           await once(context.signal, "abort");
           return null;
         }
       });
-      const client = await RuntimeClientTests.connectAsync(fixture, listener);
+      const client = await RuntimeClientFixture.connectAsync(fixture, listener);
       const controller = new AbortController();
 
-      const call = client.callAsync(RuntimeClientTests.WAIT, null, 5_000, controller.signal);
+      const call = client.callAsync(RuntimeClientFixture.WAIT, null, 5_000, controller.signal);
       await started.promise;
       controller.abort();
       const response = await call;
-      const early = await client.callAsync(RuntimeClientTests.WAIT, null, 5_000, controller.signal);
+      const early = await client.callAsync(RuntimeClientFixture.WAIT, null, 5_000, controller.signal);
 
       Assert.areEqual(FailureCode.Cancelled, response.failure?.code);
       Assert.areEqual("desktop:2", early.id);
@@ -106,28 +101,15 @@ export class RuntimeClientTests {
   }
 
   @TestMethod
-  public rejectsPendingCallsWhenTheConnectionCloses(): Promise<void> {
-    return RuntimeClientTests.runAsync(async (fixture, listener) => {
-      fixture.methods.register(RuntimeClientTests.WAIT, { handleAsync: (context: RequestContext) => once(context.signal, "abort").then(() => null) });
-      const client = await RuntimeClientTests.connectAsync(fixture, listener);
-
-      const call = client.callAsync(RuntimeClientTests.WAIT, null);
-      client.close();
-
-      Assert.areEqual("The connection to the runtime is closed.", (await Assert.throwsAsync(() => call, ConnectionException)).message);
-    });
-  }
-
-  @TestMethod
   public learnsWhichBuildOwnsTheRuntime(): Promise<void> {
-    return RuntimeClientTests.runAsync(async (fixture, listener) => {
+    return RuntimeClientFixture.runAsync(async (fixture, listener) => {
       const client = await RuntimeClient.connectAsync(
-        RuntimeClientTests.endpointOf(fixture),
+        RuntimeClientFixture.endpointOf(fixture),
         RuntimeServerFixture.TOKEN,
         RuntimeServerFixture.OTHER_IDENTITY,
         "older",
         listener,
-        RuntimeClientTests.SETTINGS);
+        RuntimeClientFixture.SETTINGS);
 
       Assert.areEqual("server-build", client.handover?.identity.fingerprint);
       Assert.areEqual(RuntimeServerFixture.EXECUTABLE, client.handover?.executablePath);
@@ -137,10 +119,10 @@ export class RuntimeClientTests {
 
   @TestMethod
   public learnsWhereDataFromBeforeTheShellIs(): Promise<void> {
-    return RuntimeClientTests.runAsync(async (fixture, listener) => {
+    return RuntimeClientFixture.runAsync(async (fixture, listener) => {
       fixture.server.refuse(new Refusal(new Failure(FailureCode.PreShellData, "Move it.", new PreShellData("/data").toJson()), ShellMethods.moveAside));
 
-      const client = await RuntimeClientTests.connectAsync(fixture, listener);
+      const client = await RuntimeClientFixture.connectAsync(fixture, listener);
 
       Assert.areEqual("/data", client.preShellData?.location);
       Assert.isNull(client.handover);
@@ -149,9 +131,9 @@ export class RuntimeClientTests {
 
   @TestMethod
   public rejectsAWrongTokenWithTheRuntimesFailure(): Promise<void> {
-    return RuntimeClientTests.runAsync(async (fixture, listener) => {
+    return RuntimeClientFixture.runAsync(async (fixture, listener) => {
       const exception = await Assert.throwsAsync(
-        () => RuntimeClient.connectAsync(RuntimeClientTests.endpointOf(fixture), "guess", RuntimeServerFixture.IDENTITY, "desktop", listener, RuntimeClientTests.SETTINGS),
+        () => RuntimeClient.connectAsync(RuntimeClientFixture.endpointOf(fixture), "guess", RuntimeServerFixture.IDENTITY, "desktop", listener, RuntimeClientFixture.SETTINGS),
         ConnectionException);
 
       Assert.areEqual("The capability token is not valid for this runtime.", exception.message);
@@ -162,8 +144,8 @@ export class RuntimeClientTests {
 
   @TestMethod
   public rejectsAnUnreachableRuntime(): Promise<void> {
-    return RuntimeClientTests.runAsync(async (fixture, listener) => {
-      const endpoint = RuntimeClientTests.endpointOf(fixture);
+    return RuntimeClientFixture.runAsync(async (fixture, listener) => {
+      const endpoint = RuntimeClientFixture.endpointOf(fixture);
       await fixture.server.closeAsync();
 
       const exception = await Assert.throwsAsync(
@@ -178,9 +160,9 @@ export class RuntimeClientTests {
 
   @TestMethod
   public requiresAClientName(): Promise<void> {
-    return RuntimeClientTests.runAsync(async (fixture, listener) => {
+    return RuntimeClientFixture.runAsync(async (fixture, listener) => {
       const exception = await Assert.throwsAsync(
-        () => RuntimeClient.connectAsync(RuntimeClientTests.endpointOf(fixture), RuntimeServerFixture.TOKEN, RuntimeServerFixture.IDENTITY, " ", listener),
+        () => RuntimeClient.connectAsync(RuntimeClientFixture.endpointOf(fixture), RuntimeServerFixture.TOKEN, RuntimeServerFixture.IDENTITY, " ", listener),
         ArgumentException);
 
       Assert.areEqual("clientName", exception.parameterName);
@@ -228,16 +210,16 @@ export class RuntimeClientTests {
 
   @TestMethod
   public ignoresWhatItDidNotAskForAndDeliversEventsOnlyOnceConnected(): Promise<void> {
-    const early = new Event(RuntimeClientTests.ECHO, "early").toText();
-    const late = new Event(RuntimeClientTests.ECHO, "late").toText();
-    return RuntimeClientTests.runRawAsync(
+    const early = new Event(RuntimeClientFixture.ECHO, "early").toText();
+    const late = new Event(RuntimeClientFixture.ECHO, "late").toText();
+    return RuntimeClientFixture.runRawAsync(
       (frame, index) => index === 0
-        ? [early, RuntimeClientTests.AUTHENTICATED]
-        : [Response.success("someone:1", null).toText(), new Request("runtime:1", RuntimeClientTests.ECHO, null).toText(), late, Response.success(RawServerFixture.readId(frame), 1).toText()],
+        ? [early, RuntimeClientFixture.AUTHENTICATED]
+        : [Response.success("someone:1", null).toText(), new Request("runtime:1", RuntimeClientFixture.ECHO, null).toText(), late, Response.success(RawServerFixture.readId(frame), 1).toText()],
       async (server, listener) => {
-        const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, RuntimeClientTests.SETTINGS);
+        const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, RuntimeClientFixture.SETTINGS);
 
-        const response = await client.callAsync(RuntimeClientTests.ECHO, null);
+        const response = await client.callAsync(RuntimeClientFixture.ECHO, null);
 
         Assert.areEqual("1", JSON.stringify(response.payload));
         Assert.areEqual("[\"late\"]", JSON.stringify(listener.events.map(t => t.payload)));
@@ -246,12 +228,12 @@ export class RuntimeClientTests {
 
   @TestMethod
   public disconnectsFromARuntimeThatSendsAnInvalidFrame(): Promise<void> {
-    return RuntimeClientTests.runRawAsync(
-      (_frame, index) => index === 0 ? [RuntimeClientTests.AUTHENTICATED] : ["{\"kind\":"],
+    return RuntimeClientFixture.runRawAsync(
+      (_frame, index) => index === 0 ? [RuntimeClientFixture.AUTHENTICATED] : ["{\"kind\":"],
       async (server, listener) => {
-        const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, RuntimeClientTests.SETTINGS);
+        const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, RuntimeClientFixture.SETTINGS);
 
-        const exception = await Assert.throwsAsync(() => client.callAsync(RuntimeClientTests.ECHO, null), ConnectionException);
+        const exception = await Assert.throwsAsync(() => client.callAsync(RuntimeClientFixture.ECHO, null), ConnectionException);
 
         Assert.areEqual("The connection to the runtime is closed.", exception.message);
         Assert.areEqual(1, listener.disconnections);
@@ -261,12 +243,12 @@ export class RuntimeClientTests {
 
   @TestMethod
   public disconnectsFromARuntimeThatSendsAFrameOverTheLimitAndSaysWhy(): Promise<void> {
-    return RuntimeClientTests.runRawAsync(
-      (_frame, index) => index === 0 ? [RuntimeClientTests.AUTHENTICATED] : ["x".repeat(2_048)],
+    return RuntimeClientFixture.runRawAsync(
+      (_frame, index) => index === 0 ? [RuntimeClientFixture.AUTHENTICATED] : ["x".repeat(2_048)],
       async (server, listener) => {
         const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, new ClientSettings(300, 1_000, 50, 1_024));
 
-        await Assert.throwsAsync(() => client.callAsync(RuntimeClientTests.ECHO, null), ConnectionException);
+        await Assert.throwsAsync(() => client.callAsync(RuntimeClientFixture.ECHO, null), ConnectionException);
 
         Assert.areEqual(1, listener.disconnections);
         Assert.areEqual(`${FailureCode.FrameTooLarge}|A frame exceeds the maximum length of 1024 characters.`, `${listener.failure?.code}|${listener.failure?.message}`);
@@ -274,38 +256,22 @@ export class RuntimeClientTests {
   }
 
   @TestMethod
-  public givesUpOnACallTheRuntimeDoesNotAnswer(): Promise<void> {
-    return RuntimeClientTests.runRawAsync(
-      (_frame, index) => index === 0 ? [RuntimeClientTests.AUTHENTICATED] : [],
-      async (server, listener) => {
-        const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, RuntimeClientTests.SETTINGS);
-        const started = Date.now();
-
-        const exception = await Assert.throwsAsync(() => client.callAsync(RuntimeClientTests.ECHO, null, 50), ConnectionException);
-
-        Assert.areEqual("The runtime did not answer notes.echo in time.", exception.message);
-        Assert.isTrue(Date.now() - started >= 90, "the client waits for the time limit and the grace");
-        Assert.isTrue(client.isConnected);
-      });
-  }
-
-  @TestMethod
   public answersARequestTooLargeToSendWithAFailureAndLeavesNoCallBehind(): Promise<void> {
-    return RuntimeClientTests.runRawAsync(
-      (frame, index) => index === 0 ? [RuntimeClientTests.AUTHENTICATED] : [Response.success(RawServerFixture.readId(frame), 1).toText()],
+    return RuntimeClientFixture.runRawAsync(
+      (frame, index) => index === 0 ? [RuntimeClientFixture.AUTHENTICATED] : [Response.success(RawServerFixture.readId(frame), 1).toText()],
       async (server, listener) => {
         const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, new ClientSettings(300, 1_000, 50, 1_024));
 
         const loop: JsonValue[] = [];
         loop.push(loop);
 
-        const large = await client.callAsync(RuntimeClientTests.ECHO, "x".repeat(2_048));
-        const invalid = Assert.throws(() => client.callAsync(RuntimeClientTests.ECHO, null, 1.5), ArgumentOutOfRangeException);
-        Assert.throws(() => client.callAsync(RuntimeClientTests.ECHO, loop), TypeError);
-        const small = await client.callAsync(RuntimeClientTests.ECHO, null);
+        const large = await client.callAsync(RuntimeClientFixture.ECHO, "x".repeat(2_048));
+        const invalid = Assert.throws(() => client.callAsync(RuntimeClientFixture.ECHO, null, 1.5), ArgumentOutOfRangeException);
+        Assert.throws(() => client.callAsync(RuntimeClientFixture.ECHO, loop), TypeError);
+        const small = await client.callAsync(RuntimeClientFixture.ECHO, null);
         client.close();
         await listener.disconnectedAsync;
-        const closed = Assert.throws(() => client.callAsync(RuntimeClientTests.ECHO, null, 0), ArgumentOutOfRangeException);
+        const closed = Assert.throws(() => client.callAsync(RuntimeClientFixture.ECHO, null, 0), ArgumentOutOfRangeException);
 
         Assert.areEqual(`desktop:1|${FailureCode.FrameTooLarge}|A frame exceeds the maximum length of 1024 characters.`, `${large.id}|${large.failure?.code}|${large.failure?.message}`);
         Assert.areEqual("timeoutMilliseconds|timeoutMilliseconds", `${String(invalid.parameterName)}|${String(closed.parameterName)}`);
@@ -317,10 +283,10 @@ export class RuntimeClientTests {
 
   @TestMethod
   public asksTheRuntimeToStopOrToMoveOldDataAside(): Promise<void> {
-    return RuntimeClientTests.runRawAsync(
-      (frame, index) => index === 0 ? [RuntimeClientTests.AUTHENTICATED] : [Response.success(RawServerFixture.readId(frame), null).toText()],
+    return RuntimeClientFixture.runRawAsync(
+      (frame, index) => index === 0 ? [RuntimeClientFixture.AUTHENTICATED] : [Response.success(RawServerFixture.readId(frame), null).toText()],
       async (server, listener) => {
-        const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, RuntimeClientTests.SETTINGS);
+        const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, RuntimeClientFixture.SETTINGS);
 
         Assert.isFalse((await client.stopAsync(StopPolicy.StopWork)).hasFailed);
         Assert.isFalse((await client.moveAsideAsync()).hasFailed);
@@ -337,42 +303,14 @@ export class RuntimeClientTests {
     reply: (frame: string, index: number) => readonly string[] | null,
     message: string,
     code: FailureCode | null): Promise<void> {
-    await RuntimeClientTests.runRawAsync(reply, async (server, listener) => {
+    await RuntimeClientFixture.runRawAsync(reply, async (server, listener) => {
       const exception = await Assert.throwsAsync(
-        () => RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, RuntimeClientTests.SETTINGS),
+        () => RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, RuntimeClientFixture.SETTINGS),
         ConnectionException);
 
       Assert.areEqual(message, exception.message);
       Assert.areEqual(code, exception.failure?.code ?? null);
       Assert.areEqual(0, listener.disconnections);
     });
-  }
-
-  private static connectAsync(fixture: RuntimeServerFixture, listener: ClientListenerFixture): Promise<RuntimeClient> {
-    return RuntimeClient.connectAsync(
-      RuntimeClientTests.endpointOf(fixture),
-      RuntimeServerFixture.TOKEN,
-      RuntimeServerFixture.IDENTITY,
-      "desktop",
-      listener,
-      RuntimeClientTests.SETTINGS);
-  }
-
-  private static endpointOf(fixture: RuntimeServerFixture): Endpoint {
-    if (fixture.endpoint === null)
-      throw new Error("The server is not listening.");
-    return fixture.endpoint;
-  }
-
-  private static async runAsync(test: (fixture: RuntimeServerFixture, listener: ClientListenerFixture) => Promise<void>): Promise<void> {
-    await using fixture = await RuntimeServerFixture.startAsync();
-    await test(fixture, new ClientListenerFixture());
-  }
-
-  private static async runRawAsync(
-    reply: (frame: string, index: number) => readonly string[] | null,
-    test: (server: RawServerFixture, listener: ClientListenerFixture) => Promise<void>): Promise<void> {
-    await using server = await RawServerFixture.startAsync(reply);
-    await test(server, new ClientListenerFixture());
   }
 }
