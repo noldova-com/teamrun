@@ -60,7 +60,22 @@ export class CoverageRunEntryTests {
   @TestMethod
   public async failsForExclusionsThatAreNotAListOfFilesAndReasons(): Promise<void> {
     for (const exclusions of ["{", "{}", "[1]", "[{\"file\":\"a.js\"}]", "[{\"reason\":\"Why.\"}]"])
-      await this.expectFailureAsync(["coverage", "Sample", "production", "production", exclusions], "exclusions must be a JSON array");
+      await this.expectFailureAsync(["coverage", "Sample", "production", "production", exclusions, "[]"], "exclusions must be a JSON array");
+  }
+
+  @TestMethod
+  public async failsForTestFoldersThatAreNotAListOfPaths(): Promise<void> {
+    for (const testFolders of ["{", "{}", "[1]", "[\"tests\", null]"])
+      await this.expectFailureAsync(["coverage", "Sample", "production", "production", "[]", testFolders], "test folders must be a JSON array of folder paths");
+  }
+
+  @TestMethod
+  public passesAPackageWhoseOnlyUncoveredFileIsInATestFolder(): Promise<void> {
+    return this.runPackageAsync(false, async (run, summary) => {
+      Assert.areEqual(0, run.exitCode, run.errorOutput);
+      Assert.isTrue(summary.includes("| Coverage gate | Passed |"), summary);
+      Assert.isFalse(summary.includes("orphan.js"), summary);
+    }, "[]", "orphans");
   }
 
   @TestMethod
@@ -70,7 +85,7 @@ export class CoverageRunEntryTests {
 
   @TestMethod
   public failsForAnIncompleteProject(): Promise<void> {
-    return this.expectFailureAsync(["coverage", "Sample", "production", "production"], "requires a package name, a production folder, a source folder and its exclusions");
+    return this.expectFailureAsync(["coverage", "Sample", "production", "production", "[]"], "requires a name, a production folder, a source folder, its exclusions and its test folders");
   }
 
   @TestMethod
@@ -83,7 +98,7 @@ export class CoverageRunEntryTests {
     await CompiledScriptFixture.writeAsync(join(production, "sample.js"), "sample;\n");
     await writeFile(join(coverage, "coverage-1.json"), "not json");
 
-    const run = await this.runEntryAsync([coverage, "Sample", production, production, "[]"]);
+    const run = await this.runEntryAsync([coverage, "Sample", production, production, "[]", "[]"]);
 
     Assert.areEqual(1, run.exitCode);
     Assert.isTrue(run.errorOutput.includes("malformed"), run.errorOutput);
@@ -100,7 +115,7 @@ export class CoverageRunEntryTests {
     Assert.isTrue((await readFile(summaryPath, "utf8")).includes(message));
   }
 
-  private async runPackageAsync(isComplete: boolean, verify: (run: EntryRun, summary: string) => Promise<void>, exclusions: string = "[]"): Promise<void> {
+  private async runPackageAsync(isComplete: boolean, verify: (run: EntryRun, summary: string) => Promise<void>, exclusions: string = "[]", orphanFolder: string = String.empty): Promise<void> {
     using directory = new TemporaryDirectory();
     const production = join(directory.path, "production");
     const coverage = join(directory.path, "coverage");
@@ -109,13 +124,15 @@ export class CoverageRunEntryTests {
     const sampleText = "sample;\n";
     const samplePath = join(production, "sample.js");
     await CompiledScriptFixture.writeAsync(samplePath, sampleText);
-    if (!isComplete)
-      await CompiledScriptFixture.writeAsync(join(production, "orphan.js"), "orphan;\n");
+    if (!isComplete) {
+      await mkdir(join(production, orphanFolder), { recursive: true });
+      await CompiledScriptFixture.writeAsync(join(production, orphanFolder, "orphan.js"), "orphan;\n");
+    }
     const report = { result: [{ url: pathToFileURL(samplePath).href, functions: [{ ranges: [{ startOffset: 0, endOffset: sampleText.length, count: 1 }] }] }] };
     await writeFile(join(coverage, "coverage-1.json"), JSON.stringify(report));
     const summaryPath = join(directory.path, "summary.md");
 
-    const run = await this.runEntryAsync([coverage, "Sample", production, production, exclusions], summaryPath);
+    const run = await this.runEntryAsync([coverage, "Sample", production, production, exclusions, JSON.stringify(orphanFolder === String.empty ? [] : [orphanFolder])], summaryPath);
 
     await verify(run, await readFile(summaryPath, "utf8"));
   }

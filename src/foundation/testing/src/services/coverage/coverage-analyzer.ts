@@ -20,20 +20,23 @@ import { CoverageReportReader } from "./coverage-report.reader.js";
 import { FileCoverageAnalyzer } from "./file-coverage-analyzer.js";
 
 export class CoverageAnalyzer {
-  private static readonly JAVASCRIPT_FILE_SUFFIX: string = ".js";
 
   public async analyzeAsync(coverageDirectory: string, projects: readonly CoverageProject[]): Promise<CoverageResult> {
     ArgumentException.throwIfNullOrWhitespace(coverageDirectory, "coverageDirectory");
     ArgumentException.throwIfEmpty(projects, "projects");
 
-    const normalizedProjects = projects.map(t => new CoverageProject(
-      t.name,
-      this.normalizeDirectory(t.productionDirectory),
-      this.normalizeDirectory(t.sourceDirectory),
-      t.exclusions));
+    const normalizedProjects = projects.map(t => {
+      const productionDirectory = this.normalizeDirectory(t.productionDirectory);
+      return new CoverageProject(
+        t.name,
+        productionDirectory,
+        this.normalizeDirectory(t.sourceDirectory),
+        t.exclusions,
+        t.testFolders.map(u => this.normalizeDirectory(join(productionDirectory, u))));
+    });
     const expectedFilePathsByProject = new Map<CoverageProject, string[]>();
     for (const project of normalizedProjects)
-      expectedFilePathsByProject.set(project, await this.collectExpectedFilePathsAsync(project.productionDirectory));
+      expectedFilePathsByProject.set(project, (await this.collectExpectedFilePathsAsync(project.productionDirectory)).filter(t => this.isMeasured(t, project)));
 
     if ([...expectedFilePathsByProject.values()].every(t => t.length === 0))
       throw new TestingException(Resources.coverageUniverseEmpty);
@@ -41,7 +44,7 @@ export class CoverageAnalyzer {
     const scriptEntriesByFile = await new CoverageReportReader(normalizedProjects.map(t => t.productionDirectory)).readAsync(coverageDirectory);
     const fileCoverages: FileCoverage[] = [];
     for (const [project, expectedFilePaths] of expectedFilePathsByProject) {
-      const reportedFilePaths = [...scriptEntriesByFile.keys()].filter(t => t.startsWith(project.productionDirectory));
+      const reportedFilePaths = [...scriptEntriesByFile.keys()].filter(t => this.isMeasured(t, project));
       const filePaths = [...new Set([...expectedFilePaths, ...reportedFilePaths])].sort();
       const fileAnalyzer = new FileCoverageAnalyzer(project);
       const projectCoverages: FileCoverage[] = [];
@@ -60,10 +63,19 @@ export class CoverageAnalyzer {
     const expectedFilePaths: string[] = [];
     const entries = await readdir(productionDirectory, { recursive: true, withFileTypes: true });
     for (const entry of entries)
-      if (entry.isFile() && entry.name.endsWith(CoverageAnalyzer.JAVASCRIPT_FILE_SUFFIX))
+      if (entry.isFile() && this.isProductionFile(entry.name))
         expectedFilePaths.push(join(entry.parentPath, entry.name).replaceAll(Resources.windowsDirectorySeparator, Resources.directorySeparator));
 
     return expectedFilePaths;
+  }
+
+  private isProductionFile(name: string): boolean {
+    return name.endsWith(Resources.javaScriptFileSuffix)
+      || (name.endsWith(Resources.typeScriptFileSuffix) && !name.endsWith(Resources.declarationFileSuffix));
+  }
+
+  private isMeasured(filePath: string, project: CoverageProject): boolean {
+    return filePath.startsWith(project.productionDirectory) && !project.testFolders.some(t => filePath.startsWith(t));
   }
 
   private normalizeDirectory(directory: string): string {

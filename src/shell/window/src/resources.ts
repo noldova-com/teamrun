@@ -84,6 +84,8 @@ export class Resources {
   public static readonly dropAxisData: string = "dropAxis";
   public static readonly dropTargetSeparator: string = ":";
   public static readonly tabKeySelector: string = "[data-tab-key]";
+  public static readonly settingsPageSelector: string = "[data-settings-page]";
+  public static readonly currentSettingsPageSelector: string = "[aria-current=page]";
   public static readonly tabKeyData: string = "tabKey";
   public static readonly tabGroupSelector: string = "tr-tab-group";
   public static readonly tabGroupData: string = "group";
@@ -233,6 +235,7 @@ export class Resources {
   public static readonly searchSettingsLabel: string = "Search settings";
   public static readonly settingsPagesLabel: string = "Settings pages";
   public static readonly noSettingsFound: string = "No settings match your search.";
+  public static readonly settingsSearchResults: string = "Search results";
   public static readonly commandColumn: string = "Command";
   public static readonly ownerColumn: string = "From";
   public static readonly keyColumn: string = "Key";
