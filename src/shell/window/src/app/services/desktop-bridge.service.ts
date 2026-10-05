@@ -112,9 +112,9 @@ export class DesktopBridgeService {
     this.bridge.keepAppearance(preferences);
   }
 
-  public onNotificationOpened(listener: (id: number) => void): () => void {
+  public onNotificationOpened(listener: (id: string) => void): () => void {
     return this.bridge.onNotificationOpened(t => {
-      if (Number.isSafeInteger(t))
+      if (Object.isString(t) && !String.isNullOrWhitespace(t))
         listener(t);
     });
   }

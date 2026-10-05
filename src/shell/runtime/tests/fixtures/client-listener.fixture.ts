@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { Event } from "@noldova/teamrun-shell-protocol";
+import type { Event, Failure } from "@noldova/teamrun-shell-protocol";
 import type { IRuntimeClientListener } from "@noldova/teamrun-shell-runtime";
 
 export class ClientListenerFixture implements IRuntimeClientListener {
@@ -15,6 +15,7 @@ export class ClientListenerFixture implements IRuntimeClientListener {
 
   public readonly events: Event[] = [];
   public disconnections: number = 0;
+  public failure: Failure | null = null;
 
   public get disconnectedAsync(): Promise<void> {
     return this.disconnected.promise;
@@ -34,8 +35,9 @@ export class ClientListenerFixture implements IRuntimeClientListener {
     }
   }
 
-  public onDisconnected(): void {
+  public onDisconnected(failure: Failure | null): void {
     this.disconnections++;
+    this.failure = failure;
     this.disconnected.resolve();
   }
 }

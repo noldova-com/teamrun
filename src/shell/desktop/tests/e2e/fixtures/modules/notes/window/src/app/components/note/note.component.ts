@@ -20,5 +20,6 @@ export class NoteComponent {
   public readonly title: InputSignal<string> = input.required<string>();
 
   protected readonly runtime: Signal<string> = NotesState.runtime;
+  protected readonly continued: Signal<number> = NotesState.continued;
   protected readonly sections: readonly string[] = ["Context", "Goals", "Decisions", "Open questions", "Risks", "Timeline", "Owners", "Dependencies", "Testing", "Rollout", "Follow-ups", "Notes from review"];
 }

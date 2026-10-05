@@ -21,7 +21,7 @@
 
 .tr-status-bar-side {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--tr-status-bar-item-gap);
   min-width: 0;
 }

@@ -6,10 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component } from "@angular/core";
+import { ChangeDetectionStrategy, Component, type WritableSignal, signal } from "@angular/core";
 
 import { PanelSurface } from "../../enums/panel-surface";
 import { SashOrientation } from "../../enums/sash-orientation";
+import { TreeNode } from "../../models/tree-node";
 import { IconButtonComponent } from "../icon-button/icon-button.component";
 import { PanelCardComponent } from "../panel-card/panel-card.component";
 import { SashComponent } from "../sash/sash.component";
@@ -18,13 +19,14 @@ import { ToolbarButtonComponent } from "../toolbar-button/toolbar-button.compone
 import { ToolbarItemDirective } from "../toolbar/toolbar-item.directive";
 import { ToolbarDirective } from "../toolbar/toolbar.directive";
 import { TooltipDirective } from "../tooltip/tooltip.directive";
+import { TreeComponent } from "../tree/tree.component";
 import { ViewBadgeComponent } from "../view-badge/view-badge.component";
 import { GalleryResources } from "./gallery-resources";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
 
 @Component({
   selector: "tr-gallery-navigation",
-  imports: [GallerySpecimenComponent, IconButtonComponent, PanelCardComponent, SashComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, ViewBadgeComponent],
+  imports: [GallerySpecimenComponent, IconButtonComponent, PanelCardComponent, SashComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, TreeComponent, ViewBadgeComponent],
   templateUrl: "./gallery-navigation.component.html",
   styleUrl: "./gallery-navigation.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -33,4 +35,16 @@ export class GalleryNavigationComponent {
   protected readonly text: typeof GalleryResources.text = GalleryResources.text;
   protected readonly surfaces: typeof PanelSurface = PanelSurface;
   protected readonly orientations: typeof SashOrientation = SashOrientation;
+  protected readonly treeNodes: readonly TreeNode[] = [
+    TreeNode.open(this.text.treeProject, this.text.treeProject, this.text.glyphFolder, [
+      new TreeNode(this.text.treeSource, this.text.treeSource, this.text.glyphFolder, [
+        new TreeNode(this.text.treeApp, this.text.treeApp, this.text.glyphDescription),
+        new TreeNode(this.text.treeStyles, this.text.treeStyles, this.text.glyphDescription)
+      ]),
+      new TreeNode(this.text.treeReadme, this.text.treeReadme, this.text.glyphDescription)
+    ]),
+    new TreeNode(this.text.treeNotes, this.text.treeNotes, this.text.glyphDescription),
+    new TreeNode(this.text.treeLong, this.text.treeLong, this.text.glyphDescription)
+  ];
+  protected readonly treeCurrent: WritableSignal<string> = signal(GalleryResources.text.treeNotes);
 }

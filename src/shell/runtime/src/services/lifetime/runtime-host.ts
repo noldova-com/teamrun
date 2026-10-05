@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -124,7 +125,8 @@ export class RuntimeHost implements IIdleParticipant {
       new RuntimeHandover(this.identity, process.execPath),
       this.methods,
       options.serverSettings,
-      () => this.idle.check());
+      () => this.idle.check(),
+      log.diagnostics);
     this.events = new EventRegistry(this.server);
     this.publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(platform, new SystemCommand(), environment));
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
@@ -133,7 +135,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.commands = new CommandRegistry(t => commandsChanged.publish(t.toJson()));
     const notificationsChanged = this.events.declare(ShellEvents.notifications);
     this.notifications = new NotificationCenter(
-      t => notificationsChanged.publish(new NotificationBroadcast(t.notifications, this.notificationSettings.quietDevices, this.notificationSettings.mutedModules, this.notifications.sequence).toJson()), () => new Date());
+      t => notificationsChanged.publish(new NotificationBroadcast(t.notifications, this.notificationSettings.quietDevices, this.notificationSettings.mutedModules, this.notifications.sequence).toJson()), () => new Date(), randomUUID);
     this.modules = new ModuleHost(
       declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics,
       this.work, new DiagnosticRedactor(homedir()));

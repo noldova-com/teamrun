@@ -10,7 +10,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { inspect } from "node:util";
 
 import "@noldova/teamrun-foundation-core";
-import { type Event, type RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
+import { type Event, type Failure, type RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
 import {
   ConnectionException,
   type IRuntimeClientListener,
@@ -53,7 +53,7 @@ export class RuntimeStartup {
     this.log = log;
     this.listener = {
       onEvent: t => this.forward(t),
-      onDisconnected: () => this.reconnect()
+      onDisconnected: t => this.reconnect(t)
     };
   }
 
@@ -147,7 +147,9 @@ export class RuntimeStartup {
     }
   }
 
-  private reconnect(): void {
+  private reconnect(failure: Failure | null): void {
+    if (!Object.isNull(failure))
+      this.log(Resources.formatConnectionEnded(failure.code, failure.message));
     if (Object.isNull(this.connectionValue) || this.isClosed)
       return;
     this.connectionValue = null;

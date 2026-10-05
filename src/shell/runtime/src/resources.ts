@@ -351,6 +351,7 @@ export class Resources {
   public static readonly defaultRequestTimeoutParameterName: string = "defaultRequestTimeout";
   public static readonly maximumRequestTimeoutParameterName: string = "maximumRequestTimeout";
   public static readonly callTimeoutParameterName: string = "callTimeout";
+  public static readonly timeoutMillisecondsParameterName: string = "timeoutMilliseconds";
   public static readonly answerGraceParameterName: string = "answerGrace";
   public static readonly clientNameParameterName: string = "clientName";
   public static readonly clientParameterName: string = "client";
@@ -605,7 +606,7 @@ export class Resources {
     return `The command ${name} is already registered.`;
   }
 
-  public static formatNotificationKindChanged(id: number, kind: string): string {
+  public static formatNotificationKindChanged(id: string, kind: string): string {
     return `Notification ${id} is of the kind ${kind}, which an update keeps.`;
   }
 
@@ -617,7 +618,7 @@ export class Resources {
     return `The module ${moduleId} may not offer the command ${command} in a notification; it must be its own or a dependency's.`;
   }
 
-  public static formatNotificationNotFound(id: number): string {
+  public static formatNotificationNotFound(id: string): string {
     return `Notification ${id} is gone; it was dismissed or its module stopped.`;
   }
 
@@ -719,6 +720,10 @@ export class Resources {
 
   public static formatEventWithdrawn(name: string): string {
     return `The event ${name} is no longer declared.`;
+  }
+
+  public static formatEventNotSent(name: string, reason: string): string {
+    return `The runtime sent the event ${name} to no client: ${reason}\n`;
   }
 
   public static formatUnknownMethod(name: string): string {

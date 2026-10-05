@@ -9,7 +9,7 @@
 import { setImmediate } from "node:timers/promises";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, Event, PreShellData, QualifiedName, RunningWork, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
+import { BuildIdentity, Event, Failure, FailureCode, PreShellData, QualifiedName, RunningWork, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, LaunchException, PreShellDataFoundException, RuntimeHandoverException, WorkInProgressException } from "@noldova/teamrun-shell-runtime";
 import { RuntimeStartup, type StartupState } from "@noldova/teamrun-shell-desktop";
 
@@ -171,12 +171,15 @@ export class RuntimeStartupTests {
 
     await startup.startAsync();
     launcher.listener?.onEvent(new Event(new QualifiedName("notes", "changed"), null));
-    launcher.listener?.onDisconnected();
+    launcher.listener?.onDisconnected(new Failure(FailureCode.FrameTooLarge, "A frame exceeds the maximum length of 16777216 characters."));
     await setImmediate();
 
     Assert.areEqual(2, launcher.calls.length);
     Assert.areEqual("Ready", startup.current.kind);
     Assert.areEqual(JSON.stringify(["notes.changed"]), JSON.stringify(this.events));
+    Assert.areEqual(
+      JSON.stringify(["The desktop ended its connection to the runtime, so it connects again (FrameTooLarge): A frame exceeds the maximum length of 16777216 characters."]),
+      JSON.stringify(this.logged));
   }
 
   @TestMethod
@@ -185,7 +188,7 @@ export class RuntimeStartupTests {
     const startup = this.create(launcher);
 
     await startup.startAsync();
-    launcher.listener?.onDisconnected();
+    launcher.listener?.onDisconnected(null);
     await setImmediate();
     const failed = startup.current.toJson();
     Assert.isTrue(await startup.actAsync("retry"));
@@ -202,7 +205,7 @@ export class RuntimeStartupTests {
     const startup = this.create(launcher);
 
     await startup.startAsync();
-    launcher.listener?.onDisconnected();
+    launcher.listener?.onDisconnected(null);
     await setImmediate();
 
     Assert.areEqual(1, launcher.calls.length);
@@ -216,7 +219,7 @@ export class RuntimeStartupTests {
 
     await startup.startAsync();
     startup.close();
-    launcher.listener?.onDisconnected();
+    launcher.listener?.onDisconnected(null);
     const lateConnection = new FakeRuntimeConnection();
     const late = this.create(new FakeRuntimeLauncher(lateConnection));
     const arriving = late.startAsync();

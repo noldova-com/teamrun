@@ -113,7 +113,7 @@ test.describe("key bindings", () => {
     await expect(note(window, 3)).toBeVisible();
 
     await window.locator("tr-tab[data-tab-key=\"document/shell.settings\"]").click();
-    await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
+    await window.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true }).click();
     await shortcut(window, "clock.tick").getByRole("button", { name: "Reset Tick" }).click();
     await expect(keyOf(window, "clock.tick")).toHaveText("No key");
     await expect(shortcut(window, "clock.tick").locator(".tr-shortcut-collision")).toHaveText(label("Ctrl+Alt+T is taken by New note", "⌥⌘T is taken by New note"));

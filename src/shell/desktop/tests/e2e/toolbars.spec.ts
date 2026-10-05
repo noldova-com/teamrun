@@ -197,6 +197,28 @@ test.describe("toolbars", () => {
     await desktop.checkpointAsync("toolbars-gaps-no-row");
   });
 
+  test("the status bar's items stand 0.25rem below the panels and 0.25rem above the window's edge, in light and dark", async ({ desktop }) => {
+    const window = desktop.window;
+    for (const mode of WindowModeFixture.modes) {
+      await WindowModeFixture.setAsync(window, mode);
+      const gaps = await window.evaluate(() => {
+        const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+        const panels = Math.max(...[...document.querySelectorAll("tr-tab-group")].map(t => t.getBoundingClientRect().bottom));
+        const items = [...document.querySelectorAll<HTMLElement>("tr-status-bar tr-status-bar-item, tr-status-bar tr-notifications, tr-status-bar tr-module-failures")]
+          .filter(t => t.checkVisibility()).map(t => t.getBoundingClientRect());
+        return {
+          above: items.map(t => Math.round((t.top - panels) / rem * 1000) / 1000),
+          below: items.map(t => Math.round((document.documentElement.clientHeight - t.bottom) / rem * 1000) / 1000)
+        };
+      });
+
+      expect(gaps.above.length).toBeGreaterThan(0);
+      expect(gaps.above.every(t => t === 0.25)).toBe(true);
+      expect(gaps.below.every(t => t === 0.25)).toBe(true);
+      await desktop.checkpointAsync(`status-bar-gaps-${mode.toLowerCase()}`);
+    }
+  });
+
   test("a button runs its command, a dropdown opens its place, a choice shows and changes the checked row, a toggle shows its state and a dynamic group's rows run", async ({ desktop }) => {
     const window = desktop.window;
     const main = toolbar(window, "notes.main");
@@ -349,7 +371,7 @@ test.describe("toolbars", () => {
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.main", "notes.spare", "notes.second"]]);
 
     await dragAsync(window, "notes.spare", rows => ({ x: first(rows).left + 20, y: first(rows).top + 2 }));
-    await expect(window.locator(".tr-toolbar-drop-row")).toBeVisible();
+    await expect(window.locator(".tr-drop-line-row")).toBeVisible();
     await window.mouse.up();
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.spare"], ["notes.main", "notes.second"]]);
     await desktop.checkpointAsync("toolbars-stacked");

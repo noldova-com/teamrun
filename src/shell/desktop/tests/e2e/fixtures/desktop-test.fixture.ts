@@ -9,6 +9,7 @@
 import { test as base, expect } from "@playwright/test";
 
 import BuildVariantFixture from "./build-variant.fixture.ts";
+import CleanupSteps from "./cleanup-steps.ts";
 import DesktopApplicationFixture from "./desktop-application.fixture.ts";
 
 export const test = base.extend<{
@@ -26,23 +27,27 @@ export const test = base.extend<{
   desktopWindowPlacement: [false, { option: true }],
   desktop: async ({ desktopEnvironment, desktopDataFiles, desktopArguments, desktopVariant, desktopWindowPlacement }, use, testInfo) => {
     let desktop: DesktopApplicationFixture | null = null;
+    let failure: { readonly error: unknown } | null = null;
     try {
       if (desktopVariant !== null)
         await BuildVariantFixture.swapInAsync(desktopVariant);
       desktop = await DesktopApplicationFixture.launchAsync(testInfo, desktopEnvironment, desktopDataFiles, desktopArguments, desktopWindowPlacement);
       await use(desktop);
     }
-    finally {
-      try {
-        await desktop?.disposeAsync();
-      }
-      finally {
-        if (desktop !== null)
-          await DesktopApplicationFixture.stopRuntimeAsync(desktop.dataDirectory);
-        await BuildVariantFixture.restoreAsync();
-      }
+    catch (error) {
+      failure = { error };
     }
-    expect(desktop.failures).toEqual([]);
+    const cleanup = await CleanupSteps.collectFailuresAsync([
+      async () => {
+        await desktop?.disposeAsync();
+      },
+      () => BuildVariantFixture.restoreAsync()
+    ]);
+    await CleanupSteps.attachAsync(testInfo, cleanup);
+    if (failure !== null)
+      throw failure.error;
+    CleanupSteps.throwFailures(cleanup);
+    expect(desktop?.failures).toEqual([]);
   }
 });
 

@@ -165,6 +165,7 @@ export class Resources {
     "number-field-width",
     "setting-marker",
     "tree-row-height",
+    "tree-indent",
     "settings-search-width",
     "settings-pages-width",
     "settings-content-width",
@@ -289,6 +290,7 @@ export class Resources {
   public static readonly valueAttribute: string = "data-value";
   public static readonly previewDescription: string = "Preview";
   public static readonly submenuGlyph: string = "chevron_right";
+  public static readonly twistieGlyph: string = "chevron_right";
   public static readonly toolbarChevronGlyph: string = "expand_more";
   public static readonly menuPopup: string = "menu";
   public static readonly trueValue: string = "true";

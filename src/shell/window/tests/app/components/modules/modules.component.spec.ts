@@ -200,7 +200,7 @@ describe("ModulesComponent", () => {
       expect(current.backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "list.inactiveSelectionBackground"));
       expect([title.fontWeight, title.color]).toEqual(["600", AppearanceFixture.readColor(DefaultTheme.theme, mode, "settings.headerForeground")]);
       expect(getComputedStyle(host.querySelector(".tr-modules-state-icon") as Element).color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "errorForeground"));
-      expect(getComputedStyle(host.querySelector(".tr-modules-row-version") as Element).color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "teamrun.mutedForeground"));
+      expect(getComputedStyle(host.querySelector(".tr-modules-row-version") as Element).color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "foreground"));
       expect(getComputedStyle(link("dependents", "Alarm")).color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "textLink.foreground"));
       fixture.destroy();
     }

@@ -16,7 +16,7 @@ test.use({ desktopVariant: BuildVariantFixture.noModules });
 
 const colors = {
   light: { window: "rgb(248, 248, 248)", panel: "rgb(255, 255, 255)", cardBorder: "rgb(229, 229, 229)", titleBar: "rgb(248, 248, 248)", titleBarText: "rgb(30, 30, 30)", text: "rgb(59, 59, 59)" },
-  dark: { window: "rgb(24, 24, 24)", panel: "rgb(31, 31, 31)", cardBorder: "rgb(37, 37, 38)", titleBar: "rgb(24, 24, 24)", titleBarText: "rgb(204, 204, 204)", text: "rgb(204, 204, 204)" }
+  dark: { window: "rgb(24, 24, 24)", panel: "rgb(31, 31, 31)", cardBorder: "rgb(37, 37, 37)", titleBar: "rgb(24, 24, 24)", titleBarText: "rgb(204, 204, 204)", text: "rgb(204, 204, 204)" }
 };
 
 test.describe("the empty window", () => {
@@ -100,6 +100,7 @@ test.describe("the empty window", () => {
         isDark: matchMedia("(prefers-color-scheme: dark)").matches,
         body: getComputedStyle(document.body).backgroundColor,
         rowLook: lookHeight("window-row-height"),
+        barLook: lookHeight("status-bar-height"),
         row: { height: row.height, background: row.backgroundColor, color: row.color, borderBottom: row.borderBottomWidth },
         bar: { height: bar.height, paddingLeft: bar.paddingLeft, paddingRight: bar.paddingRight, gap: side.columnGap, background: bar.backgroundColor, borderTop: bar.borderTopWidth },
         card: { border: card.borderTopWidth, borderColor: card.borderTopColor, radius: card.borderTopLeftRadius, background: card.backgroundColor, color: card.color },
@@ -113,7 +114,7 @@ test.describe("the empty window", () => {
 
     expect(measured.body).toBe(expected.window);
     expect(measured.row).toEqual({ height: measured.rowLook, background: expected.titleBar, color: expected.titleBarText, borderBottom: "0px" });
-    expect(measured.bar).toEqual({ height: "28px", paddingLeft: "8px", paddingRight: "8px", gap: "4px", background: expected.window, borderTop: "0px" });
+    expect(measured.bar).toEqual({ height: measured.barLook, paddingLeft: "8px", paddingRight: "8px", gap: "4px", background: expected.window, borderTop: "0px" });
     expect(measured.card).toEqual({ border: "1px", borderColor: expected.cardBorder, radius: "8px", background: expected.panel, color: expected.text });
     expect(measured.cardBounds["x"]).toBe(4);
     expect(measured.cardBounds["y"]).toBe(measured.rowBottom);

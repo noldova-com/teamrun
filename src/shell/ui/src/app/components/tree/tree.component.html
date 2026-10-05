@@ -1,0 +1,21 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<cdk-tree class="tr-tree" [dataSource]="data()" [childrenAccessor]="childrenOf" [expansionKey]="keyOf" [trackBy]="trackBy" [attr.aria-label]="label()">
+  <cdk-tree-node *cdkTreeNodeDef="let node; level as level" #row="cdkTreeNode" class="tr-tree-row" [class.tr-tree-row-current]="node.id === current()"
+    [isExpandable]="node.isBranch" [cdkTreeNodeTypeaheadLabel]="node.label" [attr.aria-selected]="node.id === current()"
+    [style.--tr-tree-level]="level" (click)="choose(node)" (activation)="choose(node)" (focus)="take(row)">
+    @if (hasBranches()) {
+      <span class="tr-tree-twistie material-symbols-rounded" [class.tr-tree-twistie-open]="row.isExpanded" aria-hidden="true">{{ node.isBranch ? resources.twistieGlyph : null }}</span>
+    }
+    @if (node.icon; as icon) {
+      <span class="tr-tree-icon material-symbols-rounded" aria-hidden="true">{{ icon }}</span>
+    }
+    <span class="tr-tree-label">{{ node.label }}</span>
+  </cdk-tree-node>
+</cdk-tree>

@@ -66,11 +66,11 @@ body {
   line-height: 1;
 }
 
-:where(button, a, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not(:disabled, [aria-disabled="true"]) {
+:where(button, a, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [role="treeitem"]):not(:disabled, [aria-disabled="true"]) {
   cursor: pointer;
 }
 
-:where(button, a, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [role="separator"]):focus-visible {
+:where(button, a, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [role="treeitem"], [role="separator"]):focus-visible {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: calc(var(--tr-border-width) * -1);
 }

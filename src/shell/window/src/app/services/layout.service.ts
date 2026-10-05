@@ -6,17 +6,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal, computed, effect, inject, signal } from "@angular/core";
+import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal, computed, effect, inject, linkedSignal, signal, untracked } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import { JsonException } from "@noldova/teamrun-foundation-json";
 
 import { Resources } from "../../resources";
 import type { BottomDockSpan } from "../enums/bottom-dock-span";
-import type { DockSide } from "../enums/dock-side";
+import { DockSide } from "../enums/dock-side";
 import { DockStyle } from "../enums/dock-style";
 import { StartupStateKind } from "../enums/startup-state-kind";
 import type { ILayoutStore } from "../interfaces/i-layout-store";
+import { DockYield } from "../models/layout/dock-yield";
 import type { DocumentTab } from "../models/layout/document-tab";
 import type { DropTarget } from "../models/layout/drop-target";
 import { Layout } from "../models/layout/layout";
@@ -54,7 +55,12 @@ export class LayoutService {
   public readonly iconSides: Signal<ReadonlySet<DockSide>> = computed(() =>
     new Set([...Resources.dockStyleSettings].filter(([, name]) => this.settings.values().get(name) === DockStyle.Icons).map(([side]) => side)));
   public readonly previewTabs: Signal<boolean> = computed(() => this.settings.values().get(Resources.previewTabsSetting) !== false);
-  public readonly geometry: Signal<LayoutGeometry> = computed(() => new LayoutGeometry(this.width(), this.height(), this.layoutState(), this.registryState(), this.iconSides()));
+  private readonly kept: WritableSignal<DockSide | null> = signal(null);
+  public readonly geometry: Signal<LayoutGeometry> = linkedSignal({
+    source: () => ({ width: this.width(), height: this.height(), layout: this.layoutState(), registry: this.registryState(), iconSides: this.iconSides(), kept: this.kept() }),
+    computation: (source, previous?: { readonly value: LayoutGeometry }) => new LayoutGeometry(source.width, source.height, source.layout, source.registry, source.iconSides,
+      new DockYield(source.layout.middleSize ?? Resources.middlePreferredSize, previous?.value.closedSides ?? new Set(), source.kept))
+  });
   public readonly currentGroup: Signal<TabGroup> = computed(() => {
     const id = this.currentGroupId();
     return (Object.isNull(id) ? null : this.layoutState().group(id)) ?? this.layoutState().documents;
@@ -79,6 +85,8 @@ export class LayoutService {
   public setViewport(width: number, height: number): void {
     this.width.set(width);
     this.height.set(height);
+    if (!untracked(() => this.geometry().isKeeping))
+      this.kept.set(null);
   }
 
   public async loadAsync(): Promise<boolean> {
@@ -137,11 +145,31 @@ export class LayoutService {
   }
 
   public toggleDock(side: DockSide): void {
+    if (this.geometry().closedSides.has(side)) {
+      this.kept.set(side);
+      return;
+    }
     this.update(this.layoutState().toggleDock(side));
+    if (this.kept() === side)
+      this.kept.set(null);
   }
 
-  public resizeDock(side: DockSide, size: number | null): void {
-    this.update(this.layoutState().resizeDock(side, size));
+  public keepOpen(side: DockSide): void {
+    if (this.geometry().closedSides.has(side))
+      this.kept.set(side);
+  }
+
+  public resizeDock(side: DockSide, size: number): void {
+    const layout = this.layoutState().resizeDock(side, size);
+    if (side === DockSide.Bottom) {
+      this.update(layout);
+      return;
+    }
+    const geometry = this.geometry();
+    const other = side === DockSide.Left ? DockSide.Right : DockSide.Left;
+    const shown = geometry.dock(other).width;
+    const held = geometry.isCollapsed(other) || layout.dock(other).preferredTrack <= shown + Resources.panelGap ? layout : layout.resizeDock(other, shown);
+    this.update(held.withMiddleSize(this.middleAfter(side, size)));
   }
 
   public setBottomSpan(span: BottomDockSpan): void {
@@ -158,6 +186,12 @@ export class LayoutService {
 
   public reset(): void {
     this.update(this.layoutState().reset(this.registryState()));
+  }
+
+  private middleAfter(side: DockSide, size: number): number | null {
+    const geometry = this.geometry();
+    const middle = geometry.middle.width + geometry.dock(side).width - size;
+    return middle < Resources.middlePreferredSize ? Math.max(0, middle) : null;
   }
 
   private reveal(tab: Tab): void {

@@ -217,17 +217,17 @@ describe("DesktopBridgeService", () => {
     expect([bridge.copied, bridge.logFolderOpens]).toEqual([["clock: Failed"], 1]);
   });
 
-  it("passes on the id of a notification opened from the operating system and ignores one that is not a whole number", () => {
+  it("passes on the id of a notification opened from the operating system and ignores a blank one", () => {
     const bridge = DesktopBridgeFixture.install();
-    const opened: number[] = [];
+    const opened: string[] = [];
 
     const stop = TestBed.inject(DesktopBridgeService).onNotificationOpened(t => opened.push(t));
-    bridge.publishNotificationOpened(2);
-    bridge.publishNotificationOpened(1.5);
+    bridge.publishNotificationOpened("n2");
+    bridge.publishNotificationOpened(" ");
     stop();
-    bridge.publishNotificationOpened(3);
+    bridge.publishNotificationOpened("n3");
 
-    expect(opened).toEqual([2]);
+    expect(opened).toEqual(["n2"]);
   });
 
   it("passes on the device's last appearance and keeps the window's", () => {
