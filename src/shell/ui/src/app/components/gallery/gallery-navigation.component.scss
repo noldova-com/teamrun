@@ -8,7 +8,7 @@
 
 :host {
   display: grid;
-  gap: var(--tr-space-4);
+  gap: var(--tr-space-6);
 }
 
 .tr-gallery-strip {
@@ -34,7 +34,7 @@
 .tr-gallery-sash-box {
   display: flex;
   align-items: stretch;
-  width: 12rem;
+  width: 12.5rem;
   height: 4rem;
 }
 
@@ -49,7 +49,7 @@
 }
 
 .tr-gallery-card {
-  width: 12rem;
+  width: 12.5rem;
   padding: var(--tr-space-3);
   box-sizing: border-box;
 }

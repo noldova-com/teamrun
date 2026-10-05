@@ -1,0 +1,11 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+$hover: ":is(:hover, [data-tr-state=\"Hover\"])";
+$focus-visible: ":is(:focus-visible, [data-tr-state=\"Focus\"])";
+$focus: ":is(:focus, [data-tr-state=\"Focus\"])";

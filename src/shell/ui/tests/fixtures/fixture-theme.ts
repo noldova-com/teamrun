@@ -230,7 +230,7 @@ export class FixtureTheme {
     ["settings-item-description-gap", "0.25rem"],
     ["settings-item-control-gap", "0.75rem"],
     ["settings-heading-space", "0.75rem"],
-    ["settings-heading-inset", "1.125rem"]
+    ["settings-content-inset", "1.125rem"]
   ]);
   private static readonly SHAPES: ReadonlyMap<string, string> = new Map([["tab", "pill"]]);
 
