@@ -47,6 +47,7 @@ export class RuntimeServerTests {
   private static readonly WAIT: QualifiedName = new QualifiedName("notes", "wait");
   private static readonly MOVE: QualifiedName = new QualifiedName("notes", "move");
   private static readonly LARGE: QualifiedName = new QualifiedName("notes", "large");
+  private static readonly BROKEN: QualifiedName = new QualifiedName("notes", "broken");
   private static readonly ECHO_HANDLER: IMethodHandler = {
     handleAsync: (context: RequestContext) => Promise.resolve({ client: context.client, payload: context.payload })
   };
@@ -148,15 +149,20 @@ export class RuntimeServerTests {
   }
 
   @TestMethod
-  public answersAnAnswerTooLargeToSendWithAFailureAndKeepsTheConnection(): Promise<void> {
+  public answersAnAnswerItCannotSendWithAFailureAndKeepsTheConnection(): Promise<void> {
     return RuntimeServerTests.runAsync(new ServerSettings(1_024, 1_000, 1_000, 1_000), async fixture => {
       fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
       fixture.methods.register(RuntimeServerTests.LARGE, { handleAsync: () => Promise.resolve("x".repeat(2_048)) });
+      fixture.methods.register(RuntimeServerTests.BROKEN, { handleAsync: () => Promise.resolve(1n as unknown as JsonValue) });
       const connection = await fixture.authenticateAsync();
 
-      connection.sendMessages(new Request("tester:1", RuntimeServerTests.LARGE, null), new Request("tester:2", RuntimeServerTests.ECHO, 1));
+      connection.sendMessages(
+        new Request("tester:1", RuntimeServerTests.LARGE, null),
+        new Request("tester:2", RuntimeServerTests.BROKEN, null),
+        new Request("tester:3", RuntimeServerTests.ECHO, 1));
 
       RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.FrameTooLarge, "A frame exceeds the maximum length of 1024 characters.", "tester:1");
+      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.Internal, "The runtime failed to handle the request.", "tester:2");
       Assert.areEqual("{\"client\":\"tester\",\"payload\":1}", JSON.stringify((await connection.readResponseAsync()).payload));
       Assert.isFalse(connection.isClosed);
     });

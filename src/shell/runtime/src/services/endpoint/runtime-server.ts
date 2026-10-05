@@ -152,9 +152,7 @@ export class RuntimeServer implements IEventSink {
       session.send(response);
     }
     catch (error) {
-      if (!(error instanceof ProtocolException))
-        throw error;
-      session.send(Response.failure(response.id, new Failure(error.code, error.message)));
+      session.send(Response.failure(response.id, RuntimeServer.describeFailure(error)));
     }
   }
 
