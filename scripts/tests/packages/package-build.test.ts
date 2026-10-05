@@ -214,9 +214,10 @@ class PackageBuildTests {
       ]);
     });
 
-    test("a module's part package is packed and installed at the module's version, and raising it rebuilds that package and recompiles the tests",{ timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
+    test("a module's part package is packed and installed at the module's version, and raising it changes the fingerprint, rebuilds that package and recompiles the tests", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
       const tasks = "@noldova/teamrun-modules-tasks-runtime";
+      await PackageTreeFixture.writeRootAsync(repository, ["tasks"]);
       await PackageTreeFixture.writePackageAsync(repository, "modules-tasks-runtime", ["shell-beta"], false, false, "src/modules/tasks/runtime");
       const declare = (version: string): Record<string, string> => ({
         "src/modules/tasks/module.json": JSON.stringify({ id: "tasks", version, displayName: "Tasks", description: "Used by the tests.", parts: ["runtime"], dependencies: [], contributes: {} })
@@ -227,11 +228,13 @@ class PackageBuildTests {
         JSON.parse(await readFile(path.join(repository.directory, "node_modules", "@noldova", "teamrun-modules-tasks-runtime", "package.json"), "utf8")) as Readonly<Record<string, unknown>>;
       await PackageBuildTests.buildAsync(build);
       const first = await installed();
+      const fingerprint = await build.hashFingerprintAsync(BuildVariant.REGULAR);
 
       await repository.writeAsync(declare("0.4.0"));
       const raised = await PackageBuildTests.buildAsync(build);
       await build.requireCurrentAsync(BuildVariant.REGULAR);
 
+      assert.notEqual(await build.hashFingerprintAsync(BuildVariant.REGULAR), fingerprint);
       assert.deepEqual([first["version"], first["dependencies"]], ["0.3.0", { [PackageBuildTests.BETA]: "0.0.7" }]);
       assert.equal((await installed())["version"], "0.4.0");
       assert.ok(existsSync(path.join(repository.directory, "_build", "archives", "noldova-teamrun-modules-tasks-runtime-0.4.0.tgz")));

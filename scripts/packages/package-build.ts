@@ -58,7 +58,7 @@ export default class PackageBuild {
       return packages;
 
     const rootManifest = await RootManifest.readAsync(this.layout.root);
-    const versions = await PackageVersions.readAsync(this.layout.root, rootManifest.productVersion, packages);
+    const versions = await PackageVersions.readAsync(this.modules, rootManifest.productVersion, packages);
     const archives = packages.map(t => this.layout.locateArchive(t, versions.of(t.name)));
     const common = await this.hashCommonInputsAsync();
     const builder = new PackageBuilder(this.layout, rootManifest, versions, this.runner, new NpmCommand(this.runner, this.environment));
@@ -101,7 +101,7 @@ export default class PackageBuild {
     if (packages.length === 0)
       return;
 
-    const versions = await PackageVersions.readAsync(this.layout.root, (await RootManifest.readAsync(this.layout.root)).productVersion, packages);
+    const versions = await PackageVersions.readAsync(this.modules, (await RootManifest.readAsync(this.layout.root)).productVersion, packages);
     const common = await this.hashCommonInputsAsync();
     const archiveHashes = new Map<string, string>();
     const stale: string[] = [];

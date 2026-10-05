@@ -6,8 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import ModuleCatalog from "../modules/module-catalog.ts";
+import type ModuleCatalog from "../modules/module-catalog.ts";
 import type PackageManifest from "./package-manifest.ts";
+import PackageException from "./package.exception.ts";
 
 export default class PackageVersions {
   private static readonly VERSION_FIELD: string = "version";
@@ -21,8 +22,11 @@ export default class PackageVersions {
     this.moduleVersions = new Map(moduleVersions);
   }
 
-  public static async readAsync(root: string, productVersion: string, packages: readonly PackageManifest[]): Promise<PackageVersions> {
-    const parts = new Map<string, string>((await new ModuleCatalog(root).readAllAsync()).declarations.flatMap(t => t.parts.map(u => [`${t.folder}/${u}`, t.version] as const)));
+  public static async readAsync(modules: ModuleCatalog, productVersion: string, packages: readonly PackageManifest[]): Promise<PackageVersions> {
+    const inventory = await modules.readAllAsync();
+    if (inventory.problems.length > 0)
+      throw new PackageException(`The build cannot version the module packages: ${inventory.problems.join(" ")}`);
+    const parts = new Map<string, string>(inventory.declarations.flatMap(t => t.parts.map(u => [`${t.folder}/${u}`, t.version] as const)));
     const moduleVersions = new Map<string, string>();
     for (const manifest of packages) {
       const version = parts.get(manifest.directory);
@@ -43,7 +47,7 @@ export default class PackageVersions {
     return JSON.stringify({
       ...fields,
       [PackageVersions.VERSION_FIELD]: this.of(manifest.name),
-      ...PackageVersions.DEPENDENCIES_FIELD in fields ? { [PackageVersions.DEPENDENCIES_FIELD]: Object.fromEntries(dependencies) } : {}
+      ...(PackageVersions.DEPENDENCIES_FIELD in fields ? { [PackageVersions.DEPENDENCIES_FIELD]: Object.fromEntries(dependencies) } : {})
     }, null, 2);
   }
 }

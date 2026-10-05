@@ -18,7 +18,7 @@ import ModuleSettings from "./module-settings.ts";
 export default class ModuleDeclaration {
   private static readonly FILE_NAME: string = "module.json";
   private static readonly ID_PATTERN: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-  private static readonly VERSION_PATTERN: RegExp = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
+  private static readonly VERSION_PATTERN: RegExp = /^(?:0|[1-9]\d{0,8})\.(?:0|[1-9]\d{0,8})\.(?:0|[1-9]\d{0,8})$/;
   private static readonly MEMBER_PATTERN: RegExp = /^[a-z][a-zA-Z0-9]*$/;
   private static readonly RESERVED_ID: string = "shell";
   private static readonly KINDS: readonly string[] = [
@@ -95,7 +95,7 @@ export default class ModuleDeclaration {
       throw fail(`must have the id "${path.posix.basename(folder)}", its folder's name: lowercase kebab-case and not "${ModuleDeclaration.RESERVED_ID}"`);
     const version = record.get("version");
     if (typeof version !== "string" || !ModuleDeclaration.VERSION_PATTERN.test(version))
-      throw fail("must have a version of the form <major>.<minor>.<patch>, such as 0.0.1");
+      throw fail("must have a version of the form <major>.<minor>.<patch>: three whole numbers of up to nine digits without leading zeros, such as 0.0.1");
     const displayName = record.get("displayName");
     if (typeof displayName !== "string" || displayName.trim().length === 0)
       throw fail("must have a display name");

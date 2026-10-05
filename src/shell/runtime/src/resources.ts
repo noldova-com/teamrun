@@ -28,7 +28,7 @@ export class Resources {
   public static readonly rootNotAbsolute: string = "The data directory must be an absolute path.";
   public static readonly migrationIdInvalid: string = "A migration id is lowercase letters and digits separated by single hyphens.";
   public static readonly moduleIdInvalid: string = "A module id is lowercase kebab-case and is not \"shell\".";
-  public static readonly moduleVersionInvalid: string = "A module's version must have the form <major>.<minor>.<patch>, such as 0.0.1.";
+  public static readonly moduleVersionInvalid: string = "A module's version must have the form <major>.<minor>.<patch>: three whole numbers of up to nine digits without leading zeros, such as 0.0.1.";
   public static readonly ownershipDatabaseFileName: string = "ownership.sqlite";
   public static readonly shellDatabaseFileName: string = "shell.sqlite";
   public static readonly discoveryFolderName: string = "discovery";
@@ -57,7 +57,7 @@ export class Resources {
   public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   public static readonly migrationIdPattern: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
   public static readonly reservedModuleId: string = "shell";
-  public static readonly moduleVersionPattern: RegExp = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/;
+  public static readonly moduleVersionPattern: RegExp = /^(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})$/;
   public static readonly movedFolderInfix: string = "-before-shell-";
   public static readonly timestampSeparatorPattern: RegExp = /[-:]|\.\d+/g;
   public static readonly acquireOwnershipStatement: string = "BEGIN EXCLUSIVE";

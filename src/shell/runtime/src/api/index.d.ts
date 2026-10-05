@@ -3057,8 +3057,8 @@ export declare class ModuleDeclaration {
    * Creates the declaration.
    *
    * @param id The module's id: lowercase kebab-case and not `shell`.
-   * @param version Its own version, `<major>.<minor>.<patch>` without leading
-   * zeros, such as `0.0.1`.
+   * @param version Its own version, `<major>.<minor>.<patch>`: three whole
+   * numbers of up to nine digits without leading zeros, such as `0.0.1`.
    * @param displayName The name people see; not whitespace only.
    * @param description What the module does; not whitespace only.
    * @param dependencies The ids of the modules it depends on.

@@ -96,8 +96,8 @@ class ModuleDeclarationTests {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
 
-      for (const version of [undefined, 1, "", "1.2", "1.2.3.4", "01.2.3", "1.02.3", "v1.2.3", "1.2.3-beta"])
-        await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...ModuleDeclarationTests.VALID, version }), "must have a version of the form <major>.<minor>.<patch>, such as 0.0.1");
+      for (const version of [undefined, 1, "", "1.2", "1.2.3.4", "01.2.3", "1.02.3", "v1.2.3", "1.2.3-beta", "1000000000.0.0"])
+        await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...ModuleDeclarationTests.VALID, version }), "must have a version of the form <major>.<minor>.<patch>: three whole numbers of up to nine digits without leading zeros, such as 0.0.1");
     });
 
     test("unknown, repeated or missing parts and invalid or own dependencies are refused", async t => {

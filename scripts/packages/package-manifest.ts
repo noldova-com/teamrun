@@ -51,7 +51,7 @@ export default class PackageManifest {
     if (typeof manifest !== "object" || manifest === null || !("name" in manifest) || typeof manifest.name !== "string")
       throw new PackageException(`${file} must have a name.`);
     if (!("version" in manifest) || manifest.version !== PackageManifest.VERSION_PLACEHOLDER)
-      throw new PackageException(`${file} must have the version "${PackageManifest.VERSION_PLACEHOLDER}"; the build stamps the product version.`);
+      throw new PackageException(`${file} must have the version "${PackageManifest.VERSION_PLACEHOLDER}"; the build stamps its module's version or the product version.`);
 
     const dependencies = "dependencies" in manifest ? manifest.dependencies : {};
     if (typeof dependencies !== "object" || dependencies === null)

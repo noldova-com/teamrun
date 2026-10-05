@@ -76,6 +76,7 @@ export class ModuleDeclarationTests {
   @TestMethod
   @TestData("0.0.1")
   @TestData("10.200.3000")
+  @TestData("999999999.999999999.999999999")
   public acceptsAVersionOfThreeNumbers(version: string): void {
     Assert.areEqual(version, new ModuleDeclaration("notes", version, "Notes", "Keeps notes.", [], null, new Map()).version);
     Assert.areEqual(version, ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, version }).version);
@@ -88,6 +89,7 @@ export class ModuleDeclarationTests {
   @TestData("01.2.3")
   @TestData("v1.2.3")
   @TestData("1.2.3-beta")
+  @TestData("1000000000.0.0")
   public refusesAnInvalidVersion(version: string): void {
     Assert.areEqual("version", Assert.throws(() => new ModuleDeclaration("notes", version, "Notes", "Keeps notes.", [], null, new Map()), ArgumentException).parameterName);
     Assert.areEqual(

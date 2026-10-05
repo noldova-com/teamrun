@@ -77,9 +77,9 @@ export class ModuleStatusTests {
 
   @TestMethod
   public acceptsOnlyAVersionOfThreeNumbers(): void {
-    for (const version of ["0.0.1", "1.20.300", "10.0.0"])
+    for (const version of ["0.0.1", "1.20.300", "999999999.0.0"])
       Assert.areEqual(version, new ModuleStatus("notes", version, "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null).version);
-    for (const version of ["", "1", "1.2", "1.2.3.4", "01.2.3", "1.02.3", "v1.2.3", "1.2.3-beta", "1.2.3 ", "1.-2.3"])
+    for (const version of ["", "1", "1.2", "1.2.3.4", "01.2.3", "1.02.3", "v1.2.3", "1.2.3-beta", "1.2.3 ", "1.-2.3", "1000000000.0.0"])
       Assert.areEqual("version", Assert.throws(() => new ModuleStatus("notes", version, "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null), ArgumentException).parameterName);
   }
 
