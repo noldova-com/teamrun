@@ -11,7 +11,7 @@ import path from "node:path";
 
 import ProductIdentity from "../packages/product-identity.ts";
 import type RootManifest from "../packages/root-manifest.ts";
-import type PackageTarget from "./package-target.ts";
+import PackageTarget from "./package-target.ts";
 
 export default class PackageConfiguration {
   private static readonly LICENSE_FILE: string = "LICENSE";
@@ -21,8 +21,6 @@ export default class PackageConfiguration {
   private static readonly LICENSES_FOLDER: string = "licenses";
   private static readonly WINDOW_LICENSES_FILE: string = "window-third-party.txt";
   private static readonly EXTENSION_MACRO: string = "${ext}";
-  private static readonly WINDOWS: string = "windows";
-  private static readonly MACOS: string = "macos";
   private static readonly MAC_CATEGORY: string = "public.app-category.developer-tools";
   private static readonly LINUX_CATEGORY: string = "Development";
   private static readonly APPIMAGE_TOOLSET: string = "1.0.3";
@@ -72,7 +70,7 @@ export default class PackageConfiguration {
       npmRebuild: false,
       nodeGypRebuild: false,
       buildDependenciesFromSource: false,
-      electronFuses: this.target.platform === PackageConfiguration.MACOS ? { ...PackageConfiguration.FUSES, resetAdHocDarwinSignature: true } : PackageConfiguration.FUSES,
+      electronFuses: this.target.platform === PackageTarget.MACOS ? { ...PackageConfiguration.FUSES, resetAdHocDarwinSignature: true } : PackageConfiguration.FUSES,
       extraResources: this.listLicenses(),
       publish: null,
       ...this.describePlatform()
@@ -90,12 +88,12 @@ export default class PackageConfiguration {
     const target = this.target.formats.map(t => ({ target: t, arch: [this.target.architecture] }));
     const artifactName = this.target.formatFileName(product.name, PackageConfiguration.EXTENSION_MACRO);
     switch (this.target.platform) {
-      case PackageConfiguration.WINDOWS:
+      case PackageTarget.WINDOWS:
         return {
           win: { target, icon: path.join(icons, ProductIdentity.WINDOWS_ICON_FILE), artifactName },
           nsis: { oneClick: true, perMachine: false, deleteAppDataOnUninstall: false, shortcutName: product.name, uninstallDisplayName: product.name, artifactName }
         };
-      case PackageConfiguration.MACOS:
+      case PackageTarget.MACOS:
         return { mac: { target, icon: path.join(icons, ProductIdentity.MAC_ICON_FILE), category: PackageConfiguration.MAC_CATEGORY, artifactName } };
       default:
         return {

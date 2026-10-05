@@ -22,6 +22,10 @@ class ProcessResultTests {
       assert.equal(new ProcessResult(1, "", "").isSuccessful, false);
       assert.equal(new ProcessResult(null, "", "").isSuccessful, false);
     });
+
+    test("the text is the output followed by the error output, without surrounding white space", () => {
+      assert.equal(new ProcessResult(1, "\nout\n", "err\n").text, "out\nerr");
+    });
   }
 }
 

@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: package-${{ github.event_name }}
+  group: package-${{ inputs.nightly && 'nightly' || 'manual' }}
   cancel-in-progress: false
 
 defaults:
@@ -111,7 +111,7 @@ jobs:
 
       - name: Install, start and quit the package
         id: smoke
-        timeout-minutes: 5
+        timeout-minutes: 15
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
             xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run package:smoke

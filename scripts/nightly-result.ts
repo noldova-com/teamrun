@@ -69,7 +69,7 @@ export default class NightlyResult {
 
     const named = outcome === NightlyResult.SUCCESS ? [] : await this.readFailuresAsync(label, part, outcome);
     const failures = outcome === NightlyResult.SUCCESS || named.length > 0 ? named
-      : [new NightlyFailure(`${label}${NightlyResult.WHOLE_RUN}`, outcome === NightlyResult.CANCELLED ? NightlyResult.TIMED_OUT : NightlyResult.UNNAMED, 1)];
+      : [new NightlyFailure(`${label}${NightlyResult.WHOLE_RUN}`, NightlyResult.explain(outcome, NightlyResult.UNNAMED), 1)];
     const folder = path.join(this.root, ...NightlyResult.RESULT_SEGMENTS);
     await mkdir(folder, { recursive: true });
     await writeFile(path.join(folder, NightlyResult.fileNameOf(label)), new NightlyLegResult(label, failures).toJson());
@@ -77,12 +77,16 @@ export default class NightlyResult {
     return 0;
   }
 
+  private static explain(outcome: string, failure: string): string {
+    return outcome === NightlyResult.CANCELLED ? NightlyResult.TIMED_OUT : failure;
+  }
+
   private async readFailuresAsync(label: string, part: string, outcome: string): Promise<readonly NightlyFailure[]> {
     if (part === NightlyResult.TESTS_PART)
       return this.readChecksAsync();
     if (part === NightlyResult.WORKFLOWS_PART)
       return this.readWorkflowsAsync();
-    return [new NightlyFailure(label, outcome === NightlyResult.CANCELLED ? NightlyResult.TIMED_OUT : NightlyResult.PACKAGING_FAILED, 1)];
+    return [new NightlyFailure(label, NightlyResult.explain(outcome, NightlyResult.PACKAGING_FAILED), 1)];
   }
 
   private async readChecksAsync(): Promise<readonly NightlyFailure[]> {

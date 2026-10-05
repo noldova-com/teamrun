@@ -30,12 +30,12 @@ class PackageWorkflowTests {
   private static readonly NIGHTLY_TARGETS: readonly string[] = ["Linux x64", "Windows x64"];
 
   public static register(): void {
-    test("packaging runs by hand or when the nightly run calls it, one run per kind of start at a time, never for a push or a pull request, and only reads the repository", async () => {
+    test("packaging runs by hand or when the nightly run calls it, one nightly and one run by hand at a time, never for a push or a pull request, and only reads the repository", async () => {
       const text = (await WorkflowFileFixture.readAsync(PackageWorkflowTests.WORKFLOW)).text;
 
       assert.ok(text.includes("on:\n  workflow_call:\n    inputs:\n      nightly:\n"));
       assert.ok(text.includes("        type: boolean\n        required: true\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\n"));
-      assert.ok(text.includes("concurrency:\n  group: package-${{ github.event_name }}\n  cancel-in-progress: false\n"));
+      assert.ok(text.includes("concurrency:\n  group: package-${{ inputs.nightly && 'nightly' || 'manual' }}\n  cancel-in-progress: false\n"));
       assert.equal(text.match(/^\s+\w[\w-]*: write$/gm), null);
       assert.deepEqual([...text.matchAll(/\$\{\{ ([^}]+) \}\}/g)].map(t => t[1] ?? "").filter(t => t.startsWith("secrets.")), []);
       assert.equal(text.match(/persist-credentials: false/g)?.length, 1);
@@ -69,6 +69,7 @@ class PackageWorkflowTests {
       assert.ok(workflow.text.includes("      - name: Prepare the job\n        timeout-minutes: 15\n        uses: ./.github/actions/prepare\n        with:\n          architecture: ${{ matrix.architecture }}\n"));
       assert.ok(workflow.text.includes(`      - name: ${PackageWorkflowTests.LIBFUSE_STEP}\n        if: runner.os == 'Linux'\n`));
       assert.equal(workflow.readStepScript("Make the package"), "npm run package\n");
+      assert.ok(workflow.text.includes(`      - name: ${PackageWorkflowTests.SMOKE_STEP}\n        id: smoke\n        timeout-minutes: 15\n`));
       assert.equal(workflow.readStepScript(PackageWorkflowTests.SMOKE_STEP), [
         "if [ \"$RUNNER_OS\" = Linux ]; then",
         "  xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run package:smoke",

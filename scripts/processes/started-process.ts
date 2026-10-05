@@ -9,6 +9,8 @@
 import type { ChildProcess } from "node:child_process";
 import { setTimeout } from "node:timers/promises";
 
+import ProcessException from "./process.exception.ts";
+
 export default class StartedProcess {
   private readonly child: ChildProcess;
   private readonly exited: Promise<void>;
@@ -19,7 +21,9 @@ export default class StartedProcess {
   }
 
   public get id(): number {
-    return Number(this.child.pid);
+    if (this.child.pid === undefined)
+      throw new ProcessException("The process has no process ID, because it never started.");
+    return this.child.pid;
   }
 
   public get hasExited(): boolean {

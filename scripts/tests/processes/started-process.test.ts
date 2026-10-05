@@ -7,9 +7,10 @@
  */
 
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { ChildProcess, spawn } from "node:child_process";
 import { test } from "node:test";
 
+import ProcessException from "../../processes/process.exception.ts";
 import StartedProcess from "../../processes/started-process.ts";
 
 class StartedProcessTests {
@@ -37,6 +38,10 @@ class StartedProcessTests {
 
       assert.equal(await started.waitAsync(StartedProcessTests.TIMEOUT), true);
       assert.deepEqual([started.hasExited, started.exitCode], [true, null]);
+    });
+
+    test("a process that never started has no process ID and says so", () => {
+      assert.throws(() => new StartedProcess(new ChildProcess()).id, new ProcessException("The process has no process ID, because it never started."));
     });
   }
 }
