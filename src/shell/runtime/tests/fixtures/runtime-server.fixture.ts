@@ -6,8 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { BuildIdentity, Handshake, type Response, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
-import { CapabilityToken, type Endpoint, MethodRegistry, RuntimeServer, ServerSettings } from "@noldova/teamrun-shell-runtime";
+import { once } from "node:events";
+
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { Assert } from "@noldova/teamrun-foundation-testing";
+import { BuildIdentity, type FailureCode, Handshake, QualifiedName, type Response, RuntimeHandover } from "@noldova/teamrun-shell-protocol";
+import { CapabilityToken, type Endpoint, type IMethodHandler, MethodRegistry, type RequestContext, RuntimeServer, ServerSettings } from "@noldova/teamrun-shell-runtime";
 
 import { RawConnectionFixture } from "./raw-connection.fixture.js";
 import { TextOutputFixture } from "./text-output.fixture.js";
@@ -17,6 +21,11 @@ export class RuntimeServerFixture implements AsyncDisposable {
   public static readonly OTHER_IDENTITY: BuildIdentity = new BuildIdentity("1.2.3", BuildIdentity.supportedProtocolVersion, "other-build");
   public static readonly TOKEN: string = "fixture-token";
   public static readonly EXECUTABLE: string = "/opt/teamrun/teamrun";
+  public static readonly ECHO: QualifiedName = new QualifiedName("notes", "echo");
+  public static readonly WAIT: QualifiedName = new QualifiedName("notes", "wait");
+  public static readonly ECHO_HANDLER: IMethodHandler = {
+    handleAsync: (context: RequestContext) => Promise.resolve({ client: context.client, payload: context.payload })
+  };
 
   private readonly connections: RawConnectionFixture[] = [];
   private readonly waiters: Set<() => void> = new Set();
@@ -92,5 +101,27 @@ export class RuntimeServerFixture implements AsyncDisposable {
     for (const connection of this.connections)
       connection[Symbol.dispose]();
     await this.server.closeAsync();
+  }
+
+  public static createWaitHandler(signals: AbortSignal[], started: PromiseWithResolvers<void> = Promise.withResolvers<void>()): IMethodHandler {
+    return {
+      handleAsync: async (context: RequestContext): Promise<JsonValue> => {
+        signals.push(context.signal);
+        started.resolve();
+        await once(context.signal, "abort");
+        return "late";
+      }
+    };
+  }
+
+  public static assertFailure(response: Response, code: FailureCode, message: string, id: string | null): void {
+    Assert.areEqual(id, response.id);
+    Assert.areEqual(code, response.failure?.code);
+    Assert.areEqual(message, response.failure?.message);
+  }
+
+  public static async runAsync(settings: ServerSettings | undefined, test: (fixture: RuntimeServerFixture) => Promise<void>, listen: boolean = true): Promise<void> {
+    await using fixture = listen ? await RuntimeServerFixture.startAsync(settings) : new RuntimeServerFixture(settings);
+    await test(fixture);
   }
 }
