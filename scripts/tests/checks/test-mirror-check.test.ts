@@ -52,14 +52,15 @@ class TestMirrorCheckTests {
         "src/shell/desktop/electron.config.ts": TestMirrorCheckTests.CLASS,
         "src/shell/desktop/tests/e2e/launch.spec.ts": TestMirrorCheckTests.CLASS,
         "src/shell/desktop/tests/e2e/fixtures/modules/clock/window/src/face.ts": TestMirrorCheckTests.CLASS,
-        "src/eslint.config.js": "export default () => [];\n"
+        "src/modules/clock/window/src/face.ts": "export const face = \"round\";\n",
+        "src/modules/clock/e2e/clock.spec.ts": TestMirrorCheckTests.CLASS
       });
       const output = new TextOutputFixture();
 
       const check = TestMirrorCheckTests.createCheck(repository);
 
       assert.equal(await check.runAsync(output), true);
-      assert.equal(output.text, "Checked 7 production files and 4 tests in 3 packages.\n");
+      assert.equal(output.text, "Checked 8 production files and 4 tests in 4 packages.\n");
       assert.equal(check.title, "Test mirrors");
     });
 
@@ -71,7 +72,8 @@ class TestMirrorCheckTests {
         "src/foundation/clock/tests/services/timer.test.ts": TestMirrorCheckTests.CLASS,
         "src/shell/window/src/app/models/row.ts": "export class Row {\n  public constructor(title: string) {\n    console.log(title);\n  }\n}\n",
         "src/shell/window/tests/app/models/old-row.spec.ts": TestMirrorCheckTests.CLASS,
-        "src/modules/notes/window/src/view.ts": "export const show = function (): void {};\n"
+        "src/modules/notes/window/src/view.ts": "export const show = function (): void {};\n",
+        "src/modules/notes/window/tests/e2e/view.spec.ts": TestMirrorCheckTests.CLASS
       });
       const output = new TextOutputFixture();
 
@@ -81,11 +83,14 @@ class TestMirrorCheckTests {
         "src/foundation/clock/tests/services/timer.test.ts: mirrors no production file; "
         + `${TestMirrorCheckTests.RULE} has each test mirror one of src/foundation/clock/src/services/timer.ts, src/foundation/clock/src/services/timer.mts, src/foundation/clock/src/services/timer.cts.`,
         `src/modules/notes/window/src/view.ts: has a function body but no mirrored test src/modules/notes/window/tests/view.spec.ts; ${TestMirrorCheckTests.RULE} gives every executable production file one.`,
+        "src/modules/notes/window/tests/e2e/view.spec.ts: mirrors no production file; "
+        + `${TestMirrorCheckTests.RULE} has each test mirror one of src/modules/notes/window/src/e2e/view.ts, src/modules/notes/window/src/e2e/view.mts, `
+        + "src/modules/notes/window/src/e2e/view.cts, src/modules/notes/window/src/e2e/view.scss.",
         `src/shell/window/src/app/models/row.ts: has a function body but no mirrored test src/shell/window/tests/app/models/row.spec.ts; ${TestMirrorCheckTests.RULE} gives every executable production file one.`,
         "src/shell/window/tests/app/models/old-row.spec.ts: mirrors no production file; "
         + `${TestMirrorCheckTests.RULE} has each test mirror one of src/shell/window/src/app/models/old-row.ts, src/shell/window/src/app/models/old-row.mts, `
         + "src/shell/window/src/app/models/old-row.cts, src/shell/window/src/app/models/old-row.scss.",
-        "Checked 3 production files and 2 tests in 3 packages.",
+        "Checked 3 production files and 3 tests in 3 packages.",
         ""
       ].join("\n"));
     });

@@ -8,6 +8,7 @@
 
 import * as nodeModule from "node:module";
 
+import type ITypeStripApi from "./interfaces/type-strip-api.ts";
 import TypeStripException from "./type-strip.exception.ts";
 
 export default class TypeStripper {
@@ -16,7 +17,7 @@ export default class TypeStripper {
 
   private readonly stripTypes: ((code: string) => string) | undefined;
 
-  public constructor(api: { readonly stripTypeScriptTypes?: (code: string) => string } = nodeModule) {
+  public constructor(api: ITypeStripApi = nodeModule) {
     this.stripTypes = api.stripTypeScriptTypes;
   }
 

@@ -20,7 +20,8 @@ import type ICheck from "./interfaces/check.ts";
 export default class TestMirrorCheck implements ICheck {
   private static readonly SOURCE_FOLDER: string = "src";
   private static readonly TESTS_FOLDER: string = "tests";
-  private static readonly EXEMPT_FOLDERS: ReadonlySet<string> = new Set(["fixtures", "e2e"]);
+  private static readonly FIXTURES_FOLDER: string = "fixtures";
+  private static readonly WORKFLOW_FOLDER: RegExp = /^src\/(?:shell\/desktop\/tests\/e2e|modules\/[^/]+\/e2e)\//;
   private static readonly SOURCE_EXTENSIONS: readonly string[] = [".ts", ".mts", ".cts"];
   private static readonly STYLE_EXTENSION: string = ".scss";
   private static readonly DECLARATION: RegExp = /\.d\.[cm]?ts$/;
@@ -64,7 +65,7 @@ export default class TestMirrorCheck implements ICheck {
         }
         for (const file of files.filter(t => t.path.startsWith(testPrefix) && t.path.endsWith(suffix))) {
           const relative = file.path.slice(testPrefix.length);
-          if ([...TestMirrorCheck.EXEMPT_FOLDERS].some(t => relative.startsWith(`${t}/`)))
+          if (relative.startsWith(`${TestMirrorCheck.FIXTURES_FOLDER}/`) || TestMirrorCheck.WORKFLOW_FOLDER.test(file.path))
             continue;
           testCount++;
           const base = `${sourcePrefix}${relative.slice(0, -suffix.length)}`;
