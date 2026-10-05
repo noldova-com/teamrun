@@ -20,7 +20,6 @@ import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtim
 import { WindowPartFailureException } from "../../../src/app/exceptions/window-part-failure.exception";
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
-import type { IWindowPartContext } from "../../../src/app/interfaces/i-window-part-context";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { DocumentContribution } from "../../../src/app/models/document-contribution";
 import { DocumentTab } from "../../../src/app/models/layout/document-tab";
@@ -50,41 +49,10 @@ import { ViewDialogService } from "../../../src/app/services/view-dialog.service
 import { SettingsService } from "../../../src/app/services/settings.service";
 import { WindowPartHostService } from "../../../src/app/services/window-part-host.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
+import { WindowPartFixture } from "../../fixtures/window-part.fixture";
 
 @Component({ template: "" })
 class ContentComponent {
-}
-
-class FakeWindowPart implements IWindowPart {
-  private readonly log: string[];
-  private readonly onActivate: (context: IWindowPartContext) => void;
-
-  public readonly moduleId: string;
-  public isDeactivationFailing: boolean = false;
-  public onReconnect: () => boolean = () => false;
-
-  public constructor(moduleId: string, log: string[], onActivate: (context: IWindowPartContext) => void = () => undefined) {
-    this.moduleId = moduleId;
-    this.log = log;
-    this.onActivate = onActivate;
-  }
-
-  public async activateAsync(context: IWindowPartContext): Promise<void> {
-    this.log.push(`activate ${this.moduleId}`);
-    await Promise.resolve();
-    this.onActivate(context);
-  }
-
-  public async reconnectAsync(): Promise<boolean> {
-    this.log.push(`reconnect ${this.moduleId}`);
-    await Promise.resolve();
-    return this.onReconnect();
-  }
-
-  public deactivateAsync(): Promise<void> {
-    this.log.push(`deactivate ${this.moduleId}`);
-    return this.isDeactivationFailing ? Promise.reject(new Error(`${this.moduleId} did not stop`)) : Promise.resolve();
-  }
 }
 
 describe("WindowPartHostService", () => {
@@ -104,13 +72,13 @@ describe("WindowPartHostService", () => {
     documents: readonly string[] = [`${moduleId}.note`]): WindowPartSource =>
     new WindowPartSource(moduleId, dependencies, views, documents, commands, statusBarItems, topBarActions, notifications,
       () => part instanceof Error ? Promise.reject(part) : Promise.resolve(part));
-  const notesPart = (log: string[]): FakeWindowPart => new FakeWindowPart("notes", log, t => {
+  const notesPart = (log: string[]): WindowPartFixture => new WindowPartFixture("notes", log, t => {
     t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load));
     t.registerDocument(new DocumentContribution("notes.note", load));
     t.openDocument("notes.note", "1", "Note 1");
   });
-  const clockPart = (log: string[]): FakeWindowPart =>
-    new FakeWindowPart("clock", log, t => t.registerView(new ViewContribution("clock.list", "Clock", "schedule", DockSide.Right, true, load)));
+  const clockPart = (log: string[]): WindowPartFixture =>
+    new WindowPartFixture("clock", log, t => t.registerView(new ViewContribution("clock.list", "Clock", "schedule", DockSide.Right, true, load)));
   let bridge: DesktopBridgeFixture;
   let errors: unknown[];
   let log: string[];
@@ -207,7 +175,7 @@ describe("WindowPartHostService", () => {
 
   it("names the reported modules while their window parts activate and lists them for the Modules document once activation ends", async () => {
     let during: readonly unknown[] = [];
-    const part = new FakeWindowPart("notes", log, () => {
+    const part = new WindowPartFixture("notes", log, () => {
       const statuses = TestBed.inject(ModuleStatusService);
       during = [statuses.nameOf("tasks"), statuses.nameOf("notes"), statuses.modules()];
     });
@@ -246,7 +214,7 @@ describe("WindowPartHostService", () => {
   });
 
   it("reports a window part that cannot load or activate as failed, withdraws what it registered and blocks its dependents", async () => {
-    const failing = new FakeWindowPart("clock", log, t => {
+    const failing = new WindowPartFixture("clock", log, t => {
       t.registerView(new ViewContribution("clock.face", "Clock", "schedule", DockSide.Right, true, load));
       throw new Error("The clock broke.");
     });
@@ -307,7 +275,7 @@ describe("WindowPartHostService", () => {
     }));
     const refusals: unknown[] = [];
     const post = new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Success, null, [], null);
-    const notes = new FakeWindowPart("notes", log, t => {
+    const notes = new WindowPartFixture("notes", log, t => {
       t.postNotificationAsync(post).catch((error: unknown) => refusals.push(error));
     });
     const { host, loads } = start([source("notes", notes, [], [], [], [], [], ["notes.saved"])], [status("notes")]);
@@ -325,7 +293,7 @@ describe("WindowPartHostService", () => {
 
   it("lists the runtime's and the window parts' commands in module order and runs both", async () => {
     const runs: string[] = [];
-    const notes = new FakeWindowPart("notes", log, t => {
+    const notes = new WindowPartFixture("notes", log, t => {
       t.registerCommand(new CommandContribution("notes.newNote", "New note", "note_add", "Mod+Alt+N", async u => {
         runs.push(`notes.newNote ${JSON.stringify(u)}`);
         return "opened";
@@ -411,11 +379,11 @@ describe("WindowPartHostService", () => {
   });
 
   it("shows the window parts' bar items in module order and withdraws a module's items when it no longer activates", async () => {
-    const notes = new FakeWindowPart("notes", log, t => {
+    const notes = new WindowPartFixture("notes", log, t => {
       t.registerStatusBarItem(new StatusBarItemContribution("notes.count", StatusBarSide.Left, new StatusBarItemState("2 notes")));
       t.registerTopBarAction(new TopBarActionContribution("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote")));
     });
-    const clock = new FakeWindowPart("clock", log, t => {
+    const clock = new WindowPartFixture("clock", log, t => {
       t.registerStatusBarItem(new StatusBarItemContribution("clock.ticks", StatusBarSide.Right, new StatusBarItemState("No ticks")));
       t.registerStatusBarItem(new StatusBarItemContribution("clock.zone", StatusBarSide.Left, new StatusBarItemState("UTC")));
       t.registerTopBarAction(new TopBarActionContribution("clock.reset", new TopBarActionState("restart_alt", "Reset", "clock.tick")));
@@ -439,7 +407,7 @@ describe("WindowPartHostService", () => {
   });
 
   it("fails a window part that registers a command the runtime part registered, and replaces the commands when the runtime returns", async () => {
-    const notes = new FakeWindowPart("notes", log, t => t.registerCommand(new CommandContribution("notes.sync", "Sync", null, null, () => Promise.resolve(null))));
+    const notes = new WindowPartFixture("notes", log, t => t.registerCommand(new CommandContribution("notes.sync", "Sync", null, null, () => Promise.resolve(null))));
     bridge.responses.set("shell.commands", { payload: { commands: [{ name: "notes.sync", title: "Sync" }], sequence: 1 } });
     const { host } = start([source("notes", notes, [], [], ["notes.sync"])], [status("notes")]);
     const commands = TestBed.inject(CommandService);
@@ -470,7 +438,7 @@ describe("WindowPartHostService", () => {
   });
 
   it("opens documents asked for during activation after the layout loads, reports refused ones, and opens later ones at once", async () => {
-    const part = new FakeWindowPart("notes", log, t => {
+    const part = new WindowPartFixture("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
       t.openDocument("notes.note", "1", "Note 1");
       t.openDocument("notes.note", "2", " ");
@@ -486,7 +454,7 @@ describe("WindowPartHostService", () => {
   it("restores the saved documents a part opens during activation with the saved active one, leaves out one the layout lacks, and opens it when asked later", async () => {
     const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
     const saved = Layout.createDefault(new ViewRegistry([], [])).openDocument(note("1")).openDocument(note("2")).openDocument(note("3")).activate(note("1"));
-    const part = new FakeWindowPart("notes", log, t => {
+    const part = new WindowPartFixture("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
       ["1", "2", "3", "4"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
     });
@@ -505,7 +473,7 @@ describe("WindowPartHostService", () => {
   it("opens a document asked for after activation but before the saved layout is read, and still leaves out a start open the layout lacks", async () => {
     const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
     const saved = Layout.createDefault(new ViewRegistry([], [])).openDocument(note("1")).openDocument(note("2"));
-    const part = new FakeWindowPart("notes", log, t => {
+    const part = new WindowPartFixture("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
       ["1", "3"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
     });
@@ -524,7 +492,7 @@ describe("WindowPartHostService", () => {
 
   it("keeps the active document when the runtime is ready again, and adds a document the parts open while reactivating that is not open", async () => {
     const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
-    const part = new FakeWindowPart("notes", log, t => {
+    const part = new WindowPartFixture("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
       ["1", "2"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
     });
@@ -543,7 +511,7 @@ describe("WindowPartHostService", () => {
   });
 
   it("keeps a preview asked to be kept before the layout loads, and keeps one at once afterwards", async () => {
-    const part = new FakeWindowPart("notes", log, t => {
+    const part = new WindowPartFixture("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
       t.openDocument("notes.note", "0", "Note 0");
       t.openDocument("notes.note", "1", "Note 1", { preview: true });
@@ -575,7 +543,7 @@ describe("WindowPartHostService", () => {
   });
 
   it("writes a window part's log lines through the desktop under its module's id", async () => {
-    const part = new FakeWindowPart("notes", log, t => t.log("Opened the list"));
+    const part = new WindowPartFixture("notes", log, t => t.log("Opened the list"));
     const { host } = start([source("notes", part)], [status("notes")]);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
@@ -592,7 +560,7 @@ describe("WindowPartHostService", () => {
   });
 
   it("rebuilds the parts that don't continue when the runtime is ready again, deactivating them in reverse, and loads the layout only once", async () => {
-    const tasks = new FakeWindowPart("tasks", log);
+    const tasks = new WindowPartFixture("tasks", log);
     const notes = notesPart(log);
     tasks.isDeactivationFailing = true;
     const { host, loads } = start([source("tasks", tasks), source("notes", notes, ["tasks"])], [status("tasks"), status("notes", ModuleState.Active, null, ["tasks"])]);
@@ -631,9 +599,9 @@ describe("WindowPartHostService", () => {
   });
 
   it("rebuilds a part that asks to be or fails to continue, logging the failure under its module's id, and every part that depends on a rebuilt one", async () => {
-    const tasks = new FakeWindowPart("tasks", log);
-    const notes = new FakeWindowPart("notes", log);
-    const clock = new FakeWindowPart("clock", log);
+    const tasks = new WindowPartFixture("tasks", log);
+    const notes = new WindowPartFixture("notes", log);
+    const clock = new WindowPartFixture("clock", log);
     tasks.onReconnect = () => {
       throw new Error("tasks lost its state");
     };
@@ -661,15 +629,15 @@ describe("WindowPartHostService", () => {
   it("withdraws a kept part whose module is no longer active, showing its views' failure, activates a module that became active, keeps the revision of a module that stays failed and moves on one whose failure changed", async () => {
     const tabs = [new ViewTab("notes.list"), new ViewTab("clock.list"), new ViewTab("tasks.list"), new ViewTab("calendar.list")];
     const during: [number[], (string | null)[]][] = [];
-    const notes = new FakeWindowPart("notes", log, t => t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load)));
-    const clock = new FakeWindowPart("clock", log, t => {
+    const notes = new WindowPartFixture("notes", log, t => t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load)));
+    const clock = new WindowPartFixture("clock", log, t => {
       t.registerView(new ViewContribution("clock.list", "Clock", "schedule", DockSide.Right, true, load));
       const host = TestBed.inject(WindowPartHostService);
       during.push([tabs.map(u => host.revisionOf(u)), tabs.map(u => host.findFailure(u)?.cause ?? null)]);
     });
     notes.onReconnect = () => true;
     const { host } = start(
-      [source("notes", notes), source("clock", clock), source("tasks", new FakeWindowPart("tasks", log)), source("calendar", new FakeWindowPart("calendar", log))],
+      [source("notes", notes), source("clock", clock), source("tasks", new WindowPartFixture("tasks", log)), source("calendar", new WindowPartFixture("calendar", log))],
       [status("notes"), status("clock", ModuleState.Failed, "It broke."), status("tasks", ModuleState.Failed, "It is broken."), status("calendar", ModuleState.Failed, "It did not start.")]);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
     const revisions = tabs.map(t => host.revisionOf(t));
@@ -695,7 +663,7 @@ describe("WindowPartHostService", () => {
   it("moves on the revision of a module that stays failed when its state changes and its cause stays the same", async () => {
     const chat = (state: ModuleState): object => ({ ...status("chat", state, "It waits.", ["tasks"]), ...state === ModuleState.Blocked ? { blockedBy: "tasks" } : {} });
     const tab = new ViewTab("chat.list");
-    const { host } = start([source("chat", new FakeWindowPart("chat", log), ["tasks"])], [status("tasks", ModuleState.Failed, "It broke."), chat(ModuleState.Blocked)]);
+    const { host } = start([source("chat", new WindowPartFixture("chat", log), ["tasks"])], [status("tasks", ModuleState.Failed, "It broke."), chat(ModuleState.Blocked)]);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
     const before = [host.revisionOf(tab), host.findFailure(tab)?.state];
 
@@ -732,7 +700,7 @@ describe("WindowPartHostService", () => {
     bridge.responses.set("shell.updateNotification", { payload: null });
     bridge.responses.set("shell.dismissNotification", { payload: null });
     const handles: NotificationHandle[] = [];
-    const notes = new FakeWindowPart("notes", log, t => {
+    const notes = new WindowPartFixture("notes", log, t => {
       void t.postNotificationAsync(saved).then(u => handles.push(u));
     });
     notes.onReconnect = () => true;
@@ -763,7 +731,7 @@ describe("WindowPartHostService", () => {
 
   it("stops activating its parts when the runtime drops while one activates, and activates them for the new runtime", async () => {
     let drops = 1;
-    const tasks = new FakeWindowPart("tasks", log, () => {
+    const tasks = new WindowPartFixture("tasks", log, () => {
       if (drops-- === 0)
         return;
       bridge.publishStartup({ kind: "Connecting", details: [] });
@@ -806,7 +774,7 @@ describe("WindowPartHostService", () => {
 
   it("gives a module's tabs its revision only once the reload that changed the module ends", async () => {
     const during: number[] = [];
-    const notes = new FakeWindowPart("notes", log, t => {
+    const notes = new WindowPartFixture("notes", log, t => {
       t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load));
       during.push(TestBed.inject(WindowPartHostService).revisionOf(new ViewTab("notes.list")));
     });
@@ -935,7 +903,7 @@ describe("WindowPartHostService", () => {
   it("keeps the modules it reported until the runtime reports them again", async () => {
     const seen: string[][] = [];
     let reported: () => readonly ModuleStatus[] = () => [];
-    const tasks = new FakeWindowPart("tasks", log, () => {
+    const tasks = new WindowPartFixture("tasks", log, () => {
       seen.push(reported().map(t => t.id));
     });
     const { host } = start([source("tasks", tasks)], [status("tasks")]);
@@ -953,7 +921,7 @@ describe("WindowPartHostService", () => {
 
   it("shows the badge a window part sets on its view, set again when the part reactivates", async () => {
     const badge = new ViewBadge(2, "2 new");
-    const notes = new FakeWindowPart("notes", log, t => t.setViewBadge("notes.list", badge));
+    const notes = new WindowPartFixture("notes", log, t => t.setViewBadge("notes.list", badge));
     const { host } = start([source("notes", notes, [], ["notes.list"])], [status("notes")]);
     const labels = TestBed.inject(TabLabelService);
     await vi.waitFor(() => expect(host.generation()).toBe(1));

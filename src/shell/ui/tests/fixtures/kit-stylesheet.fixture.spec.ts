@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { KitStylesheetFixture } from "./fixtures/kit-stylesheet.fixture";
+import { KitStylesheetFixture } from "./kit-stylesheet.fixture";
 
 describe("KitStylesheetFixture", () => {
   let page: HTMLLinkElement[];

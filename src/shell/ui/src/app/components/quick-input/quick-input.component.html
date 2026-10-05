@@ -17,7 +17,7 @@ LICENSE file in the root directory of this source tree.
     <div class="tr-quick-input-option" role="option" [id]="optionId(index)" [attr.aria-selected]="index === active()" [attr.data-item]="item.id"
       (click)="choose(index)">
       <span class="tr-quick-input-icon material-symbols-rounded" aria-hidden="true">{{ item.icon }}</span>
-      <span class="tr-quick-input-title">
+      <span class="tr-quick-input-title" data-truncates>
         @for (segment of item.segments; track $index) {
           @if (segment.isMatch) {
             <mark class="tr-quick-input-match">{{ segment.text }}</mark>
