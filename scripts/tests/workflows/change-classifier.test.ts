@@ -18,6 +18,7 @@ import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import SourceTreeFixture from "../fixtures/source-tree.fixture.ts";
 
 class ChangeClassifierTests {
+  private static readonly MERGE_BASE: string = "1".repeat(40);
   private static readonly RELATIVE_IMPORT: RegExp = /(?:\bfrom |^import )"(\.{1,2}\/[^"]+)";$/gm;
 
   public static register(): void {
@@ -71,7 +72,7 @@ class ChangeClassifierTests {
       assert.deepEqual([scope.runCode, scope.runUi, scope.reason], [true, true, "The comparison found no changed files."]);
     });
 
-    test("only Markdown at the root, under docs or .github, or a module's README counts as documentation", async t => {
+    test("only Markdown at the root, under docs or .github, or a module's README counts as documentation", () => {
       const cases: readonly (readonly [string, boolean])[] = [
         ["CHANGELOG.md", false],
         ["docs/deep/guide.md", false],
@@ -84,18 +85,11 @@ class ChangeClassifierTests {
         [".github/workflows/build-and-test.yml", true],
         ["README.txt", true]
       ];
-      const repository = await ChangeClassifierTests.createRepositoryAsync(t);
-      const classifier = ChangeClassifierTests.createClassifier(repository);
-      const base = ChangeClassifierTests.readHead(repository);
-      for (const [index, [file, runCode]] of cases.entries()) {
-        repository.git(["switch", "--quiet", "--create", `case-${index}`, base]);
-        const head = await repository.commitAsync({ [file]: "changed\n" });
-
-        assert.equal((await classifier.classifyAsync("pull_request", base, head)).runCode, runCode, file);
-      }
+      for (const [file, runCode] of cases)
+        assert.equal(ChangeClassifier.classifyPaths([file], ChangeClassifierTests.MERGE_BASE).runCode, runCode, file);
     });
 
-    test("CI, test tooling and repository configuration outside the app run the builds and tests without the UI workflows", async t => {
+    test("CI, test tooling and repository configuration outside the app run the builds and tests without the UI workflows", () => {
       const cases: readonly (readonly [string, boolean])[] = [
         [".github/workflows/watch-pull-requests.yml", false],
         [".github/workflows/build-and-test.yml", true],
@@ -118,9 +112,21 @@ class ChangeClassifierTests {
         ["src/shell/desktop/tests/e2e/new.spec.ts", true],
         ["package.json", true]
       ];
+      for (const [file, runUi] of cases) {
+        const scope = ChangeClassifier.classifyPaths([file, "docs/guide.md"], ChangeClassifierTests.MERGE_BASE);
+
+        assert.deepEqual([scope.runCode, scope.runUi], [true, runUi], file);
+        assert.equal(scope.reason, runUi
+          ? `Files the app is built or tested from changed since the merge base ${ChangeClassifierTests.MERGE_BASE}.`
+          : `Only documentation, CI and test tooling or repository configuration changed since the merge base ${ChangeClassifierTests.MERGE_BASE}.`);
+      }
+    });
+
+    test("the changed files of a pull request decide its scope", async t => {
       const repository = await ChangeClassifierTests.createRepositoryAsync(t);
       const classifier = ChangeClassifierTests.createClassifier(repository);
       const base = ChangeClassifierTests.readHead(repository);
+      const cases: readonly (readonly [string, boolean])[] = [[".github/workflows/watch-pull-requests.yml", false], ["scripts/build.ts", true]];
       for (const [index, [file, runUi]] of cases.entries()) {
         repository.git(["switch", "--quiet", "--create", `case-${index}`, base]);
         const head = await repository.commitAsync({ [file]: "changed\n", "docs/guide.md": "# Guide\n" });
@@ -128,9 +134,6 @@ class ChangeClassifierTests {
         const scope = await classifier.classifyAsync("pull_request", base, head);
 
         assert.deepEqual([scope.runCode, scope.runUi], [true, runUi], file);
-        assert.equal(scope.reason, runUi
-          ? `Files the app is built or tested from changed since the merge base ${base}.`
-          : `Only documentation, CI and test tooling or repository configuration changed since the merge base ${base}.`);
       }
     });
 
