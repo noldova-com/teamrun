@@ -23,7 +23,6 @@ import { productName } from "../../../generated/product";
 export class Resources {
   public static readonly contributionNamePattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.[A-Za-z0-9][A-Za-z0-9._-]*$/;
   public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-  public static readonly regExpSpecialPattern: RegExp = /[.*+?^${}()|[\]\\]/gu;
   public static readonly windowPartContextToken: string = "The window part's context";
   public static readonly windowPartSourcesToken: string = "The build's window parts";
   public static readonly documentsGroupId: number = 0;

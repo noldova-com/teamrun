@@ -107,8 +107,7 @@ describe("TabComponent", () => {
     const icon = part(".tr-tab-icon") ?? tab();
 
     expect(tab().getBoundingClientRect().width).toBeLessThanOrEqual(parseFloat(getComputedStyle(tab()).maxWidth));
-    expect(label.scrollWidth).toBeGreaterThan(label.clientWidth);
-    expect(getComputedStyle(label).textOverflow).toBe("ellipsis");
+    AppearanceFixture.expectTruncates(label);
     expect(icon.getBoundingClientRect().width).toBe(parseFloat(getComputedStyle(icon).fontSize));
     expect(tab().getAttribute("aria-label")).toBe(title);
   });

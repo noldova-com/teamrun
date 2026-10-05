@@ -14,78 +14,40 @@ import path from "node:path";
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import {
-  CommandRun, type Event, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName, SettingDefinition, SettingKey, SettingLocality, SettingScope, SettingType, SettingValue
-} from "@noldova/teamrun-shell-protocol";
+import { CommandRun, type Event, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 import {
   CommandRegistry,
-  DataDirectory,
-  DiagnosticRedactor,
   EventRegistry,
   MethodRegistry,
-  ModuleContext,
-  ModuleDeclaration,
   NotificationCenter,
-  NotificationPolicy,
   RegistrationException,
   RuntimeCommand,
   ServiceAccessException,
   ServiceRegistry,
-  SettingException,
   WorkTracker
 } from "@noldova/teamrun-shell-runtime";
 
+import { ModuleContextFixture } from "../../fixtures/module-context.fixture.js";
 import { ProgramFixture } from "../../fixtures/program.fixture.js";
 import { SettingsFixture } from "../../fixtures/settings.fixture.js";
 import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
-import { TextOutputFixture } from "../../fixtures/text-output.fixture.js";
 
 @TestClass
 export class ModuleContextTests {
-  private static readonly ROOT: string = path.resolve("teamrun-data");
-  private static readonly HOME: string = path.resolve("home", "person");
-  private static readonly NOTES: ModuleDeclaration = new ModuleDeclaration(
-    "notes",
-    "0.0.1",
-    "Notes",
-    "Keeps notes.",
-    ["tasks"],
-    "@noldova/teamrun-modules-notes-runtime",
-    new Map([
-      ["methods", ["notes.list"]], ["events", ["notes.changed"]], ["commands", ["notes.newNote"]], ["notifications", ["notes.saved"]], ["settings", ["notes.sortBy"]],
-      ["settingScopes", ["notes.folder"]]
-    ]));
-  private static readonly SETTINGS: readonly SettingDefinition[] = ["notes.sortBy", "tasks.size", "clock.speed", "shell.mode"].map(t => new SettingDefinition(
-    QualifiedName.parse(t), t, "A setting.", SettingType.text(20), "a", SettingLocality.Shared, t === "notes.sortBy" ? [QualifiedName.parse("notes.folder")] : [], "Page", "Group"));
-
   @TestMethod
   public async namesTheModuleAndItsFolder(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
-    const context = ModuleContextTests.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry());
+    const context = ModuleContextFixture.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry());
 
     Assert.areEqual("notes", context.moduleId);
-    Assert.areEqual(path.join(ModuleContextTests.ROOT, "modules", "notes"), context.moduleFolder);
-  }
-
-  @TestMethod
-  public async writesTheModulesLinesRedactedAndWithoutControlCharactersEachStartingWithItsId(): Promise<void> {
-    await using settings = await SettingsFixture.createAsync();
-    const diagnostics = new TextOutputFixture();
-    const context = ModuleContextTests.create(
-      settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), undefined, undefined, undefined, diagnostics);
-    const token = "a".repeat(40);
-
-    context.log.write(`Synced ${path.join(ModuleContextTests.HOME, "notes")}\r\nwith ${token}\r2026-10-04T12:00:00.000Z shell: faked\u2028\u001b[31mred\u001b[0m\tdone\n`);
-
-    Assert.areEqual(
-      `notes: Synced ${path.join("~", "notes")}\nnotes: with [redacted]\nnotes: 2026-10-04T12:00:00.000Z shell: faked\nnotes: [31mred[0m\tdone\n`, diagnostics.text);
+    Assert.areEqual(path.join(ModuleContextFixture.ROOT, "modules", "notes"), context.moduleFolder);
   }
 
   @TestMethod
   public async createsTheModulesWorkFolderWhenFirstAskedForIt(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
     await using folder = await TemporaryFolderFixture.createAsync();
-    const context = ModuleContextTests.create(
+    const context = ModuleContextFixture.create(
       settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), undefined, undefined, undefined, undefined, folder.path);
     const expected = path.join(folder.path, "work", "notes");
     const before = existsSync(expected);
@@ -105,7 +67,7 @@ export class ModuleContextTests {
     await using settings = await SettingsFixture.createAsync();
     const work = new WorkTracker(() => undefined);
     const shell = work.begin("Backing up");
-    const context = ModuleContextTests.create(
+    const context = ModuleContextFixture.create(
       settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), undefined, undefined, work);
 
     const saving = context.beginWork("Saving the notes");
@@ -126,7 +88,7 @@ export class ModuleContextTests {
   public async startsTheModulesProgramsInTheRuntimesName(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
     await using folder = await TemporaryFolderFixture.createAsync();
-    const context = ModuleContextTests.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry());
+    const context = ModuleContextFixture.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry());
 
     const owned = await context.startProcessAsync(ProgramFixture.request(folder.path, [ProgramFixture.EXIT, "0"]));
     const owners = settings.processes.programs.map(t => t.moduleId).join(",");
@@ -141,7 +103,7 @@ export class ModuleContextTests {
     await using settings = await SettingsFixture.createAsync();
     const methods = new MethodRegistry();
     const events: Event[] = [];
-    const context = ModuleContextTests.create(settings, methods, new EventRegistry({ broadcast: t => events.push(t) }), new ServiceRegistry());
+    const context = ModuleContextFixture.create(settings, methods, new EventRegistry({ broadcast: t => events.push(t) }), new ServiceRegistry());
 
     context.registerMethod("notes.list", { handleAsync: async () => [] });
     context.declareEvent("notes.changed").publish(1);
@@ -158,7 +120,7 @@ export class ModuleContextTests {
   public async registersOnlyTheCommandsItsDeclarationContributes(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
     const commands = new CommandRegistry();
-    const context = ModuleContextTests.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), commands);
+    const context = ModuleContextFixture.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), commands);
 
     context.registerCommand(new RuntimeCommand("notes.newNote", "New note", "note_add", "Mod+Alt+N", { handleAsync: async () => null }));
     const undeclared = Assert.throws(() => context.registerCommand(new RuntimeCommand("notes.delete", "Delete note", null, null, { handleAsync: async () => null })), RegistrationException);
@@ -173,7 +135,7 @@ export class ModuleContextTests {
   public async publishesServicesOnlyUnderItsOwnId(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
     const services = new ServiceRegistry();
-    const context = ModuleContextTests.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), services);
+    const context = ModuleContextFixture.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), services);
     const store = new Map<string, string>();
 
     context.publishService("notes.store", store);
@@ -194,7 +156,7 @@ export class ModuleContextTests {
     services.publish(new QualifiedName("tasks", "store"), tasks);
     services.publish(new QualifiedName("shell", "clock"), clock);
     services.publish(new QualifiedName("calendar", "store"), new Map());
-    const context = ModuleContextTests.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), services);
+    const context = ModuleContextFixture.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), services);
 
     const found = context.getService("tasks.store", Map);
     const shell = context.getService("shell.clock", Set);
@@ -217,7 +179,7 @@ export class ModuleContextTests {
     const eventRegistry = new EventRegistry({ broadcast: t => events.push(t) });
     const services = new ServiceRegistry();
     const commands = new CommandRegistry();
-    const context = ModuleContextTests.create(settings, methods, eventRegistry, services, commands);
+    const context = ModuleContextFixture.create(settings, methods, eventRegistry, services, commands);
     context.registerMethod("notes.list", { handleAsync: async () => [] });
     context.registerCommand(new RuntimeCommand("notes.newNote", "New note", null, null, { handleAsync: async () => null }));
     const channel = context.declareEvent("notes.changed");
@@ -239,7 +201,7 @@ export class ModuleContextTests {
     await using settings = await SettingsFixture.createAsync();
     let ids = 0;
     const notifications = new NotificationCenter(() => undefined, () => new Date(), () => String(++ids));
-    const context = ModuleContextTests.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), new CommandRegistry(), notifications);
+    const context = ModuleContextFixture.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), new CommandRegistry(), notifications);
     notifications.post(ModuleContextTests.post("tasks.due", "Due", "tasks.show"));
 
     const saved = context.postNotification(ModuleContextTests.post("notes.saved", "Saved", "tasks.show"));
@@ -260,7 +222,7 @@ export class ModuleContextTests {
   public async refusesAnUndeclaredKindOrAnotherModulesCommandOnPostAndOnUpdate(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
     const notifications = new NotificationCenter(() => undefined, () => new Date(), randomUUID);
-    const context = ModuleContextTests.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), new CommandRegistry(), notifications);
+    const context = ModuleContextFixture.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), new CommandRegistry(), notifications);
     const saved = context.postNotification(ModuleContextTests.post("notes.saved", "Saved", null));
 
     const undeclared = Assert.throws(() => context.postNotification(ModuleContextTests.post("notes.deleted", "Deleted", null)), RegistrationException);
@@ -271,68 +233,8 @@ export class ModuleContextTests {
     Assert.areEqual("Saved", notifications.list.notifications.map(t => t.post.title).join(","));
   }
 
-  @TestMethod
-  public async readsItsOwnItsDependenciesAndTheShellsSettingsAndChangesOnlyItsOwn(): Promise<void> {
-    await using settings = await SettingsFixture.createAsync(ModuleContextTests.SETTINGS);
-    const context = ModuleContextTests.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry());
-    const folder = new SettingScope(QualifiedName.parse("notes.folder"), "f1");
-    const tasks = new SettingScope(QualifiedName.parse("tasks.list"), "l1");
-
-    context.settings.write("notes.sortBy", "title");
-    context.settings.write("notes.sortBy", "date", folder);
-    const read = ["notes.sortBy", "tasks.size", "shell.mode"].map(t => context.settings.read(t));
-    const scoped = context.settings.read("notes.sortBy", folder);
-    context.settings.reset("notes.sortBy", folder);
-    context.settings.setScopeParent(folder, tasks);
-    context.settings.setScopeParent(folder, null);
-    context.settings.removeScope(folder);
-
-    Assert.areEqual("title,a,a,date,title", [...read, scoped, context.settings.read("notes.sortBy", folder)].join(","));
-    Assert.areEqual("The module notes may only read its own settings, its dependencies' and the shell's, not clock.speed.",
-      Assert.throws(() => context.settings.read("clock.speed"), RegistrationException).message);
-    Assert.throws(() => context.settings.read("notes.missing"), SettingException);
-    Assert.areEqual("The module notes may only change its own settings, not tasks.size.",
-      Assert.throws(() => context.settings.write("tasks.size", "b"), RegistrationException).message);
-    Assert.throws(() => context.settings.reset("shell.mode"), RegistrationException);
-    Assert.throws(() => context.settings.setScopeParent(tasks, null), RegistrationException);
-    Assert.throws(() => context.settings.setScopeParent(folder, new SettingScope(QualifiedName.parse("clock.dial"), "d1")), RegistrationException);
-    Assert.throws(() => context.settings.removeScope(tasks), RegistrationException);
-  }
-
-  @TestMethod
-  public async followsAReadableSettingUntilWithdrawn(): Promise<void> {
-    await using settings = await SettingsFixture.createAsync(ModuleContextTests.SETTINGS);
-    const context = ModuleContextTests.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry());
-    const seen: string[] = [];
-    context.settings.onChanged("tasks.size", t => seen.push(String(t.value)));
-
-    settings.service.write(new SettingValue(new SettingKey(QualifiedName.parse("shell.mode")), "b"));
-    settings.service.write(new SettingValue(new SettingKey(QualifiedName.parse("tasks.size")), "c"));
-    context[Symbol.dispose]();
-    settings.service.write(new SettingValue(new SettingKey(QualifiedName.parse("tasks.size")), "d"));
-
-    Assert.areEqual("c", seen.join(","));
-    Assert.throws(() => context.settings.onChanged("clock.speed", () => undefined), RegistrationException);
-  }
-
   private static post(kind: string, title: string, action: string | null): NotificationPost {
     const actions = action === null ? [] : [new NotificationAction("Show", new CommandRun(QualifiedName.parse(action), null))];
     return new NotificationPost(QualifiedName.parse(kind), null, title, null, NotificationSeverity.Info, null, actions, null);
-  }
-
-  private static create(
-    settings: SettingsFixture,
-    methods: MethodRegistry,
-    events: EventRegistry,
-    services: ServiceRegistry,
-    commands: CommandRegistry = new CommandRegistry(),
-    notifications: NotificationCenter = new NotificationCenter(() => undefined, () => new Date(), randomUUID),
-    work: WorkTracker = new WorkTracker(() => undefined),
-    diagnostics: TextOutputFixture = new TextOutputFixture(),
-    root: string = ModuleContextTests.ROOT): ModuleContext {
-    return new ModuleContext(
-      ModuleContextTests.NOTES, new DataDirectory(root), methods, events, commands,
-      notifications, new NotificationPolicy([ModuleContextTests.NOTES], () => true), services, settings.service,
-      work, settings.processes, diagnostics, new DiagnosticRedactor(ModuleContextTests.HOME));
   }
 }
