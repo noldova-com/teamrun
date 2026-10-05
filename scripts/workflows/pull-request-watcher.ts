@@ -25,8 +25,9 @@ export default class PullRequestWatcher {
   private static readonly NO_PULL_REQUESTS: string = "- No open pull requests.";
   private static readonly NOTHING_TO_DO: string = "nothing to do";
   private static readonly MERGE_STATE_UNKNOWN: string = "merge state still unknown";
-  private static readonly MERGE_STATE_READS: number = 6;
-  private static readonly MERGE_STATE_INTERVAL: number = 10_000;
+  private static readonly MERGE_STATE_READS: number = 11;
+  private static readonly MERGE_STATE_INTERVAL: number = 5_000;
+  private static readonly PARALLEL_PULL_REQUESTS: number = 4;
   private static readonly RUN_COMPLETED: number = 409;
 
   private readonly api: GitHubApi;
@@ -48,9 +49,8 @@ export default class PullRequestWatcher {
   public async watchAsync(): Promise<readonly string[]> {
     const repository = await this.reader.readRepositoryAsync();
     const now = new Date(this.clock());
-    const lines: string[] = [];
-    for (const pull of await this.readStatesAsync(repository, await this.reader.listOpenAsync()))
-      lines.push(typeof pull === "string" ? pull : await this.watchPullRequestAsync(repository, pull, now));
+    const pulls = await this.readStatesAsync(repository, await this.reader.listOpenAsync());
+    const lines = await PullRequestWatcher.mapAsync(pulls, async t => typeof t === "string" ? t : await this.watchPullRequestAsync(repository, t, now));
     return lines.length === 0 ? [PullRequestWatcher.NO_PULL_REQUESTS] : lines;
   }
 
@@ -65,16 +65,32 @@ export default class PullRequestWatcher {
   }
 
   private async readStatesAsync(repository: WatchedRepository, opens: readonly OpenPullRequest[]): Promise<readonly (string | PullRequestState)[]> {
-    const pulls: (string | PullRequestState)[] = [];
-    for (const open of opens)
-      pulls.push(PullRequestWatcher.describeSkip(repository, open) ?? await this.reader.readStateAsync(open.number));
+    let pulls = await PullRequestWatcher.mapAsync(opens, async t => PullRequestWatcher.describeSkip(repository, t) ?? await this.reader.readStateAsync(t.number));
     for (let read = 1; read < PullRequestWatcher.MERGE_STATE_READS && pulls.some(t => PullRequestWatcher.isWaiting(t)); read++) {
       await this.wait(PullRequestWatcher.MERGE_STATE_INTERVAL);
-      for (const [index, pull] of pulls.entries())
-        if (PullRequestWatcher.isWaiting(pull))
-          pulls[index] = await this.reader.readStateAsync(pull.number);
+      pulls = await PullRequestWatcher.mapAsync(pulls, async t => PullRequestWatcher.isWaiting(t) ? await this.reader.readStateAsync(t.number) : t);
     }
     return pulls;
+  }
+
+  private static async mapAsync<T, TResult>(items: readonly T[], work: (item: T) => Promise<TResult>): Promise<readonly TResult[]> {
+    const results: TResult[] = [];
+    const failures: unknown[] = [];
+    const entries = items.entries();
+    const workAsync = async (): Promise<void> => {
+      for (const [index, item] of entries) {
+        try {
+          results[index] = await work(item);
+        }
+        catch (error) {
+          failures.push(error);
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: PullRequestWatcher.PARALLEL_PULL_REQUESTS }, workAsync));
+    if (failures.length > 0)
+      throw failures[0];
+    return results;
   }
 
   private async watchPullRequestAsync(repository: WatchedRepository, state: PullRequestState, now: Date): Promise<string> {

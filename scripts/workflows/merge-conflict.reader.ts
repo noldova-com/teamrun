@@ -15,12 +15,19 @@ export default class MergeConflictReader {
   private static readonly MERGE_EXIT_CODES: readonly number[] = [0, 1];
 
   private readonly git: Git;
+  private previous: Promise<unknown> = Promise.resolve();
 
   public constructor(git: Git) {
     this.git = git;
   }
 
-  public async readFilesAsync(defaultBranch: string, number: number): Promise<readonly string[]> {
+  public readFilesAsync(defaultBranch: string, number: number): Promise<readonly string[]> {
+    const files = this.previous.then(() => this.mergeAsync(defaultBranch, number));
+    this.previous = files.catch(() => undefined);
+    return files;
+  }
+
+  private async mergeAsync(defaultBranch: string, number: number): Promise<readonly string[]> {
     await this.git.readOutputAsync(["fetch", "--no-tags", "--quiet", MergeConflictReader.REMOTE,
       `+refs/heads/${defaultBranch}:${MergeConflictReader.BASE}`, `+refs/pull/${number}/head:${MergeConflictReader.HEAD}`]);
     const output = await this.git.readOutputAsync(["merge-tree", "--write-tree", "--name-only", "--no-messages", "-z", MergeConflictReader.BASE, MergeConflictReader.HEAD],
