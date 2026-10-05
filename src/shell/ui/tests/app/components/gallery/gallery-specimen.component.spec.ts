@@ -6,43 +6,89 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { type ComponentFixture } from "@angular/core/testing";
-import { userEvent } from "vitest/browser";
+import { Component } from "@angular/core";
+import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
-import { type GalleryComponent } from "../../../../src/app/components/gallery/gallery.component";
+import { GalleryCellComponent } from "../../../../src/app/components/gallery/gallery-cell.component";
+import { GallerySpecimenComponent } from "../../../../src/app/components/gallery/gallery-specimen.component";
+import { GallerySize } from "../../../../src/app/enums/gallery-size";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
-import { GalleryFixture } from "../../../fixtures/gallery.fixture";
+
+@Component({
+  imports: [GalleryCellComponent, GallerySpecimenComponent],
+  template: `
+    <div class="page" style="width: 60rem">
+      <tr-gallery-specimen name="Regular">
+        <tr-gallery-cell caption="Default"><button type="button">Default</button></tr-gallery-cell>
+        <tr-gallery-cell caption="Disabled"><span>A taller specimen<br />on two lines</span></tr-gallery-cell>
+        <tr-gallery-cell caption="Focus"><span>Focus</span></tr-gallery-cell>
+        <tr-gallery-cell long caption="Long text"><span>A long specimen</span></tr-gallery-cell>
+      </tr-gallery-specimen>
+      <tr-gallery-specimen name="Wide" [size]="sizes.Wide">
+        <tr-gallery-cell caption="Default"><span>Wide</span></tr-gallery-cell>
+        <tr-gallery-cell caption="Other"><span>Wide</span></tr-gallery-cell>
+      </tr-gallery-specimen>
+      <tr-gallery-specimen name="Full" [size]="sizes.Full">
+        <tr-gallery-cell caption="Empty" />
+      </tr-gallery-specimen>
+    </div>
+  `
+})
+class SpecimenHostComponent {
+  public readonly sizes: typeof GallerySize = GallerySize;
+}
 
 describe("GallerySpecimenComponent", () => {
-  let fixture: ComponentFixture<GalleryComponent>;
+  let fixture: ComponentFixture<SpecimenHostComponent>;
+
+  beforeEach(async () => {
+    AppearanceFixture.apply();
+    fixture = TestBed.createComponent(SpecimenHostComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+  });
 
   afterEach(() => {
     AppearanceFixture.reset();
   });
 
-  it("shows the keyboard focus on the first control of a specimen when its button is pressed from the keyboard, and not before", async () => {
-    fixture = await GalleryFixture.showAsync();
-    const checkbox = (GalleryFixture.frames(fixture)[2] as HTMLElement).querySelector<HTMLElement>(".tr-gallery-specimen[aria-label=\"Checkbox\"]") as HTMLElement;
-    const button = checkbox.querySelector<HTMLButtonElement>(".tr-gallery-specimen-focus") as HTMLButtonElement;
-    const input = checkbox.querySelector("input") as HTMLInputElement;
+  const specimen = (name: string): HTMLElement => fixture.nativeElement.querySelector(`.tr-gallery-specimen[aria-label="${name}"]`);
+  const cells = (name: string): HTMLElement[] => [...specimen(name).querySelectorAll<HTMLElement>(".tr-gallery-specimen-cells > tr-gallery-cell")];
+  const rect = (element: Element): DOMRect => element.getBoundingClientRect();
 
-    expect(document.activeElement).not.toBe(input);
-    expect(button.getAttribute("aria-label")).toBe("Show the keyboard focus on the Checkbox");
-    button.focus();
-    await userEvent.keyboard("{Enter}");
+  it("heads each section with its name alone, above its cells and at their left edge", () => {
+    const heading = specimen("Regular").querySelector("h3") as HTMLElement;
 
-    expect(document.activeElement).toBe(input);
-    expect(input.matches(":focus-visible")).toBe(true);
+    expect([...specimen("Regular").querySelectorAll("h3")].map(t => t.textContent)).toEqual(["Regular"]);
+    expect([...specimen("Regular").querySelectorAll("button")].map(t => t.closest("tr-gallery-cell")?.getAttribute("aria-label"))).toEqual(["Default"]);
+    AppearanceFixture.expectPixels(rect(heading).left, rect(cells("Regular")[0] as HTMLElement).left);
+    expect(rect(heading).bottom).toBeLessThanOrEqual(rect(cells("Regular")[0] as HTMLElement).top);
+    AppearanceFixture.expectPixels(rect(specimen("Wide").querySelector("h3") as HTMLElement).height, rect(heading).height);
   });
 
-  it("offers the focus button on every specimen that has a control to focus, and on no other", async () => {
-    fixture = await GalleryFixture.showAsync();
-    const specimens = [...(GalleryFixture.frames(fixture)[0] as HTMLElement).querySelectorAll<HTMLElement>(".tr-gallery-specimen")];
+  it("lays the cells out at one fixed width, sharing their top edge, one gap apart", () => {
+    const shown = cells("Regular");
 
-    const offered = specimens.filter(t => t.querySelector(".tr-gallery-specimen-focus") !== null).map(t => t.getAttribute("aria-label"));
-    const without = specimens.filter(t => t.querySelector(".tr-gallery-specimen-focus") === null).map(t => t.getAttribute("aria-label"));
+    expect(shown.map(t => t.getAttribute("aria-label"))).toEqual(["Default", "Disabled", "Focus"]);
+    for (const cell of shown) {
+      AppearanceFixture.expectPixels(rect(cell).width, AppearanceFixture.toPixels(12.5));
+      AppearanceFixture.expectPixels(rect(cell).top, rect(shown[0] as HTMLElement).top);
+    }
+    AppearanceFixture.expectPixels(rect(shown[1] as HTMLElement).left - rect(shown[0] as HTMLElement).right, AppearanceFixture.toPixels(1));
+  });
 
-    expect(offered).toEqual(expect.arrayContaining(["Button", "Icon button", "Checkbox", "Text field", "Select", "Tab", "Tree", "Toolbar", "Toolbar button", "Menu"]));
-    expect(without).toEqual(expect.arrayContaining(["Progress", "View badge"]));
+  it("makes a wide section's cells as wide as two cells and their gap, and a full section's cell as wide as the section", () => {
+    for (const cell of cells("Wide"))
+      AppearanceFixture.expectPixels(rect(cell).width, AppearanceFixture.toPixels(26));
+    AppearanceFixture.expectPixels(rect(cells("Full")[0] as HTMLElement).width, rect(specimen("Full")).width);
+  });
+
+  it("puts a long-text cell in a full-width row below the cells, and leaves the row out of a section without one", () => {
+    const long = specimen("Regular").querySelector(".tr-gallery-specimen-long > tr-gallery-cell") as HTMLElement;
+
+    expect(long.getAttribute("aria-label")).toBe("Long text");
+    AppearanceFixture.expectPixels(rect(long).width, rect(specimen("Regular")).width);
+    expect(rect(long).top).toBeGreaterThan(Math.max(...cells("Regular").map(t => rect(t).bottom)));
+    expect(specimen("Wide").querySelector(".tr-gallery-specimen-long")).toBeNull();
   });
 });

@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "states";
+
 :host {
   position: relative;
   display: flex;
@@ -35,7 +37,7 @@
   inset: 0 calc(var(--tr-sash) * -1);
 }
 
-:host(:focus-visible) {
+:host(#{states.$focus-visible}) {
   outline: var(--tr-border-width) solid var(--tr-accent);
 }
 
@@ -49,7 +51,7 @@
 }
 
 :host(.tr-sash-active) .tr-sash-bar,
-:host(:focus-visible) .tr-sash-bar {
+:host(#{states.$focus-visible}) .tr-sash-bar {
   opacity: 1;
 }
 
@@ -60,7 +62,7 @@
 }
 
 :host(.tr-sash-active) .tr-sash-grip,
-:host(:focus-visible) .tr-sash-grip {
+:host(#{states.$focus-visible}) .tr-sash-grip {
   opacity: 0;
 }
 

@@ -16,6 +16,46 @@ function scope(window: Page, mode: "Light" | "Dark"): Locator {
   return window.locator(`tr-gallery .tr-gallery-scope-frame[data-mode="${mode}"]`);
 }
 
+async function layoutProblemsAsync(window: Page): Promise<readonly string[]> {
+  return window.locator("tr-gallery").evaluate(gallery => {
+    const problems: string[] = [];
+    const tolerance = 1;
+    const overlaps = (a: DOMRect, b: DOMRect): boolean => Math.min(a.right, b.right) - Math.max(a.left, b.left) > tolerance && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > tolerance;
+    for (const specimen of gallery.querySelectorAll<HTMLElement>(".tr-gallery-specimen")) {
+      const name = specimen.getAttribute("aria-label") ?? "";
+      const head = specimen.querySelector<HTMLElement>(".tr-gallery-specimen-name");
+      if (head?.textContent !== name)
+        problems.push(`${name}: no header with its name`);
+      const cells = [...specimen.querySelectorAll<HTMLElement>(".tr-gallery-specimen-cells > tr-gallery-cell")];
+      if (cells.length === 0)
+        problems.push(`${name}: no cells`);
+      const boxes = cells.map(t => t.getBoundingClientRect());
+      boxes.forEach((box, i) => {
+        const caption = cells[i]?.getAttribute("aria-label");
+        const first = boxes[0] as DOMRect;
+        const previous = boxes[i - 1];
+        if (Math.abs(box.width - first.width) > tolerance)
+          problems.push(`${name}: ${caption} is ${box.width}px wide, not ${first.width}px`);
+        if (previous !== undefined && box.left > previous.left + tolerance && Math.abs(box.top - previous.top) > tolerance)
+          problems.push(`${name}: ${caption} does not share its row's top edge`);
+      });
+      const parts = [...(head === null ? [] : [head]), ...cells, ...specimen.querySelectorAll<HTMLElement>(".tr-gallery-specimen-long > tr-gallery-cell")];
+      parts.forEach((part, i) => parts.slice(i + 1).filter(other => overlaps(part.getBoundingClientRect(), other.getBoundingClientRect()))
+        .forEach(other => problems.push(`${name}: ${part.getAttribute("aria-label") ?? "the header"} overlaps ${other.getAttribute("aria-label")}`)));
+      for (const cell of parts.filter(t => t.localName === "tr-gallery-cell")) {
+        const box = cell.getBoundingClientRect();
+        const outside = [...cell.querySelectorAll<HTMLElement>(".tr-gallery-cell-specimen > *")].map(t => t.getBoundingClientRect())
+          .some(t => t.width > 0 && (t.left < box.left - tolerance || t.right > box.right + tolerance));
+        if (outside)
+          problems.push(`${name}: ${cell.getAttribute("aria-label")} is wider than its cell`);
+      }
+      if (specimen.scrollWidth > specimen.clientWidth + tolerance)
+        problems.push(`${name}: scrolls sideways`);
+    }
+    return problems;
+  });
+}
+
 async function truncationAsync(control: Locator): Promise<{ isInside: boolean; isCut: boolean; overflow: string }> {
   return control.evaluate(t => {
     const box = t.getBoundingClientRect();
@@ -71,19 +111,42 @@ test.describe("gallery", () => {
     expect(await scrollTopAsync(page)).toBe(top);
   });
 
-  test("each specimen with a control shows the keyboard focus on it from the keyboard, and each scope keeps its own colors", async ({ desktop }) => {
+  test("each Focus cell shows the keyboard focus without holding it, and each scope keeps its own colors", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openGalleryAsync(window);
     const dark = scope(window, "Dark");
 
-    for (const name of ["Button", "Icon button", "Checkbox", "Text field", "Select", "Tab", "Tree", "Toolbar", "Toolbar button", "Menu"]) {
-      await dark.getByRole("button", { name: `Show the keyboard focus on the ${name}`, exact: true }).focus();
-      await window.keyboard.press("Enter");
-      await expect(dark.locator(`.tr-gallery-specimen[aria-label="${name}"] :focus-visible`)).toHaveCount(1);
-    }
+    for (const name of ["Button", "Icon button", "Checkbox", "Text field", "Select", "Choice pills", "Tab", "Toolbar button", "Sash"])
+      await expect(dark.locator(`.tr-gallery-specimen[aria-label="${name}"] tr-gallery-cell[aria-label="Focus"] [data-tr-state="Focus"]`)).toHaveCount(1);
+    await expect(dark.locator(":focus")).toHaveCount(0);
+    await dark.locator(".tr-gallery-specimen[aria-label=\"Button\"]").scrollIntoViewIfNeeded();
     await desktop.checkpointAsync("gallery-focus");
     const colors = await window.locator("tr-gallery .tr-gallery-scope-frame").evaluateAll(frames => frames.map(t => getComputedStyle(t).color));
     expect(new Set(colors).size).toBe(2);
+  });
+
+  test("with the side docks hidden, every section has its header, and its cells share their width and their row's top edge without overlapping, at 100% and 200% zoom and in a narrow window", async ({ desktop }) => {
+    const window = desktop.window;
+    await SettingsFixture.openGalleryAsync(window);
+    await window.keyboard.press("ControlOrMeta+B");
+    await window.keyboard.press("ControlOrMeta+Alt+B");
+    await expect.poll(() => window.locator("tr-tab-group[data-side=Left], tr-tab-group[data-side=Right]").evaluateAll(t => t.filter(u => u.getBoundingClientRect().width > 0).length)).toBe(0);
+
+    expect(await window.locator("tr-gallery .tr-gallery-specimen").count()).toBeGreaterThan(20);
+    expect(await layoutProblemsAsync(window)).toEqual([]);
+    await scope(window, "Light").locator(".tr-gallery-specimen[aria-label=\"Button\"]").scrollIntoViewIfNeeded();
+    await desktop.checkpointAsync("gallery-sections-light");
+    await scope(window, "Dark").locator(".tr-gallery-specimen[aria-label=\"Button\"]").scrollIntoViewIfNeeded();
+    await desktop.checkpointAsync("gallery-sections-dark");
+
+    const width = await window.evaluate(() => innerWidth);
+    await desktop.zoomAsync(2, width / 2);
+    expect(await layoutProblemsAsync(window)).toEqual([]);
+    await desktop.zoomAsync(1, width);
+
+    await desktop.useViewportAsync(640, 400);
+    expect(await layoutProblemsAsync(window)).toEqual([]);
+    await desktop.checkpointAsync("gallery-sections-narrow");
   });
 
   test("the tree is moved through, opened, closed and chosen from by keyboard alone", async ({ desktop }) => {
@@ -91,8 +154,7 @@ test.describe("gallery", () => {
     await SettingsFixture.openGalleryAsync(window);
     const tree = scope(window, "Light").getByRole("tree", { name: "Gallery files" });
     const item = (name: string): Locator => tree.getByRole("treeitem", { name, exact: true });
-    await scope(window, "Light").getByRole("button", { name: "Show the keyboard focus on the Tree", exact: true }).focus();
-    await window.keyboard.press("Enter");
+    await item("Notes").focus();
     await expect(item("Notes")).toBeFocused();
 
     await window.keyboard.press("Home");

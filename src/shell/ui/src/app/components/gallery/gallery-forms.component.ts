@@ -10,6 +10,7 @@ import { ChangeDetectionStrategy, Component, type WritableSignal, signal } from 
 
 import { ButtonVariant } from "../../enums/button-variant";
 import { ChipKind } from "../../enums/chip-kind";
+import { GallerySize } from "../../enums/gallery-size";
 import { SelectOption } from "../../models/select-option";
 import { ButtonComponent } from "../button/button.component";
 import { CheckboxComponent } from "../checkbox/checkbox.component";
@@ -21,18 +22,25 @@ import { SelectComponent } from "../select/select.component";
 import { SpinnerComponent } from "../spinner/spinner.component";
 import { TextFieldComponent } from "../text-field/text-field.component";
 import { TooltipDirective } from "../tooltip/tooltip.directive";
+import { GalleryCellComponent } from "./gallery-cell.component";
 import { GalleryResources } from "./gallery-resources";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
+import { GalleryStateDirective } from "./gallery-state.directive";
 
 @Component({
   selector: "tr-gallery-forms",
-  imports: [ButtonComponent, CheckboxComponent, ChipComponent, ChoicePillsComponent, GallerySpecimenComponent, IconButtonComponent, ProgressComponent, SelectComponent, SpinnerComponent, TextFieldComponent, TooltipDirective],
+  imports: [ButtonComponent, CheckboxComponent, ChipComponent, ChoicePillsComponent, GalleryCellComponent, GallerySpecimenComponent, GalleryStateDirective, IconButtonComponent, ProgressComponent, SelectComponent, SpinnerComponent, TextFieldComponent, TooltipDirective],
   templateUrl: "./gallery-forms.component.html",
   styleUrl: "./gallery-forms.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GalleryFormsComponent {
   protected readonly text: typeof GalleryResources.text = GalleryResources.text;
+  protected readonly sizes: typeof GallerySize = GallerySize;
+  protected readonly hoveredPill: string = GalleryResources.hoveredPill;
+  protected readonly focusedPill: string = GalleryResources.focusedPill;
+  protected readonly focusedCheckbox: string = GalleryResources.focusedCheckbox;
+  protected readonly focusedSelect: string = GalleryResources.focusedSelect;
   protected readonly variants: typeof ButtonVariant = ButtonVariant;
   protected readonly options: readonly SelectOption[] = GalleryResources.text.selectOptions.map(t => new SelectOption(t.value, t.title));
   protected readonly pillOptions: readonly SelectOption[] = GalleryResources.text.choicePillOptions.map(t => new SelectOption(t.value, t.title));
