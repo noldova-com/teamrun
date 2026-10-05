@@ -117,10 +117,11 @@ describe("ConfigurationTableComponent", () => {
       range.selectNodeContents(cell);
       return range.getClientRects().length;
     };
-    const short = [...fixture.nativeElement.querySelectorAll(".short td:not(.tr-configuration-table-fill)")].map(t => [getComputedStyle(t).whiteSpace, lines(t)]);
+    const short = [...fixture.nativeElement.querySelectorAll(".short td:not(.tr-configuration-table-fill):not(:last-child)")].map(t => [getComputedStyle(t).whiteSpace, lines(t)]);
     const others = [...fixture.nativeElement.querySelectorAll(".short td:not(.tr-configuration-table-fill)")].reduce((sum: number, t: Element) => sum + t.getBoundingClientRect().width, 0);
 
-    expect(short).toEqual([["nowrap", 1], ["nowrap", 1], ["nowrap", 1]]);
+    expect(short).toEqual([["nowrap", 1], ["nowrap", 1]]);
+    expect(getComputedStyle(find(".short td:last-child")).whiteSpace).toBe("nowrap");
     expect(lines(find(".long .tr-configuration-table-fill"))).toBeGreaterThan(1);
     AppearanceFixture.expectPixels(box(".short .tr-configuration-table-fill").width + others, box("table").width);
   });

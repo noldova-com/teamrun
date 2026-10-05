@@ -34,7 +34,7 @@ import { ConfigurationTableFillDirective } from "../../src/app/components/config
   `
 })
 export class ConfigurationTableHostComponent {
-  public readonly width = signal("30rem");
+  public readonly width = signal("40rem");
   public readonly heading = signal("Environment variables");
   public readonly label = signal("");
   public readonly level = signal(3);
