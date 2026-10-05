@@ -682,6 +682,10 @@ export class Resources {
     return `The module ${moduleId} declares the setting ${name}, which it does not own.`;
   }
 
+  public static formatSettingCommandUnknown(moduleId: string, name: string, command: string): string {
+    return `The module ${moduleId} declares the action setting ${name}, whose command ${command} it does not declare.`;
+  }
+
   public static formatSettingKindReserved(moduleId: string, name: string, kind: string): string {
     return `The module ${moduleId} declares the setting ${name} of the kind ${kind}, which only the shell declares.`;
   }

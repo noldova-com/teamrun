@@ -21,6 +21,7 @@ describe("SettingRowComponent", () => {
   let fixture: ComponentFixture<SettingRowComponent>;
   let changes: JsonValue[];
   let resets: number;
+  let runs: number;
 
   function render(definition: SettingDefinition, value?: JsonValue, isSet: boolean = false, query: string = "", theme = DefaultTheme.theme, mode = ThemeMode.Light): HTMLElement {
     AppearanceFixture.apply(theme, mode);
@@ -32,6 +33,7 @@ describe("SettingRowComponent", () => {
     fixture.componentRef.setInput("modules", [new SelectOption("clock", "Clock"), new SelectOption("notes", "Notes")]);
     fixture.componentInstance.changed.subscribe(t => changes.push(t));
     fixture.componentInstance.reset.subscribe(() => resets++);
+    fixture.componentInstance.run.subscribe(() => runs++);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
@@ -39,6 +41,7 @@ describe("SettingRowComponent", () => {
   beforeEach(() => {
     changes = [];
     resets = 0;
+    runs = 0;
   });
 
   afterEach(async () => {
@@ -68,6 +71,29 @@ describe("SettingRowComponent", () => {
     expect(getComputedStyle(marker).fontVariationSettings).toBe("\"FILL\" 1");
     expect(getComputedStyle(row.querySelector(".tr-setting-row-title") as Element).fontWeight).toBe("600");
     expect(resets).toBe(1);
+  });
+
+  it("shows an action as its title and description with a button that runs it from the keyboard, never as modified", async () => {
+    const row = render(SettingsFixture.alarms, undefined, false, "alarm");
+    fixture.componentRef.setInput("canRun", true);
+    fixture.detectChanges();
+
+    row.querySelector<HTMLButtonElement>(".tr-setting-row-control button")?.focus();
+    await userEvent.keyboard("{Enter}");
+
+    expect([row.querySelector(".tr-setting-row-title")?.textContent, row.querySelector(".tr-setting-row-description")?.textContent]).toEqual(["Alarms", "The times the clock rings, in a tab of their own."]);
+    expect([...row.querySelectorAll("mark")].map(t => t.textContent)).toEqual(["Alarm", "alarm", "alarm"]);
+    expect([row.querySelector(".tr-setting-row-marker"), row.querySelector(".tr-setting-row-reset")]).toEqual([null, null]);
+    expect([runs, changes]).toEqual([1, []]);
+  });
+
+  it("disables an action while its command cannot run", () => {
+    const row = render(SettingsFixture.alarms);
+    const button = row.querySelector<HTMLButtonElement>(".tr-setting-row-control button");
+
+    button?.click();
+
+    expect([button?.disabled, runs]).toEqual([true, 0]);
   });
 
   it("changes a boolean with its checkbox, labelled by the description", async () => {

@@ -41,8 +41,10 @@ export class SettingRowComponent {
   public readonly query = input<string>("");
   public readonly modules = input<readonly SelectOption[]>([]);
   public readonly isInverse = input<boolean>(false);
+  public readonly canRun = input<boolean>(false);
   public readonly changed = output<JsonValue>();
   public readonly reset = output<void>();
+  public readonly run = output<void>();
 
   protected readonly current: Signal<JsonValue> = computed(() => this.value() ?? this.definition().defaultValue);
   protected readonly error: WritableSignal<string | null> = linkedSignal<JsonValue, string | null>({ source: this.current, computation: () => null });

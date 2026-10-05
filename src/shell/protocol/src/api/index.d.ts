@@ -218,7 +218,14 @@ export declare enum SettingKind {
    * Each key is one `KeyChord.canBind` accepts for its command. Only the
    * shell's `shell.keyBindings` has this kind.
    */
-  KeyBindings = "KeyBindings"
+  KeyBindings = "KeyBindings",
+
+  /**
+   * A button that runs a command, such as one that opens a module's own
+   * document. It holds no value: its default and only accepted value is
+   * `null`, so nothing is stored.
+   */
+  Action = "Action"
 }
 
 /**
@@ -1647,6 +1654,16 @@ export declare class SettingType {
    */
   public readonly maxLength: number | null;
 
+  /**
+   * The command an action runs; `null` for the other kinds.
+   */
+  public readonly command: QualifiedName | null;
+
+  /**
+   * The label of an action's button; `null` for the other kinds.
+   */
+  public readonly label: string | null;
+
   private constructor();
 
   /**
@@ -1747,6 +1764,24 @@ export declare class SettingType {
   public static keyBindings(): SettingType;
 
   /**
+   * Creates the type of a setting whose row is a button that runs a
+   * command.
+   *
+   * @param command The command the button runs, without arguments.
+   * @param label The button's label; not blank.
+   * @returns The action type.
+   * @throws ArgumentException synchronously when the label is blank.
+   *
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const type: SettingType = SettingType.action(QualifiedName.parse("notes.openTemplates"), "Open templates");
+   * ```
+   */
+  public static action(command: QualifiedName, label: string): SettingType;
+
+  /**
    * Reads a type from its wire form: `kind` and the fields of that kind.
    *
    * @param value The untrusted value.
@@ -1767,9 +1802,9 @@ export declare class SettingType {
   /**
    * Tells whether a value fits the type: a boolean; one of the options'
    * values; a number within the limits on a step; a string within the
-   * length; a list of distinct, non-blank strings; or an object from
+   * length; a list of distinct, non-blank strings; an object from
    * command names to `null` or a key `KeyChord.canBind` accepts for the
-   * command.
+   * command; or, for an action, only `null`.
    *
    * @param value The value.
    * @returns Whether the type accepts it.
