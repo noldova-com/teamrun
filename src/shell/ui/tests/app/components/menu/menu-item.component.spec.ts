@@ -64,6 +64,22 @@ describe("MenuItemComponent", () => {
     return [...row(name).children].flatMap(t => t.classList.contains("tr-menu-item-trail") ? [...t.children] : [t]).map(t => t.className.split(" ")[0] ?? null);
   }
 
+  for (const mode of AppearanceFixture.modes)
+    for (const theme of AppearanceFixture.themes)
+      it(`shows its muted shortcut in the row's text color while it is the current row, in the ${theme.id} theme in ${mode} mode`, async () => {
+        AppearanceFixture.apply(theme, mode);
+        fixture.componentInstance.shortcut.set("Ctrl+R");
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const shortcut = (): string => getComputedStyle(row("plain").querySelector(".tr-menu-item-shortcut") as Element).color;
+        const muted = shortcut();
+
+        row("plain").setAttribute("aria-current", "true");
+
+        expect(muted).not.toBe(getComputedStyle(row("plain")).color);
+        expect(shortcut()).toBe(getComputedStyle(row("plain")).color);
+      });
+
   it("shows its icon, its label marked for truncation, and a chevron only when it opens a submenu", () => {
     expect(parts("plain")).toEqual(["tr-menu-item-label"]);
     expect(parts("iconic")).toEqual(["tr-menu-item-icon", "tr-menu-item-label"]);

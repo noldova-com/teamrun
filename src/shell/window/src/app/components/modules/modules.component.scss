@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "selected-surface" as *;
+
 :host {
   display: flex;
   flex-direction: column;
@@ -73,7 +75,7 @@
 
 .tr-modules-row-current,
 .tr-modules-row-current:hover {
-  background-color: var(--tr-selected);
+  @include selected-surface;
 }
 
 .tr-modules-row-head {

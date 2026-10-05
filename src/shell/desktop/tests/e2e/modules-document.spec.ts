@@ -14,12 +14,13 @@ import type { Locator, Page } from "@playwright/test";
 import { RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
+import ContrastFixture from "./fixtures/contrast.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 const colors = {
-  Light: { link: "rgb(0, 95, 184)", error: "rgb(161, 38, 13)", selected: "rgb(230, 230, 230)", muted: "rgb(97, 97, 97)" },
-  Dark: { link: "rgb(77, 170, 252)", error: "rgb(244, 135, 113)", selected: "rgb(56, 56, 56)", muted: "rgb(157, 157, 157)" }
+  Light: { link: "rgb(0, 95, 184)", error: "rgb(161, 38, 13)", selected: "rgb(230, 230, 230)", text: "rgb(59, 59, 59)" },
+  Dark: { link: "rgb(77, 170, 252)", error: "rgb(244, 135, 113)", selected: "rgb(56, 56, 56)", text: "rgb(204, 204, 204)" }
 };
 
 function modulesTab(window: Page): Locator {
@@ -89,7 +90,8 @@ test.describe("the Modules document", () => {
         const version = ".tr-modules-row-current .tr-modules-row-version";
         return [style(".tr-modules-link").color, style(".tr-modules-row-current").backgroundColor, style(version).color, top(version) === top(".tr-modules-row-current .tr-modules-id")];
       });
-      expect(look).toEqual([colors[mode].link, colors[mode].selected, colors[mode].muted, true]);
+      expect(look).toEqual([colors[mode].link, colors[mode].selected, colors[mode].text, true]);
+      expect(await ContrastFixture.measureLowestTextContrastAsync(row(window, "clock"))).toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
       await desktop.checkpointAsync(`modules-document-${mode.toLowerCase()}`);
     }
   });

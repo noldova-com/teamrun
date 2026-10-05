@@ -11,6 +11,7 @@ import path from "node:path";
 
 import type { Locator, Page } from "@playwright/test";
 
+import ContrastFixture from "./fixtures/contrast.fixture.ts";
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import ScrollAreaFixture from "./fixtures/scroll-area.fixture.ts";
@@ -76,6 +77,11 @@ test.describe("settings", () => {
     await expect(window.locator(".tr-settings-page")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Gallery"]);
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Theme", "Text", "Layout", "Command search"]);
     await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
+    for (const scheme of ["light", "dark"] as const) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      expect(await ContrastFixture.measureLowestTextContrastAsync(window.locator(".tr-settings-page[aria-current=page]"))).toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
+    }
     await expect(window.locator("[data-command=\"shell.openSettings\"] td").first()).toHaveText("Settings…");
     await desktop.checkpointAsync("settings-shortcuts");
   });

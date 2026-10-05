@@ -102,7 +102,7 @@ The table specifies normal-state colors. Check actual composited foreground/back
 | `--tr-added` | Semantic addition foreground | #3F6212 | #B5CEA8 | Added lines/counts and copy-success icon |
 | `--tr-added-background`, `--tr-removed-background` | Respective semantic foreground mixed over the local surface | 12% foreground | 12% foreground | Diff backgrounds; normal code text remains readable |
 
-Use selected foreground or another validated token when muted text loses contrast on selected surfaces. Sections 6 and 7 distinguish readable secondary text from disabled controls.
+Muted text inside a selected surface takes the surface's normal text color, and the kit's `selected-surface` mixin sets the fill and that color together, so every selected state uses it. Use another validated token when muted text loses contrast on any other surface. Sections 6 and 7 distinguish readable secondary text from disabled controls.
 
 Use one interaction accent per theme; errors and additions/removals have separate semantic colors. Section 7 governs contrast and non-color cues in every theme and mode.
 

@@ -337,6 +337,22 @@ describe("QuickInputComponent", () => {
     expect(label.getBoundingClientRect().top).toBeGreaterThanOrEqual(frame.top);
   });
 
+  for (const mode of AppearanceFixture.modes)
+    for (const theme of AppearanceFixture.themes)
+      it(`shows the detail, key and section label of its active option in the option's own text color, and of the others muted, in the ${theme.id} theme in ${mode} mode`, async () => {
+        AppearanceFixture.apply(theme, mode);
+        host.items.set(many.map((t, index) => new QuickInputItem(t.id, t.title, t.icon, "Notes", "Ctrl+K", [], [], index === 0 ? "recently used" : null)));
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const [active, other] = options() as [HTMLElement, HTMLElement];
+        const mutedColors = (option: HTMLElement): string[] => [".tr-quick-input-detail", ".tr-quick-input-key", ".tr-quick-input-section"]
+          .flatMap(t => [...option.querySelectorAll(t)]).map(t => getComputedStyle(t).color);
+        const own = getComputedStyle(active).color;
+
+        expect(mutedColors(active)).toEqual([own, own, own]);
+        expect(mutedColors(other)).not.toContain(getComputedStyle(other).color);
+      });
+
   it("keeps its list to half the window's height, or ten options when that is more", async () => {
     const tall = create(TallHostComponent);
     tall.detectChanges();
