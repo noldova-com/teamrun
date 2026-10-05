@@ -339,6 +339,7 @@ export class Resources {
   public static readonly blurEvent: "blur" = "blur";
   public static readonly treeItemSelector: string = "[role=treeitem]";
   public static readonly treeHoverOpenDelay: number = 500;
+  public static readonly treeGhostOffset: number = 12;
   public static readonly treeScrollStep: number = 8;
   public static readonly treeScrollInterval: number = 16;
   public static readonly treeDropEdgeFraction: number = 4;

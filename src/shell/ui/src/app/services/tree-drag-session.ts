@@ -91,7 +91,7 @@ export class TreeDragSession {
         return;
       this.draggingState.set(node);
     }
-    this.ghostState.set(new TreeGhost(event.clientX - (start.clientX - box.left), event.clientY - (start.clientY - box.top), box.width));
+    this.ghostState.set(new TreeGhost(event.clientX + Resources.treeGhostOffset, event.clientY - box.height / 2, box.width));
     this.setTarget(this.targetAt(event, node));
     this.setScroll(this.scrollAt(event.clientY, box.height));
   }

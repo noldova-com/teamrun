@@ -25,7 +25,7 @@ LICENSE file in the root directory of this source tree.
   <div class="tr-drop-line tr-drop-line-row tr-tree-drop-line" [style.top.px]="line.top" [style.inset-inline-start.px]="line.start" [style.width.px]="line.width"></div>
 }
 @if (session.ghost(); as ghost) {
-  <div class="tr-tree-ghost" aria-hidden="true" [style.left.px]="ghost.x" [style.top.px]="ghost.y" [style.width.px]="ghost.width">
+  <div class="tr-tree-ghost" aria-hidden="true" [style.left.px]="ghost.x" [style.top.px]="ghost.y" [style.max-width.px]="ghost.maxWidth">
     @if (session.dragging()?.icon; as icon) {
       <span class="tr-tree-icon material-symbols-rounded">{{ icon }}</span>
     }

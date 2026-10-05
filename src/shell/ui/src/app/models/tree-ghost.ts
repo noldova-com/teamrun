@@ -9,11 +9,11 @@
 export class TreeGhost {
   public readonly x: number;
   public readonly y: number;
-  public readonly width: number;
+  public readonly maxWidth: number;
 
-  public constructor(x: number, y: number, width: number) {
+  public constructor(x: number, y: number, maxWidth: number) {
     this.x = x;
     this.y = y;
-    this.width = width;
+    this.maxWidth = maxWidth;
   }
 }
