@@ -34,6 +34,9 @@
       ],
       "@noldova/teamrun-shell-window": [
         "./shell/window/src/api/index.ts"
+      ],
+      "@noldova/teamrun-shell-window/build": [
+        "./shell/window/src/api/build.ts"
       ]
     }
   },

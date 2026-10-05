@@ -31,9 +31,19 @@ class ApiCatalogTests {
       assert.equal(found[1]?.project, path.join(fixture.directory, "src/tsconfig.json"));
     });
 
+    test("a tree without the Angular project lists only the packages", async t => {
+      const fixture = await ApiCatalogTests.createAsync(t);
+      await fixture.writePackageAsync("shapes", ApiCatalogTests.SOURCE, null);
+
+      const found = await ApiCatalogTests.createCatalog(fixture, ["src/shell/window"]).listAsync();
+
+      assert.deepEqual(found.map(t => t.directory), ["src/foundation/shapes"]);
+    });
+
     test("without Angular parts lists only the packages and does not read the source project", async t => {
       const fixture = await ApiCatalogTests.createAsync(t);
       await fixture.writePackageAsync("shapes", ApiCatalogTests.SOURCE, null);
+      await fixture.writeFilesAsync({ "src/tsconfig.json": "{" });
 
       const found = await ApiCatalogTests.createCatalog(fixture, []).listAsync();
 

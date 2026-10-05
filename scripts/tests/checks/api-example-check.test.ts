@@ -182,7 +182,7 @@ class ApiExampleCheckTests {
         " * import { double } from \"@noldova/teamrun-shell-counter\";",
         " * import type { Length } from \"@noldova/teamrun-fixture-units\";",
         " *",
-        " * const length: Length = double(2);",
+        " * export const length: Length = double(2);",
         " * ```",
         " */",
         "export declare function double(value: number): number;",

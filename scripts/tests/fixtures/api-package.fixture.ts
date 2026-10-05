@@ -17,7 +17,6 @@ export default class ApiPackageFixture {
   private static readonly SCOPE: string = "@noldova";
   private static readonly NAME_PREFIX: string = "teamrun-foundation-";
   private static readonly PART_PREFIX: string = "teamrun-";
-  private static readonly PART_PREFIX: string = "teamrun-";
 
   public readonly directory: string;
 

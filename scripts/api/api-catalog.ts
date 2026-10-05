@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -34,9 +35,9 @@ export default class ApiCatalog {
 
   public async listAsync(): Promise<readonly ApiPackage[]> {
     const packages = (await this.packages.listPackagesAsync(false)).map(t => ApiPackage.forPackage(this.layout, t));
-    if (this.parts.length === 0)
-      return packages;
     const project = path.join(this.root, ...ApiCatalog.PROJECT);
+    if (this.parts.length === 0 || !existsSync(project))
+      return packages;
     const paths = await this.readPathsAsync(project);
     return [...packages, ...this.parts.map(t => ApiPackage.forPart(this.root, t, project, paths))];
   }

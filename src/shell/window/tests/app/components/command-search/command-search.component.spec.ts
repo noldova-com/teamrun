@@ -12,9 +12,9 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 
 import { CommandSearchComponent } from "../../../../src/app/components/command-search/command-search.component";
+import { BuildTokens } from "../../../../src/app/models/build-tokens";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { MenuDeclarations } from "../../../../src/app/models/menu-declarations";
-import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { CommandSearchService } from "../../../../src/app/services/command-search.service";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { MenuBarService } from "../../../../src/app/services/menu-bar.service";
@@ -49,7 +49,7 @@ describe("CommandSearchComponent", () => {
       providers: [
         { provide: WindowPartHostService, useValue: { generation: signal(1) } },
         {
-          provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
+          provide: BuildTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
             places: [{ name: "notes.templates", title: "New from template", menuBar: false }],
             groups: [
               { name: "notes.create", place: "shell.file", exclusive: false, items: [{ command: "notes.newNote", arguments: {} }, { submenu: "notes.templates" }] },

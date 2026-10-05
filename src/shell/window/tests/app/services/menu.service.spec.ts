@@ -12,6 +12,7 @@ import { TestBed } from "@angular/core/testing";
 import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 
 import { MenuCheck } from "../../../src/app/enums/menu-check";
+import { BuildTokens } from "../../../src/app/models/build-tokens";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { CommandRow } from "../../../src/app/models/command-row";
 import { MenuDeclarations } from "../../../src/app/models/menu-declarations";
@@ -20,7 +21,6 @@ import { MenuItem } from "../../../src/app/models/menu-item";
 import { MenuPlace } from "../../../src/app/models/menu-place";
 import type { MenuSection } from "../../../src/app/models/menu-section";
 import { SubmenuRow } from "../../../src/app/models/submenu-row";
-import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../src/app/services/command.service";
 import { MenuService } from "../../../src/app/services/menu.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
@@ -44,7 +44,7 @@ describe("MenuService", () => {
 
   function start(...declarations: readonly MenuDeclarations[]): MenuService {
     DesktopBridgeFixture.install();
-    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.menus, useValue: declarations }] });
+    TestBed.configureTestingModule({ providers: [{ provide: BuildTokens.menus, useValue: declarations }] });
     const reader = (value: JsonValue): JsonReader => JsonReader.fromValue(value);
     TestBed.inject(CommandService).setCommands([
       new CommandContribution("notes.openNote", "Open note", "open_in_new", "Mod+Alt+O", () => Promise.resolve(null), t => reader(t).readInteger("week") > 0),
