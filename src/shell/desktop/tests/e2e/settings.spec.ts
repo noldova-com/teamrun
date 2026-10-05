@@ -89,7 +89,7 @@ test.describe("settings", () => {
       expect(await ContrastFixture.measureLowestTextContrastAsync(window.locator(".tr-settings-pages [role=treeitem][aria-selected=true]"), ContrastFixture.SELECTED_ROW_BACKGROUND[scheme]))
         .toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
     }
-    await expect(window.locator("[data-command=\"shell.openSettings\"] td").first()).toHaveText("Settings…");
+    await expect(window.locator("[data-command=\"shell.openSettings\"] .tr-shortcut-title")).toHaveText("Settings…");
     await desktop.checkpointAsync("settings-shortcuts");
   });
 
@@ -199,6 +199,72 @@ test.describe("settings", () => {
     await window.getByRole("treeitem", { name: "Notifications", exact: true }).click();
     await expect(window.getByRole("searchbox", { name: "Search settings" })).toHaveValue("");
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
+  });
+
+  test("Keyboard shortcuts shows each command's id under its title, and a search by a part found only in an id finds the row and underlines that part", async ({ desktop }) => {
+    const window = desktop.window;
+    const split = window.locator("[data-command=\"shell.splitTabUp\"]");
+    await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
+
+    await expect(split.locator(".tr-shortcut-name")).toHaveText("shell.splitTabUp");
+    await window.locator(".tr-settings-content").hover({ position: { x: 4, y: 4 } });
+    for (const scheme of ["light", "dark"] as const) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await desktop.checkpointAsync(`settings-shortcut-ids-${scheme}`);
+    }
+    await window.getByRole("searchbox", { name: "Search settings" }).fill("bu");
+
+    await expect(split.locator(".tr-shortcut-title")).toHaveText("Split the tab up");
+    await expect(split.locator(".tr-shortcut-name mark")).toHaveText(["bU"]);
+    await expect(split.locator(".tr-shortcut-title mark, .tr-shortcut-owner mark, .tr-shortcut-key mark")).toHaveCount(0);
+    await expect(window.locator(".tr-settings-pages [aria-selected=true]")).toHaveCount(0);
+    expect(await split.locator(".tr-shortcut-name mark").evaluate(t => getComputedStyle(t).textDecorationLine)).toBe("underline");
+    for (const scheme of ["light", "dark"] as const) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await desktop.checkpointAsync(`settings-shortcut-id-search-${scheme}`);
+    }
+  });
+
+  test("in the narrowest window every command's id wraps within its Command cell, the longest included", async ({ desktop }) => {
+    const window = desktop.window;
+    const longest = window.locator("[data-command=\"shell.moveTabToPreviousGroup\"]");
+    await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
+
+    await desktop.useViewportAsync(640, 480);
+    await window.locator(".tr-settings-content").hover({ position: { x: 4, y: 4 } });
+    const overflows = await window.locator("tr-shortcuts tbody tr").evaluateAll(rows => rows.map(t => {
+      const cell = t.querySelector("td") as HTMLElement;
+      const end = cell.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(cell).paddingRight);
+      return [t.getAttribute("data-command"), Math.max(0, Math.round((t.querySelector(".tr-shortcut-name") as HTMLElement).getBoundingClientRect().right - end))] as const;
+    }));
+
+    expect(overflows.length).toBeGreaterThan(20);
+    expect(overflows.filter(t => t[1] !== 0)).toEqual([]);
+    await longest.scrollIntoViewIfNeeded();
+    expect(await longest.locator(".tr-shortcut-name").evaluate(t => t.getBoundingClientRect().height > Number.parseFloat(getComputedStyle(t).lineHeight))).toBe(true);
+    expect(await window.locator("[data-command=\"shell.moveTabToNextGroup\"] .tr-shortcut-name").evaluate(t => {
+      const range = document.createRange();
+      const group = [...t.querySelectorAll("tr-highlighted-text")].flatMap(u => [...u.childNodes]).find(u => u.textContent === "Group") as Node;
+      range.selectNodeContents(group);
+      return [Math.round(range.getBoundingClientRect().left - t.getBoundingClientRect().left), range.getBoundingClientRect().top > t.getBoundingClientRect().top, t.textContent];
+    })).toEqual([0, true, "shell.moveTabToNextGroup"]);
+    for (const scheme of ["light", "dark"] as const) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await desktop.checkpointAsync(`settings-shortcut-ids-narrow-${scheme}`);
+    }
+
+    await window.getByRole("searchbox", { name: "Search settings" }).fill("Group");
+    const next = window.locator("[data-command=\"shell.moveTabToNextGroup\"] .tr-shortcut-name");
+    await expect(next.locator("mark")).toHaveText(["Group"]);
+    expect(await next.evaluate(t => {
+      const mark = (t.querySelector("mark") as HTMLElement).getBoundingClientRect();
+      return [Math.round(mark.left - t.getBoundingClientRect().left), mark.top > t.getBoundingClientRect().top, t.textContent];
+    })).toEqual([0, true, "shell.moveTabToNextGroup"]);
+    await next.scrollIntoViewIfNeeded();
+    await desktop.checkpointAsync("settings-shortcut-id-search-narrow");
   });
 
   test("Settings keeps its page and scroll position when its tab becomes active again and when it moves to another group", async ({ desktop }) => {
