@@ -33,11 +33,6 @@
             "setupFiles": [
               "shell/ui/tests/kit-stylesheet.setup.ts"
             ],
-            "stylePreprocessorOptions": {
-              "includePaths": [
-                "shell/ui/src/styles"
-              ]
-            },
             "watch": false,
             "coverage": true,
             "coverageInclude": [
