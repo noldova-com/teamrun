@@ -320,7 +320,8 @@ describe("SettingsComponent", () => {
     gallery = FakeGalleryComponent;
     const host = render();
     const column = host.querySelector(".tr-settings-column") as HTMLElement;
-    const widths = ["100rem", "calc(37rem - 1px)"];
+    const wide = "100rem";
+    const widths = [wide, "calc(37rem - 1px)"];
     const measure = (selector: string): readonly (readonly number[])[] => {
       const columnBox = column.getBoundingClientRect();
       const box = (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
@@ -330,7 +331,7 @@ describe("SettingsComponent", () => {
       ];
     };
     const edges = async (title: string, selector: string): Promise<readonly (readonly (readonly number[])[])[]> => {
-      host.style.width = widths[0];
+      host.style.width = wide;
       await page.getByRole("treeitem", { name: title, exact: true }).click();
       fixture.detectChanges();
       return widths.map(t => {
