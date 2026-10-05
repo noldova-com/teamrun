@@ -6,14 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal, computed, effect, inject, linkedSignal, signal } from "@angular/core";
+import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal, computed, effect, inject, linkedSignal, signal, untracked } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import { JsonException } from "@noldova/teamrun-foundation-json";
 
 import { Resources } from "../../resources";
 import type { BottomDockSpan } from "../enums/bottom-dock-span";
-import type { DockSide } from "../enums/dock-side";
+import { DockSide } from "../enums/dock-side";
 import { DockStyle } from "../enums/dock-style";
 import { StartupStateKind } from "../enums/startup-state-kind";
 import type { ILayoutStore } from "../interfaces/i-layout-store";
@@ -56,12 +56,11 @@ export class LayoutService {
     new Set([...Resources.dockStyleSettings].filter(([, name]) => this.settings.values().get(name) === DockStyle.Icons).map(([side]) => side)));
   public readonly previewTabs: Signal<boolean> = computed(() => this.settings.values().get(Resources.previewTabsSetting) !== false);
   private readonly kept: WritableSignal<DockSide | null> = signal(null);
-  private readonly fitted: WritableSignal<LayoutGeometry> = linkedSignal({
+  public readonly geometry: Signal<LayoutGeometry> = linkedSignal({
     source: () => ({ width: this.width(), height: this.height(), layout: this.layoutState(), registry: this.registryState(), iconSides: this.iconSides(), kept: this.kept() }),
     computation: (source, previous?: { readonly value: LayoutGeometry }) => new LayoutGeometry(source.width, source.height, source.layout, source.registry, source.iconSides,
-      new DockYield(Resources.middlePreferredSize, previous?.value.closedSides ?? new Set(), source.kept))
+      new DockYield(source.layout.middleSize ?? Resources.middlePreferredSize, previous?.value.closedSides ?? new Set(), source.kept))
   });
-  public readonly geometry: Signal<LayoutGeometry> = this.fitted.asReadonly();
   public readonly currentGroup: Signal<TabGroup> = computed(() => {
     const id = this.currentGroupId();
     return (Object.isNull(id) ? null : this.layoutState().group(id)) ?? this.layoutState().documents;
@@ -86,7 +85,7 @@ export class LayoutService {
   public setViewport(width: number, height: number): void {
     this.width.set(width);
     this.height.set(height);
-    if (this.geometry().closedSides.size === 0)
+    if (!untracked(() => this.geometry().isKeeping))
       this.kept.set(null);
   }
 
@@ -146,6 +145,10 @@ export class LayoutService {
   }
 
   public toggleDock(side: DockSide): void {
+    if (this.geometry().closedSides.has(side)) {
+      this.kept.set(side);
+      return;
+    }
     this.update(this.layoutState().toggleDock(side));
     if (this.kept() === side)
       this.kept.set(null);
@@ -156,8 +159,9 @@ export class LayoutService {
       this.kept.set(side);
   }
 
-  public resizeDock(side: DockSide, size: number | null): void {
-    this.update(this.layoutState().resizeDock(side, size));
+  public resizeDock(side: DockSide, size: number): void {
+    const layout = this.layoutState().resizeDock(side, size);
+    this.update(side === DockSide.Bottom ? layout : layout.withMiddleSize(this.middleAfter(side, size)));
   }
 
   public setBottomSpan(span: BottomDockSpan): void {
@@ -174,6 +178,12 @@ export class LayoutService {
 
   public reset(): void {
     this.update(this.layoutState().reset(this.registryState()));
+  }
+
+  private middleAfter(side: DockSide, size: number): number | null {
+    const geometry = this.geometry();
+    const middle = geometry.middle.width + geometry.dock(side).width - size;
+    return middle < Resources.middlePreferredSize ? Math.max(0, middle) : null;
   }
 
   private reveal(tab: Tab): void {

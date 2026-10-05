@@ -70,29 +70,70 @@ describe("LayoutService", () => {
     expect(service.geometry().frames.map(t => t.group.id)).toEqual([0]);
   });
 
-  it("closes the side docks a narrow window cannot hold, right first, reopens them only past the margin and keeps open the one the person opens", async () => {
+  function closed(): readonly DockSide[] {
+    return [...service.geometry().closedSides];
+  }
+
+  it("closes the side docks a narrow window cannot hold, right first, and reopens them only past the margin", async () => {
     await loadAsync(Layout.createDefault(registry));
-    const closed = (): readonly DockSide[] => [...service.geometry().closedSides];
+
     const widths = [50, 52, 53, 40].map(t => {
       service.setViewport(t, 40);
       return closed();
     });
+
+    expect(widths).toEqual([[DockSide.Right], [DockSide.Right], [], [DockSide.Right, DockSide.Left]]);
+  });
+
+  it("keeps open the dock the person opens until the window grows so it would stay open anyway", async () => {
+    await loadAsync(Layout.createDefault(registry));
+    service.setViewport(40, 40);
 
     service.keepOpen(DockSide.Left);
     service.keepOpen(DockSide.Bottom);
     const kept = closed();
     service.setViewport(41, 40);
     const stillKept = closed();
-    service.toggleDock(DockSide.Left);
-    service.toggleDock(DockSide.Left);
-    const released = closed();
-    service.keepOpen(DockSide.Left);
     service.setViewport(60, 40);
     service.setViewport(40, 40);
 
-    expect(widths).toEqual([[DockSide.Right], [DockSide.Right], [], [DockSide.Right, DockSide.Left]]);
-    expect([kept, stillKept, released]).toEqual([[DockSide.Right], [DockSide.Right], [DockSide.Right, DockSide.Left]]);
+    expect([kept, stillKept]).toEqual([[DockSide.Right], [DockSide.Right]]);
     expect(closed()).toEqual([DockSide.Right, DockSide.Left]);
+  });
+
+  it("keeps the middle a side dock's drag leaves under its preferred size as the window narrows, and forgets it once a drag gives the middle that size again", async () => {
+    await loadAsync(Layout.createDefault(registry));
+    service.setViewport(100, 40);
+    const before = [service.layout().middleSize, service.geometry().middle.width];
+
+    service.resizeDock(DockSide.Left, 56);
+    service.resizeDock(DockSide.Bottom, 12);
+    const dragged = [service.layout().middleSize, service.geometry().middle.width];
+    service.setViewport(80, 40);
+    const narrowed = [service.geometry().middle.width, service.geometry().dock(DockSide.Left).width, service.geometry().dock(DockSide.Right).width];
+    service.resizeDock(DockSide.Left, 31);
+
+    expect([before, dragged, narrowed]).toEqual([[null, 48], [18, 18], [18, 51, 10]]);
+    expect([service.layout().middleSize, service.geometry().middle.width]).toEqual([null, 30]);
+  });
+
+  it("keeps a dock open beside one the person hid, opens a closed dock when its command runs and releases a kept dock the person hides", async () => {
+    await loadAsync(Layout.createDefault(registry).toggleDock(DockSide.Right));
+    service.setViewport(40, 40);
+    const before = closed();
+
+    service.keepOpen(DockSide.Left);
+    service.setViewport(40.0625, 40);
+    service.setViewport(40, 40);
+    const kept = closed();
+    service.toggleDock(DockSide.Left);
+    service.toggleDock(DockSide.Left);
+    const released = closed();
+    service.toggleDock(DockSide.Left);
+
+    expect([before, kept, released]).toEqual([[DockSide.Left], [], [DockSide.Left]]);
+    expect(closed()).toEqual([]);
+    expect(service.layout().dock(DockSide.Left).isExpanded).toBe(true);
   });
 
   it("loads the saved layout, the default when nothing is saved and the default for an unreadable one, and tells whether it restored one", async () => {
@@ -120,6 +161,7 @@ describe("LayoutService", () => {
 
   it("changes the layout through the model and saves it after a pause", async () => {
     await loadAsync(prepared());
+    service.setViewport(120, 60);
     const terminal = LayoutFixture.terminal;
 
     service.place(terminal, new SideDropTarget(DockSide.Right));
@@ -337,6 +379,7 @@ describe("LayoutService", () => {
 
   it("writes one layout at a time, so the newest layout is always the last one written", async () => {
     await loadAsync(prepared());
+    service.setViewport(120, 60);
     let finishFirst: () => void = () => undefined;
     const written: unknown[] = [];
     vi.spyOn(store, "writeAsync").mockImplementation(layout => {

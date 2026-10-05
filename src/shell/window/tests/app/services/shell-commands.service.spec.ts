@@ -447,6 +447,20 @@ describe("ShellCommandsService", () => {
     expect(layout.layout().dock(DockSide.Left).isCollapsed).toBe(false);
   });
 
+  it("checks a side dock's command only while the dock shows, and opens a dock the narrow window closed instead of hiding it", async () => {
+    const shown = (): boolean[] => ["shell.toggleLeftDock", "shell.toggleRightDock"].map(t => checked(t, null));
+    layout.setViewport(120, 60);
+    const wide = shown();
+
+    layout.setViewport(40, 40);
+    const narrow = shown();
+    await runAsync("shell.toggleRightDock");
+
+    expect([wide, narrow]).toEqual([[true, true], [false, false]]);
+    expect(shown()).toEqual([false, true]);
+    expect(layout.layout().dock(DockSide.Right).isExpanded).toBe(true);
+  });
+
   it("keeps the bottom dock between the side docks or spans it across the window, both always enabled and the current one changing nothing", async () => {
     const enabled = (): boolean[] => ["shell.spanBottomDock", "shell.fitBottomDockBetween"].map(t => command(t).isEnabled(null));
     const initial = layout.layout();

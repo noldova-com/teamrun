@@ -11,12 +11,12 @@ import type { DockSide } from "../../enums/dock-side";
 export class DockYield {
   public static readonly none: DockYield = new DockYield(0, new Set(), null);
 
-  public readonly middle: number;
+  public readonly preferredMiddle: number;
   public readonly closed: ReadonlySet<DockSide>;
   public readonly kept: DockSide | null;
 
-  public constructor(middle: number, closed: ReadonlySet<DockSide>, kept: DockSide | null) {
-    this.middle = middle;
+  public constructor(preferredMiddle: number, closed: ReadonlySet<DockSide>, kept: DockSide | null) {
+    this.preferredMiddle = preferredMiddle;
     this.closed = closed;
     this.kept = kept;
   }

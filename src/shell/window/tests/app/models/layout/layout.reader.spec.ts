@@ -88,6 +88,14 @@ describe("LayoutReader", () => {
     expect(failure({ ...saved(), toolbars: { rows: [{ toolbars: ["main"] }], hidden: [] } }).message).toBe("$: The value does not describe a valid part of a layout.");
   });
 
+  it("reads the person's wanted middle when the layout has one, and refuses one that is not valid", () => {
+    expect(LayoutReader.read({ ...saved(), middleSize: 20 }).middleSize).toBe(20);
+    expect(LayoutReader.read(saved()).middleSize).toBeNull();
+    expect(LayoutReader.read({ ...saved(), middleSize: 20 }).toJson()).toEqual({ ...saved(), middleSize: 20 });
+    expect(failure({ ...saved(), middleSize: "wide" }).path).toBe("$.middleSize");
+    expect(failure({ ...saved(), middleSize: -1 }).path).toBe("$");
+  });
+
   it("writes back what it read, including views whose modules are absent", () => {
     expect(LayoutReader.read(full).toJson()).toEqual(full);
     expect(LayoutReader.read(JSON.parse(JSON.stringify(LayoutReader.read(full).toJson())))).toEqual(LayoutReader.read(full));

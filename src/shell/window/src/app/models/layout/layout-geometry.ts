@@ -84,6 +84,10 @@ export class LayoutGeometry {
     return this.across.collapsed;
   }
 
+  public get isKeeping(): boolean {
+    return this.across.isKeeping;
+  }
+
   public dock(side: DockSide): Bounds {
     return this.dockBounds[side];
   }

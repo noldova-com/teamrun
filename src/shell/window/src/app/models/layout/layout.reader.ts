@@ -57,7 +57,8 @@ export class LayoutReader {
     const index = json.hasField(Resources.activeDocumentsField) ? json.readInteger(Resources.activeDocumentsField) : 0;
     const span = json.hasField(Resources.bottomSpanField) ? json.readOneOf(Resources.bottomSpanField, Object.values(BottomDockSpan)) : BottomDockSpan.Full;
     const toolbars = json.hasField(Resources.toolbarsField) ? LayoutReader.construct(json, () => ToolbarLayout.fromJson(json.readObject(Resources.toolbarsField))) : ToolbarLayout.EMPTY;
-    return LayoutReader.construct(json, () => new Layout(read, middle, span, toolbars, documents[index]?.id));
+    const middleSize = json.hasField(Resources.middleSizeField) ? json.readNumber(Resources.middleSizeField) : null;
+    return LayoutReader.construct(json, () => new Layout(read, middle, span, toolbars, documents[index]?.id, middleSize));
   }
 
   private readDock(side: DockSide, json: JsonReader): Dock {

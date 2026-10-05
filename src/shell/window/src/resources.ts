@@ -372,6 +372,7 @@ export class Resources {
   public static readonly versionField: string = "version";
   public static readonly docksField: string = "docks";
   public static readonly middleField: string = "middle";
+  public static readonly middleSizeField: string = "middleSize";
   public static readonly rootField: string = "root";
   public static readonly sizeField: string = "size";
   public static readonly collapsedField: string = "collapsed";
@@ -621,6 +622,7 @@ export class Resources {
   public static readonly previewOutsideGroup: string = "The preview tab must be one of the group's tabs.";
   public static readonly documentOutsideDocuments: string = "Document tabs stay in document groups.";
   public static readonly missingDocumentsGroup: string = "The middle holds at least one document group.";
+  public static readonly invalidMiddleSize: string = "The middle's wanted width is a number of at least zero.";
   public static readonly documentsInDock: string = "Document groups stay in the middle.";
   public static readonly repeatedDock: string = "A layout has one dock for each side.";
   public static readonly repeatedNodeId: string = "Each group and split in a layout has its own id.";
@@ -792,6 +794,10 @@ export class Resources {
 
   public static formatDocumentsGroup(position: number): string {
     return `${Resources.documentsGroupLabel} ${position}`;
+  }
+
+  public static formatDockStripView(side: DockSide, key: string): string {
+    return `tr-dock[data-side="${side}"] .tr-dock-strip-view[data-view="${CSS.escape(key)}"]`;
   }
 
   public static formatBadged(label: string, badge: string): string {

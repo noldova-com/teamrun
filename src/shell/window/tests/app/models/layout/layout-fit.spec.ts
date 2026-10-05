@@ -48,10 +48,12 @@ describe("LayoutFit", () => {
     const yielding = (width: number): LayoutFit => LayoutFit.of(width, 0.5, [left, right], 13.75, new Set(), new DockYield(30, new Set(), null));
 
     expect(tracks(yielding(100))).toEqual([26.25, 25.25, 48]);
-    expect(yielding(100).maximumSize(DockSide.Left)).toBe(44);
+    expect(yielding(100).maximumSize(DockSide.Left)).toBe(60.25);
     expect(tracks(yielding(70))).toEqual([26.25, 13.25, 30]);
     expect(tracks(yielding(52))).toEqual([11.25, 10.25, 30]);
+    expect(tracks(yielding(51))).toEqual([10.25, 10.25, 30]);
     expect(tracks(yielding(50))).toEqual([16.5, 3, 30]);
+    expect(yielding(50).isKeeping).toBe(false);
     expect(tracks(yielding(40))).toEqual([3, 3, 33.5]);
   });
 
@@ -68,7 +70,22 @@ describe("LayoutFit", () => {
     const kept = (width: number): LayoutFit => LayoutFit.of(width, 0.5, [left, right], 13.75, new Set(), new DockYield(30, new Set([DockSide.Left, DockSide.Right]), DockSide.Left));
 
     expect(tracks(kept(40))).toEqual([10.25, 3, 26.25]);
+    expect(kept(40).isKeeping).toBe(true);
     expect(tracks(kept(25))).toEqual([3, 3, 18.5]);
+    expect(kept(25).isKeeping).toBe(true);
+  });
+
+  it("stops keeping a dock once it would stay open by the margin anyway, also beside a dock the person hid", () => {
+    const kept = (width: number, docks: readonly Dock[]): LayoutFit => LayoutFit.of(width, 0.5, docks, 13.75, new Set(), new DockYield(30, new Set(), DockSide.Left));
+    const hidden = [left, right.withCollapsed(true)];
+
+    expect(tracks(kept(40, hidden))).toEqual([10.25, 3, 26.25]);
+    expect(kept(40, hidden).isKeeping).toBe(true);
+    expect(kept(45, hidden).isKeeping).toBe(true);
+    expect(kept(46, hidden).isKeeping).toBe(false);
+    expect(tracks(kept(46, hidden))).toEqual([12.5, 3, 30]);
+    expect(kept(52, [left, right]).isKeeping).toBe(true);
+    expect(kept(53, [left, right]).isKeeping).toBe(false);
   });
 
   it("keeps a collapsed dock's strip and gives an empty dock no room", () => {
