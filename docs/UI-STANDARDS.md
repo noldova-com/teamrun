@@ -48,7 +48,7 @@ A theme is data: it contains no styles, selectors or code and changes nothing el
 
 The shell's default theme defines the values in this document: the colors below and the look of sections 3, 4 and 8. Another theme provides its colors for both modes and the parts of the look it changes; the rest comes from the default theme. Modules contribute themes under the [architecture](ARCHITECTURE.md#5-contributions).
 
-Every color uses a theme token. The default theme's light and dark colors start from the table below; provide complete initial tokens before painting themed content. Section 9 governs module tokens.
+Every color uses a theme token. The default theme's light and dark colors start from the table below; provide complete initial tokens before painting themed content. The default theme's greys for surfaces, borders, hover and selection carry no tint, so a selected item sits in the same grey family as the window around it. Section 9 governs module tokens.
 
 The application shows one icon in light and dark mode, whatever the theme or the operating system's appearance. On Windows and Linux it is the outlined icon, a white shape with a dark outline that stays readable on both backgrounds, on the window, the taskbar and the program file. macOS shows the Dock icon.
 
@@ -67,14 +67,14 @@ The table specifies normal-state colors. Check actual composited foreground/back
 | `--tr-text-tab` | Opaque muted text, adjusted for its surface | #616161 | #9D9D9D | Unselected, operable tab labels |
 | `--tr-text-placeholder` | Opaque muted text, adjusted for its surface | #616161 | #9D9D9D | Placeholder of a prose input |
 | `--tr-icon-color` | `icon.foreground`, fallback `foreground` | #3B3B3B | #CCCCCC | Interface icons |
-| `--tr-card-border` | `surface.border`, fallback `widget.border` | #E5E5E5 | #252526 | Decorative panel border |
+| `--tr-card-border` | `surface.border`, fallback `widget.border` | #E5E5E5 | #252525 | Decorative panel border |
 | `--tr-border` | `sideBarSectionHeader.border` | #E5E5E5 | #2B2B2B | Section dividers |
 | `--tr-accent` | `focusBorder`, contrast-adjusted | #005FB8 | #4DAAFC | Focus and active resize indicators |
 | `--tr-sash-active` | `sash.hoverBorder`, fallback `focusBorder` | #005FB8 | #4DAAFC | Bar of a sash in use |
 | `--tr-link` | `textLink.foreground` | #005FB8 | #4DAAFC | Links |
-| `--tr-hover` | `list.hoverBackground` | #F2F2F2 | #2A2D2E | Row, tab and menu-item hover |
-| `--tr-selected` | `list.inactiveSelectionBackground`, fallback `list.activeSelectionBackground` | #E4E6F1 | #37373D | Selected rows, tabs and choice pills |
-| `--tr-toolbar-hover` | `toolbar.hoverBackground` | #B8B8B850 | #5A5D5E50 | Icon-button and toolbar-button hover |
+| `--tr-hover` | `list.hoverBackground` | #F2F2F2 | #2C2C2C | Row, tab and menu-item hover |
+| `--tr-selected` | `list.inactiveSelectionBackground`, fallback `list.activeSelectionBackground` | #E6E6E6 | #383838 | Selected rows, tabs and choice pills |
+| `--tr-toolbar-hover` | `toolbar.hoverBackground` | #B8B8B850 | #5C5C5C50 | Icon-button and toolbar-button hover |
 | `--tr-scrollbar` | `scrollbarSlider.background` | #64646466 | #79797966 | Scrollbar thumb; adjust when needed for visibility |
 | `--tr-scrollbar-active` | `scrollbarSlider.hoverBackground`, fallback `scrollbarSlider.background` | #646464B3 | #646464B3 | Scrollbar thumb while dragged |
 | `--tr-title-bar`, `--tr-title-bar-text` | `titleBar.activeBackground`, `titleBar.activeForeground` | #F8F8F8, #1E1E1E | #181818, #CCCCCC | Native title-bar integration |
@@ -96,7 +96,7 @@ The table specifies normal-state colors. Check actual composited foreground/back
 | `--tr-checkbox`, `--tr-checkbox-border` | `checkbox.*`, with contrast-checked border fallback | #F8F8F8, #858585 | #313131, #858585 | Checkbox surface and identifiable boundary |
 | `--tr-badge`, `--tr-badge-text` | `badge.*` | #CCCCCC, #3B3B3B | #616161, #F8F8F8 | Available filled-badge pair; count chips use the component table |
 | `--tr-progress` | `progressBar.background`, fallback accent | #005FB8 | #4DAAFC | Progress indicators |
-| `--tr-docking-preview`, `--tr-docking-preview-border` | `teamrun.dockingPreviewBackground`, fallback `list.inactiveSelectionBackground`; `teamrun.dockingPreviewBorder`, fallback `focusBorder` | #E4E6F1, #005FB8 | #37373D, #4DAAFC | The area a dragged tab will occupy |
+| `--tr-docking-preview`, `--tr-docking-preview-border` | `teamrun.dockingPreviewBackground`, fallback `list.inactiveSelectionBackground`; `teamrun.dockingPreviewBorder`, fallback `focusBorder` | #E6E6E6, #005FB8 | #383838, #4DAAFC | The area a dragged tab will occupy |
 | `--tr-notification`, `--tr-notification-border` | `notifications.*` | #FFFFFF, #E5E5E5 | #1F1F1F, #454545 | Notification surface |
 | `--tr-error`, `--tr-removed` | Semantic error/removal foregrounds | #A1260D | #F48771 | Errors and removed lines/counts, with text or symbols identifying their meaning |
 | `--tr-added` | Semantic addition foreground | #3F6212 | #B5CEA8 | Added lines/counts and copy-success icon |
