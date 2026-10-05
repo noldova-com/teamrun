@@ -26,6 +26,7 @@ import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.f
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
+import { TooltipFixture } from "../../../fixtures/tooltip.fixture";
 
 @Component({
   imports: [TabGroupComponent],
@@ -42,16 +43,6 @@ class TabGroupHostComponent {
   private readonly layout: LayoutService = inject(LayoutService);
 
   public readonly frames: Signal<readonly GroupFrame[]> = computed(() => this.layout.geometry().frames);
-}
-
-
-async function expectTooltipAsync(button: HTMLElement | null | undefined, text: string): Promise<void> {
-  const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === text);
-  button?.dispatchEvent(new PointerEvent("pointerenter"));
-  await vi.waitFor(() => expect(tooltip()).toBeDefined());
-  button?.dispatchEvent(new PointerEvent("pointerleave"));
-  await vi.waitFor(() => expect(tooltip()).toBeUndefined());
-  expect(button?.hasAttribute("title")).toBe(false);
 }
 
 describe("TabGroupComponent", () => {
@@ -180,19 +171,21 @@ describe("TabGroupComponent", () => {
   it("shows a tab's title below it only while its label is cut short", async () => {
     await renderAsync();
     const target = tab(1, 1);
-    const tooltip = (): HTMLElement | null => document.querySelector<HTMLElement>(".cdk-overlay-container tr-tooltip");
-
     const decided = vi.spyOn(TooltipDirective.prototype, "show");
-    target.dispatchEvent(new PointerEvent("pointerenter"));
-    await vi.waitFor(() => expect(decided).toHaveBeenCalled());
-    const isShownWhenFitting = !Object.isNull(tooltip());
-    target.dispatchEvent(new PointerEvent("pointerleave"));
-    target.style.maxWidth = "3rem";
-    target.dispatchEvent(new PointerEvent("pointerenter"));
-    await vi.waitFor(() => expect(tooltip()?.textContent?.trim()).toBe("files.search"));
 
-    expect(isShownWhenFitting).toBe(false);
-    expect(tooltip()?.getBoundingClientRect().top).toBeGreaterThan(target.getBoundingClientRect().bottom);
+    const { fitting, cut } = await TooltipFixture.shieldAsync(async () => {
+      target.dispatchEvent(new PointerEvent("pointerenter"));
+      await vi.waitFor(() => expect(decided).toHaveBeenCalled());
+      const shown = TooltipFixture.find("files.search");
+      target.dispatchEvent(new PointerEvent("pointerleave"));
+      target.style.maxWidth = "3rem";
+      target.dispatchEvent(new PointerEvent("pointerenter"));
+      await vi.waitFor(() => expect(TooltipFixture.find("files.search")).toBeDefined());
+      return { fitting: shown, cut: TooltipFixture.find("files.search") };
+    });
+
+    expect(fitting).toBeUndefined();
+    expect(cut?.getBoundingClientRect().top).toBeGreaterThan(target.getBoundingClientRect().bottom);
   });
 
   it("shows a preview in italics with its description and keeps it on a double-click", async () => {
@@ -306,10 +299,10 @@ describe("TabGroupComponent", () => {
 
     expect(group(other).querySelector(".tr-tab-group-hide")).toBeNull();
     expect(group(0).querySelector(".tr-tab-group-hide")).toBeNull();
-    const hide = group(corner ?? -1).querySelector<HTMLButtonElement>(".tr-tab-group-hide");
-    expect(hide?.getAttribute("aria-label")).toBe(Resources.hideDockLabels[DockSide.Left]);
-    await expectTooltipAsync(hide, Resources.hideDockLabels[DockSide.Left]);
-    hide?.click();
+    const hide = group(corner ?? -1).querySelector<HTMLButtonElement>(".tr-tab-group-hide") as HTMLButtonElement;
+    expect(hide.getAttribute("aria-label")).toBe(Resources.hideDockLabels[DockSide.Left]);
+    await TooltipFixture.expectTooltipAsync(hide, Resources.hideDockLabels[DockSide.Left]);
+    hide.click();
     update();
 
     expect(layout.layout().dock(DockSide.Left).isCollapsed).toBe(true);
@@ -366,17 +359,17 @@ describe("TabGroupComponent", () => {
 
   it("opens the active tab's menu from the panel actions and a tab's menu from the keyboard", async () => {
     await renderAsync();
-    const actions = group(0).querySelector<HTMLButtonElement>(".tr-tab-group-menu");
-    expect(actions?.getAttribute("aria-label")).toBe(Resources.panelActionsLabel);
-    await expectTooltipAsync(actions, Resources.panelActionsLabel);
-    actions?.click();
+    const actions = group(0).querySelector<HTMLButtonElement>(".tr-tab-group-menu") as HTMLButtonElement;
+    expect(actions.getAttribute("aria-label")).toBe(Resources.panelActionsLabel);
+    await TooltipFixture.expectTooltipAsync(actions, Resources.panelActionsLabel);
+    actions.click();
     update();
     await fixture.whenStable();
     const menu = document.querySelector<HTMLElement>(".cdk-overlay-container tr-menu[data-place='shell.tab']");
     expect(menu).not.toBeNull();
-    expect(menu?.getBoundingClientRect().right).toBeCloseTo(actions?.getBoundingClientRect().right ?? 0, 0);
-    expect(menu?.getBoundingClientRect().top).toBeGreaterThanOrEqual(actions?.getBoundingClientRect().bottom ?? Infinity);
-    actions?.click();
+    expect(menu?.getBoundingClientRect().right).toBeCloseTo(actions.getBoundingClientRect().right, 0);
+    expect(menu?.getBoundingClientRect().top).toBeGreaterThanOrEqual(actions.getBoundingClientRect().bottom);
+    actions.click();
     update();
     await fixture.whenStable();
     expect(document.querySelector(".cdk-overlay-container tr-menu[data-place='shell.tab']")).toBeNull();
@@ -454,10 +447,10 @@ describe("TabGroupComponent", () => {
 
     expect(reveal).toHaveBeenCalled();
     expect(group(1).querySelector(".tr-tab-group-overflow")).toBeNull();
-    const overflow = group(0).querySelector<HTMLButtonElement>(".tr-tab-group-overflow");
-    expect(overflow?.getAttribute("aria-label")).toBe(Resources.overflowLabel);
-    await expectTooltipAsync(overflow, Resources.overflowLabel);
-    overflow?.click();
+    const overflow = group(0).querySelector<HTMLButtonElement>(".tr-tab-group-overflow") as HTMLButtonElement;
+    expect(overflow.getAttribute("aria-label")).toBe(Resources.overflowLabel);
+    await TooltipFixture.expectTooltipAsync(overflow, Resources.overflowLabel);
+    overflow.click();
     update();
     await fixture.whenStable();
     const choices = [...document.querySelectorAll<HTMLButtonElement>(".cdk-overlay-container .tr-tab-group-overflow-tab")];
