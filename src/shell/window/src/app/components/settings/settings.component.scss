@@ -62,7 +62,7 @@
 
 .tr-settings-group-title,
 .tr-settings-result-title {
-  margin: var(--tr-settings-heading-space) 0;
+  margin: 0 0 var(--tr-settings-heading-space);
   padding-inline-start: var(--tr-settings-heading-inset);
   color: var(--tr-setting-title);
   font-size: var(--tr-text-heading);

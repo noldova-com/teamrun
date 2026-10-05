@@ -196,6 +196,21 @@ describe("SettingsComponent", () => {
     expect(edges).toEqual([[0, 0], [0, 0]]);
   });
 
+  it("tops its first heading level with the page list's first item on a page, on Keyboard shortcuts and in search results", async () => {
+    const host = render();
+    host.style.width = "100rem";
+    const top = (selector: string): number => (host.querySelector(selector) as HTMLElement).getBoundingClientRect().top;
+    const offset = (): number => Math.round(top(".tr-settings-column h2") - top(".tr-settings-pages .tr-tree-row"));
+    const offsets = [offset()];
+    await page.getByRole("treeitem", { name: "Keyboard shortcuts" }).click();
+    fixture.detectChanges();
+    offsets.push(offset());
+    await searchAsync("greeting");
+    offsets.push(offset());
+
+    expect(offsets).toEqual([0, 0, 0]);
+  });
+
   it("starts and ends the shortcuts table's text, actions and row lines at the headings' inset, whether or not the column has reached its reading width, and Reset all beside the explanation", async () => {
     const host = render();
     await page.getByRole("treeitem", { name: "Keyboard shortcuts" }).click();
@@ -483,7 +498,8 @@ describe("SettingsComponent", () => {
     expect(current.backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "list.inactiveSelectionBackground"));
     AppearanceFixture.expectLook(current.minHeight, DefaultTheme.theme, "tree-row-height", "min-height");
     AppearanceFixture.expectLook(getComputedStyle(element().querySelector(".tr-settings-pages") as Element).width, DefaultTheme.theme, "settings-pages-width", "width");
-    AppearanceFixture.expectLook(heading.marginTop, DefaultTheme.theme, "settings-heading-space", "margin-top");
+    expect(heading.marginTop).toBe("0px");
+    AppearanceFixture.expectLook(heading.marginBottom, DefaultTheme.theme, "settings-heading-space", "margin-bottom");
     AppearanceFixture.expectLook(heading.paddingLeft, DefaultTheme.theme, "settings-heading-inset", "padding-left");
     expect(heading.fontWeight).toBe("600");
     expect(heading.fontSize).toBe(`${parseFloat(getComputedStyle(document.body).fontSize) * 2}px`);
