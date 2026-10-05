@@ -12,11 +12,13 @@ import type { TreeNode } from "./tree-node";
 
 export class TreeDrop {
   public readonly target: TreeNode;
+  public readonly row: HTMLElement;
   public readonly place: TreeDropPlace;
   public readonly move: TreeMove;
 
-  public constructor(target: TreeNode, place: TreeDropPlace, move: TreeMove) {
+  public constructor(target: TreeNode, row: HTMLElement, place: TreeDropPlace, move: TreeMove) {
     this.target = target;
+    this.row = row;
     this.place = place;
     this.move = move;
   }

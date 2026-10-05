@@ -187,7 +187,7 @@ describe("TreeDragSession", () => {
     vi.advanceTimersByTime(1);
     await fixture.whenStable();
     const opened = row("Source").getAttribute("aria-expanded");
-    const landing = (line() as HTMLElement).getBoundingClientRect();
+    const landing = tree.shownLine().getBoundingClientRect();
     pointer("pointerup", row("Source"), yAt("Source", 0.95));
     await fixture.whenStable();
     vi.advanceTimersByTime(1);
@@ -274,7 +274,7 @@ describe("TreeDragSession", () => {
     pointer("pointermove", rowUnder(), edge);
     vi.advanceTimersByTime(400);
     const under = Number(rowUnder().querySelector(".tr-tree-label")?.textContent?.replace("Row ", String.empty));
-    const lineTop = (line() as HTMLElement).getBoundingClientRect().top;
+    const lineTop = tree.shownLine().getBoundingClientRect().top;
     pointer("pointerup", rowUnder(), edge);
     vi.advanceTimersByTime(1);
 
@@ -290,7 +290,8 @@ describe("TreeDragSession", () => {
         await dragAsync("Notes", "Trash", 0.9, false);
         const dragged = ghost() as HTMLElement;
         const ghostStyle = getComputedStyle(dragged);
-        const lineLook = [getComputedStyle(line() as HTMLElement).backgroundColor, Number.parseFloat(getComputedStyle(line() as HTMLElement).height)];
+        const lineStyle = getComputedStyle(tree.shownLine());
+        const lineLook = [lineStyle.backgroundColor, Number.parseFloat(lineStyle.height)];
         const borderWidth = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tr-border-width"));
         pointer("pointermove", row("Readme"), yAt("Readme", 0.5));
         pointer("pointermove", row("Source"), yAt("Source", 0.5));

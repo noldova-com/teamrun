@@ -33,7 +33,7 @@ describe("TreeLine", () => {
     await renderAsync();
 
     await tree.dragAsync("Notes", "Trash", 0.9, false);
-    const drawn = (tree.line as HTMLElement).getBoundingClientRect();
+    const drawn = tree.shownLine().getBoundingClientRect();
     const trash = tree.row("Trash").getBoundingClientRect();
     const style = getComputedStyle(tree.row("Trash"));
     const inset = Number.parseFloat(style.paddingInlineStart);
@@ -47,7 +47,7 @@ describe("TreeLine", () => {
     await renderAsync();
 
     await tree.dragAsync("Trash", "Notes", 0.1, false);
-    const drawn = (tree.line as HTMLElement).getBoundingClientRect();
+    const drawn = tree.shownLine().getBoundingClientRect();
 
     expect(drawn.top + drawn.height / 2).toBeCloseTo(tree.row("Notes").getBoundingClientRect().top - tree.gap / 2, 0);
   });
@@ -56,7 +56,7 @@ describe("TreeLine", () => {
     await renderAsync();
 
     await tree.dragAsync("Notes", "Project", 0.9, false);
-    const drawn = (tree.line as HTMLElement).getBoundingClientRect();
+    const drawn = tree.shownLine().getBoundingClientRect();
     const source = tree.row("Source").getBoundingClientRect();
 
     expect(drawn.top + drawn.height / 2).toBeCloseTo(tree.row("Project").getBoundingClientRect().bottom + tree.gap / 2, 0);
@@ -68,7 +68,7 @@ describe("TreeLine", () => {
     tree.root.dir = "rtl";
 
     await tree.dragAsync("Notes", "Trash", 0.9, false);
-    const inline = (tree.line as HTMLElement).getBoundingClientRect();
+    const inline = tree.shownLine().getBoundingClientRect();
 
     expect(inline.right).toBeCloseTo(tree.row("Trash").getBoundingClientRect().right - Number.parseFloat(getComputedStyle(tree.row("Trash")).paddingInlineStart), 0);
   });

@@ -23,15 +23,23 @@ export class TreeHarness {
   }
 
   public get line(): HTMLElement | null {
-    return this.root.querySelector(".tr-tree-drop-line");
+    return this.root.querySelector<HTMLElement>(".tr-tree-drop-line");
   }
 
   public get ghost(): HTMLElement | null {
-    return this.root.querySelector(".tr-tree-ghost");
+    return this.root.querySelector<HTMLElement>(".tr-tree-ghost");
+  }
+
+  public shownLine(): HTMLElement {
+    return this.shown(this.line, "drop line");
+  }
+
+  public shownGhost(): HTMLElement {
+    return this.shown(this.ghost, "ghost");
   }
 
   public get gap(): number {
-    return Number.parseFloat(getComputedStyle(this.root.querySelector(".tr-tree") as HTMLElement).rowGap);
+    return Number.parseFloat(getComputedStyle(this.shown(this.root.querySelector<HTMLElement>(".tr-tree"), "tree")).rowGap);
   }
 
   public get moves(): (string | number | null)[][] {
@@ -71,5 +79,11 @@ export class TreeHarness {
 
   public press(target: HTMLElement, key: string, modifiers: KeyboardEventInit = { altKey: true }): boolean {
     return target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...modifiers }));
+  }
+
+  private shown(element: HTMLElement | null, name: string): HTMLElement {
+    if (Object.isNull(element))
+      throw new Error(`The tree shows no ${name}.`);
+    return element;
   }
 }

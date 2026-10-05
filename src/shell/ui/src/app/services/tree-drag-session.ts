@@ -39,7 +39,7 @@ export class TreeDragSession {
   private rowGap: number = 0;
   private pointerX: number = 0;
   private pointerY: number = 0;
-  private targetRow: Element | null = null;
+  private targetRow: HTMLElement | null = null;
   private targetPlace: TreeDropPlace | null = null;
 
   public readonly dragging: Signal<TreeNode | null> = this.draggingState.asReadonly();
@@ -154,19 +154,19 @@ export class TreeDragSession {
     if (row === this.targetRow && place === this.targetPlace)
       return;
     const move = TreePlan.drop(this.nodes(), dragged.id, node.id, place);
-    this.setTarget(Object.isNull(move) ? null : new TreeDrop(node, place, move), row, place);
+    this.setTarget(Object.isNull(move) ? null : new TreeDrop(node, row, place, move), row, place);
   }
 
-  private rowAtPointer(): Element | undefined {
+  private rowAtPointer(): HTMLElement | undefined {
     for (const offset of [0, -this.rowGap, this.rowGap]) {
-      const row = this.document.elementFromPoint(this.pointerX, this.pointerY + offset)?.closest(Resources.treeItemSelector);
+      const row = this.document.elementFromPoint(this.pointerX, this.pointerY + offset)?.closest<HTMLElement>(Resources.treeItemSelector);
       if (!Object.isNullOrUndefined(row) && this.host.contains(row))
         return row;
     }
     return undefined;
   }
 
-  private setTarget(drop: TreeDrop | null, row: Element | null, place: TreeDropPlace | null): void {
+  private setTarget(drop: TreeDrop | null, row: HTMLElement | null, place: TreeDropPlace | null): void {
     this.targetRow = row;
     this.targetPlace = place;
     const current = this.dropState();
@@ -180,11 +180,10 @@ export class TreeDragSession {
   private lineOf(drop: TreeDrop): TreeLine | null {
     if (drop.place === TreeDropPlace.Into)
       return null;
-    const row = this.hooks.rowOf(drop.target) as HTMLElement;
-    const box = row.getBoundingClientRect();
+    const box = drop.row.getBoundingClientRect();
     const frame = this.host.getBoundingClientRect();
-    const first = drop.place === TreeDropPlace.Start ? this.hooks.rowOf(drop.target.children[0] as TreeNode) : undefined;
-    const style = getComputedStyle(first ?? row);
+    const [first] = (drop.place === TreeDropPlace.Start ? drop.target.children : []).slice(0, 1).map(t => this.hooks.rowOf(t));
+    const style = getComputedStyle(first ?? drop.row);
     const inset = Number.parseFloat(style.paddingInlineStart);
     const isRightToLeft = this.host.matches(Resources.rightToLeftSelector);
     const top = drop.place === TreeDropPlace.Before ? box.top - this.rowGap / 2 : box.bottom + this.rowGap / 2;

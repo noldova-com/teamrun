@@ -33,7 +33,7 @@ describe("TreeGhost", () => {
     await renderAsync();
 
     await tree.dragAsync("Notes", "Trash", 0.9, false);
-    const ghost = tree.ghost as HTMLElement;
+    const ghost = tree.shownGhost();
     const box = ghost.getBoundingClientRect();
 
     expect(ghost.textContent).toContain("Notes");
@@ -47,7 +47,7 @@ describe("TreeGhost", () => {
     tree.root.dir = "rtl";
 
     await tree.dragAsync("Notes", "Trash", 0.9, false);
-    const ghost = tree.ghost as HTMLElement;
+    const ghost = tree.shownGhost();
 
     expect([ghost.style.left, ghost.style.right !== String.empty]).toEqual([String.empty, true]);
     expect(ghost.getBoundingClientRect().right).toBeCloseTo(tree.root.getBoundingClientRect().left + 24 - 12, 0);
