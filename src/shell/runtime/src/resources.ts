@@ -351,6 +351,7 @@ export class Resources {
   public static readonly defaultRequestTimeoutParameterName: string = "defaultRequestTimeout";
   public static readonly maximumRequestTimeoutParameterName: string = "maximumRequestTimeout";
   public static readonly callTimeoutParameterName: string = "callTimeout";
+  public static readonly timeoutMillisecondsParameterName: string = "timeoutMilliseconds";
   public static readonly answerGraceParameterName: string = "answerGrace";
   public static readonly clientNameParameterName: string = "clientName";
   public static readonly clientParameterName: string = "client";
@@ -719,6 +720,11 @@ export class Resources {
 
   public static formatEventWithdrawn(name: string): string {
     return `The event ${name} is no longer declared.`;
+  }
+
+  public static formatEventNotSent(name: string, reason: string): string {
+    return `The runtime sent the event ${name} to no client: ${reason}
+`;
   }
 
   public static formatUnknownMethod(name: string): string {

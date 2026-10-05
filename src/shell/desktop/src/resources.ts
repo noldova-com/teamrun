@@ -290,6 +290,10 @@ export class Resources {
     return `The runtime refused ${method}: ${message}`;
   }
 
+  public static formatConnectionEnded(code: string, message: string): string {
+    return `The desktop ended its connection to the runtime, so it connects again (${code}): ${message}`;
+  }
+
   public static formatEventNotForwarded(name: string, reason: string): string {
     return `The runtime's event ${name} could not be passed to the window: ${reason}`;
   }

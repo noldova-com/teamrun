@@ -10,6 +10,7 @@ import { BuildIdentity, Handshake, type Response, RuntimeHandover } from "@noldo
 import { CapabilityToken, type Endpoint, MethodRegistry, RuntimeServer, ServerSettings } from "@noldova/teamrun-shell-runtime";
 
 import { RawConnectionFixture } from "./raw-connection.fixture.js";
+import { TextOutputFixture } from "./text-output.fixture.js";
 
 export class RuntimeServerFixture implements AsyncDisposable {
   public static readonly IDENTITY: BuildIdentity = new BuildIdentity("1.2.3", BuildIdentity.supportedProtocolVersion, "server-build");
@@ -21,6 +22,7 @@ export class RuntimeServerFixture implements AsyncDisposable {
   private readonly waiters: Set<() => void> = new Set();
 
   public readonly methods: MethodRegistry = new MethodRegistry();
+  public readonly diagnostics: TextOutputFixture = new TextOutputFixture();
   public readonly server: RuntimeServer;
   public changes: number = 0;
   public endpoint: Endpoint | null = null;
@@ -38,7 +40,8 @@ export class RuntimeServerFixture implements AsyncDisposable {
         this.onChange();
         for (const waiter of [...this.waiters])
           waiter();
-      });
+      },
+      this.diagnostics);
   }
 
   public static async startAsync(settings?: ServerSettings): Promise<RuntimeServerFixture> {
