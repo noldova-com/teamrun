@@ -35,7 +35,7 @@ export class MenuTriggerDirective extends CdkMenuTrigger {
   public constructor() {
     super();
     this.overlayRef = this.anchored.overlayRef;
-    this.anchored.originScrolls.pipe(takeUntil(this.destroyed)).subscribe(() => this.menuStack.closeAll());
+    this.anchored.originLost.pipe(takeUntil(this.destroyed)).subscribe(() => this.menuStack.closeAll());
   }
 
   private static submenuParent(menu: Menu | null): Menu | null {

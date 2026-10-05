@@ -35,7 +35,7 @@ export class CommandSearchService {
     this.returnFocus = focused instanceof HTMLElement ? focused : null;
     const overlay = new AnchoredOverlay(this.injector, Resources.commandSearchPaneClass);
     overlay.outsidePointerEvents.subscribe(() => this.close());
-    overlay.originScrolls.subscribe(() => this.close());
+    overlay.originLost.subscribe(() => this.close());
     this.overlay = overlay;
     overlay.openComponent(new ComponentPortal(CommandSearchComponent), row, new OverlayAnchoring(OverlaySide.below, OverlayAlignment.Center, 0), () => {
       const edges = row.getBoundingClientRect();

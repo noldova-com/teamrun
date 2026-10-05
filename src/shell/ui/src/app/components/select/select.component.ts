@@ -9,7 +9,7 @@
 import { CdkListbox, CdkOption, type ListboxValueChangeEvent } from "@angular/cdk/listbox";
 import { TemplatePortal } from "@angular/cdk/portal";
 import {
-  ChangeDetectionStrategy, Component, DestroyRef, Injector, type Signal, type TemplateRef, ViewContainerRef, type WritableSignal, computed, inject, input, output, signal
+  ChangeDetectionStrategy, Component, DestroyRef, type ElementRef, Injector, type Signal, type TemplateRef, ViewContainerRef, type WritableSignal, computed, inject, input, output, signal, viewChild
 } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
@@ -34,10 +34,13 @@ import { Resources } from "../../../resources";
 export class SelectComponent {
   private readonly injector: Injector = inject(Injector);
   private readonly viewContainer: ViewContainerRef = inject(ViewContainerRef);
+  private readonly button: Signal<ElementRef<HTMLButtonElement>> = viewChild.required<ElementRef<HTMLButtonElement>>("button");
   private overlay: AnchoredOverlay | null = null;
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly isOpen: WritableSignal<boolean> = signal(false);
+
+  public readonly isExpanded: Signal<boolean> = this.isOpen.asReadonly();
 
   public readonly options = input.required<readonly SelectOption[]>();
   public readonly value = input.required<string>();
@@ -46,9 +49,14 @@ export class SelectComponent {
   public readonly valueChange = output<string>();
 
   protected readonly title: Signal<string> = computed(() => this.options().find(t => t.value === this.value())?.title ?? this.value());
+  protected readonly marked: Signal<readonly string[]> = computed(() => this.options().some(t => t.value === this.value()) ? [this.value()] : []);
 
   public constructor() {
     inject(DestroyRef).onDestroy(() => this.close());
+  }
+
+  public focus(): void {
+    this.button().nativeElement.focus();
   }
 
   protected toggle(button: HTMLButtonElement, list: TemplateRef<unknown>): void {
@@ -67,7 +75,7 @@ export class SelectComponent {
       event.preventDefault();
       this.closeTo(button);
     });
-    overlay.originScrolls.subscribe(() => this.close());
+    overlay.originLost.subscribe(() => this.close());
     this.overlay = overlay;
     this.isOpen.set(true);
     overlay.openTemplate(new TemplatePortal(list, this.viewContainer), button, new OverlayAnchoring(OverlaySide.below, OverlayAlignment.Start, 0));

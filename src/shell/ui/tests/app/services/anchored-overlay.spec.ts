@@ -178,7 +178,7 @@ describe("AnchoredOverlay", () => {
 
   it("reports an ancestor scroll that moves its anchor, but not a scroll inside itself or elsewhere", async () => {
     let scrolls = 0;
-    overlay.originScrolls.subscribe(() => scrolls++);
+    overlay.originLost.subscribe(() => scrolls++);
     overlay.openComponent(new ComponentPortal(ContentComponent), anchor(), below());
     const elsewhere = document.body.appendChild(document.createElement("div"));
     elsewhere.dispatchEvent(new Event("scroll"));
@@ -192,6 +192,21 @@ describe("AnchoredOverlay", () => {
 
     expect(scrollsAfterOthers).toBe(0);
     expect(overlay.isOpen).toBe(true);
+  });
+
+  it("reports an anchor that stops rendering, but not one that only resizes", async () => {
+    let losses = 0;
+    overlay.originLost.subscribe(() => losses++);
+    const origin = anchor();
+    overlay.openComponent(new ComponentPortal(ContentComponent), origin, below());
+    origin.style.width = "200px";
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const lossesAfterResize = losses;
+
+    (fixture.nativeElement.querySelector(".scroller") as HTMLElement).style.display = "none";
+    await vi.waitFor(() => expect(losses).toBe(1));
+
+    expect(lossesAfterResize).toBe(0);
   });
 
   it("does nothing when asked to reposition while closed and lets go of its listeners once closed", () => {
