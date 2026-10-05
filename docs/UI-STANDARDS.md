@@ -48,7 +48,7 @@ A theme is data: it contains no styles, selectors or code and changes nothing el
 
 The shell's default theme defines the values in this document: the colors below and the look of sections 3, 4 and 8. Another theme provides its colors for both modes and the parts of the look it changes; the rest comes from the default theme. Modules contribute themes under the [architecture](ARCHITECTURE.md#5-contributions).
 
-Every color uses a theme token. The default theme's light and dark colors start from the table below; provide complete initial tokens before painting themed content. The default theme's greys for surfaces, borders, hover and selection carry no tint, so a selected item sits in the same grey family as the window around it. Section 9 governs module tokens.
+Every color uses a theme token. The default theme's light and dark colors start from the table below; provide complete initial tokens before painting themed content. The default theme's greys for surfaces, borders, hover, selection and the focused list's selection carry no tint, so a selected item sits in the same grey family as the window around it. Section 9 governs module tokens.
 
 The application shows one icon in light and dark mode, whatever the theme or the operating system's appearance. On Windows and Linux it is the outlined icon, a white shape with a dark outline that stays readable on both backgrounds, on the window, the taskbar and the program file. macOS shows the Dock icon.
 
@@ -82,7 +82,7 @@ The table specifies normal-state colors. Check actual composited foreground/back
 | `--tr-button`, `--tr-button-text`, `--tr-button-hover` | `button.*` | #005FB8, #FFFFFF, #0258A8 | #0078D4, #FFFFFF, #026EC1 | Primary button and the chosen docking guide |
 | `--tr-button-secondary`, `--tr-button-secondary-text`, `--tr-button-secondary-hover` | `button.secondary*` | #E5E5E5, #3B3B3B, #CCCCCC | transparent, #CCCCCC, #2B2B2B | Secondary button |
 | `--tr-dropdown`, `--tr-dropdown-border`, `--tr-dropdown-list` | `dropdown.*`, fallback `input.*` | #FFFFFF, #858585, #FFFFFF | #313131, #858585, #1F1F1F | Select and options list |
-| `--tr-list-active`, `--tr-list-active-text` | `list.activeSelection*` | #E8E8E8, #000000 | #04395E, #FFFFFF | Chosen or keyboard-active option |
+| `--tr-list-active`, `--tr-list-active-text` | `list.activeSelection*` | #D4D4D4, #000000 | #4A4A4A, #FFFFFF | Chosen or keyboard-active option |
 | `--tr-list-highlight` | `list.highlightForeground` | #0066BF | #2AAAFF | Search matches, underlined or at weight 600 so color is not their only cue |
 | `--tr-button-border` | `button.border` | #0000001A | #FFFFFF1A | Decorative edge where the button fill already identifies the control |
 | `--tr-setting-title` | `settings.headerForeground`, fallback `foreground` | #1F1F1F | #FFFFFF | Settings titles |
