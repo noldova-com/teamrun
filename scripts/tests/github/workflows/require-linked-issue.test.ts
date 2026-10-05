@@ -74,8 +74,10 @@ class RequireLinkedIssueTests {
     });
 
     test("no workflow runs on pull_request_target", async () => {
-      for (const workflow of await WorkflowFileFixture.readAllAsync())
-        assert.doesNotMatch(workflow.text, /^\s*pull_request_target\s*:/m);
+      const names = await WorkflowFileFixture.listAsync();
+      assert.ok(names.includes("require-linked-issue.yml"));
+      for (const name of names)
+        assert.doesNotMatch((await WorkflowFileFixture.readAsync(name)).text, /^\s*pull_request_target\s*:/m, name);
     });
   }
 

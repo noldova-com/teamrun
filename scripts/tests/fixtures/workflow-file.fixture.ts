@@ -16,6 +16,7 @@ export default class WorkflowFileFixture {
   private static readonly FOLDER: string = ".github/workflows";
   private static readonly ACTIONS_FOLDER: string = ".github/actions";
   private static readonly ACTION_FILE: string = "action.yml";
+  private static readonly WORKFLOW_PATTERN: RegExp = /\.ya?ml$/;
   private static readonly STEP_PATTERN: RegExp = /^( *)- name: (.+)$/;
   private static readonly INDENTATION_PATTERN: RegExp = /^ */;
   private static readonly BLOCK_INDICATOR: string = "|";
@@ -33,9 +34,8 @@ export default class WorkflowFileFixture {
     return new WorkflowFileFixture(await readFile(path.join(SourceTreeFixture.root, WorkflowFileFixture.FOLDER, name), "utf8"));
   }
 
-  public static async readAllAsync(): Promise<readonly WorkflowFileFixture[]> {
-    const names = (await readdir(path.join(SourceTreeFixture.root, WorkflowFileFixture.FOLDER))).filter(t => t.endsWith(".yml"));
-    return await Promise.all(names.map(t => WorkflowFileFixture.readAsync(t)));
+  public static async listAsync(): Promise<readonly string[]> {
+    return (await readdir(path.join(SourceTreeFixture.root, WorkflowFileFixture.FOLDER))).filter(t => WorkflowFileFixture.WORKFLOW_PATTERN.test(t));
   }
 
   public static async readActionAsync(name: string): Promise<WorkflowFileFixture> {
