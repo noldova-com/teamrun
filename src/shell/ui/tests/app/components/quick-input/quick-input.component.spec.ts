@@ -173,20 +173,20 @@ describe("QuickInputComponent", () => {
   });
 
   it("leaves Home, End and the arrows to its text field while Shift, Ctrl, Alt or Meta is held, so they select and move the caret and the active option stays", async () => {
-    const held: KeyboardEventInit[] = [{ shiftKey: true }, { ctrlKey: true }, { altKey: true }, { metaKey: true }];
+    const held: [string, KeyboardEventInit][] = [["Shift", { shiftKey: true }], ["Ctrl", { ctrlKey: true }], ["Alt", { altKey: true }], ["Meta", { metaKey: true }]];
     await pressAsync("ArrowDown");
     const active = activeIndex();
-    const unprevented: boolean[] = [];
-    for (const modifiers of held) {
+    const prevented: string[] = [];
+    for (const [name, modifiers] of held) {
       for (const key of ["Home", "End", "ArrowUp", "ArrowDown", "PageUp", "PageDown"]) {
-        unprevented.push(!press(field(), key, modifiers).defaultPrevented);
+        if (press(field(), key, modifiers).defaultPrevented)
+          prevented.push(`${name}+${key}`);
         fixture.detectChanges();
         await fixture.whenStable();
       }
     }
 
-    expect(unprevented.every(t => t)).toBe(true);
-    expect(unprevented).toHaveLength(24);
+    expect(prevented).toEqual([]);
     expect(activeIndex()).toBe(active);
   });
 
