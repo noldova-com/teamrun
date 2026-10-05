@@ -22,8 +22,3 @@
 :host(.tr-tab-content-padded.tr-tab-content-docked) {
   padding: var(--tr-view-padding-block) var(--tr-content-padding-inline);
 }
-
-.tr-tab-content-text {
-  display: contents;
-  color: var(--tr-text);
-}

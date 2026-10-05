@@ -311,10 +311,11 @@ describe("SettingsComponent", () => {
     expect(kept).toBe(outside);
   });
 
-  it("reveals the scrollbars of its page list and its content while they are hovered", () => {
+  it("reveals the scrollbars of its page list and its content while they are hovered", async () => {
     render();
 
-    expect([".tr-settings-pages", ".tr-settings-content"].map(t => element().querySelector(t)?.classList.contains("tr-scroll-reveal"))).toEqual([true, true]);
+    for (const area of [".tr-settings-pages", ".tr-settings-content"])
+      await AppearanceFixture.expectThumbRevealsOnHoverAsync(element().querySelector(area) as HTMLElement);
   });
 
   it("shows the Gallery as the last page when the build has one, and leaves it out of a search", async () => {

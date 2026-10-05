@@ -70,7 +70,7 @@ export default class ScrollAreaFixture {
   }
 
   private static thumbColorAsync(area: Locator): Promise<string> {
-    return area.evaluate(t => getComputedStyle(t).color);
+    return area.evaluate(t => getComputedStyle(t).getPropertyValue("--tr-scroll-thumb"));
   }
 
   private static async restAsync(window: Page, area: Locator): Promise<void> {
