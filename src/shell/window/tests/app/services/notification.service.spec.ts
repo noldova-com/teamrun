@@ -21,7 +21,7 @@ describe("NotificationService", () => {
   let bridge: DesktopBridgeFixture;
 
   const notification = (id: number, title: string, isRead: boolean, kind: string = "clock.alarm"): object =>
-    ({ id, sequence: id, post: { kind, title, severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead });
+    ({ id: String(id), sequence: id, post: { kind, title, severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead });
   const state = (isDoNotDisturb: boolean, ...notifications: object[]): object => ({ notifications, isDoNotDisturb, mutedModules: [], sequence: notifications.length });
 
   function start(): NotificationService {
@@ -111,14 +111,14 @@ describe("NotificationService", () => {
 
     service.markAllRead();
     service.clear();
-    service.dismiss(7);
+    service.dismiss("7");
     service.setDoNotDisturb(true);
     await vi.waitFor(() => expect(errors.length).toBe(2));
 
     expect(bridge.requests.slice(-4)).toEqual([
       ["shell.markNotificationsRead", null],
       ["shell.clearNotifications", null],
-      ["shell.dismissNotification", { id: 7 }],
+      ["shell.dismissNotification", { id: "7" }],
       ["shell.setSetting", { name: "shell.doNotDisturb", value: true }]
     ]);
   });
@@ -137,7 +137,7 @@ describe("NotificationService", () => {
   it("runs the open command of a notification opened from the operating system when it can run, and reports one that fails", async () => {
     const runs: string[] = [];
     const withOpen = (id: number, command: string): object =>
-      ({ id, sequence: id, post: { kind: "clock.alarm", title: `Alarm ${id}`, severity: "Info", open: { name: command, arguments: null }, actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false });
+      ({ id: String(id), sequence: id, post: { kind: "clock.alarm", title: `Alarm ${id}`, severity: "Info", open: { name: command, arguments: null }, actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false });
     bridge.responses.set("shell.notifications", { payload: state(false, withOpen(4, "notes.fail"), withOpen(3, "clock.tick"), withOpen(2, "notes.newNote"), notification(1, "Plain", false)) });
     const service = start();
     await settleAsync(() => service.state().notifications.length === 4);
@@ -147,7 +147,7 @@ describe("NotificationService", () => {
     ]);
 
     for (const id of [2, 1, 3, 9, 4])
-      bridge.publishNotificationOpened(id);
+      bridge.publishNotificationOpened(String(id));
     await vi.waitFor(() => expect(errors.length).toBe(1));
 
     expect(runs).toEqual(["notes.newNote"]);

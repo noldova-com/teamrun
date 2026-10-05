@@ -266,7 +266,7 @@ tests/services/snapshot-tracker.test.ts
 
 Never change production code solely to accommodate tests or coverage: no widened APIs, weakened visibility, test-only paths, or altered ownership. A test uses an accepted product boundary or is redesigned around one.
 
-Every executable production file has a corresponding test file. Foundation test classes append `Tests` to the production type; method names describe the behavior proved.
+Every executable production file has its mirrored test file under the path rule above. A file is executable when it has a function body: a constructor, method, accessor, function or arrow function. A file that only declares types, interfaces, enums, values, re-exports or abstract members, and a `.d.ts` file, is not executable; it may still have a test. Every `.test.ts` file under a package's `tests`, and every Angular `.spec.ts` file under `tests`, mirrors a production file that exists; files under `tests/fixtures`, setup and configuration files directly under `tests`, and Playwright workflows are not tests of one file and are exempt. A file that [TESTING.md](TESTING.md#5-coverage-requirements) excludes from coverage needs no mirrored test, because no package test can measure it. A file that the package's public API (`src/api/index.ts`) does not export is tested through that API, and no export is added for the test. Foundation test classes append `Tests` to the production type; method names describe the behavior proved.
 
 Angular specs mirror paths relative to `src` beneath sibling `tests`, replacing `.ts` with `.spec.ts`: `src/app/services/layout-store.service.ts` maps to `tests/app/services/layout-store.service.spec.ts`. Shared fixtures use `tests/fixtures`; environment configuration lives directly under `tests`.
 

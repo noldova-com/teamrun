@@ -27,7 +27,7 @@ function icon(window: Page, key: string): Locator {
   return strip(window).locator(`[data-view="${key}"]`);
 }
 
-async function dragAsync(window: Page, source: Locator, target: Locator, down: number): Promise<void> {
+async function dragOverAsync(window: Page, source: Locator, target: Locator, down: number): Promise<void> {
   const from = await source.boundingBox();
   if (from === null)
     throw new Error("The dragged element is not visible.");
@@ -38,6 +38,10 @@ async function dragAsync(window: Page, source: Locator, target: Locator, down: n
   if (to === null)
     throw new Error("The drop target is not visible.");
   await window.mouse.move(to.x + to.width / 2, to.y + to.height * down, { steps: 6 });
+}
+
+async function dragAsync(window: Page, source: Locator, target: Locator, down: number): Promise<void> {
+  await dragOverAsync(window, source, target, down);
   await window.mouse.up();
 }
 
@@ -80,6 +84,13 @@ test.describe("activity bar", () => {
     await dragAsync(window, window.locator(`tr-tab[data-tab-key="${clock}"]`), icon(window, notes), 0.85);
     await expect(icon(window, clock)).toBeVisible();
     expect(await strip(window).locator(".tr-dock-strip-view").evaluateAll(t => t.map(u => u.getAttribute("data-view")))).toEqual([notes, clock, outline]);
+
+    await dragOverAsync(window, icon(window, outline), icon(window, clock), 0.25);
+    await expect(icon(window, clock)).toHaveClass(/tr-drop-line-before/);
+    const [lineLength, iconWidth] = await icon(window, clock).evaluate(t => [getComputedStyle(t, "::after").width, getComputedStyle(t).width]);
+    expect(lineLength).toBe(iconWidth);
+    await window.keyboard.press("Escape");
+    await window.mouse.up();
 
     await dragAsync(window, icon(window, outline), window.locator("[data-drop-side=Right]"), 0.5);
     await expect(window.locator(`tr-tab-group[data-side=Right] tr-tab[data-tab-key="${outline}"]`)).toBeVisible();

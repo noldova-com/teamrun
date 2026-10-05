@@ -23,6 +23,11 @@ interface IReconnectResult {
   readonly card: string;
 }
 
+interface IBridge {
+  request(method: string, payload: unknown): Promise<unknown>;
+  onStartup(listener: (state: unknown) => void): () => void;
+}
+
 interface IKeptRecord {
   readonly note: Element | null;
   readonly clock: Element | null;
@@ -45,6 +50,13 @@ async function watchAsync(window: Page): Promise<void> {
     }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["inert"] });
     Reflect.set(globalThis, "reconnecting", record);
   });
+}
+
+function notificationIdsAsync(window: Page, kind: string): Promise<string[]> {
+  return window.evaluate(async name => {
+    const answer = await (Reflect.get(globalThis, "teamrun") as IBridge).request("shell.notifications", {}) as { payload: { notifications: { id: string; post: { kind: string } }[] } };
+    return answer.payload.notifications.filter(t => t.post.kind === name).map(t => t.id);
+  }, kind);
 }
 
 async function reconnectAsync(window: Page, dataDirectory: string): Promise<IReconnectResult> {
@@ -87,6 +99,7 @@ test.describe("reconnecting", () => {
     await expect(runtime).toHaveText(/^Runtime \S+$/);
     await expect(window.locator("[data-fixture-content=clock-face]")).toBeVisible();
     const first = await runtime.textContent() ?? "";
+    const posted = await notificationIdsAsync(window, "notes.saveFailed");
     const summary = note.locator("textarea");
     await summary.fill("A summary not saved yet");
     const content = window.locator("tr-tab-content", { has: note });
@@ -107,6 +120,9 @@ test.describe("reconnecting", () => {
     expect(record.isSameWorkspace).toBe(true);
     await expect(runtime).toHaveText(/^Runtime \S+$/);
     await expect(runtime).not.toHaveText(first);
+    await expect(runtime).toHaveAttribute("data-continued", "1");
+    const reposted = await notificationIdsAsync(window, "notes.saveFailed");
+    expect([posted.length, reposted.length, reposted[0] === posted[0]]).toEqual([1, 1, false]);
     await expect.poll(() => window.evaluate(() => {
       const kept = Reflect.get(globalThis, "kept") as IKeptRecord;
       return [kept.note?.isConnected, kept.clock?.isConnected, document.querySelector("[data-fixture-content=clock-face]") !== null];
@@ -115,5 +131,28 @@ test.describe("reconnecting", () => {
     await expect(summary).toHaveValue("A summary not saved yet");
     expect(await content.evaluate(t => t.scrollTop)).toBe(top);
     await desktop.checkpointAsync("reconnecting-module-kept");
+  });
+
+  test("a part that continues after a broken connection to the same runtime keeps its notification and posts it no second time", async ({ desktop }) => {
+    const window = desktop.window;
+    const runtime = window.locator("tr-notes-note", { has: window.locator("[data-fixture-content=notes-note-2]") }).locator("[data-fixture-content=notes-runtime]");
+    await expect(runtime).toHaveText(/^Runtime \S+$/);
+    const first = await runtime.textContent() ?? "";
+    const processId = await desktop.readRuntimeProcessIdAsync();
+    const posted = await notificationIdsAsync(window, "notes.saveFailed");
+    await window.evaluate(() => {
+      const states: string[] = [];
+      (Reflect.get(globalThis, "teamrun") as IBridge).onStartup(t => states.push((t as { kind: string }).kind));
+      Reflect.set(globalThis, "startups", states);
+    });
+
+    await desktop.breakRuntimeConnectionAsync();
+
+    await expect.poll(() => window.evaluate(() => Reflect.get(globalThis, "startups") as string[])).toEqual(["Connecting", "Ready"]);
+    await expect(runtime).toHaveAttribute("data-continued", "1");
+    expect(await desktop.readRuntimeProcessIdAsync()).toBe(processId);
+    await expect(runtime).toHaveText(first);
+    expect(posted).toHaveLength(1);
+    expect(await notificationIdsAsync(window, "notes.saveFailed")).toEqual(posted);
   });
 });

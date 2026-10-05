@@ -2926,7 +2926,7 @@ export declare class SystemNotifier {
    * }
    * ```
    */
-  public constructor(host: INotificationHost, log: IDesktopLog, readIcon: () => string, isAnyWindowFocused: () => boolean, open: (id: number) => void);
+  public constructor(host: INotificationHost, log: IDesktopLog, readIcon: () => string, isAnyWindowFocused: () => boolean, open: (id: string) => void);
 
   /**
    * The number to pass to {@link begin} for a read starting now; a reset or a hold changes it, so a read started before
