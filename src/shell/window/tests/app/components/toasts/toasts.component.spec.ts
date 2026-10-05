@@ -102,7 +102,7 @@ describe("ToastsComponent", () => {
     expect(second?.querySelector("span.tr-toast-title")?.textContent).toBe("Title 1");
     expect(second?.querySelector("tr-progress")?.hasAttribute("aria-valuenow")).toBe(false);
     expect(second?.querySelector(".tr-toast-close")?.getAttribute("aria-label")).toBe("Close");
-    await TooltipFixture.expectTooltipAsync(second?.querySelector<HTMLElement>(".tr-toast-close"), "Close");
+    await TooltipFixture.expectTooltipAsync(second?.querySelector<HTMLElement>(".tr-toast-close") as HTMLElement, "Close");
     await vi.waitFor(() => expect([announced()?.getAttribute("aria-live"), announced()?.textContent]).toEqual(["assertive", "Title 1. Title 2. The disk is full."]));
   });
 

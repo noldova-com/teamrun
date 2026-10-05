@@ -116,7 +116,7 @@ describe("DockComponent", () => {
     expect(strip?.classList.contains("tr-dock-strip-vertical")).toBe(true);
     expect(strip?.dataset["dropGroup"]).toBe("1");
     expect(buttons.map(t => t.getAttribute("aria-label"))).toEqual(["files.tree", "files.search"]);
-    await TooltipFixture.expectTooltipAsync(buttons[1], "files.search", tooltip => expect(tooltip.getBoundingClientRect().left).toBeGreaterThan(strip?.getBoundingClientRect().right ?? Infinity));
+    await TooltipFixture.expectTooltipAsync(buttons[1] as HTMLButtonElement, "files.search", t => expect(t.getBoundingClientRect().left).toBeGreaterThan(strip?.getBoundingClientRect().right ?? Infinity));
 
     buttons[1]?.click();
     fixture.detectChanges();

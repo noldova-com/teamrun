@@ -161,7 +161,7 @@ describe("ToolbarComponent", () => {
     const submenu = items()[3] as HTMLButtonElement;
     submenu.style.display = "inline-flex";
 
-    await TooltipFixture.expectTooltipAsync(submenu, "Templates", tooltip => expect(tooltip.getBoundingClientRect().top).toBeGreaterThanOrEqual(submenu.getBoundingClientRect().bottom));
+    await TooltipFixture.expectTooltipAsync(submenu, "Templates", t => expect(t.getBoundingClientRect().top).toBeGreaterThanOrEqual(submenu.getBoundingClientRect().bottom));
   });
 
   it("moves the sections that do not fit into a menu behind a More actions item", async () => {
