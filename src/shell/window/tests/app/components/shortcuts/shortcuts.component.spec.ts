@@ -17,6 +17,7 @@ import { SettingsComponent } from "../../../../src/app/components/settings/setti
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { SettingsService } from "../../../../src/app/services/settings.service";
+import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 
 class FakeSettingsService {
@@ -127,9 +128,11 @@ describe("ShortcutsComponent", () => {
   afterEach(async () => {
     await userEvent.keyboard("{Escape}");
     DesktopBridgeFixture.remove();
+    AppearanceFixture.reset();
   });
 
   it("shows each command's id under its title, muted in the label size like a setting's id, with From and Key on the title's line", async () => {
+    AppearanceFixture.apply();
     await renderAsync();
     const probe = document.createElement("span");
     probe.style.cssText = "color: var(--tr-text-muted); font-size: var(--tr-text-label); line-height: var(--tr-line-label)";
