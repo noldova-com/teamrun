@@ -240,6 +240,7 @@ describe("ToastService with the window parts", () => {
         isActivated = true;
         return Promise.resolve();
       },
+      reconnectAsync: () => Promise.resolve(false),
       deactivateAsync: () => Promise.resolve()
     };
     const source = new WindowPartSource("notes", [], [], [], [], [], [], ["notes.saved"], () => Promise.resolve(part));

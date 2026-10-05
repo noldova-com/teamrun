@@ -30,6 +30,10 @@ export class ClockWindowPart implements IWindowPart {
     });
   }
 
+  public async reconnectAsync(): Promise<boolean> {
+    return false;
+  }
+
   public async deactivateAsync(): Promise<void> {
   }
 }

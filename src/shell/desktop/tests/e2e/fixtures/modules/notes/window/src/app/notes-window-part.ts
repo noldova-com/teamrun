@@ -54,9 +54,12 @@ export class NotesWindowPart implements IWindowPart {
 
   private static readonly LONG_COUNT: string = "2 notes, neither pinned nor archived, both last changed today by the person who wrote them, and both waiting for review";
 
+  private context: IWindowPartContext | null = null;
+
   public readonly moduleId: string = "notes";
 
   public async activateAsync(context: IWindowPartContext): Promise<void> {
+    this.context = context;
     context.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true,
       () => import("./components/notes-list/notes-list.component").then(t => t.NotesListComponent)));
     context.registerView(new ViewContribution("notes.outline", "Outline", "toc", DockSide.Left, true,
@@ -98,7 +101,7 @@ export class NotesWindowPart implements IWindowPart {
     await context.postNotificationAsync(new NotificationPost(
       QualifiedName.parse("notes.saveFailed"), null, "Note 2 couldn't be saved", "The disk is full.", NotificationSeverity.Error, null,
       [new NotificationAction("New note", new CommandRun(QualifiedName.parse("notes.newNote"), null))], null));
-    const options = JsonReader.fromValue(await context.requestAsync("notes.options", null));
+    const options = await NotesWindowPart.readOptionsAsync(context);
     if (options.readBoolean("isLongCount"))
       counter.update(new StatusBarItemState(NotesWindowPart.LONG_COUNT, { command: "notes.newNote" }));
     if (!options.readBoolean("isMany"))
@@ -111,6 +114,20 @@ export class NotesWindowPart implements IWindowPart {
     counter.update(new StatusBarItemState(`${count} notes`));
   }
 
+  public async reconnectAsync(): Promise<boolean> {
+    if (this.context === null)
+      return false;
+    await NotesWindowPart.readOptionsAsync(this.context);
+    return true;
+  }
+
   public async deactivateAsync(): Promise<void> {
+    this.context = null;
+  }
+
+  private static async readOptionsAsync(context: IWindowPartContext): Promise<JsonReader> {
+    const options = JsonReader.fromValue(await context.requestAsync("notes.options", null));
+    NotesState.runtime.set(options.readString("runtime"));
+    return options;
   }
 }
