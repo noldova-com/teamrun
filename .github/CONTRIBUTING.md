@@ -35,7 +35,7 @@ The [labels page](https://github.com/noldova-com/teamrun/labels) describes each 
 
 Every change—including docs, small fixes, dependencies and agent work—needs a repository issue. Discuss substantial product/architecture changes before implementation. Agree on bounded scope and observable acceptance criteria; split larger work into linked issues.
 
-Start only if the issue has no `in progress` label or open PR, then label your issue/sub-issue. The **Clear in-progress label** workflow removes it on closure; remove it yourself when ending work on an open issue. If unable to label, comment that you are working on it.
+Start only if the issue has no `in progress` label or open PR, then label your issue/sub-issue. The **Clear work labels** workflow removes it and `paused` on closure; remove it yourself when ending work on an open issue. If unable to label, comment that you are working on it.
 
 Follow the [coding standards](../docs/CODING-STANDARDS.md), [UI standards](../docs/UI-STANDARDS.md) for visual/interaction changes, [architecture](../docs/ARCHITECTURE.md) for boundary changes, and affected module documents. Update each rule's owner rather than adding competing rules.
 
