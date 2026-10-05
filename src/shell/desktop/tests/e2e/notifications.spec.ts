@@ -219,11 +219,13 @@ test.describe("notifications", () => {
       return color;
     }, variable);
 
+    const popoverSurface = { light: "rgb(255, 255, 255)", dark: "rgb(31, 31, 31)" };
     await bell(window).click();
     await expect(list(window).locator(".tr-notifications-row")).toHaveCount(3);
     for (const scheme of ["light", "dark"] as const) {
       await window.emulateMedia({ colorScheme: scheme });
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await expect(list(window)).toHaveCSS("background-color", popoverSurface[scheme]);
       await desktop.checkpointAsync(`progress-in-the-list-${scheme}`);
       const track = list(window).locator(".tr-notifications-row").nth(1).locator("tr-progress");
       const fill = track.locator(".tr-progress-bar");

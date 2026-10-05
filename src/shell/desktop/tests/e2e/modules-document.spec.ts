@@ -19,8 +19,8 @@ import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 const colors = {
-  Light: { link: "rgb(0, 95, 184)", error: "rgb(161, 38, 13)", selected: "rgb(230, 230, 230)", text: "rgb(59, 59, 59)" },
-  Dark: { link: "rgb(77, 170, 252)", error: "rgb(244, 135, 113)", selected: "rgb(56, 56, 56)", text: "rgb(204, 204, 204)" }
+  Light: { link: "rgb(0, 95, 184)", error: "rgb(161, 38, 13)", selected: ContrastFixture.SELECTED_ROW_BACKGROUND.light, text: "rgb(59, 59, 59)" },
+  Dark: { link: "rgb(77, 170, 252)", error: "rgb(244, 135, 113)", selected: ContrastFixture.SELECTED_ROW_BACKGROUND.dark, text: "rgb(204, 204, 204)" }
 };
 
 function modulesTab(window: Page): Locator {
@@ -84,6 +84,7 @@ test.describe("the Modules document", () => {
     for (const mode of ["Light", "Dark"] as const) {
       await setModeAsync(window, mode);
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(mode.toLowerCase());
+      const lowest = await ContrastFixture.measureLowestTextContrastAsync(row(window, "clock"), colors[mode].selected);
       const look = await window.evaluate(() => {
         const style = (selector: string): CSSStyleDeclaration => getComputedStyle(document.querySelector(selector) as Element);
         const top = (selector: string): number => (document.querySelector(selector) as Element).getBoundingClientRect().top;
@@ -91,7 +92,7 @@ test.describe("the Modules document", () => {
         return [style(".tr-modules-link").color, style(".tr-modules-row-current").backgroundColor, style(version).color, top(version) === top(".tr-modules-row-current .tr-modules-id")];
       });
       expect(look).toEqual([colors[mode].link, colors[mode].selected, colors[mode].text, true]);
-      expect(await ContrastFixture.measureLowestTextContrastAsync(row(window, "clock"))).toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
+      expect(lowest).toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
       await desktop.checkpointAsync(`modules-document-${mode.toLowerCase()}`);
     }
   });
