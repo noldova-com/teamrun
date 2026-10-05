@@ -671,7 +671,7 @@ describe("WindowPartHostService", () => {
     notes.onReconnect = () => true;
     const { host } = start(
       [source("notes", notes), source("clock", clock), source("tasks", new FakeWindowPart("tasks", log)), source("calendar", new FakeWindowPart("calendar", log))],
-      [status("notes"), status("clock", ModuleState.Failed, "It broke."), status("tasks", ModuleState.Failed, "It is broken."), status("calendar", ModuleState.Blocked, "It waits.")]);
+      [status("notes"), status("clock", ModuleState.Failed, "It broke."), status("tasks", ModuleState.Failed, "It is broken."), status("calendar", ModuleState.Failed, "It did not start.")]);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
     const revisions = tabs.map(t => host.revisionOf(t));
 
@@ -687,9 +687,10 @@ describe("WindowPartHostService", () => {
     expect(host.findContribution(new ViewTab("notes.list"))).toBeNull();
     expect(host.findContribution(new ViewTab("clock.list"))?.context?.moduleId).toBe("clock");
     expect(revisions).toEqual([1, 1, 1, 1]);
-    expect(during).toEqual([[[0, 1, 1, 1], [null, null, "It is broken.", "It waits."]]]);
+    expect(during).toEqual([[[0, 1, 1, 1], [null, null, "It is broken.", "It did not start."]]]);
     expect(tabs.map(t => host.revisionOf(t))).toEqual([2, 2, 1, 2]);
     expect(host.findFailure(new ViewTab("calendar.list"))?.cause).toBe("It broke.");
+    expect(errors).toEqual([]);
   });
 
   it("keeps a part whose dependency has no window part, with its context", async () => {
