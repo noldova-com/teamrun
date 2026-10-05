@@ -12,5 +12,6 @@ export interface IWindowPart {
   readonly moduleId: string;
 
   activateAsync(context: IWindowPartContext): Promise<void>;
+  reconnectAsync(): Promise<boolean>;
   deactivateAsync(): Promise<void>;
 }

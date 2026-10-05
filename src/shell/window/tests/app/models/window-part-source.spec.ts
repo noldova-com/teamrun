@@ -12,7 +12,7 @@ import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
 import { WindowPartSource } from "../../../src/app/models/window-part-source";
 
 describe("WindowPartSource", () => {
-  const part: IWindowPart = { moduleId: "notes", activateAsync: () => Promise.resolve(), deactivateAsync: () => Promise.resolve() };
+  const part: IWindowPart = { moduleId: "notes", activateAsync: () => Promise.resolve(), reconnectAsync: () => Promise.resolve(false), deactivateAsync: () => Promise.resolve() };
   const load = (): Promise<IWindowPart> => Promise.resolve(part);
 
   it("keeps its module's id, name, dependencies, views, documents, commands, bar items, notification kinds and loader, copying the lists", async () => {
