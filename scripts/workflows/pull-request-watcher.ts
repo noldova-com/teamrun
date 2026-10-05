@@ -15,6 +15,7 @@ import type OpenPullRequest from "./open-pull-request.ts";
 import type PullRequestEvaluator from "./pull-request-evaluator.ts";
 import PullRequestFinding from "./pull-request-finding.ts";
 import PullRequestNote from "./pull-request-note.ts";
+import PullRequestPool from "./pull-request-pool.ts";
 import type PullRequestSnapshot from "./pull-request-snapshot.ts";
 import PullRequestState from "./pull-request-state.ts";
 import type PullRequestReader from "./pull-request.reader.ts";
@@ -25,8 +26,9 @@ export default class PullRequestWatcher {
   private static readonly NO_PULL_REQUESTS: string = "- No open pull requests.";
   private static readonly NOTHING_TO_DO: string = "nothing to do";
   private static readonly MERGE_STATE_UNKNOWN: string = "merge state still unknown";
-  private static readonly MERGE_STATE_READS: number = 6;
-  private static readonly MERGE_STATE_INTERVAL: number = 10_000;
+  private static readonly MERGE_STATE_READS: number = 11;
+  private static readonly MERGE_STATE_INTERVAL: number = 5_000;
+  private static readonly PARALLEL_PULL_REQUESTS: number = 4;
   private static readonly RUN_COMPLETED: number = 409;
 
   private readonly api: GitHubApi;
@@ -35,6 +37,7 @@ export default class PullRequestWatcher {
   private readonly conflicts: MergeConflictReader;
   private readonly clock: () => number;
   private readonly wait: IWait;
+  private readonly pool: PullRequestPool = new PullRequestPool(PullRequestWatcher.PARALLEL_PULL_REQUESTS);
 
   public constructor(api: GitHubApi, reader: PullRequestReader, evaluator: PullRequestEvaluator, conflicts: MergeConflictReader, clock: () => number, wait: IWait) {
     this.api = api;
@@ -48,9 +51,8 @@ export default class PullRequestWatcher {
   public async watchAsync(): Promise<readonly string[]> {
     const repository = await this.reader.readRepositoryAsync();
     const now = new Date(this.clock());
-    const lines: string[] = [];
-    for (const pull of await this.readStatesAsync(repository, await this.reader.listOpenAsync()))
-      lines.push(typeof pull === "string" ? pull : await this.watchPullRequestAsync(repository, pull, now));
+    const pulls = await this.readStatesAsync(repository, await this.reader.listOpenAsync());
+    const lines = await this.pool.mapAsync(pulls, async t => typeof t === "string" ? t : await this.watchPullRequestAsync(repository, t, now));
     return lines.length === 0 ? [PullRequestWatcher.NO_PULL_REQUESTS] : lines;
   }
 
@@ -65,14 +67,10 @@ export default class PullRequestWatcher {
   }
 
   private async readStatesAsync(repository: WatchedRepository, opens: readonly OpenPullRequest[]): Promise<readonly (string | PullRequestState)[]> {
-    const pulls: (string | PullRequestState)[] = [];
-    for (const open of opens)
-      pulls.push(PullRequestWatcher.describeSkip(repository, open) ?? await this.reader.readStateAsync(open.number));
+    let pulls = await this.pool.mapAsync(opens, async t => PullRequestWatcher.describeSkip(repository, t) ?? await this.reader.readStateAsync(t.number));
     for (let read = 1; read < PullRequestWatcher.MERGE_STATE_READS && pulls.some(t => PullRequestWatcher.isWaiting(t)); read++) {
       await this.wait(PullRequestWatcher.MERGE_STATE_INTERVAL);
-      for (const [index, pull] of pulls.entries())
-        if (PullRequestWatcher.isWaiting(pull))
-          pulls[index] = await this.reader.readStateAsync(pull.number);
+      pulls = await this.pool.mapAsync(pulls, async t => PullRequestWatcher.isWaiting(t) ? await this.reader.readStateAsync(t.number) : t);
     }
     return pulls;
   }

@@ -28,15 +28,16 @@ export class CoverageRunEntry {
         throw new TestingException(Resources.coverageDirectoryRequired);
 
       const projects: CoverageProject[] = [];
-      for (let index = 0; index < projectArguments.length; index += 4) {
+      for (let index = 0; index < projectArguments.length; index += 5) {
         const name = projectArguments[index];
         const productionDirectory = projectArguments[index + 1];
         const sourceDirectory = projectArguments[index + 2];
         const exclusions = projectArguments[index + 3];
-        if (Object.isUndefined(name) || Object.isUndefined(productionDirectory) || Object.isUndefined(sourceDirectory) || Object.isUndefined(exclusions))
-          throw new TestingException(Resources.coverageProjectTripleRequired);
+        const testFolders = projectArguments[index + 4];
+        if (Object.isUndefined(name) || Object.isUndefined(productionDirectory) || Object.isUndefined(sourceDirectory) || Object.isUndefined(exclusions) || Object.isUndefined(testFolders))
+          throw new TestingException(Resources.coverageProjectArgumentsRequired);
 
-        projects.push(new CoverageProject(name, productionDirectory, sourceDirectory, this.parseExclusions(exclusions)));
+        projects.push(new CoverageProject(name, productionDirectory, sourceDirectory, this.parseExclusions(exclusions), this.parseTestFolders(testFolders)));
       }
 
       const result = await new CoverageAnalyzer().analyzeAsync(coverageDirectory, projects);
@@ -52,19 +53,16 @@ export class CoverageRunEntry {
     }
   }
 
+  private parseTestFolders(text: string): string[] {
+    const value = this.parseArray(text, Resources.coverageTestFoldersInvalid);
+    if (!value.every((t: unknown): t is string => Object.isString(t)))
+      throw new TestingException(Resources.coverageTestFoldersInvalid);
+
+    return value;
+  }
+
   private parseExclusions(text: string): CoverageExclusion[] {
-    let value: unknown;
-    try {
-      value = JSON.parse(text);
-    }
-    catch (error) {
-      throw new TestingException(Resources.coverageExclusionsInvalid, new ExceptionOptions(error));
-    }
-
-    if (!Array.isArray(value))
-      throw new TestingException(Resources.coverageExclusionsInvalid);
-
-    return value.map((t: unknown) => {
+    return this.parseArray(text, Resources.coverageExclusionsInvalid).map((t: unknown) => {
       const file: unknown = Object.isObject(t) ? Reflect.get(t, Resources.exclusionFileField) : undefined;
       const reason: unknown = Object.isObject(t) ? Reflect.get(t, Resources.exclusionReasonField) : undefined;
       if (!Object.isString(file) || !Object.isString(reason))
@@ -72,6 +70,21 @@ export class CoverageRunEntry {
 
       return new CoverageExclusion(file, reason);
     });
+  }
+
+  private parseArray(text: string, message: string): unknown[] {
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    }
+    catch (error) {
+      throw new TestingException(message, new ExceptionOptions(error));
+    }
+
+    if (!Array.isArray(value))
+      throw new TestingException(message);
+
+    return value;
   }
 }
 
