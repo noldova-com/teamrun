@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "selected-surface" as *;
+
 .tr-tab {
   display: inline-flex;
   align-items: center;
@@ -45,7 +47,7 @@
 }
 
 [data-tr-tab-shape="pill"] .tr-tab.tr-tab-selected .tr-tab-pill {
-  background-color: var(--tr-selected);
+  @include selected-surface;
 }
 
 .tr-tab:focus-visible .tr-tab-pill {

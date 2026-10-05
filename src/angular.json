@@ -33,6 +33,11 @@
             "setupFiles": [
               "shell/ui/tests/kit-stylesheet.setup.ts"
             ],
+            "stylePreprocessorOptions": {
+              "includePaths": [
+                "shell/ui/src/styles"
+              ]
+            },
             "watch": false,
             "coverage": true,
             "coverageInclude": [
@@ -66,7 +71,12 @@
             "baseHref": "./",
             "styles": [
               "shell/ui/src/styles/kit.scss"
-            ]
+            ],
+            "stylePreprocessorOptions": {
+              "includePaths": [
+                "shell/ui/src/styles"
+              ]
+            }
           },
           "configurations": {
             "production": {
