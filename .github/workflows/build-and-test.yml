@@ -38,6 +38,7 @@ jobs:
       ui-targets: ${{ steps.scope.outputs.ui-targets }}
       ui-plan: ${{ steps.scope.outputs.ui-plan }}
       deferred: ${{ steps.scope.outputs.deferred }}
+      ui-deferred: ${{ steps.scope.outputs.ui-deferred }}
     steps:
       - name: Check out the change history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -439,10 +440,13 @@ jobs:
             macos-x64=${{ needs.ui-macos-x64.result }}
             macos-arm64=${{ needs.ui-macos-arm64.result }}
           DEFERRED: ${{ needs.changes.outputs.deferred }}
+          UI_DEFERRED: ${{ needs.changes.outputs.ui-deferred }}
         run: |
           set -euo pipefail
           if [ -n "$DEFERRED" ]; then
             covered="every target this pull request run covers. Skipped here and run on every push to main and in manual runs: $DEFERRED."
+          elif [ -n "$UI_DEFERRED" ]; then
+            covered="every target, with the UI workflows of $UI_DEFERRED left to manual and nightly runs."
           else
             covered='every target.'
           fi
