@@ -11,6 +11,7 @@ import type { Locator, Page } from "@playwright/test";
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import NotesOptionsFixture from "./fixtures/notes-options.fixture.ts";
 import SettingsFixture from "./fixtures/settings.fixture.ts";
 
 interface IReconnectRecord {
@@ -174,15 +175,14 @@ test.describe("reconnecting", () => {
       Reflect.set(globalThis, "startups", states);
       Reflect.set(globalThis, "clock", document.querySelector("[data-fixture-content=clock-face]"));
     });
-    const requestAsync = (method: string): Promise<unknown> => window.evaluate(async name => (await (Reflect.get(globalThis, "teamrun") as IBridge).request(name, null) as { payload?: unknown }).payload, method);
     const readyCountAsync = (): Promise<number> => window.evaluate(() => (Reflect.get(globalThis, "startups") as string[]).filter(t => t === "Ready").length);
-    await requestAsync("notes.holdOptions");
+    await NotesOptionsFixture.holdAsync(window);
 
     await desktop.breakRuntimeConnectionAsync();
-    await expect.poll(() => requestAsync("notes.heldOptions")).toBe(1);
+    await expect.poll(() => NotesOptionsFixture.heldAsync(window)).toBe(1);
     await desktop.breakRuntimeConnectionAsync();
     await expect.poll(readyCountAsync).toBe(2);
-    await requestAsync("notes.releaseOptions");
+    await NotesOptionsFixture.releaseAsync(window);
 
     await expect.poll(() => window.evaluate(() => [(Reflect.get(globalThis, "clock") as Element).isConnected, document.querySelector("[data-fixture-content=clock-face]") !== null]))
       .toEqual([false, true]);

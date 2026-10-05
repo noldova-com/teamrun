@@ -573,6 +573,66 @@ describe("WindowPartHostService", () => {
     expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1")]);
   });
 
+  function holdRead(): { read: ReturnType<typeof vi.spyOn>; release: (outcome: JsonValue | null | Error) => void } {
+    let settle: (outcome: JsonValue | null | Error) => void = () => undefined;
+    const held = new Promise<JsonValue | null>((resolve, reject) => {
+      settle = t => t instanceof Error ? reject(t) : resolve(t);
+    });
+    const read = vi.spyOn(TestBed.inject(LayoutStoreService), "readAsync").mockReturnValueOnce(held);
+    return { read, release: settle };
+  }
+
+  it("opens Settings the person opened before the layout loaded after the documents the parts opened while activating, so Settings is active", async () => {
+    const { host, layout } = start([source("notes", notesPart(log))], [status("notes")]);
+    const { read, release } = holdRead();
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+
+    layout.openDocument(ShellDocuments.settingsTab);
+    release(null);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1"), ShellDocuments.settingsTab]));
+    expect(layout.layout().documents.active).toEqual(ShellDocuments.settingsTab);
+  });
+
+  it("stops keeping the person's documents when reading the layout fails, so a document closed after that is not opened again once ready again", async () => {
+    const { host, layout } = start([source("notes", notesPart(log))], [status("notes")]);
+    const { read, release } = holdRead();
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+    layout.openDocument(ShellDocuments.settingsTab);
+    release(new Error("The layout could not be read."));
+    await vi.waitFor(() => expect(errors.map(t => (t as Error).message)).toEqual(["The layout could not be read."]));
+
+    layout.close(ShellDocuments.settingsTab);
+    layout.openDocument(ShellDocuments.modulesTab);
+    layout.close(ShellDocuments.modulesTab);
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1")]);
+  });
+
+  it("keeps the person's Settings and the parts' start documents for the next read when the connection ends while reading the layout, so only the saved layout decides the start documents", async () => {
+    const saved = Layout.createDefault(new ViewRegistry([], [])).openDocument(new DocumentTab("notes.note", "2"));
+    const { host, layout } = start([source("notes", notesPart(log))], [status("notes")]);
+    const { read, release } = holdRead();
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+    layout.openDocument(ShellDocuments.settingsTab);
+    read.mockResolvedValueOnce(saved.toJson());
+    release(new RuntimeDisconnectedException("TeamRun is not connected to its runtime."));
+    await vi.waitFor(() => expect(errors.length).toBe(1));
+    const before = layout.layout().documents.tabs;
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(before).toEqual([ShellDocuments.settingsTab]);
+    await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "2"), ShellDocuments.settingsTab]));
+    expect(layout.layout().documents.active).toEqual(ShellDocuments.settingsTab);
+  });
+
   it("rebuilds the parts that don't continue when the runtime is ready again, deactivating them in reverse, and loads the layout only once", async () => {
     const tasks = new WindowPartFixture("tasks", log);
     const notes = notesPart(log);

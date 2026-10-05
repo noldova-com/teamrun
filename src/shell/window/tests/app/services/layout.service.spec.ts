@@ -80,11 +80,49 @@ describe("LayoutService", () => {
     service.toggleDock(DockSide.Left);
 
     await service.loadAsync();
-    service.reopenOpened();
+    service.reopenEarlyDocuments();
 
     expect(service.layout().documents.tabs).toEqual([LayoutFixture.plan, LayoutFixture.todo]);
     expect(service.layout().documents.active).toEqual(LayoutFixture.plan);
     expect(service.layout().dock(DockSide.Left)).toEqual(saved.dock(DockSide.Left));
+  });
+
+  it("opens them again in the default layout when none was saved, leaving out one the person closed before the layout loaded", async () => {
+    service.openDocument(LayoutFixture.todo);
+    service.openDocument(LayoutFixture.plan);
+    service.close(LayoutFixture.plan);
+
+    await service.loadAsync();
+    const loaded = service.layout().documents.tabs;
+    service.reopenEarlyDocuments();
+
+    expect(loaded).toEqual([]);
+    expect(service.layout().documents.tabs).toEqual([LayoutFixture.todo]);
+  });
+
+  it("opens them again only once, and keeps no document opened after the layout loaded", async () => {
+    service.openDocument(LayoutFixture.todo);
+    await service.loadAsync();
+    service.reopenEarlyDocuments();
+    service.close(LayoutFixture.todo);
+    service.openDocument(LayoutFixture.plan);
+    service.close(LayoutFixture.plan);
+
+    service.reopenEarlyDocuments();
+    await service.loadAsync();
+    service.reopenEarlyDocuments();
+
+    expect(service.layout().documents.tabs).toEqual([]);
+  });
+
+  it("stops keeping documents once told to open them again without a load, as after a layout that cannot be read", () => {
+    service.openDocument(LayoutFixture.todo);
+
+    service.reopenEarlyDocuments();
+    service.close(LayoutFixture.todo);
+    service.reopenEarlyDocuments();
+
+    expect(service.layout().documents.tabs).toEqual([]);
   });
 
   function closed(): readonly DockSide[] {

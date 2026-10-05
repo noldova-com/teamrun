@@ -14,6 +14,7 @@ import type { Locator, Page } from "@playwright/test";
 import ContrastFixture from "./fixtures/contrast.fixture.ts";
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import NotesOptionsFixture from "./fixtures/notes-options.fixture.ts";
 import ScrollAreaFixture from "./fixtures/scroll-area.fixture.ts";
 import SettingsFixture from "./fixtures/settings.fixture.ts";
 import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
@@ -433,17 +434,15 @@ test.describe("settings on macOS", () => {
 });
 
 test.describe("settings opened while the window starts", () => {
-  test.use({ desktopDataFiles: { "modules/notes/hold-first-options": "" } });
+  test.use({ desktopDataFiles: { [NotesOptionsFixture.HOLD_FIRST_MARKER]: "" } });
 
-  test("a Settings tab opened by its key before the saved layout is restored is still open and active after the restore", async ({ desktop }) => {
+  test("a Settings tab opened by its key before the window first loads its layout is still open and active after the layout loads", async ({ desktop }) => {
     const window = desktop.window;
-    const requestAsync = (method: string): Promise<unknown> => window.evaluate(async name => (await (Reflect.get(globalThis, "teamrun") as { request(name: string, payload: unknown): Promise<{ payload?: unknown }> }).request(name, null)).payload, method);
 
-    await expect.poll(() => requestAsync("notes.heldOptions")).toBe(1);
-    await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
-    await window.keyboard.press("ControlOrMeta+Comma");
+    await expect.poll(() => NotesOptionsFixture.heldAsync(window)).toBe(1);
+    await SettingsFixture.openAsync(window);
     await expect(settingsTab(window)).toHaveAttribute("aria-selected", "true");
-    await requestAsync("notes.releaseOptions");
+    await NotesOptionsFixture.releaseAsync(window);
 
     await expect(window.locator("[data-fixture-content]").first()).toBeAttached();
     await expect(settingsTab(window)).toHaveCount(1);
