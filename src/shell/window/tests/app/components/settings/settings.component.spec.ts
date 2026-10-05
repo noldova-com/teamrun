@@ -179,7 +179,7 @@ describe("SettingsComponent", () => {
 
     expect(Math.abs(box(".tr-settings-content").right - host.getBoundingClientRect().right)).toBeLessThan(1);
     expect(getComputedStyle(content).scrollbarGutter).toBe("stable");
-    expect(box(".tr-settings-column").width).toBeCloseTo(56.5 * rem, 0);
+    expect(box(".tr-settings-column").width).toBeCloseTo(51.5 * rem, 0);
   });
 
   it("moves focus to the page control it now shows when it switches between the page list and the select, and to no control that was not focused", async () => {
