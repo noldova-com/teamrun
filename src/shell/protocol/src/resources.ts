@@ -88,7 +88,7 @@ export class Resources {
   public static readonly notificationTextInvalid: string = "A notification's text, when it has one, must not be blank.";
   public static readonly notificationProgressInvalid: string = "A notification's progress must be indeterminate or a number from 0 to 1.";
   public static readonly notificationActionTitleInvalid: string = "A notification action's title must not be blank.";
-  public static readonly notificationIdInvalid: string = "A notification's id must be a whole number from 1.";
+  public static readonly notificationIdInvalid: string = "A notification's id must not be blank.";
   public static readonly notificationTimeInvalid: string = "A notification's time must be a date and time.";
   public static readonly quietDeviceInvalid: string = "A device with Do not disturb on must have an id.";
   public static readonly mutedModuleInvalid: string = "A muted module must have an id.";

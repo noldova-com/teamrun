@@ -605,7 +605,7 @@ export class Resources {
     return `The command ${name} is already registered.`;
   }
 
-  public static formatNotificationKindChanged(id: number, kind: string): string {
+  public static formatNotificationKindChanged(id: string, kind: string): string {
     return `Notification ${id} is of the kind ${kind}, which an update keeps.`;
   }
 
@@ -617,7 +617,7 @@ export class Resources {
     return `The module ${moduleId} may not offer the command ${command} in a notification; it must be its own or a dependency's.`;
   }
 
-  public static formatNotificationNotFound(id: number): string {
+  public static formatNotificationNotFound(id: string): string {
     return `Notification ${id} is gone; it was dismissed or its module stopped.`;
   }
 

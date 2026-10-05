@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { JsonReader, type JsonObject } from "@noldova/teamrun-foundation-json";
 
@@ -15,10 +16,10 @@ import { WireContract } from "../services/wire-contract.js";
 export class NotificationReference {
   private static readonly FIELDS: readonly string[] = [Resources.idField];
 
-  public readonly id: number;
+  public readonly id: string;
 
-  public constructor(id: number) {
-    if (!Number.isSafeInteger(id) || id < 1)
+  public constructor(id: string) {
+    if (String.isNullOrWhitespace(id))
       throw new ArgumentException(Resources.notificationIdInvalid, Resources.idField);
 
     this.id = id;
@@ -27,7 +28,7 @@ export class NotificationReference {
   public static fromJson(value: unknown, path?: string): NotificationReference {
     const reader = JsonReader.fromValue(value, path);
     WireContract.requireKnownFields(reader, NotificationReference.FIELDS);
-    return WireContract.create(reader, () => new NotificationReference(reader.readInteger(Resources.idField)));
+    return WireContract.create(reader, () => new NotificationReference(reader.readString(Resources.idField)));
   }
 
   public toJson(): JsonObject {

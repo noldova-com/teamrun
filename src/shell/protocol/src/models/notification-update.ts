@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { JsonReader, type JsonObject } from "@noldova/teamrun-foundation-json";
 
@@ -16,11 +17,11 @@ import { NotificationPost } from "./notification-post.js";
 export class NotificationUpdate {
   private static readonly FIELDS: readonly string[] = [Resources.idField, Resources.postField];
 
-  public readonly id: number;
+  public readonly id: string;
   public readonly post: NotificationPost;
 
-  public constructor(id: number, post: NotificationPost) {
-    if (!Number.isSafeInteger(id) || id < 1)
+  public constructor(id: string, post: NotificationPost) {
+    if (String.isNullOrWhitespace(id))
       throw new ArgumentException(Resources.notificationIdInvalid, Resources.idField);
 
     this.id = id;
@@ -31,7 +32,7 @@ export class NotificationUpdate {
     const reader = JsonReader.fromValue(value, path);
     WireContract.requireKnownFields(reader, NotificationUpdate.FIELDS);
     return WireContract.create(reader, () => {
-      const id = reader.readInteger(Resources.idField);
+      const id = reader.readString(Resources.idField);
       const post = reader.readObject(Resources.postField);
       return new NotificationUpdate(id, NotificationPost.fromJson(post.toJson(), post.path));
     });

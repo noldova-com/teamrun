@@ -19,15 +19,15 @@ export class SystemNotifier {
   private readonly log: IDesktopLog;
   private readonly readIcon: () => string;
   private readonly isAnyWindowFocused: () => boolean;
-  private readonly open: (id: number) => void;
-  private readonly shown: Map<number, { sequence: number; notification: ISystemNotification }> = new Map();
+  private readonly open: (id: string) => void;
+  private readonly shown: Map<string, { sequence: number; notification: ISystemNotification }> = new Map();
   private start: { device: string; highestSequence: number } | null = null;
   private pending: NotificationBroadcast | null = null;
   private isHeld: boolean = false;
   private epochValue: number = 0;
   private hasFailed: boolean = false;
 
-  public constructor(host: INotificationHost, log: IDesktopLog, readIcon: () => string, isAnyWindowFocused: () => boolean, open: (id: number) => void) {
+  public constructor(host: INotificationHost, log: IDesktopLog, readIcon: () => string, isAnyWindowFocused: () => boolean, open: (id: string) => void) {
     this.host = host;
     this.log = log;
     this.readIcon = readIcon;
@@ -108,7 +108,7 @@ export class SystemNotifier {
     shown.show();
   }
 
-  private forget(id: number, entry: { sequence: number; notification: ISystemNotification }): void {
+  private forget(id: string, entry: { sequence: number; notification: ISystemNotification }): void {
     if (this.shown.get(id) === entry)
       this.shown.delete(id);
   }
