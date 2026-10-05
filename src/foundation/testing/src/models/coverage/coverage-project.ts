@@ -17,17 +17,21 @@ export class CoverageProject {
   public readonly productionDirectory: string;
   public readonly sourceDirectory: string;
   public readonly exclusions: readonly CoverageExclusion[];
+  public readonly testFolders: readonly string[];
 
-  public constructor(name: string, productionDirectory: string, sourceDirectory: string, exclusions: readonly CoverageExclusion[] = []) {
+  public constructor(name: string, productionDirectory: string, sourceDirectory: string, exclusions: readonly CoverageExclusion[] = [], testFolders: readonly string[] = []) {
     ArgumentException.throwIfNullOrWhitespace(name, nameof<CoverageProject>(t => t.name));
     ArgumentException.throwIfNullOrWhitespace(productionDirectory, nameof<CoverageProject>(t => t.productionDirectory));
     ArgumentException.throwIfNullOrWhitespace(sourceDirectory, nameof<CoverageProject>(t => t.sourceDirectory));
     if (new Set(exclusions.map(t => t.relativePath)).size !== exclusions.length)
       throw new ArgumentException(Resources.repeatedCoverageExclusion, nameof<CoverageProject>(t => t.exclusions));
+    for (const folder of testFolders)
+      ArgumentException.throwIfNullOrWhitespace(folder, nameof<CoverageProject>(t => t.testFolders));
 
     this.name = name;
     this.productionDirectory = productionDirectory;
     this.sourceDirectory = sourceDirectory;
     this.exclusions = [...exclusions];
+    this.testFolders = [...testFolders];
   }
 }

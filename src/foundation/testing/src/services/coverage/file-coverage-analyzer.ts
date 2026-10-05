@@ -9,7 +9,9 @@
 import "@noldova/teamrun-foundation-core";
 
 import { readFile } from "node:fs/promises";
+import { stripTypeScriptTypes } from "node:module";
 import { dirname, isAbsolute, relative } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import { EcmaScriptLineTerminator } from "@noldova/teamrun-foundation-text";
@@ -38,14 +40,19 @@ export class FileCoverageAnalyzer {
   }
 
   public async analyzeAsync(filePath: string, scriptEntries: readonly (readonly FunctionCoverage[])[]): Promise<FileCoverage> {
-    const fileText = await readFile(filePath, FileCoverageAnalyzer.TEXT_ENCODING);
+    const isTypeScript = filePath.endsWith(Resources.typeScriptFileSuffix);
+    const fileText = isTypeScript
+      ? this.stripTypes(filePath, await readFile(filePath, FileCoverageAnalyzer.TEXT_ENCODING), scriptEntries.length > 0 ? pathToFileURL(filePath).href : undefined)
+      : await readFile(filePath, FileCoverageAnalyzer.TEXT_ENCODING);
     const lineStartOffsets = this.computeLineStartOffsets(fileText);
-    const sourceMap = await this.loadSourceMapAsync(filePath);
-    const sourcePath = this.tryDetermineSourcePath(lineStartOffsets, sourceMap);
+    const sourceMap = isTypeScript ? undefined : await this.loadSourceMapAsync(filePath);
+    const sourcePath = Object.isUndefined(sourceMap) ? undefined : this.tryDetermineSourcePath(lineStartOffsets, sourceMap);
     const relativePath = Object.isUndefined(sourcePath)
       ? this.toRelativePath(filePath, this.project.productionDirectory)
       : this.toRelativePath(sourcePath, this.project.sourceDirectory);
-    const toLine = (t: number): number => this.toSourceLine(t, lineStartOffsets, sourceMap);
+    const toLine = (t: number): number => Object.isUndefined(sourceMap)
+      ? this.lineOf(t, lineStartOffsets)
+      : this.toSourceLine(t, lineStartOffsets, sourceMap);
     const exclusionReason = this.project.exclusions.find(t => t.relativePath === relativePath)?.reason;
 
     if (this.isInertModule(fileText))
@@ -116,6 +123,15 @@ export class FileCoverageAnalyzer {
     return sortedRanges.map(t => new BlockCoverage(
       toLine(t.startOffset),
       this.spanHasCoveredPosition(t, coveredPositions)));
+  }
+
+  private stripTypes(filePath: string, sourceText: string, sourceUrl?: string): string {
+    try {
+      return Object.isUndefined(sourceUrl) ? stripTypeScriptTypes(sourceText) : stripTypeScriptTypes(sourceText, { sourceUrl });
+    }
+    catch (error) {
+      throw new TestingException(Resources.formatTypeScriptNotStrippable(filePath), new ExceptionOptions(error));
+    }
   }
 
   private async loadSourceMapAsync(filePath: string): Promise<SourceMap> {
