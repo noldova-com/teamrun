@@ -212,7 +212,7 @@ export class Resources {
   public static readonly doNotDisturbSetting: string = "doNotDisturb";
   public static readonly mutedModulesSetting: string = "mutedModules";
   public static readonly keyBindingsSetting: string = "keyBindings";
-  public static readonly recentCommandsSetting: string = "recentCommands";
+  public static readonly recentCommandCountSetting: string = "recentCommandCount";
   public static readonly appearancePage: string = "Appearance";
   public static readonly notificationsPage: string = "Notifications";
   public static readonly shortcutsPage: string = "Keyboard shortcuts";
@@ -269,8 +269,8 @@ export class Resources {
   public static readonly mutedModulesDescription: string = "A module turned off still adds its notifications to the list, without toasts or operating system notifications.";
   public static readonly keyBindingsTitle: string = "Keyboard shortcuts";
   public static readonly keyBindingsDescription: string = "The keys you chose for commands, in place of their default keys, on every device.";
-  public static readonly recentCommandsTitle: string = "Recent commands";
-  public static readonly recentCommandsDescription: string = "How many of the commands you ran from command search it lists first, newest first. 0 lists none.";
+  public static readonly recentCommandCountTitle: string = "Recent commands";
+  public static readonly recentCommandCountDescription: string = "How many commands you recently ran from command search are listed first. 0 lists none.";
   public static readonly maximumRecentCommands: number = 20;
   public static readonly defaultRecentCommands: number = 5;
   public static readonly settingScopesKind: string = "settingScopes";

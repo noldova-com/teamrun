@@ -1031,7 +1031,7 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async refusesASettingsRequestWithoutAnObjectOrADevice(): Promise<void> {
+  public async refusesADeviceRequestWithoutAnObjectOrADevice(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const device = new FakeDeviceIdentity();
@@ -1042,15 +1042,19 @@ export class DesktopApplicationTests {
     const failures = [
       await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", null),
       await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", [1]),
-      await DesktopApplicationTests.requestAsync(anonymous, event, "shell.settings", {})
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.recentCommands", null),
+      await DesktopApplicationTests.requestAsync(anonymous, event, "shell.settings", {}),
+      await DesktopApplicationTests.requestAsync(anonymous, event, "shell.recordCommand", { id: "notes.newNote" })
     ].map(t => t.failure?.toJson());
 
     Assert.areEqual(JSON.stringify([
-      { code: "InvalidMessage", message: "A settings request's payload must be a JSON object." },
-      { code: "InvalidMessage", message: "A settings request's payload must be a JSON object." },
-      { code: "Unavailable", message: "This device has no identity, so its settings cannot be read or changed." }
+      { code: "InvalidMessage", message: "A request that belongs to this device must have a JSON object as its payload." },
+      { code: "InvalidMessage", message: "A request that belongs to this device must have a JSON object as its payload." },
+      { code: "InvalidMessage", message: "A request that belongs to this device must have a JSON object as its payload." },
+      { code: "Unavailable", message: "This device has no identity, so a request that belongs to it cannot be made." },
+      { code: "Unavailable", message: "This device has no identity, so a request that belongs to it cannot be made." }
     ]), JSON.stringify(failures));
-    Assert.isFalse(connection.calls.some(t => t.includes("etting")));
+    Assert.isFalse(connection.calls.some(t => t.includes("etting") || t.includes("ommand")));
   }
 
   @TestMethod
@@ -1266,32 +1270,23 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async addsItsOwnDeviceToItsWindowsRecentCommandsAndAnswersWithoutIt(): Promise<void> {
+  public async addsItsOwnDeviceToItsWindowsRecentCommandsRequests(): Promise<void> {
     const connection = new FakeRuntimeConnection();
-    connection.answers.set("shell.recentCommands", Response.success("r", { ids: ["notes.newNote"], device: FakeDeviceIdentity.ID }));
+    connection.answers.set("shell.recentCommands", Response.success("r", { ids: ["notes.newNote"] }));
     connection.answers.set("shell.recordCommand", Response.success("r", null));
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopApplicationTests.trustedEvent("linux");
-    const unidentified = new FakeDeviceIdentity();
-    unidentified.failure = new Error("The identity file is not JSON.");
-    const lost = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new FakeRuntimeConnection()), new FakeElectron(), unidentified);
 
-    const recent = await DesktopApplicationTests.requestAsync(electron, event, "shell.recentCommands", null);
+    const recent = await DesktopApplicationTests.requestAsync(electron, event, "shell.recentCommands", {});
     const recorded = await DesktopApplicationTests.requestAsync(electron, event, "shell.recordCommand", { id: "notes.newNote" });
-    const noDevice = await DesktopApplicationTests.requestAsync(lost, event, "shell.recentCommands", null);
-    connection.answers.set("shell.recentCommands", Response.failure("r", new Failure(FailureCode.Internal, "The database is busy.")));
-    const failed = await DesktopApplicationTests.requestAsync(electron, event, "shell.recentCommands", null);
 
     const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).filter(t => t.startsWith("shell.recentCommands") || t.startsWith("shell.recordCommand"));
     Assert.areEqual(JSON.stringify([
       `shell.recentCommands ${JSON.stringify({ device: FakeDeviceIdentity.ID })}`,
-      `shell.recordCommand ${JSON.stringify({ id: "notes.newNote", device: FakeDeviceIdentity.ID })}`,
-      `shell.recentCommands ${JSON.stringify({ device: FakeDeviceIdentity.ID })}`
+      `shell.recordCommand ${JSON.stringify({ id: "notes.newNote", device: FakeDeviceIdentity.ID })}`
     ]), JSON.stringify(sent));
     Assert.areEqual(JSON.stringify({ ids: ["notes.newNote"] }), JSON.stringify(recent.payload));
     Assert.isFalse(recorded.hasFailed);
-    Assert.areEqual(FailureCode.Unavailable, noDevice.failure?.code);
-    Assert.areEqual(FailureCode.Internal, failed.failure?.code);
   }
 
   @TestMethod

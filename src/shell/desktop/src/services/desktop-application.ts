@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
-  type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, RecentCommands, RecentCommandsQuery, Response, type RuntimeHandover, SettingChange, SettingKey,
+  type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, RecentCommands, Response, type RuntimeHandover, SettingChange, SettingKey,
   ShellEvents, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
 } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, LogText, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
@@ -361,10 +361,8 @@ export class DesktopApplication {
       return DesktopApplication.fail(FailureCode.Unauthorized, Resources.formatMethodRefused(name.text));
     if (name.text === ShellMethods.notifications.text)
       return await this.readNotificationsAsync(name);
-    if (name.text === ShellMethods.recentCommands.text)
-      return await this.readRecentCommandsAsync(name);
     if (Resources.deviceMethods.includes(name.text))
-      return await this.requestSettingsForDeviceAsync(name, value);
+      return await this.requestForDeviceAsync(name, value);
     return (await this.callAsync(name, value)).toJson();
   }
 
@@ -381,12 +379,12 @@ export class DesktopApplication {
     }
   }
 
-  private async requestSettingsForDeviceAsync(name: QualifiedName, value: JsonValue): Promise<JsonObject> {
+  private async requestForDeviceAsync(name: QualifiedName, value: JsonValue): Promise<JsonObject> {
     if (!Object.isObject(value) || Array.isArray(value))
-      return DesktopApplication.fail(FailureCode.InvalidMessage, Resources.settingsPayloadNotObject);
+      return DesktopApplication.fail(FailureCode.InvalidMessage, Resources.deviceRequestPayloadNotObject);
     const device = await this.device;
     if (Object.isNull(device))
-      return DesktopApplication.fail(FailureCode.Unavailable, Resources.settingsNeedDevice);
+      return DesktopApplication.fail(FailureCode.Unavailable, Resources.deviceRequestNeedsIdentity);
     return (await this.callAsync(name, { ...value, [Resources.deviceField]: device })).toJson();
   }
 
@@ -411,16 +409,6 @@ export class DesktopApplication {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
       return undefined;
     }
-  }
-
-  private async readRecentCommandsAsync(name: QualifiedName): Promise<JsonObject> {
-    const device = await this.device;
-    if (Object.isNull(device))
-      return DesktopApplication.fail(FailureCode.Unavailable, Resources.deviceNotIdentified);
-    const response = await this.callAsync(name, new RecentCommandsQuery(device).toJson());
-    if (response.hasFailed || Object.isNull(response.id))
-      return response.toJson();
-    return Response.success(response.id, new RecentCommands(RecentCommands.fromJson(response.payload).ids).toJson()).toJson();
   }
 
   private async readNotificationsAsync(name: QualifiedName): Promise<JsonObject> {

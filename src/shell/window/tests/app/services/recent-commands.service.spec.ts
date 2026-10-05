@@ -9,6 +9,9 @@
 import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
+
+import { DesktopBridgeService } from "../../../src/app/services/desktop-bridge.service";
 import { RecentCommandsService } from "../../../src/app/services/recent-commands.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 
@@ -16,8 +19,9 @@ describe("RecentCommandsService", () => {
   let errors: unknown[];
   let bridge: DesktopBridgeFixture;
 
-  function start(): RecentCommandsService {
+  function start(prepare: () => void = () => undefined): RecentCommandsService {
     TestBed.configureTestingModule({ providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }] });
+    prepare();
     const service = TestBed.inject(RecentCommandsService);
     TestBed.tick();
     return service;
@@ -50,23 +54,27 @@ describe("RecentCommandsService", () => {
 
     expect(first).toEqual(["notes.newNote", "shell.openSettings"]);
     expect(service.ids()).toEqual(["clock.show"]);
-    expect(bridge.requests.filter(t => t[0] === "shell.recentCommands")).toEqual([["shell.recentCommands", null], ["shell.recentCommands", null]]);
+    expect(bridge.requests.filter(t => t[0] === "shell.recentCommands")).toEqual([["shell.recentCommands", {}], ["shell.recentCommands", {}]]);
     expect(errors).toEqual([]);
   });
 
   it("follows the list another window changes, and keeps it over an older read that arrives later", async () => {
-    let answer: (value: unknown) => void = () => undefined;
-    const request = bridge.request.bind(bridge);
-    const spy = vi.spyOn(bridge, "request").mockImplementation((method, payload) =>
-      method === "shell.recentCommands" ? new Promise(resolve => answer = resolve) : request(method, payload));
-    const service = start();
-    await settleAsync(() => spy.mock.calls.some(t => t[0] === "shell.recentCommands"));
+    const read = Promise.withResolvers<JsonValue>();
+    let isAsked = false;
+    const service = start(() => {
+      const desktop = TestBed.inject(DesktopBridgeService);
+      const request = desktop.requestAsync.bind(desktop);
+      vi.spyOn(desktop, "requestAsync").mockImplementation((method, payload) => {
+        isAsked ||= method === "shell.recentCommands";
+        return method === "shell.recentCommands" ? read.promise : request(method, payload);
+      });
+    });
+    await settleAsync(() => isAsked);
 
     bridge.publishEvent("shell.recentCommandsChanged", { ids: ["clock.show", "notes.newNote"] });
     bridge.publishEvent("notes.changed", { ids: [] });
-    answer({ payload: { ids: ["notes.newNote"] } });
-    for (let turn = 0; turn < 5; turn++)
-      await Promise.resolve();
+    read.resolve({ ids: ["notes.newNote"] });
+    await read.promise;
 
     expect(service.ids()).toEqual(["clock.show", "notes.newNote"]);
   });

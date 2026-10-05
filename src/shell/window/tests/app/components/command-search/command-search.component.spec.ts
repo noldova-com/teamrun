@@ -84,7 +84,7 @@ describe("CommandSearchComponent", () => {
   async function showAsync(limit: number, recent: readonly string[]): Promise<void> {
     await vi.waitFor(() => expect(bridge.requests.map(t => t[0])).toContain("shell.recentCommands"));
     await fixture.whenStable();
-    bridge.publishEvent("shell.settingsChanged", { name: "shell.recentCommands", value: limit, isSet: true });
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.recentCommandCount", value: limit, isSet: true });
     bridge.publishEvent("shell.recentCommandsChanged", { ids: recent });
     fixture.detectChanges();
     await fixture.whenStable();

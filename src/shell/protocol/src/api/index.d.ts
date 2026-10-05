@@ -1491,7 +1491,7 @@ export declare class ShellMethods {
 
   /**
    * `shell.recentCommands`: asks for the commands a device ran recently from command search; its payload is a
-   * `RecentCommandsQuery` and its answer that device's `RecentCommands`.
+   * `RecentCommandsQuery` and its answer that device's `RecentCommands`, without the device.
    */
   public static readonly recentCommands: QualifiedName;
 
@@ -3767,8 +3767,8 @@ export declare class RecentCommandUse {
 
 /**
  * The commands a device ran recently from command search, newest first: the answer of `shell.recentCommands` and the
- * payload of the `shell.recentCommandsChanged` event. The runtime names the device; the desktop leaves it out of what it
- * passes to its window, and forwards the event only to that device's windows.
+ * payload of the `shell.recentCommandsChanged` event. The event names the device; the desktop forwards it only to that
+ * device's windows, without the device.
  */
 export declare class RecentCommands {
   /**

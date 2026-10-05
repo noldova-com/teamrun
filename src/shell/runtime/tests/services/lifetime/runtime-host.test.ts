@@ -264,13 +264,13 @@ export class RuntimeHostTests {
       const [responses, events] = await RuntimeHostTests.readMessagesAsync(connection, 28 + 24);
       const expected = ["c5", "c21", "c20", "c19", "c18", "c17", "c16", "c15", "c14", "c13", "c12", "c11", "c10", "c9", "c8", "c7", "c6", "c4", "c3", "c2"];
 
-      Assert.areEqual(JSON.stringify({ ids: [], device: "d1" }), JSON.stringify(responses.get("desktop:0")?.payload));
-      Assert.areEqual(JSON.stringify({ ids: expected, device: "d1" }), JSON.stringify(responses.get("desktop:25")?.payload));
-      Assert.areEqual(JSON.stringify({ ids: ["c0"], device: "d2" }), JSON.stringify(responses.get("desktop:26")?.payload));
+      Assert.areEqual(JSON.stringify({ ids: [] }), JSON.stringify(responses.get("desktop:0")?.payload));
+      Assert.areEqual(JSON.stringify({ ids: expected }), JSON.stringify(responses.get("desktop:25")?.payload));
+      Assert.areEqual(JSON.stringify({ ids: ["c0"] }), JSON.stringify(responses.get("desktop:26")?.payload));
       Assert.areEqual("InvalidParams", responses.get("desktop:27")?.failure?.code);
       Assert.areEqual(24, events.filter(t => t.name.text === "shell.recentCommandsChanged").length);
-      Assert.areEqual("c0", RecentCommands.fromJson(events.at(-1)?.payload).ids.join(","));
-      Assert.areEqual(expected.join(","), RecentCommands.fromJson(events.at(-2)?.payload).ids.join(","));
+      Assert.areEqual(JSON.stringify({ ids: ["c0"], device: "d2" }), JSON.stringify(events.at(-1)?.payload));
+      Assert.areEqual(JSON.stringify({ ids: expected, device: "d1" }), JSON.stringify(events.at(-2)?.payload));
     });
   }
 
@@ -703,7 +703,7 @@ export class RuntimeHostTests {
       Assert.isTrue(["desktop:1", "desktop:2", "desktop:4"].every(t => responses.get(t)?.hasFailed === false));
       Assert.areEqual("{\"name\":\"shell.mode\",\"value\":\"Dark\",\"isSet\":true}", entry("shell.mode"));
       Assert.areEqual("{\"name\":\"shell.doNotDisturb\",\"value\":true,\"isSet\":true}", entry("shell.doNotDisturb"));
-      Assert.areEqual("shell.theme,shell.mode,shell.interfaceFont,shell.codeFont,shell.panelSize,shell.messageSize,shell.codeSize,shell.leftDockStyle,shell.rightDockStyle,shell.menuBar,shell.previewTabs,shell.recentCommands,shell.doNotDisturb,shell.mutedModules,shell.keyBindings",
+      Assert.areEqual("shell.theme,shell.mode,shell.interfaceFont,shell.codeFont,shell.panelSize,shell.messageSize,shell.codeSize,shell.leftDockStyle,shell.rightDockStyle,shell.menuBar,shell.previewTabs,shell.recentCommandCount,shell.doNotDisturb,shell.mutedModules,shell.keyBindings",
         snapshot.definitions.map(t => t.name.text).join(","));
       Assert.areEqual("InvalidParams,NotFound,InvalidParams", ["desktop:5", "desktop:6", "desktop:7"].map(t => responses.get(t)?.failure?.code).join(","));
       Assert.areEqual(JSON.stringify([

@@ -6,15 +6,15 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal, inject, signal } from "@angular/core";
+import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal, effect, inject, signal, untracked } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { RecentCommands, ShellEvents, ShellMethods } from "@noldova/teamrun-shell-protocol";
 
-import type { StartupState } from "../models/startup-state";
 import { Resources } from "../../resources";
 import { DesktopBridgeService } from "./desktop-bridge.service";
+import { WindowPartHostService } from "./window-part-host.service";
 
 @Injectable({ providedIn: "root" })
 export class RecentCommandsService {
@@ -22,15 +22,20 @@ export class RecentCommandsService {
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly idsValue: WritableSignal<readonly string[]> = signal([]);
   private eventsSeen: number = 0;
-  private isReady: boolean = false;
+  private generationRead: number = 0;
 
   public readonly ids: Signal<readonly string[]> = this.idsValue.asReadonly();
 
   public constructor() {
-    const destroyRef = inject(DestroyRef);
-    destroyRef.onDestroy(this.bridge.onStartup(t => this.follow(t)));
-    destroyRef.onDestroy(this.bridge.onEvent((name, payload) => this.receive(name, payload)));
-    void this.bridge.readStartupAsync().then(t => this.follow(t));
+    const host = inject(WindowPartHostService);
+    inject(DestroyRef).onDestroy(this.bridge.onEvent((name, payload) => this.receive(name, payload)));
+    effect(() => {
+      const generation = host.generation();
+      if (generation > this.generationRead) {
+        this.generationRead = generation;
+        untracked(() => this.load());
+      }
+    });
   }
 
   public record(id: string): void {
@@ -38,15 +43,9 @@ export class RecentCommandsService {
     this.bridge.requestAsync(ShellMethods.recordCommand.text, { [Resources.idField]: id }).catch((error: unknown) => this.errors.handleError(error));
   }
 
-  private follow(state: StartupState): void {
-    if (state.isReady && !this.isReady)
-      this.load();
-    this.isReady = state.isReady;
-  }
-
   private load(): void {
     const seen = this.eventsSeen;
-    this.bridge.requestAsync(ShellMethods.recentCommands.text, null).then(t => {
+    this.bridge.requestAsync(ShellMethods.recentCommands.text, {}).then(t => {
       if (this.eventsSeen === seen)
         this.idsValue.set(RecentCommands.fromJson(t).ids);
     }).catch((error: unknown) => this.errors.handleError(error));

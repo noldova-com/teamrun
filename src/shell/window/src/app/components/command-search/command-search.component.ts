@@ -38,7 +38,7 @@ export class CommandSearchComponent {
     ...this.menuBar.searchRows().map(t => new CommandSearchEntry(new QuickInputItem(t.id, t.title, t.icon, t.menu, null), () => this.menuBar.run(t.id)))
   ].sort((a, b) => a.item.title.localeCompare(b.item.title) || a.detail.localeCompare(b.detail)));
   private readonly recentEntries: Signal<readonly CommandSearchEntry[]> = computed(() => {
-    const limit = this.settings.values().get(Resources.recentCommandsSetting);
+    const limit = this.settings.values().get(Resources.recentCommandCountSetting);
     const entries = new Map(this.entries().map(t => [t.item.id, t]));
     return this.recent.ids().flatMap(t => entries.get(t) ?? []).slice(0, Object.isNumber(limit) ? limit : 0);
   });

@@ -19,12 +19,18 @@ export class RecentCommandsStore {
   }
 
   public read(device: string): RecentCommands {
-    return new RecentCommands(this.database.readAll(Resources.readRecentCommandsStatement, device).map(t => String(t[Resources.idColumn])), device);
+    return new RecentCommands(this.readIds(device));
   }
 
   public record(use: RecentCommandUse): RecentCommands {
-    this.database.run(Resources.recordRecentCommandStatement, use.device, use.id);
-    this.database.run(Resources.trimRecentCommandsStatement, use.device, Resources.maximumRecentCommands);
-    return this.read(use.device);
+    return this.database.transaction(() => {
+      this.database.run(Resources.recordRecentCommandStatement, use.device, use.id);
+      this.database.run(Resources.trimRecentCommandsStatement, use.device, Resources.maximumRecentCommands);
+      return new RecentCommands(this.readIds(use.device), use.device);
+    });
+  }
+
+  private readIds(device: string): string[] {
+    return this.database.readAll(Resources.readRecentCommandsStatement, device).map(t => String(t[Resources.idColumn]));
   }
 }
