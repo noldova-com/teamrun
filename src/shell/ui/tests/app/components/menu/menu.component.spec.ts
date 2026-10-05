@@ -64,12 +64,12 @@ describe("MenuComponent", () => {
     const separator = menu.querySelector("tr-menu-separator");
 
     expect(menu.getAttribute("role")).toBe("menu");
-    expect(menu.classList.contains("tr-scroll-reveal")).toBe(true);
     expect(separator?.getAttribute("role")).toBe("separator");
     expect(menu.scrollHeight).toBeGreaterThan(menu.clientHeight);
     expect(getComputedStyle(menu).overflowX).toBe("hidden");
     expect(rows.every(t => t.getBoundingClientRect().width === rows[0]?.getBoundingClientRect().width)).toBe(true);
     expect(menu.scrollWidth).toBe(menu.clientWidth);
+    await AppearanceFixture.expectThumbRevealsOnHoverAsync(menu);
   });
 });
 

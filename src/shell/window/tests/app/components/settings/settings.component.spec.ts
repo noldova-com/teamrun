@@ -309,10 +309,11 @@ describe("SettingsComponent", () => {
     expect(kept).toBe(outside);
   });
 
-  it("reveals the scrollbars of its page list and its content while they are hovered", () => {
+  it("reveals the scrollbars of its page list and its content while they are hovered", async () => {
     render();
 
-    expect([".tr-settings-pages", ".tr-settings-content"].map(t => element().querySelector(t)?.classList.contains("tr-scroll-reveal"))).toEqual([true, true]);
+    for (const area of [".tr-settings-pages", ".tr-settings-content"])
+      await AppearanceFixture.expectThumbRevealsOnHoverAsync(element().querySelector(area) as HTMLElement);
   });
 
   it("sets every page's content between the column's content edges, the Settings inset from its ends: a built-in page's rows, a module's rows, the shortcuts table and the Gallery", async () => {

@@ -8,6 +8,20 @@
 
 @use "states";
 
+@property --tr-scroll-thumb {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
+}
+
+:where(*) {
+  transition: --tr-scroll-thumb 150ms linear;
+}
+
+:where(#{states.$hover}) {
+  --tr-scroll-thumb: var(--tr-scrollbar);
+}
+
 ::-webkit-scrollbar {
   width: var(--tr-scrollbar-size);
   height: var(--tr-scrollbar-size);
@@ -25,33 +39,18 @@
 }
 
 ::-webkit-scrollbar-thumb {
+  --tr-scroll-thumb: inherit;
   border-radius: var(--tr-scrollbar-size);
   background-color: transparent;
+  box-shadow: inset 0 0 0 var(--tr-scrollbar-size) var(--tr-scroll-thumb);
 }
 
-.tr-scroll-reveal {
-  color: transparent;
-  transition: color 150ms linear;
-}
-
-.tr-scroll-reveal#{states.$hover} {
-  color: var(--tr-scrollbar);
-}
-
-:where(.tr-scroll-reveal) > * {
-  color: var(--tr-text);
-}
-
-.tr-scroll-reveal::-webkit-scrollbar-thumb {
-  box-shadow: inset 0 0 0 var(--tr-scrollbar-size) currentColor;
-}
-
-.tr-scroll-reveal::-webkit-scrollbar-thumb:active {
+::-webkit-scrollbar-thumb:active {
   box-shadow: inset 0 0 0 var(--tr-scrollbar-size) var(--tr-scrollbar-active);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tr-scroll-reveal {
+  :where(*) {
     transition: none;
   }
 }
