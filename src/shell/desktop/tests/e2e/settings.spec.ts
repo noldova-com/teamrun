@@ -162,13 +162,17 @@ test.describe("settings", () => {
     const content = window.locator(".tr-settings-content");
     const outer = window.locator("tr-tab-content:has(tr-settings)");
     const expectAtEdgeAsync = async (area: Locator, where: string): Promise<void> => {
-      const sizes = await ScrollAreaFixture.scrollbarSizesAsync(area);
-      expect(Math.abs(await ScrollAreaFixture.panelEdgeGapAsync(area)), `${where}: the scroll area's end to the panel's inner edge`).toBeLessThan(1);
-      expect(sizes.vertical, `${where}: the scrollbar's width`).toBeCloseTo(0.375 * sizes.rem, 0);
+      await expect.poll(async () => Math.abs(await ScrollAreaFixture.panelEdgeGapAsync(area)), { message: `${where}: the scroll area's end to the panel's inner edge` }).toBeLessThan(1);
+      await expect.poll(async () => {
+        const sizes = await ScrollAreaFixture.scrollbarSizesAsync(area);
+        return Math.abs(sizes.vertical - 0.375 * sizes.rem);
+      }, { message: `${where}: the scrollbar's width to 0.375rem` }).toBeLessThan(0.5);
     };
-    for (const key of ["view/notes.list", "document/notes.note/1"]) {
+    for (const [key, page] of [["view/notes.list", "tr-notes-list"], ["document/notes.note/1", "tr-notes-note"]] as const) {
       await window.locator(`tr-tab[data-tab-key='${key}']`).click();
-      await expectAtEdgeAsync(window.locator(`tr-tab-group:has(tr-tab[data-tab-key='${key}']) tr-tab-content`), key);
+      const area = window.locator(`tr-tab-group:has(tr-tab[data-tab-key='${key}']) tr-tab-content`);
+      await expect(area.locator(page)).toBeVisible();
+      await expectAtEdgeAsync(area, key);
     }
     await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
 
