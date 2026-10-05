@@ -171,9 +171,9 @@ describe("ToastsComponent", () => {
     const resumedWhileFocused = resume.mock.calls.length;
     close.blur();
 
-    expect(pause).toHaveBeenCalledWith(1);
+    expect(pause).toHaveBeenCalledWith("1");
     expect(resumedWhileFocused).toBe(0);
-    expect(resume).toHaveBeenCalledWith(1);
+    expect(resume).toHaveBeenCalledWith("1");
   });
 
   for (const theme of AppearanceFixture.themes)
