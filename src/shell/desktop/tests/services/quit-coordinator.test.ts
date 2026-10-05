@@ -72,6 +72,30 @@ export class QuitCoordinatorTests {
   }
 
   @TestMethod
+  public async waitsUntilNoWorkIsLeftEvenWhenWorkBeginsWhileWaiting(): Promise<void> {
+    const prompt = new FakeQuitPrompt();
+    const coordinator = QuitCoordinatorTests.create(new WorkReport(["Indexing"], 1));
+    let isSettled = false;
+
+    const waiting = coordinator.confirmAsync(prompt).then(t => {
+      isSettled = true;
+      return t;
+    });
+    await Condition.waitAsync(() => prompt.shown.length === 1);
+    coordinator.answer(prompt, QuitChoice.Wait);
+    coordinator.receive(new WorkReport(["Indexing", "Saving"], 2));
+    coordinator.receive(new WorkReport([], 1));
+    coordinator.receive(new WorkReport(["Saving"], 3));
+    await Promise.resolve();
+    const settledWhileWorking = isSettled;
+    coordinator.receive(new WorkReport([], 4));
+
+    Assert.isFalse(settledWhileWorking);
+    Assert.areEqual(QuitOutcome.Quit, await waiting);
+    Assert.areEqual("Indexing,Indexing waiting,Indexing+Saving waiting,Saving waiting,none", prompt.shown.join(","));
+  }
+
+  @TestMethod
   public async quitsWhenTheWindowCanNoLongerShowTheQuestionOrTheRuntimeIsGone(): Promise<void> {
     const gone = new FakeQuitPrompt();
     gone.canShow = false;

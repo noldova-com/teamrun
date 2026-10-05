@@ -35,8 +35,6 @@ export class DesktopApplicationTests {
     "shell.notifications", "shell.postNotification", "shell.updateNotification", "shell.dismissNotification", "shell.markNotificationsRead", "shell.clearNotifications"
   ];
 
-  private static readonly APPEARANCE: object = { background: "#181818", titleBar: "#181818", titleBarText: "#CCCCCC", titleBarHeight: 35 };
-
   @TestMethod
   public namesItselfAndKeepsOneInstanceInTheSandbox(): void {
     const electron = new FakeElectron();
@@ -82,18 +80,15 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  @TestData("linux", "{\"color\":\"#181818\",\"symbolColor\":\"#CCCCCC\",\"height\":35}")
-  @TestData("darwin", "null")
-  public async showsTheWindowInTheAppearanceItsPageReports(platform: string, overlay: string): Promise<void> {
-    const electron = await DesktopStartFixture.startReadyAsync(platform);
+  public async showsTheWindowInTheAppearanceItsPageReports(): Promise<void> {
+    const electron = await DesktopStartFixture.startReadyAsync("linux");
     const window = DesktopStartFixture.firstWindow(electron);
 
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent(platform), DesktopApplicationTests.APPEARANCE);
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent(platform), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
     await Condition.waitAsync(() => window.isShown);
 
     Assert.areEqual("#181818", window.backgroundColor);
-    Assert.areEqual(overlay, JSON.stringify(window.overlay));
     Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
   }
 
@@ -145,7 +140,7 @@ export class DesktopApplicationTests {
     const electron = await DesktopStartFixture.startReadyAsync("linux");
     const window = DesktopStartFixture.firstWindow(electron);
 
-    electron.ipcMain.send("teamrun:appearance", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:appearance", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
 
     Assert.areEqual("#181818", window.backgroundColor);
     Assert.isFalse(window.isShown);
@@ -156,7 +151,7 @@ export class DesktopApplicationTests {
     const process = new FakeDesktopProcess("linux");
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
     const window = DesktopStartFixture.firstWindow(electron);
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
 
     electron.ipcMain.send("teamrun:appearance", DesktopStartFixture.trustedEvent("linux"), { background: "red" });
 
@@ -177,8 +172,8 @@ export class DesktopApplicationTests {
     ];
 
     for (const event of untrusted) {
-      electron.ipcMain.send("teamrun:ready", event, DesktopApplicationTests.APPEARANCE);
-      electron.ipcMain.send("teamrun:appearance", event, DesktopApplicationTests.APPEARANCE);
+      electron.ipcMain.send("teamrun:ready", event, DesktopStartFixture.APPEARANCE);
+      electron.ipcMain.send("teamrun:appearance", event, DesktopStartFixture.APPEARANCE);
       Assert.isFalse(electron.ipcMain.invoke("teamrun:closeAnswer", event, "request", true) === true);
     }
 
@@ -644,7 +639,7 @@ export class DesktopApplicationTests {
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const window = DesktopStartFixture.firstWindow(electron);
 
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
     await Condition.waitAsync(() => window.isShown);
 
     Assert.areEqual(JSON.stringify(["setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}", "show"]), JSON.stringify(window.calls));
@@ -1089,7 +1084,7 @@ export class DesktopApplicationTests {
     const window = DesktopStartFixture.firstWindow(electron);
     const started = Date.now();
 
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
     await setImmediate();
     const isShownEarly = window.isShown;
     await Condition.waitAsync(() => window.isShown);
@@ -1111,7 +1106,7 @@ export class DesktopApplicationTests {
       arrive = resolve;
     })));
     const window = DesktopStartFixture.firstWindow(electron);
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("win32"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("win32"), DesktopStartFixture.APPEARANCE);
     await Condition.waitAsync(() => window.isShown);
 
     window.bounds = { x: 40, y: 60, width: 900, height: 640 };
@@ -1136,7 +1131,7 @@ export class DesktopApplicationTests {
       arrive = resolve;
     })));
     const window = DesktopStartFixture.firstWindow(electron);
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent(platform), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent(platform), DesktopStartFixture.APPEARANCE);
     await Condition.waitAsync(() => window.isShown);
 
     window.change("will-move");
@@ -1151,7 +1146,7 @@ export class DesktopApplicationTests {
     const process = new FakeDesktopProcess("win32");
     const electron = await DesktopStartFixture.startReadyAsync("win32", new FakeRuntimeLauncher(new Promise<FakeRuntimeConnection>(() => undefined)), new FakeElectron(), new FakeDeviceIdentity(), process);
     const window = DesktopStartFixture.firstWindow(electron);
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("win32"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("win32"), DesktopStartFixture.APPEARANCE);
     await Condition.waitAsync(() => window.isShown);
     window.bounds = { x: 40, y: 60, width: 900, height: 640 };
     window.change("will-move");
@@ -1227,7 +1222,7 @@ export class DesktopApplicationTests {
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(connection), new FakeElectron(), new FakeDeviceIdentity(), process);
     const window = DesktopStartFixture.firstWindow(electron);
 
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
     await Condition.waitAsync(() => window.isShown);
 
     Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
@@ -1243,7 +1238,7 @@ export class DesktopApplicationTests {
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(connection), new FakeElectron(), device, process);
     const window = DesktopStartFixture.firstWindow(electron);
 
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
     await Condition.waitAsync(() => window.isShown);
 
     Assert.areEqual(0, connection.calls.length);
@@ -1258,7 +1253,7 @@ export class DesktopApplicationTests {
     const electron = await DesktopStartFixture.startReadyAsync("linux", launcher);
     const window = DesktopStartFixture.firstWindow(electron);
 
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
     await Condition.waitAsync(() => window.isShown);
     await (electron.ipcMain.invoke("teamrun:startupAction", DesktopStartFixture.trustedEvent("linux"), "moveAside") as Promise<boolean>);
     await Condition.waitAsync(() => window.calls.includes("maximize"));
@@ -1277,7 +1272,7 @@ export class DesktopApplicationTests {
     const process = new FakeDesktopProcess("linux");
     const electron = await DesktopStartFixture.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
     const window = DesktopStartFixture.firstWindow(electron);
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
     await Condition.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
 
     launcher.listener?.onDisconnected();
@@ -1306,7 +1301,7 @@ export class DesktopApplicationTests {
     const process = new FakeDesktopProcess("linux");
     const electron = await DesktopStartFixture.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
     const window = DesktopStartFixture.firstWindow(electron);
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
     await Condition.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
 
     launcher.listener?.onDisconnected();

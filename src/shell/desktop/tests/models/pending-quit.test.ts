@@ -16,26 +16,17 @@ import { FakeQuitPrompt } from "../fixtures/fake-quit-prompt.fixture.js";
 @TestClass
 export class PendingQuitTests {
   @TestMethod
-  public async waitsUntilNoWorkIsLeftEvenWhenWorkBeginsWhileWaiting(): Promise<void> {
+  public async asksWithItsNewestWorkWaitingOnlyOnceChosenAndIsAnsweredWhenNoWorkIsLeft(): Promise<void> {
     const prompt = new FakeQuitPrompt();
     const coordinator = new QuitCoordinator(() => true, () => Promise.resolve(new WorkReport(["Indexing"], 1)), () => Promise.resolve());
-    let isSettled = false;
 
-    const waiting = coordinator.confirmAsync(prompt).then(t => {
-      isSettled = true;
-      return t;
-    });
+    const asking = coordinator.confirmAsync(prompt);
     await Condition.waitAsync(() => prompt.shown.length === 1);
-    coordinator.answer(prompt, QuitChoice.Wait);
     coordinator.receive(new WorkReport(["Indexing", "Saving"], 2));
-    coordinator.receive(new WorkReport([], 1));
-    coordinator.receive(new WorkReport(["Saving"], 3));
-    await Promise.resolve();
-    const settledWhileWorking = isSettled;
-    coordinator.receive(new WorkReport([], 4));
+    coordinator.answer(prompt, QuitChoice.Wait);
+    coordinator.receive(new WorkReport([], 3));
 
-    Assert.isFalse(settledWhileWorking);
-    Assert.areEqual(QuitOutcome.Quit, await waiting);
-    Assert.areEqual("Indexing,Indexing waiting,Indexing+Saving waiting,Saving waiting,none", prompt.shown.join(","));
+    Assert.areEqual(QuitOutcome.Quit, await asking);
+    Assert.areEqual("Indexing,Indexing+Saving,Indexing+Saving waiting,none", prompt.shown.join(","));
   }
 }

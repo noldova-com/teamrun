@@ -19,8 +19,6 @@ import { FakeElectron } from "../fixtures/fake-electron.fixture.js";
 
 @TestClass
 export class WindowFactoryTests {
-  private static readonly APPEARANCE: object = { background: "#181818", titleBar: "#181818", titleBarText: "#CCCCCC", titleBarHeight: 35 };
-
   @TestMethod
   public async describesItsWindowsToTheWindowsTaskbarAsThisBuild(): Promise<void> {
     const data = resolve("data");
@@ -77,7 +75,7 @@ export class WindowFactoryTests {
   public async paintsTheWindowAgainWhenItsPageReportsAChangedAppearanceWithoutShowingItAgain(platform: string, overlay: string): Promise<void> {
     const electron = await DesktopStartFixture.startReadyAsync(platform);
     const window = DesktopStartFixture.firstWindow(electron);
-    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent(platform), WindowFactoryTests.APPEARANCE);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent(platform), DesktopStartFixture.APPEARANCE);
     await Condition.waitAsync(() => window.isShown);
 
     electron.ipcMain.send("teamrun:appearance", DesktopStartFixture.trustedEvent(platform),

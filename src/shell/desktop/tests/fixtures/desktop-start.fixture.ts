@@ -31,6 +31,8 @@ export class DesktopStartFixture {
     .digest("hex")
     .slice(0, 8)}`;
 
+  public static readonly APPEARANCE: object = { background: "#181818", titleBar: "#181818", titleBarText: "#CCCCCC", titleBarHeight: 35 };
+
   public static start(
     electron: FakeElectron,
     process: FakeDesktopProcess,
@@ -58,15 +60,17 @@ export class DesktopStartFixture {
     return electron;
   }
 
-  public static async verifyMenuBarRefusedAsync(menuBar: string): Promise<void> {
+  public static async verifyMenuBarRefusedAsync(menuBar: string, reason: string): Promise<void> {
     const process = new FakeDesktopProcess("darwin");
     const electron = await DesktopStartFixture.startReadyAsync("darwin", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
     const built = electron.menu.templates.length;
 
     electron.ipcMain.send("teamrun:menuBar", DesktopStartFixture.trustedEvent("darwin"), JSON.parse(menuBar));
+    const errors = DesktopStartFixture.readErrors(process, "The window sent a menu bar that is not valid, so the menu bar is unchanged: ");
 
     Assert.areEqual(built, electron.menu.templates.length);
-    Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The window sent a menu bar that is not valid, so the menu bar is unchanged: ").length);
+    Assert.areEqual(1, errors.length);
+    Assert.isTrue(errors[0]?.includes(reason) === true, errors.join("\n"));
   }
 
   public static readErrors(process: FakeDesktopProcess, prefix: string): string[] {

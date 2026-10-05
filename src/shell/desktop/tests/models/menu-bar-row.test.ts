@@ -13,10 +13,10 @@ import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
 @TestClass
 export class MenuBarRowTests {
   @TestMethod
-  @TestData("{\"menus\":[{\"place\":\"shell.file\",\"title\":\"File\",\"rows\":[{\"type\":\"button\"}]}]}")
-  @TestData("{\"menus\":[{\"place\":\"shell.file\",\"title\":\"File\",\"rows\":[{\"type\":\"command\",\"id\":\"a\",\"label\":\"A\",\"key\":null,\"enabled\":true,\"check\":\"Toggle\",\"checked\":false}]}]}")
-  @TestData("{\"menus\":[{\"place\":\"shell.file\",\"title\":\"File\",\"rows\":[{\"type\":\"command\",\"id\":\"a\",\"label\":\"A\",\"key\":\"Mod+Nope\",\"enabled\":true,\"check\":\"None\",\"checked\":false}]}]}")
-  public refusesARowOfAnUnknownTypeCheckOrKey(menuBar: string): Promise<void> {
-    return DesktopStartFixture.verifyMenuBarRefusedAsync(menuBar);
+  @TestData("{\"menus\":[{\"place\":\"shell.file\",\"title\":\"File\",\"rows\":[{\"type\":\"button\"}]}]}", "$: The menu bar is not valid.")
+  @TestData("{\"menus\":[{\"place\":\"shell.file\",\"title\":\"File\",\"rows\":[{\"type\":\"command\",\"id\":\"a\",\"label\":\"A\",\"key\":null,\"enabled\":true,\"check\":\"Toggle\",\"checked\":false}]}]}", "$: The menu bar is not valid.")
+  @TestData("{\"menus\":[{\"place\":\"shell.file\",\"title\":\"File\",\"rows\":[{\"type\":\"command\",\"id\":\"a\",\"label\":\"A\",\"key\":\"Mod+Nope\",\"enabled\":true,\"check\":\"None\",\"checked\":false}]}]}", "Mod+Nope")
+  public refusesARowOfAnUnknownTypeCheckOrKey(menuBar: string, reason: string): Promise<void> {
+    return DesktopStartFixture.verifyMenuBarRefusedAsync(menuBar, reason);
   }
 }

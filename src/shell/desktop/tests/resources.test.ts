@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { join } from "node:path";
-
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { ProductInfo } from "@noldova/teamrun-shell-runtime";
 
@@ -18,19 +16,13 @@ import { FakeElectron } from "./fixtures/fake-electron.fixture.js";
 @TestClass
 export class ResourcesTests {
   @TestMethod
-  public async namesItselfItsWindowAndItsTaskbarEntryAfterTheProduct(): Promise<void> {
+  public async namesItselfAndItsDevelopmentTaskbarEntryAfterTheProduct(): Promise<void> {
     const product = ProductInfo.current;
-    const packaged = new FakeElectron(true, true);
-    DesktopStartFixture.start(packaged, new FakeDesktopProcess("win32"));
-    const development = new FakeElectron();
-    DesktopStartFixture.start(development, new FakeDesktopProcess("win32"));
-    await Promise.all([packaged.app.becomeReadyAsync(), development.app.becomeReadyAsync()]);
-    const window = DesktopStartFixture.firstWindow(packaged);
+    const electron = new FakeElectron();
+    DesktopStartFixture.start(electron, new FakeDesktopProcess("win32"));
+    await electron.app.becomeReadyAsync();
 
-    Assert.isTrue(packaged.app.calls.includes(`setName ${product.name}`), packaged.app.calls.join(", "));
-    Assert.areEqual(product.name, window.options.title);
-    Assert.areEqual(product.applicationId, window.appDetails?.appId);
-    Assert.isTrue(DesktopStartFixture.firstWindow(development).appDetails?.appId?.startsWith(`${product.developmentApplicationId}.`) === true);
-    Assert.areEqual(join(DesktopStartFixture.checkoutRoot(), ...product.icons.split("/"), "icon-dark.ico"), window.options.icon);
+    Assert.isTrue(electron.app.calls.includes(`setName ${product.name}`), electron.app.calls.join(", "));
+    Assert.isTrue(DesktopStartFixture.firstWindow(electron).appDetails?.appId?.startsWith(`${product.developmentApplicationId}.`) === true);
   }
 }

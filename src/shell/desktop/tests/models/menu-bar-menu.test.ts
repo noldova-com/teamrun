@@ -13,10 +13,10 @@ import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
 @TestClass
 export class MenuBarMenuTests {
   @TestMethod
-  @TestData("{\"menus\":[{\"place\":\"shell.file\",\"rows\":[]}]}")
-  @TestData("{\"menus\":[{\"title\":\"File\",\"rows\":[]}]}")
-  @TestData("{\"menus\":[{\"place\":\"shell.file\",\"title\":\"File\"}]}")
-  public refusesAMenuWithoutItsPlaceTitleOrRows(menuBar: string): Promise<void> {
-    return DesktopStartFixture.verifyMenuBarRefusedAsync(menuBar);
+  @TestData("{\"menus\":[{\"place\":\"shell.file\",\"rows\":[]}]}", "$.title: ")
+  @TestData("{\"menus\":[{\"title\":\"File\",\"rows\":[]}]}", "$.place: ")
+  @TestData("{\"menus\":[{\"place\":\"shell.file\",\"title\":\"File\"}]}", "$.rows: ")
+  public refusesAMenuWithoutItsPlaceTitleOrRows(menuBar: string, reason: string): Promise<void> {
+    return DesktopStartFixture.verifyMenuBarRefusedAsync(menuBar, reason);
   }
 }
