@@ -44,6 +44,16 @@ export default class ChangeClassifier {
         || ChangeClassifier.isDocumentation(changedPath));
   }
 
+  public static classifyPaths(paths: readonly string[], mergeBase: string): VerificationScope {
+    if (paths.length === 0)
+      return new VerificationScope(true, true, ChangeClassifier.EMPTY_COMPARISON);
+    if (paths.every(t => ChangeClassifier.isDocumentation(t)))
+      return new VerificationScope(false, false, `Only Markdown documentation changed since the merge base ${mergeBase}.`);
+    return paths.some(t => ChangeClassifier.affectsUiWorkflows(t))
+      ? new VerificationScope(true, true, `Files the app is built or tested from changed since the merge base ${mergeBase}.`)
+      : new VerificationScope(true, false, `Only documentation, CI and test tooling or repository configuration changed since the merge base ${mergeBase}.`);
+  }
+
   public async classifyAsync(eventName?: string, baseRevision?: string, headRevision?: string): Promise<VerificationScope> {
     if (eventName === GitHubEvent.PUSH)
       return new VerificationScope(true, true, ChangeClassifier.PUSH);
@@ -54,14 +64,7 @@ export default class ChangeClassifier {
 
     const mergeBase = (await this.git.readOutputAsync(["merge-base", baseRevision, headRevision])).trim();
     const changes = await this.git.readOutputAsync(["diff", "--no-renames", "--name-only", "-z", mergeBase, headRevision, "--"]);
-    const paths = changes.split("\0").filter(t => t.length > 0);
-    if (paths.length === 0)
-      return new VerificationScope(true, true, ChangeClassifier.EMPTY_COMPARISON);
-    if (paths.every(t => ChangeClassifier.isDocumentation(t)))
-      return new VerificationScope(false, false, `Only Markdown documentation changed since the merge base ${mergeBase}.`);
-    return paths.some(t => ChangeClassifier.affectsUiWorkflows(t))
-      ? new VerificationScope(true, true, `Files the app is built or tested from changed since the merge base ${mergeBase}.`)
-      : new VerificationScope(true, false, `Only documentation, CI and test tooling or repository configuration changed since the merge base ${mergeBase}.`);
+    return ChangeClassifier.classifyPaths(changes.split("\0").filter(t => t.length > 0), mergeBase);
   }
 
   private static isDocumentation(changedPath: string): boolean {
