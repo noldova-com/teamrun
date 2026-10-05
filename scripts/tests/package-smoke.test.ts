@@ -9,8 +9,7 @@
 import assert from "node:assert/strict";
 import { ChildProcess, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { mkdir, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
@@ -21,6 +20,7 @@ import StartedProcess from "../processes/started-process.ts";
 import ProductIdentityFixture from "./fixtures/product-identity.fixture.ts";
 import RepositoryFixture from "./fixtures/repository.fixture.ts";
 import SourceTreeFixture from "./fixtures/source-tree.fixture.ts";
+import TemporaryFolderFixture from "./fixtures/temporary-folder.fixture.ts";
 import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 
 type Answer = "none" | "running" | "failed" | "other version";
@@ -238,17 +238,24 @@ class PackageSmokeTests {
       assert.deepEqual(runner.desktop.signals, ["SIGTERM"]);
     });
 
-    test("on macOS a screen that cannot be captured is reported with its reason, and the smoke check goes on", async t => {
+    test("on macOS a screen that cannot be captured is reported with its reason in the output and the step summary, and the smoke check goes on", async t => {
       const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-macos-arm64.dmg");
-      const runner = new SmokeRunnerFixture(["none", "running", "none"], undefined, "screencapture");
-      const output = new TextOutputFixture();
+      const summary = path.join(repository.directory, "summary.md");
+      const runners = [new SmokeRunnerFixture(["none", "running", "none"], undefined, "screencapture"), new SmokeRunnerFixture(["none", "running", "none"], undefined, "screencapture")] as const;
+      const outputs = [new TextOutputFixture(), new TextOutputFixture()] as const;
+      const reason = "The screen could not be captured, so the run keeps no picture of the window; screencapture exited with 9:\nscreencapture broke\n";
 
-      const exitCode = await PackageSmokeTests.runAsync(t, repository, "darwin", runner, output, "arm64");
+      const exitCodes = [
+        await PackageSmokeTests.runAsync(t, repository, "darwin", runners[0], outputs[0], "arm64"),
+        await PackageSmokeTests.runAsync(t, repository, "darwin", runners[1], outputs[1], "arm64", PackageSmokeTests.LIMITS, { GITHUB_STEP_SUMMARY: summary })
+      ];
 
-      assert.equal(exitCode, 0, output.text);
-      assert.ok(output.text.includes("\nThe screen could not be captured, so the run keeps no picture of the window; screencapture exited with 9:\nscreencapture broke\nThe desktop quit.\n"),
-        output.text);
-      assert.ok(output.text.endsWith("The runtime stopped once idle.\n"), output.text);
+      assert.deepEqual(exitCodes, [0, 0], outputs.map(t => t.text).join());
+      for (const output of outputs) {
+        assert.ok(output.text.includes(`\n${reason}The desktop quit.\n`), output.text);
+        assert.ok(output.text.endsWith("The runtime stopped once idle.\n"), output.text);
+      }
+      assert.equal(await readFile(summary, "utf8"), reason);
     });
 
     test("a step that fails, or an install without its program, stops the smoke check, and the disk image is detached even after a failed copy", async t => {
@@ -347,8 +354,8 @@ class PackageSmokeTests {
       const usage = new TextOutputFixture();
       const runner = new SmokeRunnerFixture(["none"]);
 
-      assert.equal(await new PackageSmoke(repository.directory, "freebsd", "x64", runner, {}, host).runAsync([]), 1);
-      assert.equal(await new PackageSmoke(repository.directory, "linux", "x64", runner, {}, usage).runAsync(["--target", "linux"]), 2);
+      assert.equal(await new PackageSmoke(repository.directory, "freebsd", "x64", runner, new TemporaryFolderFixture(repository.directory), {}, host).runAsync([]), 1);
+      assert.equal(await new PackageSmoke(repository.directory, "linux", "x64", runner, new TemporaryFolderFixture(repository.directory), {}, usage).runAsync(["--target", "linux"]), 2);
       await assert.rejects(PackageSmokeTests.runAsync(t, repository, "linux", new UnstartableRunnerFixture(["none"]), new TextOutputFixture()), new RangeError("The fixture broke."));
       const command = spawnSync(process.execPath, [SourceTreeFixture.locateScript("package-smoke.ts"), "--help"], { cwd: repository.directory, encoding: "utf8", timeout: 10_000 });
 
@@ -360,10 +367,10 @@ class PackageSmokeTests {
   }
 
   private static runAsync(t: TestContext, repository: RepositoryFixture, platform: string, runner: SmokeRunnerFixture, output: TextOutputFixture,
-    architecture: string = "x64", limits: typeof PackageSmokeTests.LIMITS = PackageSmokeTests.LIMITS): Promise<number> {
+    architecture: string = "x64", limits: typeof PackageSmokeTests.LIMITS = PackageSmokeTests.LIMITS, variables: NodeJS.ProcessEnv = {}): Promise<number> {
     t.after(() => runner.disposeAsync());
-    const environment = { PATH: "fixture-path", LOCALAPPDATA: path.join(repository.directory, "local") };
-    return new PackageSmoke(repository.directory, platform, architecture, runner, environment, output, limits, tmpdir()).runAsync([]);
+    const environment = { PATH: "fixture-path", LOCALAPPDATA: path.join(repository.directory, "local"), ...variables };
+    return new PackageSmoke(repository.directory, platform, architecture, runner, new TemporaryFolderFixture(repository.directory), environment, output, limits).runAsync([]);
   }
 
   private static async createAsync(t: TestContext, made: string): Promise<RepositoryFixture> {

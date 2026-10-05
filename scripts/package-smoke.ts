@@ -7,8 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { appendFile, chmod, mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 import { setTimeout } from "node:timers/promises";
@@ -22,6 +21,7 @@ import type ProcessResult from "./processes/process-result.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import ProcessException from "./processes/process.exception.ts";
 import type StartedProcess from "./processes/started-process.ts";
+import TemporaryFolder from "./processes/temporary-folder.ts";
 
 interface InstalledPackage {
   readonly desktop: string;
@@ -45,7 +45,6 @@ export default class PackageSmoke {
   private static readonly LIMITS: SmokeLimits = { command: 30_000, start: 60_000, quit: 30_000, stop: 90_000, settle: 3_000, pause: 500 };
   private static readonly CLI_SEGMENTS: readonly string[] = ["app.asar", "node_modules", "@noldova", "teamrun-shell-cli", "services", "cli-entry.js"];
   private static readonly FOLDER_PREFIX: string = "tr-smoke-";
-  private static readonly SHORT_ROOT: string = "/tmp";
   private static readonly DATA_FOLDER: string = "data";
   private static readonly DESKTOP_LOG: string = "desktop.log";
   private static readonly DATA_LOG_SEGMENTS: readonly string[] = ["logs", "desktop.log"];
@@ -72,6 +71,7 @@ export default class PackageSmoke {
   private static readonly SCREEN_CAPTURE: string = "screencapture";
   private static readonly SILENT_CAPTURE: string = "-x";
   private static readonly SCREENSHOT_EXTENSION: string = ".png";
+  private static readonly SUMMARY_VARIABLE: string = "GITHUB_STEP_SUMMARY";
   private static readonly CLOSE: string = "taskkill";
   private static readonly PROCESS_OPTION: string = "/PID";
   private static readonly BUNDLE_SEGMENTS: readonly string[] = ["Contents", "MacOS"];
@@ -85,21 +85,21 @@ export default class PackageSmoke {
   private readonly platform: string;
   private readonly architecture: string;
   private readonly runner: ProcessRunner;
+  private readonly folders: TemporaryFolder;
   private readonly environment: NodeJS.ProcessEnv;
   private readonly output: Writable;
   private readonly limits: SmokeLimits;
-  private readonly shortRoot: string;
 
-  public constructor(root: string, platform: string, architecture: string, runner: ProcessRunner, environment: NodeJS.ProcessEnv, output: Writable,
-    limits: SmokeLimits = PackageSmoke.LIMITS, shortRoot: string = PackageSmoke.SHORT_ROOT) {
+  public constructor(root: string, platform: string, architecture: string, runner: ProcessRunner, folders: TemporaryFolder, environment: NodeJS.ProcessEnv,
+    output: Writable, limits: SmokeLimits = PackageSmoke.LIMITS) {
     this.root = root;
     this.platform = platform;
     this.architecture = architecture;
     this.runner = runner;
+    this.folders = folders;
     this.environment = environment;
     this.output = output;
     this.limits = limits;
-    this.shortRoot = shortRoot;
   }
 
   public async runAsync(smokeArguments: readonly string[]): Promise<number> {
@@ -111,7 +111,7 @@ export default class PackageSmoke {
     try {
       const target = PackageTarget.fromProcess(this.platform, this.architecture);
       const manifest = await RootManifest.readAsync(this.root);
-      const folder = await realpath(await mkdtemp(path.join(target.platform === PackageSmoke.WINDOWS ? tmpdir() : this.shortRoot, PackageSmoke.FOLDER_PREFIX)));
+      const folder = await this.folders.createAsync(this.platform, PackageSmoke.FOLDER_PREFIX);
       const installed = await this.installAsync(target, manifest, folder);
       this.output.write(`Installed: ${installed.desktop}\n`);
       const data = path.join(folder, PackageSmoke.DATA_FOLDER);
@@ -260,8 +260,15 @@ export default class PackageSmoke {
     await mkdir(evidence, { recursive: true });
     await setTimeout(this.limits.settle);
     const result = await this.runner.captureAsync(PackageSmoke.SCREEN_CAPTURE, [PackageSmoke.SILENT_CAPTURE, file], folder, this.limits.command);
-    this.output.write(result.isSuccessful ? `The screen with the window: ${file}\n`
-      : `The screen could not be captured, so the run keeps no picture of the window; screencapture exited with ${result.exitCode}:\n${`${result.output}${result.errorOutput}`.trim()}\n`);
+    if (result.isSuccessful) {
+      this.output.write(`The screen with the window: ${file}\n`);
+      return;
+    }
+    const reason = `The screen could not be captured, so the run keeps no picture of the window; screencapture exited with ${result.exitCode}:\n${`${result.output}${result.errorOutput}`.trim()}\n`;
+    this.output.write(reason);
+    const summary = this.environment[PackageSmoke.SUMMARY_VARIABLE] ?? "";
+    if (summary.length > 0)
+      await appendFile(summary, reason);
   }
 
   private async quitAsync(target: PackageTarget, desktop: StartedProcess, folder: string): Promise<void> {
@@ -273,4 +280,4 @@ export default class PackageSmoke {
 }
 
 if (import.meta.main)
-  process.exitCode = await new PackageSmoke(process.cwd(), process.platform, process.arch, new ProcessRunner(), process.env, process.stdout).runAsync(process.argv.slice(2));
+  process.exitCode = await new PackageSmoke(process.cwd(), process.platform, process.arch, new ProcessRunner(), new TemporaryFolder(), process.env, process.stdout).runAsync(process.argv.slice(2));
