@@ -59,22 +59,23 @@ describe("RecentCommandsService", () => {
   });
 
   it("follows the list another window changes, and keeps it over an older read that arrives later", async () => {
-    const read = Promise.withResolvers<JsonValue>();
+    let answer: (value: JsonValue) => void = () => undefined;
+    const read = new Promise<JsonValue>(resolve => answer = resolve);
     let isAsked = false;
     const service = start(() => {
       const desktop = TestBed.inject(DesktopBridgeService);
       const request = desktop.requestAsync.bind(desktop);
       vi.spyOn(desktop, "requestAsync").mockImplementation((method, payload) => {
         isAsked ||= method === "shell.recentCommands";
-        return method === "shell.recentCommands" ? read.promise : request(method, payload);
+        return method === "shell.recentCommands" ? read : request(method, payload);
       });
     });
     await settleAsync(() => isAsked);
 
     bridge.publishEvent("shell.recentCommandsChanged", { ids: ["clock.show", "notes.newNote"] });
     bridge.publishEvent("notes.changed", { ids: [] });
-    read.resolve({ ids: ["notes.newNote"] });
-    await read.promise;
+    answer({ ids: ["notes.newNote"] });
+    await read;
 
     expect(service.ids()).toEqual(["clock.show", "notes.newNote"]);
   });
