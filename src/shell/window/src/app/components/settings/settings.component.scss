@@ -33,21 +33,6 @@
   display: none;
 }
 
-@container settings (width < 34rem) {
-  .tr-settings-page-select {
-    display: inline-flex;
-  }
-
-  .tr-settings-page-select,
-  .tr-settings-search-field {
-    flex: 1 1 10rem;
-  }
-
-  .tr-settings-pages {
-    display: none;
-  }
-}
-
 .tr-settings-body {
   display: flex;
   flex: auto;
@@ -124,4 +109,19 @@
   margin: 0 0 var(--tr-space-3);
   padding-inline-start: var(--tr-settings-heading-inset);
   color: var(--tr-text);
+}
+
+@container settings (width < 34rem) {
+  .tr-settings-page-select {
+    display: inline-flex;
+  }
+
+  .tr-settings-page-select,
+  .tr-settings-search-field {
+    flex: 1 1 10rem;
+  }
+
+  .tr-settings-pages {
+    display: none;
+  }
 }
