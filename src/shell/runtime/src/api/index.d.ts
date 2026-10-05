@@ -3778,7 +3778,9 @@ export declare class RuntimeClient {
    * @param payload The request's payload.
    * @param timeoutMilliseconds The request's time limit in milliseconds. Defaults to the settings' call limit.
    * @param signal Aborting it sends a cancellation; the response then reports it.
-   * @returns A promise of the response, successful or failed.
+   * @returns A promise of the response, successful or failed. A request too large for one frame is not sent; it fails with
+   * `FrameTooLarge`, as an answer too large for one frame does.
+   * @throws {ArgumentOutOfRangeException} Synchronously when the time limit is not a positive integer.
    * @throws {ConnectionException} Rejected when the connection is closed or closes, or the runtime does not answer within the limit and its grace.
    * @example
    * ```ts

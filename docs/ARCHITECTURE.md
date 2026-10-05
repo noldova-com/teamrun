@@ -269,7 +269,7 @@ A module declares its notification kinds in `contributes.notifications`. A part 
 ### Messages
 
 - Connections begin with an authenticated version handshake. Subsequent framed requests are correlated with responses; events notify connected clients.
-- The runtime client/server boundary owns framing, request size limits, deadlines, cancellation and disconnect handling.
+- The runtime client/server boundary owns framing, request size limits, deadlines, cancellation and disconnect handling. A request or answer over the frame limit is never sent: that call fails with `FrameTooLarge` and the connection stays open. Receiving a frame over the limit ends the connection.
 - The shell validates protocol envelopes without knowing module models. Methods and events follow section 3's naming rules, using `shell.<name>` for shell-owned entries.
 - The runtime routes only methods registered by active parts; the owning part validates payloads and reports failures under the [wire contract](CODING-STANDARDS.md#the-wire-contract).
 

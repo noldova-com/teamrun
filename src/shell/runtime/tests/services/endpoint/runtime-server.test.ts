@@ -46,6 +46,7 @@ export class RuntimeServerTests {
   private static readonly ECHO: QualifiedName = new QualifiedName("notes", "echo");
   private static readonly WAIT: QualifiedName = new QualifiedName("notes", "wait");
   private static readonly MOVE: QualifiedName = new QualifiedName("notes", "move");
+  private static readonly LARGE: QualifiedName = new QualifiedName("notes", "large");
   private static readonly ECHO_HANDLER: IMethodHandler = {
     handleAsync: (context: RequestContext) => Promise.resolve({ client: context.client, payload: context.payload })
   };
@@ -143,6 +144,21 @@ export class RuntimeServerTests {
       Assert.areEqual(FailureCode.FrameTooLarge, response.failure?.code);
       Assert.isNull(response.id);
       await connection.waitForCloseAsync();
+    });
+  }
+
+  @TestMethod
+  public answersAnAnswerTooLargeToSendWithAFailureAndKeepsTheConnection(): Promise<void> {
+    return RuntimeServerTests.runAsync(new ServerSettings(1_024, 1_000, 1_000, 1_000), async fixture => {
+      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
+      fixture.methods.register(RuntimeServerTests.LARGE, { handleAsync: () => Promise.resolve("x".repeat(2_048)) });
+      const connection = await fixture.authenticateAsync();
+
+      connection.sendMessages(new Request("tester:1", RuntimeServerTests.LARGE, null), new Request("tester:2", RuntimeServerTests.ECHO, 1));
+
+      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.FrameTooLarge, "A frame exceeds the maximum length of 1024 characters.", "tester:1");
+      Assert.areEqual("{\"client\":\"tester\",\"payload\":1}", JSON.stringify((await connection.readResponseAsync()).payload));
+      Assert.isFalse(connection.isClosed);
     });
   }
 

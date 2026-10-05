@@ -21,6 +21,7 @@ import {
   FrameWriter,
   Handshake,
   PreShellData,
+  ProtocolException,
   type QualifiedName,
   Request,
   Response,
@@ -107,6 +108,15 @@ export class RuntimeClient {
     const id = `${this.clientName}${Resources.requestIdSeparator}${this.nextId++}`;
     if (signal?.aborted === true)
       return Promise.resolve(Response.failure(id, new Failure(FailureCode.Cancelled, Resources.cancelled)));
+    let frame: string;
+    try {
+      frame = this.writer.write(new Request(id, method, payload, timeoutMilliseconds));
+    }
+    catch (error) {
+      if (!(error instanceof ProtocolException))
+        throw error;
+      return Promise.resolve(Response.failure(id, new Failure(error.code, error.message)));
+    }
 
     const resolvers = Promise.withResolvers<Response>();
     const cancel = (): void => this.send(new Cancel(id));
@@ -118,7 +128,7 @@ export class RuntimeClient {
       this.pending.delete(id);
       signal?.removeEventListener(Resources.abortEvent, cancel);
     }));
-    this.send(new Request(id, method, payload, timeoutMilliseconds));
+    this.socket.write(frame);
     return resolvers.promise;
   }
 

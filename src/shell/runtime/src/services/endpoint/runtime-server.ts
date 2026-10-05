@@ -147,6 +147,17 @@ export class RuntimeServer implements IEventSink {
     });
   }
 
+  private static answer(session: ClientSession, response: Response): void {
+    try {
+      session.send(response);
+    }
+    catch (error) {
+      if (!(error instanceof ProtocolException))
+        throw error;
+      session.send(Response.failure(response.id, new Failure(error.code, error.message)));
+    }
+  }
+
   private static describeFailure(error: unknown): Failure {
     if (error instanceof MethodFailureException)
       return error.failure;
@@ -255,7 +266,7 @@ export class RuntimeServer implements IEventSink {
       isSettled = true;
       clearTimeout(timer);
       session.releaseRequest(request.id);
-      session.send(response);
+      RuntimeServer.answer(session, response);
     };
     controller.signal.addEventListener(Resources.abortEvent, () => {
       const code = controller.signal.reason === FailureCode.DeadlineExceeded ? FailureCode.DeadlineExceeded : FailureCode.Cancelled;
