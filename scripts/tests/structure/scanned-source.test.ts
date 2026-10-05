@@ -14,16 +14,17 @@ import SourceLiteral from "../../structure/source-literal.ts";
 
 class ScannedSourceTests {
   public static register(): void {
-    test("a scanned source keeps its imports, selectors and other strings apart", () => {
+    test("a scanned source keeps its imports, selectors and other strings apart, and whether it has a function body", () => {
       const imports = [new SourceLiteral("node:fs", 1)];
       const selectors = [new SourceLiteral("tr-panel", 2)];
       const texts = [new SourceLiteral("Panel", 3)];
 
-      const source = new ScannedSource(imports, selectors, texts);
+      const source = new ScannedSource(imports, selectors, texts, true);
 
       assert.equal(source.imports, imports);
       assert.equal(source.selectors, selectors);
       assert.equal(source.texts, texts);
+      assert.equal(source.hasFunctionBody, true);
     });
   }
 }

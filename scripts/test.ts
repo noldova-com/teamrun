@@ -27,6 +27,7 @@ import PackagedBuildCheck from "./checks/packaged-build-check.ts";
 import ProductIdentityCheck from "./checks/product-identity-check.ts";
 import ScriptTestCheck from "./checks/script-test-check.ts";
 import ShellIndependenceCheck from "./checks/shell-independence-check.ts";
+import TestMirrorCheck from "./checks/test-mirror-check.ts";
 import TestWaitCheck from "./checks/test-wait-check.ts";
 import TypeCheck from "./checks/type-check.ts";
 import WindowImportCheck from "./checks/window-import-check.ts";
@@ -186,6 +187,7 @@ export default class Test {
       new ProductIdentityCheck(tree, () => ProductIdentity.readAsync(this.root)),
       new ModuleImportCheck(tree, modules),
       new WindowImportCheck(tree),
+      new TestMirrorCheck(this.root, tree),
       new NameUniquenessCheck(tree, modules),
       new DeclaredDependencyCheck(tree),
       new PackageCheck(build),
