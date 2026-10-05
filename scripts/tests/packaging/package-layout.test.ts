@@ -14,17 +14,18 @@ import PackageLayout from "../../packaging/package-layout.ts";
 
 class PackageLayoutTests {
   public static register(): void {
-    test("packaging keeps its stage, caches, Electron copy, configuration and packages under _build/package", () => {
+    test("packaging keeps its stage, caches, Electron copy, configuration, packages and smoke evidence under _build/package", () => {
       const root = path.join("fixture", "root");
       const folder = path.join(root, "_build", "package");
       const layout = new PackageLayout(root);
 
-      assert.deepEqual([layout.stage, layout.npmCache, layout.electron, layout.toolCache, layout.output, layout.configuration], [
+      assert.deepEqual([layout.stage, layout.npmCache, layout.electron, layout.toolCache, layout.output, layout.smoke, layout.configuration], [
         path.join(folder, "app"),
         path.join(folder, "npm-cache"),
         path.join(folder, "electron"),
         path.join(folder, "tool-cache"),
         path.join(folder, "out"),
+        path.join(folder, "smoke"),
         path.join(folder, "electron-builder.json")
       ]);
     });

@@ -1,0 +1,237 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Package
+
+on:
+  workflow_call:
+    inputs:
+      nightly:
+        description: Whether the nightly run calls it, which packages Windows x64 and Linux x64 only and records each job's result for its report.
+        type: boolean
+        required: true
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.event_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plan:
+    name: List the targets to package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      targets: ${{ steps.targets.outputs.targets }}
+    steps:
+      - name: List every target by hand and Windows x64 and Linux x64 each night
+        id: targets
+        timeout-minutes: 1
+        env:
+          NIGHTLY: ${{ inputs.nightly }}
+        run: |
+          set -euo pipefail
+          if [ "$NIGHTLY" = true ]; then
+            retention=3
+          else
+            retention=14
+          fi
+          targets=''
+          while IFS='|' read -r target runner architecture night; do
+            if [ "$NIGHTLY" = true ] && [ "$night" != nightly ]; then
+              continue
+            fi
+            targets="$targets${targets:+,}{\"target\":\"$target\",\"runner\":\"$runner\",\"architecture\":\"$architecture\",\"nightly\":\"${NIGHTLY:-false}\",\"retention\":$retention}"
+          done <<'TARGETS'
+          Linux x64|ubuntu-24.04|x64|nightly
+          Linux ARM64|ubuntu-24.04-arm|arm64|manual
+          Windows x64|windows-2025|x64|nightly
+          Windows ARM64|windows-11-arm|arm64|manual
+          macOS x64|macos-15-intel|x64|manual
+          macOS ARM64|macos-15|arm64|manual
+          TARGETS
+          echo "targets=[$targets]" >> "$GITHUB_OUTPUT"
+
+  package:
+    name: Package and start (${{ matrix.target }})
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.targets) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - name: Stop Spotlight indexing
+        if: runner.os == 'macOS'
+        timeout-minutes: 2
+        run: sudo mdutil -i off /System/Volumes/Data
+
+      - name: Check out the revision
+        timeout-minutes: 5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare the job
+        timeout-minutes: 15
+        uses: ./.github/actions/prepare
+        with:
+          architecture: ${{ matrix.architecture }}
+
+      - name: Remove libfuse2, which a stock Ubuntu does not install
+        if: runner.os == 'Linux'
+        timeout-minutes: 5
+        run: |
+          for name in libfuse2 libfuse2t64; do
+            if dpkg-query -W -f='${Status}' "$name" 2>/dev/null | grep 'ok installed' > /dev/null; then
+              sudo apt-get remove -y "$name"
+            fi
+          done
+          if ldconfig -p | grep 'libfuse\.so\.2' > /dev/null; then
+            echo "::error::libfuse2 is still installed."
+            exit 1
+          fi
+          echo "libfuse2 is not installed."
+
+      - name: Make the package
+        id: package
+        timeout-minutes: 25
+        run: npm run package
+
+      - name: Install, start and quit the package
+        id: smoke
+        timeout-minutes: 5
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run package:smoke
+          else
+            npm run package:smoke
+          fi
+
+      - name: Keep the package
+        id: keep
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: |
+            _build/package/out/TeamRun-*.exe
+            _build/package/out/TeamRun-*.dmg
+            _build/package/out/TeamRun-*.zip
+            _build/package/out/TeamRun-*.AppImage
+            _build/package/smoke/*.png
+          retention-days: ${{ matrix.retention }}
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Wait before keeping the package again
+        if: steps.keep.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Keep the package again
+        id: keep-again
+        if: steps.keep.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: |
+            _build/package/out/TeamRun-*.exe
+            _build/package/out/TeamRun-*.dmg
+            _build/package/out/TeamRun-*.zip
+            _build/package/out/TeamRun-*.AppImage
+            _build/package/smoke/*.png
+          retention-days: ${{ matrix.retention }}
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Wait before keeping the package a last time
+        if: steps.keep-again.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Keep the package a last time
+        if: steps.keep-again.outcome == 'failure'
+        timeout-minutes: 10
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: |
+            _build/package/out/TeamRun-*.exe
+            _build/package/out/TeamRun-*.dmg
+            _build/package/out/TeamRun-*.zip
+            _build/package/out/TeamRun-*.AppImage
+            _build/package/smoke/*.png
+          retention-days: ${{ matrix.retention }}
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Record the nightly result
+        if: always() && matrix.nightly == 'true'
+        timeout-minutes: 1
+        env:
+          NIGHTLY_LABEL: packaging ${{ matrix.target }}
+          NIGHTLY_PART: packaging
+          NIGHTLY_OUTCOME: ${{ steps.smoke.outcome }}
+        run: node scripts/nightly-result.ts
+
+      - name: Keep the nightly result
+        id: result
+        if: always() && matrix.nightly == 'true'
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-result-${{ matrix.runner }}-packaging
+          path: _build/nightly/results
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the nightly result again
+        if: always() && matrix.nightly == 'true' && steps.result.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Keep the nightly result again
+        id: result-again
+        if: always() && matrix.nightly == 'true' && steps.result.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-result-${{ matrix.runner }}-packaging
+          path: _build/nightly/results
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the nightly result a last time
+        if: always() && matrix.nightly == 'true' && steps.result-again.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Keep the nightly result a last time
+        if: always() && matrix.nightly == 'true' && steps.result-again.outcome == 'failure'
+        timeout-minutes: 5
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-result-${{ matrix.runner }}-packaging
+          path: _build/nightly/results
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true

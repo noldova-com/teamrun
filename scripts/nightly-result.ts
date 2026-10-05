@@ -26,6 +26,7 @@ export default class NightlyResult {
   private static readonly OUTCOME_VARIABLE: string = "NIGHTLY_OUTCOME";
   private static readonly TESTS_PART: string = "tests";
   private static readonly WORKFLOWS_PART: string = "workflows";
+  private static readonly PACKAGING_PART: string = "packaging";
   private static readonly SUCCESS: string = "success";
   private static readonly CANCELLED: string = "cancelled";
   private static readonly REPORT_SEGMENTS: readonly string[] = ["_build", "ui", "report.json"];
@@ -42,7 +43,8 @@ export default class NightlyResult {
   private static readonly CHECK_FAILED: string = "The check failed without naming a failing test; the job's log has the details.";
   private static readonly TIMED_OUT: string = "It timed out or was cancelled.";
   private static readonly UNNAMED: string = "It failed without naming a failing check or workflow.";
-  private static readonly VARIABLES_REQUIRED: string = "NIGHTLY_LABEL, NIGHTLY_PART (tests or workflows) and NIGHTLY_OUTCOME must describe the job.\n";
+  private static readonly PACKAGING_FAILED: string = "Making the package or its smoke check failed; the job's log has the details.";
+  private static readonly VARIABLES_REQUIRED: string = "NIGHTLY_LABEL, NIGHTLY_PART (tests, workflows or packaging) and NIGHTLY_OUTCOME must describe the job.\n";
 
   private readonly root: string;
   private readonly output: Writable;
@@ -60,12 +62,12 @@ export default class NightlyResult {
     const label = environment[NightlyResult.LABEL_VARIABLE] ?? "";
     const part = environment[NightlyResult.PART_VARIABLE] ?? "";
     const outcome = environment[NightlyResult.OUTCOME_VARIABLE] ?? "";
-    if (label.length === 0 || outcome.length === 0 || ![NightlyResult.TESTS_PART, NightlyResult.WORKFLOWS_PART].includes(part)) {
+    if (label.length === 0 || outcome.length === 0 || ![NightlyResult.TESTS_PART, NightlyResult.WORKFLOWS_PART, NightlyResult.PACKAGING_PART].includes(part)) {
       this.output.write(NightlyResult.VARIABLES_REQUIRED);
       return 1;
     }
 
-    const named = outcome === NightlyResult.SUCCESS ? [] : part === NightlyResult.TESTS_PART ? await this.readChecksAsync() : await this.readWorkflowsAsync();
+    const named = outcome === NightlyResult.SUCCESS ? [] : await this.readFailuresAsync(label, part, outcome);
     const failures = outcome === NightlyResult.SUCCESS || named.length > 0 ? named
       : [new NightlyFailure(`${label}${NightlyResult.WHOLE_RUN}`, outcome === NightlyResult.CANCELLED ? NightlyResult.TIMED_OUT : NightlyResult.UNNAMED, 1)];
     const folder = path.join(this.root, ...NightlyResult.RESULT_SEGMENTS);
@@ -73,6 +75,14 @@ export default class NightlyResult {
     await writeFile(path.join(folder, NightlyResult.fileNameOf(label)), new NightlyLegResult(label, failures).toJson());
     this.output.write(`${label}: ${failures.length === 0 ? "passed" : failures.map(t => `${t.name} failed`).join("; ")}\n`);
     return 0;
+  }
+
+  private async readFailuresAsync(label: string, part: string, outcome: string): Promise<readonly NightlyFailure[]> {
+    if (part === NightlyResult.TESTS_PART)
+      return this.readChecksAsync();
+    if (part === NightlyResult.WORKFLOWS_PART)
+      return this.readWorkflowsAsync();
+    return [new NightlyFailure(label, outcome === NightlyResult.CANCELLED ? NightlyResult.TIMED_OUT : NightlyResult.PACKAGING_FAILED, 1)];
   }
 
   private async readChecksAsync(): Promise<readonly NightlyFailure[]> {

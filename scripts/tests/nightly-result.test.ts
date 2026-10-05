@@ -144,6 +144,22 @@ class NightlyResultTests {
       ]);
     });
 
+    test("a failed or cancelled packaging job records the packaging of its target, and a passing one records nothing", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const recorded: unknown[] = [];
+      for (const [label, outcome] of [["packaging Linux x64", "failure"], ["packaging Windows x64", "cancelled"], ["packaging Windows x64", "success"]] as const) {
+        await new NightlyResult(repository.directory, new TextOutputFixture()).runAsync({ NIGHTLY_LABEL: label, NIGHTLY_PART: "packaging", NIGHTLY_OUTCOME: outcome });
+        recorded.push((await NightlyResultTests.readAsync(repository, NightlyResult.fileNameOf(label)) as { failures: unknown[] }).failures);
+      }
+
+      assert.deepEqual(recorded, [
+        [{ name: "packaging Linux x64", message: "Making the package or its smoke check failed; the job's log has the details.", count: 1 }],
+        [{ name: "packaging Windows x64", message: "It timed out or was cancelled.", count: 1 }],
+        []
+      ]);
+    });
+
     test("a report that can't be read is not hidden", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
@@ -152,7 +168,7 @@ class NightlyResultTests {
       await assert.rejects(new NightlyResult(repository.directory, new TextOutputFixture()).runAsync({ NIGHTLY_LABEL: "Linux x64, UI workflows", NIGHTLY_PART: "workflows", NIGHTLY_OUTCOME: "failure" }));
     });
 
-    test("a missing label or outcome, or a part other than tests or workflows, fails without recording anything", async () => {
+    test("a missing label or outcome, or a part other than tests, workflows or packaging, fails without recording anything", async () => {
       const cases: readonly Readonly<Record<string, string>>[] = [
         {},
         { NIGHTLY_LABEL: "", NIGHTLY_PART: "tests", NIGHTLY_OUTCOME: "success" },
@@ -163,7 +179,7 @@ class NightlyResultTests {
         const log = new TextOutputFixture();
 
         assert.equal(await new NightlyResult("unused", log).runAsync(environment), 1);
-        assert.equal(log.text, "NIGHTLY_LABEL, NIGHTLY_PART (tests or workflows) and NIGHTLY_OUTCOME must describe the job.\n");
+        assert.equal(log.text, "NIGHTLY_LABEL, NIGHTLY_PART (tests, workflows or packaging) and NIGHTLY_OUTCOME must describe the job.\n");
       }
     });
 
