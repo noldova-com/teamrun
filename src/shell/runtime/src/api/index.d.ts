@@ -2756,7 +2756,8 @@ export declare class EventChannel implements Disposable {
   public constructor(publisher: (payload: JsonValue) => void, withdraw: () => void);
 
   /**
-   * Publishes the event to every authenticated connection of the runtime's build.
+   * Publishes the event to every authenticated connection of the runtime's build. An event too large for one frame, or
+   * one whose payload cannot be written as JSON, reaches no connection and is logged in the runtime's diagnostics.
    *
    * @param payload The event's payload.
    * @throws {RegistrationException} When the event was withdrawn.
