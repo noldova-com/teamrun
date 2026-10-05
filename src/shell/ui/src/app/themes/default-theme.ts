@@ -204,7 +204,7 @@ export class DefaultTheme {
       ["field-height", "1.625rem"],
       ["field-padding", "0.375rem"],
       ["window-row-height", "calc(var(--tr-icon-button-target) + 2 * var(--tr-band-gap))"],
-      ["status-bar-height", "1.75rem"],
+      ["status-bar-height", "1.5rem"],
       ["status-bar-item-height", "1.25rem"],
       ["status-bar-inset", "0.5rem"],
       ["status-bar-item-padding", "0.375rem"],
