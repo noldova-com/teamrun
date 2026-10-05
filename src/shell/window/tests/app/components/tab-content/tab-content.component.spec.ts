@@ -13,7 +13,9 @@ import { ModuleState } from "@noldova/teamrun-shell-protocol";
 
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { TabContentComponent } from "../../../../src/app/components/tab-content/tab-content.component";
+import { ContentPadding } from "../../../../src/app/enums/content-padding";
 import type { IWindowPartContext } from "../../../../src/app/interfaces/i-window-part-context";
+import type { ContentPaddingRef } from "../../../../src/app/models/content-padding-ref";
 import { ContributionMatch } from "../../../../src/app/models/contribution-match";
 import { DocumentTab } from "../../../../src/app/models/layout/document-tab";
 import type { Tab } from "../../../../src/app/models/layout/tab";
@@ -47,6 +49,19 @@ class TestViewComponent {
 class TestDocumentComponent {
   public readonly instance: InputSignal<string> = input.required<string>();
   public readonly title: InputSignal<string> = input.required<string>();
+}
+
+@Component({
+  selector: "tr-test-page",
+  template: "<p class=\"page\">page</p>",
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+class TestPageComponent {
+  public static pages: ContentPaddingRef[] = [];
+
+  public constructor() {
+    TestPageComponent.pages.push(inject(WindowPartTokens.contentPadding));
+  }
 }
 
 @Component({
@@ -215,5 +230,62 @@ describe("TabContentComponent", () => {
     finally {
       AppearanceFixture.reset();
     }
+  });
+  for (const theme of AppearanceFixture.themes)
+    it(`pads a page with the ${theme.id} theme's content padding at the sides, and at the top and bottom with its document padding in the middle and its view padding in a dock`, async () => {
+      AppearanceFixture.apply(theme);
+      try {
+        const tab = new ViewTab("notes.list");
+        host.contributions.set(tab.key, new ContributionMatch(() => Promise.resolve(TestViewComponent), context));
+        const fixture = TestBed.createComponent(TabContentComponent);
+        fixture.componentRef.setInput("tab", tab);
+        await fixture.whenStable();
+        const style = getComputedStyle(fixture.nativeElement as HTMLElement);
+        const middle = [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft];
+        fixture.componentRef.setInput("isDocked", true);
+        fixture.detectChanges();
+        const docked = [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft];
+
+        for (const [values, block, inline] of [[middle, "document-padding-block", "content-padding-inline"], [docked, "view-padding-block", "content-padding-inline"]] as const)
+          for (const [index, property] of ["padding-top", "padding-right", "padding-bottom", "padding-left"].entries())
+            AppearanceFixture.expectLook(values[index] as string, theme, index % 2 === 0 ? block : inline, property);
+      }
+      finally {
+        AppearanceFixture.reset();
+      }
+    });
+
+  it("leaves a page edge to edge when its contribution opts out, and lets the page itself turn the padding off and back on", async () => {
+    const plain = new ViewTab("notes.outline");
+    const page = new ViewTab("notes.list");
+    host.contributions.set(plain.key, new ContributionMatch(() => Promise.resolve(TestViewComponent), context, ContentPadding.None));
+    host.contributions.set(page.key, new ContributionMatch(() => Promise.resolve(TestPageComponent), null));
+    TestPageComponent.pages = [];
+    const padded = (element: HTMLElement): boolean => element.classList.contains("tr-tab-content-padded");
+    const outline = await renderAsync(plain);
+    const fixture = TestBed.createComponent(TabContentComponent);
+    fixture.componentRef.setInput("tab", page);
+    await fixture.whenStable();
+    const element: HTMLElement = fixture.nativeElement;
+    const states = [padded(element)];
+
+    TestPageComponent.pages[0]?.set(ContentPadding.None);
+    fixture.detectChanges();
+    states.push(padded(element));
+    TestPageComponent.pages[0]?.reset();
+    fixture.detectChanges();
+    states.push(padded(element));
+
+    expect(padded(outline)).toBe(false);
+    expect(states).toEqual([true, false, true]);
+  });
+
+  it("pads the card of a failed module's view and leaves an empty tab unpadded", async () => {
+    const failed = new ViewTab("clock.face");
+    host.failures.set(failed.key, new ModuleFailure("clock", "Clock", ModuleState.Failed, "Its runtime part failed to activate.", ["clock.face"]));
+
+    const elements = [await renderAsync(failed), await renderAsync(new ViewTab("notes.list"))];
+
+    expect(elements.map(t => t.classList.contains("tr-tab-content-padded"))).toEqual([true, false]);
   });
 });

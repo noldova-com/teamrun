@@ -7,6 +7,7 @@
  */
 
 export { MenuDirective } from "../app/directives/menu.directive";
+export { ContentPadding } from "../app/enums/content-padding";
 export { DockSide } from "../app/enums/dock-side";
 export { StatusBarSide } from "../app/enums/status-bar-side";
 export { TopBarSide } from "../app/enums/top-bar-side";
@@ -17,6 +18,7 @@ export type { IViewDialogOptions } from "../app/interfaces/i-view-dialog-options
 export type { IWindowPart } from "../app/interfaces/i-window-part";
 export type { IWindowPartContext } from "../app/interfaces/i-window-part-context";
 export { CommandContribution } from "../app/models/command-contribution";
+export { ContentPaddingRef } from "../app/models/content-padding-ref";
 export { NotificationHandle } from "../app/models/notification-handle";
 export { DocumentContribution } from "../app/models/document-contribution";
 export { MenuDeclarations } from "../app/models/menu-declarations";

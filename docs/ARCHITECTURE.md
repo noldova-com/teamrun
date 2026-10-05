@@ -163,6 +163,18 @@ Besides docks and tabs, a view or document can show in a large modal dialog. A w
 
 A view or document already open in a tab moves into the dialog: its tab stays where it is with an empty panel, and its content returns there when the dialog closes, so the saved layout never changes. One that was not open closes with the dialog. Its component is created again in each place, as when a tab moves between groups, so what the view keeps in its module carries over and what it keeps only in the component does not. The dialog closes when its view's module goes away or the tab it came from closes. When a document other than its own opens or is activated while it shows, as when a command run from the view opens one, the dialog closes, the view returns to its place, and the document's tab shows active with focus. When it closes and the control that opened it is gone, as when the view showed itself, focus goes to the view's tab. Its module's keys work in it as in its tab, while a shell view or document, such as Settings, adds no keys; Commands and shortcuts says which other keys run.
 
+### Content padding
+
+The shell pads the page of every view and document, so a module's content keeps the same distance from its panel's edges as every other's without setting one itself: at the sides by the theme's content padding, and at the top and bottom by its view padding in a dock and its document padding in the middle or in a dialog. [UI-STANDARDS.md](UI-STANDARDS.md#8-component-metrics-and-behavior) owns the values. A page that runs edge to edge, such as a terminal, a code editor or a page that sets its own spacing, turns the padding off at one of three levels:
+
+| Level | Where | Applies to |
+|---|---|---|
+| Module | The window part's `padding` | Its views and documents that declare none |
+| Declaration | The `padding` argument of a view's or document's contribution | That view or document |
+| Page | `set` and `reset` on the `ContentPaddingRef` its component injects with `WindowPartTokens.contentPadding` | That page while it is shown, until it resets |
+
+Each level chooses `Default`, the shell's padding for where the page shows, or `None`; none sets its own values. The page's choice wins over its declaration's, the declaration's over its module's, and the module's over the shell's default. The shell's own Settings and Modules documents declare `None` and keep their own layout. [The window package's declarations](../src/shell/window/src/api/index.d.ts) show each level.
+
 ### Commands and shortcuts
 
 A module declares each command's name in `contributes.commands`; a part registers it with its title, icon, default key and handler, and a name the declaration lacks is refused. A window part's command runs in the window. A runtime part's command runs in the runtime: the window lists them with `shell.commands` after `shell.modules` and runs one with `shell.runCommand`, passing its arguments to the handler. Both kinds are withdrawn when their module deactivates.

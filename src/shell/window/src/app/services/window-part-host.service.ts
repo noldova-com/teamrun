@@ -96,12 +96,12 @@ export class WindowPartHostService implements IWindowPartHost {
   public findContribution(tab: Tab): ContributionMatch | null {
     const shellDocument = ShellDocuments.find(tab);
     if (!Object.isNull(shellDocument))
-      return new ContributionMatch(shellDocument.loadComponent, null);
+      return new ContributionMatch(shellDocument.loadComponent, null, shellDocument.padding);
     for (const activation of this.activations) {
       const contributions = tab instanceof DocumentTab ? activation.context.documents : activation.context.views;
       const contribution = contributions.find(t => t.name === tab.name);
       if (!Object.isUndefined(contribution))
-        return new ContributionMatch(contribution.loadComponent, activation.context);
+        return new ContributionMatch(contribution.loadComponent, activation.context, contribution.padding ?? activation.part.padding ?? null);
     }
     return null;
   }
