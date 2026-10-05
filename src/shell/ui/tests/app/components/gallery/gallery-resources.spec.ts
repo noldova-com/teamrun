@@ -19,11 +19,10 @@ describe("GalleryResources", () => {
     AppearanceFixture.reset();
   });
 
-  it("names each scope by its theme and mode, and a specimen's focus button by the specimen", async () => {
+  it("names each scope by its theme and mode", async () => {
     fixture = await GalleryFixture.showAsync();
     const frame = GalleryFixture.frames(fixture)[1] as HTMLElement;
 
     expect(frame.getAttribute("aria-label")).toBe("Default, dark mode");
-    expect(frame.querySelector(".tr-gallery-specimen[aria-label='Checkbox'] .tr-gallery-specimen-focus")?.getAttribute("aria-label")).toBe("Show the keyboard focus on the Checkbox");
   });
 });

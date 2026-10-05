@@ -6,35 +6,22 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, type ElementRef, type Signal, type WritableSignal, afterNextRender, computed, input, signal, viewChild } from "@angular/core";
+import { ChangeDetectionStrategy, Component, type Signal, computed, contentChildren, input } from "@angular/core";
 
-import { ButtonVariant } from "../../enums/button-variant";
-import { ButtonComponent } from "../button/button.component";
-import { GalleryResources } from "./gallery-resources";
+import { GallerySize } from "../../enums/gallery-size";
+import { GalleryCellComponent } from "./gallery-cell.component";
 
 @Component({
   selector: "tr-gallery-specimen",
-  imports: [ButtonComponent],
   templateUrl: "./gallery-specimen.component.html",
   styleUrl: "./gallery-specimen.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GallerySpecimenComponent {
-  private readonly body: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("body");
-  private readonly isFocusableState: WritableSignal<boolean> = signal(false);
+  private readonly cells: Signal<readonly GalleryCellComponent[]> = contentChildren(GalleryCellComponent);
 
-  protected readonly text: typeof GalleryResources.text = GalleryResources.text;
-  protected readonly variants: typeof ButtonVariant = ButtonVariant;
-  protected readonly isFocusable: Signal<boolean> = this.isFocusableState.asReadonly();
-  protected readonly focusLabel: Signal<string> = computed(() => GalleryResources.formatShowFocus(this.name()));
+  protected readonly hasLongText: Signal<boolean> = computed(() => this.cells().some(t => t.isLong));
 
   public readonly name = input.required<string>();
-
-  public constructor() {
-    afterNextRender(() => this.isFocusableState.set(this.body().nativeElement.querySelector(GalleryResources.focusableSelector) !== null));
-  }
-
-  protected showFocus(): void {
-    this.body().nativeElement.querySelector<HTMLElement>(GalleryResources.focusableSelector)?.focus();
-  }
+  public readonly size = input<GallerySize>(GallerySize.Regular);
 }
