@@ -76,7 +76,7 @@
 }
 
 .tr-quick-input-option[aria-selected="true"] {
-  @include selected-surface;
+  @include selected-surface(null, var(--tr-menu-text));
 }
 
 .tr-quick-input-icon {

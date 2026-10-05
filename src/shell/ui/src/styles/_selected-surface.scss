@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-@mixin selected-surface($fill: null) {
-  --tr-text-muted: var(--tr-text);
+@mixin selected-surface($fill: null, $text: var(--tr-text)) {
+  --tr-text-muted: #{$text};
 
   @if $fill {
     &#{$fill} {
