@@ -8,8 +8,8 @@
 
 import { BuildIdentity } from "@noldova/teamrun-shell-protocol";
 
-import { Resources } from "../resources.js";
+import { ProductInfo } from "./product-info.js";
 
 export class RuntimeBuild {
-  public static readonly identity: BuildIdentity = new BuildIdentity(Resources.productVersion, BuildIdentity.supportedProtocolVersion, Resources.build);
+  public static readonly identity: BuildIdentity = new BuildIdentity(ProductInfo.current.version, BuildIdentity.supportedProtocolVersion, ProductInfo.current.build);
 }

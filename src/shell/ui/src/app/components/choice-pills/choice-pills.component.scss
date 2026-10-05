@@ -6,7 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-@use "../../../styles/states";
+@use "selected-surface" as *;
+@use "states";
 
 :host {
   display: inline-flex;
@@ -26,7 +27,7 @@
   max-width: 100%;
   min-height: var(--tr-choice-pill);
   margin: 0;
-  padding: 0 var(--tr-choice-pill-padding);
+  padding: 0 var(--tr-pill-padding);
   border: 0;
   border-radius: var(--tr-radius-small);
   background: none;
@@ -44,7 +45,7 @@
 }
 
 .tr-choice-pill.tr-choice-pill-selected {
-  background-color: var(--tr-selected);
+  @include selected-surface;
 }
 
 .tr-choice-pill:focus-visible {

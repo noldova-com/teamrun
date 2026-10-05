@@ -1,0 +1,19 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@mixin selected-surface($part: null, $text: var(--tr-text)) {
+  --tr-text-muted: #{$text};
+
+  @if $part {
+    &#{$part} {
+      background-color: var(--tr-selected);
+    }
+  } @else {
+    background-color: var(--tr-selected);
+  }
+}

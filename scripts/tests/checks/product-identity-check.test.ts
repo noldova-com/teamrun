@@ -20,10 +20,10 @@ import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
 class ProductIdentityCheckTests {
-  private static readonly RULE: string = "; the shell takes the product's identity from its stamped resources.";
+  private static readonly RULE: string = "; the shell takes the product's identity from the build's product file through ProductInfo.";
 
   public static register(): void {
-    test("shell source that takes the identity from stamped resources passes, and the shell's namespaces, comments, tests and foundation may spell it", async t => {
+    test("shell source that takes the identity from the build's product file passes, and the shell's namespaces, comments, tests and foundation may spell it", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
@@ -31,8 +31,8 @@ class ProductIdentityCheckTests {
         "src/shell/desktop/src/resources.ts": [
           "/** Fixture Studio's resources, in org.fixtureworks.studio. */",
           "import \"@fixtureworks/studio-shell-runtime\";",
-          "export const name = \"__PRODUCT_NAME__\";",
-          "export const id = \"__APPLICATION_ID__\";",
+          "export const name = ProductInfo.current.name;",
+          "export const id = ProductInfo.current.applicationId;",
           "export const channel = \"fixture-studio:ready\";",
           "export const scope = \"@fixtureworks/studio-shell-window\";",
           "export const longer = \"org.fixtureworks.studio-tools\";",

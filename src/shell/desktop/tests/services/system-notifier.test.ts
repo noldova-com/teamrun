@@ -152,10 +152,10 @@ export class SystemNotifierTests {
     Assert.areEqual("Saved,Alarm later", host.created.map(t => t.title).join(","));
   }
 
-  private static create(): { host: FakeNotificationHost; notifier: SystemNotifier; log: FakeDesktopLog; opened: number[]; focus: { isFocused: boolean } } {
+  private static create(): { host: FakeNotificationHost; notifier: SystemNotifier; log: FakeDesktopLog; opened: string[]; focus: { isFocused: boolean } } {
     const host = new FakeNotificationHost();
     const log = new FakeDesktopLog();
-    const opened: number[] = [];
+    const opened: string[] = [];
     const focus = { isFocused: false };
     const notifier = new SystemNotifier(host, log, () => "/teamrun/icon.png", () => focus.isFocused, t => opened.push(t));
     return { host, notifier, log, opened, focus };
@@ -168,6 +168,6 @@ export class SystemNotifierTests {
   private static notification(id: number, sequence: number, title: string, text: string | null = null, progress: number | typeof NotificationPost.indeterminate | null = null,
     kind: string = "clock.alarm"): Notification {
     return new Notification(
-      id, sequence, new NotificationPost(QualifiedName.parse(kind), null, title, text, NotificationSeverity.Info, null, [], progress), "2026-10-03T08:00:00.000Z", false);
+      String(id), sequence, new NotificationPost(QualifiedName.parse(kind), null, title, text, NotificationSeverity.Info, null, [], progress), "2026-10-03T08:00:00.000Z", false);
   }
 }

@@ -6,13 +6,16 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-@use "../../../styles/states";
+@use "states";
 
 :host {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: var(--tr-space-1);
   box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   min-height: var(--tr-button-height);
   margin: 0;
   padding: 0 var(--tr-button-padding);
@@ -24,6 +27,15 @@
   font-size: var(--tr-text-label);
   line-height: var(--tr-line-label);
   white-space: nowrap;
+}
+
+.tr-button-icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.tr-button-icon:empty {
+  display: none;
 }
 
 :host(:not(:disabled)#{states.$hover}) {

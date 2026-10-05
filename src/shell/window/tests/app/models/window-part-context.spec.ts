@@ -36,6 +36,7 @@ class ListComponent {
 
 class FakeWindowPartHost implements IWindowPartHost {
   public readonly calls: string[] = [];
+  public isNotificationHeld: boolean = true;
   public readonly listeners: Set<(name: string, payload: JsonValue) => void> = new Set();
   public readonly registered: Set<string> = new Set(["notes.taken"]);
   public readonly settingListeners: Set<(change: SettingChange) => void> = new Set();
@@ -87,17 +88,17 @@ class FakeWindowPartHost implements IWindowPartHost {
     return Promise.resolve({ name, commandArguments });
   }
 
-  public postNotificationAsync(post: NotificationPost): Promise<number> {
+  public postNotificationAsync(post: NotificationPost): Promise<string> {
     this.calls.push(`post ${post.title}`);
-    return Promise.resolve(this.calls.length);
+    return Promise.resolve(String(this.calls.length));
   }
 
-  public updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
+  public updateNotificationAsync(id: string, post: NotificationPost): Promise<boolean> {
     this.calls.push(`update ${id} ${post.title}`);
-    return Promise.resolve();
+    return Promise.resolve(this.isNotificationHeld);
   }
 
-  public dismissNotification(id: number): void {
+  public dismissNotification(id: string): void {
     this.calls.push(`dismiss ${id}`);
   }
 
@@ -150,7 +151,7 @@ describe("WindowPartContext", () => {
 
   beforeEach(() => {
     host = new FakeWindowPartHost();
-    const source = new WindowPartSource("notes", "Notes", ["tasks"], ["notes.list"], ["notes.note"], ["notes.newNote", "notes.taken"], ["notes.count", "notes.sync"], ["notes.compose", "notes.share"], ["notes.saved"],
+    const source = new WindowPartSource("notes", ["tasks"], ["notes.list"], ["notes.note"], ["notes.newNote", "notes.taken"], ["notes.count", "notes.sync"], ["notes.compose", "notes.share"], ["notes.saved"],
       () => Promise.reject<IWindowPart>(new Error("unused")));
     context = new WindowPartContext(source, host);
   });
@@ -164,8 +165,27 @@ describe("WindowPartContext", () => {
     context.withdraw();
     second.dismiss();
 
-    expect([first.id, second.id]).toEqual([1, 2]);
+    expect([first.id, second.id]).toEqual(["1", "2"]);
     expect(host.calls).toEqual(["post Saved", "post Saved again", "update 1 Saved twice", "dismiss 1", "dismiss 2", "refresh"]);
+  });
+
+  it("tells whether an update reached its notification, and neither updates nor dismisses one it dismissed or found gone", async () => {
+    const dismissed = await context.postNotificationAsync(notification("notes.saved", "Saved", null));
+    dismissed.dismiss();
+    const isDismissedUpdated = await dismissed.updateAsync(notification("notes.saved", "Saved twice", null));
+    const gone = await context.postNotificationAsync(notification("notes.saved", "Saved again", null));
+    host.isNotificationHeld = false;
+    const isGoneUpdated = await gone.updateAsync(notification("notes.saved", "Saved again twice", null));
+    host.isNotificationHeld = true;
+    const isGoneUpdatedAgain = await gone.updateAsync(notification("notes.saved", "Saved again three times", null));
+    const held = await context.postNotificationAsync(notification("notes.saved", "Saved later", null));
+    const isHeldUpdated = await held.updateAsync(notification("notes.saved", "Saved later twice", null));
+    context.withdraw();
+
+    expect([isDismissedUpdated, isGoneUpdated, isGoneUpdatedAgain, isHeldUpdated]).toEqual([false, false, false, true]);
+    expect(host.calls).toEqual([
+      "post Saved", "dismiss 1", "post Saved again", "update 3 Saved again twice", "post Saved later", "update 5 Saved later twice", "dismiss 5", "refresh"
+    ]);
   });
 
   it("refuses a notification of another module, an undeclared kind or another module's command, before and on update", async () => {

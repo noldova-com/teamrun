@@ -92,12 +92,4 @@ describe("CommandSearchService", () => {
     expect(isOpenAfterClick).toBe(false);
     expect(search.isOpen).toBe(false);
   });
-
-  it("remembers the commands run, the latest first and each once", () => {
-    search.remember("shell.closeTab");
-    search.remember("notes.newNote");
-    search.remember("shell.closeTab");
-
-    expect(search.recent()).toEqual(["shell.closeTab", "notes.newNote"]);
-  });
 });

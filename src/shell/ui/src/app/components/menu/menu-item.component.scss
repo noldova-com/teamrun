@@ -6,7 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-@use "../../../styles/states";
+@use "selected-surface" as *;
+@use "states";
 
 :host {
   position: relative;
@@ -47,8 +48,8 @@
   background-color: transparent;
 }
 
-:host([aria-current="true"])::before {
-  background-color: var(--tr-selected);
+:host([aria-current="true"]) {
+  @include selected-surface("::before", $text: var(--tr-menu-text));
 }
 
 :host([aria-disabled="true"]) {

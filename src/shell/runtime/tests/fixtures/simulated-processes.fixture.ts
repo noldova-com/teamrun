@@ -72,7 +72,7 @@ export class SimulatedProcessesFixture implements Disposable {
         held.push(processId);
       }
     }
-    if (script.includes("Get-CimInstance"))
+    if (script.includes("Get-WmiObject"))
       lines.push(table);
     for (const processId of held) {
       await Wait.untilAsync(() => !this.isRunning(processId, 0), Math.max(0, deadline - Date.now()), 10);

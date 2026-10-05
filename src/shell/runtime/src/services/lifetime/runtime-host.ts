@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -24,6 +25,7 @@ import { CapabilityToken } from "../../models/capability-token.js";
 import type { Endpoint } from "../../models/endpoint.js";
 import type { EventChannel } from "../../models/event-channel.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
+import { ProductInfo } from "../../models/product-info.js";
 import { Refusal } from "../../models/refusal.js";
 import { RuntimeBuild } from "../../models/runtime-build.js";
 import { RuntimeDiscovery } from "../../models/runtime-discovery.js";
@@ -54,6 +56,9 @@ import { UpdateNotificationMethod } from "../notifications/update-notification-m
 import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
 import { ProcessSupervisor } from "../process/process-supervisor.js";
+import { RecentCommandsMethod } from "../recent-commands/recent-commands-method.js";
+import { RecentCommandsStore } from "../recent-commands/recent-commands-store.js";
+import { RecordCommandMethod } from "../recent-commands/record-command-method.js";
 import { CommandRegistry } from "../registry/command-registry.js";
 import { EventRegistry } from "../registry/event-registry.js";
 import { MethodRegistry } from "../registry/method-registry.js";
@@ -120,7 +125,8 @@ export class RuntimeHost implements IIdleParticipant {
       new RuntimeHandover(this.identity, process.execPath),
       this.methods,
       options.serverSettings,
-      () => this.idle.check());
+      () => this.idle.check(),
+      log.diagnostics);
     this.events = new EventRegistry(this.server);
     this.publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(platform, new SystemCommand(), environment));
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
@@ -129,7 +135,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.commands = new CommandRegistry(t => commandsChanged.publish(t.toJson()));
     const notificationsChanged = this.events.declare(ShellEvents.notifications);
     this.notifications = new NotificationCenter(
-      t => notificationsChanged.publish(new NotificationBroadcast(t.notifications, this.notificationSettings.quietDevices, this.notificationSettings.mutedModules, this.notifications.sequence).toJson()), () => new Date());
+      t => notificationsChanged.publish(new NotificationBroadcast(t.notifications, this.notificationSettings.quietDevices, this.notificationSettings.mutedModules, this.notifications.sequence).toJson()), () => new Date(), randomUUID);
     this.modules = new ModuleHost(
       declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics,
       this.work, new DiagnosticRedactor(homedir()));
@@ -142,7 +148,7 @@ export class RuntimeHost implements IIdleParticipant {
       this.registerShellFacilities(database);
     else {
       this.server.refuse(new Refusal(
-        new Failure(FailureCode.PreShellData, Resources.preShellData, new PreShellData(lock.dataDirectory.root).toJson()),
+        new Failure(FailureCode.PreShellData, Resources.formatPreShellDataFailure(ProductInfo.current.name), new PreShellData(lock.dataDirectory.root).toJson()),
         ShellMethods.moveAside));
       this.methods.register(ShellMethods.moveAside, new MoveAsideMethod(() => this.moveAsideAsync()));
     }
@@ -217,6 +223,7 @@ export class RuntimeHost implements IIdleParticipant {
   }
 
   private async openAsync(platform: string): Promise<void> {
+    await this.publisher.withdrawEarlierAsync();
     if (!Object.isNull(this.database) && !Object.isNull(this.settings))
       await this.activateModulesAsync(this.database, this.settings);
     const endpoint = await this.listenAsync(platform);
@@ -276,6 +283,9 @@ export class RuntimeHost implements IIdleParticipant {
     this.methods.register(ShellMethods.dismissNotification, new DismissNotificationMethod(this.notifications));
     this.methods.register(ShellMethods.markNotificationsRead, new MarkNotificationsReadMethod(this.notifications));
     this.methods.register(ShellMethods.clearNotifications, new ClearNotificationsMethod(this.notifications));
+    const recent = new RecentCommandsStore(database);
+    this.methods.register(ShellMethods.recentCommands, new RecentCommandsMethod(recent));
+    this.methods.register(ShellMethods.recordCommand, new RecordCommandMethod(recent, this.events.declare(ShellEvents.recentCommandsChanged)));
     return settings;
   }
 

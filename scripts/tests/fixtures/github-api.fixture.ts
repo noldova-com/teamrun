@@ -21,6 +21,7 @@ export default class GitHubApiFixture extends ProcessRunner {
 
   public readonly requests: string[] = [];
   public readonly bodies: string[] = [];
+  public readonly fields: string[] = [];
 
   public answer(resource: string, value: unknown): void {
     this.answers.set(resource, [JSON.stringify(value)]);
@@ -49,6 +50,7 @@ export default class GitHubApiFixture extends ProcessRunner {
     const resource = endpoint.slice(GitHubApiFixture.PREFIX.length);
     const methodIndex = commandArguments.indexOf("--method");
     this.requests.push(`${methodIndex < 0 ? "GET" : commandArguments[methodIndex + 1]} ${resource}`);
+    this.fields.push(...commandArguments.filter((_, index) => commandArguments[index - 1] === "--raw-field"));
     const bodyArgument = commandArguments.find(t => t.startsWith("body="));
     if (bodyArgument !== undefined)
       this.bodies.push(bodyArgument.slice("body=".length));

@@ -16,10 +16,9 @@ import {
 } from "@noldova/teamrun-shell-protocol";
 
 import { NotificationsComponent } from "../../../../src/app/components/notifications/notifications.component";
-import { WindowPartSource } from "../../../../src/app/models/window-part-source";
-import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { NotificationService } from "../../../../src/app/services/notification.service";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
+import { ModuleStatusFixture } from "../../../fixtures/module-status.fixture";
 
 class FakeNotificationService {
   public readonly calls: string[] = [];
@@ -45,7 +44,7 @@ class FakeNotificationService {
     this.calls.push("clear");
   }
 
-  public dismiss(id: number): void {
+  public dismiss(id: string): void {
     this.calls.push(`dismiss ${id}`);
   }
 
@@ -71,7 +70,7 @@ describe("NotificationsComponent", () => {
     kind: string,
     title: string,
     options: Partial<{ text: string; severity: NotificationSeverity; open: string; actions: readonly string[]; progress: number | typeof NotificationPost.indeterminate; isRead: boolean }> = {}): Notification =>
-    new Notification(id, id, new NotificationPost(
+    new Notification(String(id), id, new NotificationPost(
       QualifiedName.parse(kind), null, title, options.text ?? null, options.severity ?? NotificationSeverity.Info,
       options.open === undefined ? null : run(options.open), (options.actions ?? []).map(t => new NotificationAction(`Run ${t}`, run(t))),
       options.progress ?? null), "2026-10-03T08:05:00.000Z", options.isRead ?? false);
@@ -85,10 +84,10 @@ describe("NotificationsComponent", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: NotificationService, useValue: service },
-        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
     });
+    ModuleStatusFixture.report(ModuleStatusFixture.create("notes", "Notes"));
   });
 
   afterEach(() => DesktopBridgeFixture.remove());

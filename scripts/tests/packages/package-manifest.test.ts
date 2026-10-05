@@ -81,8 +81,8 @@ class PackageManifestTests {
         ["null", "src/shell/ui/package.json must have a name."],
         ["{}", "src/shell/ui/package.json must have a name."],
         ["{ \"name\": 1 }", "src/shell/ui/package.json must have a name."],
-        [`{ ${name} }`, "src/shell/ui/package.json must have the version \"__VERSION__\"; the build stamps the product version."],
-        [`{ ${name}, "version": "0.0.1" }`, "src/shell/ui/package.json must have the version \"__VERSION__\"; the build stamps the product version."],
+        [`{ ${name} }`, "src/shell/ui/package.json must have the version \"__VERSION__\"; the build stamps its module's version or the product version."],
+        [`{ ${name}, "version": "0.0.1" }`, "src/shell/ui/package.json must have the version \"__VERSION__\"; the build stamps its module's version or the product version."],
         [`{ ${name}, "version": "__VERSION__", "dependencies": null }`, "src/shell/ui/package.json must list its dependencies as an object."],
         [`{ ${name}, "version": "__VERSION__", "dependencies": "none" }`, "src/shell/ui/package.json must list its dependencies as an object."],
         [

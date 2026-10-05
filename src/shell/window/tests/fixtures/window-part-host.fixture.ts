@@ -29,4 +29,8 @@ export class WindowPartHostFixture {
   public findFailure(): ModuleFailure | null {
     return null;
   }
+
+  public revisionOf(): number {
+    return 0;
+  }
 }

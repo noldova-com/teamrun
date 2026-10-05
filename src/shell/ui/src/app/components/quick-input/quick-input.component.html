@@ -9,8 +9,11 @@ LICENSE file in the root directory of this source tree.
 <input #field class="tr-quick-input-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="true" [attr.aria-controls]="listId"
   [attr.aria-activedescendant]="activeId()" [attr.aria-label]="label()" [placeholder]="label()" [value]="query()" spellcheck="false" autocomplete="off"
   (input)="query.set(field.value)" (keydown)="onKey($event)" />
-<div class="tr-quick-input-list tr-scroll-reveal" role="listbox" [id]="listId" [attr.aria-label]="label()">
+<div #list class="tr-quick-input-list tr-scroll-reveal" role="listbox" [id]="listId" [attr.aria-label]="label()">
   @for (item of items(); track item.id; let index = $index) {
+    @if (item.section && index > 0) {
+      <div class="tr-quick-input-separator" role="none"></div>
+    }
     <div class="tr-quick-input-option" role="option" [id]="optionId(index)" [attr.aria-selected]="index === active()" [attr.data-item]="item.id"
       (click)="choose(index)">
       <span class="tr-quick-input-icon material-symbols-rounded" aria-hidden="true">{{ item.icon }}</span>
@@ -36,6 +39,9 @@ LICENSE file in the root directory of this source tree.
       }
       @if (item.keyLabel; as keys) {
         <span class="tr-quick-input-key">{{ keys }}</span>
+      }
+      @if (item.section; as section) {
+        <span class="tr-quick-input-section">{{ section }}</span>
       }
     </div>
   }

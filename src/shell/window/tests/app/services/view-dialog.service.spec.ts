@@ -22,9 +22,11 @@ import { TabLabel } from "../../../src/app/models/layout/tab-label";
 import { ViewRegistry } from "../../../src/app/models/layout/view-registry";
 import { ViewTab } from "../../../src/app/models/layout/view-tab";
 import { LayoutService } from "../../../src/app/services/layout.service";
+import { StartupService } from "../../../src/app/services/startup.service";
 import { TabLabelService } from "../../../src/app/services/tab-label.service";
 import { ViewDialogService } from "../../../src/app/services/view-dialog.service";
 import { WindowPartHostService } from "../../../src/app/services/window-part-host.service";
+import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../fixtures/layout-service.fixture";
@@ -53,9 +55,10 @@ describe("ViewDialogService", () => {
   const { search, plan } = LayoutFixture;
   let opener: HTMLButtonElement;
   let dialogs: ViewDialogService;
+  let bridge: DesktopBridgeFixture;
 
   beforeEach(async () => {
-    DesktopBridgeFixture.install();
+    bridge = DesktopBridgeFixture.install();
     const host = new WindowPartHostFixture();
     host.contributions.set(search.key, new ContributionMatch(() => Promise.resolve(TestSearchComponent), null));
     for (const note of [new DocumentTab(plan.name, "draft"), plan, LayoutFixture.todo, LayoutFixture.settings])
@@ -142,6 +145,21 @@ describe("ViewDialogService", () => {
     other.close();
 
     expect([isShowable, dialogs.canShow(search)]).toEqual([false, true]);
+  });
+
+  it("closes while the runtime starts again and shows none until it is ready", async () => {
+    const startup = TestBed.inject(StartupService);
+    await vi.waitFor(() => expect(startup.hasStarted()).toBe(true));
+    const shown = dialogs.showAsync(search);
+    await vi.waitFor(() => expect(document.querySelector(".tr-test-search")).not.toBeNull());
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    await shown;
+    const isShowable = dialogs.canShow(search);
+    await expect(dialogs.showAsync(search)).rejects.toThrowError(new ViewDialogException(Resources.dialogWhileReconnecting));
+    bridge.publishStartup({ kind: "Ready", details: [] });
+
+    expect([isShowable, dialogs.canShow(search), container()]).toEqual([false, true, null]);
   });
 
   it("closes when its view's module goes away, or when the tab it came from is closed, but not when a tab it didn't come from closes", async () => {

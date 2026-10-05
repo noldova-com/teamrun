@@ -10,6 +10,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 
 function band(window: Page): Locator {
   return window.locator(".tr-toolbar-band");
@@ -103,7 +104,7 @@ async function runCommandAsync(window: Page, title: string): Promise<void> {
 }
 
 test.describe("toolbars", () => {
-  test("a module's toolbars stand in rows under the window row, 1.75rem high, with their groups apart, each kind of item and nothing clipped", async ({ desktop }) => {
+  test("a module's toolbars stand in rows under the window row, a button high, with their groups apart, each kind of item and nothing clipped", async ({ desktop }) => {
     const window = desktop.window;
     const main = toolbar(window, "notes.main");
 
@@ -119,13 +120,10 @@ test.describe("toolbars", () => {
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const rows = [...document.querySelectorAll(".tr-toolbar-row")].map(t => t.getBoundingClientRect());
       const button = document.querySelector(".tr-toolbar-item")?.getBoundingClientRect();
-      const row = document.querySelector("tr-window-row")?.getBoundingClientRect();
-      return { rem, heights: rows.map(t => t.height), top: rows[0]?.top, windowRowBottom: row?.bottom, button: [button?.width, button?.height], stacked: rows[1]?.top === rows[0]?.bottom };
+      return { rem, heights: rows.map(t => t.height), button: [button?.width, button?.height] };
     });
-    expect(measured.heights).toEqual([measured.rem * 1.75, measured.rem * 1.75]);
-    expect(measured.top).toBe(measured.windowRowBottom);
+    expect(measured.heights).toEqual([measured.rem * 1.5, measured.rem * 1.5]);
     expect(measured.button).toEqual([measured.rem * 1.5, measured.rem * 1.5]);
-    expect(measured.stacked).toBe(true);
     expect(await clippingOf(window)).toEqual(["notes.main", "notes.second"].map(name => ({ name, outside: [], scrolls: false, corners: [] })));
     await expect(window.locator(".tr-toolbar-row").first().locator("tr-toolbar").first().locator(".tr-toolbar-grip")).toHaveAttribute("aria-label", "Move toolbar");
     const grips = await window.evaluate(() => {
@@ -168,6 +166,57 @@ test.describe("toolbars", () => {
     expect(dots.above).toBeGreaterThan(dots.rem * 0.25);
     expect(Math.abs(dots.left - dots.right)).toBeLessThan(0.5);
     await desktop.checkpointAsync("toolbars");
+  });
+
+  test("the window row's controls, each toolbar row and the panels stand 0.25rem apart, with two rows, one row and none @smoke", async ({ desktop }) => {
+    const window = desktop.window;
+    const gapsOf = (): Promise<readonly number[]> => window.evaluate(() => {
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const row = document.querySelector("tr-window-row") as HTMLElement;
+      const controls = [...row.querySelectorAll<HTMLElement>("button")].filter(t => t.checkVisibility({ visibilityProperty: true })).map(t => t.getBoundingClientRect().bottom);
+      const bands = [...document.querySelectorAll(".tr-toolbar-row")].map(t => t.getBoundingClientRect());
+      const panel = Math.min(...[...document.querySelectorAll("tr-tab-group")].map(t => t.getBoundingClientRect().top));
+      const edges = [{ top: Number.NaN, bottom: Math.max(...controls) }, ...bands, { top: panel, bottom: Number.NaN }];
+      return edges.slice(1).map((t, index) => Math.round((t.top - (edges[index]?.bottom ?? Number.NaN)) / rem * 1000) / 1000);
+    });
+
+    await expect.poll(() => arrangementOf(window)).toEqual([["notes.main"], ["notes.second"]]);
+    expect(await gapsOf()).toEqual([0.25, 0.25, 0.25]);
+    for (const mode of WindowModeFixture.modes) {
+      await WindowModeFixture.setAsync(window, mode);
+      await desktop.checkpointAsync(`toolbars-gaps-two-rows-${mode.toLowerCase()}`);
+    }
+    await WindowModeFixture.setAsync(window, "Light");
+    await setShownAsync(window, "Display", false);
+    await expect.poll(() => arrangementOf(window)).toEqual([["notes.main"]]);
+    expect(await gapsOf()).toEqual([0.25, 0.25]);
+    await desktop.checkpointAsync("toolbars-gaps-one-row");
+    await setShownAsync(window, "Main", false);
+    await expect(band(window)).toHaveCount(0);
+    expect(await gapsOf()).toEqual([0.25]);
+    await desktop.checkpointAsync("toolbars-gaps-no-row");
+  });
+
+  test("the status bar's items stand 0.25rem below the panels and 0.25rem above the window's edge, in light and dark", async ({ desktop }) => {
+    const window = desktop.window;
+    for (const mode of WindowModeFixture.modes) {
+      await WindowModeFixture.setAsync(window, mode);
+      const gaps = await window.evaluate(() => {
+        const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+        const panels = Math.max(...[...document.querySelectorAll("tr-tab-group")].map(t => t.getBoundingClientRect().bottom));
+        const items = [...document.querySelectorAll<HTMLElement>("tr-status-bar tr-status-bar-item, tr-status-bar tr-notifications, tr-status-bar tr-module-failures")]
+          .filter(t => t.checkVisibility()).map(t => t.getBoundingClientRect());
+        return {
+          above: items.map(t => Math.round((t.top - panels) / rem * 1000) / 1000),
+          below: items.map(t => Math.round((document.documentElement.clientHeight - t.bottom) / rem * 1000) / 1000)
+        };
+      });
+
+      expect(gaps.above.length).toBeGreaterThan(0);
+      expect(gaps.above.every(t => t === 0.25)).toBe(true);
+      expect(gaps.below.every(t => t === 0.25)).toBe(true);
+      await desktop.checkpointAsync(`status-bar-gaps-${mode.toLowerCase()}`);
+    }
   });
 
   test("a button runs its command, a dropdown opens its place, a choice shows and changes the checked row, a toggle shows its state and a dynamic group's rows run", async ({ desktop }) => {
@@ -322,7 +371,7 @@ test.describe("toolbars", () => {
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.main", "notes.spare", "notes.second"]]);
 
     await dragAsync(window, "notes.spare", rows => ({ x: first(rows).left + 20, y: first(rows).top + 2 }));
-    await expect(window.locator(".tr-toolbar-drop-row")).toBeVisible();
+    await expect(window.locator(".tr-drop-line-row")).toBeVisible();
     await window.mouse.up();
     await expect.poll(() => arrangementOf(window)).toEqual([["notes.spare"], ["notes.main", "notes.second"]]);
     await desktop.checkpointAsync("toolbars-stacked");

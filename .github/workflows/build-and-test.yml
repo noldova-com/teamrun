@@ -32,8 +32,13 @@ jobs:
     timeout-minutes: 10
     outputs:
       run-code: ${{ steps.scope.outputs.run-code }}
-      legs: ${{ steps.legs.outputs.legs }}
-      deferred: ${{ steps.legs.outputs.deferred }}
+      run-ui: ${{ steps.scope.outputs.run-ui }}
+      targets: ${{ steps.scope.outputs.targets }}
+      target-table: ${{ steps.scope.outputs.target-table }}
+      ui-targets: ${{ steps.scope.outputs.ui-targets }}
+      ui-plan: ${{ steps.scope.outputs.ui-plan }}
+      deferred: ${{ steps.scope.outputs.deferred }}
+      ui-deferred: ${{ steps.scope.outputs.ui-deferred }}
     steps:
       - name: Check out the change history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -73,56 +78,25 @@ jobs:
           node-version: '26.7.0'
           package-manager-cache: false
 
-      - name: List the build and test jobs
-        id: legs
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          legs=''
-          deferred=''
-          while IFS='|' read -r label target part runner architecture pull_request; do
-            if [ "$EVENT_NAME" = pull_request ] && [ "$pull_request" = deferred ]; then
-              case ", $deferred, " in
-                *", $target, "*) ;;
-                *) deferred="$deferred${deferred:+, }$target" ;;
-              esac
-              continue
-            fi
-            legs="$legs${legs:+,}{\"label\":\"$label\",\"target\":\"$target\",\"part\":\"$part\",\"runner\":\"$runner\",\"architecture\":\"$architecture\"}"
-          done <<'LEGS'
-          Linux x64|Linux x64|all|ubuntu-24.04|x64|runs
-          Linux ARM64|Linux ARM64|all|ubuntu-24.04-arm|arm64|runs
-          Windows x64, tests|Windows x64|tests|windows-2025|x64|runs
-          Windows x64, UI workflows|Windows x64|workflows|windows-2025|x64|runs
-          Windows ARM64, tests|Windows ARM64|tests|windows-11-arm|arm64|deferred
-          Windows ARM64, UI workflows|Windows ARM64|workflows|windows-11-arm|arm64|deferred
-          macOS x64, tests|macOS x64|tests|macos-15-intel|x64|deferred
-          macOS x64, UI workflows|macOS x64|workflows|macos-15-intel|x64|deferred
-          macOS ARM64|macOS ARM64|all|macos-15|arm64|runs
-          LEGS
-          echo "legs=[$legs]" >> "$GITHUB_OUTPUT"
-          echo "deferred=$deferred" >> "$GITHUB_OUTPUT"
-
       - name: Check the documents
         run: npm test -- documents
 
-      - name: Select the verification scope
+      - name: Select the verification scope and the jobs
         id: scope
         env:
           EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: node scripts/classify-changes.ts
 
   validate:
-    name: Build and test (${{ matrix.label }})
+    name: Build and test (${{ matrix.target }})
     needs: changes
     if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.changes.outputs.legs) }}
+        include: ${{ fromJSON(needs.changes.outputs.targets) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     steps:
@@ -135,95 +109,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Node.js
-        id: node
-        continue-on-error: true
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      - name: Prepare the job
+        uses: ./.github/actions/prepare
         with:
-          node-version: '26.7.0'
           architecture: ${{ matrix.architecture }}
-          package-manager-cache: false
-
-      - name: Wait before setting up Node.js again
-        if: steps.node.outcome == 'failure'
-        run: sleep 30
-
-      - name: Set up Node.js again
-        id: node-again
-        if: steps.node.outcome == 'failure'
-        continue-on-error: true
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: '26.7.0'
-          architecture: ${{ matrix.architecture }}
-          package-manager-cache: false
-
-      - name: Wait before setting up Node.js a last time
-        if: steps.node-again.outcome == 'failure'
-        run: sleep 30
-
-      - name: Set up Node.js a last time
-        if: steps.node-again.outcome == 'failure'
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: '26.7.0'
-          architecture: ${{ matrix.architecture }}
-          package-manager-cache: false
-
-      - name: Verify the toolchain
-        env:
-          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
-        run: |
-          node --version
-          npm --version
-          node --print "process.platform + '/' + process.arch"
-          test "$(node --version)" = v26.7.0
-          test "$(npm --version)" = 11.19.0
-          test "$(node --print process.arch)" = "$EXPECTED_ARCHITECTURE"
-
-      - name: Restore the installed dependencies
-        id: root-dependencies
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules
-          key: dependencies-root-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Restore the Angular project's installed dependencies
-        id: angular-dependencies
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: src/node_modules
-          key: dependencies-src-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('src/package-lock.json') }}
-
-      - name: Discard an inexact Angular install
-        if: steps.angular-dependencies.outputs.cache-hit != 'true'
-        run: rm -rf src/node_modules
-
-      - name: Install dependencies
-        if: steps.root-dependencies.outputs.cache-hit != 'true'
-        run: npm ci --no-audit --no-fund
-
-      - name: Install Electron
-        run: |
-          for attempt in 1 2 3 4; do
-            if node node_modules/electron/install.js; then
-              exit 0
-            fi
-            if [ "$attempt" -lt 4 ]; then
-              echo "Electron's binary download failed (attempt $attempt of 4); trying again in 15 seconds."
-              sleep 15
-            fi
-          done
-          echo "::error::Electron's binary could not be downloaded in 4 attempts."
-          exit 1
 
       - name: Build
-        if: matrix.part != 'workflows'
         run: npm run build
 
       - name: Test
         id: test
-        if: matrix.part != 'workflows'
         run: npm test
 
       - name: Keep the Angular test output
@@ -232,12 +127,13 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}
+          name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}
           path: |
             _build/angular-tests.log
             _build/angular-tests.json
           retention-days: 14
           if-no-files-found: ignore
+          overwrite: true
 
       - name: Wait before keeping the Angular test output again
         if: always() && steps.test.outcome == 'failure' && steps.angular.outcome == 'failure'
@@ -249,7 +145,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}
+          name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}
           path: |
             _build/angular-tests.log
             _build/angular-tests.json
@@ -267,7 +163,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}
+          name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}
           path: |
             _build/angular-tests.log
             _build/angular-tests.json
@@ -280,126 +176,57 @@ jobs:
         run: |
           echo "::warning title=The Angular test output was not kept::The upload failed three times, so it is not attached."
 
-      - name: Let Electron's sandbox start on Linux
-        if: runner.os == 'Linux' && matrix.part != 'tests'
-        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+  ui-linux-x64:
+    name: UI workflows (Linux x64)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && contains(format(' {0} ', needs.changes.outputs.ui-targets), ' linux-x64 ') }}
+    uses: ./.github/workflows/ui-workflows.yml
+    with:
+      plan: ${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['linux-x64']) }}
 
-      - name: Test the UI workflows
-        id: ui
-        if: matrix.part != 'tests'
-        run: |
-          if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui
-          else
-            npm run test:ui
-          fi
+  ui-linux-arm64:
+    name: UI workflows (Linux ARM64)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && contains(format(' {0} ', needs.changes.outputs.ui-targets), ' linux-arm64 ') }}
+    uses: ./.github/workflows/ui-workflows.yml
+    with:
+      plan: ${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['linux-arm64']) }}
 
-      - name: Keep the UI workflow results
-        id: results
-        if: always() && steps.ui.outcome != 'skipped'
-        continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}
-          path: _build/ui
-          retention-days: 14
-          if-no-files-found: ignore
+  ui-windows-x64:
+    name: UI workflows (Windows x64)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && contains(format(' {0} ', needs.changes.outputs.ui-targets), ' windows-x64 ') }}
+    uses: ./.github/workflows/ui-workflows.yml
+    with:
+      plan: ${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['windows-x64']) }}
 
-      - name: Wait before keeping the UI workflow results again
-        if: always() && steps.ui.outcome != 'skipped' && steps.results.outcome == 'failure'
-        run: sleep 15
+  ui-windows-arm64:
+    name: UI workflows (Windows ARM64)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && contains(format(' {0} ', needs.changes.outputs.ui-targets), ' windows-arm64 ') }}
+    uses: ./.github/workflows/ui-workflows.yml
+    with:
+      plan: ${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['windows-arm64']) }}
 
-      - name: Keep the UI workflow results again
-        id: results-again
-        if: always() && steps.ui.outcome != 'skipped' && steps.results.outcome == 'failure'
-        continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}
-          path: _build/ui
-          retention-days: 14
-          if-no-files-found: ignore
-          overwrite: true
+  ui-macos-x64:
+    name: UI workflows (macOS x64)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && contains(format(' {0} ', needs.changes.outputs.ui-targets), ' macos-x64 ') }}
+    uses: ./.github/workflows/ui-workflows.yml
+    with:
+      plan: ${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['macos-x64']) }}
 
-      - name: Wait before keeping the UI workflow results a last time
-        if: always() && steps.ui.outcome != 'skipped' && steps.results-again.outcome == 'failure'
-        run: sleep 15
-
-      - name: Keep the UI workflow results a last time
-        id: results-last
-        if: always() && steps.ui.outcome != 'skipped' && steps.results-again.outcome == 'failure'
-        continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}
-          path: _build/ui
-          retention-days: 14
-          if-no-files-found: ignore
-          overwrite: true
-
-      - name: Warn that the UI workflow results were not kept
-        if: always() && steps.ui.outcome != 'skipped' && steps.results-last.outcome == 'failure'
-        run: |
-          echo "::warning title=The UI workflow results were not kept::The upload failed three times, so they are not attached. The tests are not affected."
-
-      - name: Keep the main window screenshot
-        id: screenshot
-        if: always() && steps.ui.outcome != 'skipped'
-        continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          path: _build/ui/main-window-*.png
-          archive: false
-          retention-days: 14
-          if-no-files-found: warn
-
-      - name: Wait before keeping the main window screenshot again
-        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot.outcome == 'failure'
-        run: sleep 15
-
-      - name: Keep the main window screenshot again
-        id: screenshot-again
-        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot.outcome == 'failure'
-        continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          path: _build/ui/main-window-*.png
-          archive: false
-          retention-days: 14
-          if-no-files-found: warn
-          overwrite: true
-
-      - name: Wait before keeping the main window screenshot a last time
-        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-again.outcome == 'failure'
-        run: sleep 15
-
-      - name: Keep the main window screenshot a last time
-        id: screenshot-last
-        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-again.outcome == 'failure'
-        continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          path: _build/ui/main-window-*.png
-          archive: false
-          retention-days: 14
-          if-no-files-found: warn
-          overwrite: true
-
-      - name: Warn that the main window screenshot was not kept
-        if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-last.outcome == 'failure'
-        run: |
-          echo "::warning title=The main window screenshot was not kept::The upload failed three times, so it is not attached. The tests are not affected."
-
-      - name: Summarize the UI workflows
-        if: always() && steps.ui.outcome != 'skipped'
-        env:
-          UI_TARGET: ${{ matrix.target }}
-          SCREENSHOT_URL: ${{ steps.screenshot-last.outputs.artifact-url || steps.screenshot-again.outputs.artifact-url || steps.screenshot.outputs.artifact-url }}
-          SCREENSHOT_UPLOAD_FAILED: ${{ steps.screenshot-last.outcome == 'failure' }}
-        run: node scripts/ui-summary.ts
+  ui-macos-arm64:
+    name: UI workflows (macOS ARM64)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && contains(format(' {0} ', needs.changes.outputs.ui-targets), ' macos-arm64 ') }}
+    uses: ./.github/workflows/ui-workflows.yml
+    with:
+      plan: ${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['macos-arm64']) }}
 
   cache-plan:
     name: Find the missing dependency caches
+    needs: changes
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -420,8 +247,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ROOT_HASH: ${{ hashFiles('package-lock.json') }}
           SOURCE_HASH: ${{ hashFiles('src/package-lock.json') }}
+          TARGET_TABLE: ${{ needs.changes.outputs.target-table }}
         run: |
           set -euo pipefail
+          test -n "$TARGET_TABLE"
           keys=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100" --jq '.actions_caches[].key')
           saved() {
             case $'\n'"$keys"$'\n' in
@@ -435,14 +264,7 @@ jobs:
               targets="$targets${targets:+,}{\"target\":\"$target\",\"runner\":\"$runner\",\"architecture\":\"$architecture\"}"
               echo "$target has no current dependency cache."
             fi
-          done <<'TARGETS'
-          Linux x64|ubuntu-24.04|Linux|x64
-          Linux ARM64|ubuntu-24.04-arm|Linux|arm64
-          Windows x64|windows-2025|Windows|x64
-          Windows ARM64|windows-11-arm|Windows|arm64
-          macOS x64|macos-15-intel|macOS|x64
-          macOS ARM64|macos-15|macOS|arm64
-          TARGETS
+          done <<< "${TARGET_TABLE//;/$'\n'}"
           echo "targets=[$targets]" >> "$GITHUB_OUTPUT"
 
   cache:
@@ -599,7 +421,7 @@ jobs:
 
   result:
     name: Build and test (all targets)
-    needs: [changes, validate]
+    needs: [changes, validate, ui-linux-x64, ui-linux-arm64, ui-windows-x64, ui-windows-arm64, ui-macos-x64, ui-macos-arm64]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -608,23 +430,56 @@ jobs:
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           RUN_CODE: ${{ needs.changes.outputs.run-code }}
+          RUN_UI: ${{ needs.changes.outputs.run-ui }}
           VALIDATION_RESULT: ${{ needs.validate.result }}
+          UI_TARGETS: ${{ needs.changes.outputs.ui-targets }}
+          UI_RESULTS: >-
+            linux-x64=${{ needs.ui-linux-x64.result }}
+            linux-arm64=${{ needs.ui-linux-arm64.result }}
+            windows-x64=${{ needs.ui-windows-x64.result }}
+            windows-arm64=${{ needs.ui-windows-arm64.result }}
+            macos-x64=${{ needs.ui-macos-x64.result }}
+            macos-arm64=${{ needs.ui-macos-arm64.result }}
           DEFERRED: ${{ needs.changes.outputs.deferred }}
+          UI_DEFERRED: ${{ needs.changes.outputs.ui-deferred }}
         run: |
           set -euo pipefail
-          case "$CHANGES_RESULT:$RUN_CODE:$VALIDATION_RESULT" in
-            success:false:skipped)
+          if [ -n "$DEFERRED" ]; then
+            covered="every target this pull request run covers. Skipped here and run on every push to main and in manual runs: $DEFERRED."
+          elif [ -n "$UI_DEFERRED" ]; then
+            covered="every target, with the UI workflows of $UI_DEFERRED left to manual and nightly runs."
+          else
+            covered='every target.'
+          fi
+          planned=skipped
+          if [ "$RUN_UI" = true ]; then
+            planned=success
+          fi
+          ui=$planned
+          if [ -z "$UI_TARGETS" ]; then
+            ui=failure
+          fi
+          for entry in $UI_RESULTS; do
+            case " $UI_TARGETS " in
+              *" ${entry%%=*} "*) expected=$planned ;;
+              *) expected=skipped ;;
+            esac
+            if [ "${entry#*=}" != "$expected" ]; then
+              ui=failure
+            fi
+          done
+          case "$CHANGES_RESULT:$RUN_CODE:$RUN_UI:$VALIDATION_RESULT:$ui" in
+            success:false:false:skipped:skipped)
               echo 'Only Markdown documentation changed: the document checks passed, and the build and test targets were skipped.' >> "$GITHUB_STEP_SUMMARY"
               ;;
-            success:true:success)
-              if [ -n "$DEFERRED" ]; then
-                echo "The document checks passed, and the build and tests passed on every target this pull request run covers. Skipped here and run on every push to main and in manual runs: $DEFERRED." >> "$GITHUB_STEP_SUMMARY"
-              else
-                echo 'The document checks passed, and the build and tests passed on every target.' >> "$GITHUB_STEP_SUMMARY"
-              fi
+            success:true:false:success:skipped)
+              echo "Only documentation, CI and test tooling or repository configuration changed: the document checks passed, the build and tests passed on $covered The UI workflows were not required." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            success:true:true:success:success)
+              echo "The document checks passed, and the build, tests and UI workflows passed on $covered" >> "$GITHUB_STEP_SUMMARY"
               ;;
             *)
-              echo '::error::The document checks, the change classification or a build and test target did not complete successfully.'
+              echo '::error::The document checks, the change classification, a build and test target or a UI workflow shard did not complete successfully.'
               exit 1
               ;;
           esac

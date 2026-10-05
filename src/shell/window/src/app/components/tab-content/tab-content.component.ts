@@ -33,12 +33,13 @@ export class TabContentComponent {
   private readonly host: WindowPartHostService = inject(WindowPartHostService);
   private readonly labels: TabLabelService = inject(TabLabelService);
   private readonly injector: Injector = inject(Injector);
+  private readonly revision: Signal<number> = computed(() => this.host.revisionOf(this.tab()));
 
   public readonly element: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   public readonly tab: InputSignal<Tab> = input.required<Tab>();
 
   protected readonly content: ResourceRef<TabContent | null | undefined> = resource({
-    params: () => ({ tab: this.tab(), generation: this.host.generation() }),
+    params: () => ({ tab: this.tab(), revision: this.revision() }),
     loader: ({ params }) => this.loadAsync(params.tab)
   });
 

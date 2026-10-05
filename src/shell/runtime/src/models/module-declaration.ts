@@ -15,7 +15,9 @@ import { Resources } from "../resources.js";
 
 export class ModuleDeclaration {
   public readonly id: string;
+  public readonly version: string;
   public readonly displayName: string;
+  public readonly description: string;
   public readonly dependencies: readonly string[];
   public readonly runtimePackage: string | null;
   public readonly contributions: ReadonlyMap<string, readonly string[]>;
@@ -23,23 +25,34 @@ export class ModuleDeclaration {
 
   public constructor(
     id: string,
+    version: string,
     displayName: string,
+    description: string,
     dependencies: readonly string[],
     runtimePackage: string | null,
     contributions: ReadonlyMap<string, readonly string[]>,
     settings: readonly SettingDefinition[] = []) {
     if (!Resources.moduleIdPattern.test(id) || id === Resources.reservedModuleId)
       throw new ArgumentException(Resources.moduleIdInvalid, Resources.idParameterName);
+    if (!Resources.moduleVersionPattern.test(version))
+      throw new ArgumentException(Resources.moduleVersionInvalid, Resources.versionParameterName);
     ArgumentException.throwIfNullOrWhitespace(displayName, Resources.displayNameParameterName);
+    ArgumentException.throwIfNullOrWhitespace(description, Resources.descriptionParameterName);
     const foreign = settings.find(t => t.name.owner !== id);
     if (!Object.isUndefined(foreign))
       throw new ArgumentException(Resources.formatSettingOwnerInvalid(id, foreign.name.text), Resources.settingsField);
     const shellOnly = settings.find(t => t.type.kind === SettingKind.KeyBindings);
     if (!Object.isUndefined(shellOnly))
       throw new ArgumentException(Resources.formatSettingKindReserved(id, shellOnly.name.text, shellOnly.type.kind), Resources.settingsField);
+    const commands = contributions.get(Resources.commandsKind) ?? [];
+    const action = settings.find(t => t.type.kind === SettingKind.Action && !commands.includes(String(t.type.command)));
+    if (!Object.isUndefined(action))
+      throw new ArgumentException(Resources.formatSettingCommandUnknown(id, action.name.text, String(action.type.command)), Resources.settingsField);
 
     this.id = id;
+    this.version = version;
     this.displayName = displayName;
+    this.description = description;
     this.dependencies = [...dependencies];
     this.runtimePackage = runtimePackage;
     this.contributions = new Map([...contributions].map(([kind, names]) => [kind, [...names]]));
@@ -52,6 +65,9 @@ export class ModuleDeclaration {
     const id = ModuleDeclaration.readText("id" in value ? value.id : undefined, Resources.idParameterName);
     if (!Resources.moduleIdPattern.test(id) || id === Resources.reservedModuleId)
       throw new DeclarationsFormatException(Resources.formatDeclarationField(Resources.idParameterName));
+    const version = ModuleDeclaration.readText("version" in value ? value.version : undefined, Resources.versionParameterName);
+    if (!Resources.moduleVersionPattern.test(version))
+      throw new DeclarationsFormatException(Resources.formatDeclarationField(Resources.versionParameterName));
 
     const runtimePackage = "runtimePackage" in value ? value.runtimePackage : undefined;
     const contributes = "contributes" in value ? value.contributes : undefined;
@@ -59,7 +75,9 @@ export class ModuleDeclaration {
       throw new DeclarationsFormatException(Resources.formatDeclarationField(Resources.contributesParameterName));
     return new ModuleDeclaration(
       id,
+      version,
       ModuleDeclaration.readText("displayName" in value ? value.displayName : undefined, Resources.displayNameParameterName),
+      ModuleDeclaration.readText("description" in value ? value.description : undefined, Resources.descriptionParameterName),
       ModuleDeclaration.readNames("dependencies" in value ? value.dependencies : undefined, Resources.dependenciesParameterName),
       Object.isNull(runtimePackage) ? null : ModuleDeclaration.readText(runtimePackage, Resources.runtimePackageParameterName),
       new Map(Object.entries(contributes).map(([kind, names]) => [kind, ModuleDeclaration.readNames(names, Resources.contributesParameterName)])),

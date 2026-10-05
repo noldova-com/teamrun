@@ -1,0 +1,12 @@
+{
+  "id": "reminder",
+  "version": "0.0.1",
+  "displayName": "Reminder",
+  "description": "Posts a reminder from a runtime part alone, with no window part, for the UI workflows.",
+  "parts": ["runtime"],
+  "dependencies": [],
+  "contributes": {
+    "commands": ["reminder.remind"],
+    "notifications": ["reminder.due"]
+  }
+}

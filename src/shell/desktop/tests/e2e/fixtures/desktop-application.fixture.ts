@@ -18,6 +18,7 @@ import { Wait } from "@noldova/teamrun-foundation-testing";
 import { StopPolicy } from "@noldova/teamrun-shell-protocol";
 import { DataDirectory, DiscoveryReader, Endpoint, OwnershipLock, RuntimeBuild, RuntimeClient, type RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
 
+import CleanupSteps from "./cleanup-steps.ts";
 import ErrorOutputClassifier from "./error-output.classifier.ts";
 import OffCursorPlacement from "./off-cursor-placement.ts";
 import ProcessListFixture from "./process-list.fixture.ts";
@@ -27,6 +28,14 @@ interface MainProcessSilence {
   readonly action: string;
   readonly since: number;
   readonly processorMilliseconds: number | null;
+}
+
+interface IActiveSocket {
+  readonly remoteAddress?: string;
+  readonly remotePort?: number;
+  readonly readable: boolean;
+  readonly writable: boolean;
+  destroy(): void;
 }
 
 export default class DesktopApplicationFixture {
@@ -63,6 +72,8 @@ export default class DesktopApplicationFixture {
   private static readonly THREADS_TIMEOUT: number = 20_000;
   private static readonly PAGE_UNREACHABLE: string = "The page did not answer the silence report's request, which reaches it through the main process, so the test did not wait for it.";
   private static readonly MAIN_WINDOW: string = "main-window";
+  private static readonly QUIT_ACTION: string = "quit";
+  private static readonly QUIT_QUESTION: string = "tr-quit-dialog";
   private static readonly NO_ANSWER: unique symbol = Symbol("no answer");
 
   private readonly testInfo: TestInfo;
@@ -112,7 +123,7 @@ export default class DesktopApplicationFixture {
       await fixture.recordEnvironmentAsync();
     }
     catch (error) {
-      await fixture.disposeAsync(true);
+      await fixture.disposeAsync(true).catch((cleanup: unknown) => CleanupSteps.attachAsync(testInfo, [cleanup]));
       throw error;
     }
     return fixture;
@@ -207,26 +218,30 @@ export default class DesktopApplicationFixture {
   public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
     const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
+    const errors: unknown[] = [];
     try {
       await this.recordProcessesAsync();
+    }
+    catch (error) {
+      if (this.silence === null)
+        errors.push(error);
+    }
+    try {
       const started = Date.now();
-      await this.answerAsync("quit", this.application.close(), DesktopApplicationFixture.QUIT_TIMEOUT);
+      await this.answerAsync(DesktopApplicationFixture.QUIT_ACTION, this.application.close(), DesktopApplicationFixture.QUIT_TIMEOUT);
       this.closeMilliseconds = Date.now() - started;
     }
     catch (error) {
       if (this.silence === null)
-        throw error;
-      const processId = this.mainProcessId;
-      if (processId !== null && DesktopApplicationFixture.isAlive(processId))
-        process.kill(processId, "SIGKILL");
+        errors.push(error);
+      else
+        this.failures.push(await this.killSilentAsync(this.silence));
       child.kill("SIGKILL");
-      this.failures.push(`The main process ${processId ?? "(id unknown)"} did not answer for ${Math.round((Date.now() - this.silence.since) / 1000)} s after it was asked to ${this.silence.action}, so the test killed it.`);
     }
     const exitCode = await exited;
     this.electronApplication = null;
     this.page = null;
-    if (!keepRuntime)
-      await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
+    CleanupSteps.throwFailures([...errors, ...await CleanupSteps.collectFailuresAsync(keepRuntime ? [] : [() => DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory)])]);
     return exitCode;
   }
 
@@ -234,16 +249,51 @@ export default class DesktopApplicationFixture {
     return (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.processId;
   }
 
+  public async breakRuntimeConnectionAsync(): Promise<void> {
+    const discovery = await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory));
+    if (discovery === null)
+      throw new Error(`No runtime discovery file was found in ${this.dataDirectory}, so the test could not tell which connection to break.`);
+    const found = await this.answerAsync("break its connection to the runtime", this.application.evaluate((_, port) => {
+      const handles = (Reflect.get(process, "_getActiveHandles") as () => object[]).call(process);
+      const standard: readonly object[] = [process.stdin, process.stdout, process.stderr];
+      const sockets = handles.filter(t => t.constructor.name === "Socket").map(t => {
+        const socket = t as IActiveSocket;
+        const isRuntime = port === null
+          ? socket.remoteAddress === undefined && socket.readable && socket.writable && !standard.includes(t)
+          : socket.remoteAddress === "127.0.0.1" && socket.remotePort === port;
+        const address = socket.remoteAddress === undefined ? "no remote address" : `${socket.remoteAddress}:${String(socket.remotePort)}`;
+        return { socket, isRuntime, description: `${address}, readable ${String(socket.readable)}, writable ${String(socket.writable)}, standard ${String(standard.includes(t))}` };
+      });
+      const matches = sockets.filter(t => t.isRuntime);
+      if (matches.length === 1)
+        for (const match of matches)
+          match.socket.destroy();
+      return { matched: matches.length, descriptions: sockets.map(t => t.description) };
+    }, Endpoint.parse(discovery.endpoint).port));
+    if (found.matched !== 1)
+      throw new Error(`The main process should hold one connection to the runtime at ${discovery.endpoint} but holds ${found.matched}. It found these sockets through process._getActiveHandles(), which Node does not document: ${found.descriptions.join("; ") || "none"}.`);
+  }
+
   public async disposeAsync(hasFailed: boolean = this.testInfo.status !== this.testInfo.expectedStatus): Promise<void> {
     const isRunning = this.electronApplication !== null && Object.is(this.requireProcess().exitCode, null);
     if (isRunning && this.viewport !== null && this.silence === null)
       await this.checkGuardAsync(this.viewport).catch((error: unknown) => this.failures.push((error as Error).message));
-    if (hasFailed || this.silence !== null)
-      await this.keepDiagnosticsAsync(isRunning);
-    if (isRunning)
-      await this.closeAsync();
-    await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
-    await this.removeFolderAsync();
+    CleanupSteps.throwFailures(await CleanupSteps.collectFailuresAsync([
+      ...hasFailed || this.silence !== null ? [() => this.keepDiagnosticsAsync(isRunning)] : [],
+      ...isRunning ? [() => this.closeAsync(true)] : [],
+      () => DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory),
+      () => this.removeFolderAsync()
+    ]));
+  }
+
+  private async killSilentAsync(silence: MainProcessSilence): Promise<string> {
+    const processId = this.mainProcessId;
+    const question = silence.action === DesktopApplicationFixture.QUIT_ACTION ? await this.describeQuestionAsync() : null;
+    if (question !== null)
+      this.silence = null;
+    if (processId !== null && DesktopApplicationFixture.isAlive(processId))
+      process.kill(processId, "SIGKILL");
+    return question ?? `The main process ${processId ?? "(id unknown)"} did not answer for ${Math.round((Date.now() - silence.since) / 1000)} s after it was asked to ${silence.action}, so the test killed it.`;
   }
 
   private async removeFolderAsync(): Promise<void> {
@@ -263,9 +313,11 @@ export default class DesktopApplicationFixture {
   private async recordProcessesAsync(): Promise<void> {
     const electron = await this.answerAsync("list its processes", this.application.evaluate(({ app }) => ({ main: process.pid, all: app.getAppMetrics().map(t => t.pid) })));
     this.mainProcessId = electron.main;
-    const runtime = await this.readRuntimeProcessIdAsync();
-    for (const processId of [...electron.all, ...runtime === undefined ? [] : [runtime]])
+    for (const processId of electron.all)
       this.recorded.add(processId);
+    const runtime = await this.readRuntimeProcessIdAsync();
+    if (runtime !== undefined)
+      this.recorded.add(runtime);
   }
 
   private async failIfRunningAsync(running: readonly number[]): Promise<void> {
@@ -321,6 +373,19 @@ export default class DesktopApplicationFixture {
     catch (error) {
       await this.testInfo.attach(`${name}.unavailable.txt`, { body: String(error), contentType: "text/plain" });
     }
+  }
+
+  private async describeQuestionAsync(): Promise<string | null> {
+    const questions = await DesktopApplicationFixture.withinAsync(Promise.all(this.application.windows().map(async (page, index) => {
+      const question = page.getByRole("dialog").filter({ has: page.locator(DesktopApplicationFixture.QUIT_QUESTION) });
+      return await question.count() === 0 ? null : { index, text: await question.first().ariaSnapshot() };
+    }).map(t => t.catch(() => null))), DesktopApplicationFixture.DIAGNOSTIC_TIMEOUT);
+    const asked = questions === DesktopApplicationFixture.NO_ANSWER ? null : questions.find(t => t !== null) ?? null;
+    return asked === null ? null : [
+      `TeamRun did not quit within ${DesktopApplicationFixture.QUIT_TIMEOUT / 1000} s because window ${asked.index} asked the question below, so the test killed it.`,
+      "The test left work running: finish or stop it before the test ends.",
+      asked.text
+    ].join("\n");
   }
 
   private async describeSilenceAsync(silence: MainProcessSilence): Promise<string> {

@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -45,7 +46,9 @@ export class ModuleContextTests {
   private static readonly HOME: string = path.resolve("home", "person");
   private static readonly NOTES: ModuleDeclaration = new ModuleDeclaration(
     "notes",
+    "0.0.1",
     "Notes",
+    "Keeps notes.",
     ["tasks"],
     "@noldova/teamrun-modules-notes-runtime",
     new Map([
@@ -65,16 +68,17 @@ export class ModuleContextTests {
   }
 
   @TestMethod
-  public async writesTheModulesLinesRedactedEachStartingWithItsId(): Promise<void> {
+  public async writesTheModulesLinesRedactedAndWithoutControlCharactersEachStartingWithItsId(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
     const diagnostics = new TextOutputFixture();
     const context = ModuleContextTests.create(
       settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), undefined, undefined, undefined, diagnostics);
     const token = "a".repeat(40);
 
-    context.log.write(`Synced ${path.join(ModuleContextTests.HOME, "notes")}\r\nwith ${token}\n`);
+    context.log.write(`Synced ${path.join(ModuleContextTests.HOME, "notes")}\r\nwith ${token}\r2026-10-04T12:00:00.000Z shell: faked\u2028\u001b[31mred\u001b[0m\tdone\n`);
 
-    Assert.areEqual(`notes: Synced ${path.join("~", "notes")}\nnotes: with [redacted]\n`, diagnostics.text);
+    Assert.areEqual(
+      `notes: Synced ${path.join("~", "notes")}\nnotes: with [redacted]\nnotes: 2026-10-04T12:00:00.000Z shell: faked\nnotes: [31mred[0m\tdone\n`, diagnostics.text);
   }
 
   @TestMethod
@@ -233,7 +237,8 @@ export class ModuleContextTests {
   @TestMethod
   public async postsUpdatesAndDismissesItsNotificationsAndDismissesThemAllWhenDisposed(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
-    const notifications = new NotificationCenter(() => undefined, () => new Date());
+    let ids = 0;
+    const notifications = new NotificationCenter(() => undefined, () => new Date(), () => String(++ids));
     const context = ModuleContextTests.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), new CommandRegistry(), notifications);
     notifications.post(ModuleContextTests.post("tasks.due", "Due", "tasks.show"));
 
@@ -242,19 +247,19 @@ export class ModuleContextTests {
     saved.update(ModuleContextTests.post("notes.saved", "Saved again", null));
     second.dismiss();
     second.dismiss();
-    const gone = Assert.throws(() => second.update(ModuleContextTests.post("notes.saved", "Back", null)), RegistrationException);
+    const isBack = second.update(ModuleContextTests.post("notes.saved", "Back", null));
     const listed = notifications.list.notifications.map(t => `${t.id}:${t.post.title}`).join(",");
     context[Symbol.dispose]();
 
+    Assert.isFalse(isBack);
     Assert.areEqual("2:Saved again,1:Due", listed);
-    Assert.areEqual(`Notification ${second.id} is gone; it was dismissed or its module stopped.`, gone.message);
     Assert.areEqual("Due", notifications.list.notifications.map(t => t.post.title).join(","));
   }
 
   @TestMethod
   public async refusesAnUndeclaredKindOrAnotherModulesCommandOnPostAndOnUpdate(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
-    const notifications = new NotificationCenter(() => undefined, () => new Date());
+    const notifications = new NotificationCenter(() => undefined, () => new Date(), randomUUID);
     const context = ModuleContextTests.create(settings, new MethodRegistry(), new EventRegistry({ broadcast: () => undefined }), new ServiceRegistry(), new CommandRegistry(), notifications);
     const saved = context.postNotification(ModuleContextTests.post("notes.saved", "Saved", null));
 
@@ -321,7 +326,7 @@ export class ModuleContextTests {
     events: EventRegistry,
     services: ServiceRegistry,
     commands: CommandRegistry = new CommandRegistry(),
-    notifications: NotificationCenter = new NotificationCenter(() => undefined, () => new Date()),
+    notifications: NotificationCenter = new NotificationCenter(() => undefined, () => new Date(), randomUUID),
     work: WorkTracker = new WorkTracker(() => undefined),
     diagnostics: TextOutputFixture = new TextOutputFixture(),
     root: string = ModuleContextTests.ROOT): ModuleContext {

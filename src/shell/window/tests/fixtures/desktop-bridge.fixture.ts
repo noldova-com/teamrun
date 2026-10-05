@@ -17,7 +17,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly startupListeners: Set<(state: unknown) => void> = new Set();
   private readonly eventListeners: Set<(name: string, payload: unknown) => void> = new Set();
   private readonly menuListeners: Set<(id: string) => void> = new Set();
-  private readonly openedListeners: Set<(id: number) => void> = new Set();
+  private readonly openedListeners: Set<(id: string) => void> = new Set();
   private readonly quitListeners: Set<(question: unknown) => void> = new Set();
 
   public readonly platform: string;
@@ -35,7 +35,8 @@ export class DesktopBridgeFixture implements IDesktopBridge {
     ["shell.modules", { payload: { modules: [] } }],
     ["shell.commands", { payload: { commands: [], sequence: 0 } }],
     ["shell.notifications", { payload: { notifications: [], isDoNotDisturb: false, mutedModules: [], sequence: 0 } }],
-    ["shell.settings", { payload: { definitions: [], entries: [] } }]
+    ["shell.settings", { payload: { definitions: [], entries: [] } }],
+    ["shell.recentCommands", { payload: { ids: [] } }]
   ]);
   public build: unknown = { productVersion: "1.2.3", fingerprint: "abc123" };
   public readonly copied: string[] = [];
@@ -43,6 +44,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public logFolderOpens: number = 0;
   public readonly quitAnswers: string[] = [];
   public readonly logged: string[] = [];
+  public readonly errorsLogged: (readonly [string | null, string])[] = [];
   public logFolderOpened: Promise<boolean> = Promise.resolve(true);
   public readonly menuBars: JsonObject[] = [];
   public readonly edits: string[] = [];
@@ -162,7 +164,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
       listener(id);
   }
 
-  public onNotificationOpened(listener: (id: number) => void): () => void {
+  public onNotificationOpened(listener: (id: string) => void): () => void {
     this.openedListeners.add(listener);
     return () => this.openedListeners.delete(listener);
   }
@@ -181,12 +183,16 @@ export class DesktopBridgeFixture implements IDesktopBridge {
     this.logged.push(`${moduleId}: ${message}`);
   }
 
+  public logError(moduleId: string | null, text: string): void {
+    this.errorsLogged.push([moduleId, text]);
+  }
+
   public askToQuit(question: unknown): void {
     for (const listener of this.quitListeners)
       listener(question);
   }
 
-  public publishNotificationOpened(id: number): void {
+  public publishNotificationOpened(id: string): void {
     for (const listener of this.openedListeners)
       listener(id);
   }

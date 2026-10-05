@@ -12,6 +12,7 @@ import { ArgumentException, ExceptionOptions } from "@noldova/teamrun-foundation
 
 import { LaunchException } from "../exceptions/launch.exception.js";
 import { Resources } from "../resources.js";
+import { ProductInfo } from "./product-info.js";
 
 export class ProcessLaunchCommand {
   public readonly executable: string;
@@ -24,7 +25,7 @@ export class ProcessLaunchCommand {
       ProcessLaunchCommand.requireLinuxPrerequisites();
 
     this.executable = isLinux ? Resources.launchShell : executablePath;
-    this.arguments = isLinux ? [...Resources.launchShellArguments, executablePath, ...launchArguments] : [...launchArguments];
+    this.arguments = isLinux ? [...Resources.launchShellArguments, `${ProductInfo.current.slug}${Resources.launchNameSuffix}`, executablePath, ...launchArguments] : [...launchArguments];
   }
 
   private static requireLinuxPrerequisites(): void {

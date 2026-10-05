@@ -277,6 +277,22 @@ describe("Layout", () => {
     expect(arranged.reset(registry).toolbars).toBe(ToolbarLayout.EMPTY);
   });
 
+  it("keeps the person's wanted middle through every change, writes it only once it is set, refuses one outside 0 to 30rem and drops it on a reset", () => {
+    const narrowed = initial.withMiddleSize(20);
+
+    expect([initial.middleSize, initial.withMiddleSize(null)]).toEqual([null, initial]);
+    expect(narrowed.withMiddleSize(20)).toBe(narrowed);
+    expect(narrowed.withBottomSpan(BottomDockSpan.Between).withToolbars(new ToolbarLayout([["notes.main"]], [])).openView(terminal, registry).openDocument(plan).focusDocuments(0).middleSize).toBe(20);
+    expect(narrowed.toJson()["middleSize"]).toBe(20);
+    expect(initial.toJson()).not.toHaveProperty("middleSize");
+    expect(narrowed.reset(registry).middleSize).toBeNull();
+    expect(initial.withMiddleSize(0).middleSize).toBe(0);
+    expect(() => initial.withMiddleSize(-1)).toThrow(ArgumentException);
+    expect(() => initial.withMiddleSize(Number.NaN)).toThrow(ArgumentException);
+    expect(() => initial.withMiddleSize(40)).toThrow(ArgumentException);
+    expect(initial.withMiddleSize(30).middleSize).toBe(30);
+  });
+
   it("resizes a split through its handle", () => {
     const split = initial.splitGroup(changes, 1, PanelEdge.Right);
     const root = split.dock(DockSide.Left).root as SplitNode;

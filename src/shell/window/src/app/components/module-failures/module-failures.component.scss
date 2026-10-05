@@ -8,7 +8,6 @@
 
 :host {
   display: flex;
-  align-self: center;
   height: var(--tr-status-bar-item-height);
 }
 
@@ -17,7 +16,7 @@
   align-items: center;
   gap: var(--tr-space-1);
   margin: 0;
-  padding: 0 var(--tr-status-bar-item-padding);
+  padding: 0 var(--tr-pill-padding);
   border: 0;
   border-radius: var(--tr-radius-hover);
   background-color: transparent;

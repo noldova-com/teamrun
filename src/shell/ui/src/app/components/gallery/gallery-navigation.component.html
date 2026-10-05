@@ -42,6 +42,12 @@ LICENSE file in the root directory of this source tree.
   <tr-gallery-cell [caption]="text.chipLargeCount"><tr-view-badge [count]="120" /></tr-gallery-cell>
 </tr-gallery-specimen>
 
+<tr-gallery-specimen [name]="text.tree" [size]="sizes.Wide">
+  <tr-gallery-cell [caption]="text.defaultState" [isFocusTarget]="true">
+    <tr-tree class="tr-gallery-tree" [nodes]="treeNodes" [label]="text.treeLabel" [current]="treeCurrent()" (activated)="treeCurrent.set($event.id)" />
+  </tr-gallery-cell>
+</tr-gallery-specimen>
+
 <tr-gallery-specimen [name]="text.toolbar" [size]="sizes.Wide">
   <tr-gallery-cell [caption]="text.defaultState" [isFocusTarget]="true">
     <div trToolbar [trToolbarLabel]="text.toolbarLabel" class="tr-gallery-toolbar">

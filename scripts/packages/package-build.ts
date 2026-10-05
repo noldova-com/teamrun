@@ -7,22 +7,25 @@
  */
 
 import { existsSync } from "node:fs";
-import { readFile, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 import type BuildVariant from "../modules/build-variant.ts";
 import ModuleCatalog from "../modules/module-catalog.ts";
-import type ModuleDeclaration from "../modules/module-declaration.ts";
+import ModuleException from "../modules/module.exception.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
+import ProcessException from "../processes/process.exception.ts";
 import NpmCommand from "../toolchain/npm-command.ts";
 import BuildLayout from "./build-layout.ts";
+import BuildProduct from "./build-product.ts";
 import BuildRecord from "./build-record.ts";
 import ContentHash from "./content-hash.ts";
 import PackageBuilder from "./package-builder.ts";
 import PackageCatalog from "./package-catalog.ts";
 import type PackageManifest from "./package-manifest.ts";
+import PackageVersions from "./package-versions.ts";
 import PackageException from "./package.exception.ts";
 import RootManifest from "./root-manifest.ts";
 
@@ -34,11 +37,10 @@ export default class PackageBuild {
   private static readonly TESTS_FOLDER: string = "tests";
   private static readonly PROJECT_FILE: string = "tsconfig.json";
   private static readonly STALE: string = "stale";
-  private static readonly RESOURCES_FILE: string = "resources.ts";
-  private static readonly BUILD_PLACEHOLDER: string = "__BUILD__";
 
   private readonly layout: BuildLayout;
   private readonly catalog: PackageCatalog;
+  private readonly product: BuildProduct;
   private readonly modules: ModuleCatalog;
   private readonly runner: ProcessRunner;
   private readonly environment: NodeJS.ProcessEnv;
@@ -46,31 +48,31 @@ export default class PackageBuild {
   public constructor(root: string, runner: ProcessRunner, environment: NodeJS.ProcessEnv) {
     this.layout = new BuildLayout(root);
     this.catalog = new PackageCatalog(root);
+    this.product = new BuildProduct(root);
     this.modules = new ModuleCatalog(root);
     this.runner = runner;
     this.environment = environment;
   }
 
-  public async buildAsync(output: Writable, variant: BuildVariant): Promise<readonly PackageManifest[]> {
+  public async buildAsync(output: Writable, variant: BuildVariant, outputFolder: string | null = null): Promise<readonly PackageManifest[]> {
     const packages = await this.catalog.listPackagesAsync(variant.isTest);
     if (packages.length === 0)
       return packages;
 
     const rootManifest = await RootManifest.readAsync(this.layout.root);
-    const version = rootManifest.productVersion;
-    const archives = packages.map(t => this.layout.locateArchive(t, version));
+    const versions = await PackageVersions.readAsync(this.modules, rootManifest.productVersion, packages);
+    const archives = packages.map(t => this.layout.locateArchive(t, versions.of(t.name)));
     const common = await this.hashCommonInputsAsync();
-    const fingerprint = await this.hashFingerprintAsync(packages, common, await this.modules.listBuildAsync(variant.isTest, variant.excluded));
-    const builder = new PackageBuilder(this.layout, rootManifest, this.runner, new NpmCommand(this.runner, this.environment), fingerprint);
+    const builder = new PackageBuilder(this.layout, rootManifest, versions, this.runner, new NpmCommand(this.runner, this.environment));
     const archiveHashes = new Map<string, string>();
     for (const manifest of packages) {
-      const inputs = await this.hashSourceInputsAsync(manifest, packages, common, fingerprint, archiveHashes);
-      const artifacts = this.listSourceArtifacts(manifest, version);
+      const inputs = await this.hashSourceInputsAsync(manifest, packages, common, archiveHashes, versions);
+      const artifacts = this.listSourceArtifacts(manifest, versions);
       const isCurrent = await PackageBuild.isCurrentAsync(this.layout.locateRecord(manifest), inputs, artifacts);
       if (!isCurrent)
         await builder.buildSourceAsync(manifest, archives);
       await (await PackageBuild.hashRecordAsync(inputs, artifacts)).writeAsync(this.layout.locateRecord(manifest));
-      archiveHashes.set(manifest.name, await ContentHash.ofFileAsync(this.layout.locateArchive(manifest, version)));
+      archiveHashes.set(manifest.name, await ContentHash.ofFileAsync(this.layout.locateArchive(manifest, versions.of(manifest.name))));
       output.write(`${manifest.name}: ${isCurrent ? "reused" : "built"}\n`);
     }
 
@@ -92,7 +94,21 @@ export default class PackageBuild {
       }
 
     await this.requireCurrentAsync(variant);
+    await this.product.writeAsync(await this.hashFingerprintAsync(variant), outputFolder);
     return packages;
+  }
+
+  public async isCurrentReportedAsync(variant: BuildVariant, output: Writable): Promise<boolean> {
+    try {
+      await this.requireCurrentAsync(variant);
+      return true;
+    }
+    catch (error) {
+      if (!(error instanceof PackageException || error instanceof ProcessException || error instanceof ModuleException))
+        throw error;
+      output.write(`${error.message}\n`);
+      return false;
+    }
   }
 
   public async requireCurrentAsync(variant: BuildVariant): Promise<void> {
@@ -100,17 +116,16 @@ export default class PackageBuild {
     if (packages.length === 0)
       return;
 
-    const version = (await RootManifest.readAsync(this.layout.root)).productVersion;
+    const versions = await PackageVersions.readAsync(this.modules, (await RootManifest.readAsync(this.layout.root)).productVersion, packages);
     const common = await this.hashCommonInputsAsync();
-    const fingerprint = await this.hashFingerprintAsync(packages, common, await this.modules.listBuildAsync(variant.isTest, variant.excluded));
     const archiveHashes = new Map<string, string>();
     const stale: string[] = [];
     for (const manifest of packages) {
-      const inputs = await this.hashSourceInputsAsync(manifest, packages, common, fingerprint, archiveHashes);
-      const isCurrent = await PackageBuild.isCurrentAsync(this.layout.locateRecord(manifest), inputs, this.listSourceArtifacts(manifest, version));
+      const inputs = await this.hashSourceInputsAsync(manifest, packages, common, archiveHashes, versions);
+      const isCurrent = await PackageBuild.isCurrentAsync(this.layout.locateRecord(manifest), inputs, this.listSourceArtifacts(manifest, versions));
       if (!isCurrent)
         stale.push(manifest.name);
-      archiveHashes.set(manifest.name, isCurrent ? await ContentHash.ofFileAsync(this.layout.locateArchive(manifest, version)) : PackageBuild.STALE);
+      archiveHashes.set(manifest.name, isCurrent ? await ContentHash.ofFileAsync(this.layout.locateArchive(manifest, versions.of(manifest.name))) : PackageBuild.STALE);
     }
 
     const installed = PackageBuild.hashInstalled(packages, archiveHashes);
@@ -121,6 +136,15 @@ export default class PackageBuild {
     }
     if (stale.length > 0)
       throw new PackageException(`The built artifacts of ${stale.join(", ")} are missing or stale; run npm run build.`);
+  }
+
+  public async hashFingerprintAsync(variant: BuildVariant): Promise<string> {
+    const declarations = await this.modules.listBuildAsync(variant.isTest, variant.excluded);
+    const parts = [await this.hashCommonInputsAsync(), JSON.stringify(declarations.map(t => t.toJson()))];
+    const packages = await this.catalog.listPackagesAsync(variant.isTest);
+    for (const manifest of packages)
+      parts.push(`${manifest.name} ${await this.hashPackageSourceAsync(manifest)}`);
+    return ContentHash.ofParts(parts);
   }
 
   private static collectDependencies(manifest: PackageManifest, packages: readonly PackageManifest[]): readonly string[] {
@@ -143,8 +167,8 @@ export default class PackageBuild {
     return new BuildRecord(inputs, outputs);
   }
 
-  private listSourceArtifacts(manifest: PackageManifest, version: string): readonly string[] {
-    return [this.layout.locateArchive(manifest, version), this.layout.locateInstalled(manifest)];
+  private listSourceArtifacts(manifest: PackageManifest, versions: PackageVersions): readonly string[] {
+    return [this.layout.locateArchive(manifest, versions.of(manifest.name)), this.layout.locateInstalled(manifest)];
   }
 
   private listTested(packages: readonly PackageManifest[]): readonly PackageManifest[] {
@@ -160,13 +184,6 @@ export default class PackageBuild {
     return ContentHash.ofParts(parts);
   }
 
-  private async hashFingerprintAsync(packages: readonly PackageManifest[], common: string, declarations: readonly ModuleDeclaration[]): Promise<string> {
-    const parts = [common, JSON.stringify(declarations.map(t => t.toJson()))];
-    for (const manifest of packages)
-      parts.push(`${manifest.name} ${await this.hashPackageSourceAsync(manifest)}`);
-    return ContentHash.ofParts(parts);
-  }
-
   private async hashPackageSourceAsync(manifest: PackageManifest): Promise<string> {
     return ContentHash.ofParts([
       await ContentHash.ofFileAsync(this.layout.locateSource(manifest, PackageBuild.MANIFEST_FILE)),
@@ -178,17 +195,10 @@ export default class PackageBuild {
     manifest: PackageManifest,
     packages: readonly PackageManifest[],
     common: string,
-    fingerprint: string,
-    archiveHashes: ReadonlyMap<string, string>): Promise<string> {
+    archiveHashes: ReadonlyMap<string, string>,
+    versions: PackageVersions): Promise<string> {
     const dependencies = PackageBuild.collectDependencies(manifest, packages).map(t => `${t} ${archiveHashes.get(t)}`);
-    const resources = this.layout.locateSource(manifest, PackageBuild.SOURCE_FOLDER, PackageBuild.RESOURCES_FILE);
-    const stampsBuild = existsSync(resources) && (await readFile(resources, "utf8")).includes(PackageBuild.BUILD_PLACEHOLDER);
-    return ContentHash.ofParts([
-      common,
-      await this.hashPackageSourceAsync(manifest),
-      ...(stampsBuild ? [fingerprint] : []),
-      ...dependencies
-    ]);
+    return ContentHash.ofParts([common, versions.of(manifest.name), await this.hashPackageSourceAsync(manifest), ...dependencies]);
   }
 
   private async hashTestInputsAsync(manifest: PackageManifest, common: string, installed: string): Promise<string> {

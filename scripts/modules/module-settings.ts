@@ -16,6 +16,7 @@ export default class ModuleSettings {
   public static readonly FILE_NAME: string = "settings.json";
   public static readonly SETTINGS_KIND: string = "settings";
   public static readonly SCOPES_KIND: string = "settingScopes";
+  private static readonly COMMANDS_KIND: string = "commands";
   private static readonly FIELDS: readonly string[] = ["name", "title", "description", "type", "default", "locality", "scopes", "page", "group"];
   private static readonly TEXT_FIELDS: readonly string[] = ["title", "description", "page", "group"];
   private static readonly LOCALITIES: readonly string[] = ["Device", "Shared"];
@@ -24,7 +25,8 @@ export default class ModuleSettings {
     ["Choice", ["options"]],
     ["Number", ["minimum", "maximum", "step"]],
     ["Text", ["maxLength"]],
-    ["Modules", []]
+    ["Modules", []],
+    ["Action", ["command", "label"]]
   ]);
   private static readonly STEP_TOLERANCE: number = 1e-9;
 
@@ -53,7 +55,9 @@ export default class ModuleSettings {
     if (top?.size !== 1 || !Array.isArray(settings))
       throw new ModuleException(`${file} must be an object whose only field, "settings", lists the module's settings.`);
     const scopes = contributions.get(ModuleSettings.SCOPES_KIND) ?? [];
-    const definitions = settings.map((t, index) => ModuleSettings.readDefinition(t, (problem: string) => new ModuleException(`${file} settings[${index}] ${problem}.`), dependencies, scopes));
+    const commands = contributions.get(ModuleSettings.COMMANDS_KIND) ?? [];
+    const definitions = settings.map((t, index) =>
+      ModuleSettings.readDefinition(t, (problem: string) => new ModuleException(`${file} settings[${index}] ${problem}.`), dependencies, scopes, commands));
     const names = definitions.map(t => String(t["name"]));
     const undefinedNames = declared.filter(t => !names.includes(t));
     if (new Set(names).size !== names.length || undefinedNames.length > 0 || names.some(t => !declared.includes(t)))
@@ -65,14 +69,15 @@ export default class ModuleSettings {
     value: unknown,
     fail: (problem: string) => ModuleException,
     dependencies: readonly string[],
-    ownScopes: readonly string[]
+    ownScopes: readonly string[],
+    commands: readonly string[]
   ): Readonly<Record<string, unknown>> {
     const record = ModuleSettings.record(value);
     if (record === null || record.size !== ModuleSettings.FIELDS.length || !ModuleSettings.FIELDS.every(t => record.has(t)))
       throw fail(`must have exactly the fields ${ModuleSettings.FIELDS.join(", ")}`);
     if (!ModuleSettings.TEXT_FIELDS.every(t => ModuleSettings.isText(record.get(t))))
       throw fail("must have a title, description, page and group that are not blank");
-    const accepts = ModuleSettings.readType(record.get("type"), fail);
+    const accepts = ModuleSettings.readType(record.get("type"), fail, commands);
     if (!accepts(record.get("default")))
       throw fail("must have a default its type accepts");
     const locality = record.get("locality");
@@ -86,12 +91,12 @@ export default class ModuleSettings {
     return Object.fromEntries(record);
   }
 
-  private static readType(value: unknown, fail: (problem: string) => ModuleException): (candidate: unknown) => boolean {
+  private static readType(value: unknown, fail: (problem: string) => ModuleException, commands: readonly string[]): (candidate: unknown) => boolean {
     const record = ModuleSettings.record(value);
     const kind = record?.get("kind");
     const fields = typeof kind === "string" ? ModuleSettings.KIND_FIELDS.get(kind) : undefined;
     if (record === null || fields === undefined || record.size !== fields.length + 1 || !fields.every(t => record.has(t)))
-      throw fail("must have a type of kind Boolean, Choice, Number, Text or Modules, with exactly that kind's fields");
+      throw fail("must have a type of kind Boolean, Choice, Number, Text, Modules or Action, with exactly that kind's fields");
     switch (kind) {
       case "Choice":
         return ModuleSettings.readChoice(record.get("options"), fail);
@@ -105,6 +110,10 @@ export default class ModuleSettings {
       }
       case "Modules":
         return candidate => Array.isArray(candidate) && candidate.every(ModuleSettings.isText) && new Set(candidate).size === candidate.length;
+      case "Action":
+        if (!commands.includes(String(record.get("command"))) || !ModuleSettings.isText(record.get("label")))
+          throw fail("must have an action type whose command is one its module declares and whose label is not blank");
+        return candidate => candidate === null;
       default:
         return candidate => typeof candidate === "boolean";
     }

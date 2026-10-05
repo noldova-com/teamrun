@@ -16,10 +16,10 @@ import { BottomDockSpan } from "../../enums/bottom-dock-span";
 import { DockSide } from "../../enums/dock-side";
 import type { Bounds } from "../../models/layout/bounds";
 import { DockingOverlay } from "../../models/layout/docking-overlay";
+import { GroupDropTarget } from "../../models/layout/group-drop-target";
 import type { GroupFrame } from "../../models/layout/group-frame";
 import { SideDropTarget } from "../../models/layout/side-drop-target";
 import { SplitDropTarget } from "../../models/layout/split-drop-target";
-import { TabDropTarget } from "../../models/layout/tab-drop-target";
 import { LayoutService } from "../../services/layout.service";
 import { TabDragService } from "../../services/tab-drag.service";
 import { TabLabelService } from "../../services/tab-label.service";
@@ -63,6 +63,6 @@ export class DockingGuidesComponent {
     const target = this.drag.target();
     if (target instanceof SplitDropTarget)
       return Resources.edgeDirections[target.edge];
-    return new TabDropTarget(frame.group.id, frame.group.tabs.length).equals(target) ? DockingDirection.Center : null;
+    return new GroupDropTarget(frame.group.id).equals(target) ? DockingDirection.Center : null;
   }
 }

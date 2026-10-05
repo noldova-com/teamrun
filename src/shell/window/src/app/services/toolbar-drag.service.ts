@@ -89,30 +89,39 @@ export class ToolbarDragService {
   }
 
   private targetAt(name: string, x: number, y: number): ToolbarDropTarget | null {
-    const band = this.document.querySelector<HTMLElement>(Resources.toolbarBandSelector)?.getBoundingClientRect();
+    const bandElement = this.document.querySelector<HTMLElement>(Resources.toolbarBandSelector);
     const rows = [...this.document.querySelectorAll<HTMLElement>(Resources.toolbarRowSelector)];
-    if (Object.isUndefined(band) || rows.length === 0 || x < band.left || x > band.right || y < band.top || y > band.bottom)
+    if (Object.isNull(bandElement) || rows.length === 0)
+      return null;
+    const band = bandElement.getBoundingClientRect();
+    if (x < band.left || x > band.right || y < band.top || y > band.bottom)
       return null;
     const element = rows.find(t => y <= t.getBoundingClientRect().bottom) ?? rows[rows.length - 1] as HTMLElement;
     const rect = element.getBoundingClientRect();
     const row = Number(element.dataset[Resources.toolbarRowData]);
     const edge = rect.height / Resources.toolbarEdgeFraction;
+    const halfGap = parseFloat(getComputedStyle(bandElement).rowGap) / 2;
     if (y < rect.top + edge)
-      return new ToolbarDropTarget(row, 0, true, rect.left, rect.top, rect.width);
+      return new ToolbarDropTarget(row, 0, true, rect.left, rect.top - halfGap, rect.width);
     if (y > rect.bottom - edge)
-      return new ToolbarDropTarget(row + 1, 0, true, rect.left, rect.bottom, rect.width);
+      return new ToolbarDropTarget(row + 1, 0, true, rect.left, rect.bottom + halfGap, rect.width);
     return this.rowTarget(name, element, row, rect, x);
   }
 
   private rowTarget(name: string, element: HTMLElement, row: number, rect: DOMRect, x: number): ToolbarDropTarget {
     const items = [...element.querySelectorAll<HTMLElement>(Resources.toolbarSelector)].filter(t => t.dataset[Resources.toolbarData] !== name);
-    const next = items.find(t => x < t.getBoundingClientRect().left + t.getBoundingClientRect().width / 2);
+    const isRightToLeft = getComputedStyle(element).direction === Resources.rightToLeft;
+    const start = (box: DOMRect): number => isRightToLeft ? box.right : box.left;
+    const end = (box: DOMRect): number => isRightToLeft ? box.left : box.right;
+    const isBefore = (box: DOMRect): boolean => isRightToLeft ? x > box.left + box.width / 2 : x < box.left + box.width / 2;
+    const next = items.map(t => ({ element: t, box: t.getBoundingClientRect() })).find(t => isBefore(t.box));
     const last = items.at(-1)?.getBoundingClientRect();
     const length = this.toolbars.rows()[row]?.length ?? 0;
     const dragged = this.toolbars.rows().flatMap((t, r) => t.map((u, i) => ({ name: u.name, row: r, index: i }))).find(t => t.name === name);
-    const before = Object.isUndefined(next) ? length : Number(next.dataset[Resources.toolbarIndexData]);
+    const before = Object.isUndefined(next) ? length : Number(next.element.dataset[Resources.toolbarIndexData]);
     const index = dragged?.row === row && dragged.index < before ? before - 1 : before;
     const bar = (element.querySelector<HTMLElement>(Resources.toolbarSelector) ?? element).getBoundingClientRect();
-    return new ToolbarDropTarget(row, index, false, next?.getBoundingClientRect().left ?? last?.right ?? rect.left, bar.top, bar.height);
+    const edge = Object.isUndefined(next) ? (Object.isUndefined(last) ? start(rect) : end(last)) : start(next.box);
+    return new ToolbarDropTarget(row, index, false, edge, bar.top + bar.height / 2, 0);
   }
 }

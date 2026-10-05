@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { ErrorHandler, type WritableSignal, signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
@@ -34,7 +35,7 @@ describe("ToastService", () => {
     id: number,
     kind: string,
     options: Partial<{ sequence: number; severity: NotificationSeverity; text: string; progress: number | typeof NotificationPost.indeterminate; isRead: boolean }> = {}): Notification =>
-    new Notification(id, options.sequence ?? id, new NotificationPost(
+    new Notification(String(id), options.sequence ?? id, new NotificationPost(
       QualifiedName.parse(kind), null, `Title ${id}`, options.text ?? null, options.severity ?? NotificationSeverity.Info, null, [], options.progress ?? null),
     "2026-10-03T08:00:00.000Z", options.isRead ?? false);
   const latest = (list: readonly Notification[]): number => Math.max(0, ...list.map(t => t.sequence));
@@ -53,7 +54,7 @@ describe("ToastService", () => {
     TestBed.tick();
   }
 
-  const shown = (service: ToastService): number[] => service.toasts().map(t => t.id);
+  const shown = (service: ToastService): number[] => service.toasts().map(t => Number(t.id));
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -69,15 +70,24 @@ describe("ToastService", () => {
   });
 
   it("toasts only what has a higher sequence than the first read and announces it, errors assertively", () => {
+    const announce = vi.spyOn(TestBed.inject(LiveAnnouncer), "announce").mockResolvedValue();
     const service = start(notification(1, "clock.alarm"));
 
     post(false, notification(2, "notes.saved", { text: "Plan.md" }), notification(1, "clock.alarm"));
-    const polite = service.politeAnnouncement();
     post(false, notification(3, "notes.failed", { severity: NotificationSeverity.Error, text: "The disk is full." }), notification(2, "notes.saved", { text: "Plan.md" }), notification(1, "clock.alarm"));
 
     expect(shown(service)).toEqual([2, 3]);
-    expect(polite).toBe("Title 2. Plan.md");
-    expect(service.assertiveAnnouncement()).toBe("Title 3. The disk is full.");
+    expect(announce.mock.calls).toEqual([["Title 2. Plan.md", "polite"], ["Title 3. The disk is full.", "assertive"]]);
+  });
+
+  it("announces the toasts one update shows in one announcement, assertively when any of them is an error", () => {
+    const announce = vi.spyOn(TestBed.inject(LiveAnnouncer), "announce").mockResolvedValue();
+    const service = start(notification(1, "clock.alarm"));
+
+    post(false, notification(3, "notes.saved"), notification(2, "notes.failed", { severity: NotificationSeverity.Error, text: "The disk is full" }), notification(1, "clock.alarm"));
+
+    expect(shown(service)).toEqual([2, 3]);
+    expect(announce.mock.calls).toEqual([["Title 2. The disk is full. Title 3", "assertive"]]);
   });
 
   it("waits for the first read, then toasts only what follows it, even when it saw newer state first", () => {
@@ -142,8 +152,8 @@ describe("ToastService", () => {
 
     post(false, ...list);
     const firstThree = shown(service);
-    notifications.stateValue.set(new NotificationState(list.filter(t => t.id !== 4), false, [], 5));
-    service.close(1);
+    notifications.stateValue.set(new NotificationState(list.filter(t => t.id !== "4"), false, [], 5));
+    service.close("1");
     TestBed.tick();
 
     expect(firstThree).toEqual([1, 2, 3]);
@@ -157,16 +167,16 @@ describe("ToastService", () => {
       notification(3, "notes.failed", { severity: NotificationSeverity.Error }),
       notification(2, "notes.saved", { severity: NotificationSeverity.Success }),
       notification(1, "clock.alarm"));
-    service.close(4);
+    service.close("4");
     post(false, notification(4, "clock.sync", { progress: 0.5 }), notification(3, "notes.failed", { severity: NotificationSeverity.Error }), notification(2, "notes.saved", { severity: NotificationSeverity.Success }));
 
     vi.advanceTimersByTime(3_000);
-    service.pause(1);
-    service.pause(1);
+    service.pause("1");
+    service.pause("1");
     vi.advanceTimersByTime(10_000);
     const whilePaused = shown(service);
-    service.resume(1);
-    service.resume(1);
+    service.resume("1");
+    service.resume("1");
     vi.advanceTimersByTime(4_999);
     const beforeEnd = shown(service);
     vi.advanceTimersByTime(1);
@@ -206,7 +216,7 @@ describe("ToastService", () => {
 });
 
 describe("ToastService with the window parts", () => {
-  const wire = (id: number, title: string): object => ({ id, sequence: id, post: { kind: "notes.saved", title, severity: "Warning", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false });
+  const wire = (id: number, title: string): object => ({ id: String(id), sequence: id, post: { kind: "notes.saved", title, severity: "Warning", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false });
 
   afterEach(() => {
     DesktopBridgeFixture.remove();
@@ -218,7 +228,7 @@ describe("ToastService with the window parts", () => {
     const errors: unknown[] = [];
     vi.spyOn(document, "hasFocus").mockReturnValue(true);
     let answerPost: (value: unknown) => void = () => undefined;
-    bridge.responses.set("shell.modules", { payload: { modules: [{ id: "notes", state: "Active" }] } });
+    bridge.responses.set("shell.modules", { payload: { modules: [{ id: "notes", version: "0.0.1", displayName: "Notes", description: "Keeps notes.", dependencies: [], contributes: {}, state: "Active" }] } });
     bridge.responses.set("shell.postNotification", new Promise(resolve => {
       answerPost = resolve;
     }));
@@ -230,9 +240,10 @@ describe("ToastService with the window parts", () => {
         isActivated = true;
         return Promise.resolve();
       },
+      reconnectAsync: () => Promise.resolve(false),
       deactivateAsync: () => Promise.resolve()
     };
-    const source = new WindowPartSource("notes", "Notes", [], [], [], [], [], [], ["notes.saved"], () => Promise.resolve(part));
+    const source = new WindowPartSource("notes", [], [], [], [], [], [], ["notes.saved"], () => Promise.resolve(part));
     TestBed.configureTestingModule({
       providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }, { provide: WindowPartTokens.sources, useValue: [source] }]
     });
@@ -243,7 +254,7 @@ describe("ToastService with the window parts", () => {
     bridge.responses.set("shell.notifications", { payload: { notifications: [wire(1, "Early")], isDoNotDisturb: false, mutedModules: [], sequence: 1 } });
     bridge.publishEvent("shell.notifications", { notifications: [wire(1, "Early")], isDoNotDisturb: false, mutedModules: [], sequence: 1 });
     const readsBeforeAnswer = bridge.requests.filter(t => t[0] === "shell.notifications").length;
-    answerPost({ payload: { id: 1 } });
+    answerPost({ payload: { id: "1" } });
     await vi.waitFor(() => {
       TestBed.tick();
       expect(TestBed.inject(NotificationService).firstRead()?.sequence).toBe(1);

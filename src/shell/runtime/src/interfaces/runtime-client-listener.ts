@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { Event } from "@noldova/teamrun-shell-protocol";
+import type { Event, Failure } from "@noldova/teamrun-shell-protocol";
 
 export interface IRuntimeClientListener {
   onEvent(event: Event): void;
 
-  onDisconnected(): void;
+  onDisconnected(failure: Failure | null): void;
 }

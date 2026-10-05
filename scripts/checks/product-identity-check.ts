@@ -57,7 +57,7 @@ export default class ProductIdentityCheck implements ICheck {
       return matches
         .filter(t => !matches.some(u => u !== t && u.start <= t.start && u.end >= t.end && u.end - u.start > t.end - t.start))
         .sort((first, second) => first.start - second.start)
-        .map(t => `${file.formatLocation(line)}: spells "${t.value}"; the shell takes the product's identity from its stamped resources.`);
+        .map(t => `${file.formatLocation(line)}: spells "${t.value}"; the shell takes the product's identity from the build's product file through ProductInfo.`);
     });
   }
 

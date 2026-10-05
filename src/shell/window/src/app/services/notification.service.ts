@@ -51,7 +51,7 @@ export class NotificationService {
   }
 
   public isAvailable(command: CommandRun): boolean {
-    return this.commands.commands().some(t => t.name === command.name.text);
+    return this.commands.isAvailable(command.name.text, command.commandArguments);
   }
 
   public runAsync(command: CommandRun): Promise<JsonValue> {
@@ -66,7 +66,7 @@ export class NotificationService {
     this.send(ShellMethods.clearNotifications.text, null);
   }
 
-  public dismiss(id: number): void {
+  public dismiss(id: string): void {
     this.send(ShellMethods.dismissNotification.text, new NotificationReference(id).toJson());
   }
 
@@ -74,7 +74,7 @@ export class NotificationService {
     this.settings.setAsync(Resources.doNotDisturbSetting, isOn).catch((error: unknown) => this.errors.handleError(error));
   }
 
-  private open(id: number): void {
+  private open(id: string): void {
     const command = this.stateValue().notifications.find(t => t.id === id)?.post.open ?? null;
     if (!Object.isNull(command) && this.isAvailable(command))
       this.runAsync(command).catch((error: unknown) => this.errors.handleError(error));

@@ -6,9 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "@angular/cdk";
 @use "material-symbols/rounded.css";
 @use "./fonts";
 @use "./base";
+@use "./drop-line";
 @use "./overlays";
 @use "./popover";
 @use "./scroll";
+
+@include cdk.a11y-visually-hidden();

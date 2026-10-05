@@ -66,6 +66,15 @@ export class AppearanceFixture {
       expect(actual).toBe(resolved);
   }
 
+  public static measureLook(name: string): number {
+    const probe = document.createElement("div");
+    probe.style.height = `var(--tr-${name})`;
+    document.body.append(probe);
+    const height = probe.getBoundingClientRect().height;
+    probe.remove();
+    return height;
+  }
+
   public static readColor(theme: Theme, mode: ThemeMode, key: string): string {
     const color = theme.readColor(mode, key);
     if (color === undefined)

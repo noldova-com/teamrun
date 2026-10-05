@@ -41,7 +41,8 @@ describe("DesktopBridgeService", () => {
     onNotificationOpened: (): (() => void) => () => undefined,
     onQuitQuestion: (): (() => void) => () => undefined,
     answerQuit: (): Promise<boolean> => Promise.resolve(true),
-    logModule: (): void => undefined
+    logModule: (): void => undefined,
+    logError: (): void => undefined
   };
   const incomplete: readonly [string, unknown][] = [
     ["nothing", undefined],
@@ -65,7 +66,8 @@ describe("DesktopBridgeService", () => {
     ["no onNotificationOpened", { ...complete, onNotificationOpened: null }],
     ["no onQuitQuestion", { ...complete, onQuitQuestion: null }],
     ["no answerQuit", { ...complete, answerQuit: null }],
-    ["no logModule", { ...complete, logModule: null }]
+    ["no logModule", { ...complete, logModule: null }],
+    ["no logError", { ...complete, logError: null }]
   ];
 
   for (const [name, value] of incomplete)
@@ -215,17 +217,17 @@ describe("DesktopBridgeService", () => {
     expect([bridge.copied, bridge.logFolderOpens]).toEqual([["clock: Failed"], 1]);
   });
 
-  it("passes on the id of a notification opened from the operating system and ignores one that is not a whole number", () => {
+  it("passes on the id of a notification opened from the operating system and ignores a blank one", () => {
     const bridge = DesktopBridgeFixture.install();
-    const opened: number[] = [];
+    const opened: string[] = [];
 
     const stop = TestBed.inject(DesktopBridgeService).onNotificationOpened(t => opened.push(t));
-    bridge.publishNotificationOpened(2);
-    bridge.publishNotificationOpened(1.5);
+    bridge.publishNotificationOpened("n2");
+    bridge.publishNotificationOpened(" ");
     stop();
-    bridge.publishNotificationOpened(3);
+    bridge.publishNotificationOpened("n3");
 
-    expect(opened).toEqual([2]);
+    expect(opened).toEqual(["n2"]);
   });
 
   it("passes on the device's last appearance and keeps the window's", () => {
@@ -251,9 +253,10 @@ describe("DesktopBridgeService", () => {
     bridge.askToQuit(null);
     const isTaken = await service.answerQuitAsync(QuitChoice.Wait);
     service.logModule("clock", "Ticked");
+    service.logError("clock", "Error: It broke.");
 
     expect(questions.map(t => t === null ? null : [t.descriptions, t.isWaiting])).toEqual([[["Indexing the project"], true], null]);
-    expect([isTaken, bridge.quitAnswers, bridge.logged]).toEqual([true, ["Wait"], ["clock: Ticked"]]);
+    expect([isTaken, bridge.quitAnswers, bridge.logged, bridge.errorsLogged]).toEqual([true, ["Wait"], ["clock: Ticked"], [["clock", "Error: It broke."]]]);
   });
 
   it("refuses a kept layout that is not a JSON object", async () => {

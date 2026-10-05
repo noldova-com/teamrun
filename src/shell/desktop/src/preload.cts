@@ -86,8 +86,8 @@ contextBridge.exposeInMainWorld("teamrun", {
     ipcRenderer.on("teamrun:menuCommand", handler);
     return () => ipcRenderer.removeListener("teamrun:menuCommand", handler);
   },
-  onNotificationOpened(listener: (id: number) => void): () => void {
-    const handler = (_event: IpcRendererEvent, id: number): void => listener(id);
+  onNotificationOpened(listener: (id: string) => void): () => void {
+    const handler = (_event: IpcRendererEvent, id: string): void => listener(id);
     ipcRenderer.on("teamrun:notificationOpened", handler);
     return () => ipcRenderer.removeListener("teamrun:notificationOpened", handler);
   },
@@ -101,5 +101,8 @@ contextBridge.exposeInMainWorld("teamrun", {
   },
   logModule(moduleId: string, message: string): void {
     ipcRenderer.send("teamrun:moduleLog", moduleId, message);
+  },
+  logError(moduleId: string | null, text: string): void {
+    ipcRenderer.send("teamrun:windowError", moduleId, text);
   }
 });

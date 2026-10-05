@@ -78,10 +78,16 @@ export class RuntimeLauncher {
     const deadline = Date.now() + this.settings.launchTimeout;
     const limit = Date.now() + this.settings.launchLimit;
     let started: StartedRuntime | null = null;
+    let refusals = 0;
     for (;;) {
       const discovery = await DiscoveryReader.readAsync(this.settings.dataDirectory);
       if (!Object.isNull(discovery) && OwnershipLock.isOwned(this.settings.dataDirectory)) {
-        const client = await this.tryConnectAsync(discovery, clientName, listener);
+        const client = await this.tryConnectAsync(discovery, clientName, listener).catch(async (error: unknown) => {
+          if (refusals >= Resources.refusedTokenRetries || !await this.isRepublishedAsync(error, discovery))
+            throw error;
+          refusals++;
+          return null;
+        });
         if (!Object.isNull(client)) {
           await RuntimeLauncher.forgetAsync(started);
           started = null;
@@ -138,6 +144,11 @@ export class RuntimeLauncher {
         return null;
       throw error;
     }
+  }
+
+  private async isRepublishedAsync(error: unknown, discovery: RuntimeDiscovery): Promise<boolean> {
+    return error instanceof ConnectionException && error.failure?.code === FailureCode.Unauthorized &&
+      (await DiscoveryReader.readAsync(this.settings.dataDirectory))?.token !== discovery.token;
   }
 
   private async resolveOtherBuildAsync(client: RuntimeClient, handover: RuntimeHandover, policy: StopPolicy, deadline: number, takeOver: boolean): Promise<void> {

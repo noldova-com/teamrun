@@ -17,6 +17,7 @@ import GalleryFile from "../angular/gallery-file.ts";
 import ProductFile from "../angular/product-file.ts";
 import Build from "../build.ts";
 import ElectronBinary from "../desktop/electron-binary.ts";
+import BuildVariant from "../modules/build-variant.ts";
 import ModuleArtifacts from "../modules/module-artifacts.ts";
 import ModuleCatalog from "../modules/module-catalog.ts";
 import PackageBuild from "../packages/package-build.ts";
@@ -45,17 +46,52 @@ class BuildTests {
       assert.equal(output.text, "No packages under src/; there is nothing to build.\nModules in the build: 0.\nNo Angular project under src/; there is nothing to prepare.\n");
     });
 
-    test("packages are built and installed, and the build says how many", { timeout: BuildTests.BUILD_TIMEOUT }, async t => {
+    test("packages are built and installed, the build says how many, and its product file holds the product's identity, version and fingerprint", { timeout: BuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await PackageTreeFixture.writeRootAsync(repository);
       await PackageTreeFixture.writePackageAsync(repository, "foundation-alpha", [], false);
+      await repository.writeAsync({
+        "package.json": JSON.stringify({ name: "fixture", version: "0.0.7", teamrun: { protocolVersion: 3, modules: ["notes"], product: ProductIdentityFixture.json }, private: true, type: "module" }),
+        "src/modules/notes/module.json": JSON.stringify({ id: "notes", version: "0.0.1", displayName: "Notes", description: "Used by the tests.", parts: ["window"], dependencies: [], contributes: {} }),
+        "src/modules/notes/window/src/api/index.ts": "export {};\n",
+        [`${ModuleCatalog.FIXTURE_FOLDER}/clock/module.json`]: JSON.stringify({ id: "clock", version: "0.0.1", displayName: "Clock", description: "Used by the tests.", parts: ["window"], dependencies: [], contributes: {} }),
+        [`${ModuleCatalog.FIXTURE_FOLDER}/clock/window/src/api/index.ts`]: "export {};\n"
+      });
       const output = new TextOutputFixture();
+      const tested = path.join(repository.directory, "_build", "variants", "tested");
+      const withoutNotes = path.join(repository.directory, "_build", "variants", "without-notes");
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const fingerprints = [
+        await build.hashFingerprintAsync(BuildVariant.REGULAR),
+        await build.hashFingerprintAsync(new BuildVariant(true, [])),
+        await build.hashFingerprintAsync(new BuildVariant(true, ["notes"]))
+      ];
+      const readAsync = async (file: string): Promise<Record<string, unknown>> => JSON.parse(await readFile(file, "utf8"));
 
       assert.equal(await BuildTests.create(repository.directory, output, process.env).runAsync([]), 0);
+      assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--test", "--output", tested]), 0);
+      assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--test", "--output", withoutNotes, "--without", "notes"]), 0);
+      const products = [
+        await readAsync(path.join(repository.directory, "_build", "product.json")),
+        await readAsync(path.join(tested, "product.json")),
+        await readAsync(path.join(withoutNotes, "product.json"))
+      ];
+
       assert.equal(
         output.text,
-        "@noldova/teamrun-foundation-alpha: built\nPackages built and installed: 1.\nModules in the build: 0.\nNo Angular project under src/; there is nothing to prepare.\n");
+        "@noldova/teamrun-foundation-alpha: built\nPackages built and installed: 1.\nModules in the build: 1.\nNo Angular project under src/; there is nothing to prepare.\n");
+      assert.equal(new Set(fingerprints).size, 3);
+      assert.deepEqual(products.map(t => t["build"]), fingerprints);
+      assert.deepEqual(Object.keys(products[0] ?? {}), [
+        "name", "slug", "applicationId", "developmentApplicationId", "dataFolder", "deviceFolders", "dataDirectoryVariable", "icons", "version", "build"
+      ]);
+      assert.equal(products[0]?.["name"], ProductIdentityFixture.json["name"]);
+      assert.deepEqual(products[0]?.["deviceFolders"], ProductIdentityFixture.json["deviceFolders"]);
+      assert.equal(products[0]?.["version"], "0.0.7");
+      const withoutBuild = (product: Record<string, unknown> | undefined): Record<string, unknown> => Object.fromEntries(Object.entries(product ?? {}).filter(([key]) => key !== "build"));
+      for (const product of products)
+        assert.deepEqual(withoutBuild(product), withoutBuild(products[0]));
     });
 
     test("a test build adds the fixture modules, leaves out the named ones and writes the module artifacts", async t => {
@@ -63,9 +99,9 @@ class BuildTests {
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
         "package.json": JSON.stringify({ teamrun: { modules: ["notes"], product: ProductIdentityFixture.json } }),
-        "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", parts: ["window"], dependencies: [], contributes: { views: ["notes.list"] } }),
+        "src/modules/notes/module.json": JSON.stringify({ id: "notes", version: "0.0.1", displayName: "Notes", description: "Used by the tests.", parts: ["window"], dependencies: [], contributes: { views: ["notes.list"] } }),
         "src/modules/notes/window/src/api/index.ts": "export {};\n",
-        [`${ModuleCatalog.FIXTURE_FOLDER}/clock/module.json`]: JSON.stringify({ id: "clock", displayName: "Clock", parts: ["window"], dependencies: ["notes"], contributes: {} }),
+        [`${ModuleCatalog.FIXTURE_FOLDER}/clock/module.json`]: JSON.stringify({ id: "clock", version: "0.0.1", displayName: "Clock", description: "Used by the tests.", parts: ["window"], dependencies: ["notes"], contributes: {} }),
         [`${ModuleCatalog.FIXTURE_FOLDER}/clock/window/src/api/index.ts`]: "export {};\n"
       });
       const artifacts = new ModuleArtifacts(repository.directory);
@@ -89,7 +125,7 @@ class BuildTests {
       assert.equal(unknown.text, "The build has no module weather to leave out.\n");
       assert.equal(await readFile(artifacts.declarationsFile, "utf8"), testedDeclarations);
       assert.doesNotMatch(await readFile(artifacts.locateDeclarations(variant), "utf8"), /"id": "clock"/);
-      assert.match(regularParts, /\[\n {2}new WindowPartSource\("notes", "Notes", \[\], \["notes\.list"\], \[\], \[\], \[\], \[\], \[\], \(\) => import\("\.\.\/modules\/notes\/window\/src\/api\/index"\)\.then\(t => t\.windowPart\)\)\n\];\n\nexport const moduleMenus: readonly MenuDeclarations\[\] = \[\];\n$/);
+      assert.match(regularParts, /\[\n {2}new WindowPartSource\("notes", \[\], \["notes\.list"\], \[\], \[\], \[\], \[\], \[\], \(\) => import\("\.\.\/modules\/notes\/window\/src\/api\/index"\)\.then\(t => t\.windowPart\)\)\n\];\n\nexport const moduleMenus: readonly MenuDeclarations\[\] = \[\];\n$/);
       assert.match(testedParts, /import\("\.\.\/shell\/desktop\/tests\/e2e\/fixtures\/modules\/clock\/window\/src\/api\/index"\)/);
       assert.match(testedDeclarations, /"id": "notes"[\s\S]*"id": "clock"/);
     });

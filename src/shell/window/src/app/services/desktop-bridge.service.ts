@@ -112,9 +112,9 @@ export class DesktopBridgeService {
     this.bridge.keepAppearance(preferences);
   }
 
-  public onNotificationOpened(listener: (id: number) => void): () => void {
+  public onNotificationOpened(listener: (id: string) => void): () => void {
     return this.bridge.onNotificationOpened(t => {
-      if (Number.isSafeInteger(t))
+      if (Object.isString(t) && !String.isNullOrWhitespace(t))
         listener(t);
     });
   }
@@ -129,6 +129,10 @@ export class DesktopBridgeService {
 
   public logModule(moduleId: string, message: string): void {
     this.bridge.logModule(moduleId, message);
+  }
+
+  public logError(moduleId: string | null, text: string): void {
+    this.bridge.logError(moduleId, text);
   }
 
   private static readAnswer(value: unknown): JsonValue {
@@ -170,6 +174,7 @@ export class DesktopBridgeService {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onNotificationOpened))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onQuitQuestion))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerQuit))) &&
-      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.logModule)));
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.logModule))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.logError)));
   }
 }

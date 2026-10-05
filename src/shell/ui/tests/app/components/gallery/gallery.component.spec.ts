@@ -109,7 +109,7 @@ describe("GalleryComponent", () => {
     const offered = specimens.filter(t => t.querySelector(".tr-gallery-specimen-focus") !== null).map(t => t.getAttribute("aria-label"));
     const without = specimens.filter(t => t.querySelector(".tr-gallery-specimen-focus") === null).map(t => t.getAttribute("aria-label"));
 
-    expect(offered).toEqual(["Button", "Icon button", "Checkbox", "Text field", "Select", "Choice pills", "Tab", "Toolbar", "Toolbar button", "Sash", "Menu", "Popover", "Tooltip",
+    expect(offered).toEqual(["Button", "Icon button", "Checkbox", "Text field", "Select", "Choice pills", "Tab", "Tree", "Toolbar", "Toolbar button", "Sash", "Menu", "Popover", "Tooltip",
       "Dialog", "Quick input"]);
     expect(without).toEqual(["Progress", "Spinner", "Badge and key chip", "View badge", "Panel card", "Docking guides"]);
   });

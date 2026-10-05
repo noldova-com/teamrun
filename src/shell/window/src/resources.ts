@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { FocusOrigin } from "@angular/cdk/a11y";
+import type { AriaLivePoliteness, FocusOrigin } from "@angular/cdk/a11y";
 
 import "@noldova/teamrun-foundation-core";
 import { ModuleState, NotificationSeverity } from "@noldova/teamrun-shell-protocol";
@@ -33,6 +33,8 @@ export class Resources {
   public static readonly dockMinimumSize: number = 10;
   public static readonly dockStripSize: number = 2.75;
   public static readonly documentMinimumSize: number = 13.75;
+  public static readonly middlePreferredSize: number = 30;
+  public static readonly dockReopenMargin: number = 2;
   public static readonly groupMinimumLengths: Readonly<Record<SplitAxis, number>> = {
     [SplitAxis.Horizontal]: 10,
     [SplitAxis.Vertical]: 6.25
@@ -83,6 +85,8 @@ export class Resources {
   public static readonly dropTargetSeparator: string = ":";
   public static readonly tabKeySelector: string = "[data-tab-key]";
   public static readonly tabKeyData: string = "tabKey";
+  public static readonly tabGroupSelector: string = "tr-tab-group";
+  public static readonly tabGroupData: string = "group";
   public static readonly tabCloseSelector: string = ".tr-tab-close";
   public static readonly selectedTabSelector: string = ".tr-tab-selected";
   public static readonly revealOptions: ScrollIntoViewOptions = { block: "nearest", inline: "nearest" };
@@ -197,9 +201,15 @@ export class Resources {
   public static readonly showInDialogTitle: string = "Show in a dialog";
   public static readonly showInDialogGlyph: string = "open_in_full";
   public static readonly dialogAlreadyOpen: string = "A dialog is already open.";
+  public static readonly dialogWhileReconnecting: string = "A dialog can't open while the window reconnects to the runtime.";
   public static readonly settingsDocument: string = "shell.settings";
   public static readonly settingsTitle: string = "Settings";
   public static readonly settingsGlyph: string = "settings";
+  public static readonly openModulesCommand: string = "shell.openModules";
+  public static readonly openModulesTitle: string = "Modules…";
+  public static readonly modulesDocument: string = "shell.modules";
+  public static readonly modulesTitle: string = "Modules";
+  public static readonly modulesGlyph: string = "extension";
   public static readonly modifiedLabel: string = "Modified";
   public static readonly modifiedGlyph: string = "circle";
   public static readonly resetLabel: string = "Reset";
@@ -223,6 +233,7 @@ export class Resources {
   public static readonly searchSettingsLabel: string = "Search settings";
   public static readonly settingsPagesLabel: string = "Settings pages";
   public static readonly noSettingsFound: string = "No settings match your search.";
+  public static readonly settingsSearchResults: string = "Search results";
   public static readonly commandColumn: string = "Command";
   public static readonly ownerColumn: string = "From";
   public static readonly keyColumn: string = "Key";
@@ -230,6 +241,7 @@ export class Resources {
   public static readonly noKey: string = "No key";
   public static readonly choicePillMinimum: number = 2;
   public static readonly choicePillLimit: number = 4;
+  public static readonly settingErrorIdPrefix: string = "tr-setting-error-";
   public static readonly shortcutsExplanation: string = "The keys that run commands. Choose a key to record a new one; your keys apply on every device.";
   public static readonly resetAllShortcutsLabel: string = "Reset all shortcuts";
   public static readonly removeKeyLabel: string = "Remove";
@@ -307,6 +319,9 @@ export class Resources {
     ["shell.toggleRightDock", ["Mod+Alt+B"], ["Mod+Alt+B"]]
   ];
   public static readonly commandSearchLabel: string = "Search commands";
+  public static readonly recentCommandCountSetting: string = "shell.recentCommandCount";
+  public static readonly recentlyUsedSection: string = "recently used";
+  public static readonly otherCommandsSection: string = "other commands";
   public static readonly commandSearchPaneClass: string = "tr-command-search-pane";
   public static readonly windowRowSelector: string = "tr-window-row";
   public static readonly detailSeparator: string = " ";
@@ -322,6 +337,7 @@ export class Resources {
   public static readonly regionRole: string = "region";
   public static readonly tabPanelRole: string = "tabpanel";
   public static readonly verticalOrientation: string = "vertical";
+  public static readonly rightToLeft: string = "rtl";
   public static readonly previewTabsSetting: string = "shell.previewTabs";
   public static readonly dockStyleSettings: ReadonlyMap<DockSide, string> = new Map([[DockSide.Left, "shell.leftDockStyle"], [DockSide.Right, "shell.rightDockStyle"]]);
   public static readonly dockStripLabels: Readonly<Record<DockSide, string>> = {
@@ -354,6 +370,7 @@ export class Resources {
   public static readonly versionField: string = "version";
   public static readonly docksField: string = "docks";
   public static readonly middleField: string = "middle";
+  public static readonly middleSizeField: string = "middleSize";
   public static readonly rootField: string = "root";
   public static readonly sizeField: string = "size";
   public static readonly collapsedField: string = "collapsed";
@@ -471,7 +488,7 @@ export class Resources {
   public static readonly menuBarLabel: string = "Menus";
   public static readonly menuBarSetting: string = "shell.menuBar";
   public static readonly menuBarItemSelector: string = "[tr-menu-bar-item]";
-  public static readonly windowRowMinimumDragWidth: number = 96;
+  public static readonly windowRowMinimumDragRem: number = 6;
   public static readonly altKey: string = "Alt";
   public static readonly functionKey: string = "F10";
   public static readonly ariaExpandedAttribute: string = "aria-expanded";
@@ -515,6 +532,7 @@ export class Resources {
   public static readonly docksGroup: string = "shell.docks";
   public static readonly bottomDockGroup: string = "shell.bottomDock";
   public static readonly layoutGroup: string = "shell.layout";
+  public static readonly modulesGroup: string = "shell.modules";
   public static readonly toolbarsMenu: string = "shell.toolbars";
   public static readonly toolbarsMenuTitle: string = "Toolbars";
   public static readonly noPlace: string = "";
@@ -589,6 +607,9 @@ export class Resources {
   public static readonly invalidModuleId: string = "A module id is lowercase kebab-case.";
   public static readonly windowPartLoadFailed: string = "Its window part could not be loaded.";
   public static readonly windowPartActivationFailed: string = "Its window part failed to activate.";
+  public static readonly windowPartReconnectionFailed: string = "Its window part failed to continue after the runtime started again.";
+  public static readonly windowLogLimit: number = 65536;
+  public static readonly causeSeparator: string = "\nCaused by: ";
   public static readonly invalidInstance: string = "An instance is a string that is not blank.";
   public static readonly invalidBounds: string = "Bounds need finite coordinates and a width and height that are not negative.";
   public static readonly invalidSize: string = "A size is a finite number of rem.";
@@ -599,6 +620,7 @@ export class Resources {
   public static readonly previewOutsideGroup: string = "The preview tab must be one of the group's tabs.";
   public static readonly documentOutsideDocuments: string = "Document tabs stay in document groups.";
   public static readonly missingDocumentsGroup: string = "The middle holds at least one document group.";
+  public static readonly invalidMiddleSize: string = "The middle's wanted width is from 0 to its preferred 30rem.";
   public static readonly documentsInDock: string = "Document groups stay in the middle.";
   public static readonly repeatedDock: string = "A layout has one dock for each side.";
   public static readonly repeatedNodeId: string = "Each group and split in a layout has its own id.";
@@ -610,7 +632,6 @@ export class Resources {
   public static readonly appMenu: string = "shell.app";
   public static readonly appMenuTitle: string = Resources.productName;
   public static readonly noModules: string = "No modules";
-  public static readonly moduleFailuresTitle: string = "Modules that didn't start";
   public static readonly copyDetailsLabel: string = "Copy details";
   public static readonly copiedLabel: string = "Copied";
   public static readonly openLogFolderLabel: string = "Open log folder";
@@ -622,6 +643,26 @@ export class Resources {
     [ModuleState.Failed]: "Failed",
     [ModuleState.Blocked]: "Blocked"
   };
+  public static readonly moduleVersionTitle: string = "Version";
+  public static readonly moduleStateTitle: string = "State";
+  public static readonly blockedByTitle: string = "Blocked by";
+  public static readonly dependenciesTitle: string = "Depends on";
+  public static readonly dependentsTitle: string = "Needed by";
+  public static readonly noModulesNamed: string = "None";
+  public static readonly contributionsTitle: string = "Contributes";
+  public static readonly noContributions: string = "No commands, settings, menus, views or notification kinds.";
+  public static readonly commandsKind: string = "commands";
+  public static readonly settingsKind: string = "settings";
+  public static readonly notificationsKind: string = "notifications";
+  public static readonly moduleContributionKinds: readonly (readonly [string, string])[] = [
+    [Resources.commandsKind, "Commands"],
+    [Resources.settingsKind, "Settings"],
+    ["menus", "Menus"],
+    ["views", "Views"],
+    [Resources.notificationsKind, "Notification kinds"]
+  ];
+  public static readonly moduleSelector: string = "[data-module]";
+  public static readonly moduleData: string = "module";
   public static readonly bridgeName: string = "teamrun";
   public static readonly macPlatform: string = "darwin";
   public static readonly backgroundField: string = "background";
@@ -683,12 +724,16 @@ export class Resources {
     return `${displayName} didn't start`;
   }
 
+  public static formatProductVersion(productVersion: string): string {
+    return `${Resources.productName} ${productVersion}`;
+  }
+
   public static formatBuildDetails(productVersion: string, fingerprint: string): string {
     return `${Resources.productName} ${productVersion}, build ${fingerprint}`;
   }
 
-  public static formatModuleDetails(moduleId: string, state: string, cause: string | null): string {
-    return Object.isNull(cause) ? `${moduleId}: ${state}` : `${moduleId}: ${state}: ${cause}`;
+  public static formatModuleDetails(moduleId: string, version: string, state: string, cause: string | null): string {
+    return Object.isNull(cause) ? `${moduleId} ${version}: ${state}` : `${moduleId} ${version}: ${state}: ${cause}`;
   }
 
   public static formatModuleBlocked(dependency: string): string {
@@ -716,6 +761,9 @@ export class Resources {
   public static readonly dismissLabel: string = "Dismiss";
   public static readonly unreadLimit: number = 9;
   public static readonly toastLimit: number = 3;
+  public static readonly politeAnnouncement: AriaLivePoliteness = "polite";
+  public static readonly assertiveAnnouncement: AriaLivePoliteness = "assertive";
+  public static readonly announcementSeparator: string = ". ";
   public static readonly hoverSelector: string = ":hover";
   public static readonly toastDuration: number = 8000;
   public static readonly toastKindInterval: number = 5000;
@@ -744,6 +792,10 @@ export class Resources {
 
   public static formatDocumentsGroup(position: number): string {
     return `${Resources.documentsGroupLabel} ${position}`;
+  }
+
+  public static formatDockStripView(side: DockSide, key: string): string {
+    return `tr-dock[data-side="${side}"] .tr-dock-strip-view[data-view="${CSS.escape(key)}"]`;
   }
 
   public static formatBadged(label: string, badge: string): string {

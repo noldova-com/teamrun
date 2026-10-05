@@ -101,7 +101,7 @@ export default class ProcessListFixture {
   public static async describeNamingAsync(text: string): Promise<string> {
     const output = process.platform === "win32"
       ? await ProcessListFixture.runAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
-        "CimCmdlets\\Get-CimInstance Win32_Process | Microsoft.PowerShell.Core\\ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }"], ProcessListFixture.COMMAND_LINE_TIMEOUT)
+        "Microsoft.PowerShell.Management\\Get-WmiObject -Query 'SELECT ProcessId, CommandLine FROM Win32_Process' | Microsoft.PowerShell.Core\\ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }"], ProcessListFixture.COMMAND_LINE_TIMEOUT)
       : await ProcessListFixture.runAsync("ps", ["-ww", "-A", "-o", "pid=,args="]);
     const naming = output.split(/\r?\n/).map(t => t.trim()).filter(t => t.includes(text));
     return naming.length === 0 ? "none" : naming.join("; ");
@@ -154,7 +154,7 @@ export default class ProcessListFixture {
   private static async describeOnWindowsAsync(processIds: readonly number[]): Promise<string> {
     try {
       return await ProcessListFixture.runAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
-        `CimCmdlets\\Get-CimInstance Win32_Process -Filter "${processIds.map(t => `ProcessId = ${t}`).join(" OR ")}" | Microsoft.PowerShell.Core\\ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" }`],
+        `Microsoft.PowerShell.Management\\Get-WmiObject -Query "SELECT ProcessId, CommandLine FROM Win32_Process WHERE ${processIds.map(t => `ProcessId = ${t}`).join(" OR ")}" |Microsoft.PowerShell.Core\\ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" }`],
         ProcessListFixture.COMMAND_LINE_TIMEOUT);
     }
     catch {

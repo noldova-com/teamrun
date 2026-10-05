@@ -16,7 +16,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import {
   BuildIdentity, CommandList, CommandRun, Event, FailureCode, ModuleStatusList, NotificationBroadcast, NotificationPost, NotificationReference, NotificationSeverity,
-  NotificationState, NotificationUpdate, NotificationsQuery, QualifiedName, Request, Response, SettingKey, SettingValue, SettingsQuery, SettingsSnapshot, ShellMethods, StopPolicy, StopRequest,
+  NotificationState, NotificationUpdate, NotificationsQuery, QualifiedName, RecentCommandUse, RecentCommands, RecentCommandsQuery, Request, Response, SettingKey, SettingValue, SettingsQuery, SettingsSnapshot, ShellMethods, StopPolicy, StopRequest,
   WindowStateKey, WindowStateWrite, WireDecoder
 } from "@noldova/teamrun-shell-protocol";
 import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
@@ -248,6 +248,53 @@ export class RuntimeHostTests {
   }
 
   @TestMethod
+  public keepsEachDevicesTwentyNewestCommandsNewestFirstAndPublishesEachUse(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      await fixture.startAsync();
+      const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      const uses = [...Array.from({ length: 22 }, (_, index) => `c${index}`), "c5"];
+
+      connection.sendMessages(
+        new Request("desktop:0", ShellMethods.recentCommands, new RecentCommandsQuery("d1").toJson()),
+        ...uses.map((t, index) => new Request(`desktop:${index + 1}`, ShellMethods.recordCommand, new RecentCommandUse("d1", t).toJson())),
+        new Request("desktop:24", ShellMethods.recordCommand, new RecentCommandUse("d2", "c0").toJson()),
+        new Request("desktop:25", ShellMethods.recentCommands, new RecentCommandsQuery("d1").toJson()),
+        new Request("desktop:26", ShellMethods.recentCommands, new RecentCommandsQuery("d2").toJson()),
+        new Request("desktop:27", ShellMethods.recordCommand, { device: "d1" }));
+      const [responses, events] = await RuntimeHostTests.readMessagesAsync(connection, 28 + 24);
+      const expected = ["c5", "c21", "c20", "c19", "c18", "c17", "c16", "c15", "c14", "c13", "c12", "c11", "c10", "c9", "c8", "c7", "c6", "c4", "c3", "c2"];
+
+      Assert.areEqual(JSON.stringify({ ids: [] }), JSON.stringify(responses.get("desktop:0")?.payload));
+      Assert.areEqual(JSON.stringify({ ids: expected }), JSON.stringify(responses.get("desktop:25")?.payload));
+      Assert.areEqual(JSON.stringify({ ids: ["c0"] }), JSON.stringify(responses.get("desktop:26")?.payload));
+      Assert.areEqual("InvalidParams", responses.get("desktop:27")?.failure?.code);
+      Assert.areEqual(24, events.filter(t => t.name.text === "shell.recentCommandsChanged").length);
+      Assert.areEqual(JSON.stringify({ ids: ["c0"], device: "d2" }), JSON.stringify(events.at(-1)?.payload));
+      Assert.areEqual(JSON.stringify({ ids: expected, device: "d1" }), JSON.stringify(events.at(-2)?.payload));
+    });
+  }
+
+  @TestMethod
+  public keepsRecentCommandsAcrossRuntimes(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      const first = await fixture.startAsync();
+      const [writer] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      writer.sendMessages(
+        new Request("desktop:1", ShellMethods.recordCommand, new RecentCommandUse("d1", "notes.newNote").toJson()),
+        new Request("desktop:2", ShellMethods.recordCommand, new RecentCommandUse("d1", "shell.openSettings").toJson()));
+      await RuntimeHostTests.readMessagesAsync(writer, 4);
+      first.requestStop("test");
+      await first.waitForStopAsync();
+
+      await fixture.startAsync();
+      const [reader] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      reader.sendMessages(new Request("desktop:3", ShellMethods.recentCommands, new RecentCommandsQuery("d1").toJson()));
+
+      Assert.areEqual("shell.openSettings,notes.newNote", RecentCommands.fromJson((await reader.readResponseAsync()).payload).ids.join(","));
+    });
+  }
+
+  @TestMethod
   public refusesAtOnceADirectoryARuntimeOwnsAndServes(): Promise<void> {
     return RuntimeHostTests.runAsync(async fixture => {
       using lock = OwnershipLock.acquire(fixture.dataDirectory);
@@ -392,10 +439,31 @@ export class RuntimeHostTests {
 
       Assert.areEqual("{\"text\":\"hi\"}", JSON.stringify(responses[0]?.payload));
       Assert.areEqual(
-        "{\"modules\":[{\"id\":\"notes\",\"state\":\"Active\"},{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its runtime part could not be loaded.\"}]}",
-        JSON.stringify(ModuleStatusList.fromJson(responses[1]?.payload).toJson()));
+        "notes notes Active null,broken broken Failed Its runtime part could not be loaded.",
+        ModuleStatusList.fromJson(responses[1]?.payload).modules.map(t => `${t.id} ${t.description} ${t.state} ${t.cause}`).join(","));
       Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "deactivated")));
-      Assert.isTrue(/^\S+Z The module broken: Its runtime part could not be loaded\.\nError \[ERR_MODULE_NOT_FOUND\]/.test(await readFile(fixture.dataDirectory.runtimeLog, "utf8")));
+      Assert.isTrue(/^\S+Z The module broken 0\.0\.1: Its runtime part could not be loaded\.\nError \[ERR_MODULE_NOT_FOUND\]/.test(await readFile(fixture.dataDirectory.runtimeLog, "utf8")));
+    });
+  }
+
+  @TestMethod
+  public removesTheDiscoveryAnEarlierOwnerLeftBeforeItActivatesItsModulesAndListens(): Promise<void> {
+    return RuntimeHostTests.runAsync(async fixture => {
+      await mkdir(fixture.dataDirectory.discoveryFolder, { recursive: true });
+      await writeFile(fixture.dataDirectory.discoveryFile, "{\"token\":\"earlier-token\"}");
+      const probed = process.platform === "win32"
+        ? [fixture.dataDirectory.discoveryFile]
+        : [fixture.dataDirectory.discoveryFile, path.join(fixture.dataDirectory.discoveryFolder, "runtime.sock")];
+
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["notes", RuntimeHostTests.createDiscoveryProbePart(probed)]]));
+      const discovery = await fixture.readDiscoveryAsync();
+      host.requestStop("test");
+      await host.waitForStopAsync();
+
+      Assert.areEqual(probed.map(() => "absent").join(","), await readFile(path.join(fixture.dataDirectory.locateModuleFolder("notes"), "probe"), "utf8"));
+      Assert.areNotEqual("earlier-token", discovery.token);
+      if (process.platform !== "win32")
+        Assert.areEqual(probed[1], discovery.endpoint);
     });
   }
 
@@ -481,40 +549,42 @@ export class RuntimeHostTests {
         new NotificationPost(QualifiedName.parse(kind), "window", title, null, NotificationSeverity.Warning, null, [], null);
 
       const listed = await RuntimeHostTests.callAsync(connection, "desktop:1", ShellMethods.notifications, new NotificationsQuery("laptop").toJson());
+      const synced = NotificationState.fromJson(listed.payload).notifications[0]?.id ?? "";
       connection.sendMessages(new Request("desktop:2", ShellMethods.postNotification, alarm("Posted").toJson()));
       const posted = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
-      connection.sendMessages(new Request("desktop:3", ShellMethods.updateNotification, new NotificationUpdate(2, alarm("Updated")).toJson()));
+      const postedId = NotificationReference.fromJson(posted[1].payload).id;
+      connection.sendMessages(new Request("desktop:3", ShellMethods.updateNotification, new NotificationUpdate(postedId, alarm("Updated")).toJson()));
       const updated = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
-      const missing = await RuntimeHostTests.callAsync(connection, "desktop:4", ShellMethods.updateNotification, new NotificationUpdate(9, alarm("Gone")).toJson());
-      const otherKind = await RuntimeHostTests.callAsync(connection, "desktop:11", ShellMethods.updateNotification, new NotificationUpdate(1, alarm("Other", "clock.other")).toJson());
+      const missing = await RuntimeHostTests.callAsync(connection, "desktop:4", ShellMethods.updateNotification, new NotificationUpdate("9", alarm("Gone")).toJson());
+      const otherKind = await RuntimeHostTests.callAsync(connection, "desktop:11", ShellMethods.updateNotification, new NotificationUpdate(synced, alarm("Other", "clock.other")).toJson());
       const foreign = new NotificationPost(
         QualifiedName.parse("clock.alarm"), "window", "Foreign", null, NotificationSeverity.Info, new CommandRun(QualifiedName.parse("calendar.show"), null), [], null);
-      const foreignUpdate = await RuntimeHostTests.callAsync(connection, "desktop:12", ShellMethods.updateNotification, new NotificationUpdate(1, foreign).toJson());
+      const foreignUpdate = await RuntimeHostTests.callAsync(connection, "desktop:12", ShellMethods.updateNotification, new NotificationUpdate(synced, foreign).toJson());
       const undeclared = await RuntimeHostTests.callAsync(connection, "desktop:6", ShellMethods.postNotification, alarm("Other", "clock.other").toJson());
       const absent = await RuntimeHostTests.callAsync(connection, "desktop:7", ShellMethods.postNotification, alarm("Due", "calendar.due").toJson());
       const invalid = await RuntimeHostTests.callAsync(connection, "desktop:8", ShellMethods.postNotification, { kind: "clock.alarm" });
-      connection.sendMessages(new Request("desktop:9", ShellMethods.dismissNotification, new NotificationReference(2).toJson()));
+      connection.sendMessages(new Request("desktop:9", ShellMethods.dismissNotification, new NotificationReference(postedId).toJson()));
       const dismissed = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
-      const again = await RuntimeHostTests.callAsync(connection, "desktop:10", ShellMethods.dismissNotification, new NotificationReference(2).toJson());
+      const again = await RuntimeHostTests.callAsync(connection, "desktop:10", ShellMethods.dismissNotification, new NotificationReference(postedId).toJson());
       host.requestStop("test");
       await host.waitForStopAsync();
 
-      const titles = (payload: unknown): string => NotificationBroadcast.fromJson(payload).notifications.map(t => `${t.id}:${t.post.title}`).join(",");
+      const name = (id: string): string => id === synced ? "synced" : id === postedId ? "posted" : id;
+      const titles = (payload: unknown): string => NotificationBroadcast.fromJson(payload).notifications.map(t => `${name(t.id)}:${t.post.title}`).join(",");
       const state = NotificationState.fromJson(listed.payload);
-      Assert.areEqual("1:Synced|false|1", `${state.notifications.map(t => `${t.id}:${t.post.title}`).join(",")}|${String(state.isDoNotDisturb)}|${state.sequence}`);
-      Assert.areEqual(
-        "shell.notifications|2:Posted,1:Synced|2|{\"id\":2}",
-        `${posted[0].name.text}|${titles(posted[0].payload)}|${NotificationBroadcast.fromJson(posted[0].payload).sequence}|${JSON.stringify(posted[1].payload)}`);
-      Assert.areEqual("2:Updated,1:Synced|null", `${titles(updated[0].payload)}|${JSON.stringify(updated[1].payload)}`);
+      Assert.isTrue([synced, postedId].every(t => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(t)) && synced !== postedId);
+      Assert.areEqual("synced:Synced|false|1", `${state.notifications.map(t => `${name(t.id)}:${t.post.title}`).join(",")}|${String(state.isDoNotDisturb)}|${state.sequence}`);
+      Assert.areEqual("shell.notifications|posted:Posted,synced:Synced|2", `${posted[0].name.text}|${titles(posted[0].payload)}|${NotificationBroadcast.fromJson(posted[0].payload).sequence}`);
+      Assert.areEqual("posted:Updated,synced:Synced|null", `${titles(updated[0].payload)}|${JSON.stringify(updated[1].payload)}`);
       Assert.areEqual(`${FailureCode.NotFound}|Notification 9 is gone; it was dismissed or its module stopped.`, `${missing.failure?.code}|${missing.failure?.message}`);
-      Assert.areEqual(`${FailureCode.InvalidParams}|Notification 1 is of the kind clock.alarm, which an update keeps.`, `${otherKind.failure?.code}|${otherKind.failure?.message}`);
+      Assert.areEqual(`${FailureCode.InvalidParams}|Notification ${synced} is of the kind clock.alarm, which an update keeps.`, `${otherKind.failure?.code}|${otherKind.failure?.message}`);
       Assert.areEqual(
         `${FailureCode.InvalidParams}|The module clock may not offer the command calendar.show in a notification; it must be its own or a dependency's.`,
         `${foreignUpdate.failure?.code}|${foreignUpdate.failure?.message}`);
       Assert.areEqual(`${FailureCode.InvalidParams}|The module clock does not declare clock.other among its notifications.`, `${undeclared.failure?.code}|${undeclared.failure?.message}`);
       Assert.areEqual("The notification kind calendar.due belongs to calendar, which is not an active module.", absent.failure?.message);
       Assert.areEqual(FailureCode.InvalidParams, invalid.failure?.code);
-      Assert.areEqual("1:Synced|null|null", `${titles(dismissed[0].payload)}|${JSON.stringify(dismissed[1].payload)}|${JSON.stringify(again.payload)}`);
+      Assert.areEqual("synced:Synced|null|null", `${titles(dismissed[0].payload)}|${JSON.stringify(dismissed[1].payload)}|${JSON.stringify(again.payload)}`);
     });
   }
 
@@ -635,7 +705,7 @@ export class RuntimeHostTests {
       Assert.isTrue(["desktop:1", "desktop:2", "desktop:4"].every(t => responses.get(t)?.hasFailed === false));
       Assert.areEqual("{\"name\":\"shell.mode\",\"value\":\"Dark\",\"isSet\":true}", entry("shell.mode"));
       Assert.areEqual("{\"name\":\"shell.doNotDisturb\",\"value\":true,\"isSet\":true}", entry("shell.doNotDisturb"));
-      Assert.areEqual("shell.theme,shell.mode,shell.interfaceFont,shell.codeFont,shell.panelSize,shell.messageSize,shell.codeSize,shell.leftDockStyle,shell.rightDockStyle,shell.menuBar,shell.previewTabs,shell.doNotDisturb,shell.mutedModules,shell.keyBindings",
+      Assert.areEqual("shell.theme,shell.mode,shell.interfaceFont,shell.codeFont,shell.panelSize,shell.messageSize,shell.codeSize,shell.leftDockStyle,shell.rightDockStyle,shell.menuBar,shell.previewTabs,shell.recentCommandCount,shell.doNotDisturb,shell.mutedModules,shell.keyBindings",
         snapshot.definitions.map(t => t.name.text).join(","));
       Assert.areEqual("InvalidParams,NotFound,InvalidParams", ["desktop:5", "desktop:6", "desktop:7"].map(t => responses.get(t)?.failure?.code).join(","));
       Assert.areEqual(JSON.stringify([
@@ -753,6 +823,25 @@ export class RuntimeHostTests {
       "export class RuntimePart {",
       "  async activateAsync(context) {",
       `    await context.startProcessAsync(new ProcessRequest(${JSON.stringify(process.execPath)}, [${JSON.stringify(ProgramFixture.file)}, "wait"], ${JSON.stringify(path.dirname(ProgramFixture.file))}));`,
+      "  }",
+      "",
+      "  async deactivateAsync() {",
+      "  }",
+      "}",
+      ""
+    ].join("\n");
+  }
+
+  private static createDiscoveryProbePart(files: readonly string[]): string {
+    return [
+      "import { existsSync } from \"node:fs\";",
+      "import { mkdir, writeFile } from \"node:fs/promises\";",
+      "import path from \"node:path\";",
+      "",
+      "export class RuntimePart {",
+      "  async activateAsync(context) {",
+      "    await mkdir(context.moduleFolder, { recursive: true });",
+      `    await writeFile(path.join(context.moduleFolder, "probe"), ${JSON.stringify(files)}.map(t => existsSync(t) ? "present" : "absent").join(","));`,
       "  }",
       "",
       "  async deactivateAsync() {",

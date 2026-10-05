@@ -1,0 +1,59 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@use "selected-surface" as *;
+
+:host {
+  display: block;
+}
+
+.tr-tree {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-1);
+}
+
+.tr-tree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--tr-space-2);
+  box-sizing: border-box;
+  min-height: var(--tr-tree-row-height);
+  padding-inline: calc(var(--tr-space-2) + var(--tr-tree-level) * var(--tr-tree-indent)) var(--tr-space-2);
+  border-radius: var(--tr-radius-small);
+  color: var(--tr-text);
+}
+
+.tr-tree-row:hover {
+  background-color: var(--tr-hover);
+}
+
+.tr-tree-row-current,
+.tr-tree-row-current:hover {
+  @include selected-surface;
+}
+
+.tr-tree-twistie,
+.tr-tree-icon {
+  flex: none;
+  color: var(--tr-icon-color);
+}
+
+.tr-tree-twistie-open {
+  rotate: 90deg;
+}
+
+:dir(rtl) .tr-tree-twistie:not(.tr-tree-twistie-open) {
+  rotate: 180deg;
+}
+
+.tr-tree-label {
+  flex: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

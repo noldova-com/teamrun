@@ -581,8 +581,157 @@ export class CoverageAnalyzerTests {
     }, TestingException);
   }
 
-  private createProject(productionDirectory: string, sourceDirectory: string): CoverageProject {
-    return new CoverageProject("Sample", productionDirectory, sourceDirectory);
+  @TestMethod
+  public async keepsANestedUncoveredBlockThatAnotherProcessNeverEnteredWhicheverReportComesFirst(): Promise<void> {
+    const summaries: string[] = [];
+    for (const isEnteredFirst of [true, false]) {
+      using directory = new TemporaryDirectory();
+      const coverageDirectory = directory.path;
+      const includedDirectory = join(coverageDirectory, "included");
+      await mkdir(includedDirectory);
+
+      const sampleText = "head;\ntry {\n  work;\n} catch {\n  if (x)\n    throw x;\n  done;\n}\n";
+      const samplePath = join(includedDirectory, "sample.js");
+      await CompiledScriptFixture.writeAsync(samplePath, sampleText);
+      const whole = { startOffset: 0, endOffset: sampleText.length, count: 1 };
+      const catchBlock = { startOffset: sampleText.indexOf("{\n  if"), endOffset: sampleText.lastIndexOf("}") + 1 };
+      const throwStatement = { startOffset: sampleText.indexOf("    throw"), endOffset: sampleText.indexOf("  done") };
+      const entered = { result: [{ url: pathToFileURL(samplePath).href, functions: [{ ranges: [whole, { ...catchBlock, count: 1 }, { ...throwStatement, count: 0 }] }] }] };
+      const neverEntered = { result: [{ url: pathToFileURL(samplePath).href, functions: [{ ranges: [whole, { ...catchBlock, count: 0 }] }] }] };
+      await writeFile(join(coverageDirectory, "coverage-1.json"), JSON.stringify(isEnteredFirst ? entered : neverEntered));
+      await writeFile(join(coverageDirectory, "coverage-2.json"), JSON.stringify(isEnteredFirst ? neverEntered : entered));
+
+      const result = await new CoverageAnalyzer().analyzeAsync(coverageDirectory, [this.createProject(includedDirectory, coverageDirectory)]);
+      const file = result.fileCoverages[0];
+      summaries.push(`${result.isComplete} ${file?.uncoveredLineRanges.map(t => t.displayText).join(",")} ${file?.blockCoverages.map(t => `${t.line}:${t.isTaken}`).join(",")}`);
+    }
+
+    Assert.areEqual("false 6 4:true,6:false", summaries[0]);
+    Assert.areEqual(summaries[0], summaries[1]);
+  }
+
+  @TestMethod
+  public async measuresALoadedTypeScriptFileAsNodeRanItWithItsTypesStrippedAndItsSourceUrlAppended(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const coverageDirectory = directory.path;
+    const includedDirectory = join(coverageDirectory, "included");
+    await mkdir(includedDirectory);
+
+    const sampleText = "const value: number = 1;\nexport function pick(name: string): number {\n  if (name === \"a\")\n    return value;\n  return 2;\n}\n";
+    const samplePath = join(includedDirectory, "sample.ts");
+    await writeFile(samplePath, sampleText);
+    const ranLength = this.measureRanLength(samplePath, sampleText);
+    const report = {
+      result: [{ url: pathToFileURL(samplePath).href, functions: [
+        { ranges: [{ startOffset: 0, endOffset: ranLength, count: 1 }] },
+        { functionName: "pick", ranges: [
+          { startOffset: sampleText.indexOf("function pick"), endOffset: sampleText.lastIndexOf("}") + 1, count: 1 },
+          { startOffset: sampleText.indexOf("    return value"), endOffset: sampleText.indexOf("  return 2"), count: 0 }
+        ] }
+      ] }]
+    };
+    await writeFile(join(coverageDirectory, "coverage-1.json"), JSON.stringify(report));
+
+    const result = await new CoverageAnalyzer().analyzeAsync(coverageDirectory, [this.createProject(includedDirectory, includedDirectory)]);
+    const sample = result.fileCoverages[0];
+
+    Assert.isFalse(result.isComplete);
+    Assert.isDefined(sample);
+    Assert.areEqual("sample.ts", sample.relativePath);
+    Assert.areEqual(ranLength, sample.totalLength);
+    Assert.areEqual<string | undefined>("4", sample.uncoveredLineRanges[0]?.displayText);
+  }
+
+  @TestMethod
+  public async leavesOutDeclarationFilesAndTheFilesOfTestFoldersAndTreatsATypeOnlyFileAsNonExecutable(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const coverageDirectory = directory.path;
+    const includedDirectory = join(coverageDirectory, "included");
+    await mkdir(join(includedDirectory, "tests", "deep"), { recursive: true });
+
+    const sampleText = "export const sample: number = 1;\n";
+    const samplePath = join(includedDirectory, "sample.ts");
+    const helperPath = join(includedDirectory, "tests", "deep", "helper.ts");
+    await writeFile(samplePath, sampleText);
+    await writeFile(join(includedDirectory, "contract.ts"), "/**\n * License.\n */\n\nimport type { Other } from \"./other.ts\";\n\nexport default interface IContract {\n  readonly other: Other;\n}\n");
+    await writeFile(join(includedDirectory, "types.d.ts"), "export declare const declared: number;\n");
+    await writeFile(join(includedDirectory, "common.d.cts"), "export declare const declared: number;\n");
+    await writeFile(join(includedDirectory, "module.d.mts"), "export declare const declared: number;\n");
+    await writeFile(helperPath, "export const helper = 1;\n");
+    await writeFile(join(includedDirectory, "tests", "never.ts"), "export const never = 1;\n");
+    const report = {
+      result: [
+        { url: pathToFileURL(samplePath).href, functions: [{ ranges: [{ startOffset: 0, endOffset: this.measureRanLength(samplePath, sampleText), count: 1 }] }] },
+        { url: pathToFileURL(helperPath).href, functions: [{ ranges: [{ startOffset: 0, endOffset: 5, count: 0 }] }] }
+      ]
+    };
+    await writeFile(join(coverageDirectory, "coverage-1.json"), JSON.stringify(report));
+
+    const result = await new CoverageAnalyzer().analyzeAsync(coverageDirectory, [this.createProject(includedDirectory, includedDirectory, ["tests"])]);
+
+    Assert.isTrue(result.isComplete);
+    Assert.areEqual("contract.ts,sample.ts", result.fileCoverages.map(t => t.relativePath).join(","));
+    Assert.isFalse(result.fileCoverages[0]?.isExecutable ?? true);
+  }
+
+  @TestMethod
+  public async reportsANeverLoadedTypeScriptFileAsUncoveredOverItsOwnLines(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const coverageDirectory = directory.path;
+    const includedDirectory = join(coverageDirectory, "included");
+    await mkdir(includedDirectory);
+    const orphanText = "export const first: number = 1;\nexport const second: number = 2;\n";
+    await writeFile(join(includedDirectory, "orphan.ts"), orphanText);
+    await writeFile(join(coverageDirectory, "coverage-1.json"), JSON.stringify({ result: [] }));
+
+    const result = await new CoverageAnalyzer().analyzeAsync(coverageDirectory, [this.createProject(includedDirectory, includedDirectory)]);
+
+    Assert.isFalse(result.isComplete);
+    Assert.areEqual(orphanText.length, result.fileCoverages[0]?.uncoveredLength);
+    Assert.areEqual<string | undefined>("1-2", result.fileCoverages[0]?.uncoveredLineRanges[0]?.displayText);
+  }
+
+  @TestMethod
+  public async measuresCommonJsAndEcmaScriptModuleFilesLikeTheirDefaultKind(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const coverageDirectory = directory.path;
+    const includedDirectory = join(coverageDirectory, "included");
+    await mkdir(includedDirectory);
+    const commonText = "const value: number = 1;\nmodule.exports = value;\n";
+    const commonPath = join(includedDirectory, "common.cts");
+    await writeFile(commonPath, commonText);
+    await writeFile(join(includedDirectory, "module.mts"), "export const value: number = 1;\n");
+    await CompiledScriptFixture.writeAsync(join(includedDirectory, "built.cjs"), "built;\n");
+    await CompiledScriptFixture.writeAsync(join(includedDirectory, "built.mjs"), "built;\n");
+    const report = { result: [{ url: pathToFileURL(commonPath).href, functions: [{ ranges: [{ startOffset: 0, endOffset: this.measureRanLength(commonPath, commonText), count: 1 }] }] }] };
+    await writeFile(join(coverageDirectory, "coverage-1.json"), JSON.stringify(report));
+
+    const result = await new CoverageAnalyzer().analyzeAsync(coverageDirectory, [this.createProject(includedDirectory, includedDirectory)]);
+
+    Assert.areEqual("built.cjs,built.mjs,common.cts,module.mts", result.fileCoverages.map(t => t.relativePath).join(","));
+    Assert.areEqual("false,false,true,false", result.fileCoverages.map(t => t.isFullyCovered).join(","));
+  }
+
+  @TestMethod
+  public async rejectsTypeScriptWhoseTypesNodeCannotStrip(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const coverageDirectory = directory.path;
+    const includedDirectory = join(coverageDirectory, "included");
+    await mkdir(includedDirectory);
+    await writeFile(join(includedDirectory, "color.ts"), "export enum Color { Red }\n");
+    await writeFile(join(coverageDirectory, "coverage-1.json"), JSON.stringify({ result: [] }));
+
+    await Assert.throwsAsync(async () => {
+      await new CoverageAnalyzer().analyzeAsync(coverageDirectory, [this.createProject(includedDirectory, includedDirectory)]);
+    }, TestingException);
+  }
+
+  private measureRanLength(filePath: string, text: string): number {
+    return `${text}\n\n//# sourceURL=${pathToFileURL(filePath).href}`.length;
+  }
+
+  private createProject(productionDirectory: string, sourceDirectory: string, testFolders: readonly string[] = []): CoverageProject {
+    return new CoverageProject("Sample", productionDirectory, sourceDirectory, [], testFolders);
   }
 
   private async assertMalformedReportAsync(report: unknown): Promise<void> {

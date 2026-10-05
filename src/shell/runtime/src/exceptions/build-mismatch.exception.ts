@@ -9,13 +9,14 @@
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 import type { RuntimeHandover } from "@noldova/teamrun-shell-protocol";
 
+import { ProductInfo } from "../models/product-info.js";
 import { Resources } from "../resources.js";
 
 export class BuildMismatchException extends Exception {
   public readonly handover: RuntimeHandover;
 
   public constructor(handover: RuntimeHandover) {
-    super(Resources.formatBuildMismatch(handover.identity.productVersion, handover.executablePath));
+    super(Resources.formatBuildMismatch(ProductInfo.current.name, handover.identity.productVersion, handover.executablePath));
 
     this.handover = handover;
   }

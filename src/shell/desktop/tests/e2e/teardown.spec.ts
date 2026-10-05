@@ -14,6 +14,7 @@ import path from "node:path";
 
 import { DataDirectory, OwnershipLock } from "@noldova/teamrun-shell-runtime";
 
+import ClockWorkFixture from "./fixtures/clock-work.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import ProcessListFixture from "./fixtures/process-list.fixture.ts";
@@ -150,6 +151,23 @@ test.describe("the harness's teardown", () => {
     expect(existsSync(desktop.root)).toBe(false);
   });
 
+  test("a cleanup step that fails does not stop the later ones, so the runtime is still stopped and the folder removed, and the failure is reported", async ({ desktop }) => {
+    const runtime = await desktop.readRuntimeProcessIdAsync();
+    await desktop.application.evaluate(({ app }) => {
+      app.getAppMetrics = () => {
+        throw new Error("The test made listing the processes fail.");
+      };
+    });
+
+    const failure = await desktop.disposeAsync(false).then(() => null, (error: unknown) => error);
+
+    expect(runtime).toBeDefined();
+    expect(failure).not.toBeInstanceOf(AggregateError);
+    expect(String(failure)).toContain("The test made listing the processes fail.");
+    await expect.poll(() => runtime !== undefined && DesktopApplicationFixture.isAlive(runtime)).toBe(false);
+    expect(existsSync(desktop.root)).toBe(false);
+  });
+
   test("a main process that stops answering fails the call that waited on it, is reported with what it was asked, and is killed", async ({ desktop }, testInfo) => {
     const main = await desktop.application.evaluate(() => process.pid);
     const blocked = desktop.application.evaluate(() => {
@@ -190,6 +208,20 @@ test.describe("the harness's teardown", () => {
       ? new RegExp(`^Analysis of sampling .* \\(pid ${main}\\)[\\s\\S]*Call graph:`)
       : process.platform === "win32" ? /^\d+ Wait \w+ \d+ ms\r?$/m : /^\s*\d+ \S+ .*\d+:\d+(?:\.\d+)? \S/m);
     expect(testInfo.attachments.map(t => t.name)).toEqual(expect.arrayContaining(["page-0.png.unavailable.txt", "page-0.html.unavailable.txt"]));
+    expect(await ProcessListFixture.waitForSignalsAsync(desktop.recordedProcessIds, 0)).toEqual([]);
+  });
+
+  test("a quit that stops at the question about running work is reported with the question, not as a silent main process", async ({ desktop }) => {
+    test.setTimeout(120_000);
+    await ClockWorkFixture.beginAsync(desktop);
+
+    await desktop.disposeAsync(false);
+    const reported = desktop.acceptFailures(/^TeamRun did not quit/);
+
+    expect(reported).toHaveLength(1);
+    expect(reported[0]).toMatch(/^TeamRun did not quit within 30 s because window 0 asked the question below, so the test killed it\.\nThe test left work running: finish or stop it before the test ends\.\n- dialog "Work is still running":\n/);
+    expect(reported[0]).toContain(`- listitem: ${ClockWorkFixture.WORK}`);
+    expect(desktop.failures).toEqual([]);
     expect(await ProcessListFixture.waitForSignalsAsync(desktop.recordedProcessIds, 0)).toEqual([]);
   });
 });

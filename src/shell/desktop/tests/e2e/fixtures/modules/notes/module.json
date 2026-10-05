@@ -1,10 +1,12 @@
 {
   "id": "notes",
+  "version": "0.0.1",
   "displayName": "Notes",
+  "description": "Keeps notes in documents and views, for the UI workflows.",
   "parts": ["runtime", "window"],
   "dependencies": [],
   "contributes": {
-    "methods": ["notes.manyTabs"],
+    "methods": ["notes.options"],
     "commands": ["notes.newNote", "notes.openNote", "notes.sortByTitle", "notes.sortByWeek", "notes.wrapLines", "notes.showListInDialog", "notes.showNoteInDialog", "notes.showSettingsInDialog"],
     "notifications": ["notes.saveFailed"],
     "views": [
@@ -15,6 +17,7 @@
     "documents": ["notes.note"],
     "statusBarItems": ["notes.count"],
     "topBarActions": ["notes.compose", "notes.back"],
+    "settings": ["notes.start"],
     "menus": ["notes.listItem", "notes.templates", "notes.tools", "notes.sortChoice", "notes.main", "notes.second", "notes.spare"]
   }
 }

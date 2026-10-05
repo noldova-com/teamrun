@@ -9,28 +9,28 @@ LICENSE file in the root directory of this source tree.
 <tr-panel-card class="tr-tab-group-card" [surface]="surface()" [attr.data-drop-group]="group().id">
   @if (header(); as tab) {
     @let label = labels.of(tab);
-    <div class="tr-tab-group-bar tr-tab-group-header">
+    <div class="tr-tab-group-bar tr-tab-group-header" data-drop-tabs>
       <span class="tr-tab-group-title" [attr.id]="activeTabId()" [attr.data-header-key]="tab.key" [trTooltip]="label.title" [trTooltipSide]="below" [trTooltipTruncated]="true">{{ label.title }}</span>
-      <div class="tr-tab-group-actions" [class.tr-tab-group-actions-shell]="isShell()">
+      <div class="tr-tab-group-actions" [class.tr-tab-group-actions-shell]="isShell()" [class.tr-drop-line-before]="isDropAtEnd()">
         <ng-container [ngTemplateOutlet]="groupActions" />
       </div>
     </div>
   } @else {
-    <div class="tr-tab-group-bar">
+    <div class="tr-tab-group-bar" data-drop-tabs>
       <div #scroller="trTabScroller" class="tr-tab-group-scroller tr-scroll-reveal" [trTabScroller]="actionBar" [trTabScrollerFrame]="frame()">
-        <div class="tr-tab-group-strip" role="tablist" data-drop-tabs (keydown)="onStripKey($event)">
+        <div class="tr-tab-group-strip" role="tablist" (keydown)="onStripKey($event)">
           @for (tab of group().tabs; track tab.key; let index = $index) {
             @let label = labels.of(tab);
             <tr-place-menu #menu [place]="resources.tabMenu" [context]="{ tab: tab.key }" />
             @let badge = labels.badgeOf(tab);
             <tr-tab [label]="label.title" [icon]="label.icon" [badge]="badge?.description ?? null" [badgeCount]="badge?.count ?? null" [selected]="tab.equals(group().active)" [preview]="tab.equals(group().preview)" [attr.data-tab-index]="index"
-              [attr.id]="tabId(index)" [attr.data-tab-key]="tab.key" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, index)" [class.tr-tab-dragged]="tab.equals(drag.dragging())"
+              [attr.id]="tabId(index)" [attr.data-tab-key]="tab.key" [class.tr-drop-line-before]="drag.isDropBefore(group().id, index)" [class.tr-tab-dragged]="tab.equals(drag.dragging())"
               [trTooltip]="label.title" [trTooltipSide]="below" [trTooltipTruncated]="true"
               [trContextMenuTriggerFor]="menu.menu()" (activate)="layout.activate(tab)" (close)="close(tab)" (pointerdown)="drag.begin(tab, $event)" (dblclick)="keep(tab)" />
           }
-          <span class="tr-tab-group-end" [class.tr-tab-drop-before]="drag.isDropBefore(group().id, group().tabs.length)"></span>
+          <span class="tr-tab-group-end" [class.tr-drop-line-before]="isDropAtEnd() && !scroller.isOverflowing()"></span>
         </div>
-        <div #actionBar class="tr-tab-group-actions" [class.tr-tab-group-actions-shell]="isShell()">
+        <div #actionBar class="tr-tab-group-actions" [class.tr-tab-group-actions-shell]="isShell()" [class.tr-drop-line-before]="isDropAtEnd() && scroller.isOverflowing()">
           @if (scroller.isOverflowing()) {
             <button #overflowTrigger="trMenuTriggerFor" type="button" tr-icon-button class="tr-tab-group-overflow" [icon]="resources.overflowGlyph"
               [label]="resources.overflowLabel" [trTooltip]="resources.overflowLabel" [trTooltipSide]="below" [trMenuTriggerFor]="overflow" [trMenuAlignment]="end"></button>

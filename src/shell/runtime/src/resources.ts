@@ -9,11 +9,10 @@
 import "@noldova/teamrun-foundation-core";
 
 export class Resources {
-  public static readonly productName: string = "__PRODUCT_NAME__";
-  public static readonly productSlug: string = "__PRODUCT_SLUG__";
   public static readonly folderSeparator: string = "/";
   public static readonly rootParameterName: string = "root";
   public static readonly idParameterName: string = "id";
+  public static readonly versionParameterName: string = "version";
   public static readonly statementsParameterName: string = "statements";
   public static readonly endpointParameterName: string = "endpoint";
   public static readonly tokenParameterName: string = "token";
@@ -29,6 +28,7 @@ export class Resources {
   public static readonly rootNotAbsolute: string = "The data directory must be an absolute path.";
   public static readonly migrationIdInvalid: string = "A migration id is lowercase letters and digits separated by single hyphens.";
   public static readonly moduleIdInvalid: string = "A module id is lowercase kebab-case and is not \"shell\".";
+  public static readonly moduleVersionInvalid: string = "A module's version must have the form <major>.<minor>.<patch>: three whole numbers of up to nine digits without leading zeros, such as 0.0.1.";
   public static readonly ownershipDatabaseFileName: string = "ownership.sqlite";
   public static readonly shellDatabaseFileName: string = "shell.sqlite";
   public static readonly discoveryFolderName: string = "discovery";
@@ -57,6 +57,7 @@ export class Resources {
   public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   public static readonly migrationIdPattern: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
   public static readonly reservedModuleId: string = "shell";
+  public static readonly moduleVersionPattern: RegExp = /^(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})$/;
   public static readonly movedFolderInfix: string = "-before-shell-";
   public static readonly timestampSeparatorPattern: RegExp = /[-:]|\.\d+/g;
   public static readonly acquireOwnershipStatement: string = "BEGIN EXCLUSIVE";
@@ -114,6 +115,7 @@ export class Resources {
   public static readonly fileErrorCodeField: "code" = "code";
   public static readonly busyFileErrorCodes: readonly string[] = ["EPERM", "EACCES", "EBUSY"];
   public static readonly replaceAttempts: number = 40;
+  public static readonly refusedTokenRetries: number = 3;
   public static readonly replaceRetryDelay: number = 50;
   public static readonly ownershipWaitMilliseconds: number = 250;
   public static readonly backupWakeMilliseconds: number = 25;
@@ -131,11 +133,27 @@ export class Resources {
   public static readonly discoveryFormatVersion: number = 1;
   public static readonly declarationsFormatVersion: number = 1;
   public static readonly declarationsFileSegments: readonly string[] = ["_build", "modules", "declarations.json"];
+  public static readonly productFileSegments: readonly string[] = ["_build", "product.json"];
+  public static readonly nameField: string = "name";
+  public static readonly slugField: string = "slug";
+  public static readonly applicationIdField: string = "applicationId";
+  public static readonly developmentApplicationIdField: string = "developmentApplicationId";
+  public static readonly dataFolderField: string = "dataFolder";
+  public static readonly deviceFoldersField: string = "deviceFolders";
+  public static readonly windowsField: string = "windows";
+  public static readonly macosField: string = "macos";
+  public static readonly linuxField: string = "linux";
+  public static readonly dataDirectoryVariableField: string = "dataDirectoryVariable";
+  public static readonly iconsField: string = "icons";
+  public static readonly versionField: string = "version";
+  public static readonly buildField: string = "build";
   public static readonly installRootSegments: readonly string[] = ["..", "..", "..", ".."];
   public static readonly utf8Encoding: BufferEncoding = "utf8";
   public static readonly missingFileCode: string = "ENOENT";
   public static readonly lineSeparator: string = "\n";
   public static readonly lineBreakPattern: RegExp = /\r?\n/;
+  public static readonly logLineBreakPattern: RegExp = /\r\n|[\n\v\f\r\u0085\u2028\u2029]/u;
+  public static readonly logControlPattern: RegExp = /[^\P{Cc}\t]/gu;
   public static readonly windowsPlatform: string = "win32";
   public static readonly systemRootVariable: string = "SystemRoot";
   public static readonly systemFolderName: string = "System32";
@@ -197,18 +215,23 @@ export class Resources {
   public static readonly doNotDisturbSetting: string = "doNotDisturb";
   public static readonly mutedModulesSetting: string = "mutedModules";
   public static readonly keyBindingsSetting: string = "keyBindings";
+  public static readonly recentCommandCountSetting: string = "recentCommandCount";
   public static readonly appearancePage: string = "Appearance";
   public static readonly notificationsPage: string = "Notifications";
   public static readonly shortcutsPage: string = "Keyboard shortcuts";
   public static readonly themeGroup: string = "Theme";
   public static readonly textGroup: string = "Text";
   public static readonly layoutGroup: string = "Layout";
+  public static readonly commandSearchGroup: string = "Command search";
   public static readonly notificationsGroup: string = "Notifications";
   public static readonly shortcutsGroup: string = "Keys";
   public static readonly defaultThemeId: string = "shell.default";
   public static readonly defaultThemeTitle: string = "Default";
   public static readonly themeTitle: string = "Theme";
-  public static readonly themeDescription: string = `The colors and look of ${Resources.productName}.`;
+  public static formatThemeDescription(productName: string): string {
+    return `The colors and look of ${productName}.`;
+  }
+
   public static readonly modeTitle: string = "Mode";
   public static readonly modeDescription: string = "Light, dark, or following the operating system.";
   public static readonly modeOptions: readonly (readonly [string, string])[] = [["Light", "Light"], ["Dark", "Dark"], ["System", "System"]];
@@ -249,17 +272,20 @@ export class Resources {
   public static readonly mutedModulesDescription: string = "A module turned off still adds its notifications to the list, without toasts or operating system notifications.";
   public static readonly keyBindingsTitle: string = "Keyboard shortcuts";
   public static readonly keyBindingsDescription: string = "The keys you chose for commands, in place of their default keys, on every device.";
+  public static readonly recentCommandCountTitle: string = "Recent commands";
+  public static readonly recentCommandCountDescription: string = "How many commands you recently ran from command search are listed first. 0 lists none.";
+  public static readonly maximumRecentCommands: number = 20;
+  public static readonly defaultRecentCommands: number = 5;
   public static readonly settingScopesKind: string = "settingScopes";
   public static readonly settingsField: string = "settings";
   public static readonly nameParameterName: string = "name";
   public static readonly defaultKeyParameterName: string = "defaultKey";
   public static readonly isCheckedParameterName: string = "isChecked";
-  public static readonly dataDirectoryVariable: string = "__DATA_DIRECTORY_VARIABLE__";
-  public static readonly defaultDataFolder: readonly string[] = "__DATA_FOLDER__".split(Resources.folderSeparator);
   public static readonly developmentDataFolder: readonly string[] = ["_build", "data"];
-  public static readonly preShellData: string = `This data directory holds data from a ${Resources.productName} release that predates the shell; move it aside to continue.`;
-  public static readonly productVersion: string = "__VERSION__";
-  public static readonly build: string = "__BUILD__";
+  public static formatPreShellDataFailure(productName: string): string {
+    return `This data directory holds data from a ${productName} release that predates the shell; move it aside to continue.`;
+  }
+
   public static readonly linuxPlatform: string = "linux";
   public static readonly loopbackHost: string = "127.0.0.1";
   public static readonly tcpEndpointPrefix: string = "tcp://127.0.0.1:";
@@ -309,9 +335,9 @@ export class Resources {
     "--norc",
     "-p",
     "-c",
-    "set -e; shopt -s failglob; for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done; exec -- \"$@\"",
-    `${Resources.productSlug}-launch`
+    "set -e; shopt -s failglob; for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done; exec -- \"$@\""
   ];
+  public static readonly launchNameSuffix: string = "-launch";
   public static readonly stoppedByIdle: string = "idle";
   public static readonly stoppedByRequest: string = "request";
   public static readonly stoppedBySignal: string = "signal";
@@ -325,6 +351,7 @@ export class Resources {
   public static readonly defaultRequestTimeoutParameterName: string = "defaultRequestTimeout";
   public static readonly maximumRequestTimeoutParameterName: string = "maximumRequestTimeout";
   public static readonly callTimeoutParameterName: string = "callTimeout";
+  public static readonly timeoutMillisecondsParameterName: string = "timeoutMilliseconds";
   public static readonly answerGraceParameterName: string = "answerGrace";
   public static readonly clientNameParameterName: string = "clientName";
   public static readonly clientParameterName: string = "client";
@@ -340,7 +367,10 @@ export class Resources {
   public static readonly endpointUnavailable: string = "The runtime's local endpoint has no address.";
   public static readonly handshakeRequired: string = "A connection must begin with a handshake.";
   public static readonly unauthorized: string = "The capability token is not valid for this runtime.";
-  public static readonly buildMismatch: string = `Another build of ${Resources.productName} owns this data directory.`;
+  public static formatBuildMismatchFailure(productName: string): string {
+    return `Another build of ${productName} owns this data directory.`;
+  }
+
   public static readonly otherBuildMayOnlyStop: string = "A connection from another build may only ask the runtime to stop.";
   public static readonly unexpectedMessage: string = "Only requests and cancellations may follow the handshake.";
   public static readonly invalidFrame: string = "The frame is not a valid message.";
@@ -374,6 +404,15 @@ export class Resources {
   public static readonly launchDescriptorsUnavailable: string = "Starting a program on Linux requires access to /proc/self/fd. Ensure procfs is mounted at /proc and this process can read and traverse its descriptor directory.";
   public static readonly dataDirectoryRequired: string = "The --data-dir argument is required.";
   public static readonly usage: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>] [--start-log <start log name>]";
+  public static readonly recentCommandsMigration: string = "recent-commands";
+  public static readonly createRecentCommandsStatement: string =
+    "CREATE TABLE recent_commands (device TEXT NOT NULL, id TEXT NOT NULL, used INTEGER NOT NULL, PRIMARY KEY (device, id)) STRICT";
+  public static readonly readRecentCommandsStatement: string = "SELECT id FROM recent_commands WHERE device = ? ORDER BY used DESC";
+  public static readonly recordRecentCommandStatement: string =
+    "INSERT INTO recent_commands (device, id, used) SELECT ?1, ?2, COALESCE(MAX(used), 0) + 1 FROM recent_commands WHERE device = ?1 " +
+    "ON CONFLICT (device, id) DO UPDATE SET used = excluded.used";
+  public static readonly trimRecentCommandsStatement: string =
+    "DELETE FROM recent_commands WHERE device = ?1 AND id NOT IN (SELECT id FROM recent_commands WHERE device = ?1 ORDER BY used DESC LIMIT ?2)";
   public static readonly ownedProcessesMigration: string = "owned-processes";
   public static readonly createOwnedProcessesStatement: string =
     "CREATE TABLE owned_processes (id INTEGER PRIMARY KEY, module TEXT NOT NULL, process_id INTEGER NOT NULL, program TEXT NOT NULL, executable TEXT NOT NULL, " +
@@ -436,7 +475,7 @@ export class Resources {
   public static readonly windowsProcessTableScript: string =
     "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $starts = @{}; " +
     "foreach ($p in [System.Diagnostics.Process]::GetProcesses()) { try { $starts[$p.Id] = [long][Math]::Floor($p.StartTime.ToFileTimeUtc() / 10000) - 11644473600000 } catch { } }; " +
-    "foreach ($w in CimCmdlets\\Get-CimInstance -ClassName Win32_Process) { $started = $starts[[int]$w.ProcessId]; " +
+    "foreach ($w in Microsoft.PowerShell.Management\\Get-WmiObject -Query 'SELECT ProcessId, ParentProcessId, ExecutablePath FROM Win32_Process' -ErrorAction Stop) { $started = $starts[[int]$w.ProcessId]; " +
     "if ($null -ne $started) { \"{0}`t{1}`t{2}`t{3}\" -f $w.ProcessId, $w.ParentProcessId, $started, $w.ExecutablePath } }";
   public static readonly windowsScriptEncoding: BufferEncoding = "utf16le";
   public static readonly base64Encoding: BufferEncoding = "base64";
@@ -479,6 +518,10 @@ export class Resources {
     return `A module declaration's ${name} is missing or invalid.`;
   }
 
+  public static formatProductFileUnreadable(file: string, reason: string): string {
+    return `The build's product file ${file} is not valid: ${reason}`;
+  }
+
   public static formatDeclarationsUnreadable(file: string, reason: string): string {
     return `The module declarations ${file} are not valid: ${reason}`;
   }
@@ -487,8 +530,8 @@ export class Resources {
     return `The discovery file ${file} is not valid: ${reason}`;
   }
 
-  public static formatOwned(root: string): string {
-    return `Another ${Resources.productName} runtime owns the data directory ${root}.`;
+  public static formatOwned(productName: string, root: string): string {
+    return `Another ${productName} runtime owns the data directory ${root}.`;
   }
 
   public static formatPreShellData(root: string, entries: readonly string[]): string {
@@ -551,8 +594,8 @@ export class Resources {
     return `${fileName}.${unique}${Resources.temporarySuffix}`;
   }
 
-  public static formatEndpointInvalid(text: string): string {
-    return `"${text}" is not a ${Resources.productName} endpoint.`;
+  public static formatEndpointInvalid(productName: string, text: string): string {
+    return `"${text}" is not a ${productName} endpoint.`;
   }
 
   public static formatSocketPathTooLong(socketPath: string): string {
@@ -563,7 +606,7 @@ export class Resources {
     return `The command ${name} is already registered.`;
   }
 
-  public static formatNotificationKindChanged(id: number, kind: string): string {
+  public static formatNotificationKindChanged(id: string, kind: string): string {
     return `Notification ${id} is of the kind ${kind}, which an update keeps.`;
   }
 
@@ -575,7 +618,7 @@ export class Resources {
     return `The module ${moduleId} may not offer the command ${command} in a notification; it must be its own or a dependency's.`;
   }
 
-  public static formatNotificationNotFound(id: number): string {
+  public static formatNotificationNotFound(id: string): string {
     return `Notification ${id} is gone; it was dismissed or its module stopped.`;
   }
 
@@ -639,6 +682,10 @@ export class Resources {
     return `The module ${moduleId} declares the setting ${name}, which it does not own.`;
   }
 
+  public static formatSettingCommandUnknown(moduleId: string, name: string, command: string): string {
+    return `The module ${moduleId} declares the action setting ${name}, whose command ${command} it does not declare.`;
+  }
+
   public static formatSettingKindReserved(moduleId: string, name: string, kind: string): string {
     return `The module ${moduleId} declares the setting ${name} of the kind ${kind}, which only the shell declares.`;
   }
@@ -663,8 +710,8 @@ export class Resources {
     return `The service ${name} is not a ${type}.`;
   }
 
-  public static formatModuleDiagnostic(moduleId: string, cause: string, detail: string): string {
-    return `The module ${moduleId}: ${cause}\n${detail}\n`;
+  public static formatModuleDiagnostic(moduleId: string, version: string, cause: string, detail: string): string {
+    return `The module ${moduleId} ${version}: ${cause}\n${detail}\n`;
   }
 
   public static formatModuleLogLine(moduleId: string, line: string): string {
@@ -677,6 +724,10 @@ export class Resources {
 
   public static formatEventWithdrawn(name: string): string {
     return `The event ${name} is no longer declared.`;
+  }
+
+  public static formatEventNotSent(name: string, reason: string): string {
+    return `The runtime sent the event ${name} to no client: ${reason}\n`;
   }
 
   public static formatUnknownMethod(name: string): string {
@@ -695,16 +746,16 @@ export class Resources {
     return `The runtime at ${endpoint} cannot be reached.`;
   }
 
-  public static formatHandover(productVersion: string, executablePath: string): string {
-    return `${Resources.productName} ${productVersion} at ${executablePath} owns this data directory and is newer; open that ${Resources.productName} instead.`;
+  public static formatHandover(productName: string, productVersion: string, executablePath: string): string {
+    return `${productName} ${productVersion} at ${executablePath} owns this data directory and is newer; open that ${productName} instead.`;
   }
 
   public static formatNoRuntime(root: string): string {
     return `No runtime is running for ${root}.`;
   }
 
-  public static formatBuildMismatch(productVersion: string, executablePath: string): string {
-    return `${Resources.productName} ${productVersion} at ${executablePath} owns this data directory; it is another build, and taking it over was not asked for.`;
+  public static formatBuildMismatch(productName: string, productVersion: string, executablePath: string): string {
+    return `${productName} ${productVersion} at ${executablePath} owns this data directory; it is another build, and taking it over was not asked for.`;
   }
 
   public static formatWorkInProgress(descriptions: readonly string[]): string {
@@ -747,8 +798,8 @@ export class Resources {
     return `The argument ${name} needs a value.`;
   }
 
-  public static formatPreShellFound(location: string): string {
-    return `The data directory ${location} holds data from a ${Resources.productName} release that predates the shell.`;
+  public static formatPreShellFound(productName: string, location: string): string {
+    return `The data directory ${location} holds data from a ${productName} release that predates the shell.`;
   }
 
   public static formatMoveAsideFailed(message: string): string {

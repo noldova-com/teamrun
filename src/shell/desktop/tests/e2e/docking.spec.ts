@@ -10,6 +10,7 @@ import type { Page } from "@playwright/test";
 
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
+import ContrastFixture from "./fixtures/contrast.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
 
@@ -43,23 +44,13 @@ async function describeGroupsAsync(window: Page): Promise<readonly (readonly [st
   ] as const));
 }
 
-function contrast(foreground: string, background: string): number {
-  const luminance = (color: string): number => {
-    const [red = 0, green = 0, blue = 0] = (color.match(/\d+(\.\d+)?/g) ?? []).slice(0, 3).map(t => Number(t) / 255)
-      .map(t => t <= 0.03928 ? t / 12.92 : ((t + 0.055) / 1.055) ** 2.4);
-    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-  };
-  const [lighter = 0, darker = 0] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
 test.describe("docking", () => {
   test.beforeEach(async ({ desktop }) => {
     await expect(TabDragFixture.tab(desktop.window, notes)).toBeVisible();
     await expect(TabDragFixture.tab(desktop.window, secondNote)).toBeVisible();
   });
 
-  test("dragging a view's tab onto a group's center adds it to that group", async ({ desktop }) => {
+  test("dragging a view's tab onto a group's center adds it to that group @smoke", async ({ desktop }) => {
     const window = desktop.window;
     await TabDragFixture.dragOntoPlateAsync(window, notes, clock, "Center");
 
@@ -88,7 +79,7 @@ test.describe("docking", () => {
     });
   }
 
-  test("a side guide docks the tab along that whole side, centered in its landing area", async ({ desktop }) => {
+  test("a side guide docks the tab along that whole side, centered in its landing area @smoke", async ({ desktop }) => {
     const window = desktop.window;
     await TabDragFixture.startAsync(window, notes);
     await TabDragFixture.moveOverAsync(window, window.locator("[data-drop-side=Bottom][data-drop-span=Between]"));
@@ -338,7 +329,7 @@ test.describe("docking", () => {
   });
 
   for (const reopen of [true, false])
-    test(`the layout, its splits and sizes return ${reopen ? "after reopening on the running runtime" : "after a restart that stops the runtime"}`, async ({ desktop }) => {
+    test(`the layout, its splits and sizes return ${reopen ? "after reopening on the running runtime" : "after a restart that stops the runtime"} @smoke`, async ({ desktop }) => {
       await TabDragFixture.dragOntoPlateAsync(desktop.window, outline, notes, "Bottom");
       await desktop.window.mouse.up();
       const sash = desktop.window.getByRole("separator", { name: "Resize the right dock" });
@@ -411,7 +402,7 @@ test.describe("docking", () => {
     expect(measured.preview).toEqual(["1px", "8px"]);
     expect(measured.previewColors).toEqual(measured.surfaces);
     expect(measured.tabHeight).toBeGreaterThanOrEqual(32);
-    expect(contrast(measured.tabColors[0] ?? "", measured.tabColors[1] ?? "")).toBeGreaterThanOrEqual(4.5);
+    expect(ContrastFixture.measureContrast(measured.tabColors[0] ?? "", measured.tabColors[1] ?? "")).toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
     expect(measured.sash).toBe(4);
   });
 });

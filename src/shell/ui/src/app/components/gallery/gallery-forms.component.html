@@ -14,7 +14,7 @@ LICENSE file in the root directory of this source tree.
   <tr-gallery-cell [caption]="text.disabled"><button type="button" tr-button disabled>{{ text.primary }}</button></tr-gallery-cell>
   <tr-gallery-cell [caption]="text.secondaryDisabled"><button type="button" tr-button [variant]="variants.Secondary" disabled>{{ text.secondary }}</button></tr-gallery-cell>
   <tr-gallery-cell [caption]="text.focus" [isFocusTarget]="true"><button type="button" tr-button>{{ text.primary }}</button></tr-gallery-cell>
-  <tr-gallery-cell long [caption]="text.longCaption"><button type="button" tr-button class="tr-gallery-narrow">{{ text.longText }}</button></tr-gallery-cell>
+  <tr-gallery-cell long [caption]="text.longCaption"><button type="button" tr-button class="tr-gallery-narrow" [trTooltip]="text.longText" [trTooltipTruncated]="true">{{ text.longText }}</button></tr-gallery-cell>
 </tr-gallery-specimen>
 
 <tr-gallery-specimen [name]="text.iconButton">

@@ -8,24 +8,16 @@
 
 import type { Locator, Page } from "@playwright/test";
 
+import ContrastFixture from "./fixtures/contrast.fixture.ts";
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import SettingsFixture from "./fixtures/settings.fixture.ts";
 
 const colors = {
   light: { error: "rgb(161, 38, 13)", menu: "rgb(255, 255, 255)", menuBorder: "rgb(206, 206, 206)" },
   dark: { error: "rgb(244, 135, 113)", menu: "rgb(31, 31, 31)", menuBorder: "rgb(69, 69, 69)" }
 };
 const titles = ["Note 2 couldn't be saved", "Syncing the clock", "The clock started"];
-
-function contrast(foreground: string, background: string): number {
-  const luminance = (color: string): number => {
-    const [red = 0, green = 0, blue = 0] = (color.match(/\d+/gu) ?? []).slice(0, 3).map(t => Number(t) / 255)
-      .map(t => t <= 0.03928 ? t / 12.92 : ((t + 0.055) / 1.055) ** 2.4);
-    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-  };
-  const [lighter = 0, darker = 0] = [luminance(foreground), luminance(background)].sort((x, y) => y - x);
-  return (lighter + 0.05) / (darker + 0.05);
-}
 
 function bell(window: Page): Locator {
   return window.locator("button.tr-notifications-item");
@@ -43,9 +35,7 @@ async function tickWithFocusAsync(desktop: DesktopApplicationFixture): Promise<v
 }
 
 async function openNotificationsPageAsync(window: Page): Promise<void> {
-  await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
-  await window.keyboard.press("ControlOrMeta+Comma");
-  await window.locator("tr-settings").getByRole("button", { name: "Notifications", exact: true }).click();
+  await SettingsFixture.openPageAsync(window, "Notifications");
   await expect(window.locator("tr-setting-row[data-setting=\"shell.mutedModules\"]")).toBeVisible();
 }
 
@@ -114,7 +104,7 @@ test.describe("notifications", () => {
     const modules = window.locator("tr-setting-row[data-setting=\"shell.mutedModules\"]");
     await expect(bell(window).locator(".tr-notifications-count")).toHaveText("3");
     await openNotificationsPageAsync(window);
-    await expect(modules.locator(".tr-checkbox-text")).toHaveText(["Clock notifications", "Notes notifications"]);
+    await expect(modules.locator(".tr-checkbox-text")).toHaveText(["Clock notifications", "Notes notifications", "Reminder notifications"]);
     await expect(modules.getByRole("checkbox", { name: "Clock notifications" })).toBeChecked();
     await desktop.checkpointAsync("settings-notifications");
 
@@ -137,7 +127,7 @@ test.describe("notifications", () => {
     await tickWithFocusAsync(desktop);
     await expect(toasts.locator(".tr-toast-title")).toHaveText(["The clock ticked"]);
     await expect(toasts.locator(".tr-toast-text")).toHaveText(["Ticks: 1"]);
-    await expect(window.locator(".tr-toasts-announcement[aria-live=polite]")).toHaveText("The clock ticked. Ticks: 1");
+    await expect(window.locator(".cdk-live-announcer-element[aria-live=polite]")).toHaveText("The clock ticked. Ticks: 1");
     await expect(toasts).toHaveCount(0, { timeout: 15_000 });
     await bell(window).click();
     await list(window).getByRole("checkbox", { name: "Do not disturb" }).check();
@@ -229,11 +219,13 @@ test.describe("notifications", () => {
       return color;
     }, variable);
 
+    const popoverSurface = { light: "rgb(255, 255, 255)", dark: "rgb(31, 31, 31)" };
     await bell(window).click();
     await expect(list(window).locator(".tr-notifications-row")).toHaveCount(3);
     for (const scheme of ["light", "dark"] as const) {
       await window.emulateMedia({ colorScheme: scheme });
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await expect(list(window)).toHaveCSS("background-color", popoverSurface[scheme]);
       await desktop.checkpointAsync(`progress-in-the-list-${scheme}`);
       const track = list(window).locator(".tr-notifications-row").nth(1).locator("tr-progress");
       const fill = track.locator(".tr-progress-bar");
@@ -252,7 +244,7 @@ test.describe("notifications", () => {
       expect(look.fill).not.toBe(look.surface);
       expect(look.fill.startsWith("rgb(")).toBe(true);
       expect(look.surface.startsWith("rgb(")).toBe(true);
-      expect(contrast(look.fill, look.surface)).toBeGreaterThanOrEqual(3);
+      expect(ContrastFixture.measureContrast(look.fill, look.surface)).toBeGreaterThanOrEqual(3);
       expect(look.fill).not.toBe(look.track);
       expect(look.fill).not.toMatch(/^rgba\(.*, 0\)$/);
       expect(look.width).toBeGreaterThan(0);

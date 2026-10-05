@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { DOCUMENT } from "@angular/common";
 import { DestroyRef, Injectable, type Signal, type WritableSignal, computed, effect, inject, signal, untracked } from "@angular/core";
 
@@ -19,12 +20,12 @@ import { NotificationService } from "./notification.service";
 export class ToastService {
   private readonly notifications: NotificationService = inject(NotificationService);
   private readonly document: Document = inject(DOCUMENT);
-  private readonly visibleIds: WritableSignal<readonly number[]> = signal([]);
-  private readonly politeValue: WritableSignal<string> = signal("");
-  private readonly assertiveValue: WritableSignal<string> = signal("");
+  private readonly announcer: LiveAnnouncer = inject(LiveAnnouncer);
+  private readonly visibleIds: WritableSignal<readonly string[]> = signal([]);
   private readonly lastByKind: Map<string, number> = new Map();
-  private readonly timers: Map<number, { handle: ReturnType<typeof setTimeout> | null; remaining: number; startedAt: number }> = new Map();
-  private queue: number[] = [];
+  private readonly timers: Map<string, { handle: ReturnType<typeof setTimeout> | null; remaining: number; startedAt: number }> = new Map();
+  private queue: string[] = [];
+  private shown: Notification[] = [];
   private firstRead: NotificationState | null = null;
   private highestSequence: number = 0;
 
@@ -32,8 +33,6 @@ export class ToastService {
     const notifications = this.notifications.state().notifications;
     return this.visibleIds().flatMap(t => notifications.filter(u => u.id === t));
   });
-  public readonly politeAnnouncement: Signal<string> = this.politeValue.asReadonly();
-  public readonly assertiveAnnouncement: Signal<string> = this.assertiveValue.asReadonly();
 
   public constructor() {
     effect(() => {
@@ -48,7 +47,27 @@ export class ToastService {
     });
   }
 
-  public close(id: number): void {
+  public close(id: string): void {
+    this.remove(id);
+    this.announce();
+  }
+
+  public pause(id: string): void {
+    const timer = this.timers.get(id);
+    if (Object.isUndefined(timer) || Object.isNull(timer.handle))
+      return;
+    ToastService.clear(timer.handle);
+    this.timers.set(id, { handle: null, remaining: Math.max(0, timer.remaining - (Date.now() - timer.startedAt)), startedAt: Date.now() });
+  }
+
+  public resume(id: string): void {
+    const timer = this.timers.get(id);
+    if (Object.isUndefined(timer) || !Object.isNull(timer.handle))
+      return;
+    this.startTimer(id, timer.remaining);
+  }
+
+  private remove(id: string): void {
     const timer = this.timers.get(id);
     ToastService.clear(timer?.handle ?? null);
     this.timers.delete(id);
@@ -61,21 +80,6 @@ export class ToastService {
       next = this.queue.shift();
   }
 
-  public pause(id: number): void {
-    const timer = this.timers.get(id);
-    if (Object.isUndefined(timer) || Object.isNull(timer.handle))
-      return;
-    ToastService.clear(timer.handle);
-    this.timers.set(id, { handle: null, remaining: Math.max(0, timer.remaining - (Date.now() - timer.startedAt)), startedAt: Date.now() });
-  }
-
-  public resume(id: number): void {
-    const timer = this.timers.get(id);
-    if (Object.isUndefined(timer) || !Object.isNull(timer.handle))
-      return;
-    this.startTimer(id, timer.remaining);
-  }
-
   private follow(state: NotificationState, firstRead: NotificationState): void {
     const notifications = state.notifications;
     if (firstRead !== this.firstRead) {
@@ -86,13 +90,14 @@ export class ToastService {
     this.highestSequence = Math.max(highest, ...notifications.map(t => t.sequence));
     for (const id of [...this.visibleIds(), ...this.queue])
       if (!notifications.some(t => t.id === id))
-        this.close(id);
+        this.remove(id);
     for (const notification of [...notifications].reverse())
       if (notification.sequence > highest)
         this.offer(notification, state);
     for (const notification of notifications)
       if (this.visibleIds().includes(notification.id) && !this.timers.has(notification.id) && ToastService.closesByItself(notification))
         this.startTimer(notification.id, Resources.toastDuration);
+    this.announce();
   }
 
   private offer(notification: Notification, state: NotificationState): void {
@@ -109,22 +114,27 @@ export class ToastService {
       this.queue.push(notification.id);
   }
 
-  private show(id: number): boolean {
+  private show(id: string): boolean {
     const notification = this.notifications.state().notifications.find(t => t.id === id);
     if (Object.isUndefined(notification))
       return false;
     this.visibleIds.update(t => [...t, id]);
-    const announcement = Object.isNull(notification.post.text) ? notification.post.title : `${notification.post.title}. ${notification.post.text}`;
-    if (notification.post.severity === NotificationSeverity.Error)
-      this.assertiveValue.set(announcement);
-    else
-      this.politeValue.set(announcement);
+    this.shown.push(notification);
     if (ToastService.closesByItself(notification))
       this.startTimer(id, Resources.toastDuration);
     return true;
   }
 
-  private startTimer(id: number, milliseconds: number): void {
+  private announce(): void {
+    const shown = this.shown;
+    this.shown = [];
+    if (shown.length === 0)
+      return;
+    const text = shown.map(t => Object.isNull(t.post.text) ? t.post.title : `${t.post.title}. ${t.post.text}`).join(Resources.announcementSeparator);
+    void this.announcer.announce(text, shown.some(t => t.post.severity === NotificationSeverity.Error) ? Resources.assertiveAnnouncement : Resources.politeAnnouncement);
+  }
+
+  private startTimer(id: string, milliseconds: number): void {
     this.timers.set(id, { handle: setTimeout(() => this.close(id), milliseconds), remaining: milliseconds, startedAt: Date.now() });
   }
 

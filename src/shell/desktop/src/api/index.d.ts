@@ -99,6 +99,26 @@ export declare enum QuitOutcome {
 }
 
 /**
+ * What becomes of an error a window's page reports, under its {@link WindowErrorLimit}.
+ */
+export declare enum WindowErrorAdmission {
+  /**
+   * Write the error to the log.
+   */
+  Write = "Write",
+
+  /**
+   * Leave the error out, and write once that the rest of the period's errors are left out.
+   */
+  Notice = "Notice",
+
+  /**
+   * Leave the error out without a word; the notice was already written.
+   */
+  Drop = "Drop"
+}
+
+/**
  * A window that can show the question about work in progress.
  */
 export interface IQuitPrompt {
@@ -1402,7 +1422,7 @@ export interface IDesktopWindow {
    * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
    *
    * export function paintControls(window: IDesktopWindow): void {
-   *   window.setTitleBarOverlay({ color: "#181818", symbolColor: "#CCCCCC", height: 35 });
+   *   window.setTitleBarOverlay({ color: "#181818", symbolColor: "#CCCCCC", height: 32 });
    * }
    * ```
    */
@@ -2216,7 +2236,7 @@ export declare class WindowAppearance {
    * ```ts
    * import { WindowAppearance } from "@noldova/teamrun-shell-desktop";
    *
-   * export const appearance: WindowAppearance = new WindowAppearance("#181818", "#181818", "#CCCCCC", 35);
+   * export const appearance: WindowAppearance = new WindowAppearance("#181818", "#181818", "#CCCCCC", 32);
    * ```
    */
   public constructor(background: string, titleBar: string, titleBarText: string, titleBarHeight: number);
@@ -2231,7 +2251,7 @@ export declare class WindowAppearance {
    * ```ts
    * import { WindowAppearance } from "@noldova/teamrun-shell-desktop";
    *
-   * export const appearance: WindowAppearance = WindowAppearance.fromJson({ background: "#F8F8F8", titleBar: "#F8F8F8", titleBarText: "#1E1E1E", titleBarHeight: 35 });
+   * export const appearance: WindowAppearance = WindowAppearance.fromJson({ background: "#F8F8F8", titleBar: "#F8F8F8", titleBarText: "#1E1E1E", titleBarHeight: 32 });
    * ```
    */
   public static fromJson(value: unknown): WindowAppearance;
@@ -2244,7 +2264,7 @@ export declare class WindowAppearance {
    * ```ts
    * import { WindowAppearance } from "@noldova/teamrun-shell-desktop";
    *
-   * export const message: string = JSON.stringify(new WindowAppearance("#181818", "#181818", "#CCCCCC", 35).toJson());
+   * export const message: string = JSON.stringify(new WindowAppearance("#181818", "#181818", "#CCCCCC", 32).toJson());
    * ```
    */
   public toJson(): JsonObject;
@@ -2285,7 +2305,7 @@ export declare class WindowState {
    * @param x The left edge, an integer, or `null` together with `y`.
    * @param y The top edge, an integer, or `null` together with `x`.
    * @param width The width; an integer of at least the window's minimum width, 640.
-   * @param height The height; an integer of at least the window's minimum height, 400.
+   * @param height The height; an integer of at least the window's minimum height, 480.
    * @param isMaximized Whether the window is maximized.
    * @throws ArgumentException synchronously when only one coordinate is given.
    * @throws ArgumentOutOfRangeException synchronously for a coordinate that is not an integer or a size below the
@@ -2315,7 +2335,7 @@ export declare class WindowState {
   public static createDefault(area: ScreenArea): WindowState;
 
   /**
-   * Reads a saved state.
+   * Reads a saved state, growing a size below the window's minimum to it.
    *
    * @param value The saved JSON.
    * @returns The state.
@@ -2444,6 +2464,11 @@ export declare class OpenWindow implements IQuitPrompt {
    * Restores and keeps the window's bounds.
    */
   public readonly bounds: WindowBoundsKeeper;
+
+  /**
+   * Limits how many errors from the window's page reach the desktop log: ten a minute, then one notice.
+   */
+  public readonly errors: WindowErrorLimit;
 
   /**
    * Takes charge of a window that is not yet shown.
@@ -2901,7 +2926,7 @@ export declare class SystemNotifier {
    * }
    * ```
    */
-  public constructor(host: INotificationHost, log: IDesktopLog, readIcon: () => string, isAnyWindowFocused: () => boolean, open: (id: number) => void);
+  public constructor(host: INotificationHost, log: IDesktopLog, readIcon: () => string, isAnyWindowFocused: () => boolean, open: (id: string) => void);
 
   /**
    * The number to pass to {@link begin} for a read starting now; a reset or a hold changes it, so a read started before
@@ -3129,6 +3154,43 @@ export declare class DesktopLog implements IDesktopLog {
    * ```
    */
   public write(text: string): void;
+}
+
+/**
+ * Limits the errors one window's page reports within a fixed period. The period starts with the first error after
+ * the previous one has passed; reloading the page does not start a new one.
+ */
+export declare class WindowErrorLimit {
+  /**
+   * Creates the limit, with no period started.
+   *
+   * @param burst The most errors written in one period.
+   * @param period The period's length, in milliseconds.
+   * @param now Returns the current time in milliseconds; `Date.now` by default.
+   * @example
+   * ```ts
+   * import { WindowErrorLimit } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const limit: WindowErrorLimit = new WindowErrorLimit(10, 60000);
+   * ```
+   */
+  public constructor(burst: number, period: number, now?: () => number);
+
+  /**
+   * Counts one more error and says what becomes of it.
+   *
+   * @returns {@link WindowErrorAdmission.Write} for the period's first `burst` errors, {@link WindowErrorAdmission.Notice} for the next one, and
+   * {@link WindowErrorAdmission.Drop} for the rest of the period.
+   * @example
+   * ```ts
+   * import { WindowErrorAdmission, type WindowErrorLimit } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function isWritten(limit: WindowErrorLimit): boolean {
+   *   return limit.admit() === WindowErrorAdmission.Write;
+   * }
+   * ```
+   */
+  public admit(): WindowErrorAdmission;
 }
 
 /**

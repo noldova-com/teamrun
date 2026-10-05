@@ -10,10 +10,13 @@ import { Component, ErrorHandler, type Type } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
-import { ModuleState, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { ModuleState, type ModuleStatus, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
+import { ModulesComponent } from "../../../src/app/components/modules/modules.component";
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
 import { DockSide } from "../../../src/app/enums/dock-side";
+import { WindowPartFailureException } from "../../../src/app/exceptions/window-part-failure.exception";
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
 import type { IWindowPartContext } from "../../../src/app/interfaces/i-window-part-context";
@@ -25,6 +28,8 @@ import { ViewRegistry } from "../../../src/app/models/layout/view-registry";
 import { ViewTab } from "../../../src/app/models/layout/view-tab";
 import { ViewType } from "../../../src/app/models/layout/view-type";
 import type { MenuItem } from "../../../src/app/models/menu-item";
+import type { NotificationHandle } from "../../../src/app/models/notification-handle";
+import { ShellDocuments } from "../../../src/app/models/shell-documents";
 import { StatusBarItemContribution } from "../../../src/app/models/status-bar-item-contribution";
 import { StatusBarItemState } from "../../../src/app/models/status-bar-item-state";
 import { TopBarActionContribution } from "../../../src/app/models/top-bar-action-contribution";
@@ -38,6 +43,7 @@ import { CommandService } from "../../../src/app/services/command.service";
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../src/app/services/layout.service";
 import { MenuService } from "../../../src/app/services/menu.service";
+import { ModuleStatusService } from "../../../src/app/services/module-status.service";
 import { TabLabelService } from "../../../src/app/services/tab-label.service";
 import { ViewDialogService } from "../../../src/app/services/view-dialog.service";
 import { SettingsService } from "../../../src/app/services/settings.service";
@@ -54,6 +60,7 @@ class FakeWindowPart implements IWindowPart {
 
   public readonly moduleId: string;
   public isDeactivationFailing: boolean = false;
+  public onReconnect: () => boolean = () => false;
 
   public constructor(moduleId: string, log: string[], onActivate: (context: IWindowPartContext) => void = () => undefined) {
     this.moduleId = moduleId;
@@ -67,6 +74,12 @@ class FakeWindowPart implements IWindowPart {
     this.onActivate(context);
   }
 
+  public async reconnectAsync(): Promise<boolean> {
+    this.log.push(`reconnect ${this.moduleId}`);
+    await Promise.resolve();
+    return this.onReconnect();
+  }
+
   public deactivateAsync(): Promise<void> {
     this.log.push(`deactivate ${this.moduleId}`);
     return this.isDeactivationFailing ? Promise.reject(new Error(`${this.moduleId} did not stop`)) : Promise.resolve();
@@ -75,7 +88,9 @@ class FakeWindowPart implements IWindowPart {
 
 describe("WindowPartHostService", () => {
   const load = (): Promise<Type<unknown>> => Promise.resolve(ContentComponent);
-  const status = (id: string, state: ModuleState = ModuleState.Active, cause: string | null = null): object => ({ id, state, ...(cause === null ? {} : { cause }) });
+  const status = (id: string, state: ModuleState = ModuleState.Active, cause: string | null = null, dependencies: readonly string[] = []): object => ({
+    id, version: "0.0.1", displayName: `${id[0]?.toUpperCase()}${id.slice(1)}`, description: "Used by the tests.", dependencies, contributes: {}, state, ...(cause === null ? {} : { cause })
+  });
   const source = (
     moduleId: string,
     part: IWindowPart | Error,
@@ -86,13 +101,15 @@ describe("WindowPartHostService", () => {
     topBarActions: readonly string[] = [],
     notifications: readonly string[] = [],
     documents: readonly string[] = [`${moduleId}.note`]): WindowPartSource =>
-    new WindowPartSource(moduleId, `${moduleId[0]?.toUpperCase()}${moduleId.slice(1)}`, dependencies, views, documents, commands, statusBarItems, topBarActions, notifications,
+    new WindowPartSource(moduleId, dependencies, views, documents, commands, statusBarItems, topBarActions, notifications,
       () => part instanceof Error ? Promise.reject(part) : Promise.resolve(part));
   const notesPart = (log: string[]): FakeWindowPart => new FakeWindowPart("notes", log, t => {
     t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load));
     t.registerDocument(new DocumentContribution("notes.note", load));
     t.openDocument("notes.note", "1", "Note 1");
   });
+  const clockPart = (log: string[]): FakeWindowPart =>
+    new FakeWindowPart("clock", log, t => t.registerView(new ViewContribution("clock.list", "Clock", "schedule", DockSide.Right, true, load)));
   let bridge: DesktopBridgeFixture;
   let errors: unknown[];
   let log: string[];
@@ -129,21 +146,23 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(loads).toEqual([""]));
 
     expect(bridge.requests).toEqual([["shell.settings", {}], ["shell.modules", null], ["shell.commands", null]]);
-    expect(host.failures()).toEqual([]);
+    expect([TestBed.inject(ModuleStatusService).modules(), host.failures()]).toEqual([[], []]);
     expect(host.generation()).toBe(1);
     expect(layout.layout().documents.tabs).toEqual([]);
     expect(errors).toEqual([]);
   });
 
-  it("registers the shell's Settings document before any module's, finds it without a part's context and labels it", async () => {
+  it("registers the shell's Settings and Modules documents before any module's, finds them without a part's context and labels them", async () => {
     const { host, layout, loads } = start([], []);
     await vi.waitFor(() => expect(loads).toEqual([""]));
+    const labels = TestBed.inject(TabLabelService);
 
-    const match = host.findContribution(new DocumentTab("shell.settings"));
+    const settings = host.findContribution(new DocumentTab("shell.settings"));
+    const modules = host.findContribution(new DocumentTab("shell.modules"));
 
-    expect(layout.registry().hasDocument("shell.settings")).toBe(true);
-    expect([match?.context, await match?.loadComponent()]).toEqual([null, SettingsComponent]);
-    expect(TestBed.inject(TabLabelService).of(new DocumentTab("shell.settings")).title).toBe("Settings");
+    expect(["shell.settings", "shell.modules"].map(t => layout.registry().hasDocument(t))).toEqual([true, true]);
+    expect([settings?.context, await settings?.loadComponent(), modules?.context, await modules?.loadComponent()]).toEqual([null, SettingsComponent, null, ModulesComponent]);
+    expect(["shell.settings", "shell.modules"].map(t => labels.of(new DocumentTab(t))).map(t => [t.title, t.icon])).toEqual([["Settings", "settings"], ["Modules", "extension"]]);
   });
 
   it("reads, sets, resets and follows settings through the settings service", async () => {
@@ -167,7 +186,7 @@ describe("WindowPartHostService", () => {
 
   it("activates the active modules' window parts before loading the layout and finds their contributions", async () => {
 
-    const { host, layout, loads } = start([source("notes", notesPart(log), ["tasks"])], [status("tasks"), status("notes")]);
+    const { host, layout, loads } = start([source("notes", notesPart(log), ["tasks"])], [status("tasks"), status("notes", ModuleState.Active, null, ["tasks"])]);
     const labels = TestBed.inject(TabLabelService);
 
     await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1")]));
@@ -185,6 +204,21 @@ describe("WindowPartHostService", () => {
     expect(errors).toEqual([]);
   });
 
+  it("names the reported modules while their window parts activate and lists them for the Modules document once activation ends", async () => {
+    let during: readonly unknown[] = [];
+    const part = new FakeWindowPart("notes", log, () => {
+      const statuses = TestBed.inject(ModuleStatusService);
+      during = [statuses.nameOf("tasks"), statuses.nameOf("notes"), statuses.modules()];
+    });
+    const { loads } = start([source("notes", part)], [status("tasks"), status("notes")]);
+
+    await vi.waitFor(() => expect(loads).toHaveLength(1));
+
+    expect(log).toEqual(["activate notes"]);
+    expect(during).toEqual(["Tasks", "Notes", []]);
+    expect(TestBed.inject(ModuleStatusService).modules().map(t => t.id)).toEqual(["tasks", "notes"]);
+  });
+
   it("keeps a failed module's views in their saved places with its name and an error icon, and finds its failure", async () => {
 
     const { host, layout } = start(
@@ -199,7 +233,7 @@ describe("WindowPartHostService", () => {
 
     expect(host.failures().map(t => [t.moduleId, t.displayName, t.state, t.cause, t.viewNames])).toEqual([
       ["clock", "Clock", ModuleState.Failed, "Its runtime part failed to activate.", ["clock.face"]],
-      ["weather", "weather", ModuleState.Failed, "Its runtime part failed to activate.", []]
+      ["weather", "Weather", ModuleState.Failed, "Its runtime part failed to activate.", []]
     ]);
     expect(layout.layout().sideOf(layout.layout().groupOf(face)?.id ?? -1)).toBe(DockSide.Right);
     expect(layout.registry().view("clock.face")).toEqual(new ViewType("clock.face", DockSide.Left, false));
@@ -217,10 +251,17 @@ describe("WindowPartHostService", () => {
     });
     const { host, layout } = start(
       [source("tasks", new Error("No chunk.")), source("clock", failing, [], ["clock.face"]), source("notes", notesPart(log), ["clock"]), source("weather", notesPart(log), ["tasks"])],
-      [status("tasks"), status("clock"), status("notes"), status("weather")]);
+      [status("tasks"), status("clock"), status("notes", ModuleState.Active, null, ["clock"]), status("weather", ModuleState.Active, null, ["tasks"]), status("alarm")]);
 
     await vi.waitFor(() => expect(host.failures().length).toBe(4));
 
+    expect(TestBed.inject(ModuleStatusService).modules().map(t => [t.id, t.state, t.blockedBy, t.description])).toEqual([
+      ["tasks", ModuleState.Failed, null, "Used by the tests."],
+      ["clock", ModuleState.Failed, null, "Used by the tests."],
+      ["notes", ModuleState.Blocked, "clock", "Used by the tests."],
+      ["weather", ModuleState.Blocked, "tasks", "Used by the tests."],
+      ["alarm", ModuleState.Active, null, "Used by the tests."]
+    ]);
     expect(host.failures().map(t => [t.moduleId, t.state, t.cause])).toEqual([
       ["tasks", ModuleState.Failed, "Its window part could not be loaded."],
       ["clock", ModuleState.Failed, "Its window part failed to activate."],
@@ -230,27 +271,30 @@ describe("WindowPartHostService", () => {
     expect(log).toEqual(["activate clock"]);
     expect(host.findContribution(new ViewTab("clock.face"))).toBeNull();
     expect(layout.registry().view("clock.face").isShownByDefault).toBe(false);
-    expect(errors.map(t => (t as Error).message)).toEqual(["No chunk.", "The clock broke."]);
+    expect(errors.map(t => [(t as WindowPartFailureException).moduleId, (t as Error).message, ((t as Error).cause as Error).message])).toEqual([
+      ["tasks", "Its window part could not be loaded.", "No chunk."],
+      ["clock", "Its window part failed to activate.", "The clock broke."]
+    ]);
   });
 
   it("posts, updates and dismisses notifications through the runtime and reports a dismissal that fails", async () => {
     const post = new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Success, null, [], null);
-    bridge.responses.set("shell.postNotification", { payload: { id: 4 } });
+    bridge.responses.set("shell.postNotification", { payload: { id: "n4" } });
     bridge.responses.set("shell.updateNotification", { payload: null });
     bridge.responses.set("shell.dismissNotification", { failure: { code: "Unavailable", message: "Not connected." } });
     const { host } = start([], []);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
     const id = await host.postNotificationAsync(post);
-    await host.updateNotificationAsync(id, post);
+    const isUpdated = await host.updateNotificationAsync(id, post);
     host.dismissNotification(id);
     await vi.waitFor(() => expect(errors.length).toBe(1));
 
-    expect(id).toBe(4);
+    expect([id, isUpdated]).toEqual(["n4", true]);
     expect(bridge.requests.slice(-3).map(t => [t[0], JSON.stringify(t[1])])).toEqual([
       ["shell.postNotification", JSON.stringify(post.toJson())],
-      ["shell.updateNotification", JSON.stringify({ id: 4, post: post.toJson() })],
-      ["shell.dismissNotification", JSON.stringify({ id: 4 })]
+      ["shell.updateNotification", JSON.stringify({ id: "n4", post: post.toJson() })],
+      ["shell.dismissNotification", JSON.stringify({ id: "n4" })]
     ]);
     expect((errors[0] as Error).message).toContain("Not connected.");
   });
@@ -405,7 +449,7 @@ describe("WindowPartHostService", () => {
     bridge.publishStartup({ kind: "Ready", details: [] });
     await vi.waitFor(() => expect(host.generation()).toBe(2));
 
-    expect(errors.map(t => (t as Error).message)).toEqual(["The command notes.sync is already registered."]);
+    expect(errors.map(t => [(t as WindowPartFailureException).moduleId, ((t as Error).cause as Error).message])).toEqual([["notes", "The command notes.sync is already registered."]]);
     expect(commands.commands().filter(t => !t.name.startsWith("shell.")).map(t => t.title)).toEqual(["Sync"]);
     expect(host.isCommandRegistered("notes.sync")).toBe(true);
     expect(host.failures().length).toBe(0);
@@ -438,23 +482,46 @@ describe("WindowPartHostService", () => {
     expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1"), new DocumentTab("notes.note", "3")]);
   });
 
-  it("keeps the saved active document when a part opens the saved documents and a new one during activation", async () => {
+  it("restores the saved documents a part opens during activation with the saved active one, leaves out one the layout lacks, and opens it when asked later", async () => {
     const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
     const saved = Layout.createDefault(new ViewRegistry([], [])).openDocument(note("1")).openDocument(note("2")).openDocument(note("3")).activate(note("1"));
     const part = new FakeWindowPart("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
       ["1", "2", "3", "4"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
     });
-    const { layout } = start([source("notes", part)], [status("notes")]);
+    const { host, layout } = start([source("notes", part)], [status("notes")]);
     vi.spyOn(TestBed.inject(LayoutStoreService), "readAsync").mockResolvedValue(saved.toJson());
+    await vi.waitFor(() => expect(layout.layout().documents.tabs).toHaveLength(3));
+    const restored = [layout.layout().documents.tabs, layout.layout().documents.active];
 
-    await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([note("1"), note("2"), note("3"), note("4")]));
+    host.openDocument("notes", "notes.note", "4", "Note 4", false);
 
-    expect(layout.layout().documents.active).toEqual(note("1"));
+    expect(restored).toEqual([[note("1"), note("2"), note("3")], note("1")]);
     expect(TestBed.inject(TabLabelService).of(note("3")).title).toBe("Note 3");
+    expect([layout.layout().documents.tabs, layout.layout().documents.active]).toEqual([[note("1"), note("2"), note("3"), note("4")], note("4")]);
   });
 
-  it("keeps the active document when the runtime is ready again and the parts open their documents while reactivating", async () => {
+  it("opens a document asked for after activation but before the saved layout is read, and still leaves out a start open the layout lacks", async () => {
+    const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
+    const saved = Layout.createDefault(new ViewRegistry([], [])).openDocument(note("1")).openDocument(note("2"));
+    const part = new FakeWindowPart("notes", log, t => {
+      t.registerDocument(new DocumentContribution("notes.note", load));
+      ["1", "3"].forEach(u => t.openDocument("notes.note", u, `Note ${u}`));
+    });
+    let read: (value: JsonValue) => void = () => undefined;
+    const { host, layout } = start([source("notes", part)], [status("notes")]);
+    vi.spyOn(TestBed.inject(LayoutStoreService), "readAsync").mockReturnValue(new Promise(resolve => read = resolve));
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    host.openDocument("notes", "notes.note", "4", "Note 4", false);
+    host.keepDocument("notes", "notes.note", "1");
+    read(saved.toJson());
+
+    await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([note("1"), note("2"), note("4")]));
+    expect(layout.layout().documents.active).toEqual(note("4"));
+  });
+
+  it("keeps the active document when the runtime is ready again, and adds a document the parts open while reactivating that is not open", async () => {
     const note = (instance: string): DocumentTab => new DocumentTab("notes.note", instance);
     const part = new FakeWindowPart("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
@@ -463,6 +530,7 @@ describe("WindowPartHostService", () => {
     const { host, layout } = start([source("notes", part)], [status("notes")]);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
     expect(layout.layout().documents.active).toEqual(note("2"));
+    layout.close(note("2"));
     layout.activate(note("1"));
 
     bridge.publishStartup({ kind: "Connecting", details: [] });
@@ -522,11 +590,11 @@ describe("WindowPartHostService", () => {
     expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1")]);
   });
 
-  it("deactivates its parts in reverse when the runtime is ready again, reactivates them and loads the layout only once", async () => {
+  it("rebuilds the parts that don't continue when the runtime is ready again, deactivating them in reverse, and loads the layout only once", async () => {
     const tasks = new FakeWindowPart("tasks", log);
     const notes = notesPart(log);
     tasks.isDeactivationFailing = true;
-    const { host, loads } = start([source("tasks", tasks), source("notes", notes, ["tasks"])], [status("tasks"), status("notes")]);
+    const { host, loads } = start([source("tasks", tasks), source("notes", notes, ["tasks"])], [status("tasks"), status("notes", ModuleState.Active, null, ["tasks"])]);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
     bridge.publishStartup({ kind: "Ready", details: [] });
@@ -534,10 +602,277 @@ describe("WindowPartHostService", () => {
     bridge.publishStartup({ kind: "Ready", details: [] });
     await vi.waitFor(() => expect(host.generation()).toBe(2));
 
-    expect(log).toEqual(["activate tasks", "activate notes", "deactivate notes", "deactivate tasks", "activate tasks", "activate notes"]);
+    expect(log).toEqual(["activate tasks", "activate notes", "reconnect tasks", "deactivate notes", "deactivate tasks", "activate tasks", "activate notes"]);
     expect(loads.length).toBe(1);
     expect(errors.map(t => (t as Error).message)).toEqual(["tasks did not stop"]);
     expect(host.findContribution(new ViewTab("notes.list"))?.context?.moduleId).toBe("notes");
+  });
+
+  it("keeps a part that continues when the runtime is ready again, with its context and its tabs' revisions, and moves on only the rebuilt module's tabs", async () => {
+    const notes = notesPart(log);
+    const clock = clockPart(log);
+    notes.onReconnect = () => true;
+    const { host } = start([source("notes", notes), source("clock", clock)], [status("notes"), status("clock")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const tabs = [new ViewTab("notes.list"), new DocumentTab("notes.note", "1"), new ViewTab("clock.list"), ShellDocuments.settingsTab];
+    const context = host.findContribution(new ViewTab("notes.list"))?.context;
+    const revisions = tabs.map(t => host.revisionOf(t));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(log).toEqual(["activate notes", "activate clock", "reconnect notes", "reconnect clock", "deactivate clock", "activate clock"]);
+    expect(host.findContribution(new ViewTab("notes.list"))?.context).toBe(context);
+    expect(revisions).toEqual([1, 1, 1, 0]);
+    expect(tabs.map(t => host.revisionOf(t))).toEqual([1, 1, 2, 0]);
+    expect(errors).toEqual([]);
+  });
+
+  it("rebuilds a part that asks to be or fails to continue, logging the failure under its module's id, and every part that depends on a rebuilt one", async () => {
+    const tasks = new FakeWindowPart("tasks", log);
+    const notes = new FakeWindowPart("notes", log);
+    const clock = new FakeWindowPart("clock", log);
+    tasks.onReconnect = () => {
+      throw new Error("tasks lost its state");
+    };
+    notes.onReconnect = () => true;
+    const { host } = start(
+      [source("tasks", tasks), source("notes", notes, ["tasks"]), source("clock", clock)],
+      [status("tasks"), status("notes", ModuleState.Active, null, ["tasks"]), status("clock")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(log).toEqual([
+      "activate tasks", "activate notes", "activate clock",
+      "reconnect tasks", "reconnect clock",
+      "deactivate clock", "deactivate notes", "deactivate tasks",
+      "activate tasks", "activate notes", "activate clock"
+    ]);
+    expect(errors.map(t => [(t as WindowPartFailureException).moduleId, (t as Error).message, ((t as Error).cause as Error).message])).toEqual([
+      ["tasks", "Its window part failed to continue after the runtime started again.", "tasks lost its state"]
+    ]);
+  });
+
+  it("withdraws a kept part whose module is no longer active, showing its views' failure, activates a module that became active, keeps the revision of a module that stays failed and moves on one whose failure changed", async () => {
+    const tabs = [new ViewTab("notes.list"), new ViewTab("clock.list"), new ViewTab("tasks.list"), new ViewTab("calendar.list")];
+    const during: [number[], (string | null)[]][] = [];
+    const notes = new FakeWindowPart("notes", log, t => t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load)));
+    const clock = new FakeWindowPart("clock", log, t => {
+      t.registerView(new ViewContribution("clock.list", "Clock", "schedule", DockSide.Right, true, load));
+      const host = TestBed.inject(WindowPartHostService);
+      during.push([tabs.map(u => host.revisionOf(u)), tabs.map(u => host.findFailure(u)?.cause ?? null)]);
+    });
+    notes.onReconnect = () => true;
+    const { host } = start(
+      [source("notes", notes), source("clock", clock), source("tasks", new FakeWindowPart("tasks", log)), source("calendar", new FakeWindowPart("calendar", log))],
+      [status("notes"), status("clock", ModuleState.Failed, "It broke."), status("tasks", ModuleState.Failed, "It is broken."), status("calendar", ModuleState.Failed, "It did not start.")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const revisions = tabs.map(t => host.revisionOf(t));
+
+    bridge.responses.set("shell.modules", { payload: { modules: [
+      status("notes", ModuleState.Failed, "It broke too."), status("clock"), status("tasks", ModuleState.Failed, "It is broken."), status("calendar", ModuleState.Failed, "It broke.")
+    ] } });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(log).toEqual(["activate notes", "deactivate notes", "activate clock"]);
+    expect(host.findFailure(new ViewTab("notes.list"))?.cause).toBe("It broke too.");
+    expect(host.findContribution(new ViewTab("notes.list"))).toBeNull();
+    expect(host.findContribution(new ViewTab("clock.list"))?.context?.moduleId).toBe("clock");
+    expect(revisions).toEqual([1, 1, 1, 1]);
+    expect(during).toEqual([[[0, 1, 1, 1], [null, null, "It is broken.", "It did not start."]]]);
+    expect(tabs.map(t => host.revisionOf(t))).toEqual([2, 2, 1, 2]);
+    expect(host.findFailure(new ViewTab("calendar.list"))?.cause).toBe("It broke.");
+    expect(errors).toEqual([]);
+  });
+
+  it("moves on the revision of a module that stays failed when its state changes and its cause stays the same", async () => {
+    const chat = (state: ModuleState): object => ({ ...status("chat", state, "It waits.", ["tasks"]), ...state === ModuleState.Blocked ? { blockedBy: "tasks" } : {} });
+    const tab = new ViewTab("chat.list");
+    const { host } = start([source("chat", new FakeWindowPart("chat", log), ["tasks"])], [status("tasks", ModuleState.Failed, "It broke."), chat(ModuleState.Blocked)]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const before = [host.revisionOf(tab), host.findFailure(tab)?.state];
+
+    bridge.responses.set("shell.modules", { payload: { modules: [status("tasks", ModuleState.Failed, "It broke."), chat(ModuleState.Failed)] } });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(before).toEqual([1, ModuleState.Blocked]);
+    expect([host.revisionOf(tab), host.findFailure(tab)?.state]).toEqual([2, ModuleState.Failed]);
+    expect(log).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  it("keeps a part whose dependency has no window part, with its context", async () => {
+    const notes = notesPart(log);
+    notes.onReconnect = () => true;
+    const { host } = start([source("notes", notes, ["tasks"])], [status("tasks"), status("notes", ModuleState.Active, null, ["tasks"])]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const context = host.findContribution(new ViewTab("notes.list"))?.context;
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(log).toEqual(["activate notes", "reconnect notes"]);
+    expect(host.findContribution(new ViewTab("notes.list"))?.context).toBe(context);
+    expect(errors).toEqual([]);
+  });
+
+  it("keeps a part's notification handles across a reconnect, so an update reaches a notification the runtime still holds and tells the part when it is gone", async () => {
+    const saved = new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Success, null, [], null);
+    bridge.responses.set("shell.postNotification", { payload: { id: "n1" } });
+    bridge.responses.set("shell.updateNotification", { payload: null });
+    bridge.responses.set("shell.dismissNotification", { payload: null });
+    const handles: NotificationHandle[] = [];
+    const notes = new FakeWindowPart("notes", log, t => {
+      void t.postNotificationAsync(saved).then(u => handles.push(u));
+    });
+    notes.onReconnect = () => true;
+    const { host } = start([source("notes", notes, [], [], [], [], [], ["notes.saved"])], [status("notes")]);
+    await vi.waitFor(() => expect(handles.length).toBe(1));
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+    const isHeld = await Promise.all(handles.map(t => t.updateAsync(saved)));
+    bridge.responses.set("shell.updateNotification", { failure: { code: "NotFound", message: "Notification n1 is gone; it was dismissed or its module stopped." } });
+    const isGone = await Promise.all(handles.map(t => t.updateAsync(saved)));
+    bridge.responses.set("shell.updateNotification", { failure: { code: "Unavailable", message: "TeamRun is not connected to its runtime." } });
+    const refusal = host.updateNotificationAsync("n2", saved);
+    await expect(refusal).rejects.toThrowError("TeamRun is not connected to its runtime.");
+    bridge.responses.set("shell.modules", { payload: { modules: [status("notes", ModuleState.Failed, "It broke.")] } });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(3));
+
+    expect([isHeld, isGone]).toEqual([[true], [false]]);
+    expect(log).toEqual(["activate notes", "reconnect notes", "deactivate notes"]);
+    expect(bridge.requests.filter(t => t[0].includes("Notification")).map(t => t[0]))
+      .toEqual(["shell.postNotification", "shell.updateNotification", "shell.updateNotification", "shell.updateNotification"]);
+    expect(errors).toEqual([]);
+  });
+
+  it("stops activating its parts when the runtime drops while one activates, and activates them for the new runtime", async () => {
+    let drops = 1;
+    const tasks = new FakeWindowPart("tasks", log, () => {
+      if (drops-- === 0)
+        return;
+      bridge.publishStartup({ kind: "Connecting", details: [] });
+      bridge.publishStartup({ kind: "Ready", details: [] });
+    });
+    const { host } = start([source("tasks", tasks), source("notes", notesPart(log))], [status("tasks"), status("notes")]);
+
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    expect(log).toEqual(["activate tasks", "reconnect tasks", "deactivate tasks", "activate tasks", "activate notes"]);
+    expect(errors).toEqual([]);
+  });
+
+  it("starts over from its parts as they are when the runtime drops while a part is continuing, so no part is rebuilt twice or left half kept", async () => {
+    const notes = notesPart(log);
+    const clock = clockPart(log);
+    let calls = 0;
+    notes.onReconnect = () => {
+      calls++;
+      if (calls > 1)
+        return true;
+      bridge.publishStartup({ kind: "Connecting", details: [] });
+      bridge.publishStartup({ kind: "Ready", details: [] });
+      return false;
+    };
+    const { host } = start([source("notes", notes), source("clock", clock)], [status("notes"), status("clock")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const context = host.findContribution(new ViewTab("notes.list"))?.context;
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(log).toEqual(["activate notes", "activate clock", "reconnect notes", "reconnect notes", "reconnect clock", "deactivate clock", "activate clock"]);
+    expect(host.findContribution(new ViewTab("notes.list"))?.context).toBe(context);
+    expect(host.findContribution(new ViewTab("clock.list"))?.context?.moduleId).toBe("clock");
+    expect([host.revisionOf(new ViewTab("notes.list")), host.revisionOf(new ViewTab("clock.list"))]).toEqual([1, 2]);
+    expect(errors).toEqual([]);
+  });
+
+  it("gives a module's tabs its revision only once the reload that changed the module ends", async () => {
+    const during: number[] = [];
+    const notes = new FakeWindowPart("notes", log, t => {
+      t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load));
+      during.push(TestBed.inject(WindowPartHostService).revisionOf(new ViewTab("notes.list")));
+    });
+    const { host } = start([source("notes", notes)], [status("notes")]);
+
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    expect(during).toEqual([0]);
+    expect(host.revisionOf(new ViewTab("notes.list"))).toBe(1);
+  });
+
+  it("reloads once for the newest connection when the runtime is ready again more than once before it reloads", async () => {
+    const notes = notesPart(log);
+    notes.onReconnect = () => true;
+    const { host } = start([source("notes", notes)], [status("notes")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    for (let index = 0; index < 2; index++) {
+      bridge.publishStartup({ kind: "Connecting", details: [] });
+      bridge.publishStartup({ kind: "Ready", details: [] });
+    }
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(log).toEqual(["activate notes", "reconnect notes"]);
+    expect(errors).toEqual([]);
+  });
+
+  it("leaves its parts as they are, reporting nothing, when a request fails because the runtime dropped again", async () => {
+    const notes = notesPart(log);
+    notes.onReconnect = () => true;
+    const { host } = start([source("notes", notes)], [status("notes")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const request = bridge.request.bind(bridge);
+    let drops = 1;
+    vi.spyOn(bridge, "request").mockImplementation((method, payload) => {
+      if (method !== "shell.modules" || drops-- === 0)
+        return request(method, payload);
+      bridge.publishStartup({ kind: "Connecting", details: [] });
+      bridge.publishStartup({ kind: "Ready", details: [] });
+      return Promise.resolve({ failure: { code: "Unavailable", message: "TeamRun is not connected to its runtime." } });
+    });
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(log).toEqual(["activate notes", "reconnect notes"]);
+    expect(errors).toEqual([]);
+  });
+
+  it("keeps the modules it reported until the runtime reports them again", async () => {
+    const seen: string[][] = [];
+    let reported: () => readonly ModuleStatus[] = () => [];
+    const tasks = new FakeWindowPart("tasks", log, () => {
+      seen.push(reported().map(t => t.id));
+    });
+    const { host } = start([source("tasks", tasks)], [status("tasks")]);
+    reported = () => TestBed.inject(ModuleStatusService).modules();
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(seen).toEqual([[], ["tasks"]]);
+    expect(TestBed.inject(ModuleStatusService).modules().map(t => t.id)).toEqual(["tasks"]);
   });
 
   it("shows the badge a window part sets on its view, set again when the part reactivates", async () => {

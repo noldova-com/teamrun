@@ -6,18 +6,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ErrorHandler, type WritableSignal, signal } from "@angular/core";
+import { Component, ErrorHandler, type WritableSignal, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { DialogService } from "@noldova/teamrun-shell-ui";
 import { CommandRun, Notification, NotificationAction, NotificationPost, NotificationSeverity, NotificationState, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { ToastsComponent } from "../../../../src/app/components/toasts/toasts.component";
-import { WindowPartSource } from "../../../../src/app/models/window-part-source";
-import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { NotificationService } from "../../../../src/app/services/notification.service";
 import { ToastService } from "../../../../src/app/services/toast.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
+import { ModuleStatusFixture } from "../../../fixtures/module-status.fixture";
 
 class FakeNotificationService {
   public readonly calls: string[] = [];
@@ -46,13 +46,23 @@ async function expectTooltipAsync(button: HTMLElement | null | undefined, text: 
   expect(button?.hasAttribute("title")).toBe(false);
 }
 
+@Component({
+  template: `<button type="button" class="inside">Keep working</button>`
+})
+class OpenDialogComponent {
+}
+
+function announced(): HTMLElement | null {
+  return document.querySelector<HTMLElement>(".cdk-live-announcer-element");
+}
+
 describe("ToastsComponent", () => {
   const run = (name: string): CommandRun => new CommandRun(QualifiedName.parse(name), null);
   let notifications: FakeNotificationService;
   let errors: unknown[];
 
   const toast = (id: number, options: Partial<{ severity: NotificationSeverity; open: string; actions: readonly string[]; progress: number | typeof NotificationPost.indeterminate; text: string }> = {}): Notification =>
-    new Notification(id, id, new NotificationPost(
+    new Notification(String(id), id, new NotificationPost(
       QualifiedName.parse(`notes.kind${id}`), null, `Title ${id}`, options.text ?? null, options.severity ?? NotificationSeverity.Warning,
       options.open === undefined ? null : run(options.open), (options.actions ?? []).map(t => new NotificationAction(`Run ${t}`, run(t))), options.progress ?? null),
     "2026-10-03T08:00:00.000Z", false);
@@ -76,10 +86,10 @@ describe("ToastsComponent", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: NotificationService, useValue: notifications },
-        { provide: WindowPartTokens.sources, useValue: [new WindowPartSource("notes", "Notes", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused")))] },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
     });
+    ModuleStatusFixture.report(ModuleStatusFixture.create("notes", "Notes"));
   });
 
   afterEach(() => {
@@ -92,7 +102,6 @@ describe("ToastsComponent", () => {
       toast(2, { severity: NotificationSeverity.Error, text: "The disk is full.", open: "notes.open", actions: ["notes.retry", "clock.reset"] }),
       toast(1, { progress: NotificationPost.indeterminate }));
     const [second, first] = toasts(fixture);
-    const regions = [...(fixture.nativeElement as HTMLElement).querySelectorAll(".tr-toasts-announcement")].map(t => [t.getAttribute("aria-live"), t.textContent]);
 
     expect(toasts(fixture).map(t => t.dataset["notification"])).toEqual(["1", "2"]);
     expect(first?.querySelector(".tr-toast-severity")?.getAttribute("aria-label")).toBe("Error");
@@ -103,11 +112,28 @@ describe("ToastsComponent", () => {
     expect(second?.querySelector("tr-progress")?.hasAttribute("aria-valuenow")).toBe(false);
     expect(second?.querySelector(".tr-toast-close")?.getAttribute("aria-label")).toBe("Close");
     await expectTooltipAsync(second?.querySelector<HTMLElement>(".tr-toast-close"), "Close");
-    expect(regions).toEqual([["polite", "Title 1"], ["assertive", "Title 2. The disk is full."]]);
+    await vi.waitFor(() => expect([announced()?.getAttribute("aria-live"), announced()?.textContent]).toEqual(["assertive", "Title 1. Title 2. The disk is full."]));
   });
 
-  it("names each toast's module, by its display name when it has a window part, and the time it was posted", async () => {
-    const clock = new Notification(2, 2, new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null),
+  it("announces a toast from outside the window, so a screen reader still hears it while a dialog holds the window inert", async () => {
+    const fixture = TestBed.createComponent(ToastsComponent);
+    await fixture.whenStable();
+    const dialog = TestBed.inject(DialogService).open(OpenDialogComponent, ".inside");
+    await vi.waitFor(() => expect(document.activeElement?.classList.contains("inside")).toBe(true));
+
+    notifications.stateValue.set(new NotificationState([toast(1, { text: "The clock ticked." })], false, [], 1));
+    await fixture.whenStable();
+    await vi.waitFor(() => expect(announced()?.textContent).toBe("Title 1. The clock ticked."));
+    const isWindowInert = (fixture.nativeElement as HTMLElement).closest("[inert]") !== null;
+    const isRegionLive = announced()?.closest("[inert], [aria-hidden=true]") === null;
+    dialog.close();
+
+    expect(toasts(fixture).length).toBe(1);
+    expect([isWindowInert, isRegionLive, announced()?.getAttribute("aria-live")]).toEqual([true, true, "polite"]);
+  });
+
+  it("names each toast's module, by the display name the runtime reports for it, and the time it was posted", async () => {
+    const clock = new Notification("2", 2, new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null),
       "2026-10-03T08:05:00.000Z", false);
     const fixture = await renderAsync(clock, toast(1));
 
@@ -145,9 +171,9 @@ describe("ToastsComponent", () => {
     const resumedWhileFocused = resume.mock.calls.length;
     close.blur();
 
-    expect(pause).toHaveBeenCalledWith(1);
+    expect(pause).toHaveBeenCalledWith("1");
     expect(resumedWhileFocused).toBe(0);
-    expect(resume).toHaveBeenCalledWith(1);
+    expect(resume).toHaveBeenCalledWith("1");
   });
 
   for (const theme of AppearanceFixture.themes)

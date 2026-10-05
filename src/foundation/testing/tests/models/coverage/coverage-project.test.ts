@@ -19,6 +19,22 @@ export class CoverageProjectTests {
     Assert.areEqual("production", project.productionDirectory);
     Assert.areEqual("source", project.sourceDirectory);
     Assert.areEqual(0, project.exclusions.length);
+    Assert.areEqual(0, project.testFolders.length);
+  }
+
+  @TestMethod
+  public keepsItsOwnCopyOfTheTestFolders(): void {
+    const testFolders = ["tests"];
+
+    const project = new CoverageProject("Sample", "production", "source", [], testFolders);
+    testFolders.pop();
+
+    Assert.areEqual("tests", project.testFolders[0]);
+  }
+
+  @TestMethod
+  public rejectsAWhitespaceTestFolder(): void {
+    Assert.throws(() => new CoverageProject("Sample", "production", "source", [], ["tests", " "]), ArgumentException);
   }
 
   @TestMethod

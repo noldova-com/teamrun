@@ -15,14 +15,14 @@ import { NotificationReference } from "@noldova/teamrun-shell-protocol";
 export class NotificationReferenceTests {
   @TestMethod
   public pinsItsWireForm(): void {
-    Assert.areEqual(4, NotificationReference.fromJson({ id: 4 }).id);
-    Assert.areEqual("{\"id\":4}", JSON.stringify(new NotificationReference(4).toJson()));
+    Assert.areEqual("n4", NotificationReference.fromJson({ id: "n4" }).id);
+    Assert.areEqual("{\"id\":\"n4\"}", JSON.stringify(new NotificationReference("n4").toJson()));
   }
 
   @TestMethod
   public refusesAnInvalidIdAndUnknownFields(): void {
-    Assert.areEqual("id", Assert.throws(() => new NotificationReference(-1), ArgumentException).parameterName);
-    Assert.areEqual("$.id", Assert.throws(() => NotificationReference.fromJson({ id: "4" }), JsonException).path);
-    Assert.areEqual("$.extra", Assert.throws(() => NotificationReference.fromJson({ id: 4, extra: 1 }), JsonException).path);
+    Assert.areEqual("id", Assert.throws(() => new NotificationReference(" "), ArgumentException).parameterName);
+    Assert.areEqual("$.id", Assert.throws(() => NotificationReference.fromJson({ id: 4 }), JsonException).path);
+    Assert.areEqual("$.extra", Assert.throws(() => NotificationReference.fromJson({ id: "n4", extra: 1 }), JsonException).path);
   }
 }
