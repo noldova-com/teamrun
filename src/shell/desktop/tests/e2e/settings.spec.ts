@@ -82,6 +82,7 @@ test.describe("settings", () => {
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
     await expect(window.getByRole("treeitem", { name: "Notifications", exact: true })).toHaveAttribute("aria-selected", "true");
     await window.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true }).click();
+    await expect(window.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true })).toHaveAttribute("aria-selected", "true");
     for (const scheme of ["light", "dark"] as const) {
       await window.emulateMedia({ colorScheme: scheme });
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
