@@ -13,6 +13,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { RecentCommands, ShellEvents, ShellMethods } from "@noldova/teamrun-shell-protocol";
 
 import { Resources } from "../../resources";
+import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { WindowPartHostService } from "./window-part-host.service";
 
@@ -48,7 +49,10 @@ export class RecentCommandsService {
     this.bridge.requestAsync(ShellMethods.recentCommands.text, {}).then(t => {
       if (this.eventsSeen === seen)
         this.idsValue.set(RecentCommands.fromJson(t).ids);
-    }).catch((error: unknown) => this.errors.handleError(error));
+    }).catch((error: unknown) => {
+      if (!RuntimeRequestException.isDisconnected(error))
+        this.errors.handleError(error);
+    });
   }
 
   private receive(name: string, payload: JsonValue): void {

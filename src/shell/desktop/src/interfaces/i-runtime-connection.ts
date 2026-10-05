@@ -10,6 +10,8 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type { QualifiedName, Response } from "@noldova/teamrun-shell-protocol";
 
 export interface IRuntimeConnection {
+  readonly isConnected: boolean;
+
   callAsync(method: QualifiedName, payload: JsonValue, timeout?: number): Promise<Response>;
   close(): void;
 }

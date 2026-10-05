@@ -161,6 +161,28 @@ test.describe("reconnecting", () => {
     expect(posted).toHaveLength(1);
     expect(await notificationIdsAsync(window, "notes.saveFailed")).toEqual(posted);
   });
+
+  test("a connection that ends again as soon as the runtime is ready, while the window reads it again, leaves no window error and its parts in place", async ({ desktop }) => {
+    const window = desktop.window;
+    const runtime = window.locator("tr-notes-note", { has: window.locator("[data-fixture-content=notes-note-2]") }).locator("[data-fixture-content=notes-runtime]");
+    await expect(runtime).toHaveText(/^Runtime \S+$/);
+    const first = await runtime.textContent() ?? "";
+    await window.evaluate(() => {
+      const states: string[] = [];
+      (Reflect.get(globalThis, "teamrun") as IBridge).onStartup(t => states.push((t as { kind: string }).kind));
+      Reflect.set(globalThis, "startups", states);
+    });
+    const readyCountAsync = (): Promise<number> => window.evaluate(() => (Reflect.get(globalThis, "startups") as string[]).filter(t => t === "Ready").length);
+
+    for (let end = 1; end <= 3; end++) {
+      await desktop.breakRuntimeConnectionAsync();
+      await expect.poll(readyCountAsync).toBe(end);
+    }
+
+    await expect(runtime).toHaveAttribute("data-continued", /^[1-3]$/);
+    await expect(runtime).toHaveText(first);
+    await expect(window.locator("tr-workspace")).not.toHaveAttribute("inert");
+  });
 });
 
 test.describe("reconnecting backoff", () => {

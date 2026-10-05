@@ -425,14 +425,14 @@ export class DesktopApplication {
   private async callAsync(method: QualifiedName, payload: JsonValue): Promise<Response> {
     const connection = this.startup.connection;
     if (Object.isNull(connection))
-      return Response.failure(null, new Failure(FailureCode.Unavailable, Resources.runtimeNotConnected));
+      return Response.failure(null, new Failure(FailureCode.Disconnected, Resources.runtimeNotConnected));
     try {
       return await connection.callAsync(method, payload);
     }
     catch (error) {
       if (!(error instanceof ConnectionException))
         throw error;
-      return Response.failure(null, new Failure(FailureCode.Unavailable, error.message));
+      return Response.failure(null, new Failure(connection.isConnected ? FailureCode.Unavailable : FailureCode.Disconnected, error.message));
     }
   }
 

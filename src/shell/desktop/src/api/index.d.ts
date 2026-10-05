@@ -412,6 +412,12 @@ export interface IDesktopProcess {
  */
 export interface IRuntimeConnection {
   /**
+   * Whether the connection is still open; `false` once it has ended, from
+   * either side.
+   */
+  readonly isConnected: boolean;
+
+  /**
    * Sends a request and waits for its response.
    *
    * @param method The method's qualified name.
