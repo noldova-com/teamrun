@@ -11,6 +11,7 @@ import { TestBed } from "@angular/core/testing";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 
+import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { DesktopBridgeService } from "../../../src/app/services/desktop-bridge.service";
 import { RecentCommandsService } from "../../../src/app/services/recent-commands.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
@@ -90,7 +91,7 @@ describe("RecentCommandsService", () => {
     expect(bridge.requests.filter(t => t[0] === "shell.recordCommand")).toEqual([["shell.recordCommand", { id: "notes.newNote" }]]);
   });
 
-  it("reports nothing when a read fails because the connection to the runtime ended, and reads again once ready", async () => {
+  it("leaves a read that fails because the connection to the runtime ended to be dropped, and reads again once ready", async () => {
     bridge.responses.set("shell.recentCommands", { failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
     const service = start();
     await settleAsync(() => bridge.requests.some(t => t[0] === "shell.recentCommands"));
@@ -101,11 +102,11 @@ describe("RecentCommandsService", () => {
     await settleAsync(() => service.ids().length === 1);
 
     expect(bridge.requests.filter(t => t[0] === "shell.recentCommands").length).toBe(2);
-    expect(errors).toEqual([]);
+    expect(errors.map(t => RuntimeDisconnectedException.isIn(t))).toEqual([true]);
   });
 
-  it("reports a list it cannot read, an event it cannot understand and a use it cannot record", async () => {
-    bridge.responses.set("shell.recentCommands", { failure: { code: "Unavailable", message: "Not connected." } });
+  it("reports a list it cannot read, an event it cannot understand and a use it cannot record, leaving one not recorded because the connection ended to be dropped", async () => {
+    bridge.responses.set("shell.recentCommands", { failure: { code: "Unavailable", message: "The runtime did not answer shell.recentCommands in time." } });
     bridge.responses.set("shell.recordCommand", { failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
     const service = start();
     await settleAsync(() => errors.length === 1);
@@ -115,5 +116,6 @@ describe("RecentCommandsService", () => {
     await settleAsync(() => errors.length === 3);
 
     expect(service.ids()).toEqual(["notes.newNote"]);
+    expect(errors.map(t => RuntimeDisconnectedException.isIn(t))).toEqual([false, false, true]);
   });
 });

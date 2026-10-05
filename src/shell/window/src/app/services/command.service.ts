@@ -14,6 +14,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type { KeyChord } from "@noldova/teamrun-shell-protocol";
 import { DialogService } from "@noldova/teamrun-shell-ui";
 
+import { ActionNotSentException } from "../exceptions/action-not-sent.exception";
 import { CommandNotFoundException } from "../exceptions/command-not-found.exception";
 import type { CommandContribution } from "../models/command-contribution";
 import { KeyBindings } from "../models/key-bindings";
@@ -59,7 +60,7 @@ export class CommandService {
 
   public async runAsync(name: string, commandArguments: JsonValue = null): Promise<JsonValue> {
     const command = this.find(name);
-    return this.isHeldByReconnect(command.name) ? null : command.runAsync(commandArguments);
+    return this.isHeldByReconnect(command.name) ? null : CommandService.runCommandAsync(command, commandArguments);
   }
 
   public run(name: string, commandArguments: JsonValue = null): void {
@@ -114,7 +115,7 @@ export class CommandService {
       return false;
 
     event.preventDefault();
-    this.report(command.runAsync(null));
+    this.report(CommandService.runCommandAsync(command, null));
     return true;
   }
 
@@ -133,6 +134,15 @@ export class CommandService {
     catch (error) {
       this.errors.handleError(error);
       return false;
+    }
+  }
+
+  private static async runCommandAsync(command: CommandContribution, commandArguments: JsonValue): Promise<JsonValue> {
+    try {
+      return await command.runAsync(commandArguments);
+    }
+    catch (error) {
+      throw ActionNotSentException.from(error, Resources.formatCommandNotFinished(command.name));
     }
   }
 

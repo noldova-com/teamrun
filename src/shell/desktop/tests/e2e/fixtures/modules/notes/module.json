@@ -6,7 +6,7 @@
   "parts": ["runtime", "window"],
   "dependencies": [],
   "contributes": {
-    "methods": ["notes.options"],
+    "methods": ["notes.options", "notes.holdOptions", "notes.heldOptions", "notes.releaseOptions"],
     "commands": ["notes.newNote", "notes.openNote", "notes.sortByTitle", "notes.sortByWeek", "notes.wrapLines", "notes.showListInDialog", "notes.showNoteInDialog", "notes.showSettingsInDialog"],
     "notifications": ["notes.saveFailed"],
     "views": [

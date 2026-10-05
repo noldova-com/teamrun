@@ -16,6 +16,7 @@ import {
 } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../enums/dock-side";
+import { RuntimeDisconnectedException } from "../exceptions/runtime-disconnected.exception";
 import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
 import { WindowPartFailureException } from "../exceptions/window-part-failure.exception";
 import type { IWindowPart } from "../interfaces/i-window-part";
@@ -254,7 +255,7 @@ export class WindowPartHostService implements IWindowPartHost {
         return;
     }
     catch (error) {
-      if (!this.isConnected(connection) || RuntimeRequestException.isDisconnected(error))
+      if (!this.isConnected(connection) || RuntimeDisconnectedException.isIn(error))
         return;
       this.errors.handleError(error);
       await this.deactivateAsync(this.activations.slice());
@@ -272,10 +273,6 @@ export class WindowPartHostService implements IWindowPartHost {
       this.generationValue.update(t => t + 1);
       if (!isReconnect && await this.loadLayoutAsync())
         openAtStart = (...t) => this.opener.restoreSaved(...t);
-    }
-    catch (error) {
-      if (!RuntimeRequestException.isDisconnected(error))
-        throw error;
     }
     finally {
       this.replayPending(openAtStart);
@@ -328,7 +325,7 @@ export class WindowPartHostService implements IWindowPartHost {
       return await activation.part.reconnectAsync();
     }
     catch (error) {
-      if (RuntimeRequestException.isDisconnected(error))
+      if (RuntimeDisconnectedException.isIn(error))
         throw error;
       this.errors.handleError(new WindowPartFailureException(activation.context.moduleId, Resources.windowPartReconnectionFailed, error));
       return false;
@@ -364,7 +361,7 @@ export class WindowPartHostService implements IWindowPartHost {
       return isRestored;
     }
     catch (error) {
-      this.isLayoutLoaded = !RuntimeRequestException.isDisconnected(error);
+      this.isLayoutLoaded = !RuntimeDisconnectedException.isIn(error);
       throw error;
     }
   }
@@ -449,7 +446,7 @@ export class WindowPartHostService implements IWindowPartHost {
     catch (error) {
       this.activations.splice(this.activations.indexOf(activation), 1);
       activation.context.withdraw();
-      if (RuntimeRequestException.isDisconnected(error))
+      if (RuntimeDisconnectedException.isIn(error))
         throw error;
       this.errors.handleError(new WindowPartFailureException(status.id, Resources.windowPartActivationFailed, error));
       return status.withState(ModuleState.Failed, Resources.windowPartActivationFailed);

@@ -8,6 +8,8 @@
 
 import { TestBed } from "@angular/core/testing";
 
+import { ActionNotSentException } from "../../../src/app/exceptions/action-not-sent.exception";
+import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { WindowPartFailureException } from "../../../src/app/exceptions/window-part-failure.exception";
 import { WindowErrorHandler } from "../../../src/app/services/window-error-handler";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
@@ -56,6 +58,18 @@ describe("WindowErrorHandler", () => {
 
     expect(bridge.errorsLogged).toEqual([[null, error.stack], [null, "Repeated."], [null, "Repeated."]]);
     expect(written).toHaveBeenCalledTimes(3);
+  });
+
+  it("drops a failure because the connection to the runtime ended, anywhere in its causes, but sends an action that was not sent", () => {
+    const disconnected = new RuntimeDisconnectedException("TeamRun is not connected to its runtime.");
+    const action = new ActionNotSentException("The command notes.save did not finish because the connection to the runtime ended.");
+
+    handler.handleError(disconnected);
+    handler.handleError(new WindowPartFailureException("notes", "Its views failed to load.", disconnected));
+    handler.handleError(action);
+
+    expect(bridge.errorsLogged).toEqual([[null, action.stack]]);
+    expect(written).toHaveBeenCalledTimes(1);
   });
 
   it("sends every error, cutting one longer than the log takes to its first 65536 characters", () => {

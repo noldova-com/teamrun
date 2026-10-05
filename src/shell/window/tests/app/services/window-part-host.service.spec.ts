@@ -16,7 +16,7 @@ import { ModuleState, type ModuleStatus, NotificationPost, NotificationSeverity,
 import { ModulesComponent } from "../../../src/app/components/modules/modules.component";
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
 import { DockSide } from "../../../src/app/enums/dock-side";
-import { RuntimeRequestException } from "../../../src/app/exceptions/runtime-request.exception";
+import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { WindowPartFailureException } from "../../../src/app/exceptions/window-part-failure.exception";
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
@@ -282,7 +282,7 @@ describe("WindowPartHostService", () => {
     const post = new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Success, null, [], null);
     bridge.responses.set("shell.postNotification", { payload: { id: "n4" } });
     bridge.responses.set("shell.updateNotification", { payload: null });
-    bridge.responses.set("shell.dismissNotification", { failure: { code: "Unavailable", message: "Not connected." } });
+    bridge.responses.set("shell.dismissNotification", { failure: { code: "Unavailable", message: "The runtime did not answer shell.dismissNotification in time." } });
     const { host } = start([], []);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
@@ -297,7 +297,7 @@ describe("WindowPartHostService", () => {
       ["shell.updateNotification", JSON.stringify({ id: "n4", post: post.toJson() })],
       ["shell.dismissNotification", JSON.stringify({ id: "n4" })]
     ]);
-    expect((errors[0] as Error).message).toContain("Not connected.");
+    expect((errors[0] as Error).message).toContain("did not answer");
   });
 
   it("advances its generation only once every post its parts made while activating is answered, even one not awaited or refused", async () => {
@@ -846,7 +846,7 @@ describe("WindowPartHostService", () => {
         return request(method, payload);
       bridge.publishStartup({ kind: "Connecting", details: [] });
       bridge.publishStartup({ kind: "Ready", details: [] });
-      return Promise.resolve({ failure: { code: "Unavailable", message: "TeamRun is not connected to its runtime." } });
+      return Promise.resolve({ failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
     });
 
     bridge.publishStartup({ kind: "Connecting", details: [] });
@@ -866,7 +866,7 @@ describe("WindowPartHostService", () => {
       if (!isDropping)
         return true;
       isDropping = false;
-      throw new Error("Its options were not read.", { cause: new RuntimeRequestException("Disconnected", "TeamRun is not connected to its runtime.") });
+      throw new Error("Its options were not read.", { cause: new RuntimeDisconnectedException("TeamRun is not connected to its runtime.") });
     };
 
     bridge.publishStartup({ kind: "Connecting", details: [] });
@@ -905,7 +905,7 @@ describe("WindowPartHostService", () => {
       if (!isDropping)
         return;
       isDropping = false;
-      throw new RuntimeRequestException("Disconnected", "TeamRun is not connected to its runtime.");
+      throw new RuntimeDisconnectedException("TeamRun is not connected to its runtime.");
     });
     const { host } = start([source("notes", notes)], [status("notes")]);
     await vi.waitFor(() => expect(log).toEqual(["activate notes"]));
@@ -929,7 +929,7 @@ describe("WindowPartHostService", () => {
 
     await vi.waitFor(() => expect(loads.length).toBe(2));
     expect(read).toHaveBeenCalledTimes(2);
-    expect(errors).toEqual([]);
+    expect(errors.map(t => RuntimeDisconnectedException.isIn(t))).toEqual([true]);
   });
 
   it("keeps the modules it reported until the runtime reports them again", async () => {

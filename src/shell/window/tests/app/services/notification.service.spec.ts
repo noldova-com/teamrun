@@ -11,6 +11,8 @@ import { TestBed } from "@angular/core/testing";
 
 import { CommandRun, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
+import { ActionNotSentException } from "../../../src/app/exceptions/action-not-sent.exception";
+import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { CommandService } from "../../../src/app/services/command.service";
 import { NotificationService } from "../../../src/app/services/notification.service";
@@ -65,7 +67,7 @@ describe("NotificationService", () => {
     ]);
   });
 
-  it("reports nothing when a read fails because the connection to the runtime ended, and reads again once ready", async () => {
+  it("leaves a read that fails because the connection to the runtime ended to be dropped, and reads again once ready", async () => {
     bridge.responses.set("shell.notifications", { failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
     const service = start();
     await settleAsync(() => bridge.requests.some(t => t[0] === "shell.notifications"));
@@ -76,16 +78,16 @@ describe("NotificationService", () => {
     await settleAsync(() => service.state().notifications.length === 1);
 
     expect(bridge.requests.filter(t => t[0] === "shell.notifications").length).toBe(2);
-    expect(errors).toEqual([]);
+    expect(errors.map(t => RuntimeDisconnectedException.isIn(t))).toEqual([true]);
   });
 
   it("reports a first read that fails", async () => {
-    bridge.responses.set("shell.notifications", { failure: { code: "Unavailable", message: "Not connected." } });
+    bridge.responses.set("shell.notifications", { failure: { code: "Unavailable", message: "The runtime did not answer shell.notifications in time." } });
 
     start();
     await settleAsync(() => errors.length === 1);
 
-    expect((errors[0] as Error).message).toContain("Not connected.");
+    expect((errors[0] as Error).message).toContain("did not answer");
   });
 
   it("follows the notifications event, ignores other events and reports one it cannot read", async () => {
@@ -117,18 +119,21 @@ describe("NotificationService", () => {
     expect(service.firstRead()?.sequence).toBe(1);
   });
 
-  it("asks the runtime to mark read, clear and dismiss, sets Do not disturb, and reports the requests that fail", async () => {
+  it("asks the runtime to mark read, clear and dismiss, sets Do not disturb, and reports the requests that fail, one not confirmed because the connection ended as an action not sent", async () => {
     const service = start();
     await settleAsync(() => !Object.is(service.firstRead(), null));
-    bridge.responses.set("shell.clearNotifications", { failure: { code: "Unavailable", message: "Not connected." } });
-    bridge.responses.set("shell.setSetting", { failure: { code: "Unavailable", message: "Not connected." } });
+    bridge.responses.set("shell.clearNotifications", { failure: { code: "Unavailable", message: "The runtime did not answer shell.clearNotifications in time." } });
+    bridge.responses.set("shell.setSetting", { failure: { code: "Unavailable", message: "The runtime did not answer shell.setSetting in time." } });
+    bridge.responses.set("shell.dismissNotification", { failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
 
     service.markAllRead();
     service.clear();
     service.dismiss("7");
     service.setDoNotDisturb(true);
-    await vi.waitFor(() => expect(errors.length).toBe(2));
+    await vi.waitFor(() => expect(errors.length).toBe(3));
 
+    expect(errors.filter(t => t instanceof ActionNotSentException).map(t => (t as Error).message))
+      .toEqual(["The runtime did not confirm the change to the notifications because the connection to it ended."]);
     expect(bridge.requests.slice(-4)).toEqual([
       ["shell.markNotificationsRead", null],
       ["shell.clearNotifications", null],

@@ -12,7 +12,9 @@ import { TestBed } from "@angular/core/testing";
 import { DialogService } from "@noldova/teamrun-shell-ui";
 
 import { EditAction } from "../../../src/app/enums/edit-action";
+import { ActionNotSentException } from "../../../src/app/exceptions/action-not-sent.exception";
 import { CommandNotFoundException } from "../../../src/app/exceptions/command-not-found.exception";
+import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { CommandService } from "../../../src/app/services/command.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
@@ -26,11 +28,11 @@ describe("CommandService", () => {
   let errors: unknown[];
   let runs: string[];
 
-  const command = (name: string, key: string | null, fails: boolean = false): CommandContribution =>
+  const command = (name: string, key: string | null, failure: Error | null = null): CommandContribution =>
     new CommandContribution(name, name, null, key, async t => {
       runs.push(`${name} ${JSON.stringify(t)}`);
-      if (fails)
-        throw new Error(`${name} failed`);
+      if (!Object.isNull(failure))
+        throw failure;
       return name;
     });
 
@@ -182,7 +184,7 @@ describe("CommandService", () => {
 
   it("applies the person's bindings as the setting changes and reports a command that fails", async () => {
     const service = start("linux");
-    service.setCommands([command("notes.newNote", "Mod+Alt+N", true)]);
+    service.setCommands([command("notes.newNote", "Mod+Alt+N", new Error("notes.newNote failed"))]);
     const before = service.keyLabel("notes.newNote");
     bridge.publishEvent("shell.settingsChanged", { name: "shell.keyBindings", value: { "notes.newNote": "F6" }, isSet: true });
 
@@ -270,13 +272,28 @@ describe("CommandService", () => {
 
   it("runs a command by name and reports its failure", async () => {
     const service = start("win32");
-    service.setCommands([command("notes.newNote", null, true)]);
+    service.setCommands([command("notes.newNote", null, new Error("notes.newNote failed"))]);
 
     service.run("notes.newNote", { folder: "inbox" });
     service.run("notes.gone");
 
     await vi.waitFor(() => expect(errors.map(t => (t as Error).constructor.name).sort()).toEqual(["CommandNotFoundException", "Error"]));
     expect(runs).toEqual(["notes.newNote {\"folder\":\"inbox\"}"]);
+  });
+
+  it("reports a command that did not finish because the connection to the runtime ended as an action not sent, whether run by name or by its key", async () => {
+    const service = start("win32");
+    const disconnected = new RuntimeDisconnectedException("TeamRun is not connected to its runtime.");
+    service.setCommands([command("notes.save", "Mod+Alt+S", new Error("The note was not saved.", { cause: disconnected }))]);
+
+    const run = await service.runAsync("notes.save").catch((error: unknown) => error);
+    press({ key: "s", code: "KeyS", ctrlKey: true, altKey: true });
+
+    await vi.waitFor(() => expect(errors).toHaveLength(1));
+    expect([run, errors[0]].map(t => [t instanceof ActionNotSentException, (t as Error).message])).toEqual([
+      [true, "The command notes.save did not finish because the connection to the runtime ended."],
+      [true, "The command notes.save did not finish because the connection to the runtime ended."]
+    ]);
   });
 
   it("stops listening when the window closes", () => {
