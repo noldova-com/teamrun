@@ -36,6 +36,7 @@ import PackageBuild from "./packages/package-build.ts";
 import ModuleCatalog from "./modules/module-catalog.ts";
 import PackageCatalog from "./packages/package-catalog.ts";
 import ProductIdentity from "./packages/product-identity.ts";
+import PackagedBuild from "./packaging/packaged-build.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import Git from "./repository/git.ts";
 import RepositoryFiles from "./repository/repository-files.ts";
@@ -197,7 +198,7 @@ export default class Test {
       new ApiExampleCheck(this.root, catalog, layout, this.runner, server, Test.API_TIMEOUT),
       new ScriptTestCheck(this.root, build, this.runner, this.environment),
       new AngularTestCheck(angular),
-      new PackagedBuildCheck(this.root, this.runner, new GalleryFile(this.root), angular)
+      new PackagedBuildCheck(this.root, new PackagedBuild(this.root, this.runner, new GalleryFile(this.root), angular), angular)
     ];
   }
 }
