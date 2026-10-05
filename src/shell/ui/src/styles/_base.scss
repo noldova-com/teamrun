@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "states";
+
 :root {
   --tr-text-panel: 0.8125rem;
   --tr-text-label: max(12px, calc(var(--tr-text-panel) - 0.0625rem));
@@ -70,7 +72,7 @@ body {
   cursor: pointer;
 }
 
-:where(button, a, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [role="treeitem"], [role="separator"]):focus-visible {
+:where(button, a, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [role="treeitem"], [role="separator"])#{states.$focus-visible} {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: calc(var(--tr-border-width) * -1);
 }

@@ -12,7 +12,7 @@ import path from "node:path";
 import LicenseHeader from "../structure/license-header.ts";
 
 export default class GalleryFile {
-  public static readonly MARKERS: readonly string[] = ["tr-gallery-scope-frame", "tr-gallery-forms", "Show the keyboard focus"];
+  public static readonly MARKERS: readonly string[] = ["tr-gallery-scope-frame", "tr-gallery-forms", "Plate, center chosen", "\"data-tr-state\""];
 
   private static readonly FILE_SEGMENTS: readonly string[] = ["src", "generated", "gallery.ts"];
   private static readonly TYPE_IMPORT: string = "import type { Type } from \"@angular/core\";\n";

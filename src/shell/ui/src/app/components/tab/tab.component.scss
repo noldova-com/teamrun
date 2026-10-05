@@ -7,6 +7,7 @@
  */
 
 @use "selected-surface" as *;
+@use "states";
 
 .tr-tab {
   display: inline-flex;
@@ -41,7 +42,7 @@
   border-radius: var(--tr-radius-small);
 }
 
-[data-tr-tab-shape="pill"] .tr-tab:hover .tr-tab-pill {
+[data-tr-tab-shape="pill"] .tr-tab#{states.$hover} .tr-tab-pill {
   background-color: var(--tr-hover);
 }
 
@@ -49,7 +50,7 @@
   @include selected-surface;
 }
 
-.tr-tab:focus-visible .tr-tab-pill {
+.tr-tab#{states.$focus-visible} .tr-tab-pill {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: calc(var(--tr-border-width) * -1);
 }
@@ -110,21 +111,21 @@
   grid-area: 1 / 1;
 }
 
-.tr-tab-close:hover::before {
+.tr-tab-close#{states.$hover}::before {
   background-color: var(--tr-toolbar-hover);
 }
 
 .tr-tab.tr-tab-selected .tr-tab-close,
-.tr-tab:hover .tr-tab-close,
-.tr-tab:focus-visible .tr-tab-close {
+.tr-tab#{states.$hover} .tr-tab-close,
+.tr-tab#{states.$focus-visible} .tr-tab-close {
   visibility: visible;
 }
 
-.tr-tab.tr-tab-working:not(:hover, :focus-visible) .tr-tab-close {
+.tr-tab.tr-tab-working:not(#{states.$hover}, #{states.$focus-visible}) .tr-tab-close {
   visibility: hidden;
 }
 
-.tr-tab.tr-tab-working:is(:hover, :focus-visible) .tr-tab-spinner {
+.tr-tab.tr-tab-working:is(#{states.$hover}, #{states.$focus-visible}) .tr-tab-spinner {
   visibility: hidden;
 }
 
