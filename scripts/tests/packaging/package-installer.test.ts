@@ -16,6 +16,7 @@ import type InstalledPackage from "../../packaging/installed-package.ts";
 import PackageInstaller from "../../packaging/package-installer.ts";
 import PackageTarget from "../../packaging/package-target.ts";
 import PackagingException from "../../packaging/packaging.exception.ts";
+import ProcessException from "../../processes/process.exception.ts";
 import InstallRunnerFixture from "../fixtures/install-runner.fixture.ts";
 import ProductIdentityFixture from "../fixtures/product-identity.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
@@ -69,17 +70,23 @@ class PackageInstallerTests {
       assert.deepEqual([installed.desktop, installed.resources], [path.join(application, "Contents", "MacOS", "Fixture Studio"), path.join(application, "Contents", "Resources")]);
     });
 
-    test("on macOS a failed copy still detaches the disk image and keeps its own reason when detaching fails too, and a failed detach after the copy fails", async t => {
+    test("on macOS a failed copy still detaches the disk image, a detach that fails after it is reported with the copy's reason, and a failed detach after the copy fails", async t => {
       const repository = await PackageInstallerTests.createAsync(t);
-      const copy = PackageInstallerTests.createRunner(t, ["ditto", "detach"]);
+      const copy = PackageInstallerTests.createRunner(t, ["ditto"]);
+      const both = PackageInstallerTests.createRunner(t, ["ditto", "detach"]);
       const detach = PackageInstallerTests.createRunner(t, ["detach"]);
 
       await assert.rejects(PackageInstallerTests.installAsync(repository, copy, "darwin", "arm64"), (error: unknown) =>
-        error instanceof PackagingException && /^ditto .+ failed with exit code 9:\nditto broke$/.test(error.message));
+        error instanceof ProcessException && error.message === `ditto ${path.join(copy.folder, "mount", "Fixture Studio.app")} ${path.join(copy.folder, "Fixture Studio.app")} failed with exit code 9:\nditto broke`);
+      await assert.rejects(PackageInstallerTests.installAsync(repository, both, "darwin", "arm64"), (error: unknown) =>
+        error instanceof PackagingException && error.cause instanceof ProcessException && error.message === `ProcessException: ditto ${path.join(both.folder, "mount", "Fixture Studio.app")} `
+          + `${path.join(both.folder, "Fixture Studio.app")} failed with exit code 9:\nditto broke\nDetaching the disk image after the failed copy failed too: `
+          + `ProcessException: hdiutil detach -force ${path.join(both.folder, "mount")} failed with exit code 9:\nhdiutil broke`);
       await assert.rejects(PackageInstallerTests.installAsync(repository, detach, "darwin", "arm64"), (error: unknown) =>
-        error instanceof PackagingException && error.message === `hdiutil detach -force ${path.join(detach.folder, "mount")} failed with exit code 9:\nhdiutil broke`);
-      assert.deepEqual(copy.calls.map(t => t.slice(0, 3)), [["hdiutil", "attach", path.join(repository.directory, "_build", "package", "out", "Fixture Studio-macos-arm64.dmg")],
-        ["ditto", path.join("mount", "Fixture Studio.app"), "Fixture Studio.app"], ["hdiutil", "detach", "-force"]]);
+        error instanceof ProcessException && error.message === `hdiutil detach -force ${path.join(detach.folder, "mount")} failed with exit code 9:\nhdiutil broke`);
+      for (const runner of [copy, both])
+        assert.deepEqual(runner.calls.map(t => t.slice(0, 3)), [["hdiutil", "attach", path.join(repository.directory, "_build", "package", "out", "Fixture Studio-macos-arm64.dmg")],
+          ["ditto", path.join("mount", "Fixture Studio.app"), "Fixture Studio.app"], ["hdiutil", "detach", "-force"]]);
     });
 
     test("on Linux the AppImage is made executable and unpacked, the desktop starts from the AppImage and the command line from the unpacked program", async t => {
@@ -96,7 +103,7 @@ class PackageInstallerTests {
       if (process.platform !== "win32")
         assert.equal((await stat(appImage)).mode & 0o777, 0o755);
       await assert.rejects(PackageInstallerTests.installAsync(repository, failing, "linux", "x64"),
-        new PackagingException("Fixture Studio-linux-x64.AppImage --appimage-extract failed with exit code 9:\nFixture Studio-linux-x64.AppImage broke"));
+        new ProcessException("Fixture Studio-linux-x64.AppImage --appimage-extract failed with exit code 9:\nFixture Studio-linux-x64.AppImage broke"));
     });
   }
 

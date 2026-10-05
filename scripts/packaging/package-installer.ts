@@ -84,7 +84,12 @@ export default class PackageInstaller {
       await this.requireAsync(PackageInstaller.COPY, [path.join(mount, bundle), application], folder);
     }
     catch (error) {
-      await Promise.allSettled([this.runner.captureAsync(PackageInstaller.DISK_IMAGES, [...PackageInstaller.DETACH, mount], folder, PackageInstaller.LIMIT)]);
+      try {
+        await this.requireAsync(PackageInstaller.DISK_IMAGES, [...PackageInstaller.DETACH, mount], folder);
+      }
+      catch (detachError) {
+        throw new PackagingException(`${String(error)}\nDetaching the disk image after the failed copy failed too: ${String(detachError)}`, { cause: error });
+      }
       throw error;
     }
     await this.requireAsync(PackageInstaller.DISK_IMAGES, [...PackageInstaller.DETACH, mount], folder);
@@ -102,9 +107,7 @@ export default class PackageInstaller {
     return new InstalledPackage(file, program, path.join(extracted, PackageInstaller.RESOURCES_FOLDER));
   }
 
-  private async requireAsync(command: string, commandArguments: readonly string[], folder: string): Promise<void> {
-    const result = await this.runner.captureAsync(command, commandArguments, folder, PackageInstaller.LIMIT);
-    if (!result.isSuccessful)
-      throw new PackagingException(`${path.basename(command)} ${commandArguments.join(" ")} failed with exit code ${result.exitCode}:\n${result.text}`);
+  private requireAsync(command: string, commandArguments: readonly string[], folder: string): Promise<void> {
+    return this.runner.requireAsync(command, commandArguments, folder, PackageInstaller.LIMIT);
   }
 }

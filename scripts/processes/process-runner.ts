@@ -8,6 +8,7 @@
 
 import { spawn } from "node:child_process";
 import { closeSync, createWriteStream, openSync } from "node:fs";
+import path from "node:path";
 import type { Writable } from "node:stream";
 
 import ProcessResult from "./process-result.ts";
@@ -49,6 +50,12 @@ export default class ProcessRunner {
           reject(failure);
       });
     });
+  }
+
+  public async requireAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number, environment?: NodeJS.ProcessEnv): Promise<void> {
+    const result = await this.captureAsync(command, commandArguments, directory, timeout, environment);
+    if (!result.isSuccessful)
+      throw new ProcessException(`${path.basename(command)} ${commandArguments.join(" ")} failed with exit code ${result.exitCode}:\n${result.text}`);
   }
 
   public runAsync(command: string, commandArguments: readonly string[], directory: string, environment?: NodeJS.ProcessEnv): Promise<number | null> {

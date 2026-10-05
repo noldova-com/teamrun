@@ -43,6 +43,10 @@ export default class PackageSmoke {
   private static readonly DATA_LOG_SEGMENTS: readonly string[] = ["logs", "desktop.log"];
   private static readonly DISCOVERY_SEGMENTS: readonly string[] = ["discovery", "runtime.json"];
   private static readonly DATA_DIRECTORY_OPTION: string = "--data-dir";
+  private static readonly PROCESS_ID_FIELD: string = "processId";
+  private static readonly BUILD_FIELD: string = "build";
+  private static readonly VERSION_FIELD: string = "productVersion";
+  private static readonly DATA_DIRECTORY_FIELD: string = "dataDirectory";
   private static readonly STATUS_ARGUMENTS: readonly string[] = ["status", "--json"];
   private static readonly LOG_TAIL_LENGTH: number = 4_000;
   private static readonly SCREEN_CAPTURE: string = "screencapture";
@@ -58,19 +62,19 @@ export default class PackageSmoke {
   private readonly platform: string;
   private readonly architecture: string;
   private readonly runner: ProcessRunner;
-  private readonly folders: TemporaryFolder;
+  private readonly temporaryFolder: TemporaryFolder;
   private readonly environment: NodeJS.ProcessEnv;
   private readonly output: Writable;
   private folder: string | null = null;
   private runtime: number | null = null;
   private hasRuntimeOutlived: boolean = false;
 
-  public constructor(root: string, platform: string, architecture: string, runner: ProcessRunner, folders: TemporaryFolder, environment: NodeJS.ProcessEnv, output: Writable) {
+  public constructor(root: string, platform: string, architecture: string, runner: ProcessRunner, temporaryFolder: TemporaryFolder, environment: NodeJS.ProcessEnv, output: Writable) {
     this.root = root;
     this.platform = platform;
     this.architecture = architecture;
     this.runner = runner;
-    this.folders = folders;
+    this.temporaryFolder = temporaryFolder;
     this.environment = environment;
     this.output = output;
   }
@@ -103,7 +107,7 @@ export default class PackageSmoke {
   private async checkAsync(): Promise<void> {
     const target = PackageTarget.fromProcess(this.platform, this.architecture);
     const manifest = await RootManifest.readAsync(this.root);
-    const folder = await this.folders.createAsync(this.platform, PackageSmoke.FOLDER_PREFIX);
+    const folder = await this.temporaryFolder.createAsync(this.platform, PackageSmoke.FOLDER_PREFIX);
     this.folder = folder;
     const installed = await new PackageInstaller(this.root, this.runner, this.environment).installAsync(target, manifest.product, folder);
     this.output.write(`Installed: ${installed.desktop}\n`);
@@ -159,7 +163,7 @@ export default class PackageSmoke {
       }
     }
     try {
-      await this.folders.removeAsync(this.folder);
+      await this.temporaryFolder.removeAsync(this.folder);
     }
     catch (error) {
       problems.push(`The smoke's folder ${this.folder} could not be removed: ${String(error)}`);
@@ -186,21 +190,25 @@ export default class PackageSmoke {
     }
   }
 
+  private static readField(value: unknown, name: string): unknown {
+    return typeof value === "object" && value !== null ? Object.getOwnPropertyDescriptor(value, name)?.value : undefined;
+  }
+
   private static async readRuntimeIdAsync(data: string): Promise<number | null> {
     const file = path.join(data, ...PackageSmoke.DISCOVERY_SEGMENTS);
     const value = existsSync(file) ? PackageSmoke.parse(await readFile(file, "utf8")) : null;
-    const processId = typeof value === "object" && value !== null && "processId" in value ? value.processId : null;
+    const processId = PackageSmoke.readField(value, PackageSmoke.PROCESS_ID_FIELD);
     return typeof processId === "number" ? processId : null;
   }
 
-  private statusAsync(installed: InstalledPackage, data: string, folder: string): Promise<ProcessResult> {
+  private queryStatusAsync(installed: InstalledPackage, data: string, folder: string): Promise<ProcessResult> {
     return this.runner.captureAsync(installed.program,
       [path.join(installed.resources, PackageSmoke.ARCHIVE, ...TeamRunCommand.ENTRY_SEGMENTS), ...PackageSmoke.STATUS_ARGUMENTS, PackageSmoke.DATA_DIRECTORY_OPTION, data],
       folder, PackageSmoke.COMMAND_LIMIT, { ...this.environment, [TeamRunCommand.RUN_AS_NODE_VARIABLE]: TeamRunCommand.RUN_AS_NODE_VALUE });
   }
 
   private async requireNoRuntimeAsync(installed: InstalledPackage, data: string, folder: string, moment: string): Promise<void> {
-    const status = await this.statusAsync(installed, data, folder);
+    const status = await this.queryStatusAsync(installed, data, folder);
     if (status.exitCode !== PackageSmoke.NO_RUNTIME_EXIT_CODE)
       throw new PackagingException(`teamrun status ${moment} exited with ${status.exitCode} instead of ${PackageSmoke.NO_RUNTIME_EXIT_CODE}:\n${status.text}`);
   }
@@ -208,7 +216,7 @@ export default class PackageSmoke {
   private async waitForRuntimeAsync(installed: InstalledPackage, data: string, folder: string, desktop: StartedProcess, logs: readonly string[]): Promise<string> {
     const started = Date.now();
     for (;;) {
-      const status = await this.statusAsync(installed, data, folder);
+      const status = await this.queryStatusAsync(installed, data, folder);
       if (status.isSuccessful)
         return status.output;
       if (desktop.hasExited)
@@ -221,9 +229,8 @@ export default class PackageSmoke {
 
   private checkStarted(answer: string, version: string, data: string): void {
     const value = PackageSmoke.parse(answer);
-    const build = typeof value === "object" && value !== null && "build" in value ? value.build : undefined;
-    const reportedVersion = typeof build === "object" && build !== null && "productVersion" in build ? build.productVersion : undefined;
-    const directory = typeof value === "object" && value !== null && "dataDirectory" in value ? value.dataDirectory : undefined;
+    const reportedVersion = PackageSmoke.readField(PackageSmoke.readField(value, PackageSmoke.BUILD_FIELD), PackageSmoke.VERSION_FIELD);
+    const directory = PackageSmoke.readField(value, PackageSmoke.DATA_DIRECTORY_FIELD);
     if (typeof reportedVersion !== "string" || typeof directory !== "string")
       throw new PackagingException(`teamrun status --json answered without a build version and a data directory:\n${answer.trim()}`);
     if (reportedVersion !== version || directory !== data)
@@ -263,10 +270,7 @@ export default class PackageSmoke {
       desktop.signal(PackageSmoke.QUIT_SIGNAL);
       return;
     }
-    const closing = [PackageSmoke.PROCESS_OPTION, String(desktop.id)];
-    const result = await this.runner.captureAsync(PackageSmoke.CLOSE, closing, folder, PackageSmoke.COMMAND_LIMIT);
-    if (!result.isSuccessful)
-      throw new PackagingException(`${PackageSmoke.CLOSE} ${closing.join(" ")} failed with exit code ${result.exitCode}:\n${result.text}`);
+    await this.runner.requireAsync(PackageSmoke.CLOSE, [PackageSmoke.PROCESS_OPTION, String(desktop.id)], folder, PackageSmoke.COMMAND_LIMIT);
   }
 }
 

@@ -158,8 +158,9 @@ class PackageSmokeTests {
         const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-linux-x64.AppImage");
         const runner = new SmokeRunnerFixture(["none", "none", "failed", "running", "none"]);
         const output = new TextOutputFixture();
+        const temporaryFolder = new TemporaryFolderFixture(repository.directory);
 
-        const exitCode = await PackageSmokeTests.runAsync(t, repository, "linux", runner, output);
+        const exitCode = await PackageSmokeTests.runAsync(t, repository, "linux", runner, output, "x64", {}, temporaryFolder);
 
         const appImage = path.join(repository.directory, "_build", "package", "out", "Fixture Studio-linux-x64.AppImage");
         const status = ["fixture-studio", path.join("squashfs-root", "resources", PackageSmokeTests.CLI), ...PackageSmokeTests.STATUS];
@@ -168,6 +169,7 @@ class PackageSmokeTests {
         assert.deepEqual(runner.starts, [[appImage, `--data-dir=${path.join(runner.folder, "data")}`]]);
         assert.deepEqual(runner.environments.map(t => [t?.["ELECTRON_RUN_AS_NODE"], t?.["PATH"]]), [1, 2, 3, 4, 5].map(() => ["1", "fixture-path"]));
         assert.deepEqual(runner.desktop.signals, ["SIGTERM"]);
+        assert.deepEqual(temporaryFolder.platforms, ["linux"]);
         assert.deepEqual([runner.checked, runner.killed], [[5151, 5151, 5151], []]);
         assert.equal(output.text, [
           `Installed: ${appImage}`,
@@ -185,13 +187,15 @@ class PackageSmokeTests {
       const runner = new SmokeRunnerFixture(["none", "running", "none"]);
       const output = new TextOutputFixture();
       runner.localAppData = path.join(repository.directory, "local");
+      const temporaryFolder = new TemporaryFolderFixture(repository.directory);
 
-      const exitCode = await PackageSmokeTests.runAsync(t, repository, "win32", runner, output);
+      const exitCode = await PackageSmokeTests.runAsync(t, repository, "win32", runner, output, "x64", {}, temporaryFolder);
 
       const program = path.join(repository.directory, "local", "Programs", "fixture-studio", "Fixture Studio.exe");
       const status = ["Fixture Studio.exe", path.join(path.dirname(program), "resources", PackageSmokeTests.CLI), ...PackageSmokeTests.STATUS];
       assert.equal(exitCode, 0, output.text);
       assert.deepEqual(runner.calls, [["Fixture Studio-windows-x64.exe", "/S"], status, status, ["taskkill", "/PID", "4242"], status]);
+      assert.deepEqual(temporaryFolder.platforms, ["win32"]);
       assert.deepEqual(runner.starts, [[program, `--data-dir=${path.join(runner.folder, "data")}`]]);
       assert.deepEqual(runner.desktop.signals, []);
       assert.ok(output.text.startsWith(`Installed: ${program}\n`));
@@ -201,8 +205,9 @@ class PackageSmokeTests {
       const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-macos-arm64.dmg");
       const runner = new SmokeRunnerFixture(["none", "running", "none"]);
       const output = new TextOutputFixture();
+      const temporaryFolder = new TemporaryFolderFixture(repository.directory);
 
-      const exitCode = await PackageSmokeTests.runAsync(t, repository, "darwin", runner, output, "arm64");
+      const exitCode = await PackageSmokeTests.runAsync(t, repository, "darwin", runner, output, "arm64", {}, temporaryFolder);
 
       const status = ["Fixture Studio", path.join("Fixture Studio.app", "Contents", "Resources", PackageSmokeTests.CLI), ...PackageSmokeTests.STATUS];
       const screen = path.join(repository.directory, "_build", "package", "smoke", "window-macos-arm64.png");
@@ -212,6 +217,7 @@ class PackageSmokeTests {
       assert.ok(output.text.includes(`\nThe screen with the window: ${screen}\nThe desktop quit.\n`), output.text);
       assert.deepEqual(runner.starts, [[path.join("Fixture Studio.app", "Contents", "MacOS", "Fixture Studio"), `--data-dir=${path.join(runner.folder, "data")}`]]);
       assert.deepEqual(runner.desktop.signals, ["SIGTERM"]);
+      assert.deepEqual(temporaryFolder.platforms, ["darwin"]);
     });
 
     test("on macOS a screen that cannot be captured is reported with its reason in the output and the step summary, and the smoke check goes on", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
@@ -339,8 +345,8 @@ class PackageSmokeTests {
         stubborn.runtimeChecks = Number.POSITIVE_INFINITY;
         stubborn.isKillable = false;
         const locked = [new TemporaryFolderFixture(repository.directory), new TemporaryFolderFixture(repository.directory)] as const;
-        for (const folders of locked)
-          folders.isRemovable = false;
+        for (const temporaryFolder of locked)
+          temporaryFolder.isRemovable = false;
         const outputs = [new TextOutputFixture(), new TextOutputFixture(), new TextOutputFixture()] as const;
 
         const exitCodes = [
@@ -377,10 +383,10 @@ class PackageSmokeTests {
   }
 
   private static async runAsync(t: TestContext, repository: RepositoryFixture, platform: string, runner: SmokeRunnerFixture, output: TextOutputFixture,
-    architecture: string = "x64", variables: NodeJS.ProcessEnv = {}, folders: TemporaryFolderFixture = new TemporaryFolderFixture(repository.directory)): Promise<number> {
+    architecture: string = "x64", variables: NodeJS.ProcessEnv = {}, temporaryFolder: TemporaryFolderFixture = new TemporaryFolderFixture(repository.directory)): Promise<number> {
     t.after(() => runner.disposeAsync());
     const environment = { PATH: "fixture-path", LOCALAPPDATA: path.join(repository.directory, "local"), ...variables };
-    const smoke = new PackageSmoke(repository.directory, platform, architecture, runner, folders, environment, output);
+    const smoke = new PackageSmoke(repository.directory, platform, architecture, runner, temporaryFolder, environment, output);
     t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
     try {
       let isDone = false;

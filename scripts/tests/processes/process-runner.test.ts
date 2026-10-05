@@ -34,6 +34,15 @@ class ProcessRunnerTests {
       assert.equal(result.errorOutput, "warning");
     });
 
+    test("requiring a command passes when it succeeds and otherwise fails naming the command, its arguments, its exit code and its output", async () => {
+      const runner = new ProcessRunner();
+      const script = "process.stdout.write('out '); process.stderr.write(process.env.TEAMRUN_FIXTURE_VALUE ?? 'none'); process.exitCode = Number(process.argv[1])";
+
+      await runner.requireAsync(process.execPath, ["-e", script, "0"], tmpdir(), ProcessRunnerTests.TIMEOUT);
+      await assert.rejects(runner.requireAsync(process.execPath, ["-e", script, "5"], tmpdir(), ProcessRunnerTests.TIMEOUT, { ...process.env, TEAMRUN_FIXTURE_VALUE: "given" }),
+        new ProcessException(`${path.basename(process.execPath)} -e ${script} 5 failed with exit code 5:\nout given`));
+    });
+
     test("capturing stops a process that outlives its deadline", async () => {
       const started = Date.now();
 
