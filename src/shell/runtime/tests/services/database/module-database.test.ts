@@ -83,7 +83,7 @@ export class ModuleDatabaseTests {
     await using folder = await TemporaryFolderFixture.createAsync();
     const directory = new DataDirectory(folder.path);
     using notes = await ModuleDatabase.openAsync(directory, "notes", [ModuleDatabaseFixture.NOTES]);
-    using tasks = await ModuleDatabase.openAsync(directory, "tasks", [new Migration("create-notes", ["CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT NOT NULL) STRICT"])]);
+    using tasks = await ModuleDatabase.openAsync(directory, "tasks", [ModuleDatabaseFixture.NOTES]);
 
     notes.run("INSERT INTO notes (title) VALUES (?)", "Only in notes");
 

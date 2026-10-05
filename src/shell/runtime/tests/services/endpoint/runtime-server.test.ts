@@ -43,6 +43,7 @@ export class RuntimeServerTests {
   private static readonly MOVE: QualifiedName = new QualifiedName("notes", "move");
   private static readonly LARGE: QualifiedName = new QualifiedName("notes", "large");
   private static readonly BROKEN: QualifiedName = new QualifiedName("notes", "broken");
+
   @TestMethod
   public answersTheHandshakeWithItsIdentityAndServesRequests(): Promise<void> {
     return RuntimeServerFixture.runAsync(new ServerSettings(64 * 1024, 100, 1_000, 2_000), async fixture => {
