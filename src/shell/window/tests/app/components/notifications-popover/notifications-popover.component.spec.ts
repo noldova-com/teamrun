@@ -9,6 +9,7 @@
 import { NotificationPost, NotificationSeverity, NotificationState } from "@noldova/teamrun-shell-protocol";
 
 import { NotificationsFixture } from "../../../fixtures/notifications.fixture";
+import { TooltipFixture } from "../../../fixtures/tooltip.fixture";
 
 describe("NotificationsPopoverComponent", () => {
   let service: NotificationsFixture;
@@ -57,7 +58,7 @@ describe("NotificationsPopoverComponent", () => {
     (await NotificationsFixture.openAsync(fixture)).querySelector<HTMLButtonElement>("button.tr-notifications-open")?.click();
     await fixture.whenStable();
     const list = await NotificationsFixture.openAsync(fixture);
-    await NotificationsFixture.expectTooltipAsync(list.querySelector<HTMLButtonElement>(".tr-notifications-dismiss"), "Dismiss");
+    await TooltipFixture.expectTooltipAsync(list.querySelector<HTMLButtonElement>(".tr-notifications-dismiss"), "Dismiss");
     list.querySelector<HTMLButtonElement>(".tr-notifications-dismiss")?.click();
     list.querySelector<HTMLButtonElement>(".tr-notifications-clear")?.click();
     list.querySelector<HTMLInputElement>(".tr-notifications-quiet .tr-checkbox-box")?.click();

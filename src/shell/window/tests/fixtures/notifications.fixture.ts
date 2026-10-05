@@ -73,15 +73,6 @@ export class NotificationsFixture {
     return NotificationsFixture.findPopover() as HTMLElement;
   }
 
-  public static async expectTooltipAsync(button: HTMLElement | null | undefined, text: string): Promise<void> {
-    const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === text);
-    button?.dispatchEvent(new PointerEvent("pointerenter"));
-    await vi.waitFor(() => expect(tooltip()).toBeDefined());
-    button?.dispatchEvent(new PointerEvent("pointerleave"));
-    await vi.waitFor(() => expect(tooltip()).toBeUndefined());
-    expect(button?.hasAttribute("title")).toBe(false);
-  }
-
   public isAvailable(command: CommandRun): boolean {
     return command.name.text !== "clock.reset";
   }

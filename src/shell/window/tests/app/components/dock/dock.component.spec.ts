@@ -21,6 +21,7 @@ import { Resources } from "../../../../src/resources";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
+import { TooltipFixture } from "../../../fixtures/tooltip.fixture";
 
 @Component({
   imports: [DockComponent],
@@ -115,12 +116,7 @@ describe("DockComponent", () => {
     expect(strip?.classList.contains("tr-dock-strip-vertical")).toBe(true);
     expect(strip?.dataset["dropGroup"]).toBe("1");
     expect(buttons.map(t => t.getAttribute("aria-label"))).toEqual(["files.tree", "files.search"]);
-    const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === "files.search");
-    buttons[1]?.dispatchEvent(new PointerEvent("pointerenter"));
-    await vi.waitFor(() => expect(tooltip()).toBeDefined());
-    expect(tooltip()?.getBoundingClientRect().left).toBeGreaterThan(strip?.getBoundingClientRect().right ?? Infinity);
-    buttons[1]?.dispatchEvent(new PointerEvent("pointerleave"));
-    await vi.waitFor(() => expect(tooltip()).toBeUndefined());
+    await TooltipFixture.expectTooltipAsync(buttons[1], "files.search", tooltip => expect(tooltip.getBoundingClientRect().left).toBeGreaterThan(strip?.getBoundingClientRect().right ?? Infinity));
 
     buttons[1]?.click();
     fixture.detectChanges();
