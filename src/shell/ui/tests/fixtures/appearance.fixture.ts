@@ -50,6 +50,12 @@ export class AppearanceFixture {
     AppearanceFixture.expectPixels(Number.parseFloat(actual), AppearanceFixture.toPixels(rem, panelSize));
   }
 
+  public static expectTruncates(element: HTMLElement): void {
+    const style = getComputedStyle(element);
+    expect([element.hasAttribute("data-truncates"), style.minWidth, style.overflowX, style.textOverflow, style.whiteSpace, element.scrollWidth > element.clientWidth])
+      .toEqual([true, "0px", "hidden", "ellipsis", "nowrap", true]);
+  }
+
   public static expectLook(actual: string, theme: Theme, name: string, property: string, shorthand: string = property): void {
     const value = theme.readLook(name);
     if (value === undefined)

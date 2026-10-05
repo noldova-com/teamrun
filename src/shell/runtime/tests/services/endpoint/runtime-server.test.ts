@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -31,10 +30,8 @@ import {
 } from "@noldova/teamrun-shell-protocol";
 import {
   ConnectionException,
-  type IMethodHandler,
   MethodFailureException,
   Refusal,
-  type RequestContext,
   ServerSettings
 } from "@noldova/teamrun-shell-runtime";
 
@@ -43,24 +40,19 @@ import { SocketFolderFixture } from "../../fixtures/socket-folder.fixture.js";
 
 @TestClass
 export class RuntimeServerTests {
-  private static readonly ECHO: QualifiedName = new QualifiedName("notes", "echo");
-  private static readonly WAIT: QualifiedName = new QualifiedName("notes", "wait");
   private static readonly MOVE: QualifiedName = new QualifiedName("notes", "move");
   private static readonly LARGE: QualifiedName = new QualifiedName("notes", "large");
   private static readonly BROKEN: QualifiedName = new QualifiedName("notes", "broken");
-  private static readonly ECHO_HANDLER: IMethodHandler = {
-    handleAsync: (context: RequestContext) => Promise.resolve({ client: context.client, payload: context.payload })
-  };
 
   @TestMethod
   public answersTheHandshakeWithItsIdentityAndServesRequests(): Promise<void> {
-    return RuntimeServerTests.runAsync(new ServerSettings(64 * 1024, 100, 1_000, 2_000), async fixture => {
-      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
+    return RuntimeServerFixture.runAsync(new ServerSettings(64 * 1024, 100, 1_000, 2_000), async fixture => {
+      fixture.methods.register(RuntimeServerFixture.ECHO, RuntimeServerFixture.ECHO_HANDLER);
 
       const [connection, answer] = await fixture.handshakeAsync("desktop");
       const silent = await fixture.connectAsync();
       await silent.waitForCloseAsync();
-      connection.sendMessages(new Request("desktop:1", RuntimeServerTests.ECHO, { path: "notes.md" }));
+      connection.sendMessages(new Request("desktop:1", RuntimeServerFixture.ECHO, { path: "notes.md" }));
       const response = await connection.readResponseAsync();
 
       Assert.areEqual("desktop:0", answer.id);
@@ -73,23 +65,23 @@ export class RuntimeServerTests {
 
   @TestMethod
   public refusesAWrongToken(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
       const [connection, answer] = await fixture.handshakeAsync("desktop", RuntimeServerFixture.IDENTITY, "guess");
 
-      RuntimeServerTests.assertFailure(answer, FailureCode.Unauthorized, "The capability token is not valid for this runtime.", "desktop:0");
+      RuntimeServerFixture.assertFailure(answer, FailureCode.Unauthorized, "The capability token is not valid for this runtime.", "desktop:0");
       await connection.waitForCloseAsync();
     });
   }
 
   @TestMethod
   public requiresTheHandshakeFirstAndIgnoresWhatFollows(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
-      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
+      fixture.methods.register(RuntimeServerFixture.ECHO, RuntimeServerFixture.ECHO_HANDLER);
       const connection = await fixture.connectAsync();
 
-      connection.sendMessages(new Request("tester:1", RuntimeServerTests.ECHO, null), new Request("tester:2", RuntimeServerTests.ECHO, null));
+      connection.sendMessages(new Request("tester:1", RuntimeServerFixture.ECHO, null), new Request("tester:2", RuntimeServerFixture.ECHO, null));
 
-      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.InvalidMessage, "A connection must begin with a handshake.", null);
+      RuntimeServerFixture.assertFailure(await connection.readResponseAsync(), FailureCode.InvalidMessage, "A connection must begin with a handshake.", null);
       await connection.waitForCloseAsync();
       await Assert.throwsAsync(() => connection.readTextAsync(), Error);
     });
@@ -97,7 +89,7 @@ export class RuntimeServerTests {
 
   @TestMethod
   public closesAConnectionThatSendsNoHandshakeInTime(): Promise<void> {
-    return RuntimeServerTests.runAsync(new ServerSettings(1_024, 100, 1_000, 1_000), async fixture => {
+    return RuntimeServerFixture.runAsync(new ServerSettings(1_024, 100, 1_000, 1_000), async fixture => {
       const connection = await fixture.connectAsync();
 
       await connection.waitForCloseAsync();
@@ -110,25 +102,25 @@ export class RuntimeServerTests {
 
   @TestMethod
   public endsAConnectionWhoseFirstFrameIsInvalid(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
       const connection = await fixture.connectAsync();
 
       connection.send("not json\n");
 
-      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.InvalidMessage, "The frame is not a valid message.", null);
+      RuntimeServerFixture.assertFailure(await connection.readResponseAsync(), FailureCode.InvalidMessage, "The frame is not a valid message.", null);
       await connection.waitForCloseAsync();
     });
   }
 
   @TestMethod
   public keepsAnAuthenticatedConnectionAfterAnInvalidFrame(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
-      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
+      fixture.methods.register(RuntimeServerFixture.ECHO, RuntimeServerFixture.ECHO_HANDLER);
       const connection = await fixture.authenticateAsync();
 
-      connection.send(`{"kind":"Unknown"}\n${new Request("tester:1", RuntimeServerTests.ECHO, 1).toText()}\n`);
+      connection.send(`{"kind":"Unknown"}\n${new Request("tester:1", RuntimeServerFixture.ECHO, 1).toText()}\n`);
 
-      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.InvalidMessage, "The frame is not a valid message.", null);
+      RuntimeServerFixture.assertFailure(await connection.readResponseAsync(), FailureCode.InvalidMessage, "The frame is not a valid message.", null);
       Assert.areEqual("{\"client\":\"tester\",\"payload\":1}", JSON.stringify((await connection.readResponseAsync()).payload));
       Assert.isFalse(connection.isClosed);
     });
@@ -136,7 +128,7 @@ export class RuntimeServerTests {
 
   @TestMethod
   public endsAConnectionThatSendsAnOversizedFrame(): Promise<void> {
-    return RuntimeServerTests.runAsync(new ServerSettings(1_024, 1_000, 1_000, 1_000), async fixture => {
+    return RuntimeServerFixture.runAsync(new ServerSettings(1_024, 1_000, 1_000, 1_000), async fixture => {
       const connection = await fixture.authenticateAsync();
 
       connection.send("x".repeat(2_048));
@@ -150,8 +142,8 @@ export class RuntimeServerTests {
 
   @TestMethod
   public answersAnAnswerItCannotSendWithAFailureAndKeepsTheConnection(): Promise<void> {
-    return RuntimeServerTests.runAsync(new ServerSettings(1_024, 1_000, 1_000, 1_000), async fixture => {
-      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
+    return RuntimeServerFixture.runAsync(new ServerSettings(1_024, 1_000, 1_000, 1_000), async fixture => {
+      fixture.methods.register(RuntimeServerFixture.ECHO, RuntimeServerFixture.ECHO_HANDLER);
       fixture.methods.register(RuntimeServerTests.LARGE, { handleAsync: () => Promise.resolve("x".repeat(2_048)) });
       fixture.methods.register(RuntimeServerTests.BROKEN, { handleAsync: () => Promise.resolve(RuntimeServerTests.loop()) });
       const connection = await fixture.authenticateAsync();
@@ -159,10 +151,10 @@ export class RuntimeServerTests {
       connection.sendMessages(
         new Request("tester:1", RuntimeServerTests.LARGE, null),
         new Request("tester:2", RuntimeServerTests.BROKEN, null),
-        new Request("tester:3", RuntimeServerTests.ECHO, 1));
+        new Request("tester:3", RuntimeServerFixture.ECHO, 1));
 
-      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.FrameTooLarge, "A frame exceeds the maximum length of 1024 characters.", "tester:1");
-      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.Internal, "The runtime failed to handle the request.", "tester:2");
+      RuntimeServerFixture.assertFailure(await connection.readResponseAsync(), FailureCode.FrameTooLarge, "A frame exceeds the maximum length of 1024 characters.", "tester:1");
+      RuntimeServerFixture.assertFailure(await connection.readResponseAsync(), FailureCode.Internal, "The runtime failed to handle the request.", "tester:2");
       Assert.areEqual("{\"client\":\"tester\",\"payload\":1}", JSON.stringify((await connection.readResponseAsync()).payload));
       Assert.isFalse(connection.isClosed);
     });
@@ -170,13 +162,13 @@ export class RuntimeServerTests {
 
   @TestMethod
   public logsAnEventItCannotSendAndSendsItToNoClient(): Promise<void> {
-    return RuntimeServerTests.runAsync(new ServerSettings(1_024, 1_000, 1_000, 1_000), async fixture => {
+    return RuntimeServerFixture.runAsync(new ServerSettings(1_024, 1_000, 1_000, 1_000), async fixture => {
       const first = await fixture.authenticateAsync("first");
       const second = await fixture.authenticateAsync("second");
 
-      fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, "x".repeat(2_048)));
-      fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, RuntimeServerTests.loop()));
-      fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, "small"));
+      fixture.server.broadcast(new Event(RuntimeServerFixture.ECHO, "x".repeat(2_048)));
+      fixture.server.broadcast(new Event(RuntimeServerFixture.ECHO, RuntimeServerTests.loop()));
+      fixture.server.broadcast(new Event(RuntimeServerFixture.ECHO, "small"));
 
       Assert.areEqual("\"small\"|\"small\"", `${JSON.stringify((await first.readEventAsync()).payload)}|${JSON.stringify((await second.readEventAsync()).payload)}`);
       const entries = fixture.diagnostics.text.split("The runtime sent the event notes.echo to no client: ").slice(1);
@@ -189,71 +181,46 @@ export class RuntimeServerTests {
 
   @TestMethod
   public answersUnknownMethodsAndUnexpectedMessages(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
       const connection = await fixture.authenticateAsync();
 
       connection.sendMessages(
-        new Request("tester:1", RuntimeServerTests.ECHO, null),
+        new Request("tester:1", RuntimeServerFixture.ECHO, null),
         new Handshake("tester:2", RuntimeServerFixture.IDENTITY, RuntimeServerFixture.TOKEN, "tester"),
-        new Event(RuntimeServerTests.ECHO, null),
+        new Event(RuntimeServerFixture.ECHO, null),
         Response.success("tester:3", null),
         new Cancel("tester:9"));
 
-      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.UnknownMethod, "The method notes.echo is not registered.", "tester:1");
+      RuntimeServerFixture.assertFailure(await connection.readResponseAsync(), FailureCode.UnknownMethod, "The method notes.echo is not registered.", "tester:1");
       for (let index = 0; index < 3; index++)
-        RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.InvalidMessage, "Only requests and cancellations may follow the handshake.", null);
-      connection.sendMessages(new Request("tester:4", RuntimeServerTests.ECHO, null));
-      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.UnknownMethod, "The method notes.echo is not registered.", "tester:4");
+        RuntimeServerFixture.assertFailure(await connection.readResponseAsync(), FailureCode.InvalidMessage, "Only requests and cancellations may follow the handshake.", null);
+      connection.sendMessages(new Request("tester:4", RuntimeServerFixture.ECHO, null));
+      RuntimeServerFixture.assertFailure(await connection.readResponseAsync(), FailureCode.UnknownMethod, "The method notes.echo is not registered.", "tester:4");
       Assert.isFalse(connection.isClosed);
     });
   }
 
   @TestMethod
-  public cancelsARequestAndRefusesADuplicateId(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
-      const signals: AbortSignal[] = [];
-      fixture.methods.register(RuntimeServerTests.WAIT, RuntimeServerTests.createWaitHandler(signals));
-      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
-      const connection = await fixture.authenticateAsync();
-
-      connection.sendMessages(new Request("tester:1", RuntimeServerTests.WAIT, null), new Request("tester:1", RuntimeServerTests.WAIT, null));
-      RuntimeServerTests.assertFailure(
-        await connection.readResponseAsync(),
-        FailureCode.InvalidMessage,
-        "A request with the id tester:1 is already running on this connection.",
-        "tester:1");
-      connection.sendMessages(new Cancel("tester:1"));
-
-      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.Cancelled, "The request was cancelled.", "tester:1");
-      Assert.areEqual(1, signals.length);
-      Assert.areEqual(true, signals[0]?.aborted);
-      connection.sendMessages(new Request("tester:2", RuntimeServerTests.ECHO, null));
-      Assert.areEqual("tester:2", (await connection.readResponseAsync()).id);
-      Assert.areEqual(0, connection.frameCount);
-    });
-  }
-
-  @TestMethod
   public endsRequestsAtTheirDeadline(): Promise<void> {
-    return RuntimeServerTests.runAsync(new ServerSettings(64 * 1024, 1_000, 100, 200), async fixture => {
-      fixture.methods.register(RuntimeServerTests.WAIT, RuntimeServerTests.createWaitHandler([]));
+    return RuntimeServerFixture.runAsync(new ServerSettings(64 * 1024, 1_000, 100, 200), async fixture => {
+      fixture.methods.register(RuntimeServerFixture.WAIT, RuntimeServerFixture.createWaitHandler([]));
       const connection = await fixture.authenticateAsync();
       const started = Date.now();
 
       connection.sendMessages(
-        new Request("tester:1", RuntimeServerTests.WAIT, null, 20),
-        new Request("tester:2", RuntimeServerTests.WAIT, null),
-        new Request("tester:3", RuntimeServerTests.WAIT, null, 60_000));
+        new Request("tester:1", RuntimeServerFixture.WAIT, null, 20),
+        new Request("tester:2", RuntimeServerFixture.WAIT, null),
+        new Request("tester:3", RuntimeServerFixture.WAIT, null, 60_000));
 
       for (const id of ["tester:1", "tester:2", "tester:3"])
-        RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.DeadlineExceeded, "The request did not finish within its time limit.", id);
+        RuntimeServerFixture.assertFailure(await connection.readResponseAsync(), FailureCode.DeadlineExceeded, "The request did not finish within its time limit.", id);
       Assert.isTrue(Date.now() - started < 2_000, "the maximum limits the requested time");
     });
   }
 
   @TestMethod
   public describesHandlerFailures(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
       const failure = new Failure(FailureCode.NotFound, "The note does not exist.", { path: "notes.md" });
       const failures: Record<string, () => never> = {
         method: () => { throw new MethodFailureException(failure); },
@@ -282,37 +249,20 @@ export class RuntimeServerTests {
   }
 
   @TestMethod
-  public abortsRunningRequestsWhenTheConnectionCloses(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
-      const signals: AbortSignal[] = [];
-      const started = Promise.withResolvers<void>();
-      fixture.methods.register(RuntimeServerTests.WAIT, RuntimeServerTests.createWaitHandler(signals, started));
-      const connection = await fixture.authenticateAsync();
-      connection.sendMessages(new Request("tester:1", RuntimeServerTests.WAIT, null));
-      await started.promise;
-
-      connection.reset();
-
-      await fixture.waitUntilAsync(() => fixture.server.sessionCount === 0);
-      Assert.areEqual(true, signals[0]?.aborted);
-    });
-  }
-
-  @TestMethod
   public letsAnotherBuildOnlyAskItToStop(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
-      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
-      fixture.methods.register(ShellMethods.stop, RuntimeServerTests.ECHO_HANDLER);
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
+      fixture.methods.register(RuntimeServerFixture.ECHO, RuntimeServerFixture.ECHO_HANDLER);
+      fixture.methods.register(ShellMethods.stop, RuntimeServerFixture.ECHO_HANDLER);
 
       const [connection, answer] = await fixture.handshakeAsync("older", RuntimeServerFixture.OTHER_IDENTITY);
-      connection.sendMessages(new Request("older:1", RuntimeServerTests.ECHO, null), new Request("older:2", ShellMethods.stop, { policy: "IfIdle" }));
-      fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, "not for other builds"));
+      connection.sendMessages(new Request("older:1", RuntimeServerFixture.ECHO, null), new Request("older:2", ShellMethods.stop, { policy: "IfIdle" }));
+      fixture.server.broadcast(new Event(RuntimeServerFixture.ECHO, "not for other builds"));
 
       Assert.areEqual(
         `{"kind":"Response","id":"older:0","failure":{"code":"BuildMismatch","message":"Another build of TeamRun owns this data directory.",`
         + `"details":{"identity":{"productVersion":"1.2.3","protocolVersion":1,"fingerprint":"server-build"},"executablePath":"/opt/teamrun/teamrun"}}}`,
         answer.toText());
-      RuntimeServerTests.assertFailure(
+      RuntimeServerFixture.assertFailure(
         await connection.readResponseAsync(),
         FailureCode.BuildMismatch,
         "A connection from another build may only ask the runtime to stop.",
@@ -326,7 +276,7 @@ export class RuntimeServerTests {
 
   @TestMethod
   public answersALaterProtocolVersionWithTheHandover(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
       const later = new BuildIdentity("2.0.0", BuildIdentity.supportedProtocolVersion + 1, "later-build");
 
       const [connection, answer] = await fixture.handshakeAsync("later", later);
@@ -339,15 +289,15 @@ export class RuntimeServerTests {
 
   @TestMethod
   public servesOnlyTheRefusalsMethodUntilItAdmits(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
       const failure = new Failure(FailureCode.PreShellData, "Move the old data aside.", { location: "/data" });
-      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
-      fixture.methods.register(RuntimeServerTests.MOVE, RuntimeServerTests.ECHO_HANDLER);
+      fixture.methods.register(RuntimeServerFixture.ECHO, RuntimeServerFixture.ECHO_HANDLER);
+      fixture.methods.register(RuntimeServerTests.MOVE, RuntimeServerFixture.ECHO_HANDLER);
       fixture.server.refuse(new Refusal(failure, RuntimeServerTests.MOVE));
 
       const [refused, answer] = await fixture.handshakeAsync("desktop");
-      refused.sendMessages(new Request("desktop:1", RuntimeServerTests.ECHO, null), new Request("desktop:2", RuntimeServerTests.MOVE, null));
-      fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, "not for refused connections"));
+      refused.sendMessages(new Request("desktop:1", RuntimeServerFixture.ECHO, null), new Request("desktop:2", RuntimeServerTests.MOVE, null));
+      fixture.server.broadcast(new Event(RuntimeServerFixture.ECHO, "not for refused connections"));
 
       Assert.areEqual(JSON.stringify(Response.failure("desktop:0", failure).toJson()), JSON.stringify(answer.toJson()));
       Assert.areEqual(JSON.stringify(Response.failure("desktop:1", failure).toJson()), JSON.stringify((await refused.readResponseAsync()).toJson()));
@@ -356,24 +306,24 @@ export class RuntimeServerTests {
       await refused.waitForCloseAsync();
       await Assert.throwsAsync(() => refused.readTextAsync(), Error);
       const admitted = await fixture.authenticateAsync("desktop");
-      fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, "for everyone"));
+      fixture.server.broadcast(new Event(RuntimeServerFixture.ECHO, "for everyone"));
       Assert.areEqual("\"for everyone\"", JSON.stringify((await admitted.readEventAsync()).payload));
     });
   }
 
   @TestMethod
   public servesStopButNoOtherMethodToARefusedConnection(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
       const failure = new Failure(FailureCode.PreShellData, "Move the old data aside.", { location: "/data" });
-      fixture.methods.register(ShellMethods.stop, RuntimeServerTests.ECHO_HANDLER);
-      fixture.methods.register(ShellMethods.settings, RuntimeServerTests.ECHO_HANDLER);
-      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
+      fixture.methods.register(ShellMethods.stop, RuntimeServerFixture.ECHO_HANDLER);
+      fixture.methods.register(ShellMethods.settings, RuntimeServerFixture.ECHO_HANDLER);
+      fixture.methods.register(RuntimeServerFixture.ECHO, RuntimeServerFixture.ECHO_HANDLER);
       fixture.server.refuse(new Refusal(failure, RuntimeServerTests.MOVE));
 
       const [refused] = await fixture.handshakeAsync("desktop");
       refused.sendMessages(
         new Request("desktop:1", ShellMethods.settings, null),
-        new Request("desktop:2", RuntimeServerTests.ECHO, null),
+        new Request("desktop:2", RuntimeServerFixture.ECHO, null),
         new Request("desktop:3", ShellMethods.stop, { policy: "StopWork" }));
 
       Assert.areEqual(JSON.stringify(Response.failure("desktop:1", failure).toJson()), JSON.stringify((await refused.readResponseAsync()).toJson()));
@@ -389,11 +339,11 @@ export class RuntimeServerTests {
       if (process.platform !== "win32")
         await writeFile(socketPath, "stale");
       const fixture = new RuntimeServerFixture();
-      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
+      fixture.methods.register(RuntimeServerFixture.ECHO, RuntimeServerFixture.ECHO_HANDLER);
 
       fixture.endpoint = await fixture.server.listenSocketAsync(socketPath);
       const connection = await fixture.authenticateAsync();
-      connection.sendMessages(new Request("tester:1", RuntimeServerTests.ECHO, 7));
+      connection.sendMessages(new Request("tester:1", RuntimeServerFixture.ECHO, 7));
 
       Assert.areEqual(socketPath, fixture.endpoint.path);
       Assert.areEqual("{\"client\":\"tester\",\"payload\":7}", JSON.stringify((await connection.readResponseAsync()).payload));
@@ -426,7 +376,7 @@ export class RuntimeServerTests {
 
   @TestMethod
   public failsToListenWhenClosedWhileStarting(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
       const listening = fixture.server.listenTcpAsync();
       const closed = new Promise<void>(resolve => process.nextTick(() => process.nextTick(() => void fixture.server.closeAsync().then(resolve))));
 
@@ -439,7 +389,7 @@ export class RuntimeServerTests {
 
   @TestMethod
   public closesConnectionsThatDoNotEndWithinTheGrace(): Promise<void> {
-    return RuntimeServerTests.runAsync(undefined, async fixture => {
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
       await fixture.connectAsync(true);
       await fixture.waitUntilAsync(() => fixture.server.sessionCount === 1);
       const started = Date.now();
@@ -452,37 +402,14 @@ export class RuntimeServerTests {
     });
   }
 
-  private static createWaitHandler(signals: AbortSignal[], started: PromiseWithResolvers<void> = Promise.withResolvers<void>()): IMethodHandler {
-    return {
-      handleAsync: async (context: RequestContext): Promise<JsonValue> => {
-        signals.push(context.signal);
-        started.resolve();
-        await once(context.signal, "abort");
-        return "late";
-      }
-    };
-  }
-
   private static loop(): JsonValue[] {
     const loop: JsonValue[] = [];
     loop.push(loop);
     return loop;
   }
 
-  private static assertFailure(response: Response, code: FailureCode, message: string, id: string | null): void {
-    Assert.areEqual(id, response.id);
-    Assert.areEqual(code, response.failure?.code);
-    Assert.areEqual(message, response.failure?.message);
-  }
-
-  private static async runAsync(settings: ServerSettings | undefined, test: (fixture: RuntimeServerFixture) => Promise<void>, listen: boolean = true): Promise<void> {
-    await using fixture = listen ? await RuntimeServerFixture.startAsync(settings) : new RuntimeServerFixture(settings);
-    await test(fixture);
-  }
-
   private static async runInFolderAsync(test: (folder: string) => Promise<void>): Promise<void> {
     await using folder = await SocketFolderFixture.createAsync("tr-srv-");
     await test(folder.path);
   }
-
 }

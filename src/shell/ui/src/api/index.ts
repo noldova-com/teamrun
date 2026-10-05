@@ -58,6 +58,7 @@ export { OverlayAnchoring } from "../app/models/overlay-anchoring";
 export { OverlayBounds } from "../app/models/overlay-bounds";
 export { OverlayPlacement } from "../app/models/overlay-placement";
 export { OverlaySide } from "../app/models/overlay-side";
+export { QueryMatcher } from "../app/models/query-matcher";
 export { QuickInputItem } from "../app/models/quick-input-item";
 export { SelectOption } from "../app/models/select-option";
 export { Theme } from "../app/models/theme";

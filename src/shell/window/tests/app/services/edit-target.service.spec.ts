@@ -10,33 +10,20 @@ import { TestBed } from "@angular/core/testing";
 
 import { EditAction } from "../../../src/app/enums/edit-action";
 import { EditTargetService } from "../../../src/app/services/edit-target.service";
+import { EditTargetFixture } from "../../fixtures/edit-target.fixture";
 
 describe("EditTargetService", () => {
-  let host: HTMLElement;
+  let page: EditTargetFixture;
   let overlay: HTMLButtonElement;
   let elsewhere: HTMLButtonElement;
 
   beforeEach(() => {
-    host = document.createElement("div");
-    host.innerHTML = `
-      <input class="field" type="text" value="Meeting notes">
-      <input class="locked" type="text" value="Read only" readonly>
-      <input class="count" type="number" value="42">
-      <textarea class="notes">Week 3</textarea>
-      <div class="rich" contenteditable="true">Rich text</div>
-      <svg class="drawing" tabindex="0"></svg>
-      <button type="button" class="elsewhere">Elsewhere</button>
-      <div class="cdk-overlay-container"><button type="button" class="row">Copy</button></div>`;
-    document.body.append(host);
-    overlay = host.querySelector(".row") as HTMLButtonElement;
-    elsewhere = host.querySelector(".elsewhere") as HTMLButtonElement;
+    page = EditTargetFixture.create();
+    overlay = page.find(".row", HTMLButtonElement);
+    elsewhere = page.find(".elsewhere", HTMLButtonElement);
   });
 
-  afterEach(() => host.remove());
-
-  function element<T extends Element>(selector: string): T {
-    return host.querySelector(selector) as T;
-  }
+  afterEach(() => page.remove());
 
   function actions(edits: EditTargetService): readonly EditAction[] {
     return Object.values(EditAction).filter(t => edits.canRun(t));
@@ -44,7 +31,7 @@ describe("EditTargetService", () => {
 
   it("keeps the field and its selection while focus is in a menu, and restores both", async () => {
     const edits = TestBed.inject(EditTargetService);
-    const field = element<HTMLInputElement>(".field");
+    const field = page.find(".field", HTMLInputElement);
     field.focus();
     field.setSelectionRange(0, 7, "backward");
 
@@ -60,8 +47,8 @@ describe("EditTargetService", () => {
 
   it("allows only what a field can do: no copy or cut without a selection, and nothing that writes into a read-only field", () => {
     const edits = TestBed.inject(EditTargetService);
-    const field = element<HTMLInputElement>(".field");
-    const locked = element<HTMLInputElement>(".locked");
+    const field = page.find(".field", HTMLInputElement);
+    const locked = page.find(".locked", HTMLInputElement);
 
     field.focus();
     field.setSelectionRange(3, 3);
@@ -78,7 +65,7 @@ describe("EditTargetService", () => {
 
   it("forgets the field when focus moves to something that is not editable outside the menus, or the field leaves the page", async () => {
     const edits = TestBed.inject(EditTargetService);
-    const field = element<HTMLInputElement>(".field");
+    const field = page.find(".field", HTMLInputElement);
 
     field.focus();
     elsewhere.focus();
@@ -93,9 +80,9 @@ describe("EditTargetService", () => {
 
   it("restores a selection in editable rich text and in a text area, and treats a field without a selection range as selected", async () => {
     const edits = TestBed.inject(EditTargetService);
-    const rich = element<HTMLElement>(".rich");
-    const notes = element<HTMLTextAreaElement>(".notes");
-    const count = element<HTMLInputElement>(".count");
+    const rich = page.find(".rich", HTMLElement);
+    const notes = page.find(".notes", HTMLTextAreaElement);
+    const count = page.find(".count", HTMLInputElement);
     rich.focus();
     const range = document.createRange();
     range.setStart(rich.firstChild as Node, 0);
@@ -121,14 +108,14 @@ describe("EditTargetService", () => {
 
   it("treats rich text without a selection inside it as unselected, and ignores focus on an element that is not HTML", async () => {
     const edits = TestBed.inject(EditTargetService);
-    const rich = element<HTMLElement>(".rich");
+    const rich = page.find(".rich", HTMLElement);
     document.getSelection()?.removeAllRanges();
 
     rich.focus();
     document.getSelection()?.removeAllRanges();
     overlay.focus();
     const unselected = actions(edits);
-    element<SVGElement>(".drawing").focus();
+    page.find(".drawing", SVGElement).focus();
 
     expect(unselected).toEqual([EditAction.Undo, EditAction.Redo, EditAction.Paste, EditAction.SelectAll]);
     expect(actions(edits)).toEqual(unselected);
