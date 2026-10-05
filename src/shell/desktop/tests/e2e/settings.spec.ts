@@ -140,19 +140,19 @@ test.describe("settings", () => {
     const content = window.locator(".tr-settings-content");
     await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
     await content.locator(".tr-settings-group-title").first().click();
-    await window.mouse.move(1, 1);
-    await ScrollAreaFixture.expectThumbShownAsync(content, false);
+    await ScrollAreaFixture.restPointerAsync(window, content);
     const hidden = await ScrollAreaFixture.scrollbarImageAsync(window, content, "vertical");
 
     const scrolled = Date.now();
     await window.keyboard.press("PageDown");
-    await expect.poll(() => ScrollAreaFixture.scrollTopAsync(content)).toBeGreaterThan(0);
     await ScrollAreaFixture.expectThumbShownAsync(content, true);
-    expect((await ScrollAreaFixture.scrollbarImageAsync(window, content, "vertical")).equals(hidden)).toBe(false);
+    const shown = await ScrollAreaFixture.scrollbarImageAsync(window, content, "vertical");
     await desktop.checkpointAsync("settings-keyboard-scroll-thumb");
+    expect(shown).not.toEqual(hidden);
+    expect(await ScrollAreaFixture.scrollTopAsync(content)).toBeGreaterThan(0);
     await ScrollAreaFixture.expectThumbShownAsync(content, false);
 
-    expect(Date.now() - scrolled).toBeGreaterThanOrEqual(900);
+    expect(Date.now() - scrolled).toBeGreaterThanOrEqual(1000);
     expect(await content.evaluate(t => t.matches(":hover"))).toBe(false);
   });
 

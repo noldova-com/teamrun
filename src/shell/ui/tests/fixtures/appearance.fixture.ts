@@ -22,11 +22,11 @@ export class AppearanceFixture {
   private static readonly SHAPE_ATTRIBUTE: string = "data-tr-tab-shape";
   private static readonly LAYOUT_TOLERANCE: number = 1 / 32;
   private static readonly PIXEL_LENGTH: RegExp = /^-?[\d.]+px$/;
-  private static readonly HIDDEN: string = "rgba(0, 0, 0, 0)";
 
   public static readonly modes: readonly ThemeMode[] = [ThemeMode.Light, ThemeMode.Dark];
   public static readonly themes: readonly Theme[] = [DefaultTheme.theme, FixtureTheme.theme];
   public static readonly panelSizes: readonly number[] = [12, 13, 14, 15, 16, 17, 18];
+  public static readonly hiddenThumb: string = "rgba(0, 0, 0, 0)";
 
   public static apply(theme: Theme = DefaultTheme.theme, mode: ThemeMode = ThemeMode.Light, panelSize: number = AppearanceFixture.PANEL_SIZE): void {
     const root = document.documentElement;
@@ -84,22 +84,32 @@ export class AppearanceFixture {
     return height;
   }
 
-  public static async expectThumbRevealsOnHoverAsync(area: HTMLElement): Promise<void> {
-    const thumb = (): string => getComputedStyle(area).getPropertyValue("--tr-scroll-thumb");
+  public static readShownThumb(): string {
     const probe = document.body.appendChild(document.createElement("div"));
     probe.style.color = "var(--tr-scrollbar)";
     const shown = getComputedStyle(probe).color;
     probe.remove();
+    return shown;
+  }
 
+  public static async parkPointerAsync(): Promise<HTMLElement> {
     const park = document.body.appendChild(document.createElement("div"));
-    try {
-      park.popover = "manual";
-      park.style.cssText = "position: fixed; inset: 0 auto auto 0; width: 4px; height: 4px; margin: 0; padding: 0; border: 0;";
-      park.showPopover();
-      await userEvent.hover(park);
-      await vi.waitFor(() => expect([area.matches(":hover"), thumb()]).toEqual([false, AppearanceFixture.HIDDEN]));
+    park.popover = "manual";
+    park.style.cssText = "position: fixed; inset: 0 auto auto 0; width: 4px; height: 4px; margin: 0; padding: 0; border: 0;";
+    park.showPopover();
+    await userEvent.hover(park);
+    return park;
+  }
 
-      expect(shown).not.toBe(AppearanceFixture.HIDDEN);
+  public static async expectThumbRevealsOnHoverAsync(area: HTMLElement): Promise<void> {
+    const thumb = (): string => getComputedStyle(area).getPropertyValue("--tr-scroll-thumb");
+    const shown = AppearanceFixture.readShownThumb();
+
+    const park = await AppearanceFixture.parkPointerAsync();
+    try {
+      await vi.waitFor(() => expect([area.matches(":hover"), thumb()]).toEqual([false, AppearanceFixture.hiddenThumb]));
+
+      expect(shown).not.toBe(AppearanceFixture.hiddenThumb);
       await userEvent.hover(area);
       await vi.waitFor(() => expect(thumb()).toBe(shown));
     }

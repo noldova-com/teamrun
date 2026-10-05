@@ -474,9 +474,9 @@ export declare class AnchoredOverlay {
  * the document catches every scroll and marks the element that scrolled, or
  * the root element when the document itself scrolls, with a
  * `data-tr-scrolling` attribute. The mark shows that element's thumb and
- * leaves it one second after the last scroll, when the thumb fades out unless
- * the pointer rests on the element. The listener and every mark go when the
- * application ends.
+ * leaves it one second after the last scroll, when the thumb fades out, or
+ * hides at once when reduced motion is preferred, unless the pointer rests on
+ * the element. The listener and every mark go when the application ends.
  */
 export declare class AppearanceService {
   /**

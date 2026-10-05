@@ -12,6 +12,7 @@ export default class ScrollAreaFixture {
   private static readonly HIDDEN: string = "rgba(0, 0, 0, 0)";
   private static readonly HOVER_POSITION: Readonly<Record<"x" | "y", number>> = { x: 20, y: 10 };
   private static readonly DRAG_STEPS: number = 5;
+  private static readonly FRAME: number = 16;
 
   public static scrollbarSizesAsync(area: Locator): Promise<Readonly<Record<"vertical" | "horizontal" | "rem", number>>> {
     return area.evaluate(t => {
@@ -26,12 +27,12 @@ export default class ScrollAreaFixture {
   }
 
   public static async revealThumbColorAsync(window: Page, area: Locator): Promise<void> {
-    await ScrollAreaFixture.restAsync(window, area);
+    await ScrollAreaFixture.restPointerAsync(window, area);
     await ScrollAreaFixture.hoverAsync(area);
   }
 
   public static async thumbChangesOnHoverAsync(window: Page, area: Locator, axis: "vertical" | "horizontal"): Promise<boolean> {
-    await ScrollAreaFixture.restAsync(window, area);
+    await ScrollAreaFixture.restPointerAsync(window, area);
     const rest = await ScrollAreaFixture.scrollbarImageAsync(window, area, axis);
     await ScrollAreaFixture.hoverAsync(area);
     return !rest.equals(await ScrollAreaFixture.scrollbarImageAsync(window, area, axis));
@@ -82,9 +83,14 @@ export default class ScrollAreaFixture {
     return { start: thumb.start, distance: distance * thumb.ratio };
   }
 
+  public static async restPointerAsync(window: Page, area: Locator): Promise<void> {
+    await window.mouse.move(1, 1);
+    await ScrollAreaFixture.expectThumbShownAsync(area, false);
+  }
+
   public static async expectThumbShownAsync(area: Locator, isShown: boolean): Promise<void> {
     const expected = isShown ? await ScrollAreaFixture.readShownColorAsync(area) : ScrollAreaFixture.HIDDEN;
-    await expect.poll(() => ScrollAreaFixture.thumbColorAsync(area), { message: `the thumb's color, ${isShown ? "shown" : "hidden"}` }).toBe(expected);
+    await expect.poll(() => ScrollAreaFixture.thumbColorAsync(area), { message: `the thumb's color, ${isShown ? "shown" : "hidden"}`, intervals: [ScrollAreaFixture.FRAME] }).toBe(expected);
   }
 
   private static thumbColorAsync(area: Locator): Promise<string> {
@@ -99,11 +105,6 @@ export default class ScrollAreaFixture {
       probe.remove();
       return color;
     });
-  }
-
-  private static async restAsync(window: Page, area: Locator): Promise<void> {
-    await window.mouse.move(1, 1);
-    await ScrollAreaFixture.expectThumbShownAsync(area, false);
   }
 
   private static async hoverAsync(area: Locator): Promise<void> {
