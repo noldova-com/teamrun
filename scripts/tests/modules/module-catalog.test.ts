@@ -101,7 +101,7 @@ class ModuleCatalogTests {
   }
 
   private static declare(id: string, dependencies: readonly string[]): string {
-    return JSON.stringify({ id, displayName: id, description: "Used by the tests.", parts: [], dependencies, contributes: {} });
+    return JSON.stringify({ id, version: "0.0.1", displayName: id, description: "Used by the tests.", parts: [], dependencies, contributes: {} });
   }
 
   private static async createAsync(t: TestContext, files: Readonly<Record<string, string>>): Promise<RepositoryFixture> {

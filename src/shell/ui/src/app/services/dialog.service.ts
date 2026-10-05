@@ -48,6 +48,7 @@ export class DialogService {
       maxWidth: Resources.noLimit,
       providers: [{ provide: DialogTokens.titleId, useValue: titleId }]
     });
+    (reference.overlayRef.backdropElement as HTMLElement).addEventListener(Resources.mousedownEvent, event => event.preventDefault());
     if (this.dialog.openDialogs.length === 1)
       this.makeBackgroundInert();
     reference.closed.subscribe(() => {

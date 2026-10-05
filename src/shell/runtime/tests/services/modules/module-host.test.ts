@@ -52,7 +52,7 @@ export class ModuleHostTests {
     Assert.areEqual<unknown>(store, found);
     Assert.areEqual("tasks Active,theme Active,notes Active", ModuleHostTests.describe(host));
     Assert.areEqual(
-      "{\"id\":\"notes\",\"displayName\":\"notes\",\"description\":\"notes\",\"dependencies\":[\"tasks\",\"theme\"],\"contributes\":{\"methods\":[\"notes.run\"]},\"state\":\"Active\"}",
+      "{\"id\":\"notes\",\"version\":\"0.0.1\",\"displayName\":\"notes\",\"description\":\"notes\",\"dependencies\":[\"tasks\",\"theme\"],\"contributes\":{\"methods\":[\"notes.run\"]},\"state\":\"Active\"}",
       JSON.stringify(host.report.modules[2]?.toJson()));
   }
 
@@ -94,8 +94,8 @@ export class ModuleHostTests {
       ModuleHostTests.describe(host));
     Assert.isUndefined(methods.find(new QualifiedName("failing", "run")));
     Assert.areEqual("activate failing", log.join(","));
-    Assert.isTrue(written.startsWith("The module broken: Its runtime part could not be loaded.\nError: Cannot find module /home/person/secret/broken.js\n"), written);
-    Assert.isTrue(written.includes("The module failing: Its runtime part failed to activate.\nError: at /home/person/secret/failing.js:3\n"), written);
+    Assert.isTrue(written.startsWith("The module broken 0.0.1: Its runtime part could not be loaded.\nError: Cannot find module /home/person/secret/broken.js\n"), written);
+    Assert.isTrue(written.includes("The module failing 0.0.1: Its runtime part failed to activate.\nError: at /home/person/secret/failing.js:3\n"), written);
   }
 
   @TestMethod
@@ -156,7 +156,7 @@ export class ModuleHostTests {
     Assert.areEqual<unknown>(failure, exception.errors[0]);
     Assert.isUndefined(methods.find(new QualifiedName("notes", "list")));
     Assert.isUndefined(methods.find(new QualifiedName("tasks", "list")));
-    Assert.isTrue(diagnostics.text.startsWith("The module notes: Its runtime part failed to deactivate.\nError: The notes cannot be saved.\n"));
+    Assert.isTrue(diagnostics.text.startsWith("The module notes 0.0.1: Its runtime part failed to deactivate.\nError: The notes cannot be saved.\n"));
   }
 
   @TestMethod
@@ -278,7 +278,7 @@ export class ModuleHostTests {
   }
 
   private static declare(id: string, dependencies: readonly string[], runtimePackage: string | null, methods: readonly string[] = []): ModuleDeclaration {
-    return new ModuleDeclaration(id, id, id, dependencies, runtimePackage, new Map([["methods", [...methods, `${id}.run`]]]));
+    return new ModuleDeclaration(id, "0.0.1", id, id, dependencies, runtimePackage, new Map([["methods", [...methods, `${id}.run`]]]));
   }
 
   private static create(

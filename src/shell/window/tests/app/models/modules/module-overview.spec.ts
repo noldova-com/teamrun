@@ -12,7 +12,7 @@ import { ModuleOverview } from "../../../../src/app/models/modules/module-overvi
 
 describe("ModuleOverview", () => {
   const status = (id: string, dependencies: readonly string[] = [], contributions: ReadonlyMap<string, readonly string[]> = new Map()): ModuleStatus =>
-    new ModuleStatus(id, id.toUpperCase(), "Used by the tests.", dependencies, contributions, ModuleState.Active, null);
+    new ModuleStatus(id, "0.0.1", id.toUpperCase(), "Used by the tests.", dependencies, contributions, ModuleState.Active, null);
   const tasks = status("tasks");
   const clock = status("clock");
   const notes = status("notes", ["clock", "tasks"]);
@@ -37,7 +37,7 @@ describe("ModuleOverview", () => {
   });
 
   it("refers to a dependency or blocker the list lacks by its id alone", () => {
-    const blocked = new ModuleStatus("alarm", "Alarm", "Used by the tests.", ["clock"], new Map(), ModuleState.Blocked, "It depends on clock, which is not active.", "clock");
+    const blocked = new ModuleStatus("alarm", "0.0.1", "Alarm", "Used by the tests.", ["clock"], new Map(), ModuleState.Blocked, "It depends on clock, which is not active.", "clock");
     const overview = new ModuleOverview([tasks, blocked]);
 
     expect(overview.listDependencies(blocked).map(t => [t.id, t.module])).toEqual([["clock", null]]);

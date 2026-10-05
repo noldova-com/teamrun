@@ -228,7 +228,7 @@ describe("ToastService with the window parts", () => {
     const errors: unknown[] = [];
     vi.spyOn(document, "hasFocus").mockReturnValue(true);
     let answerPost: (value: unknown) => void = () => undefined;
-    bridge.responses.set("shell.modules", { payload: { modules: [{ id: "notes", displayName: "Notes", description: "Keeps notes.", dependencies: [], contributes: {}, state: "Active" }] } });
+    bridge.responses.set("shell.modules", { payload: { modules: [{ id: "notes", version: "0.0.1", displayName: "Notes", description: "Keeps notes.", dependencies: [], contributes: {}, state: "Active" }] } });
     bridge.responses.set("shell.postNotification", new Promise(resolve => {
       answerPost = resolve;
     }));

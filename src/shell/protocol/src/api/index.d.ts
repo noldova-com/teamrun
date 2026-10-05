@@ -1058,6 +1058,11 @@ export declare class ModuleStatus {
   public readonly id: string;
 
   /**
+   * The module's own version, `<major>.<minor>.<patch>`, as it declares it.
+   */
+  public readonly version: string;
+
+  /**
    * The name people see.
    */
   public readonly displayName: string;
@@ -1097,6 +1102,8 @@ export declare class ModuleStatus {
    * Creates the status.
    *
    * @param id The module's id; not whitespace only.
+   * @param version The module's version, `<major>.<minor>.<patch>`: three
+   * whole numbers of up to nine digits without leading zeros, such as `0.0.1`.
    * @param displayName The name people see; not whitespace only.
    * @param description What the module does; not whitespace only.
    * @param dependencies The ids of the modules it depends on.
@@ -1107,7 +1114,7 @@ export declare class ModuleStatus {
    * @param blockedBy For a blocked module, the dependency that blocks it;
    * otherwise `null`, the default.
    * @throws ArgumentException synchronously when the id, the display name or
-   * the description is blank, an active module has a cause, a failed or
+   * the description is blank, the version does not have that form, an active module has a cause, a failed or
    * blocked module has none or a blank one, or `blockedBy` is not one of the
    * dependencies of a blocked module.
    *
@@ -1116,12 +1123,13 @@ export declare class ModuleStatus {
    * import { ModuleState, ModuleStatus } from "@noldova/teamrun-shell-protocol";
    *
    * export const status: ModuleStatus = new ModuleStatus(
-   *   "notes", "Notes", "Keeps notes.", ["tasks"], new Map([["commands", ["notes.newNote"]]]), ModuleState.Blocked,
+   *   "notes", "0.0.1", "Notes", "Keeps notes.", ["tasks"], new Map([["commands", ["notes.newNote"]]]), ModuleState.Blocked,
    *   "It depends on tasks, which is not active.", "tasks");
    * ```
    */
   public constructor(
     id: string,
+    version: string,
     displayName: string,
     description: string,
     dependencies: readonly string[],
@@ -1145,7 +1153,7 @@ export declare class ModuleStatus {
    * import { ModuleStatus } from "@noldova/teamrun-shell-protocol";
    *
    * export const status: ModuleStatus = ModuleStatus.fromJson({
-   *   id: "notes", displayName: "Notes", description: "Keeps notes.", dependencies: [], contributes: {}, state: "Active"
+   *   id: "notes", version: "0.0.1", displayName: "Notes", description: "Keeps notes.", dependencies: [], contributes: {}, state: "Active"
    * });
    * ```
    */
@@ -1193,7 +1201,7 @@ export declare class ModuleStatus {
   /**
    * Returns the wire form.
    *
-   * @returns The `id`, `displayName`, `description`, `dependencies`,
+   * @returns The `id`, `version`, `displayName`, `description`, `dependencies`,
    * `contributes` and `state` fields, `cause` when there is one and
    * `blockedBy` when there is one.
    *
@@ -1202,7 +1210,7 @@ export declare class ModuleStatus {
    * import type { JsonObject } from "@noldova/teamrun-foundation-json";
    * import { ModuleState, ModuleStatus } from "@noldova/teamrun-shell-protocol";
    *
-   * export const json: JsonObject = new ModuleStatus("notes", "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null).toJson();
+   * export const json: JsonObject = new ModuleStatus("notes", "0.0.1", "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null).toJson();
    * ```
    */
   public toJson(): JsonObject;
@@ -1227,7 +1235,7 @@ export declare class ModuleStatusList {
    * ```ts
    * import { ModuleState, ModuleStatus, ModuleStatusList } from "@noldova/teamrun-shell-protocol";
    *
-   * export const list: ModuleStatusList = new ModuleStatusList([new ModuleStatus("notes", "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null)]);
+   * export const list: ModuleStatusList = new ModuleStatusList([new ModuleStatus("notes", "0.0.1", "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null)]);
    * ```
    */
   public constructor(modules: readonly ModuleStatus[]);
@@ -1246,7 +1254,7 @@ export declare class ModuleStatusList {
    * import { ModuleStatusList } from "@noldova/teamrun-shell-protocol";
    *
    * export const list: ModuleStatusList = ModuleStatusList.fromJson({
-   *   modules: [{ id: "notes", displayName: "Notes", description: "Keeps notes.", dependencies: [], contributes: {}, state: "Active" }]
+   *   modules: [{ id: "notes", version: "0.0.1", displayName: "Notes", description: "Keeps notes.", dependencies: [], contributes: {}, state: "Active" }]
    * });
    * ```
    */

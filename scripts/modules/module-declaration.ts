@@ -18,12 +18,13 @@ import ModuleSettings from "./module-settings.ts";
 export default class ModuleDeclaration {
   private static readonly FILE_NAME: string = "module.json";
   private static readonly ID_PATTERN: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+  private static readonly VERSION_PATTERN: RegExp = /^(?:0|[1-9]\d{0,8})\.(?:0|[1-9]\d{0,8})\.(?:0|[1-9]\d{0,8})$/;
   private static readonly MEMBER_PATTERN: RegExp = /^[a-z][a-zA-Z0-9]*$/;
   private static readonly RESERVED_ID: string = "shell";
   private static readonly KINDS: readonly string[] = [
     "methods", "events", "commands", "notifications", "views", "documents", "statusBarItems", "topBarActions", "menus", "themes", ModuleSettings.SETTINGS_KIND, ModuleSettings.SCOPES_KIND
   ];
-  private static readonly FIELDS: readonly string[] = ["id", "displayName", "description", "parts", "dependencies", "contributes"];
+  private static readonly FIELDS: readonly string[] = ["id", "version", "displayName", "description", "parts", "dependencies", "contributes"];
   private static readonly RUNTIME_PART: string = "runtime";
   private static readonly WINDOW_PART: string = "window";
   private static readonly WINDOW_ENTRY: string = "window/src/api/index";
@@ -33,6 +34,7 @@ export default class ModuleDeclaration {
 
   public readonly folder: string;
   public readonly id: string;
+  public readonly version: string;
   public readonly displayName: string;
   public readonly description: string;
   public readonly parts: readonly string[];
@@ -45,6 +47,7 @@ export default class ModuleDeclaration {
   private constructor(
     folder: string,
     id: string,
+    version: string,
     displayName: string,
     description: string,
     parts: readonly string[],
@@ -55,6 +58,7 @@ export default class ModuleDeclaration {
     isFixture: boolean) {
     this.folder = folder;
     this.id = id;
+    this.version = version;
     this.displayName = displayName;
     this.description = description;
     this.parts = parts;
@@ -89,6 +93,9 @@ export default class ModuleDeclaration {
     const id = record.get("id");
     if (typeof id !== "string" || id !== path.posix.basename(folder) || !ModuleDeclaration.ID_PATTERN.test(id) || id === ModuleDeclaration.RESERVED_ID)
       throw fail(`must have the id "${path.posix.basename(folder)}", its folder's name: lowercase kebab-case and not "${ModuleDeclaration.RESERVED_ID}"`);
+    const version = record.get("version");
+    if (typeof version !== "string" || !ModuleDeclaration.VERSION_PATTERN.test(version))
+      throw fail("must have a version of the form <major>.<minor>.<patch>: three whole numbers of up to nine digits without leading zeros, such as 0.0.1");
     const displayName = record.get("displayName");
     if (typeof displayName !== "string" || displayName.trim().length === 0)
       throw fail("must have a display name");
@@ -112,7 +119,7 @@ export default class ModuleDeclaration {
     }
     const menus = await ModuleMenus.readAsync(root, folder, id, contributions.get(ModuleDeclaration.MENUS_KIND) ?? []);
     const settings = await ModuleSettings.readAsync(root, folder, dependencies, contributions);
-    return new ModuleDeclaration(folder, id, displayName, description, parts, dependencies, contributions, menus, settings, isFixture);
+    return new ModuleDeclaration(folder, id, version, displayName, description, parts, dependencies, contributions, menus, settings, isFixture);
   }
 
   public get file(): string {
@@ -132,6 +139,7 @@ export default class ModuleDeclaration {
   public toJson(): IModuleDeclarationJson {
     return {
       id: this.id,
+      version: this.version,
       displayName: this.displayName,
       description: this.description,
       dependencies: [...this.dependencies],

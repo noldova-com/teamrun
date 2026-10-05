@@ -60,7 +60,7 @@ export class ProbeBuildFixture implements AsyncDisposable {
     await mkdir(modules, { recursive: true });
     const product = { ...JSON.parse(await readFile(ProductInfo.file, "utf8")), version: identity.productVersion, build: identity.fingerprint };
     await writeFile(path.join(folder, "_build", "product.json"), JSON.stringify(product));
-    const declaration = { id: "probe", displayName: "Probe", description: "Answers the command line tests.", dependencies: [], runtimePackage: pathToFileURL(probe).href, contributes: { commands: ["probe.echo", "probe.fail", "probe.wait"] } };
+    const declaration = { id: "probe", version: "0.0.1", displayName: "Probe", description: "Answers the command line tests.", dependencies: [], runtimePackage: pathToFileURL(probe).href, contributes: { commands: ["probe.echo", "probe.fail", "probe.wait"] } };
     const declarationsFile = path.join(modules, "declarations.json");
     await writeFile(declarationsFile, JSON.stringify({ formatVersion: 1, modules: [declaration] }));
     return new ProbeBuildFixture(folder, identity, path.join(copy, "services", "runtime-entry.js"), declarationsFile);

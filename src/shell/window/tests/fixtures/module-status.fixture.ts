@@ -15,7 +15,7 @@ import { Resources } from "../../src/resources";
 
 export class ModuleStatusFixture {
   public static create(id: string, displayName: string, notificationKinds: readonly string[] = []): ModuleStatus {
-    return new ModuleStatus(id, displayName, `${displayName} for the specs.`, [], new Map([[Resources.notificationsKind, notificationKinds]]), ModuleState.Active, null);
+    return new ModuleStatus(id, "0.0.1", displayName, `${displayName} for the specs.`, [], new Map([[Resources.notificationsKind, notificationKinds]]), ModuleState.Active, null);
   }
 
   public static report(...modules: readonly ModuleStatus[]): void {
