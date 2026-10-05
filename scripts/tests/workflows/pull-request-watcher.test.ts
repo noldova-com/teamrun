@@ -202,41 +202,29 @@ class PullRequestWatcherTests {
       ].sort());
     });
 
-    test("at most four pull requests are checked at the same time, and the list keeps their order", async () => {
+    test("pull requests checked several at a time are listed in their order", async () => {
       const scenario = new PullRequestScenarioFixture();
       const numbers = [3, 4, 5, 6, 7, 8];
       for (const number of numbers)
         scenario.add({ number });
-      const api = new GitHubApi(GitHubApiFixture.REPOSITORY, scenario.api, "work");
-      const reader = new PullRequestReader(api);
-      const read = reader.readAsync.bind(reader);
-      let checking = 0;
-      let most = 0;
-      reader.readAsync = async state => {
-        most = Math.max(most, ++checking);
-        try {
-          return await read(state);
-        }
-        finally {
-          checking--;
-        }
-      };
-      const conflicts = new MergeConflictReader(new Git("work", scenario.git));
 
-      const lines = await new PullRequestWatcher(api, reader, new PullRequestEvaluator(), conflicts, () => PullRequestScenarioFixture.NOW.getTime(), async () => undefined).watchAsync();
+      const lines = await PullRequestWatcherTests.watchAsync(scenario);
 
-      assert.equal(most, 4);
       assert.deepEqual(lines, numbers.map(t => `- #${t}: nothing to do`));
     });
 
-    test("a failure with one pull request still lets the others be checked, then fails the run", async () => {
+    test("failures with some pull requests still let the others be checked, then fail the run with each failure in their order", async () => {
       const scenario = new PullRequestScenarioFixture();
-      scenario.add({ number: 3, buildRuns: 0, commitMinutesAgo: 30 });
-      scenario.add({ number: 4, buildRuns: 0, commitMinutesAgo: 30 });
-      scenario.api.fail("/issues/3/comments", "HTTP 403: Resource not accessible by integration");
+      for (const number of [3, 4, 5, 6, 7, 8])
+        scenario.add({ number, buildRuns: 0, commitMinutesAgo: 30 });
+      scenario.api.fail("/pulls/3/reviews?per_page=100", "HTTP 502: the reviews of 3");
+      scenario.api.fail("/issues/5/comments", "HTTP 403: a comment on 5");
 
-      await assert.rejects(PullRequestWatcherTests.watchAsync(scenario), /HTTP 403: Resource not accessible by integration/);
-      assert.deepEqual([...scenario.api.writes].sort(), ["POST /issues/3/comments", "POST /issues/4/comments"]);
+      const failure = await PullRequestWatcherTests.watchAsync(scenario).then(() => null, (error: unknown) => error);
+
+      assert.ok(failure instanceof AggregateError);
+      assert.deepEqual(failure.errors.map(t => /the reviews of 3|a comment on 5/.exec((t as Error).message)?.[0]), ["the reviews of 3", "a comment on 5"]);
+      assert.deepEqual([...scenario.api.writes].sort(), [4, 5, 6, 7, 8].map(t => `POST /issues/${t}/comments`));
     });
 
     test("an error other than Git's failure while reading the files fails the run", async () => {

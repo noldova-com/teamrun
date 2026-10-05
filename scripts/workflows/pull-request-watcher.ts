@@ -15,6 +15,7 @@ import type OpenPullRequest from "./open-pull-request.ts";
 import type PullRequestEvaluator from "./pull-request-evaluator.ts";
 import PullRequestFinding from "./pull-request-finding.ts";
 import PullRequestNote from "./pull-request-note.ts";
+import PullRequestPool from "./pull-request-pool.ts";
 import type PullRequestSnapshot from "./pull-request-snapshot.ts";
 import PullRequestState from "./pull-request-state.ts";
 import type PullRequestReader from "./pull-request.reader.ts";
@@ -36,6 +37,7 @@ export default class PullRequestWatcher {
   private readonly conflicts: MergeConflictReader;
   private readonly clock: () => number;
   private readonly wait: IWait;
+  private readonly pool: PullRequestPool = new PullRequestPool(PullRequestWatcher.PARALLEL_PULL_REQUESTS);
 
   public constructor(api: GitHubApi, reader: PullRequestReader, evaluator: PullRequestEvaluator, conflicts: MergeConflictReader, clock: () => number, wait: IWait) {
     this.api = api;
@@ -50,7 +52,7 @@ export default class PullRequestWatcher {
     const repository = await this.reader.readRepositoryAsync();
     const now = new Date(this.clock());
     const pulls = await this.readStatesAsync(repository, await this.reader.listOpenAsync());
-    const lines = await PullRequestWatcher.mapAsync(pulls, async t => typeof t === "string" ? t : await this.watchPullRequestAsync(repository, t, now));
+    const lines = await this.pool.mapAsync(pulls, async t => typeof t === "string" ? t : await this.watchPullRequestAsync(repository, t, now));
     return lines.length === 0 ? [PullRequestWatcher.NO_PULL_REQUESTS] : lines;
   }
 
@@ -65,32 +67,12 @@ export default class PullRequestWatcher {
   }
 
   private async readStatesAsync(repository: WatchedRepository, opens: readonly OpenPullRequest[]): Promise<readonly (string | PullRequestState)[]> {
-    let pulls = await PullRequestWatcher.mapAsync(opens, async t => PullRequestWatcher.describeSkip(repository, t) ?? await this.reader.readStateAsync(t.number));
+    let pulls = await this.pool.mapAsync(opens, async t => PullRequestWatcher.describeSkip(repository, t) ?? await this.reader.readStateAsync(t.number));
     for (let read = 1; read < PullRequestWatcher.MERGE_STATE_READS && pulls.some(t => PullRequestWatcher.isWaiting(t)); read++) {
       await this.wait(PullRequestWatcher.MERGE_STATE_INTERVAL);
-      pulls = await PullRequestWatcher.mapAsync(pulls, async t => PullRequestWatcher.isWaiting(t) ? await this.reader.readStateAsync(t.number) : t);
+      pulls = await this.pool.mapAsync(pulls, async t => PullRequestWatcher.isWaiting(t) ? await this.reader.readStateAsync(t.number) : t);
     }
     return pulls;
-  }
-
-  private static async mapAsync<T, TResult>(items: readonly T[], work: (item: T) => Promise<TResult>): Promise<readonly TResult[]> {
-    const results: TResult[] = [];
-    const failures: unknown[] = [];
-    const entries = items.entries();
-    const workAsync = async (): Promise<void> => {
-      for (const [index, item] of entries) {
-        try {
-          results[index] = await work(item);
-        }
-        catch (error) {
-          failures.push(error);
-        }
-      }
-    };
-    await Promise.all(Array.from({ length: PullRequestWatcher.PARALLEL_PULL_REQUESTS }, workAsync));
-    if (failures.length > 0)
-      throw failures[0];
-    return results;
   }
 
   private async watchPullRequestAsync(repository: WatchedRepository, state: PullRequestState, now: Date): Promise<string> {
