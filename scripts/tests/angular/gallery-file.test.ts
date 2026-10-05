@@ -28,7 +28,7 @@ class GalleryFileTests {
   ].join("\n");
 
   public static register(): void {
-    test("a development build's gallery file brings the kit's Gallery into the window", async t => {
+    test("a development build's gallery file brings the kit's Gallery into the window through its development entry", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       const file = new GalleryFile(repository.directory);
@@ -38,7 +38,7 @@ class GalleryFileTests {
       assert.equal(file.file, path.join(repository.directory, "src", "generated", "gallery.ts"));
       assert.equal(await readFile(file.file, "utf8"), [
         GalleryFileTests.LICENSE,
-        "import { GalleryComponent } from \"@noldova/teamrun-shell-ui\";",
+        "import { GalleryComponent } from \"@noldova/teamrun-shell-ui/gallery\";",
         "import type { Type } from \"@angular/core\";",
         "",
         "export const gallery: Type<unknown> | null = GalleryComponent;",
@@ -56,7 +56,7 @@ class GalleryFileTests {
       await file.writeAsync(false);
 
       assert.deepEqual([packaged, await file.isPackagedAsync()], [true, false]);
-      assert.deepEqual(GalleryFile.MARKERS, ["tr-gallery-scope-frame", "tr-gallery-forms", "Show the keyboard focus"]);
+      assert.deepEqual(GalleryFile.MARKERS, ["tr-gallery-scope-frame", "tr-gallery-forms", "Plate, center chosen", "\"data-tr-state\""]);
     });
 
     test("every marker the packaged check looks for occurs in the Gallery's own source, so renaming it cannot make the check pass on nothing", async () => {

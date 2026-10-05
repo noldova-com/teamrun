@@ -22,6 +22,7 @@ import { RuntimeRequestException } from "../exceptions/runtime-request.exception
 import { WindowPartFailureException } from "../exceptions/window-part-failure.exception";
 import type { IWindowPart } from "../interfaces/i-window-part";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
+import { BuildTokens } from "../models/build-tokens";
 import { CommandContribution } from "../models/command-contribution";
 import { ContributionMatch } from "../models/contribution-match";
 import type { DocumentContribution } from "../models/document-contribution";
@@ -41,7 +42,6 @@ import type { ViewContribution } from "../models/view-contribution";
 import { WindowPartActivation } from "../models/window-part-activation";
 import { WindowPartContext } from "../models/window-part-context";
 import type { WindowPartSource } from "../models/window-part-source";
-import { WindowPartTokens } from "../models/window-part-tokens";
 import { Resources } from "../../resources";
 import { BarItemsService } from "./bar-items.service";
 import { CommandService } from "./command.service";
@@ -67,7 +67,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly settings: SettingsService = inject(SettingsService);
   private readonly viewDialogs: ViewDialogService = inject(ViewDialogService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
-  private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
+  private readonly sources: readonly WindowPartSource[] = inject(BuildTokens.sources);
   private readonly activations: WindowPartActivation[] = [];
   private readonly posting: Set<Promise<JsonValue>> = new Set();
   private startOpens: PendingDocument[] = [];

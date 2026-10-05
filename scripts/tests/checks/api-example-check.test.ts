@@ -7,12 +7,11 @@
  */
 
 import assert from "node:assert/strict";
+import path from "node:path";
 import { test, type TestContext } from "node:test";
 
 import ApiServer from "../../api/api-server.ts";
 import ApiExampleCheck from "../../checks/api-example-check.ts";
-import BuildLayout from "../../packages/build-layout.ts";
-import PackageCatalog from "../../packages/package-catalog.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
 import ApiPackageFixture from "../fixtures/api-package.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
@@ -168,6 +167,51 @@ class ApiExampleCheckTests {
       assert.equal(output, "src/foundation/counter:\n  An @example of double must start with a ```ts code block on its next line.\n");
     });
 
+    test("an Angular part's examples compile against its declarations in source and the source project's dependencies", async t => {
+      const example = [
+        "import { double } from \"@noldova/teamrun-shell-counter\";",
+        "import type { Length } from \"@noldova/teamrun-fixture-units/lengths\";",
+        "",
+        "export const length: Length = double(2);"
+      ];
+
+      assert.equal(await ApiExampleCheckTests.runPartAsync(t, example, true), "src/shell/counter: every example compiles\n");
+    });
+
+    test("an Angular part's example that does not compile fails with its owner, number and line, though the examples compile under node_modules", async t => {
+      const example = [
+        "import { double } from \"@noldova/teamrun-shell-counter\";",
+        "",
+        "export const text: string = double(2);"
+      ];
+
+      const output = await ApiExampleCheckTests.runPartAsync(t, example, false);
+
+      assert.ok(output.startsWith("src/shell/counter:\n  the compiler exited with code 1\n"), output);
+      assert.ok(output.includes("  double example 1, line 3: error TS2322: "), output);
+    });
+
+    test("an Angular part without declarations fails and names the missing file", async t => {
+      const fixture = await ApiPackageFixture.createAsync();
+      t.after(() => fixture.disposeAsync());
+      await fixture.writePartAsync("src/shell/counter", ApiExampleCheckTests.IMPLEMENTATION, null);
+      const output = new TextOutputFixture();
+
+      assert.equal(await ApiExampleCheckTests.createCheck(fixture, ["src/shell/counter"]).runAsync(output), false);
+      assert.equal(output.text, `src/shell/counter:\n  no declarations at ${path.join(fixture.directory, "src/shell/counter/src/api/index.d.ts")}\n`);
+    });
+
+    test("a listed Angular part that no path alias leads to fails the check with the reason", async t => {
+      const fixture = await ApiPackageFixture.createAsync();
+      t.after(() => fixture.disposeAsync());
+      await fixture.writeFilesAsync({ "src/tsconfig.json": JSON.stringify({ compilerOptions: { paths: {} } }) });
+      const output = new TextOutputFixture();
+
+      assert.equal(await ApiExampleCheckTests.createCheck(fixture, ["src/shell/counter"]).runAsync(output), false);
+      assert.equal(output.text,
+        "No path alias in src/tsconfig.json leads to src/shell/counter/src/api/index.ts, so the examples of src/shell/counter cannot be compiled against its declarations.\n");
+    });
+
     test("a package without installed declarations fails and asks for a build", async t => {
       const fixture = await ApiPackageFixture.createAsync();
       t.after(() => fixture.disposeAsync());
@@ -179,9 +223,9 @@ class ApiExampleCheckTests {
     });
   }
 
-  private static createCheck(fixture: ApiPackageFixture): ApiExampleCheck {
-    return new ApiExampleCheck(fixture.directory, new PackageCatalog(fixture.directory), new BuildLayout(fixture.directory), new ProcessRunner(), [ApiServer.locateCompiler()],
-      ApiExampleCheckTests.TIMEOUT);
+  private static createCheck(fixture: ApiPackageFixture, parts: readonly string[] = []): ApiExampleCheck {
+    return new ApiExampleCheck(fixture.directory, fixture.createCatalog(parts), new ProcessRunner(),
+      [ApiServer.locateCompiler()], ApiExampleCheckTests.TIMEOUT);
   }
 
   private static async runAsync(context: TestContext, declarations: string, expected: boolean): Promise<string> {
@@ -191,6 +235,32 @@ class ApiExampleCheckTests {
     const output = new TextOutputFixture();
 
     assert.equal(await ApiExampleCheckTests.createCheck(fixture).runAsync(output), expected, output.text);
+    return output.text;
+  }
+
+  private static async runPartAsync(context: TestContext, example: readonly string[], expected: boolean): Promise<string> {
+    const fixture = await ApiPackageFixture.createAsync();
+    context.after(() => fixture.disposeAsync());
+    const declarations = [
+      "/**",
+      " * Doubles a length.",
+      " *",
+      " * @example",
+      " * ```ts",
+      ...example.map(t => t === "" ? " *" : ` * ${t}`),
+      " * ```",
+      " */",
+      "export declare function double(value: number): number;",
+      ""
+    ].join("\n");
+    await fixture.writePartAsync("src/shell/counter", { "api/index.ts": "export const unused: number = 0;\n" }, declarations);
+    await fixture.writeFilesAsync({
+      "src/node_modules/@noldova/teamrun-fixture-units/package.json": JSON.stringify({ name: "@noldova/teamrun-fixture-units", exports: { "./lengths": { types: "./types/lengths.d.ts" } } }),
+      "src/node_modules/@noldova/teamrun-fixture-units/types/lengths.d.ts": "export type Length = number;\n"
+    });
+    const output = new TextOutputFixture();
+
+    assert.equal(await ApiExampleCheckTests.createCheck(fixture, ["src/shell/counter"]).runAsync(output), expected, output.text);
     return output.text;
   }
 }

@@ -18,6 +18,7 @@ import { NotificationService } from "../../../../src/app/services/notification.s
 import { ToastService } from "../../../../src/app/services/toast.service";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { ModuleStatusFixture } from "../../../fixtures/module-status.fixture";
+import { TooltipFixture } from "../../../fixtures/tooltip.fixture";
 
 class FakeNotificationService {
   public readonly calls: string[] = [];
@@ -34,16 +35,6 @@ class FakeNotificationService {
     this.calls.push(`run ${command.name.text}`);
     return this.failure === null ? Promise.resolve(null) : Promise.reject(this.failure);
   }
-}
-
-
-async function expectTooltipAsync(button: HTMLElement | null | undefined, text: string): Promise<void> {
-  const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === text);
-  button?.dispatchEvent(new PointerEvent("pointerenter"));
-  await vi.waitFor(() => expect(tooltip()).toBeDefined());
-  button?.dispatchEvent(new PointerEvent("pointerleave"));
-  await vi.waitFor(() => expect(tooltip()).toBeUndefined());
-  expect(button?.hasAttribute("title")).toBe(false);
 }
 
 @Component({
@@ -111,7 +102,7 @@ describe("ToastsComponent", () => {
     expect(second?.querySelector("span.tr-toast-title")?.textContent).toBe("Title 1");
     expect(second?.querySelector("tr-progress")?.hasAttribute("aria-valuenow")).toBe(false);
     expect(second?.querySelector(".tr-toast-close")?.getAttribute("aria-label")).toBe("Close");
-    await expectTooltipAsync(second?.querySelector<HTMLElement>(".tr-toast-close"), "Close");
+    await TooltipFixture.expectTooltipAsync(second?.querySelector<HTMLElement>(".tr-toast-close") as HTMLElement, "Close");
     await vi.waitFor(() => expect([announced()?.getAttribute("aria-live"), announced()?.textContent]).toEqual(["assertive", "Title 1. Title 2. The disk is full."]));
   });
 

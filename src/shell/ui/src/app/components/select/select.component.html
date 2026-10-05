@@ -12,7 +12,7 @@ LICENSE file in the root directory of this source tree.
   <span class="tr-select-arrow material-symbols-rounded" aria-hidden="true">{{ resources.selectGlyph }}</span>
 </button>
 <ng-template #list>
-  <div class="tr-select-list tr-scroll-reveal" cdkListbox [cdkListboxValue]="marked()" [attr.aria-label]="label()" [style.min-width.px]="button.offsetWidth"
+  <div class="tr-select-list" cdkListbox [cdkListboxValue]="marked()" [attr.aria-label]="label()" [style.min-width.px]="button.offsetWidth"
     (cdkListboxValueChange)="choose($event, button)" (keydown)="chooseAgain($event, button)">
     @for (option of options(); track option.value) {
       <div class="tr-select-option" [cdkOption]="option.value" [attr.data-value]="option.value" (click)="closeOnCurrent(option.value, button)">{{ option.title }}</div>

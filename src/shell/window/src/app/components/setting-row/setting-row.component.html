@@ -17,7 +17,7 @@ LICENSE file in the root directory of this source tree.
     </button>
   }
 </div>
-<div class="tr-setting-row-name"><tr-highlighted-text [text]="definition().name.text" [query]="query()" /></div>
+<div class="tr-setting-row-name"><tr-highlighted-text [text]="definition().name.text" [query]="query()" [breaksWords]="true" /></div>
 @if (definition().type.kind !== kinds.Boolean) {
   <div class="tr-setting-row-description"><tr-highlighted-text [text]="definition().description" [query]="query()" /></div>
 }

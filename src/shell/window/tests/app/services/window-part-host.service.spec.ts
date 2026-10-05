@@ -21,6 +21,7 @@ import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtim
 import { WindowPartFailureException } from "../../../src/app/exceptions/window-part-failure.exception";
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
+import { BuildTokens } from "../../../src/app/models/build-tokens";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { DocumentContribution } from "../../../src/app/models/document-contribution";
 import { DocumentTab } from "../../../src/app/models/layout/document-tab";
@@ -38,7 +39,6 @@ import { TopBarActionState } from "../../../src/app/models/top-bar-action-state"
 import { ViewBadge } from "../../../src/app/models/view-badge";
 import { ViewContribution } from "../../../src/app/models/view-contribution";
 import { WindowPartSource } from "../../../src/app/models/window-part-source";
-import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { BarItemsService } from "../../../src/app/services/bar-items.service";
 import { CommandService } from "../../../src/app/services/command.service";
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
@@ -97,7 +97,7 @@ describe("WindowPartHostService", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } },
-        { provide: WindowPartTokens.sources, useValue: sources }
+        { provide: BuildTokens.sources, useValue: sources }
       ]
     });
     const layout = TestBed.inject(LayoutService);

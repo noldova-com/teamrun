@@ -30,6 +30,19 @@ class ApiProjectTests {
         files: ["a.ts", "b.ts"]
       });
     });
+
+    test("a project given path aliases maps them in place of its base project's", async t => {
+      const fixture = await ApiPackageFixture.createAsync();
+      t.after(() => fixture.disposeAsync());
+      const project = new ApiProject(fixture.directory, "api-examples", "shell-window");
+      await project.writeAsync("base.json", fixture.directory, ["a.ts"], { "@noldova/teamrun-shell-window": ["index.d.ts"], "*": ["node_modules/*"] });
+
+      assert.deepEqual(JSON.parse(await readFile(project.file, "utf8")), {
+        extends: "base.json",
+        compilerOptions: { noEmit: true, rootDir: fixture.directory, paths: { "@noldova/teamrun-shell-window": ["index.d.ts"], "*": ["node_modules/*"] } },
+        files: ["a.ts"]
+      });
+    });
   }
 }
 

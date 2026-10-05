@@ -12,6 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 
 import { MenuCheck } from "../enums/menu-check";
+import { BuildTokens } from "../models/build-tokens";
 import { CommandRow } from "../models/command-row";
 import type { MenuDeclarations } from "../models/menu-declarations";
 import type { MenuGroup } from "../models/menu-group";
@@ -19,7 +20,6 @@ import type { MenuItem } from "../models/menu-item";
 import type { MenuPlace } from "../models/menu-place";
 import { MenuSection } from "../models/menu-section";
 import { SubmenuRow } from "../models/submenu-row";
-import { WindowPartTokens } from "../models/window-part-tokens";
 import { ShellMenus } from "../models/shell-menus";
 import { CommandService } from "./command.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
@@ -28,7 +28,7 @@ import { DesktopBridgeService } from "./desktop-bridge.service";
 export class MenuService {
   private readonly commands: CommandService = inject(CommandService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
-  private readonly declarations: readonly MenuDeclarations[] = inject(WindowPartTokens.menus);
+  private readonly declarations: readonly MenuDeclarations[] = inject(BuildTokens.menus);
   private readonly activeValue: WritableSignal<readonly string[]> = signal([]);
   private readonly providers: WritableSignal<ReadonlyMap<string, (context: JsonObject) => readonly MenuItem[]>> = signal(new Map());
   private readonly shell: MenuDeclarations = ShellMenus.of(inject(DesktopBridgeService).isMac);

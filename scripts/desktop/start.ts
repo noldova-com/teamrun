@@ -15,7 +15,7 @@ import DevelopmentBinary from "./development-binary.ts";
 import SandboxHelper from "./sandbox-helper.ts";
 
 export default class Start {
-  private static readonly MAIN_SEGMENTS: readonly string[] = ["node_modules", "@noldova", "teamrun-shell-desktop", "main.js"];
+  public static readonly MAIN_SEGMENTS: readonly string[] = ["node_modules", "@noldova", "teamrun-shell-desktop", "main.js"];
   private static readonly RUN_AS_NODE_VARIABLE: string = "ELECTRON_RUN_AS_NODE";
   private static readonly FAILURE_EXIT_CODE: number = 1;
 

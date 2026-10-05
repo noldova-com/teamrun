@@ -32,9 +32,9 @@ export class CliOutputTests {
     const noneJson = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.echo", "--json"]));
 
     Assert.areEqual(0, commands.code);
-    Assert.areEqual(`probe.echo  Echo\nprobe.fail  Fail\nprobe.wait  Wait\n\n${CliOutputTests.NOTE}\n`, commands.output);
+    Assert.areEqual(`probe.block  Block\nprobe.echo   Echo\nprobe.fail   Fail\nprobe.wait   Wait\n\n${CliOutputTests.NOTE}\n`, commands.output);
     Assert.areEqual(
-      JSON.stringify({ commands: [{ name: "probe.echo", title: "Echo", module: "probe" }, { name: "probe.fail", title: "Fail", module: "probe" }, { name: "probe.wait", title: "Wait", module: "probe" }] }),
+      JSON.stringify({ commands: [{ name: "probe.block", title: "Block", module: "probe" }, { name: "probe.echo", title: "Echo", module: "probe" }, { name: "probe.fail", title: "Fail", module: "probe" }, { name: "probe.wait", title: "Wait", module: "probe" }] }),
       commandsJson.output.trim());
     Assert.areEqual("{\n  \"a\": 1\n}\n", result.output);
     Assert.areEqual("{\"a\":1}\n", resultJson.output);

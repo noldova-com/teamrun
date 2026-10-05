@@ -215,6 +215,7 @@ export class FixtureTheme {
     ["setting-marker", "0.75rem"],
     ["tree-row-height", "1.875rem"],
     ["tree-indent", "2rem"],
+    ["section-header-height", "2.25rem"],
     ["content-padding-inline", "calc(var(--tr-pill-padding) + var(--tr-tab-inset) * 3)"],
     ["document-padding-block", "1.25rem"],
     ["view-padding-block", "0.75rem"],
@@ -229,7 +230,7 @@ export class FixtureTheme {
     ["settings-item-description-gap", "0.25rem"],
     ["settings-item-control-gap", "0.75rem"],
     ["settings-heading-space", "0.75rem"],
-    ["settings-heading-inset", "1.125rem"]
+    ["settings-content-inset", "1.125rem"]
   ]);
   private static readonly SHAPES: ReadonlyMap<string, string> = new Map([["tab", "pill"]]);
 

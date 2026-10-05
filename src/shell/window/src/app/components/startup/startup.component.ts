@@ -20,10 +20,7 @@ import { Resources } from "../../../resources";
   imports: [ButtonComponent],
   templateUrl: "./startup.component.html",
   styleUrl: "./startup.component.scss",
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    "class": "tr-scroll-reveal"
-  }
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StartupComponent {
   private readonly startup: StartupService = inject(StartupService);

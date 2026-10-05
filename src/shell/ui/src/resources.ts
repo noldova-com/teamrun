@@ -164,6 +164,7 @@ export class Resources {
     "setting-marker",
     "tree-row-height",
     "tree-indent",
+    "section-header-height",
     "content-padding-inline",
     "document-padding-block",
     "view-padding-block",
@@ -178,7 +179,7 @@ export class Resources {
     "settings-item-description-gap",
     "settings-item-control-gap",
     "settings-heading-space",
-    "settings-heading-inset"
+    "settings-content-inset"
   ];
   public static readonly shapes: ReadonlyMap<string, readonly string[]> = new Map([["tab", ["pill"]]]);
   public static readonly defaultThemeId: string = "shell.default";
@@ -187,6 +188,7 @@ export class Resources {
   public static readonly lightScheme: string = "light";
   public static readonly darkScheme: string = "dark";
   public static readonly darkSchemeQuery: string = "(prefers-color-scheme: dark)";
+  public static readonly sectionHeaderLevel: number = 3;
   public static readonly changeEvent: "change" = "change";
   public static readonly defaultRootSize: number = 16;
   public static readonly defaultPanelSize: number = 13;

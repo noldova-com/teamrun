@@ -8,7 +8,6 @@
 
 :host {
   display: block;
-  padding-inline: var(--tr-settings-heading-inset);
 }
 
 .tr-shortcuts-header {
@@ -64,10 +63,18 @@
 }
 
 .tr-shortcut-title {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--tr-space-2);
   min-height: var(--tr-button-height);
+}
+
+.tr-shortcut-name {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--tr-text-muted);
+  font-size: var(--tr-text-label);
+  line-height: var(--tr-line-label);
 }
 
 .tr-shortcut-marker {

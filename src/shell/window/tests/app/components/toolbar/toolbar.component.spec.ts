@@ -11,17 +11,18 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import { ToolbarComponent } from "../../../../src/app/components/toolbar/toolbar.component";
 import { MenuCheck } from "../../../../src/app/enums/menu-check";
+import { BuildTokens } from "../../../../src/app/models/build-tokens";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { CommandRow } from "../../../../src/app/models/command-row";
 import { MenuDeclarations } from "../../../../src/app/models/menu-declarations";
 import { MenuSection } from "../../../../src/app/models/menu-section";
 import { SubmenuRow } from "../../../../src/app/models/submenu-row";
 import { Toolbar } from "../../../../src/app/models/toolbar";
-import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { MenuService } from "../../../../src/app/services/menu.service";
 import { ToolbarDragService } from "../../../../src/app/services/toolbar-drag.service";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
+import { TooltipFixture } from "../../../fixtures/tooltip.fixture";
 
 @Component({
   imports: [ToolbarComponent],
@@ -69,7 +70,7 @@ describe("ToolbarComponent", () => {
           }
         },
         {
-          provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
+          provide: BuildTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
             places: [{ name: "notes.templates", title: "Templates", shows: "menu" }],
             groups: [{ name: "notes.fromTemplate", place: "notes.templates", exclusive: false, items: [{ command: "notes.newNote", arguments: {} }] }]
           })]
@@ -159,14 +160,8 @@ describe("ToolbarComponent", () => {
     await showAsync(1000);
     const submenu = items()[3] as HTMLButtonElement;
     submenu.style.display = "inline-flex";
-    const tooltip = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>(".cdk-overlay-container tr-tooltip")].find(t => t.textContent?.trim() === "Templates");
 
-    submenu.dispatchEvent(new PointerEvent("pointerenter"));
-    await vi.waitFor(() => expect(tooltip()).toBeDefined());
-
-    expect(tooltip()?.getBoundingClientRect().top).toBeGreaterThanOrEqual(submenu.getBoundingClientRect().bottom);
-    submenu.dispatchEvent(new PointerEvent("pointerleave"));
-    await vi.waitFor(() => expect(tooltip()).toBeUndefined());
+    await TooltipFixture.expectTooltipAsync(submenu, "Templates", t => expect(t.getBoundingClientRect().top).toBeGreaterThanOrEqual(submenu.getBoundingClientRect().bottom));
   });
 
   it("moves the sections that do not fit into a menu behind a More actions item", async () => {

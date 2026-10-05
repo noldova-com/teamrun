@@ -13,10 +13,10 @@ import { JsonReader } from "@noldova/teamrun-foundation-json";
 import { MenuTriggerDirective } from "@noldova/teamrun-shell-ui";
 
 import { PlaceMenuComponent } from "../../../../src/app/components/place-menu/place-menu.component";
+import { BuildTokens } from "../../../../src/app/models/build-tokens";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { MenuDeclarations } from "../../../../src/app/models/menu-declarations";
 import type { MenuSection } from "../../../../src/app/models/menu-section";
-import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { MenuService } from "../../../../src/app/services/menu.service";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
@@ -59,7 +59,7 @@ describe("PlaceMenuComponent", () => {
           }
         },
         {
-          provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
+          provide: BuildTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
             places: [{ name: "notes.listItem", title: "Note", shows: "menu" }, { name: "notes.templates", title: "New from template", shows: "menu" }],
             groups: [
               { name: "notes.open", place: "notes.listItem", exclusive: false, items: [{ command: "notes.openNote", arguments: {} }, { submenu: "notes.templates" }] },
