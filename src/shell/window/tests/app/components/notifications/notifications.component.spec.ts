@@ -11,6 +11,7 @@ import { userEvent } from "vitest/browser";
 import { NotificationState } from "@noldova/teamrun-shell-protocol";
 
 import { NotificationsFixture } from "../../../fixtures/notifications.fixture";
+import { TooltipFixture } from "../../../fixtures/tooltip.fixture";
 
 describe("NotificationsComponent", () => {
   let service: NotificationsFixture;
@@ -32,7 +33,7 @@ describe("NotificationsComponent", () => {
     expect(empty).toEqual(["notifications", "Notifications"]);
     expect([NotificationsFixture.findItem(fixture).querySelector(".tr-notifications-icon")?.textContent, NotificationsFixture.findItem(fixture).querySelector(".tr-notifications-count")?.textContent]).toEqual(["notifications_off", "9+"]);
     expect(quietLabel()).toBe("Notifications, 12 unread, Do not disturb");
-    await NotificationsFixture.expectTooltipAsync(NotificationsFixture.findItem(fixture), "Notifications, 12 unread, Do not disturb");
+    await TooltipFixture.expectTooltipAsync(NotificationsFixture.findItem(fixture), "Notifications, 12 unread, Do not disturb");
   });
 
   it("opens its list, marking everything read only when something is unread, and closes on a second click, Escape and a click outside", async () => {
