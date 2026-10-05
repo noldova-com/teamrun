@@ -21,7 +21,7 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: true,
   reporter: [
-    ["list"],
+    ["list", { printFailuresInline: true }],
     ["html", { outputFolder: "../../../../../_build/ui/report", open: "never" }],
     ["json", { outputFile: "../../../../../_build/ui/report.json" }]
   ]
