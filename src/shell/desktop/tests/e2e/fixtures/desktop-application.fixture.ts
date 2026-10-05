@@ -21,6 +21,7 @@ import { DataDirectory, DiscoveryReader, Endpoint, OwnershipLock, RuntimeBuild, 
 import CleanupSteps from "./cleanup-steps.ts";
 import DesktopLogFixture from "./desktop-log.fixture.ts";
 import ErrorOutputClassifier from "./error-output.classifier.ts";
+import MainProcessAnswer, { type MainProcessAnswerRecord } from "./main-process-answer.ts";
 import OffCursorPlacement from "./off-cursor-placement.ts";
 import ProcessListFixture from "./process-list.fixture.ts";
 import ProcessorLoadFixture from "./processor-load.fixture.ts";
@@ -29,11 +30,6 @@ interface MainProcessSilence {
   readonly action: string;
   readonly since: number;
   readonly processorMilliseconds: number | null;
-}
-
-interface MainProcessAnswer {
-  readonly action: string;
-  readonly at: number;
 }
 
 interface IActiveSocket {
@@ -95,7 +91,7 @@ export default class DesktopApplicationFixture {
   private placement: string = "The window had not been moved off the cursor.";
   private isPageUnreachable: boolean = false;
   private silence: MainProcessSilence | null = null;
-  private lastAnswer: MainProcessAnswer | null = null;
+  private lastAnswer: MainProcessAnswerRecord | null = null;
   private mainProcessId: number | null = null;
 
   public readonly failures: string[] = [];
@@ -433,21 +429,15 @@ export default class DesktopApplicationFixture {
     }), limit);
     if (answer !== DesktopApplicationFixture.NO_ANSWER)
       return answer;
+    const lastAnswer = MainProcessAnswer.describeLast(this.lastAnswer, asked);
     const processorMilliseconds = await this.readProcessorMillisecondsAsync();
     this.silence = { action, since: asked, processorMilliseconds };
     throw new Error([
       `The main process did not answer within ${limit / 1000} s when asked to ${action}.`,
-      DesktopApplicationFixture.describeLastAnswer(this.lastAnswer, asked),
+      lastAnswer,
       await DesktopLogFixture.describeMainProcessFailuresAsync(new DataDirectory(this.dataDirectory).desktopLog),
       this.placement
     ].join("\n"));
-  }
-
-  private static describeLastAnswer(last: MainProcessAnswer | null, asked: number): string {
-    if (last === null)
-      return "It had answered none of the harness's own calls before; the workflow's own calls are not counted.";
-    const gap = last.at <= asked ? `${asked - last.at} ms before` : `${last.at - asked} ms after`;
-    return `The last of the harness's own calls it answered was to ${last.action}, ${gap} this one was asked; the workflow's own calls are not counted.`;
   }
 
   private async readProcessorMillisecondsAsync(): Promise<number | null> {
