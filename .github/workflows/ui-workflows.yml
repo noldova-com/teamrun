@@ -60,6 +60,7 @@ jobs:
           path: ui-build.tar
           retention-days: 3
           if-no-files-found: error
+          overwrite: true
 
       - name: Wait before keeping the builds again
         if: steps.keep.outcome == 'failure'
@@ -174,10 +175,11 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}
+          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}
           path: _build/ui
           retention-days: 14
           if-no-files-found: ignore
+          overwrite: true
 
       - name: Wait before keeping the UI workflow results again
         if: always() && steps.ui.outcome != 'skipped' && steps.results.outcome == 'failure'
@@ -189,7 +191,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}
+          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}
           path: _build/ui
           retention-days: 14
           if-no-files-found: ignore
@@ -205,7 +207,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}
+          name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}
           path: _build/ui
           retention-days: 14
           if-no-files-found: ignore
@@ -226,6 +228,7 @@ jobs:
           archive: false
           retention-days: 14
           if-no-files-found: ignore
+          overwrite: true
 
       - name: Wait before keeping the main window screenshot again
         if: always() && steps.ui.outcome != 'skipped' && steps.screenshot.outcome == 'failure'

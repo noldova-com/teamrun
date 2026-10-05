@@ -129,8 +129,8 @@ class NightlyWorkflowTests {
       assert.ok(workflow.text.includes("          NIGHTLY_LABEL: ${{ matrix.label }}\n          NIGHTLY_PART: ${{ matrix.part }}\n"
         + "          NIGHTLY_OUTCOME: ${{ matrix.part == 'tests' && steps.tests.outcome || steps.workflows.outcome }}\n        run: node scripts/nightly-result.ts\n"));
       assert.deepEqual(simulation.find("Keep what the failures left").settings, [
-        "name: nightly-failures-${{ matrix.runner }}-${{ matrix.part }}", "path: |", "  _build/nightly/tests.log", "  _build/angular-tests.log", "  _build/ui/results", "retention-days: 14",
-        "if-no-files-found: ignore"
+        "name: nightly-failures-${{ matrix.runner }}-${{ matrix.part }}-${{ github.run_attempt }}", "path: |", "  _build/nightly/tests.log", "  _build/angular-tests.log", "  _build/ui/results", "retention-days: 14",
+        "if-no-files-found: ignore", "overwrite: true"
       ]);
     });
 
