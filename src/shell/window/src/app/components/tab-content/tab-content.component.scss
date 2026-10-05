@@ -12,10 +12,10 @@
   flex-direction: column;
   min-height: 0;
   overflow: auto;
-  scrollbar-gutter: stable;
 }
 
 :host(.tr-tab-content-padded) {
+  scrollbar-gutter: stable;
   padding: var(--tr-document-padding-block) var(--tr-content-padding-inline);
 }
 

@@ -157,6 +157,33 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-wide-dark");
   });
 
+  test("Settings has one scroller whose scrollbar ends at the panel's edge in its wide and narrow layouts, in light and dark, as a document's and a docked view's do", async ({ desktop }) => {
+    const window = desktop.window;
+    const content = window.locator(".tr-settings-content");
+    const others = [window.locator("tr-tab-group:has(tr-tab[data-tab-key='view/notes.list']) tr-tab-content")];
+    await window.locator("tr-tab[data-tab-key='document/notes.note/1']").click();
+    others.push(window.locator("tr-tab-group:has(tr-tab[data-tab-key='document/notes.note/1']) tr-tab-content"));
+    for (const other of others) {
+      const edge = await ScrollAreaFixture.edgeGapAsync(other);
+      expect([Math.abs(edge.gap) < 1, edge.scrollbar > 0]).toEqual([true, true]);
+    }
+    await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
+
+    for (const [layout, width, height] of [["wide", 1600, 900], ["narrow", 1000, 600]] as const) {
+      await desktop.useViewportAsync(width, height);
+      await expect(window.locator(layout === "wide" ? ".tr-settings-pages" : ".tr-settings-page-select")).toBeVisible();
+      for (const mode of WindowModeFixture.modes) {
+        await WindowModeFixture.setAsync(window, mode);
+        const edge = await ScrollAreaFixture.edgeGapAsync(content);
+        const outer = await window.locator("tr-tab-content:has(tr-settings)").evaluate(t => [getComputedStyle(t).scrollbarGutter, (t as HTMLElement).offsetWidth - t.clientWidth]);
+
+        expect([Math.abs(edge.gap) < 1, edge.scrollbar > 0, outer]).toEqual([true, true, ["auto", 0]]);
+        await ScrollAreaFixture.revealThumbColorAsync(window, content);
+        await desktop.checkpointAsync(`settings-edge-${layout}-${mode.toLowerCase()}`);
+      }
+    }
+  });
+
   test("in a 1000 × 600 window Settings swaps its page list for a select, and its content takes the width, its controls work and its scrollbar drags", async ({ desktop }) => {
     const window = desktop.window;
     const content = window.locator(".tr-settings-content");
