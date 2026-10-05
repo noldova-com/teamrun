@@ -297,7 +297,7 @@ test.describe("gallery", () => {
         t.scrollTo({ left: t.scrollWidth });
         t.scrollIntoView({ block: "end" });
       });
-      await area.hover();
+      await area.hover({ position: { x: 8, y: 8 } });
       await expect(narrow.getByRole("button", { name: "Remove LANG" })).toBeInViewport();
       await desktop.checkpointAsync(`configuration-table-${mode.toLowerCase()}`);
       await window.mouse.move(0, 0);
