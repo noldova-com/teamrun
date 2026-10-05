@@ -38,7 +38,7 @@ describe("GalleryCellComponent", () => {
   });
 
   const cells = (): GalleryCellComponent[] => fixture.debugElement.queryAll(By.directive(GalleryCellComponent)).map(t => t.componentInstance as GalleryCellComponent);
-  const hosts = (): HTMLElement[] => [...fixture.nativeElement.querySelectorAll<HTMLElement>("tr-gallery-cell")];
+  const hosts = (): HTMLElement[] => [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>("tr-gallery-cell")];
 
   it("is a group named by its caption, shown above its specimen", () => {
     expect(hosts().map(t => [t.getAttribute("role"), t.getAttribute("aria-label"), t.querySelector(".tr-gallery-cell-caption")?.textContent])).toEqual([
