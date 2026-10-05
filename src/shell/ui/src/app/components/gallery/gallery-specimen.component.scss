@@ -13,29 +13,35 @@
 
 .tr-gallery-specimen {
   display: grid;
-  gap: var(--tr-space-2);
-  min-width: 0;
-}
-
-.tr-gallery-specimen-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   gap: var(--tr-space-3);
+  min-width: 0;
 }
 
 .tr-gallery-specimen-name {
   margin: 0;
-  color: var(--tr-text-muted);
   font-size: var(--tr-text-label);
   font-weight: var(--tr-weight-emphasis);
   line-height: var(--tr-line-label);
 }
 
-.tr-gallery-specimen-body {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--tr-space-3);
+.tr-gallery-specimen-cells {
+  --tr-gallery-cell: 12.5rem;
+
+  display: grid;
+  grid-template-columns: repeat(auto-fill, min(var(--tr-gallery-cell), 100%));
+  gap: var(--tr-space-4);
+  min-width: 0;
+}
+
+.tr-gallery-specimen-cells[data-size="Wide"] {
+  --tr-gallery-cell: calc(25rem + var(--tr-space-4));
+}
+
+.tr-gallery-specimen-cells[data-size="Full"] {
+  --tr-gallery-cell: 100%;
+}
+
+.tr-gallery-specimen-long {
+  display: grid;
   min-width: 0;
 }

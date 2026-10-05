@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "states";
+
 :host {
   display: inline-flex;
   min-width: 0;
@@ -38,7 +40,7 @@
   cursor: pointer;
 }
 
-.tr-checkbox-box:focus-visible {
+.tr-checkbox-box#{states.$focus-visible} {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: var(--tr-border-width);
 }
