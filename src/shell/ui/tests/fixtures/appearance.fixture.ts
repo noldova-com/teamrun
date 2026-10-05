@@ -91,9 +91,21 @@ export class AppearanceFixture {
     const shown = getComputedStyle(probe).color;
     probe.remove();
 
-    expect([shown === AppearanceFixture.HIDDEN, thumb()]).toEqual([false, AppearanceFixture.HIDDEN]);
-    await userEvent.hover(area);
-    await vi.waitFor(() => expect(thumb()).toBe(shown));
+    const park = document.body.appendChild(document.createElement("div"));
+    try {
+      const corners = [[0, 0], [innerWidth - 4, 0], [0, innerHeight - 4], [innerWidth - 4, innerHeight - 4]];
+      const [left, top] = corners.find(([x = 0, y = 0]) => !area.contains(document.elementFromPoint(x + 2, y + 2))) ?? [0, 0];
+      park.style.cssText = `position: fixed; left: ${left}px; top: ${top}px; width: 4px; height: 4px; z-index: 2147483647;`;
+      await userEvent.hover(park);
+      await vi.waitFor(() => expect([area.matches(":hover"), thumb()]).toEqual([false, AppearanceFixture.HIDDEN]));
+
+      expect(shown).not.toBe(AppearanceFixture.HIDDEN);
+      await userEvent.hover(area);
+      await vi.waitFor(() => expect(thumb()).toBe(shown));
+    }
+    finally {
+      park.remove();
+    }
   }
 
   public static readColor(theme: Theme, mode: ThemeMode, key: string): string {

@@ -17,6 +17,7 @@ import { MenuComponent } from "../../src/app/components/menu/menu.component";
 import { ThemeMode } from "../../src/app/enums/theme-mode";
 import { DefaultTheme } from "../../src/app/themes/default-theme";
 import { AppearanceFixture } from "../fixtures/appearance.fixture";
+import { MotionFixture } from "../fixtures/motion.fixture";
 
 @Component({
   imports: [MenuComponent, MenuItemComponent, MenuSeparatorComponent],
@@ -123,6 +124,27 @@ describe("kit styles", () => {
         area.remove();
       }
     });
+
+  it("fade a scroll area's thumb in over 150 ms, and show it at once when reduced motion is preferred", async () => {
+    AppearanceFixture.apply();
+    const area = document.body.appendChild(document.createElement("div"));
+    area.style.cssText = "position: fixed; top: 0; left: 0; width: 200px; height: 120px; overflow: scroll;";
+    area.appendChild(document.createElement("div")).style.cssText = "height: 600px;";
+    const timing = (): string[] => [getComputedStyle(area).transitionDuration, getComputedStyle(area).transitionTimingFunction];
+
+    try {
+      const fading = timing();
+      await MotionFixture.reduceAsync();
+      const reduced = timing();
+      await AppearanceFixture.expectThumbRevealsOnHoverAsync(area);
+
+      expect([fading, reduced, area.getAnimations()]).toEqual([["0.15s", "linear"], ["0s", "ease"], []]);
+    }
+    finally {
+      area.remove();
+      await MotionFixture.resetAsync();
+    }
+  });
 
   for (const mode of AppearanceFixture.modes)
     for (const theme of AppearanceFixture.themes)
