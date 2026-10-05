@@ -353,6 +353,7 @@ test.describe("settings", () => {
     const pill = (name: string): Locator => row(window, "shell.mode").getByRole("radiogroup", { name: "Mode" }).getByRole("radio", { name, exact: true });
     const backgroundAsync = (): Promise<string> => window.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
+    await expect(row(window, "shell.mode").getByRole("radio")).toHaveText(["System", "Light", "Dark"]);
     await pill("Light").click();
     await expect.poll(backgroundAsync).toBe(WindowModeFixture.backgrounds.Light);
     await window.keyboard.press("ArrowRight");
@@ -364,11 +365,11 @@ test.describe("settings", () => {
     await window.keyboard.press("ArrowRight");
     await expect(pill("Light")).toBeChecked();
     await window.keyboard.press("End");
-    await expect(pill("System")).toBeChecked();
-    await window.keyboard.press("ArrowLeft");
     await expect(pill("Dark")).toBeChecked();
-    await expect(pill("Light")).toHaveAttribute("tabindex", "-1");
-    await expect(pill("Dark")).toHaveAttribute("tabindex", "0");
+    await window.keyboard.press("ArrowLeft");
+    await expect(pill("Light")).toBeChecked();
+    await expect(pill("Dark")).toHaveAttribute("tabindex", "-1");
+    await expect(pill("Light")).toHaveAttribute("tabindex", "0");
     await desktop.checkpointAsync("settings-mode-pills");
   });
 
