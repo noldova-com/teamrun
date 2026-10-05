@@ -30,14 +30,15 @@ class TemporaryFolderTests {
       assert.equal((await stat(folder)).isDirectory(), true);
     });
 
-    test("removing a folder removes everything in it, and a folder that is already gone is no failure", async () => {
-      const folders = new TemporaryFolder();
-      const folder = await folders.createAsync(process.platform, "tr-folder-");
+    test("removing a folder removes everything in it, and a folder that is already gone is no failure", async t => {
+      const temporaryFolder = new TemporaryFolder();
+      const folder = await temporaryFolder.createAsync(process.platform, "tr-folder-");
+      t.after(() => rm(folder, { recursive: true, force: true }));
       await mkdir(path.join(folder, "data"));
       await writeFile(path.join(folder, "data", "log.txt"), "log\n");
 
-      await folders.removeAsync(folder);
-      await folders.removeAsync(folder);
+      await temporaryFolder.removeAsync(folder);
+      await temporaryFolder.removeAsync(folder);
 
       assert.equal(existsSync(folder), false);
     });

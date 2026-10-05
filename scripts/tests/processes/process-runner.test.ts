@@ -137,6 +137,10 @@ class ProcessRunnerTests {
       t.after(() => repository.disposeAsync());
       const runner = new ProcessRunner();
       const started = await runner.startAsync(process.execPath, ["-e", "setInterval(() => {}, 1000)"], tmpdir(), path.join(repository.directory, "killed.log"));
+      t.after(() => {
+        if (!started.hasExited)
+          started.signal("SIGKILL");
+      });
 
       runner.kill(started.id);
 

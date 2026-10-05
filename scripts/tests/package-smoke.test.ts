@@ -24,6 +24,8 @@ import TemporaryFolderFixture from "./fixtures/temporary-folder.fixture.ts";
 import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 
 type Answer = "none" | "running" | "failed" | "other version" | "unreadable";
+type Discovery = "written" | "missing" | "unreadable";
+type Killing = "ends" | "refused" | "ignored";
 
 class DesktopFixture extends StartedProcess {
   private readonly quitCode: number | null;
@@ -75,8 +77,8 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
   public readonly checked: number[] = [];
   public readonly killed: number[] = [];
   public runtimeChecks: number = 1;
-  public hasDiscovery: boolean = true;
-  public isKillable: boolean = true;
+  public discovery: Discovery = "written";
+  public killing: Killing = "ends";
 
   public constructor(answers: readonly Answer[], desktop: DesktopFixture = new DesktopFixture(0, null), failing: readonly string[] = []) {
     super(failing);
@@ -107,9 +109,10 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
 
   public override kill(processId: number): void {
     this.killed.push(processId);
-    if (!this.isKillable)
+    if (this.killing === "refused")
       throw new Error(`EPERM: operation not permitted, kill ${processId}`);
-    this.runtimeChecks = 0;
+    if (this.killing === "ends")
+      this.runtimeChecks = 0;
   }
 
   public override async startAsync(command: string, commandArguments: readonly string[], directory: string, log: string): Promise<StartedProcess> {
@@ -120,10 +123,12 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
 
   private answer(data: string): ProcessResult {
     const answer = this.answers.length > 1 ? this.answers.shift() : this.answers[0];
-    if ((answer === "running" || answer === "other version") && this.hasDiscovery) {
+    if ((answer === "running" || answer === "other version") && this.discovery === "written") {
       mkdirSync(path.join(data, "discovery"), { recursive: true });
       writeFileSync(path.join(data, "discovery", "runtime.json"), JSON.stringify({ processId: 5151 }));
     }
+    if (this.discovery === "unreadable")
+      mkdirSync(path.join(data, "discovery", "runtime.json"), { recursive: true });
     switch (answer) {
       case "running":
         return new ProcessResult(0, JSON.stringify({ build: { productVersion: "0.0.7" }, dataDirectory: data }), "");
@@ -170,7 +175,7 @@ class PackageSmokeTests {
         assert.deepEqual(runner.environments.map(t => [t?.["ELECTRON_RUN_AS_NODE"], t?.["PATH"]]), [1, 2, 3, 4, 5].map(() => ["1", "fixture-path"]));
         assert.deepEqual(runner.desktop.signals, ["SIGTERM"]);
         assert.deepEqual(temporaryFolder.platforms, ["linux"]);
-        assert.deepEqual([runner.checked, runner.killed], [[5151, 5151, 5151], []]);
+        assert.deepEqual([runner.checked, runner.killed], [[5151, 5151], []]);
         assert.equal(output.text, [
           `Installed: ${appImage}`,
           "teamrun status before the start: no runtime.",
@@ -316,7 +321,7 @@ class PackageSmokeTests {
         const hidden = new SmokeRunnerFixture(["none", "running"]);
         const answering = new SmokeRunnerFixture(["none", "running"]);
         lingering.runtimeChecks = Number.POSITIVE_INFINITY;
-        hidden.hasDiscovery = false;
+        hidden.discovery = "missing";
         answering.runtimeChecks = 0;
         const outputs = [new TextOutputFixture(), new TextOutputFixture(), new TextOutputFixture()] as const;
 
@@ -328,7 +333,7 @@ class PackageSmokeTests {
 
         assert.deepEqual(exitCodes, [1, 1, 1]);
         assert.match(outputs[0].text, /\nThe desktop quit\.\nThe runtime, process 5151, did not stop within 90000 ms after the desktop quit, although nothing used it:\n.+desktop\.log:\nThe desktop's log\.\n$/);
-        assert.equal(lingering.checked.length, 90_000 / 500 + 1);
+        assert.equal(lingering.checked.length, 90_000 / 500 + 2);
         assert.deepEqual(lingering.killed, [5151]);
         assert.match(outputs[1].text, /\nThe runtime's discovery file .+runtime\.json names no process\.\n$/);
         assert.deepEqual(hidden.desktop.signals, ["SIGKILL"]);
@@ -343,7 +348,7 @@ class PackageSmokeTests {
         const stubborn = new SmokeRunnerFixture(["none", "running"]);
         const passing = new SmokeRunnerFixture(["none", "running", "none"]);
         stubborn.runtimeChecks = Number.POSITIVE_INFINITY;
-        stubborn.isKillable = false;
+        stubborn.killing = "refused";
         const locked = [new TemporaryFolderFixture(repository.directory), new TemporaryFolderFixture(repository.directory)] as const;
         for (const temporaryFolder of locked)
           temporaryFolder.isRemovable = false;
@@ -362,6 +367,29 @@ class PackageSmokeTests {
           + `Cleaning up failed:\\nThe runtime, process 5151, could not be ended: Error: EPERM: operation not permitted, kill 5151\\n`
           + `The smoke's folder .+ could not be removed: Error: EBUSY: resource busy or locked, rmdir '.+'\\n$`, "s"));
         assert.match(outputs[2].text, /\nThe runtime stopped once idle\.\nCleaning up failed:\nThe smoke's folder .+ could not be removed: Error: EBUSY: resource busy or locked, rmdir '.+'\n$/);
+      });
+
+    test("a runtime still running after the kill is reported once the kill's 10 s have passed, and a discovery file that cannot be read is reported, with the folder removed either way",
+      { timeout: PackageSmokeTests.TIMEOUT }, async t => {
+        const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-linux-x64.AppImage");
+        const ignoring = new SmokeRunnerFixture(["none", "running"]);
+        const unreadable = new SmokeRunnerFixture(["none", "other version"]);
+        ignoring.runtimeChecks = Number.POSITIVE_INFINITY;
+        ignoring.killing = "ignored";
+        unreadable.discovery = "unreadable";
+        const outputs = [new TextOutputFixture(), new TextOutputFixture()] as const;
+
+        const exitCodes = [
+          await PackageSmokeTests.runAsync(t, repository, "linux", ignoring, outputs[0]),
+          await PackageSmokeTests.runAsync(t, repository, "linux", unreadable, outputs[1])
+        ];
+
+        assert.deepEqual(exitCodes, [1, 1]);
+        assert.match(outputs[0].text, /\nCleaning up failed:\nThe runtime, process 5151, could not be ended: it was still running 10000 ms after it was killed\.\n$/);
+        assert.deepEqual([ignoring.checked.length, ignoring.killed], [90_000 / 500 + 1 + 10_000 / 500 + 1, [5151]]);
+        assert.match(outputs[1].text, /\nCleaning up failed:\nThe runtime's discovery file in .+ could not be read: Error: EISDIR: illegal operation on a directory, read\n$/);
+        assert.deepEqual([unreadable.checked, unreadable.killed], [[], []]);
+        assert.deepEqual([ignoring, unreadable].map(t => existsSync(t.folder)), [false, false]);
       });
 
     test("a host without packages is refused, an unexpected error reaches the caller, and any argument is refused with the usage", { timeout: PackageSmokeTests.TIMEOUT }, async t => {

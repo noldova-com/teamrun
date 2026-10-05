@@ -34,6 +34,7 @@ export default class PackageSmoke {
   private static readonly START_LIMIT: number = 60_000;
   private static readonly QUIT_LIMIT: number = 30_000;
   private static readonly STOP_LIMIT: number = 90_000;
+  private static readonly KILL_LIMIT: number = 10_000;
   private static readonly SETTLE: number = 3_000;
   private static readonly PAUSE: number = 500;
   private static readonly ARCHIVE: string = "app.asar";
@@ -68,6 +69,7 @@ export default class PackageSmoke {
   private folder: string | null = null;
   private runtime: number | null = null;
   private hasRuntimeOutlived: boolean = false;
+  private hasRuntimeStopped: boolean = false;
 
   public constructor(root: string, platform: string, architecture: string, runner: ProcessRunner, temporaryFolder: TemporaryFolder, environment: NodeJS.ProcessEnv, output: Writable) {
     this.root = root;
@@ -88,6 +90,7 @@ export default class PackageSmoke {
     this.folder = null;
     this.runtime = null;
     this.hasRuntimeOutlived = false;
+    this.hasRuntimeStopped = false;
     let hasFailed = false;
     try {
       await this.checkAsync();
@@ -140,10 +143,12 @@ export default class PackageSmoke {
       if (!desktop.hasExited)
         desktop.signal(PackageSmoke.KILL_SIGNAL);
     }
-    if (!await this.waitForExitAsync(runtime)) {
+    if (!await this.waitForExitAsync(runtime, PackageSmoke.STOP_LIMIT)) {
       this.hasRuntimeOutlived = true;
       throw new PackagingException(`The runtime, process ${runtime}, did not stop within ${PackageSmoke.STOP_LIMIT} ms after the desktop quit, although nothing used it:\n${await PackageSmoke.readTailAsync(logs)}`);
     }
+    this.runtime = null;
+    this.hasRuntimeStopped = true;
     await this.requireNoRuntimeAsync(installed, data, folder, "after the runtime stopped");
     this.output.write("The runtime stopped once idle.\n");
   }
@@ -152,16 +157,9 @@ export default class PackageSmoke {
     if (this.folder === null)
       return true;
     const problems: string[] = [];
-    const runtime = this.runtime ?? await PackageSmoke.readRuntimeIdAsync(path.join(this.folder, PackageSmoke.DATA_FOLDER));
-    if (runtime !== null) {
-      try {
-        if (this.hasRuntimeOutlived || !await this.waitForExitAsync(runtime))
-          this.runner.kill(runtime);
-      }
-      catch (error) {
-        problems.push(`The runtime, process ${runtime}, could not be ended: ${String(error)}`);
-      }
-    }
+    const ending = await this.endRuntimeAsync(this.folder);
+    if (ending !== null)
+      problems.push(ending);
     try {
       await this.temporaryFolder.removeAsync(this.folder);
     }
@@ -172,6 +170,25 @@ export default class PackageSmoke {
     if (problems.length > 0)
       this.output.write(`Cleaning up failed:\n${problems.join("\n")}\n`);
     return problems.length === 0;
+  }
+
+  private async endRuntimeAsync(folder: string): Promise<string | null> {
+    let runtime = this.runtime;
+    try {
+      if (runtime === null && !this.hasRuntimeStopped)
+        runtime = await PackageSmoke.readRuntimeIdAsync(path.join(folder, PackageSmoke.DATA_FOLDER));
+      if (runtime === null || (!this.hasRuntimeOutlived && await this.waitForExitAsync(runtime, PackageSmoke.STOP_LIMIT)))
+        return null;
+      this.runner.kill(runtime);
+      if (await this.waitForExitAsync(runtime, PackageSmoke.KILL_LIMIT))
+        return null;
+      return `The runtime, process ${runtime}, could not be ended: it was still running ${PackageSmoke.KILL_LIMIT} ms after it was killed.`;
+    }
+    catch (error) {
+      if (runtime === null)
+        return `The runtime's discovery file in ${folder} could not be read: ${String(error)}`;
+      return `The runtime, process ${runtime}, could not be ended: ${String(error)}`;
+    }
   }
 
   private static async readTailAsync(logs: readonly string[]): Promise<string> {
@@ -238,10 +255,10 @@ export default class PackageSmoke {
     this.output.write(`teamrun status after the start: version ${reportedVersion} in ${directory}.\n`);
   }
 
-  private async waitForExitAsync(runtime: number): Promise<boolean> {
+  private async waitForExitAsync(runtime: number, limit: number): Promise<boolean> {
     const started = Date.now();
     while (this.runner.isRunning(runtime)) {
-      if (Date.now() - started >= PackageSmoke.STOP_LIMIT)
+      if (Date.now() - started >= limit)
         return false;
       await timers.setTimeout(PackageSmoke.PAUSE);
     }

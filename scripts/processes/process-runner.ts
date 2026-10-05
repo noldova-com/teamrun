@@ -84,18 +84,6 @@ export default class ProcessRunner {
     ProcessRunner.signal(processId, ProcessRunner.KILL_SIGNAL);
   }
 
-  private static signal(processId: number, signal: NodeJS.Signals | 0): boolean {
-    try {
-      process.kill(processId, signal);
-      return true;
-    }
-    catch (error) {
-      if (error instanceof Error && "code" in error && error.code === ProcessRunner.MISSING_PROCESS_CODE)
-        return false;
-      throw error;
-    }
-  }
-
   public runLoggedAsync(command: string, commandArguments: readonly string[], directory: string, log: string, output: Writable, errorOutput: Writable): Promise<number | null> {
     return new Promise<number | null>((resolve, reject) => {
       const file = createWriteStream(log);
@@ -110,5 +98,17 @@ export default class ProcessRunner {
       child.on("error", t => failure = new ProcessException(`"${command}" could not start.`, { cause: t }));
       child.on("close", t => file.end(() => failure === null ? resolve(t) : reject(failure)));
     });
+  }
+
+  private static signal(processId: number, signal: NodeJS.Signals | 0): boolean {
+    try {
+      process.kill(processId, signal);
+      return true;
+    }
+    catch (error) {
+      if (error instanceof Error && "code" in error && error.code === ProcessRunner.MISSING_PROCESS_CODE)
+        return false;
+      throw error;
+    }
   }
 }
