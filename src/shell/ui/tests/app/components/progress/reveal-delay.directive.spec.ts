@@ -32,6 +32,8 @@ describe("RevealDelayDirective", () => {
   });
 
   afterEach(() => {
+    if (vi.isFakeTimers())
+      vi.runOnlyPendingTimers();
     vi.useRealTimers();
     AppearanceFixture.reset();
   });

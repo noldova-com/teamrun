@@ -30,6 +30,8 @@ describe("ModuleActionsComponent", () => {
   });
 
   afterEach(() => {
+    if (vi.isFakeTimers())
+      vi.runOnlyPendingTimers();
     vi.useRealTimers();
     DesktopBridgeFixture.remove();
   });
