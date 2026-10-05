@@ -170,7 +170,7 @@ External references may establish behavior; their prose is not copied. Every JSD
  */
 ```
 
-Automated checks compare packaged declarations with implementation: exports, constructors, parameter/property types, optionality/nullability, generic constraints, overloads, visibility and returns. Check documentation, links and drift; humans review meaning. Compile positive and expected-error consumer examples against the package and test its installed runtime behavior. Breaking changes require an explicit version/compatibility decision.
+Automated checks compare packaged declarations with implementation: exports, constructors, parameter/property types, optionality/nullability, generic constraints, overloads, visibility and returns. `npm test` checks the documentation through the compiler's view of the declarations: it refuses a public type, member or overload without JSDoc, `@param` tags that don't match a callable's parameters, a missing `@returns` on a result or one on a constructor or `void` result, an empty tag, a single-line JSDoc, a hyphen after a parameter's name and a `{@link}` that doesn't resolve. A `never` result or an `asserts` signature neither needs nor refuses `@returns`, because its `@throws` documents it. Humans review meaning. Compile positive and expected-error consumer examples against the package and test its installed runtime behavior. Breaking changes require an explicit version/compatibility decision.
 
 ## 10. Naming and formatting
 
