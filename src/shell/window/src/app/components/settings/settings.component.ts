@@ -7,12 +7,12 @@
  */
 
 import { NgComponentOutlet, NgTemplateOutlet } from "@angular/common";
-import { ChangeDetectionStrategy, Component, ElementRef, ErrorHandler, type Signal, type Type, type WritableSignal, afterNextRender, computed, inject, signal, viewChild } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, type Signal, type Type, type WritableSignal, afterNextRender, computed, inject, signal, viewChild } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
-import { SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
+import { SelectComponent, SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
 
 import { GalleryTokens } from "../../models/gallery-tokens";
 import { SettingsPage } from "../../models/settings/settings-page";
@@ -31,12 +31,14 @@ import { ShortcutsComponent } from "../shortcuts/shortcuts.component";
 
 @Component({
   selector: "tr-settings",
-  imports: [NgComponentOutlet, NgTemplateOutlet, SettingRowComponent, ShortcutsComponent, TextFieldComponent],
+  imports: [NgComponentOutlet, NgTemplateOutlet, SelectComponent, SettingRowComponent, ShortcutsComponent, TextFieldComponent],
   templateUrl: "./settings.component.html",
   styleUrl: "./settings.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    "class": "tr-settings"
+    "class": "tr-settings",
+    "(focusin)": "noteFocus($event)",
+    "(focusout)": "noteBlur()"
   }
 })
 export class SettingsComponent {
@@ -48,7 +50,10 @@ export class SettingsComponent {
   private readonly kept: SettingsView = this.viewStates.find(ShellDocuments.settingsTab.key, SettingsView) ?? SettingsView.initial;
   private readonly selected: WritableSignal<string> = signal(this.kept.page);
   private readonly pageList: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("pageList");
+  private readonly pageSelect: Signal<ElementRef<HTMLElement>> = viewChild.required("pageSelect", { read: ElementRef<HTMLElement> });
+  private readonly pageChooser: Signal<SelectComponent> = viewChild.required("pageSelect", { read: SelectComponent });
   private readonly content: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("content");
+  private focusedControl: HTMLElement | null = null;
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly query: WritableSignal<string> = signal(this.kept.query);
@@ -67,7 +72,10 @@ export class SettingsComponent {
     ...SettingsPage.pagesOf(this.settings.definitions()),
     ...Object.isNull(this.gallery) ? [] : [SettingsPage.galleryOf(Resources.galleryPage)]
   ]);
-  protected readonly currentPage: Signal<SettingsPage | undefined> = computed(() => this.pages().find(t => t.title === this.selected()) ?? this.pages()[0]);
+  private readonly currentTitle: Signal<string> = computed(() => this.pages().some(t => t.title === this.selected()) ? this.selected() : Resources.appearancePage);
+  protected readonly currentPage: Signal<SettingsPage | undefined> = computed(() => this.pages().find(t => t.title === this.currentTitle()));
+  protected readonly pageOptions: Signal<readonly SelectOption[]> = computed(() => this.pages().map(t => new SelectOption(t.title, t.title)));
+  protected readonly pageChoice: Signal<string> = computed(() => this.isSearching() ? Resources.settingsSearchResults : this.currentTitle());
   protected readonly shortcuts: Signal<readonly ShortcutRow[]> = computed(() => {
     const map = this.commands.shortcuts();
     const bindings = this.commands.bindings();
@@ -90,10 +98,25 @@ export class SettingsComponent {
   });
 
   public constructor() {
+    const destroyRef = inject(DestroyRef);
     afterNextRender(() => {
       this.pageList().nativeElement.scrollTop = this.kept.pageListTop;
       this.content().nativeElement.scrollTop = this.kept.contentTop;
+      const switched = new ResizeObserver(() => this.keepFocus());
+      switched.observe(this.pageList().nativeElement);
+      switched.observe(this.pageSelect().nativeElement);
+      destroyRef.onDestroy(() => switched.disconnect());
     });
+  }
+
+  protected noteFocus(event: FocusEvent): void {
+    const path = event.composedPath();
+    this.focusedControl = [this.pageList().nativeElement, this.pageSelect().nativeElement].find(t => path.includes(t)) ?? null;
+  }
+
+  protected noteBlur(): void {
+    if (this.focusedControl?.checkVisibility() && !this.pageChooser().isExpanded())
+      this.focusedControl = null;
   }
 
   protected keep(): void {
@@ -106,9 +129,9 @@ export class SettingsComponent {
     this.keep();
   }
 
-  protected select(page: SettingsPage): void {
+  protected select(title: string): void {
     this.query.set("");
-    this.selected.set(page.title);
+    this.selected.set(title);
     this.keep();
   }
 
@@ -122,6 +145,19 @@ export class SettingsComponent {
 
   protected reset(definition: SettingDefinition): void {
     this.settings.resetAsync(definition.name.text).catch((error: unknown) => this.errors.handleError(error));
+  }
+
+  private keepFocus(): void {
+    const list = this.pageList().nativeElement;
+    const select = this.pageSelect().nativeElement;
+    const hidden = list.checkVisibility() ? select : list;
+    const active = document.activeElement;
+    if (this.focusedControl !== hidden || !(active === document.body || hidden.contains(active) || this.pageChooser().isExpanded()))
+      return;
+    if (hidden === list)
+      this.pageChooser().focus();
+    else
+      (list.querySelector<HTMLElement>(Resources.currentSettingsPageSelector) ?? list.querySelector<HTMLElement>(Resources.settingsPageSelector))?.focus();
   }
 
   private static matches(definition: SettingDefinition, query: string): boolean {

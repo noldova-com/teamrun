@@ -23,7 +23,7 @@ export class AnchoredOverlay {
   private readonly strategy: GlobalPositionStrategy;
   private readonly bounds: OverlayBoundsService;
   private readonly cleanups: (() => void)[] = [];
-  private readonly originScrollsValue: Subject<void> = new Subject<void>();
+  private readonly originLostValue: Subject<void> = new Subject<void>();
   private origin: Element | null = null;
   private originAt: DOMRect | null = null;
   private area: (() => DOMRect) | null = null;
@@ -65,8 +65,8 @@ export class AnchoredOverlay {
     return this.overlay.keydownEvents();
   }
 
-  public get originScrolls(): Observable<void> {
-    return this.originScrollsValue;
+  public get originLost(): Observable<void> {
+    return this.originLostValue;
   }
 
   public openComponent<T>(portal: ComponentPortal<T>, origin: Element, anchoring: OverlayAnchoring, area: (() => DOMRect) | null = null): ComponentRef<T> {
@@ -89,7 +89,7 @@ export class AnchoredOverlay {
     const reposition = (): void => this.reposition();
     const scrolled = (event: Event): void => {
       if (event.target instanceof Node && !this.element.contains(event.target) && event.target.contains(origin) && this.hasOriginMoved(origin))
-        this.originScrollsValue.next();
+        this.originLostValue.next();
     };
     let frame: number | null = null;
     const resize = new ResizeObserver(() => frame ??= requestAnimationFrame(() => {
@@ -97,10 +97,16 @@ export class AnchoredOverlay {
       this.reposition();
     }));
     resize.observe(this.element);
+    const hidden = new ResizeObserver(() => {
+      if (!origin.checkVisibility())
+        this.originLostValue.next();
+    });
+    hidden.observe(origin);
     window.addEventListener(Resources.resizeEvent, reposition);
     document.addEventListener(Resources.scrollEvent, scrolled, { capture: true, passive: true });
     this.cleanups.push(
       () => resize.disconnect(),
+      () => hidden.disconnect(),
       () => {
         if (!Object.isNull(frame))
           cancelAnimationFrame(frame);
