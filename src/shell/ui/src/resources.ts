@@ -126,7 +126,7 @@ export class Resources {
     "menu-item-inset",
     "menu-item-padding",
     "menu-trail-gap",
-    "toolbar-row",
+    "band-gap",
     "toolbar-button",
     "toolbar-button-padding",
     "toolbar-gap",
@@ -168,6 +168,8 @@ export class Resources {
     "settings-search-width",
     "settings-pages-width",
     "settings-content-width",
+    "modules-list-width",
+    "modules-detail-width",
     "dropdown-padding",
     "dropdown-row-height",
     "dropdown-row-padding",
@@ -266,6 +268,7 @@ export class Resources {
   public static readonly scrollEvent: string = "scroll";
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
+  public static readonly programFocusOrigin: FocusOrigin = "program";
   public static readonly menuPaneClass: string = "tr-menu-pane";
   public static readonly popoverClass: string = "tr-popover";
   public static readonly popoverPaneClass: string = "tr-popover-pane";
@@ -276,6 +279,9 @@ export class Resources {
   public static readonly dialogCloseLabel: string = "Close";
   public static readonly dialogCloseSelector: string = ".tr-dialog-close";
   public static readonly noLimit: string = "none";
+  public static readonly inertAttribute: string = "inert";
+  public static readonly ariaLiveAttribute: string = "aria-live";
+  public static readonly popoverAttribute: string = "popover";
   public static readonly dropdownPaneClass: string = "tr-dropdown-pane";
   public static readonly listboxSelector: string = "[role=listbox]";
   public static readonly tabKey: string = "Tab";
@@ -289,9 +295,7 @@ export class Resources {
   public static readonly quickInputIdPrefix: string = "tr-quick-input-";
   public static readonly quickInputOptionSeparator: string = "-option-";
   public static readonly quickInputFieldSelector: string = ".tr-quick-input-field";
-  public static readonly quickInputListSelector: string = ".tr-quick-input-list";
   public static readonly quickInputOptionSelector: string = "[role=option]";
-  public static readonly revealOptions: ScrollIntoViewOptions = { block: "nearest" };
   public static readonly arrowDownKey: string = "ArrowDown";
   public static readonly arrowUpKey: string = "ArrowUp";
   public static readonly homeKey: string = "Home";
@@ -311,6 +315,7 @@ export class Resources {
   public static readonly clickEvent: string = "click";
   public static readonly auxclickEvent: string = "auxclick";
   public static readonly mouseenterEvent: "mouseenter" = "mouseenter";
+  public static readonly mousedownEvent: "mousedown" = "mousedown";
   public static readonly pointermoveEvent: "pointermove" = "pointermove";
   public static readonly hoverSelector: string = ":hover";
   public static readonly secondaryButton: number = 2;

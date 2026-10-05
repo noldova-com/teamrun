@@ -37,6 +37,7 @@ export class ShellMenus {
   private static readonly GROUPS: readonly MenuGroup[] = [
     new MenuGroup(Resources.closeGroup, Resources.fileMenu, false, [MenuItem.ofCommand(Resources.closeTabCommand)]),
     new MenuGroup(Resources.searchGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.showCommandsCommand)]),
+    new MenuGroup(Resources.modulesGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.openModulesCommand)]),
     new MenuGroup(Resources.docksGroup, Resources.viewMenu, false,
       Object.values(DockSide).map(t => MenuItem.ofCommand(Resources.toggleDockCommands[t], {}, Resources.dockRowLabels[t]))),
     new MenuGroup(Resources.bottomDockGroup, Resources.viewMenu, true, Object.values(BottomDockSpan).map(t => MenuItem.ofCommand(Resources.bottomSpanCommands[t]))),

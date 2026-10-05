@@ -52,4 +52,9 @@ export class ShellMethodsTests {
   public namesTheSettingsMethods(): void {
     Assert.areEqual("shell.settings,shell.setSetting,shell.resetSetting", [ShellMethods.settings, ShellMethods.setSetting, ShellMethods.resetSetting].map(t => t.text).join(","));
   }
+
+  @TestMethod
+  public namesTheRecentCommandsMethods(): void {
+    Assert.areEqual("shell.recentCommands,shell.recordCommand", [ShellMethods.recentCommands, ShellMethods.recordCommand].map(t => t.text).join(","));
+  }
 }

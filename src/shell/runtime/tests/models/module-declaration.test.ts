@@ -15,7 +15,9 @@ import { DeclarationsFormatException, ModuleDeclaration } from "@noldova/teamrun
 export class ModuleDeclarationTests {
   private static readonly VALID: Readonly<Record<string, unknown>> = {
     id: "notes",
+    version: "1.2.3",
     displayName: "Notes",
+    description: "Keeps notes.",
     dependencies: ["tasks"],
     runtimePackage: "@noldova/teamrun-modules-notes-runtime",
     contributes: { methods: ["notes.list"], events: [] }
@@ -27,7 +29,9 @@ export class ModuleDeclarationTests {
     const windowOnly = ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, runtimePackage: null });
 
     Assert.areEqual("notes", declaration.id);
+    Assert.areEqual("1.2.3", declaration.version);
     Assert.areEqual("Notes", declaration.displayName);
+    Assert.areEqual("Keeps notes.", declaration.description);
     Assert.areEqual("tasks", declaration.dependencies.join(","));
     Assert.areEqual("@noldova/teamrun-modules-notes-runtime", declaration.runtimePackage);
     Assert.areEqual("notes.list", declaration.listContributions("methods").join(","));
@@ -42,7 +46,7 @@ export class ModuleDeclarationTests {
     const methods = ["notes.list"];
     const contributions = new Map([["methods", methods]]);
 
-    const declaration = new ModuleDeclaration("notes", "Notes", dependencies, null, contributions);
+    const declaration = new ModuleDeclaration("notes", "1.2.3", "Notes", "Keeps notes.", dependencies, null, contributions);
     dependencies.push("clock");
     methods.push("notes.open");
     contributions.set("events", ["notes.changed"]);
@@ -57,15 +61,40 @@ export class ModuleDeclarationTests {
   @TestData("Notes")
   @TestData("")
   public refusesAnInvalidId(id: string): void {
-    Assert.throws(() => new ModuleDeclaration(id, "Notes", [], null, new Map()), ArgumentException);
+    Assert.throws(() => new ModuleDeclaration(id, "1.2.3", "Notes", "Keeps notes.", [], null, new Map()), ArgumentException);
     Assert.areEqual(
       "A module declaration's id is missing or invalid.",
       Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, id }), DeclarationsFormatException).message);
   }
 
   @TestMethod
-  public refusesABlankDisplayName(): void {
-    Assert.throws(() => new ModuleDeclaration("notes", " ", [], null, new Map()), ArgumentException);
+  public refusesABlankDisplayNameOrDescription(): void {
+    Assert.throws(() => new ModuleDeclaration("notes", "1.2.3", " ", "Keeps notes.", [], null, new Map()), ArgumentException);
+    Assert.throws(() => new ModuleDeclaration("notes", "1.2.3", "Notes", " ", [], null, new Map()), ArgumentException);
+  }
+
+  @TestMethod
+  @TestData("0.0.1")
+  @TestData("10.200.3000")
+  @TestData("999999999.999999999.999999999")
+  public acceptsAVersionOfThreeNumbers(version: string): void {
+    Assert.areEqual(version, new ModuleDeclaration("notes", version, "Notes", "Keeps notes.", [], null, new Map()).version);
+    Assert.areEqual(version, ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, version }).version);
+  }
+
+  @TestMethod
+  @TestData("")
+  @TestData("1.2")
+  @TestData("1.2.3.4")
+  @TestData("01.2.3")
+  @TestData("v1.2.3")
+  @TestData("1.2.3-beta")
+  @TestData("1000000000.0.0")
+  public refusesAnInvalidVersion(version: string): void {
+    Assert.areEqual("version", Assert.throws(() => new ModuleDeclaration("notes", version, "Notes", "Keeps notes.", [], null, new Map()), ArgumentException).parameterName);
+    Assert.areEqual(
+      "A module declaration's version is missing or invalid.",
+      Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, version }), DeclarationsFormatException).message);
   }
 
   @TestMethod
@@ -75,11 +104,14 @@ export class ModuleDeclarationTests {
       [null, "A module declaration is not a JSON object."],
       [ModuleDeclarationTests.without("id"), "A module declaration's id is missing or invalid."],
       [{ ...ModuleDeclarationTests.VALID, id: 3 }, "A module declaration's id is missing or invalid."],
+      [ModuleDeclarationTests.without("version"), "A module declaration's version is missing or invalid."],
+      [{ ...ModuleDeclarationTests.VALID, version: 1 }, "A module declaration's version is missing or invalid."],
       [ModuleDeclarationTests.without("contributes"), "A module declaration's contributes is missing or invalid."],
       [{ ...ModuleDeclarationTests.VALID, contributes: [] }, "A module declaration's contributes is missing or invalid."],
       [{ ...ModuleDeclarationTests.VALID, contributes: { methods: "notes.list" } }, "A module declaration's contributes is missing or invalid."],
       [{ ...ModuleDeclarationTests.VALID, contributes: { methods: [" "] } }, "A module declaration's contributes is missing or invalid."],
       [ModuleDeclarationTests.without("displayName"), "A module declaration's displayName is missing or invalid."],
+      [ModuleDeclarationTests.without("description"), "A module declaration's description is missing or invalid."],
       [ModuleDeclarationTests.without("dependencies"), "A module declaration's dependencies is missing or invalid."],
       [{ ...ModuleDeclarationTests.VALID, dependencies: [1] }, "A module declaration's dependencies is missing or invalid."],
       [ModuleDeclarationTests.without("runtimePackage"), "A module declaration's runtimePackage is missing or invalid."],

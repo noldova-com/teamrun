@@ -93,7 +93,7 @@ export class ModuleHost {
         await activation.part.deactivateAsync();
       }
       catch (error) {
-        this.writeDiagnostic(activation.context.moduleId, Resources.moduleDeactivationPartFailed, error);
+        this.writeDiagnostic(activation.declaration, Resources.moduleDeactivationPartFailed, error);
         failures.push(error);
       }
       finally {
@@ -122,17 +122,17 @@ export class ModuleHost {
   private async activateModuleAsync(declaration: ModuleDeclaration, settings: SettingsService, processes: ProcessSupervisor): Promise<ModuleStatus> {
     const blocker = declaration.dependencies.find(t => this.statuses.get(t)?.state !== ModuleState.Active);
     if (!Object.isUndefined(blocker))
-      return new ModuleStatus(declaration.id, ModuleState.Blocked, Resources.formatModuleBlocked(blocker));
+      return ModuleHost.describe(declaration, ModuleState.Blocked, Resources.formatModuleBlocked(blocker), blocker);
     if (Object.isNull(declaration.runtimePackage))
-      return new ModuleStatus(declaration.id, ModuleState.Active, null);
+      return ModuleHost.describe(declaration, ModuleState.Active, null);
 
     let part: IRuntimePart;
     try {
       part = await this.loader.loadAsync(declaration.runtimePackage);
     }
     catch (error) {
-      this.writeDiagnostic(declaration.id, Resources.moduleLoadFailed, error);
-      return new ModuleStatus(declaration.id, ModuleState.Failed, Resources.moduleLoadFailed);
+      this.writeDiagnostic(declaration, Resources.moduleLoadFailed, error);
+      return ModuleHost.describe(declaration, ModuleState.Failed, Resources.moduleLoadFailed);
     }
 
     let database: ModuleDatabase | undefined;
@@ -142,8 +142,8 @@ export class ModuleHost {
       }
       catch (error) {
         const cause = error instanceof UnknownSchemaException ? Resources.moduleDatabaseUnknown : Resources.moduleDatabaseFailed;
-        this.writeDiagnostic(declaration.id, cause, error);
-        return new ModuleStatus(declaration.id, ModuleState.Failed, cause);
+        this.writeDiagnostic(declaration, cause, error);
+        return ModuleHost.describe(declaration, ModuleState.Failed, cause);
       }
 
     const context = new ModuleContext(
@@ -156,14 +156,19 @@ export class ModuleHost {
       await processes.stopOwnedByAsync(declaration.id);
       context[Symbol.dispose]();
       database?.close();
-      this.writeDiagnostic(declaration.id, Resources.moduleActivationFailed, error);
-      return new ModuleStatus(declaration.id, ModuleState.Failed, Resources.moduleActivationFailed);
+      this.writeDiagnostic(declaration, Resources.moduleActivationFailed, error);
+      return ModuleHost.describe(declaration, ModuleState.Failed, Resources.moduleActivationFailed);
     }
-    this.activations.push(new ModuleActivation(context, part, processes, database));
-    return new ModuleStatus(declaration.id, ModuleState.Active, null);
+    this.activations.push(new ModuleActivation(declaration, context, part, processes, database));
+    return ModuleHost.describe(declaration, ModuleState.Active, null);
   }
 
-  private writeDiagnostic(moduleId: string, cause: string, error: unknown): void {
-    this.diagnostics.write(Resources.formatModuleDiagnostic(moduleId, cause, inspect(error)));
+  private static describe(declaration: ModuleDeclaration, state: ModuleState, cause: string | null, blockedBy: string | null = null): ModuleStatus {
+    return new ModuleStatus(
+      declaration.id, declaration.version, declaration.displayName, declaration.description, declaration.dependencies, declaration.contributions, state, cause, blockedBy);
+  }
+
+  private writeDiagnostic(declaration: ModuleDeclaration, cause: string, error: unknown): void {
+    this.diagnostics.write(Resources.formatModuleDiagnostic(declaration.id, declaration.version, cause, inspect(error)));
   }
 }

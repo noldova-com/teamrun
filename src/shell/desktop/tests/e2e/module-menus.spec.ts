@@ -39,7 +39,7 @@ async function openBarMenuAsync(window: Page, title: string): Promise<Locator> {
 test.describe("the inline menu bar on Windows and Linux", () => {
   test.skip(process.platform === "darwin", "macOS shows the menus in its own menu bar.");
 
-  test("the menu bar opens File, Edit, View and the modules' menus, and runs their rows with their checked state", async ({ desktop }) => {
+  test("the menu bar opens File, Edit, View and the modules' menus, and runs their rows with their checked state @smoke", async ({ desktop }) => {
     const window = desktop.window;
     const list = window.locator(".tr-notes-list-items");
     const bar = window.locator("tr-menu-bar");
@@ -96,7 +96,7 @@ test.describe("the inline menu bar on Windows and Linux", () => {
 test.describe("the menu bar on macOS", () => {
   test.skip(process.platform !== "darwin", "Windows and Linux show the menus in the window row.");
 
-  test("the native menu bar holds the shell's and the modules' menus, shows checked state and runs a chosen row in the window", async ({ desktop }) => {
+  test("the native menu bar holds the shell's and the modules' menus, shows checked state and runs a chosen row in the window @smoke", async ({ desktop }) => {
     const window = desktop.window;
     const read = (id: string): Promise<readonly [boolean, boolean] | null> => desktop.application.evaluate(({ Menu }, itemId) => {
       const item = Menu.getApplicationMenu()?.getMenuItemById(itemId);

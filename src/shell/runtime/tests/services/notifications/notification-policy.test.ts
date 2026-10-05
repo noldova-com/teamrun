@@ -12,8 +12,8 @@ import { ModuleDeclaration, NotificationPolicy, RegistrationException } from "@n
 
 @TestClass
 export class NotificationPolicyTests {
-  private static readonly NOTES: ModuleDeclaration = new ModuleDeclaration("notes", "Notes", ["tasks"], null, new Map([["notifications", ["notes.saved"]]]));
-  private static readonly TASKS: ModuleDeclaration = new ModuleDeclaration("tasks", "Tasks", [], null, new Map([["notifications", ["tasks.due"]]]));
+  private static readonly NOTES: ModuleDeclaration = new ModuleDeclaration("notes", "0.0.1", "Notes", "Keeps notes.", ["tasks"], null, new Map([["notifications", ["notes.saved"]]]));
+  private static readonly TASKS: ModuleDeclaration = new ModuleDeclaration("tasks", "0.0.1", "Tasks", "Tracks tasks.", [], null, new Map([["notifications", ["tasks.due"]]]));
 
   @TestMethod
   public allowsADeclaredKindWithTheModulesOwnAndItsDependenciesCommands(): void {

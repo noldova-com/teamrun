@@ -7,6 +7,7 @@
  */
 
 export class Resources {
-  public static readonly manyTabsMethod: string = "notes.manyTabs";
+  public static readonly optionsMethod: string = "notes.options";
   public static readonly manyTabsMarker: string = "many-tabs";
+  public static readonly longCountMarker: string = "long-count";
 }

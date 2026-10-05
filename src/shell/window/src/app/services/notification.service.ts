@@ -51,7 +51,7 @@ export class NotificationService {
   }
 
   public isAvailable(command: CommandRun): boolean {
-    return this.commands.commands().some(t => t.name === command.name.text);
+    return this.commands.isAvailable(command.name.text, command.commandArguments);
   }
 
   public runAsync(command: CommandRun): Promise<JsonValue> {

@@ -7,8 +7,8 @@
  */
 
 import {
-  ChangeDetectionStrategy, Component, ElementRef, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, input, model,
-  output, signal
+  ChangeDetectionStrategy, Component, ElementRef, Injector, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, input, model,
+  output, signal, viewChild
 } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
@@ -26,7 +26,11 @@ export class QuickInputComponent {
   private static count: number = 0;
 
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector: Injector = inject(Injector);
+  private readonly list: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("list");
   private readonly activeValue: WritableSignal<number> = signal(0);
+  private shownQuery: string = String.empty;
+  private isChoosing: boolean = false;
 
   protected readonly listId: string = `${Resources.quickInputIdPrefix}${QuickInputComponent.count++}`;
   protected readonly active: Signal<number> = this.activeValue.asReadonly();
@@ -46,7 +50,13 @@ export class QuickInputComponent {
       this.activeValue.set(0);
     });
     afterRenderEffect(() => {
-      this.host.querySelector(`#${this.optionId(this.active())}`)?.scrollIntoView(Resources.revealOptions);
+      this.shownQuery = this.query();
+    });
+    afterRenderEffect(() => {
+      const list = this.list().nativeElement;
+      const row = list.querySelector<HTMLElement>(`#${this.optionId(this.active())}`);
+      if (!Object.isNull(row))
+        QuickInputComponent.reveal(list, row);
     });
     afterNextRender(() => {
       if (this.isFocusing())
@@ -67,7 +77,7 @@ export class QuickInputComponent {
     }
     if (event.key === Resources.enterKey) {
       event.preventDefault();
-      this.choose(this.active());
+      this.chooseActive();
     }
     else if (event.key === Resources.escapeKey) {
       event.preventDefault();
@@ -79,6 +89,18 @@ export class QuickInputComponent {
     const item = this.items()[index];
     if (!Object.isUndefined(item))
       this.chosen.emit(item);
+  }
+
+  private chooseActive(): void {
+    if (this.query() === this.shownQuery)
+      this.choose(this.active());
+    else if (!this.isChoosing) {
+      this.isChoosing = true;
+      afterNextRender(() => {
+        this.isChoosing = false;
+        this.choose(this.active());
+      }, { injector: this.injector });
+    }
   }
 
   private indexFor(key: string): number | null {
@@ -102,8 +124,17 @@ export class QuickInputComponent {
   }
 
   private pageSize(): number {
-    const list = this.host.querySelector<HTMLElement>(Resources.quickInputListSelector);
-    const row = list?.querySelector<HTMLElement>(Resources.quickInputOptionSelector);
-    return Object.isNullOrUndefined(list) || Object.isNullOrUndefined(row) ? 1 : Math.max(1, Math.floor(list.clientHeight / row.offsetHeight));
+    const list = this.list().nativeElement;
+    const row = list.querySelector<HTMLElement>(Resources.quickInputOptionSelector);
+    return Object.isNull(row) ? 1 : Math.max(1, Math.floor(list.clientHeight / row.offsetHeight));
+  }
+
+  private static reveal(list: HTMLElement, row: HTMLElement): void {
+    const top = row.getBoundingClientRect().top - list.getBoundingClientRect().top - list.clientTop + list.scrollTop;
+    const bottom = top + row.offsetHeight;
+    if (top < list.scrollTop)
+      list.scrollTop = top;
+    else if (bottom > list.scrollTop + list.clientHeight)
+      list.scrollTop = bottom - list.clientHeight;
   }
 }

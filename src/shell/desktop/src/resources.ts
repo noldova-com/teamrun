@@ -7,12 +7,22 @@
  */
 
 import { ShellMethods } from "@noldova/teamrun-shell-protocol";
+import { ProductInfo } from "@noldova/teamrun-shell-runtime";
 
 export class Resources {
   public static readonly folderSeparator: string = "/";
-  public static readonly applicationName: string = "__PRODUCT_NAME__";
-  public static readonly appUserModelId: string = "__APPLICATION_ID__";
-  public static readonly developmentAppUserModelId: string = "__DEVELOPMENT_APPLICATION_ID__";
+  public static get applicationName(): string {
+    return ProductInfo.current.name;
+  }
+
+  public static get appUserModelId(): string {
+    return ProductInfo.current.applicationId;
+  }
+
+  public static get developmentAppUserModelId(): string {
+    return ProductInfo.current.developmentApplicationId;
+  }
+
   public static readonly checkoutHashAlgorithm: string = "sha256";
   public static readonly hexEncoding: "hex" = "hex";
   public static readonly checkoutHashLength: number = 8;
@@ -42,6 +52,7 @@ export class Resources {
   public static readonly quitQuestionChannel: string = "teamrun:quitQuestion";
   public static readonly quitAnswerChannel: string = "teamrun:quitAnswer";
   public static readonly moduleLogChannel: string = "teamrun:moduleLog";
+  public static readonly windowErrorChannel: string = "teamrun:windowError";
   public static readonly copyTextLimit: number = 65536;
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
@@ -57,13 +68,24 @@ export class Resources {
     ShellMethods.clearNotifications.text,
     ShellMethods.settings.text,
     ShellMethods.setSetting.text,
-    ShellMethods.resetSetting.text
+    ShellMethods.resetSetting.text,
+    ShellMethods.recentCommands.text,
+    ShellMethods.recordCommand.text
   ];
-  public static readonly deviceMethods: readonly string[] = [ShellMethods.settings.text, ShellMethods.setSetting.text, ShellMethods.resetSetting.text];
+  public static readonly deviceMethods: readonly string[] = [
+    ShellMethods.settings.text,
+    ShellMethods.setSetting.text,
+    ShellMethods.resetSetting.text,
+    ShellMethods.recentCommands.text,
+    ShellMethods.recordCommand.text
+  ];
   public static readonly deviceField: string = "device";
-  public static readonly settingsNeedDevice: string = "This device has no identity, so its settings cannot be read or changed.";
-  public static readonly settingsPayloadNotObject: string = "A settings request's payload must be a JSON object.";
-  public static readonly untrustedRequest: string = `Only ${Resources.applicationName}'s own window may call the runtime.`;
+  public static readonly deviceRequestNeedsIdentity: string = "This device has no identity, so a request that belongs to it cannot be made.";
+  public static readonly deviceRequestPayloadNotObject: string = "A request that belongs to this device must have a JSON object as its payload.";
+  public static get untrustedRequest(): string {
+    return `Only ${Resources.applicationName}'s own window may call the runtime.`;
+  }
+
   public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
   public static readonly payloadNotJson: string = "The payload must be a JSON value.";
   public static readonly layoutNotObject: string = "The layout must be a JSON object.";
@@ -85,11 +107,20 @@ export class Resources {
   public static readonly windowsPlatform: string = "win32";
   public static readonly localAppDataVariable: string = "LOCALAPPDATA";
   public static readonly windowsLocalAppData: readonly string[] = ["AppData", "Local"];
-  public static readonly windowsDeviceFolder: readonly string[] = "__WINDOWS_DEVICE_FOLDER__".split(Resources.folderSeparator);
-  public static readonly macDeviceFolder: readonly string[] = ["Library", "Application Support", ..."__MACOS_DEVICE_FOLDER__".split(Resources.folderSeparator)];
+  public static get windowsDeviceFolder(): readonly string[] {
+    return ProductInfo.current.windowsDeviceFolder.split(Resources.folderSeparator);
+  }
+
+  public static get macDeviceFolder(): readonly string[] {
+    return ["Library", "Application Support", ...ProductInfo.current.macosDeviceFolder.split(Resources.folderSeparator)];
+  }
+
   public static readonly xdgStateVariable: string = "XDG_STATE_HOME";
   public static readonly xdgStateDefault: readonly string[] = [".local", "state"];
-  public static readonly linuxDeviceFolder: readonly string[] = "__LINUX_DEVICE_FOLDER__".split(Resources.folderSeparator);
+  public static get linuxDeviceFolder(): readonly string[] {
+    return ProductInfo.current.linuxDeviceFolder.split(Resources.folderSeparator);
+  }
+
   public static readonly deviceFileName: string = "device.json";
   public static readonly deviceIdField: string = "id";
   public static readonly createOnlyFlag: string = "wx";
@@ -106,7 +137,10 @@ export class Resources {
   public static readonly macPlatform: string = "darwin";
   public static readonly linuxPlatform: string = "linux";
   public static readonly desktopFileSuffix: string = ".desktop";
-  public static readonly iconFolderSegments: readonly string[] = "__ICONS_FOLDER__".split(Resources.folderSeparator);
+  public static get iconFolderSegments(): readonly string[] {
+    return ProductInfo.current.icons.split(Resources.folderSeparator);
+  }
+
   public static readonly windowsIcon: string = "icon-dark.ico";
   public static readonly windowIcon: string = "icon-dark-512.png";
   public static readonly dockIcon: string = "icon-dock-512.png";
@@ -118,7 +152,7 @@ export class Resources {
   public static readonly preloadParameter: string = "preloadPath";
   public static readonly hiddenTitleBarStyle: "hidden" = "hidden";
   public static readonly denyWindowOpen: "deny" = "deny";
-  public static readonly trafficLightPosition: Readonly<{ x: number; y: number }> = { x: 12, y: 10 };
+  public static readonly trafficLightPosition: Readonly<{ x: number; y: number }> = { x: 12, y: 9 };
   public static readonly willNavigateEvent: "will-navigate" = "will-navigate";
   public static readonly willRedirectEvent: "will-redirect" = "will-redirect";
   public static readonly willAttachWebviewEvent: "will-attach-webview" = "will-attach-webview";
@@ -140,7 +174,6 @@ export class Resources {
   public static readonly connectingShowLimit: number = 2_000;
   public static readonly paintShowLimit: number = 10_000;
   public static readonly logLineSeparator: string = "\n";
-  public static readonly lineBreakPattern: RegExp = /\r?\n/;
   public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   public static readonly reloadCrashLimit: number = 10_000;
   public static readonly rendererEndLimit: number = 5_000;
@@ -150,10 +183,16 @@ export class Resources {
   public static readonly responsiveEvent: "responsive" = "responsive";
   public static readonly cleanExitReason: string = "clean-exit";
   public static readonly warningBoxType: "warning" = "warning";
-  public static readonly windowStopped: string = `${Resources.applicationName}'s window stopped unexpectedly.`;
+  public static get windowStopped(): string {
+    return `${Resources.applicationName}'s window stopped unexpectedly.`;
+  }
+
   public static readonly windowStoppedDetail: string = "Reload it to continue. Your layout comes back from the last save.";
   public static readonly windowStoppedAgainDetail: string = "It stopped again right after it was reloaded. The log folder has what it recorded.";
-  public static readonly windowNotResponding: string = `${Resources.applicationName}'s window isn't responding.`;
+  public static get windowNotResponding(): string {
+    return `${Resources.applicationName}'s window isn't responding.`;
+  }
+
   public static readonly windowNotRespondingDetail: string = "You can wait for it or reload it.";
   public static readonly reloadButton: string = "Reload";
   public static readonly quitButton: string = "Quit";
@@ -163,7 +202,10 @@ export class Resources {
   public static readonly windowResponsiveAgain: string = "The window's page responds again.";
   public static readonly windowStoppedAgainRecord: string = "The window's page stopped again within 10 s of a reload, so the person was offered the log folder instead of another reload.";
   public static readonly mainWindow: string = "main";
-  public static readonly runtimeNotConnected: string = `${Resources.applicationName} is not connected to its runtime.`;
+  public static get runtimeNotConnected(): string {
+    return `${Resources.applicationName} is not connected to its runtime.`;
+  }
+
   public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout and Do not disturb are not kept.";
   public static readonly descriptionsField: string = "descriptions";
   public static readonly isWaitingField: string = "isWaiting";
@@ -174,7 +216,10 @@ export class Resources {
   public static readonly windowAreaShare: number = 0.9;
   public static readonly closeAnswerTimeout: number = 5000;
   public static readonly workQueryTimeout: number = 2000;
-  public static readonly moduleLogLimit: number = 65536;
+  public static readonly windowLogLimit: number = 65536;
+  public static readonly windowErrorBurst: number = 10;
+  public static readonly windowErrorPeriod: number = 60000;
+  public static readonly windowErrorsLeftOut: string = "The window reported more than ten errors within a minute; the rest of that minute's errors are left out of the log.";
   public static readonly executableField: string = "executable";
   public static readonly argumentsField: string = "arguments";
   public static readonly errorFileField: string = "errorFile";
@@ -186,7 +231,10 @@ export class Resources {
   public static readonly replyNeedsOneOutcome: string = "A start reply carries either a process id or a failure.";
   public static readonly starterEnded: string = "The runtime starter ended before it started the runtime.";
   public static readonly starterAcknowledgement: string = "acknowledged";
-  public static readonly starterServiceName: string = `${Resources.applicationName} runtime starter`;
+  public static get starterServiceName(): string {
+    return `${Resources.applicationName} runtime starter`;
+  }
+
   public static readonly utilityEntryRelativePath: string = "../utility-entry.js";
   public static readonly ignoredStdio: "ignore" = "ignore";
   public static readonly messageEvent: "message" = "message";
@@ -256,6 +304,10 @@ export class Resources {
 
   public static formatModuleLogLine(moduleId: string, line: string): string {
     return `${moduleId}: ${line}`;
+  }
+
+  public static formatWindowErrorLine(moduleId: string | null, line: string): string {
+    return Object.isNull(moduleId) ? `Window error: ${line}` : `Window error in ${moduleId}: ${line}`;
   }
 
   public static formatBoundsUnsaved(reason: string): string {

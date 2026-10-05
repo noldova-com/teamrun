@@ -11,6 +11,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
+import BuildMatrix from "../../../workflows/build-matrix.ts";
 import CommandDoublesFixture from "../../fixtures/command-doubles.fixture.ts";
 import SourceTreeFixture from "../../fixtures/source-tree.fixture.ts";
 import WorkflowFileFixture from "../../fixtures/workflow-file.fixture.ts";
@@ -19,30 +20,41 @@ import WorkflowSimulation from "../../fixtures/workflow-simulation.fixture.ts";
 class BuildAndTestTests {
   private static readonly SCRIPT_TIMEOUT: number = 30_000;
   private static readonly WORKFLOW: string = "build-and-test.yml";
+  private static readonly UI_WORKFLOW: string = "ui-workflows.yml";
+  private static readonly ACTION: string = "prepare";
+  private static readonly ACTION_STEP: string = "      - name: Prepare the job\n        uses: ./.github/actions/prepare\n        with:\n          architecture: ${{ matrix.architecture }}\n";
   private static readonly TOOLCHAIN_STEP: string = "Verify the toolchain";
   private static readonly RESULT_STEP: string = "Require the selected verification to pass";
   private static readonly PLAN_STEP: string = "List the targets without a current cache";
   private static readonly UI_STEP: string = "Test the UI workflows";
   private static readonly SUMMARY_STEP: string = "Summarize the UI workflows";
-  private static readonly LEGS_STEP: string = "List the build and test jobs";
-  private static readonly WHOLE_LEG: Readonly<Record<string, string>> = { part: "all" };
   private static readonly UPLOAD_ACTION: string = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1";
+  private static readonly DOWNLOAD_ACTION: string = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1";
   private static readonly UPLOADS: readonly (readonly [string, string, string, readonly string[]])[] = [
     ["Keep the UI workflow results", "Keep the UI workflow results again", "Keep the UI workflow results a last time",
-      ["name: ui-${{ matrix.runner }}-${{ matrix.architecture }}", "path: _build/ui", "retention-days: 14", "if-no-files-found: ignore"]],
+      ["name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}", "path: _build/ui", "retention-days: 14", "if-no-files-found: ignore", "overwrite: true"]],
     ["Keep the main window screenshot", "Keep the main window screenshot again", "Keep the main window screenshot a last time",
-      ["path: _build/ui/main-window-*.png", "archive: false", "retention-days: 14", "if-no-files-found: warn"]]
+      ["path: _build/ui/main-window-*.png", "archive: false", "retention-days: 14", "if-no-files-found: ignore", "overwrite: true"]]
   ];
-  private static readonly NODE_SETUPS: readonly string[] = ["Set up Node.js to classify", "Set up Node.js", "Set up Node.js to install"];
+  private static readonly BUILD_ARTIFACT: string = "name: ui-build-${{ matrix.runner }}-${{ matrix.architecture }}";
+  private static readonly BUILD_UPLOAD_SETTINGS: readonly string[] = [BuildAndTestTests.BUILD_ARTIFACT, "path: ui-build.tar", "retention-days: 3", "if-no-files-found: error", "overwrite: true"];
+  private static readonly PACKED: string = "_build/archives _build/modules _build/packages _build/product.json _build/records _build/tests _build/variants _build/window _build/ui-builds.record " +
+    "node_modules/.package-lock.json node_modules/@noldova src/generated";
+  private static readonly WORKFLOW_NODE_SETUPS: readonly string[] = ["Set up Node.js to classify", "Set up Node.js to install"];
+  private static readonly ACTION_NODE_SETUP: string = "Set up Node.js";
   private static readonly NODE_ACTION: string = "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0";
   private static readonly TEST_STEP: string = "Test";
   private static readonly ANGULAR_UPLOADS: readonly string[] = ["Keep the Angular test output", "Keep the Angular test output again", "Keep the Angular test output a last time"];
   private static readonly ANGULAR_WARNING: string = "Warn that the Angular test output was not kept";
   private static readonly ANGULAR_SETTINGS: readonly string[] = [
-    "name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}", "path: |", "  _build/angular-tests.log", "  _build/angular-tests.json", "retention-days: 14",
-    "if-no-files-found: ignore"
+    "name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}", "path: |", "  _build/angular-tests.log", "  _build/angular-tests.json", "retention-days: 14",
+    "if-no-files-found: ignore", "overwrite: true"
   ];
   private static readonly CACHE_LIST: string = "api --paginate repos/noldova-com/teamrun/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100 --jq .actions_caches[].key";
+  private static readonly SPOTLIGHT_STEPS: readonly string[] = ["Stop Spotlight indexing", "Stop Spotlight indexing while saving"];
+  private static readonly UI_SPOTLIGHT_STEPS: readonly string[] = ["Stop Spotlight indexing before building", "Stop Spotlight indexing before the UI workflows"];
+  private static readonly PULL_REQUEST_UI_TARGETS: string = "linux-x64 linux-arm64 windows-x64 macos-arm64";
+  private static readonly ALL_UI_TARGETS: string = "linux-x64 linux-arm64 windows-x64 windows-arm64 macos-x64 macos-arm64";
   private static readonly TARGETS: readonly (readonly [string, string, string, string])[] = [
     ["Linux x64", "ubuntu-24.04", "Linux", "x64"],
     ["Linux ARM64", "ubuntu-24.04-arm", "Linux", "arm64"],
@@ -54,7 +66,7 @@ class BuildAndTestTests {
 
   public static register(): void {
     test("the toolchain check passes only for the pinned Node.js and npm versions on the expected architecture", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
-      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.TOOLCHAIN_STEP);
+      const script = (await WorkflowFileFixture.readActionAsync(BuildAndTestTests.ACTION)).readStepScript(BuildAndTestTests.TOOLCHAIN_STEP);
       const cases: readonly (readonly [string, string, string, number])[] = [
         ["v26.7.0", "11.19.0", "arm64", 0],
         ["v26.8.0", "11.19.0", "arm64", 1],
@@ -76,41 +88,63 @@ class BuildAndTestTests {
       }
     });
 
-    test("the workflow pins the versions the root manifest requires", async () => {
+    test("the workflow and its shared setup pin the versions the root manifest requires", async () => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const action = await WorkflowFileFixture.readActionAsync(BuildAndTestTests.ACTION);
+      const ui = await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW);
       const manifest: unknown = JSON.parse(await readFile(path.join(SourceTreeFixture.root, "package.json"), "utf8"));
       assert.ok(typeof manifest === "object" && manifest !== null && "engines" in manifest && "packageManager" in manifest);
       assert.deepEqual(manifest.engines, { node: ">=26.7.0 <27", npm: "11.19.0" });
       assert.equal(manifest.packageManager, "npm@11.19.0");
-      assert.equal(workflow.text.match(/node-version: '26\.7\.0'/g)?.length, 3 * BuildAndTestTests.NODE_SETUPS.length);
-      assert.doesNotMatch(workflow.text, /node-version: '(?!26\.7\.0')/);
-      const script = workflow.readStepScript(BuildAndTestTests.TOOLCHAIN_STEP);
+      assert.equal(workflow.text.match(/node-version: '26\.7\.0'/g)?.length, 3 * BuildAndTestTests.WORKFLOW_NODE_SETUPS.length);
+      assert.equal(action.text.match(/node-version: '26\.7\.0'/g)?.length, 3);
+      assert.doesNotMatch(ui.text, /node-version|setup-node/);
+      for (const text of [workflow.text, action.text])
+        assert.doesNotMatch(text, /node-version: '(?!26\.7\.0')/);
+      const script = action.readStepScript(BuildAndTestTests.TOOLCHAIN_STEP);
       assert.ok(script.includes("test \"$(node --version)\" = v26.7.0\n"));
       assert.ok(script.includes("test \"$(npm --version)\" = 11.19.0\n"));
     });
 
-    test("the aggregate check passes a documentation-only skip or a complete pass, and fails otherwise", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+    test("the aggregate check passes a documentation-only skip, a run without UI workflows or a complete pass, and fails otherwise", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
-      const cases: readonly (readonly [string, string, string, number, RegExp])[] = [
-        ["success", "false", "skipped", 0, /^Only Markdown documentation changed/],
-        ["success", "true", "success", 0, /^The document checks passed, and the build and tests passed on every target/],
-        ["success", "true", "failure", 1, /^$/],
-        ["success", "true", "cancelled", 1, /^$/],
-        ["success", "true", "skipped", 1, /^$/],
-        ["success", "false", "success", 1, /^$/],
-        ["failure", "", "skipped", 1, /^$/],
-        ["cancelled", "", "skipped", 1, /^$/],
-        ["skipped", "", "skipped", 1, /^$/]
+      const all = BuildAndTestTests.ALL_UI_TARGETS;
+      const pullRequest = BuildAndTestTests.PULL_REQUEST_UI_TARGETS;
+      const results = (planned: string, unplanned: string, changed: Readonly<Record<string, string>> = {}): string =>
+        all.split(" ").map(t => `${t}=${changed[t] ?? (pullRequest.split(" ").includes(t) ? planned : unplanned)}`).join(" ");
+      const cases: readonly (readonly [string, string, string, string, string, string, number, RegExp])[] = [
+        ["success", "false", "false", "skipped", pullRequest, results("skipped", "skipped"), 0, /^Only Markdown documentation changed/],
+        ["success", "true", "false", "success", pullRequest, results("skipped", "skipped"), 0, /^Only documentation, CI and test tooling or repository configuration changed: .* The UI workflows were not required\.\n$/],
+        ["success", "true", "true", "success", pullRequest, results("success", "skipped"), 0, /^The document checks passed, and the build, tests and UI workflows passed on every target\.\n$/],
+        ["success", "true", "true", "success", all, results("success", "success"), 0, /^The document checks passed, and the build, tests and UI workflows passed on every target\.\n$/],
+        ["success", "true", "true", "success", pullRequest, results("success", "skipped", { "windows-x64": "failure" }), 1, /^$/],
+        ["success", "true", "true", "success", pullRequest, results("success", "skipped", { "macos-arm64": "skipped" }), 1, /^$/],
+        ["success", "true", "true", "success", pullRequest, results("success", "skipped", { "linux-x64": "cancelled" }), 1, /^$/],
+        ["success", "true", "true", "success", all, results("success", "success", { "macos-x64": "skipped" }), 1, /^$/],
+        ["success", "true", "true", "success", pullRequest, results("success", "success"), 1, /^$/],
+        ["success", "true", "true", "success", "", results("skipped", "skipped"), 1, /^$/],
+        ["success", "true", "true", "failure", pullRequest, results("success", "skipped"), 1, /^$/],
+        ["success", "true", "true", "cancelled", pullRequest, results("success", "skipped"), 1, /^$/],
+        ["success", "true", "false", "success", pullRequest, results("success", "skipped"), 1, /^$/],
+        ["success", "true", "false", "skipped", pullRequest, results("skipped", "skipped"), 1, /^$/],
+        ["success", "false", "false", "success", pullRequest, results("skipped", "skipped"), 1, /^$/],
+        ["failure", "", "", "skipped", "", results("skipped", "skipped"), 1, /^$/],
+        ["cancelled", "", "", "skipped", "", results("skipped", "skipped"), 1, /^$/],
+        ["skipped", "", "", "skipped", "", results("skipped", "skipped"), 1, /^$/]
       ];
-      await Promise.all(cases.map(async ([changes, runCode, validation, status, summary]) => {
+      await Promise.all(cases.map(async ([changes, runCode, runUi, validation, uiTargets, uiResults, status, summary]) => {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
         await writeFile(path.join(doubles.directory, "summary.md"), "");
 
-        const result = await doubles.runAsync(script, { CHANGES_RESULT: changes, RUN_CODE: runCode, VALIDATION_RESULT: validation, DEFERRED: "", GITHUB_STEP_SUMMARY: "summary.md" });
+        const result = await doubles.runAsync(script, {
+          CHANGES_RESULT: changes, RUN_CODE: runCode, RUN_UI: runUi, VALIDATION_RESULT: validation, UI_TARGETS: uiTargets, UI_RESULTS: uiResults, DEFERRED: "", UI_DEFERRED: "",
+          GITHUB_STEP_SUMMARY: "summary.md"
+        });
 
-        assert.equal(result.status, status, `${changes}:${runCode}:${validation}: ${result.stderr}`);
-        assert.match(await doubles.readFileAsync("summary.md"), summary);
+        const label = [changes, runCode, runUi, validation, uiTargets, uiResults].join(":");
+        assert.equal(result.status, status, `${label}: ${result.stderr}`);
+        assert.match(await doubles.readFileAsync("summary.md"), summary, label);
         if (status !== 0)
           assert.match(result.stdout, /^::error::/);
       }));
@@ -118,49 +152,164 @@ class BuildAndTestTests {
 
     test("the aggregate check names the targets a passing pull request run left to main and manual runs", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
-      const doubles = await CommandDoublesFixture.createAsync();
-      t.after(() => doubles.disposeAsync());
-      await writeFile(path.join(doubles.directory, "summary.md"), "");
+      const left = "every target this pull request run covers. Skipped here and run on every push to main and in manual runs: Windows ARM64, macOS x64.";
+      for (const [runUi, planned, summary] of [
+        ["true", "success", `The document checks passed, and the build, tests and UI workflows passed on ${left}\n`],
+        ["false", "skipped", `Only documentation, CI and test tooling or repository configuration changed: the document checks passed, the build and tests passed on ${left} The UI workflows were not required.\n`]
+      ] as const) {
+        const doubles = await CommandDoublesFixture.createAsync();
+        t.after(() => doubles.disposeAsync());
+        await writeFile(path.join(doubles.directory, "summary.md"), "");
+        const uiTargets = BuildAndTestTests.PULL_REQUEST_UI_TARGETS;
+        const uiResults = BuildAndTestTests.ALL_UI_TARGETS.split(" ").map(t => `${t}=${uiTargets.split(" ").includes(t) ? planned : "skipped"}`).join(" ");
 
-      const result = await doubles.runAsync(script, {
-        CHANGES_RESULT: "success", RUN_CODE: "true", VALIDATION_RESULT: "success", DEFERRED: "Windows ARM64, macOS x64", GITHUB_STEP_SUMMARY: "summary.md"
-      });
+        const result = await doubles.runAsync(script, {
+          CHANGES_RESULT: "success", RUN_CODE: "true", RUN_UI: runUi, VALIDATION_RESULT: "success", UI_TARGETS: uiTargets, UI_RESULTS: uiResults, DEFERRED: "Windows ARM64, macOS x64", UI_DEFERRED: "",
+          GITHUB_STEP_SUMMARY: "summary.md"
+        });
 
-      assert.equal(result.status, 0, result.stderr);
-      assert.equal(await doubles.readFileAsync("summary.md"),
-        "The document checks passed, and the build and tests passed on every target this pull request run covers. Skipped here and run on every push to main and in manual runs: Windows ARM64, macOS x64.\n");
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(await doubles.readFileAsync("summary.md"), summary);
+      }
     });
 
-    test("macOS targets stop Spotlight indexing before checking out", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+    test("the aggregate check expects no UI workflows from the targets a push leaves to manual and nightly runs, names them, and still requires every planned target", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
+      const uiTargets = BuildAndTestTests.ALL_UI_TARGETS.split(" ").filter(t => t !== "macos-x64").join(" ");
+      for (const [changed, status, summary] of [
+        [{}, 0, "The document checks passed, and the build, tests and UI workflows passed on every target, with the UI workflows of macOS x64 left to manual and nightly runs.\n"],
+        [{ "macos-x64": "success" }, 1, ""],
+        [{ "windows-arm64": "skipped" }, 1, ""]
+      ] as const) {
+        const doubles = await CommandDoublesFixture.createAsync();
+        t.after(() => doubles.disposeAsync());
+        await writeFile(path.join(doubles.directory, "summary.md"), "");
+        const results: Readonly<Record<string, string>> = { "macos-x64": "skipped", ...changed };
+        const uiResults = BuildAndTestTests.ALL_UI_TARGETS.split(" ").map(t => `${t}=${results[t] ?? "success"}`).join(" ");
+
+        const result = await doubles.runAsync(script, {
+          CHANGES_RESULT: "success", RUN_CODE: "true", RUN_UI: "true", VALIDATION_RESULT: "success", UI_TARGETS: uiTargets, UI_RESULTS: uiResults, DEFERRED: "", UI_DEFERRED: "macOS x64",
+          GITHUB_STEP_SUMMARY: "summary.md"
+        });
+
+        assert.equal(result.status, status, `${uiResults}: ${result.stderr}`);
+        assert.equal(await doubles.readFileAsync("summary.md"), summary);
+      }
+    });
+
+    test("every macOS job stops Spotlight indexing before checking out", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const ui = await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
       doubles.respond("sudo", "mdutil -i off /System/Volumes/Data", "");
+      const steps = [...BuildAndTestTests.SPOTLIGHT_STEPS.map(t => [workflow, t] as const), ...BuildAndTestTests.UI_SPOTLIGHT_STEPS.map(t => [ui, t] as const)];
 
-      const result = await doubles.runAsync(workflow.readStepScript("Stop Spotlight indexing"));
+      for (const [file, step] of steps)
+        assert.equal((await doubles.runAsync(file.readStepScript(step))).status, 0, step);
 
-      assert.equal(result.status, 0, result.stderr);
-      assert.deepEqual(await doubles.readCallsAsync(), ["sudo mdutil -i off /System/Volumes/Data"]);
-      assert.ok(workflow.text.indexOf("Stop Spotlight indexing\n        if: runner.os == 'macOS'") < workflow.text.indexOf("Check out the revision"));
+      assert.deepEqual(await doubles.readCallsAsync(), steps.map(() => "sudo mdutil -i off /System/Volumes/Data"));
+      for (const [text, job, next] of [[workflow.text, "validate", "ui-linux-x64"], [workflow.text, "cache", "caches"], [ui.text, "build", "shards"], [ui.text, "shards", ""]] as const) {
+        const end = next === "" ? text.length : text.indexOf(`  ${next}:\n`);
+        const jobSteps = text.slice(text.indexOf(`  ${job}:\n`), end).split("    steps:\n")[1] ?? "";
+        assert.match(jobSteps, /^ {6}- name: Stop Spotlight indexing[^\n]*\n {8}if: runner\.os == 'macOS'\n {8}run: sudo mdutil -i off \/System\/Volumes\/Data\n\n {6}- name: Check out the revision/, job);
+      }
     });
 
-    test("every change checks the documents, and the six targets build and test unless only documentation changed", async () => {
+    test("every change checks the documents, and the targets build and test unless only documentation changed", async () => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
       const text = workflow.text;
       assert.equal(workflow.readStepScript("Check the documents"), "npm test -- documents\n");
-      assert.equal(workflow.readStepScript("Select the verification scope"), "node scripts/classify-changes.ts\n");
-      assert.ok(text.indexOf("Check the documents") < text.indexOf("Select the verification scope"));
-      assert.ok(text.includes("    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}\n"));
-      assert.deepEqual([...new Set(BuildAndTestTests.readLegs(text).map(t => t.target))], ["Linux x64", "Linux ARM64", "Windows x64", "Windows ARM64", "macOS x64", "macOS ARM64"]);
-      assert.equal(workflow.readStepScript("Install dependencies"), "npm ci --no-audit --no-fund\n");
+      assert.equal(workflow.readStepScript("Select the verification scope and the jobs"), "node scripts/classify-changes.ts\n");
+      assert.ok(text.indexOf("Check the documents") < text.indexOf("Select the verification scope and the jobs"));
+      assert.ok(text.includes("          EVENT_NAME: ${{ github.event_name }}\n          BASE_SHA: ${{ github.event.pull_request.base.sha }}\n" +
+        "          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}\n"));
+      for (const output of ["run-code", "run-ui", "targets", "target-table", "ui-targets", "ui-plan", "deferred", "ui-deferred"])
+        assert.ok(text.includes(`      ${output}: \${{ steps.scope.outputs.${output} }}\n`), output);
+      assert.ok(text.includes("  validate:\n    name: Build and test (${{ matrix.target }})\n    needs: changes\n" +
+        "    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}\n" +
+        "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(needs.changes.outputs.targets) }}\n    runs-on: ${{ matrix.runner }}\n"));
       assert.equal(workflow.readStepScript("Build"), "npm run build\n");
       assert.equal(workflow.readStepScript("Test"), "npm test\n");
-      assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [changes, validate]\n    if: always()\n"));
+      const callers = new BuildMatrix("workflow_dispatch").targets.map(t => `ui-${t.key}`).join(", ");
+      assert.ok(text.includes(`    name: Build and test (all targets)\n    needs: [changes, validate, ${callers}]\n    if: always()\n`));
+      assert.ok(text.includes(`          UI_RESULTS: >-\n${new BuildMatrix("workflow_dispatch").targets.map(t => `            ${t.key}=\${{ needs.ui-${t.key}.result }}\n`).join("")}`));
+      assert.ok(text.includes("          UI_TARGETS: ${{ needs.changes.outputs.ui-targets }}\n"));
+      assert.ok(text.includes("          UI_DEFERRED: ${{ needs.changes.outputs.ui-deferred }}\n"));
+    });
+
+    test("each target's UI workflows run in their own called workflow, which waits for nothing but the classification", async () => {
+      const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
+      const ui = (await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW)).text;
+
+      for (const target of new BuildMatrix("workflow_dispatch").targets)
+        assert.ok(text.includes(`  ui-${target.key}:\n    name: UI workflows (${target.name})\n    needs: changes\n` +
+          "    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && " +
+          `contains(format(' {0} ', needs.changes.outputs.ui-targets), ' ${target.key} ') }}\n` +
+          "    uses: ./.github/workflows/ui-workflows.yml\n    with:\n" +
+          `      plan: \${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['${target.key}']) }}\n\n`), target.name);
+      assert.equal(text.match(/^ {4}uses: \.\/\.github\/workflows\/ui-workflows\.yml$/gm)?.length, new BuildMatrix("workflow_dispatch").targets.length);
+      assert.ok(ui.includes("on:\n  workflow_call:\n    inputs:\n      plan:\n"));
+      assert.ok(ui.includes("  build:\n    name: Build (${{ matrix.target }})\n    if: ${{ fromJSON(inputs.plan).build[0] != null }}\n" +
+        "    strategy:\n      matrix:\n        include: ${{ fromJSON(inputs.plan).build }}\n    runs-on: ${{ matrix.runner }}\n"));
+      assert.ok(ui.includes("  shards:\n    name: ${{ matrix.grep == '' && format('Shard {0} of {1}', matrix.shard, matrix.shards) || 'Smoke set' }}\n    needs: build\n" +
+        "    if: ${{ !cancelled() && contains(fromJSON('[\"success\", \"skipped\"]'), needs.build.result) }}\n" +
+        "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(inputs.plan).shards }}\n    runs-on: ${{ matrix.runner }}\n"));
+      assert.deepEqual(ui.match(/^ {2}[a-z-]+:(?=\n {4}name: )/gm), ["  build:", "  shards:"]);
+    });
+
+    test("each target builds once for its UI workflows and runs them in shards that reuse that build", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW);
+      const text = workflow.text;
+      const doubles = await CommandDoublesFixture.createAsync();
+      t.after(() => doubles.disposeAsync());
+      const paths = BuildAndTestTests.PACKED.split(" ");
+      const listing = `for path in ${BuildAndTestTests.PACKED}; do if [ -d "$path" ]; then cat "$path/content"; else cat "$path"; fi; done\n`;
+      await doubles.runAsync(paths.map(t => t.includes(".") ? `mkdir -p "$(dirname ${t})" && echo ${t} > ${t}\n` : `mkdir -p ${t} && echo ${t} > ${t}/content\n`).join(""));
+
+      const packed = await doubles.runAsync(workflow.readStepScript("Pack the builds"));
+      await doubles.runAsync(`rm -rf ${BuildAndTestTests.PACKED}\n`);
+      const removed = await doubles.runAsync(listing);
+      const unpacked = await doubles.runAsync(workflow.readStepScript("Unpack the builds"));
+      const restored = await doubles.runAsync(listing);
+      const archive = await doubles.runAsync("test -e ui-build.tar\n");
+
+      assert.deepEqual([packed.status, removed.status, unpacked.status, restored.status, archive.status], [0, 1, 0, 0, 1], packed.stderr + unpacked.stderr + restored.stderr);
+      assert.equal(restored.stdout, paths.map(t => `${t}\n`).join(""));
+      assert.equal(workflow.readStepScript("Build the test build and its variants"), "npm run test:ui -- --list\n");
+      const main = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
+      const validate = main.slice(main.indexOf("  validate:\n"), main.indexOf("  ui-linux-x64:\n"));
+      const [build, shards] = [text.slice(text.indexOf("  build:\n"), text.indexOf("  shards:\n")), text.slice(text.indexOf("  shards:\n"))];
+      for (const job of [validate, build, shards])
+        assert.equal(job.split(BuildAndTestTests.ACTION_STEP).length, 2);
+      assert.doesNotMatch(main, /test:ui|Test the UI workflows/);
+      assert.doesNotMatch(build, /npm run build|npm test\n|--shard/);
+      assert.doesNotMatch(shards, /npm run build|npm test\n|--list/);
+      const order = ["Build the test build and its variants", "Pack the builds", "Keep the builds for the UI workflows", "Fetch the builds", "Unpack the builds", "Let Electron's sandbox start on Linux",
+        BuildAndTestTests.UI_STEP].map(t => text.indexOf(`      - name: ${t}\n`));
+      assert.ok(order.every((position, index) => position > 0 && (index === 0 || position > (order[index - 1] ?? 0))), order.join(","));
+    });
+
+    test("the plan reads its targets from the classification, which lists every target for a push", async () => {
+      const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
+      const operatingSystems: Readonly<Record<string, string>> = { ubuntu: "Linux", windows: "Windows", macos: "macOS" };
+
+      assert.deepEqual(new BuildMatrix("push").targets.map(t => [t.name, t.runner, t.operatingSystem, t.architecture]), BuildAndTestTests.TARGETS.map(t => [...t]));
+      for (const [, runner, os] of BuildAndTestTests.TARGETS)
+        assert.equal(operatingSystems[runner.split("-")[0] ?? ""], os, runner);
+      assert.ok(text.includes("  cache-plan:\n    name: Find the missing dependency caches\n    needs: changes\n"));
+      assert.ok(text.includes("          TARGET_TABLE: ${{ needs.changes.outputs.target-table }}\n"));
     });
 
     test("runs read the repository only, except the cache cleanup on main, and only pull request runs are cancelled by a newer push", async () => {
       const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
+      const ui = (await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW)).text;
+      const action = (await WorkflowFileFixture.readActionAsync(BuildAndTestTests.ACTION)).text;
       assert.ok(text.includes("permissions:\n  contents: read\n"));
+      assert.ok(ui.includes("permissions:\n  contents: read\n"));
+      assert.deepEqual(ui.match(/^ *\S+: (read|write)$/gm), ["  contents: read"]);
+      assert.equal(ui.match(/persist-credentials: false/g)?.length, 2);
+      assert.doesNotMatch(ui, /concurrency|secrets|token/);
       assert.deepEqual(text.match(/^ *\S+: write$/gm), ["      actions: write"]);
       assert.deepEqual(text.match(/^ *\S+: read$/gm), [
         "  contents: read", "      actions: read", "      contents: read", "      contents: read"
@@ -172,27 +321,33 @@ class BuildAndTestTests {
       assert.ok(text.includes("cancel-in-progress: ${{ github.event_name == 'pull_request' }}"));
       for (const trigger of ["  pull_request:\n    branches: [main]", "  push:\n    branches: [main]", "  workflow_dispatch:"])
         assert.ok(text.includes(trigger), trigger);
-      for (const action of text.matchAll(/uses: (\S+)/g))
-        assert.match(action[1] ?? "", /^actions\/[a-z-]+(\/[a-z-]+)?@[0-9a-f]{40}$/);
+      for (const use of [...text.matchAll(/uses: (\S+)/g), ...ui.matchAll(/uses: (\S+)/g), ...action.matchAll(/uses: (\S+)/g)])
+        assert.match(use[1] ?? "", /^(actions\/[a-z-]+(\/[a-z-]+)?@[0-9a-f]{40}|\.\/\.github\/actions\/prepare|\.\/\.github\/workflows\/ui-workflows\.yml)$/);
+      assert.doesNotMatch(action, /permissions|secrets|token/);
     });
 
-    test("each target restores both dependency caches by OS, CPU and lockfile and never saves them", async () => {
+    test("each job restores both dependency caches by OS, CPU and lockfile and never saves them", async () => {
       const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
-      const validate = text.slice(text.indexOf("  validate:\n"), text.indexOf("  cache-plan:\n"));
-      const order = [
-        "Restore the installed dependencies", "Restore the Angular project's installed dependencies", "Discard an inexact Angular install", "Install dependencies", "Build", "Test"
-      ].map(t => validate.indexOf(`      - name: ${t}\n`));
+      const action = (await WorkflowFileFixture.readActionAsync(BuildAndTestTests.ACTION)).text;
+      const order = ["Restore the installed dependencies", "Restore the Angular project's installed dependencies", "Discard an inexact Angular install", "Install dependencies", "Install Electron"]
+        .map(t => action.indexOf(`    - name: ${t}\n`));
       assert.ok(order.every((position, index) => position > 0 && (index === 0 || position > (order[index - 1] ?? 0))), order.join(","));
-      assert.equal(text.match(/key: dependencies-root-\$\{\{ runner\.os \}\}-\$\{\{ matrix\.architecture \}\}-\$\{\{ hashFiles\('package-lock\.json'\) \}\}\n/g)?.length, 2);
-      assert.equal(text.match(/key: dependencies-src-\$\{\{ runner\.os \}\}-\$\{\{ matrix\.architecture \}\}-\$\{\{ hashFiles\('src\/package-lock\.json'\) \}\}\n/g)?.length, 2);
-      assert.doesNotMatch(text, /restore-keys/);
-      assert.ok(validate.includes("      - name: Install dependencies\n        if: steps.root-dependencies.outputs.cache-hit != 'true'\n"));
-      assert.ok(validate.includes("      - name: Discard an inexact Angular install\n        if: steps.angular-dependencies.outputs.cache-hit != 'true'\n"));
-      assert.doesNotMatch(validate, /actions\/cache\/save/);
+      assert.equal(action.match(/key: dependencies-root-\$\{\{ runner\.os \}\}-\$\{\{ inputs\.architecture \}\}-\$\{\{ hashFiles\('package-lock\.json'\) \}\}\n/g)?.length, 1);
+      assert.equal(action.match(/key: dependencies-src-\$\{\{ runner\.os \}\}-\$\{\{ inputs\.architecture \}\}-\$\{\{ hashFiles\('src\/package-lock\.json'\) \}\}\n/g)?.length, 1);
+      assert.equal(text.match(/key: dependencies-root-\$\{\{ runner\.os \}\}-\$\{\{ matrix\.architecture \}\}-\$\{\{ hashFiles\('package-lock\.json'\) \}\}\n/g)?.length, 1);
+      assert.equal(text.match(/key: dependencies-src-\$\{\{ runner\.os \}\}-\$\{\{ matrix\.architecture \}\}-\$\{\{ hashFiles\('src\/package-lock\.json'\) \}\}\n/g)?.length, 1);
+      for (const file of [text, action])
+        assert.doesNotMatch(file, /restore-keys/);
+      assert.ok(action.includes("    - name: Install dependencies\n      if: steps.root-dependencies.outputs.cache-hit != 'true'\n"));
+      assert.ok(action.includes("    - name: Discard an inexact Angular install\n      if: steps.angular-dependencies.outputs.cache-hit != 'true'\n"));
+      assert.doesNotMatch(action, /actions\/cache\/save/);
+      assert.doesNotMatch(text.slice(0, text.indexOf("  cache-plan:\n")), /actions\/cache\/save/);
+      assert.doesNotMatch((await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW)).text, /actions\/cache/);
     });
 
     test("the plan lists only the targets that miss a current root or Angular cache", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.PLAN_STEP);
+      const table = BuildAndTestTests.TARGETS.map(t => t.join("|")).join(";");
       const complete = BuildAndTestTests.TARGETS.flatMap(([, , os, architecture]) => [`dependencies-root-${os}-${architecture}-rootnew`, `dependencies-src-${os}-${architecture}-srcnew`]);
       const entry = ([target, runner, , architecture]: readonly [string, string, string, string]): string =>
         `{"target":"${target}","runner":"${runner}","architecture":"${architecture}"}`;
@@ -211,7 +366,7 @@ class BuildAndTestTests {
         doubles.respond("gh", BuildAndTestTests.CACHE_LIST, keys.length === 0 ? "" : `${keys.join("\n")}\n`);
         await doubles.runAsync("touch outputs.txt\n");
 
-        const result = await doubles.runAsync(script, { GITHUB_REPOSITORY: "noldova-com/teamrun", ROOT_HASH: "rootnew", SOURCE_HASH: "srcnew", GITHUB_OUTPUT: "outputs.txt" });
+        const result = await doubles.runAsync(script, { GITHUB_REPOSITORY: "noldova-com/teamrun", ROOT_HASH: "rootnew", SOURCE_HASH: "srcnew", GITHUB_OUTPUT: "outputs.txt", TARGET_TABLE: table });
 
         assert.equal(result.status, 0, result.stderr);
         assert.equal(await doubles.readFileAsync("outputs.txt"), outputs);
@@ -223,90 +378,26 @@ class BuildAndTestTests {
       const failing = await CommandDoublesFixture.createAsync();
       t.after(() => failing.disposeAsync());
       failing.respond("gh", BuildAndTestTests.CACHE_LIST, "", 1);
-      assert.notEqual((await failing.runAsync(script, { GITHUB_REPOSITORY: "noldova-com/teamrun", ROOT_HASH: "rootnew", SOURCE_HASH: "srcnew", GITHUB_OUTPUT: "outputs.txt" })).status, 0);
+      assert.notEqual((await failing.runAsync(script, { GITHUB_REPOSITORY: "noldova-com/teamrun", ROOT_HASH: "rootnew", SOURCE_HASH: "srcnew", GITHUB_OUTPUT: "outputs.txt", TARGET_TABLE: table })).status, 0);
+      const unplanned = await CommandDoublesFixture.createAsync();
+      t.after(() => unplanned.disposeAsync());
+      unplanned.respond("gh", BuildAndTestTests.CACHE_LIST, "");
+      await unplanned.runAsync("touch outputs.txt\n");
+      assert.notEqual((await unplanned.runAsync(script, { GITHUB_REPOSITORY: "noldova-com/teamrun", ROOT_HASH: "rootnew", SOURCE_HASH: "srcnew", GITHUB_OUTPUT: "outputs.txt", TARGET_TABLE: "" })).status, 0);
+      assert.equal(await unplanned.readFileAsync("outputs.txt"), "");
     });
 
-    test("the slow targets run their tests and their UI workflows as parallel jobs that each build natively", async () => {
+    test("a target without a current cache installs exactly as the jobs' shared setup does and saves only what is missing", async () => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
-      const text = workflow.text;
-      const legs = BuildAndTestTests.readLegs(text);
-
-      assert.deepEqual(legs.map(t => [t.label, t.part, t.pullRequest]), [
-        ["Linux x64", "all", "runs"],
-        ["Linux ARM64", "all", "runs"],
-        ["Windows x64, tests", "tests", "runs"],
-        ["Windows x64, UI workflows", "workflows", "runs"],
-        ["Windows ARM64, tests", "tests", "deferred"],
-        ["Windows ARM64, UI workflows", "workflows", "deferred"],
-        ["macOS x64, tests", "tests", "deferred"],
-        ["macOS x64, UI workflows", "workflows", "deferred"],
-        ["macOS ARM64", "all", "runs"]
-      ]);
-      for (const leg of legs)
-        assert.equal(leg.label, leg.part === "all" ? leg.target : `${leg.target}, ${leg.part === "tests" ? "tests" : "UI workflows"}`);
-      assert.ok(text.includes("    name: Build and test (${{ matrix.label }})\n    needs: changes\n"));
-      assert.ok(text.includes("      matrix:\n        include: ${{ fromJSON(needs.changes.outputs.legs) }}\n    runs-on: ${{ matrix.runner }}\n"));
-      assert.ok(text.includes("      legs: ${{ steps.legs.outputs.legs }}\n      deferred: ${{ steps.legs.outputs.deferred }}\n"));
-      assert.ok(text.includes("      - name: Build\n        if: matrix.part != 'workflows'\n"));
-      assert.ok(text.includes("      - name: Test\n        id: test\n        if: matrix.part != 'workflows'\n"));
-      assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n        if: matrix.part != 'tests'\n"));
-      for (const step of ["Check out the revision", "Set up Node.js", "Restore the installed dependencies", "Restore the Angular project's installed dependencies", "Install Electron"])
-        assert.ok(!new RegExp(`      - name: ${step}\\n        if: [^\\n]*matrix\\.part`).test(text), step);
-      assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [changes, validate]\n    if: always()\n"));
-    });
-
-    test("a pull request leaves Windows ARM64 and macOS x64 to main and manual runs, and every other run lists every job", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
-      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
-      const script = workflow.readStepScript(BuildAndTestTests.LEGS_STEP);
-      const all = BuildAndTestTests.readLegs(workflow.text).map(({ label, target, part, runner, architecture }) => ({ label, target, part, runner, architecture }));
-
-      for (const event of ["pull_request", "push", "workflow_dispatch"]) {
-        const doubles = await CommandDoublesFixture.createAsync();
-        t.after(() => doubles.disposeAsync());
-        await writeFile(path.join(doubles.directory, "outputs.txt"), "");
-
-        const result = await doubles.runAsync(script, { EVENT_NAME: event, GITHUB_OUTPUT: "outputs.txt" });
-        const outputs = new Map((await doubles.readFileAsync("outputs.txt")).trimEnd().split("\n").map(line => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]));
-
-        assert.equal(result.status, 0, `${event}: ${result.stderr}`);
-        assert.equal(result.stdout, "", event);
-        assert.deepEqual([...outputs.keys()], ["legs", "deferred"], event);
-        if (event === "pull_request") {
-          assert.deepEqual(JSON.parse(outputs.get("legs") ?? ""), all.filter(t => t.target !== "Windows ARM64" && t.target !== "macOS x64"));
-          assert.equal(outputs.get("deferred"), "Windows ARM64, macOS x64");
-        }
-        else {
-          assert.deepEqual(JSON.parse(outputs.get("legs") ?? ""), all, event);
-          assert.equal(outputs.get("deferred"), "", event);
-        }
-      }
-      assert.equal(all.length, 9);
-      assert.ok(workflow.text.includes(`      - name: ${BuildAndTestTests.LEGS_STEP}\n        id: legs\n        env:\n          EVENT_NAME: \${{ github.event_name }}\n`));
-    });
-
-    test("the plan's targets are the validated targets", async () => {
-      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
-      const matrix = [...new Map(BuildAndTestTests.readLegs(workflow.text).map(t => [t.target, [t.target, t.runner, t.architecture]])).values()];
-      const operatingSystems: Readonly<Record<string, string>> = { ubuntu: "Linux", windows: "Windows", macos: "macOS" };
-      const planned = workflow.readStepScript(BuildAndTestTests.PLAN_STEP).split("<<'TARGETS'\n")[1]?.split("TARGETS\n")[0]?.trimEnd().split("\n").map(t => t.split("|")) ?? [];
-
-      assert.deepEqual(matrix, BuildAndTestTests.TARGETS.map(([target, runner, , architecture]) => [target, runner, architecture]));
-      assert.deepEqual(planned, BuildAndTestTests.TARGETS.map(t => [...t]));
-      for (const [, runner, os] of BuildAndTestTests.TARGETS)
-        assert.equal(operatingSystems[runner.split("-")[0] ?? ""], os, runner);
-    });
-
-    test("a target without a current cache installs exactly as validation does and saves only what is missing", async () => {
-      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const action = await WorkflowFileFixture.readActionAsync(BuildAndTestTests.ACTION);
       const text = workflow.text;
       const cache = text.slice(text.indexOf("  cache:\n"), text.indexOf("  caches:\n"));
       assert.ok(cache.startsWith("  cache:\n    name: Save the dependency caches (${{ matrix.target }})\n    needs: cache-plan\n" +
         "    if: needs.cache-plan.outputs.targets != '[]'\n"));
       assert.ok(cache.includes("        include: ${{ fromJSON(needs.cache-plan.outputs.targets) }}\n"));
-      assert.equal(workflow.readStepScript("Verify the toolchain to install"), workflow.readStepScript(BuildAndTestTests.TOOLCHAIN_STEP));
-      assert.equal(workflow.readStepScript("Stop Spotlight indexing while saving"), workflow.readStepScript("Stop Spotlight indexing"));
-      assert.equal(workflow.readStepScript("Install the dependencies to save"), workflow.readStepScript("Install dependencies"));
-      assert.equal(workflow.readStepScript("Install Electron to save"), workflow.readStepScript("Install Electron"));
+      assert.equal(workflow.readStepScript("Verify the toolchain to install"), action.readStepScript(BuildAndTestTests.TOOLCHAIN_STEP));
+      assert.equal(workflow.readStepScript("Install the dependencies to save"), action.readStepScript("Install dependencies"));
+      assert.equal(workflow.readStepScript("Install Electron to save"), action.readStepScript("Install Electron"));
       assert.equal(workflow.readStepScript("Install the Angular project to save"), workflow.readStepScript("Build"));
       const order = [
         "Stop Spotlight indexing while saving", "Check out the revision to install", "Set up Node.js to install", "Verify the toolchain to install",
@@ -324,12 +415,12 @@ class BuildAndTestTests {
     });
 
     test("Electron's binary is installed before the dependencies are saved, so a saved install includes it", async () => {
-      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
-      const text = workflow.text;
+      const action = await WorkflowFileFixture.readActionAsync(BuildAndTestTests.ACTION);
+      const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
 
-      assert.ok(workflow.readStepScript("Install Electron").includes("node node_modules/electron/install.js"));
-      assert.ok(text.includes("      - name: Install Electron\n        run: "));
-      assert.ok(text.indexOf("      - name: Install dependencies\n") < text.indexOf("      - name: Install Electron\n"));
+      assert.ok(action.readStepScript("Install Electron").includes("node node_modules/electron/install.js"));
+      assert.ok(action.text.includes("    - name: Install Electron\n      shell: bash\n      run: "));
+      assert.ok(action.text.indexOf("    - name: Install dependencies\n") < action.text.indexOf("    - name: Install Electron\n"));
       assert.ok(text.indexOf("      - name: Install Electron to save\n") < text.indexOf("      - name: Save the installed dependencies\n"));
     });
 
@@ -339,13 +430,13 @@ class BuildAndTestTests {
       ["a download that fails every attempt fails the step after three pauses", [1], 1, 3]
     ] as const)
       test(`Electron's binary download is retried a bounded number of times: ${name}`, { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
-        const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+        const action = await WorkflowFileFixture.readActionAsync(BuildAndTestTests.ACTION);
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
         doubles.respondInTurn("node", "node_modules/electron/install.js", exitCodes, "HTTPError: Response code 500");
         const stoppedSleep = "sleep() { echo \"sleep $*\" >> sleeps.log; }\n";
 
-        const result = await doubles.runAsync(stoppedSleep + workflow.readStepScript("Install Electron"));
+        const result = await doubles.runAsync(stoppedSleep + action.readStepScript("Install Electron"));
 
         const calls = await doubles.readCallsAsync();
         const waits = (await doubles.readFileAsync("sleeps.log").catch(() => "")).split("\n").filter(t => t.length > 0);
@@ -358,30 +449,40 @@ class BuildAndTestTests {
         }
       });
 
-    test("the UI workflows run after the tests, under Xvfb on Linux, and their results are kept from every run", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
-      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+    test("each shard runs its part of the UI workflows, under Xvfb on Linux, and keeps its results", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW);
       const text = workflow.text;
-      const script = workflow.readStepScript("Test the UI workflows");
+      const script = workflow.readStepScript(BuildAndTestTests.UI_STEP);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui", "");
-      doubles.respond("npm", "run test:ui", "");
+      doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3", "");
+      doubles.respond("npm", "run test:ui -- --require-current --shard 2/3", "");
 
-      const linux = await doubles.runAsync(script, { RUNNER_OS: "Linux" });
-      const windows = await doubles.runAsync(script, { RUNNER_OS: "Windows" });
-      const macos = await doubles.runAsync(script, { RUNNER_OS: "macOS" });
+      doubles.respond("npm", "run test:ui -- --shard 1/1 --grep @smoke", "");
+      const shard = { SHARD: "2/3", REQUIRE_CURRENT: "--require-current", GREP: "" };
 
-      assert.deepEqual([linux.status, windows.status, macos.status], [0, 0, 0], linux.stderr + windows.stderr + macos.stderr);
-      assert.deepEqual(await doubles.readCallsAsync(), ["xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui", "npm run test:ui", "npm run test:ui"]);
-      assert.ok(text.indexOf("      - name: Test\n") < text.indexOf("      - name: Test the UI workflows\n"));
-      assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n"));
-      assert.equal(workflow.readStepScript("Summarize the UI workflows"), "node scripts/ui-summary.ts\n");
-      assert.ok(text.includes("          UI_TARGET: ${{ matrix.target }}\n          SCREENSHOT_URL: ${{ steps.screenshot-last.outputs.artifact-url || steps.screenshot-again.outputs.artifact-url || steps.screenshot.outputs.artifact-url }}\n"));
+      const linux = await doubles.runAsync(script, { RUNNER_OS: "Linux", ...shard });
+      const windows = await doubles.runAsync(script, { RUNNER_OS: "Windows", ...shard });
+      const macos = await doubles.runAsync(script, { RUNNER_OS: "macOS", ...shard });
+      const smoke = await doubles.runAsync(script, { RUNNER_OS: "macOS", SHARD: "1/1", REQUIRE_CURRENT: "", GREP: "@smoke" });
+
+      assert.deepEqual([linux.status, windows.status, macos.status, smoke.status], [0, 0, 0, 0], linux.stderr + windows.stderr + macos.stderr + smoke.stderr);
+      assert.deepEqual(await doubles.readCallsAsync(), [
+        "xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3", "npm run test:ui -- --require-current --shard 2/3", "npm run test:ui -- --require-current --shard 2/3",
+        "npm run test:ui -- --shard 1/1 --grep @smoke"
+      ]);
+      assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n        env:\n          SHARD: ${{ matrix.shard }}/${{ matrix.shards }}\n" +
+        "          REQUIRE_CURRENT: ${{ matrix.prebuilt && '--require-current' || '' }}\n          GREP: ${{ matrix.grep }}\n"));
+      assert.ok(text.includes("      - name: Fetch the builds\n        id: fetch\n        if: matrix.prebuilt\n"));
+      assert.ok(text.includes("      - name: Unpack the builds\n        if: matrix.prebuilt\n"));
+      assert.equal(workflow.readStepScript(BuildAndTestTests.SUMMARY_STEP), "node scripts/ui-summary.ts\n");
+      assert.ok(text.includes("          UI_TARGET: ${{ matrix.target }}, ${{ matrix.shard }} of ${{ matrix.shards }}\n" +
+        "          SCREENSHOT_URL: ${{ steps.screenshot-last.outputs.artifact-url || steps.screenshot-again.outputs.artifact-url || steps.screenshot.outputs.artifact-url }}\n"));
       assert.ok(text.includes("          SCREENSHOT_UPLOAD_FAILED: ${{ steps.screenshot-last.outcome == 'failure' }}\n"));
     });
 
     test("each upload of the UI results is tried three times with a pause, with the same settings", async () => {
-      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW);
       const simulation = new WorkflowSimulation(workflow.text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
 
       for (const [first, again, last, settings] of BuildAndTestTests.UPLOADS) {
@@ -390,53 +491,76 @@ class BuildAndTestTests {
 
         assert.deepEqual(attempts.map(t => t.uses), attempts.map(() => BuildAndTestTests.UPLOAD_ACTION));
         assert.deepEqual(attempts.map(t => t.continueOnError), [true, true, true]);
-        assert.deepEqual(attempts[0]?.settings, settings);
-        assert.deepEqual(attempts[1]?.settings, [...settings, "overwrite: true"]);
-        assert.deepEqual(attempts[2]?.settings, [...settings, "overwrite: true"]);
+        assert.deepEqual(attempts.map(t => t.settings), BuildAndTestTests.threeTimes(settings));
         assert.equal(workflow.readStepScript(`${pause} again`), "sleep 15\n");
         assert.equal(workflow.readStepScript(`${pause} a last time`), "sleep 15\n");
       }
     });
 
-    test("each Node.js setup is tried three times with a pause and the same settings, and fails its job only when the last attempt fails", async () => {
-      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+    test("keeping and fetching a target's builds are each tried three times with a pause, and fail the job only when the last attempt fails", async () => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW);
 
-      for (const first of BuildAndTestTests.NODE_SETUPS) {
+      for (const [first, pause, action, settings] of [
+        ["Keep the builds for the UI workflows", "Wait before keeping the builds", BuildAndTestTests.UPLOAD_ACTION, BuildAndTestTests.BUILD_UPLOAD_SETTINGS],
+        ["Fetch the builds", "Wait before fetching the builds", BuildAndTestTests.DOWNLOAD_ACTION, [BuildAndTestTests.BUILD_ARTIFACT]]
+      ] as const) {
         const [again, last] = [`${first} again`, `${first} a last time`];
-        const pause = `Wait before setting up ${first.slice("Set up ".length)}`;
         const simulation = new WorkflowSimulation(workflow.text, first, last);
         const attempts = [first, again, last].map(t => simulation.find(t));
 
-        const passed = simulation.run(BuildAndTestTests.WHOLE_LEG, {});
-        const retried = simulation.run(BuildAndTestTests.WHOLE_LEG, { [first]: "failure" });
-        const failed = simulation.run(BuildAndTestTests.WHOLE_LEG, { [first]: "failure", [again]: "failure", [last]: "failure" });
+        const prebuilt = { prebuilt: "true" };
+        const passed = simulation.run(prebuilt, {});
+        const retried = simulation.run(prebuilt, { [first]: "failure" });
+        const failed = simulation.run(prebuilt, { [first]: "failure", [again]: "failure", [last]: "failure" });
+        const selfBuilt = simulation.run({ prebuilt: "false" }, {});
 
-        assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[BuildAndTestTests.NODE_ACTION, true], [BuildAndTestTests.NODE_ACTION, true], [BuildAndTestTests.NODE_ACTION, false]], first);
-        assert.deepEqual([attempts[1]?.settings, attempts[2]?.settings], [attempts[0]?.settings, attempts[0]?.settings], first);
-        assert.ok(attempts[0]?.settings.includes("node-version: '26.7.0'"), first);
-        assert.deepEqual([workflow.readStepScript(`${pause} again`), workflow.readStepScript(`${pause} a last time`)], ["sleep 30\n", "sleep 30\n"], first);
+        assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[action, true], [action, true], [action, false]], first);
+        assert.deepEqual(selfBuilt.ran, first === "Fetch the builds" ? [] : [first], first);
+        assert.deepEqual(attempts.map(t => t.settings), BuildAndTestTests.threeTimes(settings), first);
+        assert.deepEqual([workflow.readStepScript(`${pause} again`), workflow.readStepScript(`${pause} a last time`)], ["sleep 15\n", "sleep 15\n"], first);
         assert.deepEqual([passed.ran, passed.isJobFailed], [[first], false], first);
         assert.deepEqual([retried.ran, retried.isJobFailed], [[first, `${pause} again`, again], false], first);
         assert.deepEqual([failed.ran, failed.isJobFailed], [[first, `${pause} again`, again, `${pause} a last time`, last], true], first);
       }
     });
 
-    test("failed tests keep the Angular tests' output and report, tried three times with a pause, and a passing or skipped test step keeps nothing", async t => {
+    test("each Node.js setup is tried three times with a pause and the same settings, and fails its job only when the last attempt fails", async () => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const action = await WorkflowFileFixture.readActionAsync(BuildAndTestTests.ACTION);
+
+      for (const [file, first] of [...BuildAndTestTests.WORKFLOW_NODE_SETUPS.map(t => [workflow, t] as const), [action, BuildAndTestTests.ACTION_NODE_SETUP] as const]) {
+        const [again, last] = [`${first} again`, `${first} a last time`];
+        const pause = `Wait before setting up ${first.slice("Set up ".length)}`;
+        const simulation = new WorkflowSimulation(file.text, first, last);
+        const attempts = [first, again, last].map(t => simulation.find(t));
+
+        const passed = simulation.run({}, {});
+        const retried = simulation.run({}, { [first]: "failure" });
+        const failed = simulation.run({}, { [first]: "failure", [again]: "failure", [last]: "failure" });
+
+        assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[BuildAndTestTests.NODE_ACTION, true], [BuildAndTestTests.NODE_ACTION, true], [BuildAndTestTests.NODE_ACTION, false]], first);
+        assert.deepEqual([attempts[1]?.settings, attempts[2]?.settings], [attempts[0]?.settings, attempts[0]?.settings], first);
+        assert.ok(attempts[0]?.settings.includes("node-version: '26.7.0'"), first);
+        assert.deepEqual([file.readStepScript(`${pause} again`), file.readStepScript(`${pause} a last time`)], ["sleep 30\n", "sleep 30\n"], first);
+        assert.deepEqual([passed.ran, passed.isJobFailed], [[first], false], first);
+        assert.deepEqual([retried.ran, retried.isJobFailed], [[first, `${pause} again`, again], false], first);
+        assert.deepEqual([failed.ran, failed.isJobFailed], [[first, `${pause} again`, again, `${pause} a last time`, last], true], first);
+      }
+    });
+
+    test("failed tests keep the Angular tests' output and report, tried three times with a pause, and a passing test step keeps nothing", async t => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
       const simulation = new WorkflowSimulation(workflow.text, BuildAndTestTests.TEST_STEP, BuildAndTestTests.ANGULAR_WARNING);
       const [first, again, last] = BuildAndTestTests.ANGULAR_UPLOADS.map(t => simulation.find(t));
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
 
-      const passed = simulation.run(BuildAndTestTests.WHOLE_LEG, {});
-      const skipped = simulation.run({ part: "workflows" }, {});
-      const failed = simulation.run(BuildAndTestTests.WHOLE_LEG, { [BuildAndTestTests.TEST_STEP]: "failure" });
-      const unkept = simulation.run(BuildAndTestTests.WHOLE_LEG,
-        Object.fromEntries([BuildAndTestTests.TEST_STEP, ...BuildAndTestTests.ANGULAR_UPLOADS].map(t => [t, "failure"])));
+      const passed = simulation.run({}, {});
+      const failed = simulation.run({}, { [BuildAndTestTests.TEST_STEP]: "failure" });
+      const unkept = simulation.run({}, Object.fromEntries([BuildAndTestTests.TEST_STEP, ...BuildAndTestTests.ANGULAR_UPLOADS].map(t => [t, "failure"])));
       const warning = await doubles.runAsync(workflow.readStepScript(BuildAndTestTests.ANGULAR_WARNING));
 
       assert.deepEqual([passed.ran, passed.isJobFailed], [[BuildAndTestTests.TEST_STEP], false]);
-      assert.deepEqual([skipped.ran, skipped.isJobFailed], [[], false]);
       assert.deepEqual([failed.ran, failed.isJobFailed], [[BuildAndTestTests.TEST_STEP, "Keep the Angular test output"], true]);
       assert.deepEqual(unkept.ran, [
         BuildAndTestTests.TEST_STEP,
@@ -445,17 +569,16 @@ class BuildAndTestTests {
         BuildAndTestTests.ANGULAR_WARNING
       ]);
       assert.deepEqual([first, again, last].map(t => [t?.uses, t?.continueOnError]), [first, again, last].map(() => [BuildAndTestTests.UPLOAD_ACTION, true]));
-      assert.deepEqual(first?.settings, BuildAndTestTests.ANGULAR_SETTINGS);
-      assert.deepEqual([again?.settings, last?.settings], [[...BuildAndTestTests.ANGULAR_SETTINGS, "overwrite: true"], [...BuildAndTestTests.ANGULAR_SETTINGS, "overwrite: true"]]);
+      assert.deepEqual([first, again, last].map(t => t?.settings), BuildAndTestTests.threeTimes(BuildAndTestTests.ANGULAR_SETTINGS));
       assert.equal(workflow.readStepScript("Wait before keeping the Angular test output again"), "sleep 15\n");
       assert.equal(workflow.readStepScript("Wait before keeping the Angular test output a last time"), "sleep 15\n");
       assert.deepEqual([warning.status, warning.stdout], [0, "::warning title=The Angular test output was not kept::The upload failed three times, so it is not attached.\n"]);
     });
 
     test("an upload that fails and then succeeds is tried again once and keeps the job green", async () => {
-      const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
+      const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
 
-      const result = simulation.run(BuildAndTestTests.WHOLE_LEG, { "Keep the UI workflow results": "failure", "Keep the main window screenshot": "failure", "Keep the main window screenshot again": "failure" });
+      const result = simulation.run({}, { "Keep the UI workflow results": "failure", "Keep the main window screenshot": "failure", "Keep the main window screenshot again": "failure" });
 
       assert.equal(result.isJobFailed, false);
       assert.deepEqual(result.ran, [
@@ -468,13 +591,13 @@ class BuildAndTestTests {
     });
 
     test("an upload that fails every time warns, leaves the job green and tells the summary", async t => {
-      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW);
       const simulation = new WorkflowSimulation(workflow.text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
       const failures = Object.fromEntries(BuildAndTestTests.UPLOADS.flatMap(([first, again, last]) => [[first, "failure"], [again, "failure"], [last, "failure"]]));
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
 
-      const result = simulation.run(BuildAndTestTests.WHOLE_LEG, failures);
+      const result = simulation.run({}, failures);
       const results = await doubles.runAsync(workflow.readStepScript("Warn that the UI workflow results were not kept"));
       const screenshot = await doubles.runAsync(workflow.readStepScript("Warn that the main window screenshot was not kept"));
 
@@ -487,11 +610,11 @@ class BuildAndTestTests {
       assert.equal(screenshot.stdout, "::warning title=The main window screenshot was not kept::The upload failed three times, so it is not attached. The tests are not affected.\n");
     });
 
-    test("uploads that succeed run no retry and no warning, and failed tests still fail the job", async () => {
-      const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
+    test("uploads that succeed run no retry and no warning, and failed UI workflows still fail the job", async () => {
+      const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
 
-      const passed = simulation.run(BuildAndTestTests.WHOLE_LEG, {});
-      const failed = simulation.run(BuildAndTestTests.WHOLE_LEG, { [BuildAndTestTests.UI_STEP]: "failure" });
+      const passed = simulation.run({}, {});
+      const failed = simulation.run({}, { [BuildAndTestTests.UI_STEP]: "failure" });
 
       assert.deepEqual(passed.ran, [BuildAndTestTests.UI_STEP, "Keep the UI workflow results", "Keep the main window screenshot", BuildAndTestTests.SUMMARY_STEP]);
       assert.equal(passed.isJobFailed, false);
@@ -501,39 +624,29 @@ class BuildAndTestTests {
       assert.equal(simulation.find(BuildAndTestTests.SUMMARY_STEP).continueOnError, false);
     });
 
-    test("a tests leg runs no UI workflow, upload or summary, and a UI workflows leg runs them as a whole leg does", async () => {
-      const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
-      const failures = { "Keep the UI workflow results": "failure", "Keep the main window screenshot": "failure" };
+    test("the UI workflows make their own test builds, so the workflow names no variant", async () => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW);
+      const main = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
 
-      const tests = simulation.run({ part: "tests" }, failures);
-      const workflows = simulation.run({ part: "workflows" }, failures);
-
-      assert.deepEqual(tests.ran, []);
-      assert.equal(tests.isJobFailed, false);
-      assert.deepEqual(workflows, simulation.run(BuildAndTestTests.WHOLE_LEG, failures));
+      for (const text of [workflow.text, main.text]) {
+        assert.ok(!text.includes("--output _build/variants"));
+        assert.ok(!text.includes("npm run build -- --test"));
+      }
     });
 
-    test("the UI workflows build their own test builds, so the workflow builds none", async () => {
-      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
-
-      assert.ok(!workflow.text.includes("--output _build/variants"));
-      assert.ok(!workflow.text.includes("npm run build -- --test"));
-      assert.ok(workflow.text.indexOf("      - name: Test\n") < workflow.text.indexOf("      - name: Test the UI workflows\n"));
-    });
-
-    test("a failed UI workflow run fails its step",{ timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
-      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript("Test the UI workflows");
+    test("a failed UI workflow run fails its step", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW)).readStepScript(BuildAndTestTests.UI_STEP);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui", "", 1);
-      doubles.respond("npm", "run test:ui", "", 1);
+      doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 1/3", "", 1);
+      doubles.respond("npm", "run test:ui -- --require-current --shard 1/3", "", 1);
 
-      assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Linux" })).status, 1);
-      assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Windows" })).status, 1);
+      assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Linux", SHARD: "1/3", REQUIRE_CURRENT: "--require-current", GREP: "" })).status, 1);
+      assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Windows", SHARD: "1/3", REQUIRE_CURRENT: "--require-current", GREP: "" })).status, 1);
     });
 
-    test("Linux targets let Electron's sandbox create its namespaces before the UI workflows", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
-      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+    test("Linux shards let Electron's sandbox create its namespaces before the UI workflows", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
       doubles.respond("sudo", "sysctl -w kernel.apparmor_restrict_unprivileged_userns=0", "");
@@ -542,12 +655,12 @@ class BuildAndTestTests {
 
       assert.equal(result.status, 0, result.stderr);
       assert.deepEqual(await doubles.readCallsAsync(), ["sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0"]);
-      assert.ok(workflow.text.includes("      - name: Let Electron's sandbox start on Linux\n        if: runner.os == 'Linux' && matrix.part != 'tests'\n"));
+      assert.ok(workflow.text.includes("      - name: Let Electron's sandbox start on Linux\n        if: runner.os == 'Linux'\n"));
       assert.ok(workflow.text.indexOf("Let Electron's sandbox start on Linux") < workflow.text.indexOf("Test the UI workflows"));
     });
 
     test("an inexact Angular restore is discarded, so a partial restore never passes as installed", async t => {
-      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript("Discard an inexact Angular install");
+      const script = (await WorkflowFileFixture.readActionAsync(BuildAndTestTests.ACTION)).readStepScript("Discard an inexact Angular install");
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
       await doubles.runAsync("mkdir -p src/node_modules/partial && touch src/node_modules/.teamrun-install src/package-lock.json\n");
@@ -612,9 +725,8 @@ class BuildAndTestTests {
     });
   }
 
-  private static readLegs(text: string): readonly { label: string; target: string; part: string; runner: string; architecture: string; pullRequest: string }[] {
-    return [...text.matchAll(/^ {10}([^|\n]+)\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)$/gm)]
-      .map(t => ({ label: t[1] ?? "", target: t[2] ?? "", part: t[3] ?? "", runner: t[4] ?? "", architecture: t[5] ?? "", pullRequest: t[6] ?? "" }));
+  private static threeTimes<T>(value: T): readonly T[] {
+    return [value, value, value];
   }
 }
 

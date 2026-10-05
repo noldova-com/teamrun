@@ -1,0 +1,104 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<header class="tr-modules-header">
+  <h1 class="tr-modules-title">{{ resources.modulesTitle }}</h1>
+  @if (version(); as version) {
+    <span class="tr-modules-version">{{ version }}</span>
+  }
+</header>
+<div class="tr-modules-body">
+  <nav class="tr-modules-list" [attr.aria-label]="resources.modulesTitle">
+    @for (module of overview().modules; track module.id) {
+      @let isCurrent = module.id === current()?.id;
+      <button type="button" class="tr-modules-row" [class.tr-modules-row-current]="isCurrent" [attr.aria-current]="isCurrent ? 'true' : null"
+        [attr.data-module]="module.id" (click)="select(module.id)">
+        <span class="tr-modules-row-head">
+          <span class="tr-modules-name" data-truncates [trTooltip]="module.displayName" [trTooltipTruncated]="true">{{ module.displayName }}</span>
+          <ng-container [ngTemplateOutlet]="state" [ngTemplateOutletContext]="{ $implicit: module }" />
+        </span>
+        <span class="tr-modules-row-meta">
+          <span class="tr-modules-id" data-truncates [trTooltip]="module.id" [trTooltipTruncated]="true">{{ module.id }}</span>
+          <span class="tr-modules-row-version">{{ module.version }}</span>
+        </span>
+        <span class="tr-modules-description">{{ module.description }}</span>
+      </button>
+    } @empty {
+      <p class="tr-modules-empty">{{ resources.noModules }}</p>
+    }
+  </nav>
+  @if (current(); as module) {
+    @let contributions = contributionsOf(module);
+    <section class="tr-modules-detail" [attr.aria-labelledby]="'tr-modules-detail-' + module.id">
+      <h2 class="tr-modules-detail-title" [id]="'tr-modules-detail-' + module.id">{{ module.displayName }}</h2>
+      <p class="tr-modules-detail-id">{{ module.id }}</p>
+      <p class="tr-modules-detail-description">{{ module.description }}</p>
+      <dl class="tr-modules-facts">
+        <dt>{{ resources.moduleVersionTitle }}</dt>
+        <dd class="tr-modules-fact-version">{{ module.version }}</dd>
+        <dt>{{ resources.moduleStateTitle }}</dt>
+        <dd class="tr-modules-fact-state">
+          <ng-container [ngTemplateOutlet]="state" [ngTemplateOutletContext]="{ $implicit: module }" />
+          @if (module.cause; as cause) {
+            <span class="tr-modules-cause">{{ cause }}</span>
+          }
+        </dd>
+        @if (overview().findBlocker(module); as blocker) {
+          <dt>{{ resources.blockedByTitle }}</dt>
+          <dd class="tr-modules-fact-blocker"><ng-container [ngTemplateOutlet]="links" [ngTemplateOutletContext]="{ $implicit: [blocker] }" /></dd>
+        }
+        <dt>{{ resources.dependenciesTitle }}</dt>
+        <dd class="tr-modules-fact-dependencies"><ng-container [ngTemplateOutlet]="links" [ngTemplateOutletContext]="{ $implicit: overview().listDependencies(module) }" /></dd>
+        <dt>{{ resources.dependentsTitle }}</dt>
+        <dd class="tr-modules-fact-dependents"><ng-container [ngTemplateOutlet]="links" [ngTemplateOutletContext]="{ $implicit: overview().listDependents(module) }" /></dd>
+      </dl>
+      @if (module.state !== active) {
+        <tr-module-actions [module]="module" />
+      }
+      <h3 class="tr-modules-section-title">{{ resources.contributionsTitle }}</h3>
+      @if (contributions.length > 0) {
+        <dl class="tr-modules-facts">
+          @for (group of contributions; track group.kind) {
+            <dt>{{ group.title }}</dt>
+            <dd>
+              <ul class="tr-modules-contributions" [attr.data-kind]="group.kind">
+                @for (row of group.rows; track row.name) {
+                  <li class="tr-modules-contribution">
+                    @if (row.title; as title) {
+                      <span class="tr-modules-contribution-title">{{ title }}</span>
+                    }
+                    <span class="tr-modules-contribution-name">{{ row.name }}</span>
+                  </li>
+                }
+              </ul>
+            </dd>
+          }
+        </dl>
+      } @else {
+        <p class="tr-modules-none">{{ resources.noContributions }}</p>
+      }
+    </section>
+  }
+</div>
+
+<ng-template #state let-module>
+  <span class="tr-modules-state" [class.tr-modules-state-down]="module.state !== active">
+    @if (module.state !== active) {
+      <span class="material-symbols-rounded tr-modules-state-icon" aria-hidden="true">{{ resources.moduleFailureGlyph }}</span>
+    }
+    <span class="tr-modules-state-label">{{ labelOf(module.state) }}</span>
+  </span>
+</ng-template>
+
+<ng-template #links let-references>
+  @for (reference of references; track reference.id; let isLast = $last) {
+    @if (reference.module; as module) {<button type="button" class="tr-modules-link" (click)="follow(module.id)">{{ module.displayName }}</button>} @else {<span class="tr-modules-unknown">{{ reference.id }}</span>}@if (!isLast) {<span>, </span>}
+  } @empty {
+    <span class="tr-modules-none">{{ resources.noModulesNamed }}</span>
+  }
+</ng-template>

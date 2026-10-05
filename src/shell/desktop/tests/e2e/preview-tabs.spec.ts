@@ -9,6 +9,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import SettingsFixture from "./fixtures/settings.fixture.ts";
 
 const documentsGroup = "tr-tab-group:has(tr-tab[data-tab-key='document/notes.note/1'])";
 
@@ -41,12 +42,6 @@ async function turnPreviewTabsOnAsync(window: Page): Promise<void> {
   await previewTabsRow(window).getByRole("button", { name: /^Reset / }).click();
   await expect(previewTabsRow(window).locator(".tr-setting-row-marker")).toHaveCount(0);
   await expect(previewTabsSetting(window)).toBeChecked();
-}
-
-async function openSettingsAsync(window: Page): Promise<void> {
-  await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
-  await window.keyboard.press("ControlOrMeta+Comma");
-  await expect(window.locator("tr-settings")).toBeVisible();
 }
 
 async function expectPreviewAsync(locator: Locator, isPreview: boolean): Promise<void> {
@@ -117,7 +112,7 @@ test.describe("preview tabs", () => {
 
   test("with Preview tabs off, a single click opens a kept tab and the next note opens a second tab", async ({ desktop }) => {
     const window = desktop.window;
-    await openSettingsAsync(window);
+    await SettingsFixture.openAsync(window);
     await expect(previewTabsSetting(window)).toBeChecked();
     await turnPreviewTabsOffAsync(window);
 
@@ -138,7 +133,7 @@ test.describe("preview tabs", () => {
     await listItem(window, 3).click();
     await expectPreviewAsync(tab(window, 3), true);
 
-    await openSettingsAsync(window);
+    await SettingsFixture.openAsync(window);
     await turnPreviewTabsOffAsync(window);
     await expectPreviewAsync(tab(window, 3), false);
     await turnPreviewTabsOnAsync(window);

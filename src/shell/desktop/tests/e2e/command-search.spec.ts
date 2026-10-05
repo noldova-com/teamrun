@@ -25,7 +25,7 @@ function options(window: Page): Locator {
 }
 
 test.describe("command search", () => {
-  test("opens from its key centred under the window row, runs a module's command from the keyboard and lists it first next time", async ({ desktop }) => {
+  test("opens from its key centred under the window row, runs a module's command from the keyboard and lists it first next time @smoke", async ({ desktop }) => {
     const window = desktop.window;
     const tab = window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]");
     await expect(tab).toBeVisible();
@@ -91,6 +91,7 @@ test.describe("command search", () => {
 
     await window.keyboard.type("new note");
 
+    await expect(options(window).last().locator("mark")).toHaveText(["New note"]);
     await expect(options(window)).toHaveCount(2);
     await expect(options(window).last()).toHaveAttribute("data-item", "notes.newNote");
     await expect(options(window).first().locator(".tr-quick-input-detail")).toHaveText("File › New from template");
@@ -100,6 +101,15 @@ test.describe("command search", () => {
 
     await expect(pane(window)).toHaveCount(0);
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"] .tr-tab-label")).toHaveText("Note 3");
+  });
+
+  test("lists each focus command once, leaving out the View menu items that run them without arguments", async ({ desktop }) => {
+    const window = desktop.window;
+    await CommandSearchFixture.searchAsync(window, "focus");
+
+    await expect(options(window).and(window.locator("[data-item=\"shell.focusNextGroup\"]"))).toHaveCount(1);
+    await expect(options(window).and(window.locator("[data-item=\"shell.focusPreviousGroup\"]"))).toHaveCount(1);
+    await expect(options(window).and(window.locator("[data-item^=\"shell.view/\"]"))).toHaveCount(0);
   });
 
   test("a query keeps the rows that contain it as one run, in the same order, and marks the run in the title without changing its text", async ({ desktop }) => {
@@ -114,19 +124,97 @@ test.describe("command search", () => {
     await CommandSearchFixture.searchAsync(window, String());
     await expect(options(window).first()).toBeVisible();
     const all = await rows();
+    const expected = all.filter(t => `${t[1]} ${t[2]}`.toLowerCase().includes("tab")).map(t => t[0]);
 
     await window.keyboard.type("tab");
-    await expect.poll(async () => (await rows()).length).toBeLessThan(all.length);
+    await expect.poll(async () => (await rows()).map(t => [t[0], t[3].map(u => u.toLowerCase())])).toEqual(expected.map(t => [t, ["tab"]]));
     const found = await rows();
 
     expect(found.length).toBeGreaterThan(0);
-    expect(found.map(t => t[0])).toEqual(all.filter(t => `${t[1]} ${t[2]}`.toLowerCase().includes("tab")).map(t => t[0]));
     expect(found.map(t => [t[1], t[2]])).toEqual(found.map(t => all.find(u => u[0] === t[0])).map(t => [t?.[1], t?.[2]]));
-    expect(found.every(t => t[3].length === 1 && t[3][0]?.toLowerCase() === "tab")).toBe(true);
     for (const mode of WindowModeFixture.modes) {
       await WindowModeFixture.setAsync(window, mode);
       await desktop.checkpointAsync(`command-search-match-${mode.toLowerCase()}`);
     }
+    await window.keyboard.press("Escape");
+  });
+
+  test("keeps its list to half the window's height in a tall window, and to ten rows in a short one", async ({ desktop }) => {
+    const window = desktop.window;
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]")).toBeVisible();
+
+    for (const [width, height, name] of [[1920, 1080, "tall"], [900, 420, "short"]] as const) {
+      await desktop.useViewportAsync(width, height);
+      await CommandSearchFixture.searchAsync(window, String());
+      await expect(options(window).first()).toBeVisible();
+      const list = await pane(window).locator(".tr-quick-input-list").evaluate(element => ({
+        height: element.getBoundingClientRect().height,
+        row: (element.querySelector("[role=option]") as HTMLElement).offsetHeight,
+        scrolls: element.scrollHeight > element.clientHeight,
+        half: innerHeight / 2
+      }));
+
+      expect(list.scrolls).toBe(true);
+      expect(Math.abs(list.height - (name === "tall" ? list.half : list.row * 10))).toBeLessThan(1);
+      expect(list.row * 10 > list.half).toBe(name === "short");
+      await desktop.checkpointAsync(`command-search-height-${name}`);
+      await window.keyboard.press("Escape");
+      await expect(pane(window)).toHaveCount(0);
+    }
+  });
+
+  test("lists the commands last run from it first, newest first, labelled and set apart from the others, keeps them first while typing, and after a restart", async ({ desktop }) => {
+    const ids = (): Promise<readonly string[]> => options(window).evaluateAll(items => items.map(t => t.getAttribute("data-item") ?? ""));
+    const sections = (): Promise<readonly (readonly [number, string])[]> => options(window).evaluateAll(items => items.flatMap((t, index) => {
+      const label = t.querySelector(".tr-quick-input-section")?.textContent?.trim();
+      return label === undefined ? [] : [[index, label] as const];
+    }));
+    const separated = (): Promise<readonly string[]> => pane(window).locator(".tr-quick-input-separator + [role=option]").evaluateAll(items => items.map(t => t.getAttribute("data-item") ?? ""));
+    let window = desktop.window;
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]")).toBeVisible();
+
+    await CommandSearchFixture.searchAsync(window, "new n");
+    await expect(options(window).last()).toHaveAttribute("data-item", "notes.newNote");
+    await window.keyboard.press("End");
+    await window.keyboard.press("Enter");
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/3\"]")).toBeVisible();
+    await CommandSearchFixture.searchAsync(window, "tick");
+    await pane(window).locator("[data-item=\"clock.tick\"]").click();
+    await expect(window.locator("[data-fixture-content=clock-ticks]")).toHaveText("Ticks: 1");
+
+    await CommandSearchFixture.searchAsync(window, String());
+    await expect(options(window).first()).toHaveAttribute("data-item", "clock.tick");
+    const listed = await ids();
+    expect(listed.slice(0, 2)).toEqual(["clock.tick", "notes.newNote"]);
+    expect(new Set(listed).size).toBe(listed.length);
+    expect(await sections()).toEqual([[0, "recently used"], [2, "other commands"]]);
+    expect(await separated()).toEqual([listed[2]]);
+    await expect(options(window).first()).toHaveAccessibleName(/recently used$/);
+    await expect(options(window).nth(2)).toHaveAccessibleName(/other commands$/);
+    const titles = await options(window).evaluateAll(items => items.slice(2).map(t => t.querySelector(".tr-quick-input-title")?.textContent ?? ""));
+    expect(titles).toEqual([...titles].sort((a, b) => a.localeCompare(b)));
+    for (const mode of WindowModeFixture.modes) {
+      await WindowModeFixture.setAsync(window, mode);
+      await desktop.checkpointAsync(`command-search-recent-${mode.toLowerCase()}`);
+    }
+    await WindowModeFixture.setAsync(window, "Light");
+
+    await window.keyboard.type("o");
+    await expect.poll(async () => (await ids()).length).toBeLessThan(listed.length);
+    const typed = await ids();
+    const typedTitles = await options(window).evaluateAll(items => items.slice(2).map(t => t.querySelector(".tr-quick-input-title")?.textContent ?? ""));
+    expect(typed.slice(0, 2)).toEqual(["clock.tick", "notes.newNote"]);
+    expect(typedTitles).toEqual([...typedTitles].sort((a, b) => a.localeCompare(b)));
+    expect([await sections(), await separated()]).toEqual([[], []]);
+    await desktop.checkpointAsync("command-search-recent-typed");
+    await window.keyboard.press("Escape");
+
+    await desktop.restartAsync();
+    window = desktop.window;
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]")).toBeVisible();
+    await CommandSearchFixture.searchAsync(window, String());
+    await expect.poll(async () => (await ids()).slice(0, 2)).toEqual(["clock.tick", "notes.newNote"]);
+    expect(await sections()).toEqual([[0, "recently used"], [2, "other commands"]]);
     await window.keyboard.press("Escape");
   });
 

@@ -25,17 +25,20 @@ export default class UiWorkflows {
   private static readonly PLAYWRIGHT_CONFIG: string = "src/shell/desktop/tests/e2e/playwright.config.ts";
   private static readonly RECORD_SEGMENTS: readonly string[] = ["_build", "ui-builds.record"];
   private static readonly DECLARATIONS_SEGMENTS: readonly string[] = ["_build", "modules", "declarations.json"];
+  private static readonly PRODUCT_SEGMENTS: readonly string[] = ["_build", "product.json"];
   private static readonly TREE_OUTPUTS: readonly (readonly string[])[] = [
     ["_build", "window"],
     ["_build", "variants", "no-modules"],
     ["_build", "variants", "without-clock"]
   ];
   private static readonly BUILDS: readonly (readonly string[])[] = [
-    ["--test", "--without", "notes", "--without", "clock", "--output", "_build/variants/no-modules"],
-    ["--test", "--without", "clock", "--output", "_build/variants/without-clock"],
+    ["--test", "--without", "notes", "--without", "alarm", "--without", "clock", "--without", "reminder", "--output", "_build/variants/no-modules"],
+    ["--test", "--without", "alarm", "--without", "clock", "--output", "_build/variants/without-clock"],
     ["--test"]
   ];
   private static readonly CURRENT: string = "The builds of the UI workflows are current.\n";
+  private static readonly REQUIRE_CURRENT: string = "--require-current";
+  private static readonly NOT_CURRENT: string = "The builds of the UI workflows are not current, and --require-current forbids building them here, so nothing ran.\n";
   private static readonly BUILDING: string = "Building the test build and its variants for the UI workflows...\n";
 
   private readonly root: string;
@@ -52,11 +55,17 @@ export default class UiWorkflows {
     this.binary = binary;
   }
 
-  public async runAsync(playwrightArguments: readonly string[]): Promise<number> {
+  public async runAsync(commandArguments: readonly string[]): Promise<number> {
+    const requiresCurrent = commandArguments.includes(UiWorkflows.REQUIRE_CURRENT);
+    const playwrightArguments = commandArguments.filter(t => t !== UiWorkflows.REQUIRE_CURRENT);
     const inputs = await this.hashInputsAsync();
     const recordFile = path.join(this.root, ...UiWorkflows.RECORD_SEGMENTS);
     if (await this.isCurrentAsync(inputs, recordFile))
       this.output.write(UiWorkflows.CURRENT);
+    else if (requiresCurrent) {
+      this.output.write(UiWorkflows.NOT_CURRENT);
+      return 1;
+    }
     else {
       this.output.write(UiWorkflows.BUILDING);
       for (const buildArguments of UiWorkflows.BUILDS) {
@@ -86,14 +95,16 @@ export default class UiWorkflows {
   }
 
   private async hashOutputsAsync(inputs: string): Promise<BuildRecord> {
-    const outputs = [await ContentHash.ofFileAsync(path.join(this.root, ...UiWorkflows.DECLARATIONS_SEGMENTS))];
+    const outputs: string[] = [];
+    for (const file of [UiWorkflows.DECLARATIONS_SEGMENTS, UiWorkflows.PRODUCT_SEGMENTS])
+      outputs.push(await ContentHash.ofFileAsync(path.join(this.root, ...file)));
     for (const tree of UiWorkflows.TREE_OUTPUTS)
       outputs.push(await ContentHash.ofTreeAsync(path.join(this.root, ...tree)));
     return new BuildRecord(inputs, outputs);
   }
 
   private listOutputs(): readonly string[] {
-    return [path.join(this.root, ...UiWorkflows.DECLARATIONS_SEGMENTS), ...UiWorkflows.TREE_OUTPUTS.map(t => path.join(this.root, ...t))];
+    return [path.join(this.root, ...UiWorkflows.DECLARATIONS_SEGMENTS), path.join(this.root, ...UiWorkflows.PRODUCT_SEGMENTS), ...UiWorkflows.TREE_OUTPUTS.map(t => path.join(this.root, ...t))];
   }
 }
 

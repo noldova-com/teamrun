@@ -19,8 +19,8 @@
   background-color: var(--tr-input);
   color: var(--tr-input-text);
   font: inherit;
-  font-size: var(--tr-text-label);
-  line-height: var(--tr-line-label);
+  font-size: var(--tr-text-panel);
+  line-height: var(--tr-line-panel);
   cursor: text;
 }
 
@@ -32,6 +32,10 @@
 :host(:focus) {
   border-color: var(--tr-accent);
   outline: none;
+}
+
+:host([aria-invalid="true"]) {
+  border-color: var(--tr-error);
 }
 
 :host(:disabled) {

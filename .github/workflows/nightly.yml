@@ -1,0 +1,345 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Nightly repeats
+
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plan:
+    name: List the nightly jobs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      legs: ${{ steps.legs.outputs.legs }}
+      labels: ${{ steps.legs.outputs.labels }}
+    steps:
+      - name: List each target's tests and UI workflows
+        id: legs
+        run: |
+          set -euo pipefail
+          legs=''
+          labels=''
+          while IFS='|' read -r target runner architecture; do
+            for part in tests workflows; do
+              if [ "$part" = tests ]; then
+                label="$target, tests"
+              else
+                label="$target, UI workflows"
+              fi
+              legs="$legs${legs:+,}{\"label\":\"$label\",\"part\":\"$part\",\"runner\":\"$runner\",\"architecture\":\"$architecture\"}"
+              labels="$labels${labels:+,}\"$label\""
+            done
+          done <<'TARGETS'
+          Linux x64|ubuntu-24.04|x64
+          Linux ARM64|ubuntu-24.04-arm|arm64
+          Windows x64|windows-2025|x64
+          Windows ARM64|windows-11-arm|arm64
+          macOS x64|macos-15-intel|x64
+          macOS ARM64|macos-15|arm64
+          TARGETS
+          echo "legs=[$legs]" >> "$GITHUB_OUTPUT"
+          echo "labels=[$labels]" >> "$GITHUB_OUTPUT"
+
+  repeat:
+    name: Repeat five times (${{ matrix.label }})
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.legs) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    steps:
+      - name: Stop Spotlight indexing
+        if: runner.os == 'macOS'
+        run: sudo mdutil -i off /System/Volumes/Data
+
+      - name: Check out the revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        id: node
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          architecture: ${{ matrix.architecture }}
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js again
+        if: steps.node.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          architecture: ${{ matrix.architecture }}
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js a last time
+        if: steps.node-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js a last time
+        if: steps.node-again.outcome == 'failure'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          architecture: ${{ matrix.architecture }}
+          package-manager-cache: false
+
+      - name: Verify the toolchain
+        env:
+          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          node --version
+          npm --version
+          node --print "process.platform + '/' + process.arch"
+          test "$(node --version)" = v26.7.0
+          test "$(npm --version)" = 11.19.0
+          test "$(node --print process.arch)" = "$EXPECTED_ARCHITECTURE"
+
+      - name: Restore the installed dependencies
+        id: root-dependencies
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: dependencies-root-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Restore the Angular project's installed dependencies
+        id: angular-dependencies
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: src/node_modules
+          key: dependencies-src-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('src/package-lock.json') }}
+
+      - name: Discard an inexact Angular install
+        if: steps.angular-dependencies.outputs.cache-hit != 'true'
+        run: rm -rf src/node_modules
+
+      - name: Install dependencies
+        if: steps.root-dependencies.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Electron
+        run: |
+          for attempt in 1 2 3 4; do
+            if node node_modules/electron/install.js; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 4 ]; then
+              echo "Electron's binary download failed (attempt $attempt of 4); trying again in 15 seconds."
+              sleep 15
+            fi
+          done
+          echo "::error::Electron's binary could not be downloaded in 4 attempts."
+          exit 1
+
+      - name: Let Electron's sandbox start on Linux
+        if: runner.os == 'Linux' && matrix.part == 'workflows'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Build
+        if: matrix.part == 'tests'
+        run: npm run build
+
+      - name: Repeat the tests
+        id: tests
+        if: matrix.part == 'tests'
+        run: |
+          set -o pipefail
+          mkdir -p _build/nightly
+          failed=0
+          for run in 1 2 3 4 5; do
+            echo "Run $run of 5"
+            npm test 2>&1 | tee -a _build/nightly/tests.log || failed=1
+          done
+          exit "$failed"
+
+      - name: Repeat the UI workflows
+        id: workflows
+        if: matrix.part == 'workflows'
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui -- --repeat-each 5 --retries 0
+          else
+            npm run test:ui -- --repeat-each 5 --retries 0
+          fi
+
+      - name: Record the result
+        if: always()
+        env:
+          NIGHTLY_LABEL: ${{ matrix.label }}
+          NIGHTLY_PART: ${{ matrix.part }}
+          NIGHTLY_OUTCOME: ${{ matrix.part == 'tests' && steps.tests.outcome || steps.workflows.outcome }}
+        run: node scripts/nightly-result.ts
+
+      - name: Keep the result
+        id: result
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-result-${{ matrix.runner }}-${{ matrix.part }}
+          path: _build/nightly/results
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the result again
+        if: always() && steps.result.outcome == 'failure'
+        run: sleep 30
+
+      - name: Keep the result again
+        id: result-again
+        if: always() && steps.result.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-result-${{ matrix.runner }}-${{ matrix.part }}
+          path: _build/nightly/results
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the result a last time
+        if: always() && steps.result-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Keep the result a last time
+        if: always() && steps.result-again.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-result-${{ matrix.runner }}-${{ matrix.part }}
+          path: _build/nightly/results
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Keep what the failures left
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-failures-${{ matrix.runner }}-${{ matrix.part }}-${{ github.run_attempt }}
+          path: |
+            _build/nightly/tests.log
+            _build/angular-tests.log
+            _build/ui/results
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+  report:
+    name: Report the failures
+    needs: [plan, repeat]
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Check out the reporting scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js to report
+        id: node
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to report again
+        if: steps.node.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to report again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to report a last time
+        if: steps.node-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to report a last time
+        if: steps.node-again.outcome == 'failure'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Gather the results
+        id: gather
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: nightly-result-*
+          path: _build/nightly/results
+          merge-multiple: true
+
+      - name: Wait before gathering the results again
+        if: steps.gather.outcome == 'failure'
+        run: sleep 30
+
+      - name: Gather the results again
+        id: gather-again
+        if: steps.gather.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: nightly-result-*
+          path: _build/nightly/results
+          merge-multiple: true
+
+      - name: Wait before gathering the results a last time
+        if: steps.gather-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Gather the results a last time
+        if: steps.gather-again.outcome == 'failure'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: nightly-result-*
+          path: _build/nightly/results
+          merge-multiple: true
+
+      - name: Open or update a bug for each failure
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NIGHTLY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          NIGHTLY_LEGS: ${{ needs.plan.outputs.labels }}
+          NIGHTLY_RESULTS: _build/nightly/results
+        run: node scripts/nightly-report.ts

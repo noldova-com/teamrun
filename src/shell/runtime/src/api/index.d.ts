@@ -1134,6 +1134,26 @@ export declare class LogFile {
 }
 
 /**
+ * Prepares text that comes from outside the shell's own code for a log, so it cannot pass for a record of its own.
+ */
+export declare class LogText {
+  /**
+   * Splits a text into the lines a log shows.
+   *
+   * @param text The text, with any line endings.
+   * @returns The lines, without the text's trailing white space. Every line ending ends a line: CR LF, LF, CR, vertical tab, form feed, U+0085, U+2028 and U+2029.
+   * Each line keeps its tabs and loses every other control character, so terminal escapes do nothing.
+   * @example
+   * ```ts
+   * import { LogText } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const lines: readonly string[] = LogText.lines("Synced\rwith the server\n");
+   * ```
+   */
+  public static lines(text: string): readonly string[];
+}
+
+/**
  * Publishes and withdraws a runtime's discovery metadata.
  */
 export declare class DiscoveryPublisher {
@@ -1521,6 +1541,29 @@ export declare class ProcessStartException extends Exception {
    *
    * export function fail(): never {
    *   throw new ProcessStartException("The program \"git\" is not on the PATH.");
+   * }
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
+ * The exception thrown when the build's product file cannot be read: the file
+ * is missing or not JSON, or a field is missing or blank. Its message names
+ * the file and the problem.
+ */
+export declare class ProductFileException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What is wrong.
+   * @param options The cause, when another error led to this one.
+   * @example
+   * ```ts
+   * import { ProductFileException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(): never {
+   *   throw new ProductFileException("The build's product file has no build.");
    * }
    * ```
    */
@@ -2976,9 +3019,19 @@ export declare class ModuleDeclaration {
   public readonly id: string;
 
   /**
+   * The module's own version, `<major>.<minor>.<patch>`.
+   */
+  public readonly version: string;
+
+  /**
    * The name people see.
    */
   public readonly displayName: string;
+
+  /**
+   * What the module does, in a sentence people see.
+   */
+  public readonly description: string;
 
   /**
    * The ids of the modules it depends on.
@@ -3004,25 +3057,30 @@ export declare class ModuleDeclaration {
    * Creates the declaration.
    *
    * @param id The module's id: lowercase kebab-case and not `shell`.
+   * @param version Its own version, `<major>.<minor>.<patch>`: three whole
+   * numbers of up to nine digits without leading zeros, such as `0.0.1`.
    * @param displayName The name people see; not whitespace only.
+   * @param description What the module does; not whitespace only.
    * @param dependencies The ids of the modules it depends on.
    * @param runtimePackage Its runtime package, or `null`.
    * @param contributions The names it contributes, by kind.
    * @param settings The definitions of its settings, each its own; none by
    * default.
-   * @throws {ArgumentException} When the id or the display name is not valid,
-   * or a setting belongs to another owner or is of the shell's own kind
-   * `KeyBindings`.
+   * @throws {ArgumentException} When the id, the version, the display name or
+   * the description is not valid, or a setting belongs to another owner or is of
+   * the shell's own kind `KeyBindings`.
    * @example
    * ```ts
    * import { ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
    *
-   * export const notes: ModuleDeclaration = new ModuleDeclaration("notes", "Notes", [], "@noldova/teamrun-modules-notes-runtime", new Map([["methods", ["notes.list"]]]));
+   * export const notes: ModuleDeclaration = new ModuleDeclaration("notes", "0.0.1", "Notes", "Keeps notes.", [], "@noldova/teamrun-modules-notes-runtime", new Map([["methods", ["notes.list"]]]));
    * ```
    */
   public constructor(
     id: string,
+    version: string,
     displayName: string,
+    description: string,
     dependencies: readonly string[],
     runtimePackage: string | null,
     contributions: ReadonlyMap<string, readonly string[]>,
@@ -3039,7 +3097,7 @@ export declare class ModuleDeclaration {
    * ```ts
    * import { ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
    *
-   * export const notes: ModuleDeclaration = ModuleDeclaration.fromJson({ id: "notes", displayName: "Notes", dependencies: [], runtimePackage: null, contributes: {} });
+   * export const notes: ModuleDeclaration = ModuleDeclaration.fromJson({ id: "notes", version: "0.0.1", displayName: "Notes", description: "Keeps notes.", dependencies: [], runtimePackage: null, contributes: {} });
    * ```
    */
   public static fromJson(value: unknown): ModuleDeclaration;
@@ -3334,6 +3392,125 @@ export declare class ProcessSettings {
    * ```
    */
   public constructor(graceMilliseconds?: number, endMilliseconds?: number, seenMilliseconds?: number);
+}
+
+/**
+ * The product and build this runtime belongs to, as the build wrote them to
+ * `_build/product.json` beside the installed runtime: the product's identity,
+ * its version and the build's fingerprint. The runtime, the desktop and the
+ * command line read it once, at start, instead of having it compiled in.
+ */
+export declare class ProductInfo {
+  /**
+   * The product's name, such as the one in messages and window titles.
+   */
+  public readonly name: string;
+
+  /**
+   * The product's slug: its lowercase name for programs, packages and
+   * variables.
+   */
+  public readonly slug: string;
+
+  /**
+   * The packaged application's ID.
+   */
+  public readonly applicationId: string;
+
+  /**
+   * The development application's ID, before the checkout's hash is added.
+   */
+  public readonly developmentApplicationId: string;
+
+  /**
+   * The data folder under the home folder, its segments separated by `/`.
+   */
+  public readonly dataFolder: string;
+
+  /**
+   * The per-device folder on Windows, under the local application data
+   * folder, its segments separated by `/`.
+   */
+  public readonly windowsDeviceFolder: string;
+
+  /**
+   * The per-device folder on macOS, under `Library/Application Support`, its
+   * segments separated by `/`.
+   */
+  public readonly macosDeviceFolder: string;
+
+  /**
+   * The per-device folder on Linux, under the state folder, its segments
+   * separated by `/`.
+   */
+  public readonly linuxDeviceFolder: string;
+
+  /**
+   * The environment variable that names another data directory.
+   */
+  public readonly dataDirectoryVariable: string;
+
+  /**
+   * The folder of the product's icons, relative to the repository, its
+   * segments separated by `/`.
+   */
+  public readonly icons: string;
+
+  /**
+   * The product version.
+   */
+  public readonly version: string;
+
+  /**
+   * The build's fingerprint: the same inputs give the same fingerprint, and
+   * any change gives another.
+   */
+  public readonly build: string;
+
+  private constructor();
+
+  /**
+   * The product file of the installed runtime's build.
+   */
+  public static get file(): string;
+
+  /**
+   * The installed runtime's product, read from {@link ProductInfo.file} on
+   * first use and kept.
+   *
+   * @throws {ProductFileException} When the file cannot be read or a field is
+   * missing or blank.
+   * @example
+   * ```ts
+   * import { ProductInfo } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function describeBuild(): string {
+   *   const product = ProductInfo.current;
+   *   return `${product.name} ${product.version} (build ${product.build})`;
+   * }
+   * ```
+   */
+  public static get current(): ProductInfo;
+
+  /**
+   * Reads a product file.
+   *
+   * @param file The product file.
+   * @returns The product it describes.
+   * @throws {ProductFileException} When the file cannot be read or a field is
+   * missing or blank.
+   * @example
+   * ```ts
+   * import path from "node:path";
+   *
+   * import { ProductInfo } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readVersion(checkout: string): string {
+   *   return ProductInfo.read(path.join(checkout, "_build", "product.json")).version;
+   * }
+   * ```
+   */
+  public static read(file: string): ProductInfo;
 }
 
 /**
@@ -4199,7 +4376,7 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * } from "@noldova/teamrun-shell-runtime";
    *
    * export function createContext(events: EventRegistry, settings: SettingsService, processes: ProcessSupervisor): ModuleContext {
-   *   const notes = new ModuleDeclaration("notes", "Notes", [], null, new Map());
+   *   const notes = new ModuleDeclaration("notes", "0.0.1", "Notes", "Keeps notes.", [], null, new Map());
    *   return new ModuleContext(
    *     notes, new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(),
    *     new NotificationCenter(() => undefined, () => new Date()), new NotificationPolicy([notes], () => true), new ServiceRegistry(), settings,
@@ -5827,7 +6004,7 @@ export declare class DataDirectoryLocator {
  */
 export declare class RuntimeBuild {
   /**
-   * The build's identity: the stamped product version, the supported protocol version and the build fingerprint.
+   * The build's identity: the product version and the build fingerprint from {@link ProductInfo.current}, and the supported protocol version.
    */
   public static readonly identity: BuildIdentity;
 }

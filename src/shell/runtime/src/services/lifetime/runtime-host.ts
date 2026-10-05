@@ -24,6 +24,7 @@ import { CapabilityToken } from "../../models/capability-token.js";
 import type { Endpoint } from "../../models/endpoint.js";
 import type { EventChannel } from "../../models/event-channel.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
+import { ProductInfo } from "../../models/product-info.js";
 import { Refusal } from "../../models/refusal.js";
 import { RuntimeBuild } from "../../models/runtime-build.js";
 import { RuntimeDiscovery } from "../../models/runtime-discovery.js";
@@ -54,6 +55,9 @@ import { UpdateNotificationMethod } from "../notifications/update-notification-m
 import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
 import { ProcessSupervisor } from "../process/process-supervisor.js";
+import { RecentCommandsMethod } from "../recent-commands/recent-commands-method.js";
+import { RecentCommandsStore } from "../recent-commands/recent-commands-store.js";
+import { RecordCommandMethod } from "../recent-commands/record-command-method.js";
 import { CommandRegistry } from "../registry/command-registry.js";
 import { EventRegistry } from "../registry/event-registry.js";
 import { MethodRegistry } from "../registry/method-registry.js";
@@ -142,7 +146,7 @@ export class RuntimeHost implements IIdleParticipant {
       this.registerShellFacilities(database);
     else {
       this.server.refuse(new Refusal(
-        new Failure(FailureCode.PreShellData, Resources.preShellData, new PreShellData(lock.dataDirectory.root).toJson()),
+        new Failure(FailureCode.PreShellData, Resources.formatPreShellDataFailure(ProductInfo.current.name), new PreShellData(lock.dataDirectory.root).toJson()),
         ShellMethods.moveAside));
       this.methods.register(ShellMethods.moveAside, new MoveAsideMethod(() => this.moveAsideAsync()));
     }
@@ -277,6 +281,9 @@ export class RuntimeHost implements IIdleParticipant {
     this.methods.register(ShellMethods.dismissNotification, new DismissNotificationMethod(this.notifications));
     this.methods.register(ShellMethods.markNotificationsRead, new MarkNotificationsReadMethod(this.notifications));
     this.methods.register(ShellMethods.clearNotifications, new ClearNotificationsMethod(this.notifications));
+    const recent = new RecentCommandsStore(database);
+    this.methods.register(ShellMethods.recentCommands, new RecentCommandsMethod(recent));
+    this.methods.register(ShellMethods.recordCommand, new RecordCommandMethod(recent, this.events.declare(ShellEvents.recentCommandsChanged)));
     return settings;
   }
 

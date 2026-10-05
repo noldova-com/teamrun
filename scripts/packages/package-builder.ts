@@ -16,6 +16,7 @@ import type NpmCommand from "../toolchain/npm-command.ts";
 import TypeScriptCompiler from "../toolchain/typescript-compiler.ts";
 import type BuildLayout from "./build-layout.ts";
 import type PackageManifest from "./package-manifest.ts";
+import type PackageVersions from "./package-versions.ts";
 import PackageException from "./package.exception.ts";
 import type RootManifest from "./root-manifest.ts";
 
@@ -35,22 +36,21 @@ export default class PackageBuilder {
   private static readonly DECLARATIONS: readonly string[] = ["api", "index.d.ts"];
   private static readonly VERSION_PLACEHOLDER: string = "__VERSION__";
   private static readonly PROTOCOL_VERSION_PLACEHOLDER: string = "__PROTOCOL_VERSION__";
-  private static readonly BUILD_PLACEHOLDER: string = "__BUILD__";
   private static readonly PACK_ARGUMENTS: readonly string[] = ["pack", "--ignore-scripts", "--loglevel=error", "--pack-destination"];
   private static readonly INSTALL_ARGUMENTS: readonly string[] = ["install", "--no-save", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error"];
 
   private readonly layout: BuildLayout;
   private readonly rootManifest: RootManifest;
+  private readonly versions: PackageVersions;
   private readonly runner: ProcessRunner;
   private readonly npm: NpmCommand;
-  private readonly fingerprint: string;
 
-  public constructor(layout: BuildLayout, rootManifest: RootManifest, runner: ProcessRunner, npm: NpmCommand, fingerprint: string) {
+  public constructor(layout: BuildLayout, rootManifest: RootManifest, versions: PackageVersions, runner: ProcessRunner, npm: NpmCommand) {
     this.layout = layout;
     this.rootManifest = rootManifest;
+    this.versions = versions;
     this.runner = runner;
     this.npm = npm;
-    this.fingerprint = fingerprint;
   }
 
   public async buildSourceAsync(manifest: PackageManifest, archives: readonly string[]): Promise<void> {
@@ -61,7 +61,7 @@ export default class PackageBuilder {
     const output = this.layout.locateOutput(manifest);
     await rm(output, { recursive: true, force: true });
     await this.compileAsync(manifest, PackageBuilder.SOURCE_FOLDER, output);
-    await writeFile(path.join(output, PackageBuilder.MANIFEST_FILE), this.stamp(await readFile(this.layout.locateSource(manifest, PackageBuilder.MANIFEST_FILE), "utf8")));
+    await writeFile(path.join(output, PackageBuilder.MANIFEST_FILE), this.stamp(this.versions.stampManifest(manifest, await readFile(this.layout.locateSource(manifest, PackageBuilder.MANIFEST_FILE), "utf8"))));
     const resources = path.join(output, PackageBuilder.RESOURCES_FILE);
     if (existsSync(resources))
       await writeFile(resources, this.stamp(await readFile(resources, "utf8")));
@@ -115,9 +115,8 @@ export default class PackageBuilder {
   }
 
   private stamp(text: string): string {
-    return [...this.rootManifest.product.placeholders].reduce((stamped, [placeholder, value]) => stamped.replaceAll(placeholder, value), text)
+    return text
       .replaceAll(PackageBuilder.VERSION_PLACEHOLDER, this.rootManifest.productVersion)
-      .replaceAll(PackageBuilder.PROTOCOL_VERSION_PLACEHOLDER, String(this.rootManifest.protocolVersion))
-      .replaceAll(PackageBuilder.BUILD_PLACEHOLDER, this.fingerprint);
+      .replaceAll(PackageBuilder.PROTOCOL_VERSION_PLACEHOLDER, String(this.rootManifest.protocolVersion));
   }
 }

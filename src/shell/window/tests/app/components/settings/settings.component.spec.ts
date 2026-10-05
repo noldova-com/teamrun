@@ -18,8 +18,6 @@ import { SettingsComponent } from "../../../../src/app/components/settings/setti
 import { GalleryTokens } from "../../../../src/app/models/gallery-tokens";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { Layout } from "../../../../src/app/models/layout/layout";
-import { WindowPartSource } from "../../../../src/app/models/window-part-source";
-import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../../src/app/services/command.service";
 import type { LayoutService } from "../../../../src/app/services/layout.service";
 import { SettingsService } from "../../../../src/app/services/settings.service";
@@ -28,6 +26,7 @@ import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.f
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
+import { ModuleStatusFixture } from "../../../fixtures/module-status.fixture";
 import { SettingsFixture } from "../../../fixtures/settings.fixture";
 
 class FakeSettingsService {
@@ -81,6 +80,20 @@ describe("SettingsComponent", () => {
     await fixture.whenStable();
   }
 
+  function pageSelect(host: HTMLElement): HTMLButtonElement {
+    return host.querySelector(".tr-settings-page-select .tr-select-button") as HTMLButtonElement;
+  }
+
+  async function chooseClockAsync(host: HTMLElement): Promise<void> {
+    host.style.width = "37rem";
+    await page.getByRole("button", { name: "Clock", exact: true }).click();
+    fixture.detectChanges();
+  }
+
+  function framesAsync(): Promise<void> {
+    return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  }
+
   beforeEach(async () => {
     DesktopBridgeFixture.install("linux");
     settings = new FakeSettingsService();
@@ -90,15 +103,11 @@ describe("SettingsComponent", () => {
       providers: [
         { provide: GalleryTokens.component, useFactory: () => gallery },
         { provide: SettingsService, useValue: settings },
-        { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } },
-        {
-          provide: WindowPartTokens.sources, useValue: [
-            new WindowPartSource("clock", "Clock", [], [], [], [], [], [], [], () => Promise.reject(new Error("unused"))),
-            new WindowPartSource("notes", "Notes", [], [], [], [], [], [], ["notes.saved"], () => Promise.reject(new Error("unused")))
-          ]
-        }
+        { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
     });
+    ModuleStatusFixture.report(
+      ModuleStatusFixture.create("clock", "Clock"), ModuleStatusFixture.create("notes", "Notes", ["notes.saved"]), ModuleStatusFixture.create("reminder", "Reminder", ["reminder.due"]));
     TestBed.inject(CommandService).setCommands([
       new CommandContribution("clock.tick", "Tick the clock", null, "Ctrl+Alt+T", () => Promise.resolve(null)),
       new CommandContribution("clock.stop", "Stop the clock", null, "Ctrl+Alt+T", () => Promise.resolve(null))
@@ -128,6 +137,122 @@ describe("SettingsComponent", () => {
     expect(markers).toEqual([true, false]);
   });
 
+  it("swaps its page list for a Settings pages select at the start of the search row below 34rem inside its padding, and changes page and leaves a search through it", async () => {
+    const host = render();
+    const select = (): HTMLButtonElement => host.querySelector(".tr-settings-page-select .tr-select-button") as HTMLButtonElement;
+    const shown = (): readonly boolean[] => [".tr-settings-pages", ".tr-settings-page-select"].map(t => getComputedStyle(host.querySelector(t) as Element).display !== "none");
+    const box = (selector: string): DOMRect => (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
+    host.style.width = "37rem";
+    const wide = shown();
+    host.style.width = "calc(37rem - 1px)";
+    const narrow = shown();
+    const row = [box(".tr-settings-page-select").top === box(".tr-settings-search-field").top, box(".tr-settings-page-select").left < box(".tr-settings-search-field").left];
+    const filled = Math.abs(box(".tr-settings-content").width - (box(".tr-settings-body").width)) < 1;
+
+    await userEvent.click(select());
+    await page.getByRole("option", { name: "Clock" }).click();
+    fixture.detectChanges();
+    const clock = [select().getAttribute("aria-label"), texts(".tr-settings-group-title")];
+    await searchAsync("greeting");
+    const searching = select().getAttribute("aria-label");
+    await userEvent.click(select());
+    await page.getByRole("option", { name: "Appearance" }).click();
+    fixture.detectChanges();
+    host.style.width = "15rem";
+    const stacked = box(".tr-settings-page-select").bottom <= box(".tr-settings-search-field").top;
+
+    expect([wide, narrow]).toEqual([[true, false], [false, true]]);
+    expect([row, filled]).toEqual([[true, true], true]);
+    expect(clock).toEqual(["Settings pages, Clock", ["Words", "Ticks"]]);
+    expect(searching).toBe("Settings pages, Search results");
+    expect([(host.querySelector(".tr-settings-search-field") as HTMLInputElement).value, select().getAttribute("aria-label"), texts(".tr-settings-group-title")])
+      .toEqual(["", "Settings pages, Appearance", ["Theme", "Text"]]);
+    expect(stacked).toBe(true);
+  });
+
+  it("scrolls its content from the page list to its end edge with a stable gutter, and keeps its column at the reading width", () => {
+    const host = render();
+    host.style.width = "100rem";
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const box = (selector: string): DOMRect => (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
+    const content = host.querySelector(".tr-settings-content") as HTMLElement;
+
+    expect(Math.abs(box(".tr-settings-content").right - host.getBoundingClientRect().right)).toBeLessThan(1);
+    expect(getComputedStyle(content).scrollbarGutter).toBe("stable");
+    expect(box(".tr-settings-column").width).toBeCloseTo(51.5 * rem, 0);
+  });
+
+  it("mirrors its insets right to left, so its scroller meets the left edge and its start inset is on the right", () => {
+    const host = render();
+    host.dir = "rtl";
+    host.style.width = "100rem";
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const box = (selector: string): DOMRect => (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
+    const edges = host.getBoundingClientRect();
+
+    expect(Math.abs(box(".tr-settings-content").left - edges.left)).toBeLessThan(1);
+    expect(Math.abs(edges.right - box(".tr-settings-pages").right - 1.5 * rem)).toBeLessThan(1);
+    expect(Math.abs(edges.right - box(".tr-settings-search").right - 1.5 * rem)).toBeLessThan(1);
+  });
+
+  it("moves focus to the page control it now shows when it switches between the page list and the select, and to no control that was not focused", async () => {
+    const host = render();
+    const field = host.querySelector(".tr-settings-search-field") as HTMLInputElement;
+    await chooseClockAsync(host);
+
+    host.style.width = "15rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(pageSelect(host)));
+    host.style.width = "37rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(host.querySelector(".tr-settings-page-current")));
+    host.style.width = "15rem";
+    (document.activeElement as HTMLElement).blur();
+    await vi.waitFor(() => expect(document.activeElement).toBe(pageSelect(host)));
+    await searchAsync("greeting");
+    field.focus();
+    host.style.width = "37rem";
+    await framesAsync();
+    const searching = document.activeElement;
+    host.style.width = "15rem";
+    await framesAsync();
+    pageSelect(host).focus();
+    host.style.width = "37rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(host.querySelector(".tr-settings-page")));
+
+    expect(searching).toBe(field);
+  });
+
+  it("closes the Settings pages list when it widens while the list is open, moving focus to the current page, and leaves focus that moved elsewhere", async () => {
+    const host = render();
+    const outside = document.body.appendChild(document.createElement("button"));
+    await chooseClockAsync(host);
+    host.style.width = "15rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(pageSelect(host)));
+    await userEvent.click(pageSelect(host));
+    await expect.element(page.getByRole("listbox")).toBeVisible();
+
+    host.style.width = "37rem";
+    await vi.waitFor(() => expect(document.querySelector("[role=listbox]")).toBeNull());
+    await vi.waitFor(() => expect(document.activeElement).toBe(host.querySelector(".tr-settings-page-current")));
+    host.style.width = "15rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(pageSelect(host)));
+    await userEvent.click(pageSelect(host));
+    await expect.element(page.getByRole("listbox")).toBeVisible();
+    await userEvent.click(outside);
+    await vi.waitFor(() => expect(document.querySelector("[role=listbox]")).toBeNull());
+    host.style.width = "37rem";
+    await framesAsync();
+    const kept = document.activeElement;
+    outside.remove();
+
+    expect(kept).toBe(outside);
+  });
+
+  it("reveals the scrollbars of its page list and its content while they are hovered", () => {
+    render();
+
+    expect([".tr-settings-pages", ".tr-settings-content"].map(t => element().querySelector(t)?.classList.contains("tr-scroll-reveal"))).toEqual([true, true]);
+  });
+
   it("shows the Gallery as the last page when the build has one, and leaves it out of a search", async () => {
     gallery = FakeGalleryComponent;
     render();
@@ -144,7 +269,7 @@ describe("SettingsComponent", () => {
     expect(element().querySelector(".fake-gallery")).toBeNull();
   });
 
-  it("lists only the modules that post notifications on Notifications, each checked while its notifications are on", async () => {
+  it("lists every module the runtime reports with notification kinds on Notifications, whatever its parts, each checked while its notifications are on", async () => {
     render();
     await page.getByRole("button", { name: "Notifications", exact: true }).click();
     fixture.detectChanges();
@@ -153,7 +278,7 @@ describe("SettingsComponent", () => {
 
     await page.getByRole("checkbox", { name: "Notes notifications" }).click();
 
-    expect(boxes).toEqual([["Notes notifications", true]]);
+    expect(boxes).toEqual([["Notes notifications", true], ["Reminder notifications", true]]);
     expect(settings.calls).toEqual(["set shell.mutedModules [\"notes\"]"]);
   });
 

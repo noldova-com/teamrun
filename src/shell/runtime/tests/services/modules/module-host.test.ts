@@ -50,9 +50,10 @@ export class ModuleHostTests {
     Assert.areEqual(0, before);
     Assert.areEqual("activate tasks,activate notes", log.join(","));
     Assert.areEqual<unknown>(store, found);
+    Assert.areEqual("tasks Active,theme Active,notes Active", ModuleHostTests.describe(host));
     Assert.areEqual(
-      "{\"modules\":[{\"id\":\"tasks\",\"state\":\"Active\"},{\"id\":\"theme\",\"state\":\"Active\"},{\"id\":\"notes\",\"state\":\"Active\"}]}",
-      JSON.stringify(host.report.toJson()));
+      "{\"id\":\"notes\",\"version\":\"0.0.1\",\"displayName\":\"notes\",\"description\":\"notes\",\"dependencies\":[\"tasks\",\"theme\"],\"contributes\":{\"methods\":[\"notes.run\"]},\"state\":\"Active\"}",
+      JSON.stringify(host.report.modules[2]?.toJson()));
   }
 
   @TestMethod
@@ -83,18 +84,18 @@ export class ModuleHostTests {
 
     Assert.areEqual(
       [
-        "{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its runtime part could not be loaded.\"}",
-        "{\"id\":\"failing\",\"state\":\"Failed\",\"cause\":\"Its runtime part failed to activate.\"}",
-        "{\"id\":\"orphan\",\"state\":\"Blocked\",\"cause\":\"It depends on missing, which is not active.\"}",
-        "{\"id\":\"notes\",\"state\":\"Blocked\",\"cause\":\"It depends on broken, which is not active.\"}",
-        "{\"id\":\"first\",\"state\":\"Blocked\",\"cause\":\"It depends on second, which is not active.\"}",
-        "{\"id\":\"second\",\"state\":\"Blocked\",\"cause\":\"It depends on first, which is not active.\"}"
+        "broken Failed Its runtime part could not be loaded.",
+        "failing Failed Its runtime part failed to activate.",
+        "orphan Blocked It depends on missing, which is not active. missing",
+        "notes Blocked It depends on broken, which is not active. broken",
+        "first Blocked It depends on second, which is not active. second",
+        "second Blocked It depends on first, which is not active. first"
       ].join(","),
-      host.report.modules.map(t => JSON.stringify(t.toJson())).join(","));
+      ModuleHostTests.describe(host));
     Assert.isUndefined(methods.find(new QualifiedName("failing", "run")));
     Assert.areEqual("activate failing", log.join(","));
-    Assert.isTrue(written.startsWith("The module broken: Its runtime part could not be loaded.\nError: Cannot find module /home/person/secret/broken.js\n"), written);
-    Assert.isTrue(written.includes("The module failing: Its runtime part failed to activate.\nError: at /home/person/secret/failing.js:3\n"), written);
+    Assert.isTrue(written.startsWith("The module broken 0.0.1: Its runtime part could not be loaded.\nError: Cannot find module /home/person/secret/broken.js\n"), written);
+    Assert.isTrue(written.includes("The module failing 0.0.1: Its runtime part failed to activate.\nError: at /home/person/secret/failing.js:3\n"), written);
   }
 
   @TestMethod
@@ -155,7 +156,7 @@ export class ModuleHostTests {
     Assert.areEqual<unknown>(failure, exception.errors[0]);
     Assert.isUndefined(methods.find(new QualifiedName("notes", "list")));
     Assert.isUndefined(methods.find(new QualifiedName("tasks", "list")));
-    Assert.isTrue(diagnostics.text.startsWith("The module notes: Its runtime part failed to deactivate.\nError: The notes cannot be saved.\n"));
+    Assert.isTrue(diagnostics.text.startsWith("The module notes 0.0.1: Its runtime part failed to deactivate.\nError: The notes cannot be saved.\n"));
   }
 
   @TestMethod
@@ -208,9 +209,9 @@ export class ModuleHostTests {
 
     Assert.areEqual("", log.join(","));
     Assert.areEqual(
-      "{\"modules\":[{\"id\":\"broken\",\"state\":\"Failed\",\"cause\":\"Its database could not be opened or migrated.\"}," +
-      "{\"id\":\"newer\",\"state\":\"Failed\",\"cause\":\"Its database was written by a newer build or is not one this build recognizes.\"}]}",
-      JSON.stringify(host.report.toJson()));
+      "broken Failed Its database could not be opened or migrated.," +
+      "newer Failed Its database was written by a newer build or is not one this build recognizes.",
+      ModuleHostTests.describe(host));
     Assert.isTrue(diagnostics.text.includes("The migration create-broken of the database of the module broken failed and was rolled back."));
     using kept = await ModuleDatabase.openAsync(directory, "newer", [
       new Migration("create-items", ["CREATE TABLE items (name TEXT) STRICT"]),
@@ -272,8 +273,12 @@ export class ModuleHostTests {
     Assert.isTrue(diagnostics.text.startsWith(`notes: Opened ${path.join("~", "notes")}\n`), diagnostics.text);
   }
 
+  private static describe(host: ModuleHost): string {
+    return host.report.modules.map(t => [t.id, t.state, t.cause, t.blockedBy].filter(u => !Object.isNull(u)).join(" ")).join(",");
+  }
+
   private static declare(id: string, dependencies: readonly string[], runtimePackage: string | null, methods: readonly string[] = []): ModuleDeclaration {
-    return new ModuleDeclaration(id, id, dependencies, runtimePackage, new Map([["methods", [...methods, `${id}.run`]]]));
+    return new ModuleDeclaration(id, "0.0.1", id, id, dependencies, runtimePackage, new Map([["methods", [...methods, `${id}.run`]]]));
   }
 
   private static create(

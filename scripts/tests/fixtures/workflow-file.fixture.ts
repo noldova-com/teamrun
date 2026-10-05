@@ -14,6 +14,8 @@ import SourceTreeFixture from "./source-tree.fixture.ts";
 
 export default class WorkflowFileFixture {
   private static readonly FOLDER: string = ".github/workflows";
+  private static readonly ACTIONS_FOLDER: string = ".github/actions";
+  private static readonly ACTION_FILE: string = "action.yml";
   private static readonly STEP_PATTERN: RegExp = /^( *)- name: (.+)$/;
   private static readonly INDENTATION_PATTERN: RegExp = /^ */;
   private static readonly BLOCK_INDICATOR: string = "|";
@@ -29,6 +31,10 @@ export default class WorkflowFileFixture {
 
   public static async readAsync(name: string): Promise<WorkflowFileFixture> {
     return new WorkflowFileFixture(await readFile(path.join(SourceTreeFixture.root, WorkflowFileFixture.FOLDER, name), "utf8"));
+  }
+
+  public static async readActionAsync(name: string): Promise<WorkflowFileFixture> {
+    return new WorkflowFileFixture(await readFile(path.join(SourceTreeFixture.root, WorkflowFileFixture.ACTIONS_FOLDER, name, WorkflowFileFixture.ACTION_FILE), "utf8"));
   }
 
   public readStepScript(stepName: string): string {

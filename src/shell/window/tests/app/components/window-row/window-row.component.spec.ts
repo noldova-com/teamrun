@@ -6,11 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ErrorHandler, signal } from "@angular/core";
+import { Component, ErrorHandler, signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
-import { AppearanceService, DefaultTheme, ModePreference, type Theme, ThemeMode } from "@noldova/teamrun-shell-ui";
+import { AppearanceService, DefaultTheme, DialogService, ModePreference, type Theme, ThemeMode, Typography } from "@noldova/teamrun-shell-ui";
 
 import { WindowRowComponent } from "../../../../src/app/components/window-row/window-row.component";
 import { TopBarSide } from "../../../../src/app/enums/top-bar-side";
@@ -29,17 +29,24 @@ import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.f
 import { FixtureTheme } from "../../../../../ui/tests/fixtures/fixture-theme";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 
+@Component({
+  template: `<button type="button" class="inside">Keep working</button>`
+})
+class OpenDialogComponent {
+}
+
 describe("WindowRowComponent", () => {
   afterEach(() => {
     AppearanceFixture.reset();
     DesktopBridgeFixture.remove();
   });
 
-  function apply(theme: Theme = DefaultTheme.theme, mode: ThemeMode = ThemeMode.Light): void {
-    AppearanceFixture.apply(theme, mode);
+  function apply(theme: Theme = DefaultTheme.theme, mode: ThemeMode = ThemeMode.Light, panelSize?: number): void {
+    AppearanceFixture.apply(theme, mode, panelSize);
     const appearance = TestBed.inject(AppearanceService);
     appearance.setTheme(theme);
     appearance.setModePreference(mode === ThemeMode.Dark ? ModePreference.Dark : ModePreference.Light);
+    appearance.setTypography(new Typography(panelSize));
   }
 
   function render(): HTMLElement {
@@ -141,7 +148,7 @@ describe("WindowRowComponent", () => {
       background: getComputedStyle(document.body).backgroundColor,
       titleBar: AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Dark, "titleBar.activeBackground"),
       titleBarText: AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Dark, "titleBar.activeForeground"),
-      titleBarHeight: Math.round(AppearanceFixture.toPixels(2.1875))
+      titleBarHeight: AppearanceFixture.toPixels(2)
     }]);
   });
 
@@ -191,6 +198,27 @@ describe("WindowRowComponent", () => {
     })]);
     TestBed.inject(MenuService).setActiveModules(["notes"]);
   }
+
+  for (const panelSize of [12, 13, 18])
+    for (const platform of ["win32", "linux", "darwin"])
+      it(`stands as high as its tallest control and 0.25rem above and below it at panel size ${panelSize} on ${platform}`, async () => {
+        DesktopBridgeFixture.install(platform);
+        useNotesMenus([]);
+        apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
+
+        const fixture = TestBed.createComponent(WindowRowComponent);
+        fixture.detectChanges();
+        await settle(fixture);
+        const row: HTMLElement = fixture.nativeElement;
+        const bounds = row.getBoundingClientRect();
+        const controls = [...row.querySelectorAll<HTMLElement>("button")].filter(t => t.checkVisibility({ visibilityProperty: true })).map(t => t.getBoundingClientRect());
+        const gap = AppearanceFixture.toPixels(0.25, panelSize);
+
+        expect(controls.length).toBeGreaterThan(platform === "darwin" ? 0 : 3);
+        AppearanceFixture.expectPixels(bounds.height, Math.max(24, AppearanceFixture.toPixels(1.375, panelSize)) + 2 * gap);
+        AppearanceFixture.expectPixels(bounds.bottom - Math.max(...controls.map(t => t.bottom)), gap);
+        AppearanceFixture.expectPixels(Math.min(...controls.map(t => t.top)) - bounds.top, gap);
+      });
 
   function useMenuBarStyle(style: string): void {
     TestBed.configureTestingModule({ providers: [{ provide: SettingsService, useValue: { values: signal(new Map([["shell.menuBar", style]])) } }] });
@@ -301,6 +329,33 @@ describe("WindowRowComponent", () => {
     expect(bar.classList.contains("tr-window-row-menu-bar-folded")).toBe(false);
   });
 
+  for (const panelSize of [12, 18])
+    it(`folds the menu bar once the row cannot leave 6rem for dragging, at panel size ${panelSize}`, async () => {
+      DesktopBridgeFixture.install("win32");
+      useNotesMenus([]);
+      apply();
+      TestBed.inject(AppearanceService).setTypography(new Typography(panelSize));
+      const fixture = TestBed.createComponent(WindowRowComponent);
+      const row: HTMLElement = fixture.nativeElement;
+      row.style.width = "1000px";
+      fixture.detectChanges();
+      await settle(fixture);
+      const style = getComputedStyle(row);
+      const parts = [".tr-window-row-start", ".tr-window-row-actions", "tr-menu-bar"].map(t => (row.querySelector(t) as HTMLElement).offsetWidth);
+      const fits = Math.ceil(parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + parts.reduce((a, b) => a + b, 0) + AppearanceFixture.toPixels(6, panelSize));
+      const folded = (): boolean | undefined => row.querySelector("tr-menu-bar")?.classList.contains("tr-window-row-menu-bar-folded");
+
+      row.style.width = `${fits}px`;
+      await settle(fixture);
+      fixture.detectChanges();
+      const atFit = folded();
+      row.style.width = `${fits - 1}px`;
+      await settle(fixture);
+      fixture.detectChanges();
+
+      expect([atFit, folded()]).toEqual([false, true]);
+    });
+
   it("shows neither the bar nor the button when the menus are hidden, and ignores Alt and F10", async () => {
     DesktopBridgeFixture.install("win32");
     useMenuBarStyle("Hidden");
@@ -360,6 +415,30 @@ describe("WindowRowComponent", () => {
 
     expect(focused).toEqual([field, first, field, first, first]);
     field.remove();
+  });
+
+  it("leaves the focus in an open dialog on F10 or a lone Alt, and focuses the first menu again once the dialog closes", async () => {
+    DesktopBridgeFixture.install("win32");
+    useNotesMenus([]);
+    apply();
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    fixture.detectChanges();
+    await settle(fixture);
+    const first = fixture.nativeElement.querySelector("button.tr-window-row-menu-bar-item") as HTMLElement;
+    const dialog = TestBed.inject(DialogService).open(OpenDialogComponent, ".inside");
+    await vi.waitFor(() => expect(document.activeElement?.classList.contains("inside")).toBe(true));
+    const inside = document.activeElement as HTMLElement;
+
+    press(inside, "F10");
+    press(inside, "Alt");
+    press(inside, "Alt", "keyup");
+    const whileOpen = document.activeElement;
+    dialog.close();
+    await settle(fixture);
+    press(document.body, "F10");
+
+    expect(whileOpen).toBe(inside);
+    expect(document.activeElement).toBe(first);
   });
 
   it("focuses the menu button instead when the menus are a button, and keeps Escape for an open menu", async () => {

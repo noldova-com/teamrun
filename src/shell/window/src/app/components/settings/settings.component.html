@@ -7,31 +7,34 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <div class="tr-settings-search">
+  <tr-select #pageSelect class="tr-settings-page-select" [label]="resources.settingsPagesLabel" [options]="pageOptions()" [value]="pageChoice()" (valueChange)="select($event)" />
   <input tr-text-field type="search" class="tr-settings-search-field" [attr.aria-label]="resources.searchSettingsLabel" [placeholder]="resources.searchSettingsLabel"
     [value]="query()" (input)="search($event)" />
 </div>
 <div class="tr-settings-body">
-  <nav #pageList class="tr-settings-pages" [attr.aria-label]="resources.settingsPagesLabel" (scroll)="keep()">
+  <nav #pageList class="tr-settings-pages tr-scroll-reveal" [attr.aria-label]="resources.settingsPagesLabel" (scroll)="keep()">
     @for (page of pages(); track page.title) {
       @let isCurrent = !isSearching() && page.title === currentPage()?.title;
-      <button type="button" class="tr-settings-page" [class.tr-settings-page-current]="isCurrent" [attr.aria-current]="isCurrent ? 'page' : null" (click)="select(page)">
+      <button type="button" class="tr-settings-page" data-settings-page [class.tr-settings-page-current]="isCurrent" [attr.aria-current]="isCurrent ? 'page' : null" (click)="select(page.title)">
         {{ page.title }}
       </button>
     }
   </nav>
-  <div #content class="tr-settings-content" (scroll)="keep()">
-    @if (isSearching()) {
-      @for (page of results(); track page.title) {
-        <section class="tr-settings-result" [attr.aria-label]="page.title">
-          <h2 class="tr-settings-result-title">{{ page.title }}</h2>
-          <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: true }" />
-        </section>
-      } @empty {
-        <p class="tr-settings-empty">{{ resources.noSettingsFound }}</p>
+  <div #content class="tr-settings-content tr-scroll-reveal" (scroll)="keep()">
+    <div class="tr-settings-column">
+      @if (isSearching()) {
+        @for (page of results(); track page.title) {
+          <section class="tr-settings-result" [attr.aria-label]="page.title">
+            <h2 class="tr-settings-result-title">{{ page.title }}</h2>
+            <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: true }" />
+          </section>
+        } @empty {
+          <p class="tr-settings-empty">{{ resources.noSettingsFound }}</p>
+        }
+      } @else if (currentPage(); as page) {
+        <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: false }" />
       }
-    } @else if (currentPage(); as page) {
-      <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: false }" />
-    }
+    </div>
   </div>
 </div>
 
@@ -53,8 +56,9 @@ LICENSE file in the root directory of this source tree.
         }
         @for (definition of group.definitions; track definition.name.text) {
           <tr-setting-row [definition]="definition" [value]="values().get(definition.name.text)" [isSet]="setFlags().get(definition.name.text)?.() ?? false"
-            [query]="query()" [modules]="isMutedModules(definition) ? notifyingModules : modules" [isInverse]="isMutedModules(definition)"
+            [query]="query()" [modules]="isMutedModules(definition) ? notifyingModules() : modules()" [isInverse]="isMutedModules(definition)"
             (changed)="change(definition, $event)" (reset)="reset(definition)" (run)="run(definition)" />
+
         }
       </section>
     }

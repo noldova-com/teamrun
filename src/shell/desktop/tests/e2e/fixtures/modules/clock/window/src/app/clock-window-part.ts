@@ -12,9 +12,13 @@ import {
 } from "@noldova/teamrun-shell-window";
 
 export class ClockWindowPart implements IWindowPart {
+  public static readonly failureKey: string = "teamrun.fixture.clock.failWindowPart";
+
   public readonly moduleId: string = "clock";
 
   public async activateAsync(context: IWindowPartContext): Promise<void> {
+    if (localStorage.getItem(ClockWindowPart.failureKey) !== null)
+      throw new Error("The clock's window part was asked to fail.");
     context.registerView(new ViewContribution("clock.face", "Clock", "schedule", DockSide.Right, true,
       () => import("./components/clock-face/clock-face.component").then(t => t.ClockFaceComponent)));
     const describe = (text: string): StatusBarItemState => new StatusBarItemState(text, { icon: "timer", tooltip: "Tick the clock", command: "clock.tick" });
@@ -24,6 +28,10 @@ export class ClockWindowPart implements IWindowPart {
       ticks.update(describe(`Ticks: ${count}`));
       context.setViewBadge("clock.face", new ViewBadge(count, `${count} ticks`));
     });
+  }
+
+  public async reconnectAsync(): Promise<boolean> {
+    return false;
   }
 
   public async deactivateAsync(): Promise<void> {

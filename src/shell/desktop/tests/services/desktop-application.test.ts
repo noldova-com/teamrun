@@ -18,7 +18,7 @@ import type { MenuItemConstructorOptions } from "electron";
 
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
+import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeBuild, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
 import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
 
@@ -137,7 +137,7 @@ export class DesktopApplicationTests {
   public opensAHiddenSecureWindowWithTrafficLightsOnMacOS(): Promise<void> {
     return DesktopApplicationTests.verifyWindowAsync("darwin", window => {
       Assert.isUndefined(window.options.titleBarOverlay);
-      Assert.areEqual(JSON.stringify({ x: 12, y: 10 }), JSON.stringify(window.options.trafficLightPosition));
+      Assert.areEqual(JSON.stringify({ x: 12, y: 9 }), JSON.stringify(window.options.trafficLightPosition));
     });
   }
 
@@ -549,15 +549,59 @@ export class DesktopApplicationTests {
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
     const event = DesktopApplicationTests.trustedEvent("linux");
 
-    electron.ipcMain.send("teamrun:moduleLog", event, "notes", "Opened the list\r\nwith 3 notes\n");
+    electron.ipcMain.send("teamrun:moduleLog", event, "notes", "Opened the list\r\nwith 3 notes\r2026-10-04T12:00:00.000Z shell: \u001b[1mfaked\n");
     electron.ipcMain.send("teamrun:moduleLog", { ...event, senderFrame: null }, "notes", "Untrusted");
     electron.ipcMain.send("teamrun:moduleLog", event, "Notes", "Not an id");
     electron.ipcMain.send("teamrun:moduleLog", event, 7, "Not text");
     electron.ipcMain.send("teamrun:moduleLog", event, "notes", 7);
-    electron.ipcMain.send("teamrun:moduleLog", event, "notes", "x".repeat(65_537));
+    electron.ipcMain.send("teamrun:moduleLog", event, "notes", `${"a ".repeat(32_767)}ab left out`);
 
-    Assert.areEqual(JSON.stringify(["notes: Opened the list", "notes: with 3 notes"]), JSON.stringify(process.errors.split("\n").filter(t => t.includes("notes: ")).map(t => t.slice(t.indexOf("notes: ")))));
+    Assert.areEqual(JSON.stringify(["notes: Opened the list", "notes: with 3 notes", "notes: 2026-10-04T12:00:00.000Z shell: [1mfaked", `notes: ${"a ".repeat(32_767)}ab`]),
+      JSON.stringify(process.errors.split("\n").filter(t => t.includes("notes: ")).map(t => t.slice(t.indexOf("notes: ")))));
     Assert.areEqual(0, process.errors.split("\n").filter(t => t.includes("Untrusted") || t.includes("Not ")).length);
+  }
+
+  @TestMethod
+  public async writesItsOwnWindowsErrorsToItsLogRedactedAndUnderTheModulesIdWhenThereIsOne(): Promise<void> {
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    electron.ipcMain.send("teamrun:windowError", event, null,
+      `Error: The layout could not be saved.\u20282026-10-04T12:00:00.000Z Faked record\n    at save (${process.homeFolder}/teamrun/window.js:1:2)\n`);
+    electron.ipcMain.send("teamrun:windowError", event, "clock", "Error: Its window part failed to activate.");
+    electron.ipcMain.send("teamrun:windowError", { ...event, senderFrame: null }, null, "Untrusted");
+    electron.ipcMain.send("teamrun:windowError", event, "Clock", "Not an id");
+    electron.ipcMain.send("teamrun:windowError", event, 7, "Not an id either");
+    electron.ipcMain.send("teamrun:windowError", event, null, 7);
+    electron.ipcMain.send("teamrun:windowError", event, null, `${"a ".repeat(32_767)}ab left out`);
+
+    const lines = process.errors.split("\n").filter(t => t.includes("Window error")).map(t => t.slice(t.indexOf("Window error")));
+    Assert.areEqual(JSON.stringify([
+      "Window error: Error: The layout could not be saved.",
+      "Window error: 2026-10-04T12:00:00.000Z Faked record",
+      "Window error:     at save (~/teamrun/window.js:1:2)",
+      "Window error in clock: Error: Its window part failed to activate.",
+      `Window error: ${"a ".repeat(32_767)}ab`
+    ]), JSON.stringify(lines));
+    Assert.areEqual(0, process.errors.split("\n").filter(t => t.includes("Untrusted") || t.includes("Not an id")).length);
+  }
+
+  @TestMethod
+  public async writesTenErrorsFromAWindowThenOneNoticeAndLeavesOutTheRestOfTheMinute(): Promise<void> {
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    electron.ipcMain.send("teamrun:windowError", event, "Clock", "Not counted");
+    for (let index = 0; index < 12; index++)
+      electron.ipcMain.send("teamrun:windowError", event, null, `Error ${index}`);
+
+    const lines = process.errors.split("\n").filter(t => t.includes("Window error") || t.includes("errors are left out")).map(t => t.slice(t.indexOf(" ") + 1));
+    Assert.areEqual(JSON.stringify([
+      ...Array.from({ length: 10 }, (_, index) => `Window error: Error ${index}`),
+      "The window reported more than ten errors within a minute; the rest of that minute's errors are left out of the log."
+    ]), JSON.stringify(lines));
   }
 
   @TestMethod
@@ -987,7 +1031,7 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async refusesASettingsRequestWithoutAnObjectOrADevice(): Promise<void> {
+  public async refusesADeviceRequestWithoutAnObjectOrADevice(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const device = new FakeDeviceIdentity();
@@ -998,15 +1042,19 @@ export class DesktopApplicationTests {
     const failures = [
       await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", null),
       await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", [1]),
-      await DesktopApplicationTests.requestAsync(anonymous, event, "shell.settings", {})
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.recentCommands", null),
+      await DesktopApplicationTests.requestAsync(anonymous, event, "shell.settings", {}),
+      await DesktopApplicationTests.requestAsync(anonymous, event, "shell.recordCommand", { id: "notes.newNote" })
     ].map(t => t.failure?.toJson());
 
     Assert.areEqual(JSON.stringify([
-      { code: "InvalidMessage", message: "A settings request's payload must be a JSON object." },
-      { code: "InvalidMessage", message: "A settings request's payload must be a JSON object." },
-      { code: "Unavailable", message: "This device has no identity, so its settings cannot be read or changed." }
+      { code: "InvalidMessage", message: "A request that belongs to this device must have a JSON object as its payload." },
+      { code: "InvalidMessage", message: "A request that belongs to this device must have a JSON object as its payload." },
+      { code: "InvalidMessage", message: "A request that belongs to this device must have a JSON object as its payload." },
+      { code: "Unavailable", message: "This device has no identity, so a request that belongs to it cannot be made." },
+      { code: "Unavailable", message: "This device has no identity, so a request that belongs to it cannot be made." }
     ]), JSON.stringify(failures));
-    Assert.isFalse(connection.calls.some(t => t.includes("etting")));
+    Assert.isFalse(connection.calls.some(t => t.includes("etting") || t.includes("ommand")));
   }
 
   @TestMethod
@@ -1219,6 +1267,44 @@ export class DesktopApplicationTests {
       ]),
       JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.settingsChanged could not be passed to the window").length);
+  }
+
+  @TestMethod
+  public async addsItsOwnDeviceToItsWindowsRecentCommandsRequests(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.answers.set("shell.recentCommands", Response.success("r", { ids: ["notes.newNote"] }));
+    connection.answers.set("shell.recordCommand", Response.success("r", null));
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    const recent = await DesktopApplicationTests.requestAsync(electron, event, "shell.recentCommands", {});
+    const recorded = await DesktopApplicationTests.requestAsync(electron, event, "shell.recordCommand", { id: "notes.newNote" });
+
+    const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).filter(t => t.startsWith("shell.recentCommands") || t.startsWith("shell.recordCommand"));
+    Assert.areEqual(JSON.stringify([
+      `shell.recentCommands ${JSON.stringify({ device: FakeDeviceIdentity.ID })}`,
+      `shell.recordCommand ${JSON.stringify({ id: "notes.newNote", device: FakeDeviceIdentity.ID })}`
+    ]), JSON.stringify(sent));
+    Assert.areEqual(JSON.stringify({ ids: ["notes.newNote"] }), JSON.stringify(recent.payload));
+    Assert.isFalse(recorded.hasFailed);
+  }
+
+  @TestMethod
+  public async passesRecentCommandsOnlyToTheDeviceThatRanThemWithoutItsDevice(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher();
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", DesktopApplicationTests.trustedEvent("linux"));
+
+    launcher.listener?.onEvent(new Event(ShellEvents.recentCommandsChanged, new RecentCommands(["notes.newNote"], FakeDeviceIdentity.ID).toJson()));
+    launcher.listener?.onEvent(new Event(ShellEvents.recentCommandsChanged, new RecentCommands(["clock.show"], "another").toJson()));
+    launcher.listener?.onEvent(new Event(ShellEvents.recentCommandsChanged, { device: FakeDeviceIdentity.ID }));
+
+    Assert.areEqual(
+      JSON.stringify([["teamrun:runtimeEvent", "shell.recentCommandsChanged", { ids: ["notes.newNote"] }]]),
+      JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.recentCommandsChanged could not be passed to the window").length);
   }
 
   @TestMethod

@@ -66,8 +66,8 @@ class ModuleFolderCheckTests {
         "src/modules/notes/README.md": "# Notes\n",
         "src/modules/notes/window/src/api/index.ts": "export {};\n",
         "src/modules/clock/README.md": "# Clock\n",
-        "src/modules/clock/module.json": JSON.stringify({ id: "clock", displayName: "Clock", parts: [], dependencies: [], contributes: {} }),
-        [`${ModuleCatalog.FIXTURE_FOLDER}/weather/module.json`]: JSON.stringify({ id: "weather", displayName: " ", parts: [], dependencies: [], contributes: {} })
+        "src/modules/clock/module.json": JSON.stringify({ id: "clock", version: "0.0.1", displayName: "Clock", description: "Used by the tests.", parts: [], dependencies: [], contributes: {} }),
+        [`${ModuleCatalog.FIXTURE_FOLDER}/weather/module.json`]: JSON.stringify({ id: "weather", version: "0.0.1", displayName: " ", description: "Used by the tests.", parts: [], dependencies: [], contributes: {} })
       });
       const output = new TextOutputFixture();
 

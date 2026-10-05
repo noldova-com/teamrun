@@ -17,7 +17,7 @@ import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.
 
 @TestClass
 export class ModuleDeclarationReaderTests {
-  private static readonly NOTES: Readonly<Record<string, unknown>> = { id: "notes", displayName: "Notes", dependencies: [], runtimePackage: null, contributes: {} };
+  private static readonly NOTES: Readonly<Record<string, unknown>> = { id: "notes", version: "0.0.1", displayName: "Notes", description: "Keeps notes.", dependencies: [], runtimePackage: null, contributes: {} };
 
   @TestMethod
   public readsTheBuildsDeclarationsInOrder(): Promise<void> {

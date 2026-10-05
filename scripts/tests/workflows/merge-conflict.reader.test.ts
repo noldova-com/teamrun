@@ -13,6 +13,7 @@ import ProcessRunner from "../../processes/process-runner.ts";
 import ProcessException from "../../processes/process.exception.ts";
 import Git from "../../repository/git.ts";
 import MergeConflictReader from "../../workflows/merge-conflict.reader.ts";
+import MergeTreeFixture from "../fixtures/merge-tree.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 
 class MergeConflictReaderTests {
@@ -32,6 +33,31 @@ class MergeConflictReaderTests {
       assert.deepEqual(await reader.readFilesAsync("main", 7), ["a.txt", "café notes.txt"]);
       assert.deepEqual(await reader.readFilesAsync("main", 8), []);
       await assert.rejects(reader.readFilesAsync("main", 9), ProcessException);
+    });
+
+    test("reads asked for at the same time run one after the other, since they share the checkout's refs, and each gets its own files", async () => {
+      const git = new MergeTreeFixture();
+      git.conflict(3, ["a.ts"]);
+      git.conflict(4, ["b.ts"]);
+      const reader = new MergeConflictReader(new Git("work", git));
+
+      const files = await Promise.all([reader.readFilesAsync("main", 3), reader.readFilesAsync("main", 4)]);
+
+      assert.deepEqual(files, [["a.ts"], ["b.ts"]]);
+      assert.deepEqual(git.commands.map(t => t.split(" ")[0]), ["fetch", "merge-tree", "fetch", "merge-tree"]);
+    });
+
+    test("a read that fails does not stop the one asked for after it", async () => {
+      const git = new MergeTreeFixture();
+      git.fail(3);
+      git.conflict(4, ["b.ts"]);
+      const reader = new MergeConflictReader(new Git("work", git));
+
+      const [first, second] = await Promise.allSettled([reader.readFilesAsync("main", 3), reader.readFilesAsync("main", 4)]);
+
+      assert.ok(first.status === "rejected" && first.reason instanceof ProcessException);
+      assert.deepEqual(second, { status: "fulfilled", value: ["b.ts"] });
+      assert.deepEqual(git.commands.map(t => t.split(" ")[0]), ["fetch", "fetch", "merge-tree"]);
     });
   }
 }
