@@ -9,13 +9,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import ProductIdentity from "../packages/product-identity.ts";
 import type RootManifest from "../packages/root-manifest.ts";
 import type PackageTarget from "./package-target.ts";
 
 export default class PackageConfiguration {
-  private static readonly WINDOWS_ICON_FILE: string = "icon-dark.ico";
-  private static readonly MAC_ICON_FILE: string = "icon-dock-512.png";
-  private static readonly LINUX_ICON_FILE: string = "icon-dark-512.png";
   private static readonly LICENSE_FILE: string = "LICENSE";
   private static readonly FONTS_FOLDER: string = "assets/fonts";
   private static readonly FONT_LICENSE_FILTER: readonly string[] = ["*.txt"];
@@ -70,12 +68,11 @@ export default class PackageConfiguration {
       directories: { app: this.stage, output: this.output },
       electronDist: this.electronDistribution,
       electronVersion: this.electronVersion,
-      asar: true,
-      asarUnpack: [],
+      asar: { smartUnpack: false },
       npmRebuild: false,
       nodeGypRebuild: false,
       buildDependenciesFromSource: false,
-      electronFuses: PackageConfiguration.FUSES,
+      electronFuses: this.target.platform === PackageConfiguration.MACOS ? { ...PackageConfiguration.FUSES, resetAdHocDarwinSignature: true } : PackageConfiguration.FUSES,
       extraResources: this.listLicenses(),
       publish: null,
       ...this.describePlatform()
@@ -95,17 +92,17 @@ export default class PackageConfiguration {
     switch (this.target.platform) {
       case PackageConfiguration.WINDOWS:
         return {
-          win: { target, icon: path.join(icons, PackageConfiguration.WINDOWS_ICON_FILE), artifactName },
+          win: { target, icon: path.join(icons, ProductIdentity.WINDOWS_ICON_FILE), artifactName },
           nsis: { oneClick: true, perMachine: false, deleteAppDataOnUninstall: false, shortcutName: product.name, uninstallDisplayName: product.name, artifactName }
         };
       case PackageConfiguration.MACOS:
-        return { mac: { target, icon: path.join(icons, PackageConfiguration.MAC_ICON_FILE), category: PackageConfiguration.MAC_CATEGORY, artifactName } };
+        return { mac: { target, icon: path.join(icons, ProductIdentity.MAC_ICON_FILE), category: PackageConfiguration.MAC_CATEGORY, artifactName } };
       default:
         return {
           toolsets: { appimage: PackageConfiguration.APPIMAGE_TOOLSET },
           linux: {
             target,
-            icon: path.join(icons, PackageConfiguration.LINUX_ICON_FILE),
+            icon: path.join(icons, ProductIdentity.LINUX_ICON_FILE),
             executableName: product.slug,
             syncDesktopName: true,
             category: PackageConfiguration.LINUX_CATEGORY,

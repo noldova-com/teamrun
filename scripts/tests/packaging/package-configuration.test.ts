@@ -38,8 +38,7 @@ class PackageConfigurationTests {
         directories: { app: PackageConfigurationTests.STAGE, output: PackageConfigurationTests.OUTPUT },
         electronDist: PackageConfigurationTests.DISTRIBUTION,
         electronVersion: "44.5.1",
-        asar: true,
-        asarUnpack: [],
+        asar: { smartUnpack: false },
         npmRebuild: false,
         nodeGypRebuild: false,
         buildDependenciesFromSource: false,
@@ -98,6 +97,14 @@ class PackageConfigurationTests {
           desktop: { entry: { Name: "Fixture Studio", StartupWMClass: "org.fixtureworks.studio" } }
         }
       });
+    });
+
+    test("only a macOS target signs the program ad hoc again after its fuses are flipped, so that Apple silicon still starts it", () => {
+      const fuses = ["macos", "windows", "linux"].map(t => PackageConfigurationTests.create(t, "arm64").toJson()["electronFuses"]);
+      const windowsFuses = PackageConfigurationTests.create("windows", "x64").toJson()["electronFuses"];
+
+      assert.deepEqual(fuses, [{ ...Object(windowsFuses), resetAdHocDarwinSignature: true }, windowsFuses, windowsFuses]);
+      assert.equal(Object.hasOwn(Object(windowsFuses), "resetAdHocDarwinSignature"), false);
     });
 
     test("the configuration is written as JSON, creating its folder", async t => {

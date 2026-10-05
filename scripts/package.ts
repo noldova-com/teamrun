@@ -18,8 +18,10 @@ import PackageException from "./packages/package.exception.ts";
 import RootManifest from "./packages/root-manifest.ts";
 import ElectronDistribution from "./packaging/electron-distribution.ts";
 import PackageConfiguration from "./packaging/package-configuration.ts";
+import PackageLayout from "./packaging/package-layout.ts";
 import PackageStage from "./packaging/package-stage.ts";
 import PackageTarget from "./packaging/package-target.ts";
+import PackagedBuild from "./packaging/packaged-build.ts";
 import PackagingException from "./packaging/packaging.exception.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import ProcessException from "./processes/process.exception.ts";
@@ -28,13 +30,15 @@ import NpmCommand from "./toolchain/npm-command.ts";
 export default class Package {
   private static readonly USAGE: string = "Usage: npm run package\n";
   private static readonly USAGE_EXIT_CODE: number = 2;
-  private static readonly OUTPUT_SEGMENTS: readonly string[] = ["_build", "package", "out"];
-  private static readonly CONFIGURATION_SEGMENTS: readonly string[] = ["_build", "package", "electron-builder.json"];
-  private static readonly TOOL_CACHE_SEGMENTS: readonly string[] = ["_build", "package", "tool-cache"];
   private static readonly TOOL_CACHE_MANIFEST: string = "package.json";
   private static readonly COMMONJS_SCOPE: string = `${JSON.stringify({ type: "commonjs" })}\n`;
   private static readonly BUILDER_SEGMENTS: readonly string[] = ["node_modules", "electron-builder", "cli.js"];
   private static readonly BUILDER_OPTIONS: readonly string[] = ["--publish", "never", "--config"];
+  private static readonly BUILDER_VARIABLES: ReadonlySet<string> = new Set([
+    "PATH", "PATHEXT", "COMSPEC", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS",
+    "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA", "USER", "USERNAME", "LOGNAME",
+    "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"
+  ]);
 
   private readonly root: string;
   private readonly platform: string;
@@ -62,23 +66,21 @@ export default class Package {
 
     try {
       const target = PackageTarget.fromProcess(this.platform, this.architecture);
+      const layout = new PackageLayout(this.root);
       await this.stage.stageAsync(this.output);
-      const folder = path.join(this.root, ...Package.OUTPUT_SEGMENTS);
-      await rm(folder, { recursive: true, force: true });
-      const electron = new ElectronDistribution(this.root);
+      await rm(layout.output, { recursive: true, force: true });
+      const electron = new ElectronDistribution(this.root, layout.electron);
       await electron.copyAsync();
-      const configuration = new PackageConfiguration(this.root, await RootManifest.readAsync(this.root), target, this.stage.folder, folder,
+      const configuration = new PackageConfiguration(this.root, await RootManifest.readAsync(this.root), target, this.stage.folder, layout.output,
         electron.folder, await electron.readVersionAsync());
-      const file = path.join(this.root, ...Package.CONFIGURATION_SEGMENTS);
-      await configuration.writeAsync(file);
-      const toolCache = path.join(this.root, ...Package.TOOL_CACHE_SEGMENTS);
-      await mkdir(toolCache, { recursive: true });
-      await writeFile(path.join(toolCache, Package.TOOL_CACHE_MANIFEST), Package.COMMONJS_SCOPE);
-      const environment = { ...this.environment, ELECTRON_BUILDER_CACHE: toolCache, CSC_IDENTITY_AUTO_DISCOVERY: "false" };
-      const exitCode = await this.runner.runAsync(process.execPath, [path.join(this.root, ...Package.BUILDER_SEGMENTS), ...Package.BUILDER_OPTIONS, file], this.root, environment);
+      await configuration.writeAsync(layout.configuration);
+      await mkdir(layout.toolCache, { recursive: true });
+      await writeFile(path.join(layout.toolCache, Package.TOOL_CACHE_MANIFEST), Package.COMMONJS_SCOPE);
+      const exitCode = await this.runner.runAsync(process.execPath, [path.join(this.root, ...Package.BUILDER_SEGMENTS), ...Package.BUILDER_OPTIONS, layout.configuration], this.root,
+        this.createBuilderEnvironment(layout));
       if (exitCode !== 0)
         throw new PackagingException(`electron-builder failed with exit code ${exitCode}.`);
-      const files = configuration.fileNames.map(t => path.join(folder, t));
+      const files = configuration.fileNames.map(t => path.join(layout.output, t));
       const missing = files.filter(t => !existsSync(t));
       if (missing.length > 0)
         throw new PackagingException(`electron-builder finished without making ${missing.join(", ")}.`);
@@ -92,12 +94,21 @@ export default class Package {
       return 1;
     }
   }
+
+  private createBuilderEnvironment(layout: PackageLayout): NodeJS.ProcessEnv {
+    return {
+      ...Object.fromEntries(Object.entries(this.environment).filter(([name]) => Package.BUILDER_VARIABLES.has(name.toUpperCase()))),
+      ELECTRON_BUILDER_CACHE: layout.toolCache,
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    };
+  }
 }
 
 if (import.meta.main) {
   const runner = new ProcessRunner();
   const root = process.cwd();
   const npm = new NpmCommand(runner, process.env);
-  const stage = new PackageStage(root, runner, npm, new GalleryFile(root), new AngularProject(root, runner, npm));
+  const angular = new AngularProject(root, runner, npm);
+  const stage = new PackageStage(root, npm, new PackagedBuild(root, runner, new GalleryFile(root), angular));
   process.exitCode = await new Package(root, process.platform, process.arch, stage, runner, process.env, process.stdout).runAsync(process.argv.slice(2));
 }
