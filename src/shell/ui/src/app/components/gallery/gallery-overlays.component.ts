@@ -35,13 +35,13 @@ import { TooltipComponent } from "../tooltip/tooltip.component";
 import { TooltipDirective } from "../tooltip/tooltip.directive";
 import { GalleryResources } from "./gallery-resources";
 import { GalleryCellComponent } from "./gallery-cell.component";
-import { GalleryHoverDirective } from "./gallery-hover.directive";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
+import { GalleryStateDirective } from "./gallery-state.directive";
 
 @Component({
   selector: "tr-gallery-overlays",
   imports: [
-    ButtonComponent, ContextMenuTriggerDirective, DialogComponent, DockingGuideComponent, DockingPlateComponent, GalleryCellComponent, GalleryHoverDirective, GallerySpecimenComponent, MenuBarComponent, MenuBarItemComponent,
+    ButtonComponent, ContextMenuTriggerDirective, DialogComponent, DockingGuideComponent, DockingPlateComponent, GalleryCellComponent, GallerySpecimenComponent, GalleryStateDirective, MenuBarComponent, MenuBarItemComponent,
     MenuComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, PopoverDirective, PopoverTriggerDirective, QuickInputComponent, TooltipComponent, TooltipDirective
   ],
   templateUrl: "./gallery-overlays.component.html",

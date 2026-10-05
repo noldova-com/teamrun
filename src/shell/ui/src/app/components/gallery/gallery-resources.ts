@@ -13,7 +13,11 @@ export class GalleryResources {
   public static readonly longAttribute: string = "long";
   public static readonly stateAttribute: string = "data-tr-state";
   public static readonly hoverState: string = "hover";
+  public static readonly focusState: string = "focus";
   public static readonly hoveredPill: string = ".tr-choice-pill[aria-checked=\"false\"]";
+  public static readonly focusedPill: string = ".tr-choice-pill[aria-checked=\"true\"]";
+  public static readonly focusedCheckbox: string = ".tr-checkbox-box";
+  public static readonly focusedSelect: string = ".tr-select-button";
   public static readonly dialogTitleIdPrefix: string = "tr-gallery-dialog-";
   public static readonly text = {
     gallery: "Gallery",

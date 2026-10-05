@@ -24,12 +24,12 @@ import { TreeComponent } from "../tree/tree.component";
 import { ViewBadgeComponent } from "../view-badge/view-badge.component";
 import { GalleryResources } from "./gallery-resources";
 import { GalleryCellComponent } from "./gallery-cell.component";
-import { GalleryHoverDirective } from "./gallery-hover.directive";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
+import { GalleryStateDirective } from "./gallery-state.directive";
 
 @Component({
   selector: "tr-gallery-navigation",
-  imports: [GalleryCellComponent, GalleryHoverDirective, GallerySpecimenComponent, IconButtonComponent, PanelCardComponent, SashComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, TreeComponent, ViewBadgeComponent],
+  imports: [GalleryCellComponent, GallerySpecimenComponent, GalleryStateDirective, IconButtonComponent, PanelCardComponent, SashComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, TreeComponent, ViewBadgeComponent],
   templateUrl: "./gallery-navigation.component.html",
   styleUrl: "./gallery-navigation.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush

@@ -7,3 +7,5 @@
  */
 
 $hover: ":is(:hover, [data-tr-state=\"hover\"])";
+$focus-visible: ":is(:focus-visible, [data-tr-state=\"focus\"])";
+$focus: ":is(:focus, [data-tr-state=\"focus\"])";

@@ -50,7 +50,7 @@
   @include selected-surface;
 }
 
-.tr-tab:focus-visible .tr-tab-pill {
+.tr-tab#{states.$focus-visible} .tr-tab-pill {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: calc(var(--tr-border-width) * -1);
 }
@@ -117,15 +117,15 @@
 
 .tr-tab.tr-tab-selected .tr-tab-close,
 .tr-tab#{states.$hover} .tr-tab-close,
-.tr-tab:focus-visible .tr-tab-close {
+.tr-tab#{states.$focus-visible} .tr-tab-close {
   visibility: visible;
 }
 
-.tr-tab.tr-tab-working:not(#{states.$hover}, :focus-visible) .tr-tab-close {
+.tr-tab.tr-tab-working:not(#{states.$hover}, #{states.$focus-visible}) .tr-tab-close {
   visibility: hidden;
 }
 
-.tr-tab.tr-tab-working:is(#{states.$hover}, :focus-visible) .tr-tab-spinner {
+.tr-tab.tr-tab-working:is(#{states.$hover}, #{states.$focus-visible}) .tr-tab-spinner {
   visibility: hidden;
 }
 

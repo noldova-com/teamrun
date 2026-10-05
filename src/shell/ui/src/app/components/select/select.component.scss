@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "states";
+
 :host {
   display: inline-flex;
   width: var(--tr-select-width);
@@ -34,7 +36,7 @@
   cursor: pointer;
 }
 
-.tr-select-button:focus-visible,
+.tr-select-button#{states.$focus-visible},
 .tr-select-button[aria-expanded="true"] {
   border-color: var(--tr-accent);
   outline: none;

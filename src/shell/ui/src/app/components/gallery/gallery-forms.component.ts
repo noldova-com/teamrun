@@ -24,12 +24,12 @@ import { TextFieldComponent } from "../text-field/text-field.component";
 import { TooltipDirective } from "../tooltip/tooltip.directive";
 import { GalleryResources } from "./gallery-resources";
 import { GalleryCellComponent } from "./gallery-cell.component";
-import { GalleryHoverDirective } from "./gallery-hover.directive";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
+import { GalleryStateDirective } from "./gallery-state.directive";
 
 @Component({
   selector: "tr-gallery-forms",
-  imports: [ButtonComponent, CheckboxComponent, ChipComponent, ChoicePillsComponent, GalleryCellComponent, GalleryHoverDirective, GallerySpecimenComponent, IconButtonComponent, ProgressComponent, SelectComponent, SpinnerComponent, TextFieldComponent, TooltipDirective],
+  imports: [ButtonComponent, CheckboxComponent, ChipComponent, ChoicePillsComponent, GalleryCellComponent, GallerySpecimenComponent, GalleryStateDirective, IconButtonComponent, ProgressComponent, SelectComponent, SpinnerComponent, TextFieldComponent, TooltipDirective],
   templateUrl: "./gallery-forms.component.html",
   styleUrl: "./gallery-forms.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -38,6 +38,9 @@ export class GalleryFormsComponent {
   protected readonly text: typeof GalleryResources.text = GalleryResources.text;
   protected readonly sizes: typeof GallerySize = GallerySize;
   protected readonly hoveredPill: string = GalleryResources.hoveredPill;
+  protected readonly focusedPill: string = GalleryResources.focusedPill;
+  protected readonly focusedCheckbox: string = GalleryResources.focusedCheckbox;
+  protected readonly focusedSelect: string = GalleryResources.focusedSelect;
   protected readonly variants: typeof ButtonVariant = ButtonVariant;
   protected readonly options: readonly SelectOption[] = GalleryResources.text.selectOptions.map(t => new SelectOption(t.value, t.title));
   protected readonly pillOptions: readonly SelectOption[] = GalleryResources.text.choicePillOptions.map(t => new SelectOption(t.value, t.title));

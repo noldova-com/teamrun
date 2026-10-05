@@ -48,7 +48,7 @@
   @include selected-surface;
 }
 
-.tr-choice-pill:focus-visible {
+.tr-choice-pill#{states.$focus-visible} {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: calc(var(--tr-border-width) * -1);
 }
