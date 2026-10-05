@@ -43,7 +43,7 @@ class TestTests {
       ];
       assert.deepEqual([...output.text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`), titles.map(t => `${t}: passed`));
       assert.ok(output.text.endsWith("\n19 of 19 checks passed.\n"));
-      assert.equal(runner.runs.length, 4);
+      assert.equal(runner.runs.length, 5);
       assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
     });
 
@@ -58,7 +58,7 @@ class TestTests {
       assert.ok(output.text.includes("\nScript types: failed\n"));
       assert.ok(output.text.includes("\nScript tests and coverage: passed\n"));
       assert.ok(output.text.endsWith("\n18 of 19 checks passed.\n"));
-      assert.equal(runner.runs.length, 4);
+      assert.equal(runner.runs.length, 5);
     });
 
     test("a filtered run runs only the test checks on what the filters select and reports the counts in the console and the summary", async t => {
@@ -164,7 +164,7 @@ class TestTests {
       const exitCode = await new Test(repository.directory, runner, output, {}).runAsync(["--repeat", "2"]);
 
       assert.equal(exitCode, 0, output.text);
-      assert.equal(runner.runs.length, 8);
+      assert.equal(runner.runs.length, 10);
       assert.ok(output.text.endsWith("\nAll 2 runs passed.\n"));
     });
 

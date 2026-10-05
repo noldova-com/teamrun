@@ -77,16 +77,19 @@ class PackageTestCheckTests {
       assert.deepEqual(runner.runs[1], [
         process.execPath,
         repository.directory,
+        "--disable-warning=ExperimentalWarning",
         path.join(services, "coverage", "coverage-run-entry.js"),
         coverage,
         "@noldova/teamrun-foundation-testing",
         path.join(repository.directory, "node_modules", "@noldova", "teamrun-foundation-testing"),
         path.join(repository.directory, "src", "foundation", "testing", "src"),
         "[]",
+        "[]",
         "@noldova/teamrun-foundation-alpha",
         path.join(repository.directory, "node_modules", "@noldova", "teamrun-foundation-alpha"),
         path.join(repository.directory, "src", "foundation", "alpha", "src"),
-        "[{\"file\":\"main.ts\",\"reason\":\"Runs only inside Electron.\"}]"
+        "[{\"file\":\"main.ts\",\"reason\":\"Runs only inside Electron.\"}]",
+        "[]"
       ]);
       assert.deepEqual(runner.environments[1], { KEPT: "yes" });
     });

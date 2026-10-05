@@ -20,13 +20,13 @@ import PackageException from "../packages/package.exception.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import ProcessException from "../processes/process.exception.ts";
 import CheckSelection from "./check-selection.ts";
+import CoverageRun from "./coverage-run.ts";
 import type ISelectableCheck from "./interfaces/selectable-check.ts";
 
 export default class PackageTestCheck implements ISelectableCheck {
   private static readonly TESTING_PACKAGE: string = "@noldova/teamrun-foundation-testing";
   private static readonly FRAMEWORK_SEGMENTS: readonly string[] = ["node_modules", "@noldova", "teamrun-foundation-testing", "services"];
   private static readonly TEST_ENTRY_SEGMENTS: readonly string[] = ["execution", "test-run-entry.js"];
-  private static readonly COVERAGE_ENTRY_SEGMENTS: readonly string[] = ["coverage", "coverage-run-entry.js"];
   private static readonly COVERAGE_SEGMENTS: readonly string[] = ["_build", "coverage"];
   private static readonly COVERAGE_VARIABLE: string = "NODE_V8_COVERAGE";
   private static readonly SOURCE_FOLDER: string = "src";
@@ -95,8 +95,8 @@ export default class PackageTestCheck implements ISelectableCheck {
       const testsPassed = await this.runner.runAsync(process.execPath, [PackageTestCheck.SOURCE_MAPS_OPTION, this.locateEntry(PackageTestCheck.TEST_ENTRY_SEGMENTS), ...tests], this.root, environment) === 0;
       if (isFiltered)
         return await this.readSelectionAsync(selectionFile, testsPassed, output);
-      const projects = packages.flatMap(t => [t.name, layout.locateInstalled(t), layout.locateSource(t, PackageTestCheck.SOURCE_FOLDER), t.coverageExclusions]);
-      const coverageComplete = await this.runner.runAsync(process.execPath, [this.locateEntry(PackageTestCheck.COVERAGE_ENTRY_SEGMENTS), coverage, ...projects], this.root, this.environment) === 0;
+      const projects = packages.flatMap(t => CoverageRun.project(t.name, layout.locateInstalled(t), layout.locateSource(t, PackageTestCheck.SOURCE_FOLDER), t.coverageExclusions));
+      const coverageComplete = await new CoverageRun(this.root, this.runner).measureAsync(coverage, projects, this.environment);
       return new CheckSelection(testsPassed && coverageComplete, PackageTestCheck.UNIT, 0, 0);
     }
     catch (error) {
