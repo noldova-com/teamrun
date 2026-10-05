@@ -201,6 +201,21 @@ export class Resources {
   public static readonly windowUnresponsive: string = "The window's page stopped responding.";
   public static readonly windowResponsiveAgain: string = "The window's page responds again.";
   public static readonly windowStoppedAgainRecord: string = "The window's page stopped again within 10 s of a reload, so the person was offered the log folder instead of another reload.";
+  public static readonly unhandledRejectionOrigin: string = "unhandledRejection";
+  public static readonly failureExitCode: number = 1;
+  public static get mainProcessFailed(): string {
+    return `${Resources.applicationName} stopped because of an unexpected error.`;
+  }
+
+  public static get mainProcessFailedDetail(): string {
+    return "Work running in the runtime continues. Changes from the last few seconds may not have been saved. "
+      + `Restart ${Resources.applicationName} to go on, or open the log folder to see what happened.`;
+  }
+
+  public static get restartButton(): string {
+    return `Restart ${Resources.applicationName}`;
+  }
+
   public static readonly mainWindow: string = "main";
   public static get runtimeNotConnected(): string {
     return `${Resources.applicationName} is not connected to its runtime.`;
@@ -401,6 +416,15 @@ export class Resources {
 
   public static formatRecoveryChoice(choice: string): string {
     return `The person chose ${choice}.`;
+  }
+
+  public static formatMainProcessFailure(origin: string, error: string): string {
+    const kind = origin === Resources.unhandledRejectionOrigin ? "an unhandled rejection" : "an uncaught exception";
+    return `The desktop's main process failed with ${kind}: ${error}`;
+  }
+
+  public static formatMainProcessBoxFailed(error: string): string {
+    return `The desktop could not ask what to do after its main process failed, so it quits: ${error}`;
   }
 
   public static formatWindowSize(name: string, minimum: number): string {

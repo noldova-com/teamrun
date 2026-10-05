@@ -41,6 +41,7 @@ import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
 import { MenuBarTemplate } from "./menu-bar-template.js";
 import { DeviceIdentity } from "./device-identity.js";
+import { MainProcessRecovery } from "./main-process-recovery.js";
 import { OpenWindow } from "./open-window.js";
 import { QuitCoordinator } from "./quit-coordinator.js";
 import { RuntimeStartup } from "./runtime-startup.js";
@@ -145,6 +146,8 @@ export class DesktopApplication {
   }
 
   private run(): void {
+    const recovery = new MainProcessRecovery(this.electron.app, this.electron.dialog, this.log, () => this.openLogFolderAsync());
+    this.process.onUncaughtError((error, origin) => recovery.receive(error, origin));
     const app = this.electron.app;
     app.setName(Resources.applicationName);
     app.setAppUserModelId(this.taskbar.appId);

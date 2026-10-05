@@ -30,6 +30,7 @@ export class FakeDesktopProcess implements IDesktopProcess {
   public readonly started: (readonly string[])[] = [];
   public readonly ended: number[] = [];
   public readonly processId: number = 1000;
+  public readonly uncaughtListeners: ((error: unknown, origin: string) => void)[] = [];
   public endFailure: Error | null = null;
 
   public constructor(platform: string, argv: readonly string[] = [], env: NodeJS.ProcessEnv = {}, homeFolder: string = "/home/person") {
@@ -51,5 +52,9 @@ export class FakeDesktopProcess implements IDesktopProcess {
     if (this.endFailure !== null)
       throw this.endFailure;
     this.ended.push(processId);
+  }
+
+  public onUncaughtError(listener: (error: unknown, origin: string) => void): void {
+    this.uncaughtListeners.push(listener);
   }
 }

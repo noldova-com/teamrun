@@ -1367,6 +1367,31 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async writesAnErrorItsMainProcessDoesNotCatchToItsLogRedactedAndOffersTheLogFolderInItsOwnBox(): Promise<void> {
+    const data = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const electron = new FakeElectron();
+      const process = new FakeDesktopProcess("linux", [`--data-dir=${data}`]);
+      electron.dialog.answers.push(1);
+      DesktopStartFixture.start(electron, process);
+
+      for (const listener of process.uncaughtListeners)
+        listener(new Error(`The pipe at ${process.homeFolder}/teamrun/runtime.sock broke.`), "uncaughtException");
+      await electron.app.becomeReadyAsync();
+      await Condition.waitAsync(() => electron.dialog.boxes.length === 2);
+
+      Assert.areEqual(1, process.uncaughtListeners.length);
+      Assert.isTrue(process.errors.includes("The desktop's main process failed with an uncaught exception: Error: The pipe at ~/teamrun/runtime.sock broke.\n    at "), process.errors);
+      Assert.isTrue(process.errors.includes("desktop-application.test"), "the log keeps the error's stack");
+      Assert.areEqual(JSON.stringify([null, null]), JSON.stringify(electron.dialog.boxes.map(t => t.windowId)));
+      Assert.areEqual(JSON.stringify([join(data, "logs")]), JSON.stringify(electron.shell.opened));
+    }
+    finally {
+      await rm(data, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
   public async opensTheLogFolderForItsOwnWindowAndCreatesItFirst(): Promise<void> {
     const data = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
     try {
