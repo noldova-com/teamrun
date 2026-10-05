@@ -21,7 +21,7 @@ import { DataDirectory, DiscoveryReader, Endpoint, OwnershipLock, RuntimeBuild, 
 import CleanupSteps from "./cleanup-steps.ts";
 import DesktopLogFixture from "./desktop-log.fixture.ts";
 import ErrorOutputClassifier from "./error-output.classifier.ts";
-import MainProcessAnswer, { type MainProcessAnswerRecord } from "./main-process-answer.ts";
+import MainProcessAnswer, { type IMainProcessAnswerRecord } from "./main-process-answer.ts";
 import OffCursorPlacement from "./off-cursor-placement.ts";
 import ProcessListFixture from "./process-list.fixture.ts";
 import ProcessorLoadFixture from "./processor-load.fixture.ts";
@@ -91,7 +91,7 @@ export default class DesktopApplicationFixture {
   private placement: string = "The window had not been moved off the cursor.";
   private isPageUnreachable: boolean = false;
   private silence: MainProcessSilence | null = null;
-  private lastAnswer: MainProcessAnswerRecord | null = null;
+  private lastAnswer: IMainProcessAnswerRecord | null = null;
   private mainProcessId: number | null = null;
 
   public readonly failures: string[] = [];
@@ -429,12 +429,12 @@ export default class DesktopApplicationFixture {
     }), limit);
     if (answer !== DesktopApplicationFixture.NO_ANSWER)
       return answer;
-    const lastAnswer = MainProcessAnswer.describeLast(this.lastAnswer, asked);
+    const lastAnswerLine = MainProcessAnswer.describeLast(this.lastAnswer, asked);
     const processorMilliseconds = await this.readProcessorMillisecondsAsync();
     this.silence = { action, since: asked, processorMilliseconds };
     throw new Error([
       `The main process did not answer within ${limit / 1000} s when asked to ${action}.`,
-      lastAnswer,
+      lastAnswerLine,
       await DesktopLogFixture.describeMainProcessFailuresAsync(new DataDirectory(this.dataDirectory).desktopLog),
       this.placement
     ].join("\n"));
