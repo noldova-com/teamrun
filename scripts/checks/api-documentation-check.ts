@@ -38,8 +38,8 @@ export default class ApiDocumentationCheck implements ICheck {
 
   private async inspectAsync(apiPackage: ApiPackage): Promise<readonly string[]> {
     try {
-      return await this.session.useAsync(apiPackage, ApiDocumentationCheck.PURPOSE,
-        t => new ApiDocumentationReader(t, apiPackage.visibility, this.root).readAsync(apiPackage.declarations, apiPackage.source));
+      return await this.session.useAsync(apiPackage, ApiDocumentationCheck.PURPOSE, [apiPackage.declarations],
+        t => new ApiDocumentationReader(t, apiPackage.visibility, this.root).readAsync(apiPackage.declarations, apiPackage.sourceDeclarations));
     }
     catch (error) {
       return [ApiException.describe(error)];

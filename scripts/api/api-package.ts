@@ -24,20 +24,20 @@ export default class ApiPackage {
   public readonly project: string;
   public readonly implementation: string;
   public readonly declarations: string;
-  public readonly source: string;
+  public readonly sourceDeclarations: string;
   public readonly missingDeclarationsMessage: string;
   public readonly visibility: ApiVisibility;
   public readonly exampleRoot: string;
   public readonly paths?: Readonly<Record<string, readonly string[]>>;
 
-  private constructor(directory: string, id: string, project: string, implementation: string, declarations: string, source: string, missingDeclarationsMessage: string,
+  private constructor(directory: string, id: string, project: string, implementation: string, declarations: string, sourceDeclarations: string, missingDeclarationsMessage: string,
     visibility: ApiVisibility, exampleRoot: string, paths?: Readonly<Record<string, readonly string[]>>) {
     this.directory = directory;
     this.id = id;
     this.project = project;
     this.implementation = implementation;
     this.declarations = declarations;
-    this.source = source;
+    this.sourceDeclarations = sourceDeclarations;
     this.missingDeclarationsMessage = missingDeclarationsMessage;
     this.visibility = visibility;
     this.exampleRoot = exampleRoot;

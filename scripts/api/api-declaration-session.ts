@@ -26,11 +26,11 @@ export default class ApiDeclarationSession {
     this.timeout = timeout;
   }
 
-  public async useAsync<T>(apiPackage: ApiPackage, purpose: string, read: (project: Project) => Promise<T>): Promise<T> {
+  public async useAsync<T>(apiPackage: ApiPackage, purpose: string, files: readonly string[], read: (project: Project) => Promise<T>): Promise<T> {
     if (!existsSync(apiPackage.declarations))
       throw new ApiException(apiPackage.missingDeclarationsMessage);
     const project = new ApiProject(this.root, purpose, apiPackage.id);
-    await project.writeAsync(apiPackage.project, this.root, [apiPackage.declarations]);
+    await project.writeAsync(apiPackage.project, this.root, files);
     return await ApiServer.useAsync(this.server, this.root, project.file, this.timeout, read);
   }
 }

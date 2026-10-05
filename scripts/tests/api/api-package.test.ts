@@ -25,7 +25,7 @@ class ApiPackageTests {
       assert.equal(found.project, path.join(root, "src/foundation/json/src/tsconfig.json"));
       assert.equal(found.implementation, path.join(root, "src/foundation/json/src/api/index.ts"));
       assert.equal(found.declarations, path.join(root, "node_modules/@noldova/teamrun-foundation-json/api/index.d.ts"));
-      assert.equal(found.source, path.join(root, "src/foundation/json/src/api/index.d.ts"));
+      assert.equal(found.sourceDeclarations, path.join(root, "src/foundation/json/src/api/index.d.ts"));
       assert.equal(found.missingDeclarationsMessage, `no installed declarations at ${found.declarations}; build the packages first`);
       assert.equal(found.visibility, ApiVisibility.PUBLIC_AND_PROTECTED);
       assert.equal(found.exampleRoot, root);
@@ -43,7 +43,7 @@ class ApiPackageTests {
       assert.equal(found.implementation, ApiPackage.locatePartImplementation(root, "src/shell/window"));
       assert.equal(found.declarations, path.join(root, "src/shell/window/src/api/index.d.ts"));
       assert.equal(found.declarations, ApiPackage.locatePartDeclarations(root, "src/shell/window"));
-      assert.equal(found.source, found.declarations);
+      assert.equal(found.sourceDeclarations, found.declarations);
       assert.equal(found.missingDeclarationsMessage, `no declarations at ${found.declarations}`);
       assert.equal(found.visibility, ApiVisibility.PUBLIC);
       assert.equal(found.exampleRoot, path.join(root, "src/node_modules/.cache/teamrun"));

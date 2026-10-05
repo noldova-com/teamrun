@@ -64,7 +64,7 @@ export default class ApiExampleCheck implements ICheck {
 
   private async inspectAsync(apiPackage: ApiPackage): Promise<readonly string[]> {
     try {
-      const found = await this.session.useAsync(apiPackage, `${ApiExampleCheck.PURPOSE}-reading`,
+      const found = await this.session.useAsync(apiPackage, `${ApiExampleCheck.PURPOSE}-reading`, [apiPackage.declarations],
         t => new ApiExampleReader(t, apiPackage.visibility).readAsync(apiPackage.declarations));
       return [...found.undocumented.map(t => `${t} has no @example`), ...await this.compileAsync(apiPackage, found)];
     }
