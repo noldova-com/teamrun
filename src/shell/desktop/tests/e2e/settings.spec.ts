@@ -144,8 +144,8 @@ test.describe("settings", () => {
     await ScrollAreaFixture.expectThumbShownAsync(content, false);
     const hidden = await ScrollAreaFixture.scrollbarImageAsync(window, content, "vertical");
 
-    await window.keyboard.press("PageDown");
     const scrolled = Date.now();
+    await window.keyboard.press("PageDown");
     await expect.poll(() => ScrollAreaFixture.scrollTopAsync(content)).toBeGreaterThan(0);
     await ScrollAreaFixture.expectThumbShownAsync(content, true);
     expect((await ScrollAreaFixture.scrollbarImageAsync(window, content, "vertical")).equals(hidden)).toBe(false);

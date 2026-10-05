@@ -83,28 +83,31 @@ export default class ScrollAreaFixture {
   }
 
   public static async expectThumbShownAsync(area: Locator, isShown: boolean): Promise<void> {
-    const poll = expect.poll(() => ScrollAreaFixture.thumbColorAsync(area));
-    await (isShown ? poll.not : poll).toBe(ScrollAreaFixture.HIDDEN);
+    const expected = isShown ? await ScrollAreaFixture.readShownColorAsync(area) : ScrollAreaFixture.HIDDEN;
+    await expect.poll(() => ScrollAreaFixture.thumbColorAsync(area), { message: `the thumb's color, ${isShown ? "shown" : "hidden"}` }).toBe(expected);
   }
 
   private static thumbColorAsync(area: Locator): Promise<string> {
     return area.evaluate(t => getComputedStyle(t).getPropertyValue("--tr-scroll-thumb"));
   }
 
-  private static async restAsync(window: Page, area: Locator): Promise<void> {
-    await window.mouse.move(1, 1);
-    await expect.poll(() => ScrollAreaFixture.thumbColorAsync(area)).toBe(ScrollAreaFixture.HIDDEN);
-  }
-
-  private static async hoverAsync(area: Locator): Promise<void> {
-    const shown = await area.evaluate(t => {
+  private static readShownColorAsync(area: Locator): Promise<string> {
+    return area.evaluate(t => {
       const probe = (t.parentElement ?? document.body).appendChild(document.createElement("div"));
       probe.style.color = "var(--tr-scrollbar)";
       const color = getComputedStyle(probe).color;
       probe.remove();
       return color;
     });
+  }
+
+  private static async restAsync(window: Page, area: Locator): Promise<void> {
+    await window.mouse.move(1, 1);
+    await ScrollAreaFixture.expectThumbShownAsync(area, false);
+  }
+
+  private static async hoverAsync(area: Locator): Promise<void> {
     await area.hover({ position: ScrollAreaFixture.HOVER_POSITION });
-    await expect.poll(() => ScrollAreaFixture.thumbColorAsync(area)).toBe(shown);
+    await ScrollAreaFixture.expectThumbShownAsync(area, true);
   }
 }

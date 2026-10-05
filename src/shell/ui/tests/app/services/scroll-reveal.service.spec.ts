@@ -105,13 +105,34 @@ describe("ScrollRevealService", () => {
 
   it("fades the thumb out over 150 ms once scrolling stops", async () => {
     await MotionFixture.resetAsync();
+    useFakeClock();
     const scroll = scrolled(area);
     area.scrollTop = 100;
     await scroll;
+    vi.advanceTimersByTime(1000);
 
     const style = getComputedStyle(area);
-    expect([style.transitionProperty, style.transitionDuration, style.transitionTimingFunction]).toEqual(["--tr-scroll-thumb", "0.15s", "linear"]);
-    await vi.waitFor(() => expect(thumb(area)).toBe(hidden), { timeout: 3000 });
+    const fades = area.getAnimations().filter(t => t instanceof CSSTransition);
+    expect([style.transitionDuration, style.transitionTimingFunction, isScrolling(area), fades.map(t => t.transitionProperty)]).toEqual(["0.15s", "linear", false, ["--tr-scroll-thumb"]]);
+    await Promise.all(fades.map(t => t.finished));
+    expect(thumb(area)).toBe(hidden);
+  });
+
+  it("marks only the nested area that scrolls, not the area around it", async () => {
+    useFakeClock();
+    const inner = area.insertBefore(document.createElement("div"), area.firstChild);
+    inner.style.cssText = "height: 60px; overflow: auto;";
+    inner.appendChild(document.createElement("div")).style.cssText = "height: 600px;";
+    const innerScroll = scrolled(inner);
+    inner.scrollTop = 100;
+    await innerScroll;
+
+    expect([isScrolling(inner), thumb(inner), isScrolling(area), thumb(area)]).toEqual([true, shown, false, hidden]);
+    vi.advanceTimersByTime(1000);
+    const outerScroll = scrolled(area);
+    area.scrollTop = 100;
+    await outerScroll;
+    expect([isScrolling(inner), thumb(inner), isScrolling(area), thumb(area)]).toEqual([false, hidden, true, shown]);
   });
 
   it("hides the thumb at once, without the fade, when reduced motion is preferred", async () => {
