@@ -693,6 +693,24 @@ describe("WindowPartHostService", () => {
     expect(errors).toEqual([]);
   });
 
+  it("moves on the revision of a module that stays failed when its state changes and its cause stays the same", async () => {
+    const chat = (state: ModuleState): object => ({ ...status("chat", state, "It waits.", ["tasks"]), ...state === ModuleState.Blocked ? { blockedBy: "tasks" } : {} });
+    const tab = new ViewTab("chat.list");
+    const { host } = start([source("chat", new FakeWindowPart("chat", log), ["tasks"])], [status("tasks", ModuleState.Failed, "It broke."), chat(ModuleState.Blocked)]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const before = [host.revisionOf(tab), host.findFailure(tab)?.state];
+
+    bridge.responses.set("shell.modules", { payload: { modules: [status("tasks", ModuleState.Failed, "It broke."), chat(ModuleState.Failed)] } });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(before).toEqual([1, ModuleState.Blocked]);
+    expect([host.revisionOf(tab), host.findFailure(tab)?.state]).toEqual([2, ModuleState.Failed]);
+    expect(log).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
   it("keeps a part whose dependency has no window part, with its context", async () => {
     const notes = notesPart(log);
     notes.onReconnect = () => true;
