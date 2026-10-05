@@ -37,8 +37,7 @@
 
 [data-tr-tab-shape="pill"] .tr-tab-pill {
   min-height: var(--tr-tab-pill);
-  padding-inline-start: var(--tr-tab-label-inset);
-  padding-inline-end: calc(var(--tr-tab-action-allowance) - var(--tr-tab-action-slot));
+  padding-inline: var(--tr-pill-padding);
   border-radius: var(--tr-radius-small);
 }
 
@@ -80,7 +79,7 @@
 .tr-tab-action {
   display: grid;
   flex: none;
-  margin-inline-start: var(--tr-space-1);
+  margin-inline: var(--tr-space-1) calc((var(--tr-icon) - var(--tr-tab-action-slot)) / 2);
   place-items: center;
   width: var(--tr-tab-action-slot);
   height: var(--tr-tab-action-slot);

@@ -150,8 +150,8 @@ describe("ChoicePillsComponent", () => {
 
         AppearanceFixture.expectLook(first.minHeight, theme, "choice-pill", "min-height");
         expect((pills()[0] as HTMLElement).getBoundingClientRect().height).toBeGreaterThanOrEqual(Number.parseFloat(first.minHeight) - 1 / 32);
-        AppearanceFixture.expectLook(first.paddingLeft, theme, "choice-pill-padding", "padding-left");
-        AppearanceFixture.expectLook(first.paddingRight, theme, "choice-pill-padding", "padding-right");
+        AppearanceFixture.expectLook(first.paddingLeft, theme, "pill-padding", "padding-left");
+        AppearanceFixture.expectLook(first.paddingRight, theme, "pill-padding", "padding-right");
         AppearanceFixture.expectLook(first.borderRadius, theme, "radius-small", "border-radius");
         AppearanceFixture.expectLook(getComputedStyle(group()).columnGap, theme, "choice-pill-gap", "column-gap");
         AppearanceFixture.expectPixels(right.left - left.right, Number.parseFloat(getComputedStyle(group()).columnGap));

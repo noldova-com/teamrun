@@ -225,7 +225,8 @@ describe("TabComponent", () => {
         AppearanceFixture.expectLook(tabStyle.maxWidth, theme, "tab-max-width", "max-width");
         AppearanceFixture.expectLook(getComputedStyle(part(".tr-tab-action") ?? tab()).marginLeft, theme, "space-1", "margin-left");
         AppearanceFixture.expectLook(pill.minHeight, theme, "tab-pill", "min-height");
-        AppearanceFixture.expectLook(pill.paddingLeft, theme, "tab-label-inset", "padding-left");
+        AppearanceFixture.expectLook(pill.paddingLeft, theme, "pill-padding", "padding-left");
+        AppearanceFixture.expectLook(pill.paddingRight, theme, "pill-padding", "padding-right");
         AppearanceFixture.expectLook(pill.borderTopLeftRadius, theme, "radius-small", "border-top-left-radius");
         AppearanceFixture.expectLook(getComputedStyle(part(".tr-tab-action") ?? tab()).width, theme, "tab-action-slot", "width");
         AppearanceFixture.expectLook(getComputedStyle(part(".tr-tab-close") ?? tab(), "::before").width, theme, "tab-close", "width");
@@ -240,7 +241,8 @@ describe("TabComponent", () => {
 
       AppearanceFixture.expectRem(getComputedStyle(tab()).minHeight, 2, panelSize);
       AppearanceFixture.expectRem(getComputedStyle(pill).minHeight, 1.5, panelSize);
-      AppearanceFixture.expectRem(getComputedStyle(pill).paddingRight, 0.25, panelSize);
+      AppearanceFixture.expectRem(getComputedStyle(pill).paddingLeft, 0.375, panelSize);
+      AppearanceFixture.expectRem(getComputedStyle(pill).paddingRight, 0.375, panelSize);
       AppearanceFixture.expectRem(getComputedStyle(tab()).fontSize, 0.8125, panelSize);
       AppearanceFixture.expectPixels(tab().getBoundingClientRect().height, AppearanceFixture.toPixels(2, panelSize));
       const close = (part(".tr-tab-close") ?? tab()).getBoundingClientRect();
@@ -249,4 +251,20 @@ describe("TabComponent", () => {
       expect([close.left + close.width / 2, close.top + close.height / 2].map(t => Math.round(t))).toEqual([slot.left + slot.width / 2, slot.top + slot.height / 2].map(t => Math.round(t)));
       expect(close.bottom).toBeLessThanOrEqual(tab().getBoundingClientRect().bottom);
     });
+
+  it("leaves the same space before its icon as after its close glyph, or after its label when it has no close button", () => {
+    update(() => {
+      host.icon.set("description");
+      host.selected.set(true);
+    });
+    const edges = (): DOMRect => (part(".tr-tab-pill") ?? tab()).getBoundingClientRect();
+    const start = (part(".tr-tab-icon") ?? tab()).getBoundingClientRect().left - edges().left;
+
+    const afterGlyph = edges().right - (part(".tr-tab-close span") ?? tab()).getBoundingClientRect().right;
+    update(() => host.closable.set(false));
+    const afterLabel = edges().right - (part(".tr-tab-label") ?? tab()).getBoundingClientRect().right;
+
+    expect([afterGlyph, afterLabel].map(t => Math.round(t - start))).toEqual([0, 0]);
+    AppearanceFixture.expectRem(`${start}px`, 0.375);
+  });
 });
