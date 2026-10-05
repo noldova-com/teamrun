@@ -57,6 +57,10 @@ describe("ScrollRevealService", () => {
     return element.hasAttribute("data-tr-scrolling");
   }
 
+  function transitions(element: HTMLElement): CSSTransition[] {
+    return element.getAnimations().filter(t => t instanceof CSSTransition);
+  }
+
   function useFakeClock(): void {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   }
@@ -103,18 +107,20 @@ describe("ScrollRevealService", () => {
     expect(isScrolling(area)).toBe(false);
   });
 
-  it("fades the thumb out over 150 ms once scrolling stops", async () => {
+  it("fades the thumb in while the area scrolls and out over 150 ms once scrolling stops", async () => {
     await MotionFixture.resetAsync();
     useFakeClock();
     const scroll = scrolled(area);
     area.scrollTop = 100;
     await scroll;
+    const fadeIn = transitions(area);
     vi.advanceTimersByTime(1000);
+    const fadeOut = transitions(area);
 
     const style = getComputedStyle(area);
-    const fades = area.getAnimations().filter(t => t instanceof CSSTransition);
-    expect([style.transitionDuration, style.transitionTimingFunction, isScrolling(area), fades.map(t => t.transitionProperty)]).toEqual(["0.15s", "linear", false, ["--tr-scroll-thumb"]]);
-    await Promise.all(fades.map(t => t.finished));
+    expect([style.transitionDuration, style.transitionTimingFunction, isScrolling(area), fadeIn.map(t => t.transitionProperty), fadeOut.map(t => t.transitionProperty)])
+      .toEqual(["0.15s", "linear", false, ["--tr-scroll-thumb"], ["--tr-scroll-thumb"]]);
+    await Promise.all(fadeOut.map(t => t.finished));
     expect(thumb(area)).toBe(hidden);
   });
 
