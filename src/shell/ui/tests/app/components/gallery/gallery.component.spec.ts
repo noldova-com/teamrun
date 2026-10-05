@@ -113,6 +113,29 @@ describe("GalleryComponent", () => {
     await userEvent.keyboard("{Escape}");
   });
 
+  it("marks the first match of the quick input's query in each of its options", async () => {
+    await showAsync();
+    const quick = fixture.nativeElement.querySelector("tr-gallery-overlays tr-quick-input") as HTMLElement;
+    const query = (quick.querySelector(".tr-quick-input-field") as HTMLInputElement).value;
+    const titles = [...quick.querySelectorAll<HTMLElement>(".tr-quick-input-title")].map(t => [...t.children]);
+    const marked = titles.map(segments => {
+      let offset = 0;
+      return segments.flatMap(t => {
+        const start = offset;
+        offset += (t.textContent ?? "").length;
+        return t.tagName === "MARK" ? [[start, t.textContent]] : [];
+      });
+    });
+
+    expect(query).not.toBe("");
+    expect(titles).toHaveLength(3);
+    expect(marked).toEqual(titles.map(segments => {
+      const text = segments.map(t => t.textContent).join("");
+      const start = text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase());
+      return [[start, text.slice(start, start + query.length)]];
+    }));
+  });
+
   it("lets the sample controls be used: a toggle button, a checkbox, a select and a checkbox row of a menu", async () => {
     await showAsync();
     const forms = fixture.nativeElement.querySelector("tr-gallery-forms") as HTMLElement;
