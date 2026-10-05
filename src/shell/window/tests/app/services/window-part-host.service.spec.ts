@@ -869,7 +869,7 @@ describe("WindowPartHostService", () => {
 
   it("activates a part again once ready when its activation failed because the connection ended, without counting it failed", async () => {
     let isDropping = true;
-    const notes = new FakeWindowPart("notes", log, () => {
+    const notes = new WindowPartFixture("notes", log, () => {
       if (!isDropping)
         return;
       isDropping = false;
