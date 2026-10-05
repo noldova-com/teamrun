@@ -24,7 +24,7 @@ class TestMirrorCheckTests {
   private static readonly RULE: string = "CODING-STANDARDS.md section 13";
 
   public static register(): void {
-    test("mirrored executable files pass, and declarations, enums, exclusions, fixtures, workflows and other files need no mirror", async t => {
+    test("mirrored executable files pass, and declarations, enums, exclusions, fixtures, workflows and files outside a package's src need no mirror", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
@@ -49,6 +49,7 @@ class TestMirrorCheckTests {
         "src/shell/ui/src/styles/kit.scss": ".tr-button {\n  color: red;\n}\n",
         "src/shell/ui/tests/styles/kit.spec.ts": TestMirrorCheckTests.CLASS,
         "src/shell/desktop/src/app.ts": "export const name = \"TeamRun\";\n",
+        "src/shell/desktop/electron.config.ts": TestMirrorCheckTests.CLASS,
         "src/shell/desktop/tests/e2e/launch.spec.ts": TestMirrorCheckTests.CLASS,
         "src/shell/desktop/tests/e2e/fixtures/modules/clock/window/src/face.ts": TestMirrorCheckTests.CLASS,
         "src/eslint.config.js": "export default () => [];\n"
