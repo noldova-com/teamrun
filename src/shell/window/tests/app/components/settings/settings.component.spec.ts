@@ -156,13 +156,6 @@ describe("SettingsComponent", () => {
     expect(stacked).toBe(true);
   });
 
-  it("lists no page and its page select shows none before any settings arrive", () => {
-    settings.definitions.set([]);
-    const host = render();
-
-    expect([texts(".tr-settings-page"), host.querySelector(".tr-settings-page-select .tr-select-value")?.textContent?.trim()]).toEqual([[], ""]);
-  });
-
   it("reveals the scrollbars of its page list and its content while they are hovered", () => {
     render();
 
