@@ -16,6 +16,7 @@ import {
 } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../enums/dock-side";
+import { RuntimeDisconnectedException } from "../exceptions/runtime-disconnected.exception";
 import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
 import { WindowPartFailureException } from "../exceptions/window-part-failure.exception";
 import type { IWindowPart } from "../interfaces/i-window-part";
@@ -254,7 +255,7 @@ export class WindowPartHostService implements IWindowPartHost {
         return;
     }
     catch (error) {
-      if (!this.isConnected(connection))
+      if (!this.isConnected(connection) || RuntimeDisconnectedException.isIn(error))
         return;
       this.errors.handleError(error);
       await this.deactivateAsync(this.activations.slice());
@@ -324,6 +325,8 @@ export class WindowPartHostService implements IWindowPartHost {
       return await activation.part.reconnectAsync();
     }
     catch (error) {
+      if (RuntimeDisconnectedException.isIn(error))
+        throw error;
       this.errors.handleError(new WindowPartFailureException(activation.context.moduleId, Resources.windowPartReconnectionFailed, error));
       return false;
     }
@@ -353,10 +356,13 @@ export class WindowPartHostService implements IWindowPartHost {
 
   private async loadLayoutAsync(): Promise<boolean> {
     try {
-      return await this.layout.loadAsync();
-    }
-    finally {
+      const isRestored = await this.layout.loadAsync();
       this.isLayoutLoaded = true;
+      return isRestored;
+    }
+    catch (error) {
+      this.isLayoutLoaded = !RuntimeDisconnectedException.isIn(error);
+      throw error;
     }
   }
 
@@ -440,6 +446,8 @@ export class WindowPartHostService implements IWindowPartHost {
     catch (error) {
       this.activations.splice(this.activations.indexOf(activation), 1);
       activation.context.withdraw();
+      if (RuntimeDisconnectedException.isIn(error))
+        throw error;
       this.errors.handleError(new WindowPartFailureException(status.id, Resources.windowPartActivationFailed, error));
       return status.withState(ModuleState.Failed, Resources.windowPartActivationFailed);
     }

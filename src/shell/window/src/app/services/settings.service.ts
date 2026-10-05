@@ -23,6 +23,8 @@ import {
   type SettingScope
 } from "@noldova/teamrun-shell-protocol";
 
+import { ActionNotConfirmedException } from "../exceptions/action-not-confirmed.exception";
+import { Resources } from "../../resources";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 
 @Injectable({ providedIn: "root" })
@@ -78,16 +80,25 @@ export class SettingsService {
   }
 
   public async setAsync(name: string, value: JsonValue, scope: SettingScope | null = null): Promise<void> {
-    await this.bridge.requestAsync(ShellMethods.setSetting.text, new SettingValue(new SettingKey(QualifiedName.parse(name), scope), value).toJson());
+    await this.changeAsync(name, ShellMethods.setSetting.text, new SettingValue(new SettingKey(QualifiedName.parse(name), scope), value).toJson());
   }
 
   public async resetAsync(name: string, scope: SettingScope | null = null): Promise<void> {
-    await this.bridge.requestAsync(ShellMethods.resetSetting.text, new SettingKey(QualifiedName.parse(name), scope).toJson());
+    await this.changeAsync(name, ShellMethods.resetSetting.text, new SettingKey(QualifiedName.parse(name), scope).toJson());
   }
 
   public onChanged(listener: (change: SettingChange) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  private async changeAsync(name: string, method: string, payload: JsonValue): Promise<void> {
+    try {
+      await this.bridge.requestAsync(method, payload);
+    }
+    catch (error) {
+      throw ActionNotConfirmedException.from(error, Resources.formatSettingNotConfirmed(name));
+    }
   }
 
   private apply(change: SettingChange): void {
