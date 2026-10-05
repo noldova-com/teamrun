@@ -14,6 +14,7 @@ import { MenuBarComponent } from "../../../../src/app/components/menu-bar/menu-b
 import { MenuItemComponent } from "../../../../src/app/components/menu/menu-item.component";
 import { MenuTriggerDirective } from "../../../../src/app/components/menu/menu-trigger.directive";
 import { MenuComponent } from "../../../../src/app/components/menu/menu.component";
+import { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({
@@ -69,4 +70,13 @@ describe("MenuBarItemComponent", () => {
     expect(item("file").textContent).toBe("Files");
     expect(getComputedStyle(item("view")).opacity).toBe("0.5");
   });
+
+  for (const theme of AppearanceFixture.themes)
+    it(`leaves the ${theme.id} theme's pill padding on both sides of an item, as toolbar buttons and tabs do`, () => {
+      AppearanceFixture.apply(theme, ThemeMode.Light);
+      const style = getComputedStyle(item("file"));
+
+      AppearanceFixture.expectLook(style.paddingLeft, theme, "pill-padding", "padding-left");
+      AppearanceFixture.expectLook(style.paddingRight, theme, "pill-padding", "padding-right");
+    });
 });
