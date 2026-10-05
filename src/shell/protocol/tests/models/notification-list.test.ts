@@ -15,12 +15,12 @@ export class NotificationListTests {
   @TestMethod
   public pinsItsWireFormAndKeepsItsOwnCopyInOrder(): void {
     const post = new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null);
-    const source = [new Notification(2, 2, post, "2026-10-03T08:01:00.000Z", false), new Notification(1, 1, post, "2026-10-03T08:00:00.000Z", true)];
+    const source = [new Notification("n2", 2, post, "2026-10-03T08:01:00.000Z", false), new Notification("n1", 1, post, "2026-10-03T08:00:00.000Z", true)];
 
     const list = new NotificationList(source);
     source.pop();
 
-    Assert.areEqual("2,1", NotificationList.fromJson(list.toJson()).notifications.map(t => t.id).join(","));
+    Assert.areEqual("n2,n1", NotificationList.fromJson(list.toJson()).notifications.map(t => t.id).join(","));
     Assert.areEqual("{\"notifications\":[]}", JSON.stringify(new NotificationList([]).toJson()));
   }
 

@@ -15,7 +15,7 @@ import { NotificationState } from "@noldova/teamrun-shell-protocol";
 export class NotificationStateTests {
   @TestMethod
   public pinsItsWireForm(): void {
-    const notification = { id: 1, sequence: 3, post: { kind: "clock.alarm", title: "Alarm", severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false };
+    const notification = { id: "n1", sequence: 3, post: { kind: "clock.alarm", title: "Alarm", severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false };
     const json = { notifications: [notification], isDoNotDisturb: true, mutedModules: ["clock"], sequence: 3 };
     const state = NotificationState.fromJson(json);
 

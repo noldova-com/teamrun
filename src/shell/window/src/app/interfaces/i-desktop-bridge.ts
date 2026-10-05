@@ -30,7 +30,7 @@ export interface IDesktopBridge {
   edit(action: string): Promise<boolean>;
   setMenuBar(menuBar: JsonObject): void;
   onMenuCommand(listener: (id: string) => void): () => void;
-  onNotificationOpened(listener: (id: number) => void): () => void;
+  onNotificationOpened(listener: (id: string) => void): () => void;
   onQuitQuestion(listener: (question: unknown) => void): () => void;
   answerQuit(choice: string): Promise<boolean>;
   logModule(moduleId: string, message: string): void;

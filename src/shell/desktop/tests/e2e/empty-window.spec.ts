@@ -16,7 +16,7 @@ test.use({ desktopVariant: BuildVariantFixture.noModules });
 
 const colors = {
   light: { window: "rgb(248, 248, 248)", panel: "rgb(255, 255, 255)", cardBorder: "rgb(229, 229, 229)", titleBar: "rgb(248, 248, 248)", titleBarText: "rgb(30, 30, 30)", text: "rgb(59, 59, 59)" },
-  dark: { window: "rgb(24, 24, 24)", panel: "rgb(31, 31, 31)", cardBorder: "rgb(37, 37, 38)", titleBar: "rgb(24, 24, 24)", titleBarText: "rgb(204, 204, 204)", text: "rgb(204, 204, 204)" }
+  dark: { window: "rgb(24, 24, 24)", panel: "rgb(31, 31, 31)", cardBorder: "rgb(37, 37, 37)", titleBar: "rgb(24, 24, 24)", titleBarText: "rgb(204, 204, 204)", text: "rgb(204, 204, 204)" }
 };
 
 test.describe("the empty window", () => {

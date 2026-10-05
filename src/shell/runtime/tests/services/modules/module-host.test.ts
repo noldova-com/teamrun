@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
@@ -294,7 +295,7 @@ export class ModuleHostTests {
       methods,
       new EventRegistry({ broadcast: () => undefined }),
       new CommandRegistry(),
-      new NotificationCenter(() => undefined, () => new Date()),
+      new NotificationCenter(() => undefined, () => new Date(), randomUUID),
       new RuntimePartLoaderFixture(parts),
       diagnostics,
       work,

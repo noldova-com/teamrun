@@ -33,11 +33,11 @@ export interface IWindowPartHost {
 
   runCommandAsync(name: string, commandArguments: JsonValue): Promise<JsonValue>;
 
-  postNotificationAsync(post: NotificationPost): Promise<number>;
+  postNotificationAsync(post: NotificationPost): Promise<string>;
 
-  updateNotificationAsync(id: number, post: NotificationPost): Promise<void>;
+  updateNotificationAsync(id: string, post: NotificationPost): Promise<boolean>;
 
-  dismissNotification(id: number): void;
+  dismissNotification(id: string): void;
 
   readSetting(name: string): JsonValue | undefined;
 

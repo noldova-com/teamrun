@@ -9,18 +9,18 @@
 import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
 
 export class NotificationHandle {
-  private readonly change: (post: NotificationPost) => Promise<void>;
+  private readonly change: (post: NotificationPost) => Promise<boolean>;
   private readonly remove: () => void;
 
-  public readonly id: number;
+  public readonly id: string;
 
-  public constructor(id: number, change: (post: NotificationPost) => Promise<void>, remove: () => void) {
+  public constructor(id: string, change: (post: NotificationPost) => Promise<boolean>, remove: () => void) {
     this.id = id;
     this.change = change;
     this.remove = remove;
   }
 
-  public updateAsync(post: NotificationPost): Promise<void> {
+  public updateAsync(post: NotificationPost): Promise<boolean> {
     return this.change(post);
   }
 
