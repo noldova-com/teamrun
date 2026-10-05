@@ -22,8 +22,8 @@ describe("Resources", () => {
     expect(Resources.formatModulesDidNotStart(3)).toBe("3 modules didn't start");
     expect(Resources.formatModuleDidNotStart("Clock")).toBe("Clock didn't start");
     expect(Resources.formatBuildDetails("1.2.3", "abc123")).toBe("TeamRun 1.2.3, build abc123");
-    expect(Resources.formatModuleDetails("clock", "Failed", "Its runtime part failed to activate.")).toBe("clock: Failed: Its runtime part failed to activate.");
-    expect(Resources.formatModuleDetails("clock", "Active", null)).toBe("clock: Active");
+    expect(Resources.formatModuleDetails("clock", "0.4.0", "Failed", "Its runtime part failed to activate.")).toBe("clock 0.4.0: Failed: Its runtime part failed to activate.");
+    expect(Resources.formatModuleDetails("clock", "0.4.0", "Active", null)).toBe("clock 0.4.0: Active");
   });
 
   it("accepts contribution names of the form <module id>.<name> only", () => {

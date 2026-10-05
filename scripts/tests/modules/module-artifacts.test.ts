@@ -44,7 +44,7 @@ class ModuleArtifactsTests {
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
         "package.json": JSON.stringify({ teamrun: { modules: ["notes", "tasks"] } }),
-        "src/modules/notes/module.json": JSON.stringify({ id: "notes", displayName: "Notes", description: "Used by the tests.", parts: ["window"], dependencies: ["tasks"], contributes: {
+        "src/modules/notes/module.json": JSON.stringify({ id: "notes", version: "0.0.1", displayName: "Notes", description: "Used by the tests.", parts: ["window"], dependencies: ["tasks"], contributes: {
           views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"],
           menus: ["notes.templates"],
           settings: ["notes.wrap"]
@@ -53,9 +53,9 @@ class ModuleArtifactsTests {
         "src/modules/notes/menus.json": JSON.stringify(ModuleArtifactsTests.MENUS),
         "src/modules/notes/settings.json": JSON.stringify({ settings: [ModuleArtifactsTests.WRAP] }),
         "src/modules/notes/window/src/api/index.ts": "export {};\n",
-        "src/modules/tasks/module.json": JSON.stringify({ id: "tasks", displayName: "Tasks", description: "Used by the tests.", parts: ["runtime"], dependencies: [], contributes: {} }),
+        "src/modules/tasks/module.json": JSON.stringify({ id: "tasks", version: "0.0.1", displayName: "Tasks", description: "Used by the tests.", parts: ["runtime"], dependencies: [], contributes: {} }),
         "src/modules/tasks/runtime/package.json": "{}\n",
-        [`${ModuleCatalog.FIXTURE_FOLDER}/clock/module.json`]: JSON.stringify({ id: "clock", displayName: "Clock", description: "Used by the tests.", parts: ["window"], dependencies: [], contributes: {} }),
+        [`${ModuleCatalog.FIXTURE_FOLDER}/clock/module.json`]: JSON.stringify({ id: "clock", version: "0.0.1", displayName: "Clock", description: "Used by the tests.", parts: ["window"], dependencies: [], contributes: {} }),
         [`${ModuleCatalog.FIXTURE_FOLDER}/clock/window/src/api/index.ts`]: "export {};\n"
       });
       const artifacts = new ModuleArtifacts(repository.directory);
@@ -79,10 +79,10 @@ class ModuleArtifactsTests {
       assert.deepEqual(JSON.parse(await readFile(artifacts.declarationsFile, "utf8")), {
         formatVersion: 1,
         modules: [
-          { id: "tasks", displayName: "Tasks", description: "Used by the tests.", dependencies: [], runtimePackage: "@noldova/teamrun-modules-tasks-runtime", contributes: {}, settings: [] },
-          { id: "clock", displayName: "Clock", description: "Used by the tests.", dependencies: [], runtimePackage: null, contributes: {}, settings: [] },
+          { id: "tasks", version: "0.0.1", displayName: "Tasks", description: "Used by the tests.", dependencies: [], runtimePackage: "@noldova/teamrun-modules-tasks-runtime", contributes: {}, settings: [] },
+          { id: "clock", version: "0.0.1", displayName: "Clock", description: "Used by the tests.", dependencies: [], runtimePackage: null, contributes: {}, settings: [] },
           {
-            id: "notes", displayName: "Notes", description: "Used by the tests.", dependencies: ["tasks"], runtimePackage: null, contributes: {
+            id: "notes", version: "0.0.1", displayName: "Notes", description: "Used by the tests.", dependencies: ["tasks"], runtimePackage: null, contributes: {
               views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"],
               menus: ["notes.templates"], settings: ["notes.wrap"]
             },

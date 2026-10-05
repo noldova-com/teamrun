@@ -132,7 +132,7 @@ export class CliTests {
   public async reportsARuntimeWithoutModulesAndAFailedModule(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     const declarations = path.join(fixture.root, "declarations.json");
-    const missing = { id: "broken", displayName: "Broken", description: "Fails to load.", dependencies: [], runtimePackage: "@noldova/teamrun-fixture-missing-runtime", contributes: {} };
+    const missing = { id: "broken", version: "0.0.1", displayName: "Broken", description: "Fails to load.", dependencies: [], runtimePackage: "@noldova/teamrun-fixture-missing-runtime", contributes: {} };
     await writeFile(declarations, JSON.stringify({ formatVersion: 1, modules: [missing] }));
     await fixture.startHostAsync(declarations);
 

@@ -25,12 +25,12 @@ import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { SettingsFixture } from "../../../fixtures/settings.fixture";
 
 describe("ModulesComponent", () => {
-  const clock = new ModuleStatus("clock", "Clock", "Tells the time.", [], new Map([
+  const clock = new ModuleStatus("clock", "1.4.2", "Clock", "Tells the time.", [], new Map([
     ["commands", ["clock.tick", "clock.gone"]], ["settings", ["clock.tickStep", "clock.oldStep"]], ["views", ["clock.face"]], ["methods", ["clock.time"]]
   ]), ModuleState.Active, null);
-  const notes = new ModuleStatus("notes", "Notes", "Keeps notes.", [], new Map([["menus", ["notes.tools"]], ["notifications", ["notes.saved"]]]),
+  const notes = new ModuleStatus("notes", "0.0.1", "Notes", "Keeps notes.", [], new Map([["menus", ["notes.tools"]], ["notifications", ["notes.saved"]]]),
     ModuleState.Failed, "Its runtime part could not be loaded.");
-  const alarm = new ModuleStatus("alarm", "Alarm", "Rings at a time.", ["clock", "notes"], new Map(), ModuleState.Blocked, "It depends on notes, which is not active.", "notes");
+  const alarm = new ModuleStatus("alarm", "0.0.1", "Alarm", "Rings at a time.", ["clock", "notes"], new Map(), ModuleState.Blocked, "It depends on notes, which is not active.", "notes");
   let fixture: ComponentFixture<ModulesComponent>;
   let modules: WritableSignal<readonly ModuleStatus[]>;
   let bridge: DesktopBridgeFixture;
@@ -85,22 +85,22 @@ describe("ModulesComponent", () => {
     AppearanceFixture.reset();
   });
 
-  it("lists every module in module order with its name, state, id and description, and shows the first with TeamRun's version", async () => {
+  it("lists every module in module order with its name, state, id, version and description, and shows the first with TeamRun's version", async () => {
     await renderAsync();
 
     expect(texts(".tr-modules-title")).toEqual(["Modules"]);
     expect(texts(".tr-modules-version")).toEqual([Resources.formatProductVersion("1.2.3")]);
     expect(parts(".tr-modules-row")).toEqual([
-      ["Clock", "Active", "clock", "Tells the time."],
-      ["Notes", "error", "Failed", "notes", "Keeps notes."],
-      ["Alarm", "error", "Blocked", "alarm", "Rings at a time."]
+      ["Clock", "Active", "clock", "1.4.2", "Tells the time."],
+      ["Notes", "error", "Failed", "notes", "0.0.1", "Keeps notes."],
+      ["Alarm", "error", "Blocked", "alarm", "0.0.1", "Rings at a time."]
     ]);
     expect(texts("[aria-current=true]")).toEqual([texts(".tr-modules-row")[0]]);
     expect(element().querySelector("nav")?.getAttribute("aria-label")).toBe("Modules");
     expect(texts(".tr-modules-detail-title")).toEqual(["Clock"]);
     expect(element().querySelector(".tr-modules-detail")?.getAttribute("aria-labelledby")).toBe(element().querySelector(".tr-modules-detail-title")?.id);
-    expect(texts(".tr-modules-facts:first-of-type dt")).toEqual(["State", "Depends on", "Needed by"]);
-    expect([texts(".tr-modules-fact-state"), texts(".tr-modules-fact-dependencies"), texts(".tr-modules-fact-dependents")]).toEqual([["Active"], ["None"], ["Alarm"]]);
+    expect(texts(".tr-modules-facts:first-of-type dt")).toEqual(["Version", "State", "Depends on", "Needed by"]);
+    expect([texts(".tr-modules-fact-version"), texts(".tr-modules-fact-state"), texts(".tr-modules-fact-dependencies"), texts(".tr-modules-fact-dependents")]).toEqual([["1.4.2"], ["Active"], ["None"], ["Alarm"]]);
     expect([...element().querySelectorAll(".tr-modules-contributions")].map(t => t.getAttribute("data-kind"))).toEqual(["commands", "settings", "views"]);
     expect(parts(".tr-modules-contribution")).toEqual([["Tick the clock", "clock.tick"], ["clock.gone"], ["Tick step", "clock.tickStep"], ["clock.oldStep"], ["clock.face"]]);
     expect(errors).toEqual([]);
@@ -115,7 +115,7 @@ describe("ModulesComponent", () => {
 
     expect(failed).toEqual([[["error", "Failed", "Its runtime part could not be loaded."]], ["Alarm"], ["notes.tools", "notes.saved"]]);
     expect(texts("[aria-current=true] .tr-modules-name")).toEqual(["Alarm"]);
-    expect(texts(".tr-modules-facts:first-of-type dt")).toEqual(["State", "Blocked by", "Depends on", "Needed by"]);
+    expect(texts(".tr-modules-facts:first-of-type dt")).toEqual(["Version", "State", "Blocked by", "Depends on", "Needed by"]);
     expect([parts(".tr-modules-fact-state"), texts(".tr-modules-fact-blocker"), texts(".tr-modules-fact-dependencies"), texts(".tr-modules-fact-dependents")])
       .toEqual([[["error", "Blocked", "It depends on notes, which is not active."]], ["Notes"], ["Clock, Notes"], ["None"]]);
     expect([texts(".tr-modules-contributions"), texts(".tr-modules-none")]).toEqual([[], ["None", "No commands, settings, menus, views or notification kinds."]]);
@@ -200,20 +200,24 @@ describe("ModulesComponent", () => {
       expect(current.backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "list.inactiveSelectionBackground"));
       expect([title.fontWeight, title.color]).toEqual(["600", AppearanceFixture.readColor(DefaultTheme.theme, mode, "settings.headerForeground")]);
       expect(getComputedStyle(host.querySelector(".tr-modules-state-icon") as Element).color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "errorForeground"));
+      expect(getComputedStyle(host.querySelector(".tr-modules-row-version") as Element).color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "teamrun.mutedForeground"));
       expect(getComputedStyle(link("dependents", "Alarm")).color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "textLink.foreground"));
       fixture.destroy();
     }
   });
 
-  it("truncates a row's name and id on one line and keeps its description to two lines", async () => {
-    modules.set([new ModuleStatus("long", "A module whose name is far too long for the list", "Tells the time. ".repeat(20), [], new Map(), ModuleState.Active, null), clock]);
+  it("truncates a row's name and id on one line, keeps its version whole beside the id and its description to two lines", async () => {
+    modules.set([new ModuleStatus("long", "0.0.1", "A module whose name is far too long for the list", "Tells the time. ".repeat(20), [], new Map(), ModuleState.Active, null), clock]);
     await renderAsync();
     const long = row("long");
 
     const truncating = [".tr-modules-name", ".tr-modules-id"].map(t => long.querySelector(t)?.hasAttribute("data-truncates"));
     const description = getComputedStyle(long.querySelector(".tr-modules-description") as Element);
+    const meta = getComputedStyle(long.querySelector(".tr-modules-row-meta") as Element);
+    const version = getComputedStyle(long.querySelector(".tr-modules-row-version") as Element);
 
     expect(truncating).toEqual([true, true]);
+    expect([meta.display, meta.minWidth, version.flexShrink]).toEqual(["flex", "0px", "0"]);
     expect([description.webkitLineClamp, description.overflow]).toEqual(["2", "hidden"]);
     expect(long.querySelector(".tr-modules-description")?.textContent).toBe("Tells the time. ".repeat(20));
   });

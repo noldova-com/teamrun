@@ -315,6 +315,7 @@ export class Resources {
   public static readonly clickEvent: string = "click";
   public static readonly auxclickEvent: string = "auxclick";
   public static readonly mouseenterEvent: "mouseenter" = "mouseenter";
+  public static readonly mousedownEvent: "mousedown" = "mousedown";
   public static readonly pointermoveEvent: "pointermove" = "pointermove";
   public static readonly hoverSelector: string = ":hover";
   public static readonly secondaryButton: number = 2;

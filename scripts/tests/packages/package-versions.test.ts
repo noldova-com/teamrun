@@ -1,0 +1,89 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import ModuleCatalog from "../../modules/module-catalog.ts";
+import PackageManifest from "../../packages/package-manifest.ts";
+import PackageVersions from "../../packages/package-versions.ts";
+import PackageException from "../../packages/package.exception.ts";
+import RepositoryFixture from "../fixtures/repository.fixture.ts";
+
+class PackageVersionsTests {
+  private static readonly NOTES: PackageManifest = new PackageManifest(
+    "src/modules/notes/runtime",
+    "@noldova/teamrun-modules-notes-runtime",
+    ["@noldova/teamrun-modules-tasks-runtime", "@noldova/teamrun-shell-protocol"]);
+
+  private static declare(id: string, version: string, parts: readonly string[]): string {
+    return JSON.stringify({ id, version, displayName: id, description: "Used by the tests.", parts, dependencies: [], contributes: {} });
+  }
+
+  public static register(): void {
+    test("a module's part packages take the module's version and every other package the product's", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await repository.writeAsync({
+        "src/modules/notes/module.json": PackageVersionsTests.declare("notes", "1.2.3", ["runtime", "window"]),
+        "src/modules/notes/runtime/package.json": "{}\n",
+        "src/modules/notes/window/package.json": "{}\n",
+        "src/modules/tasks/module.json": PackageVersionsTests.declare("tasks", "0.2.0", ["runtime"]),
+        "src/modules/tasks/runtime/package.json": "{}\n",
+        [`${ModuleCatalog.FIXTURE_FOLDER}/clock/module.json`]: PackageVersionsTests.declare("clock", "0.4.0", ["runtime"]),
+        [`${ModuleCatalog.FIXTURE_FOLDER}/clock/runtime/package.json`]: "{}\n"
+      });
+      const packages = [
+        PackageVersionsTests.NOTES,
+        new PackageManifest("src/modules/notes/window", "@noldova/teamrun-modules-notes-window", []),
+        new PackageManifest("src/modules/tasks/runtime", "@noldova/teamrun-modules-tasks-runtime", []),
+        new PackageManifest(`${ModuleCatalog.FIXTURE_FOLDER}/clock/runtime`, "@noldova/teamrun-fixture-clock-runtime", []),
+        new PackageManifest("src/shell/protocol", "@noldova/teamrun-shell-protocol", [])
+      ];
+
+      const versions = await PackageVersions.readAsync(new ModuleCatalog(repository.directory), "0.0.7", packages);
+
+      assert.deepEqual(packages.map(t => versions.of(t.name)), ["1.2.3", "1.2.3", "0.2.0", "0.4.0", "0.0.7"]);
+    });
+
+    test("a module declaration that cannot be read refuses the versions and names its file", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await repository.writeAsync({
+        "src/modules/notes/module.json": PackageVersionsTests.declare("notes", "1.2.3", ["runtime"]),
+        "src/modules/tasks/module.json": PackageVersionsTests.declare("tasks", "1.2", ["runtime"])
+      });
+
+      await assert.rejects(
+        PackageVersions.readAsync(new ModuleCatalog(repository.directory), "0.0.7", [PackageVersionsTests.NOTES]),
+        (error: unknown) => error instanceof PackageException && error.message.includes("src/modules/tasks/module.json must have a version"));
+    });
+
+    test("a part package's manifest is stamped with its module's version and each own dependency's version", () => {
+      const versions = new PackageVersions("0.0.7", new Map([["@noldova/teamrun-modules-notes-runtime", "1.2.3"], ["@noldova/teamrun-modules-tasks-runtime", "0.4.0"]]));
+      const manifest = {
+        name: "@noldova/teamrun-modules-notes-runtime",
+        version: "__VERSION__",
+        type: "module",
+        dependencies: { "@noldova/teamrun-modules-tasks-runtime": "__VERSION__", "@noldova/teamrun-shell-protocol": "__VERSION__", "left-pad": "1.3.0" }
+      };
+
+      const stamped = versions.stampManifest(PackageVersionsTests.NOTES, JSON.stringify(manifest));
+      const alone = versions.stampManifest(new PackageManifest("src/shell/protocol", "@noldova/teamrun-shell-protocol", []), JSON.stringify({ name: "@noldova/teamrun-shell-protocol", version: "__VERSION__" }));
+
+      assert.deepEqual(JSON.parse(stamped), {
+        ...manifest,
+        version: "1.2.3",
+        dependencies: { "@noldova/teamrun-modules-tasks-runtime": "0.4.0", "@noldova/teamrun-shell-protocol": "0.0.7", "left-pad": "1.3.0" }
+      });
+      assert.deepEqual(JSON.parse(alone), { name: "@noldova/teamrun-shell-protocol", version: "0.0.7" });
+    });
+  }
+}
+
+PackageVersionsTests.register();
