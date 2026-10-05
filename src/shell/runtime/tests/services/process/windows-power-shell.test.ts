@@ -16,18 +16,19 @@ import { SystemCommandFixture } from "../../fixtures/system-command.fixture.js";
 @TestClass
 export class WindowsPowerShellTests {
   @TestMethod
-  public async logsATableReadThatFailsAndKeepsTheRecordsOnWindows(): Promise<void> {
+  public async reportsAMissingSystemRootAndKeepsTheLeftoversOnWindows(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
     const clock = ProcessSupervisorFixture.WINDOWS;
     const now = clock.now();
-    settings.database.run(ProcessSupervisorFixture.INSERT, "notes", 900_901, "tool", "C:\\Tools\\tool.exe", clock.boot, now, now, now, clock.offset());
-    const command = new SystemCommandFixture([new Error("Get-WmiObject : The RPC server is unavailable.")]);
-    const processes = ProcessSupervisorFixture.createWindows(settings, { SystemRoot: ProcessSupervisorFixture.SYSTEM_ROOT }, command);
+    settings.database.run(ProcessSupervisorFixture.INSERT, "notes", 900_401, "tool", "C:\\tool.exe", clock.boot, now, now, now, clock.offset());
+    settings.database.run(ProcessSupervisorFixture.INSERT, "tasks", 900_402, "tool", "C:\\tool.exe", clock.boot, now, now, now, clock.offset());
+    const missingRoot = ProcessSupervisorFixture.createWindows(settings, {}, new SystemCommandFixture([]));
 
-    await processes.cleanUpAsync();
+    await missingRoot.cleanUpAsync();
 
-    Assert.areEqual(1, command.calls.length);
-    Assert.isTrue(settings.diagnostics.text.startsWith("The module notes's program tool (process 900901): Error: Get-WmiObject : The RPC server is unavailable."), settings.diagnostics.text);
-    Assert.areEqual(1, settings.database.readAll(ProcessSupervisorFixture.RECORDS).length);
+    Assert.isTrue(settings.diagnostics.text.startsWith("The module notes's program tool (process 900401): "), settings.diagnostics.text);
+    Assert.isTrue(settings.diagnostics.text.includes("The module tasks's program tool (process 900402): "), settings.diagnostics.text);
+    Assert.isTrue(settings.diagnostics.text.includes("SystemRoot is not set, so the Windows system tools cannot be found."), settings.diagnostics.text);
+    Assert.areEqual(2, settings.database.readAll(ProcessSupervisorFixture.RECORDS).length);
   }
 }

@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { existsSync } from "node:fs";
 
 import "@noldova/teamrun-foundation-core";

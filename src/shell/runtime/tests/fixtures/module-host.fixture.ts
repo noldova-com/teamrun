@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
