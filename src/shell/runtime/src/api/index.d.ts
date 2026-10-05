@@ -4368,6 +4368,7 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    * @param database The module's open database, when its runtime part declares migrations.
    * @example
    * ```ts
+   * import { randomUUID } from "node:crypto";
    * import { homedir } from "node:os";
    *
    * import {
@@ -4379,7 +4380,7 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
    *   const notes = new ModuleDeclaration("notes", "0.0.1", "Notes", "Keeps notes.", [], null, new Map());
    *   return new ModuleContext(
    *     notes, new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(),
-   *     new NotificationCenter(() => undefined, () => new Date()), new NotificationPolicy([notes], () => true), new ServiceRegistry(), settings,
+   *     new NotificationCenter(() => undefined, () => new Date(), randomUUID), new NotificationPolicy([notes], () => true), new ServiceRegistry(), settings,
    *     new WorkTracker(() => undefined), processes, process.stderr, new DiagnosticRedactor(homedir()));
    * }
    * ```
@@ -4846,6 +4847,7 @@ export declare class ModuleHost {
    * @param redactor Removes the home folder and opaque values from the lines the modules log.
    * @example
    * ```ts
+   * import { randomUUID } from "node:crypto";
    * import { homedir } from "node:os";
    *
    * import {
@@ -4855,7 +4857,7 @@ export declare class ModuleHost {
    * export function createHost(events: EventRegistry): ModuleHost {
    *   return new ModuleHost(
    *     [], new DataDirectory("/home/person/.noldova/teamrun"), new MethodRegistry(), events, new CommandRegistry(),
-   *     new NotificationCenter(() => undefined, () => new Date()), new PackageRuntimePartLoader(), process.stderr,
+   *     new NotificationCenter(() => undefined, () => new Date(), randomUUID), new PackageRuntimePartLoader(), process.stderr,
    *     new WorkTracker(() => undefined), new DiagnosticRedactor(homedir()));
    * }
    * ```
@@ -5209,16 +5211,17 @@ export declare class NotificationCenter {
    *
    * @param publish Receives the whole list after every change.
    * @param now The clock that times new posts.
-   * @param createId Creates the id of each new notification, one that no notification had before; `crypto.randomUUID` by
-   * default.
+   * @param createId Creates the id of each new notification, one that no notification had before, such as `randomUUID`.
    * @example
    * ```ts
+   * import { randomUUID } from "node:crypto";
+   *
    * import { NotificationCenter } from "@noldova/teamrun-shell-runtime";
    *
-   * export const notifications: NotificationCenter = new NotificationCenter(t => console.log(t.notifications.length), () => new Date());
+   * export const notifications: NotificationCenter = new NotificationCenter(t => console.log(t.notifications.length), () => new Date(), randomUUID);
    * ```
    */
-  public constructor(publish: (list: NotificationList) => void, now: () => Date, createId?: () => string);
+  public constructor(publish: (list: NotificationList) => void, now: () => Date, createId: () => string);
 
   /**
    * The notifications, newest first.

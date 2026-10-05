@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { randomUUID } from "node:crypto";
+
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { type NotificationList, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 import { NotificationCenter, RegistrationException } from "@noldova/teamrun-shell-runtime";
@@ -137,8 +139,8 @@ export class NotificationCenterTests {
 
   @TestMethod
   public givesEachNewNotificationARandomIdThatAnotherRunNeverGives(): void {
-    const first = new NotificationCenter(() => undefined, () => new Date());
-    const second = new NotificationCenter(() => undefined, () => new Date());
+    const first = new NotificationCenter(() => undefined, () => new Date(), randomUUID);
+    const second = new NotificationCenter(() => undefined, () => new Date(), randomUUID);
 
     const ids = [
       first.post(NotificationCenterTests.post("clock.alarm", null, "Alarm")),

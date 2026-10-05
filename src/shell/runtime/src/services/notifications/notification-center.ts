@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { randomUUID } from "node:crypto";
-
 import "@noldova/teamrun-foundation-core";
 import { Notification, NotificationList, NotificationPost } from "@noldova/teamrun-shell-protocol";
 
@@ -21,7 +19,7 @@ export class NotificationCenter {
   private entries: readonly Notification[] = [];
   private lastSequence: number = 0;
 
-  public constructor(publish: (list: NotificationList) => void, now: () => Date, createId: () => string = randomUUID) {
+  public constructor(publish: (list: NotificationList) => void, now: () => Date, createId: () => string) {
     this.publish = publish;
     this.now = now;
     this.createId = createId;
