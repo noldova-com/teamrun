@@ -114,12 +114,14 @@ describe("ScrollRevealService", () => {
     area.scrollTop = 100;
     await scroll;
     const fadeIn = transitions(area);
+    await Promise.all(fadeIn.map(t => t.finished));
+    const revealed = thumb(area);
     vi.advanceTimersByTime(1000);
     const fadeOut = transitions(area);
 
     const style = getComputedStyle(area);
-    expect([style.transitionDuration, style.transitionTimingFunction, isScrolling(area), fadeIn.map(t => t.transitionProperty), fadeOut.map(t => t.transitionProperty)])
-      .toEqual(["0.15s", "linear", false, ["--tr-scroll-thumb"], ["--tr-scroll-thumb"]]);
+    expect([style.transitionDuration, style.transitionTimingFunction, fadeIn.map(t => t.transitionProperty), revealed, isScrolling(area), fadeOut.map(t => t.transitionProperty)])
+      .toEqual(["0.15s", "linear", ["--tr-scroll-thumb"], shown, false, ["--tr-scroll-thumb"]]);
     await Promise.all(fadeOut.map(t => t.finished));
     expect(thumb(area)).toBe(hidden);
   });
