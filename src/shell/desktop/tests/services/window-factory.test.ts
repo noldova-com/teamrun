@@ -96,7 +96,7 @@ export class WindowFactoryTests {
       width: 1280,
       height: 800,
       minWidth: 640,
-      minHeight: 400,
+      minHeight: 480,
       show: false,
       title: "TeamRun",
       titleBarStyle: "hidden",

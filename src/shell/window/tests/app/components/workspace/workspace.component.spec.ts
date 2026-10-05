@@ -12,9 +12,11 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
 import { WorkspaceComponent } from "../../../../src/app/components/workspace/workspace.component";
+import { DockSide } from "../../../../src/app/enums/dock-side";
 import { PanelEdge } from "../../../../src/app/enums/panel-edge";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
+import { LayoutService } from "../../../../src/app/services/layout.service";
 import { ViewDialogService } from "../../../../src/app/services/view-dialog.service";
 import { WindowPartHostService } from "../../../../src/app/services/window-part-host.service";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
@@ -112,6 +114,48 @@ describe("WorkspaceComponent", () => {
 
     expect(whileLoading).toBe(true);
     expect(document.activeElement).toBe(tab);
+  });
+
+  it("moves the focus to the dock's strip when a narrower window closes the dock that holds it", async () => {
+    const registry = LayoutFixture.createRegistry();
+    const fixture = await renderAsync(registry);
+    const host = fixture.nativeElement as HTMLElement;
+    const group = host.querySelector<HTMLElement>(`[data-tab-key="${LayoutFixture.files.key}"]`)?.closest("tr-tab-group") as HTMLElement;
+    const focused = group.appendChild(document.createElement("button"));
+    focused.focus();
+    fixture.componentInstance.height.set(590);
+    await settleAsync(fixture);
+    const whileFocused = document.activeElement === focused;
+    focused.blur();
+    fixture.componentInstance.height.set(600);
+    await settleAsync(fixture);
+    const whileOpen = document.activeElement;
+    focused.focus();
+
+    fixture.componentInstance.width.set(AppearanceFixture.toPixels(40));
+    await settleAsync(fixture);
+
+    expect([whileFocused, whileOpen === document.body]).toEqual([true, true]);
+    expect(document.activeElement).toBe(host.querySelector(`tr-dock[data-side="Left"] .tr-dock-strip-view[data-view="${LayoutFixture.files.key}"]`));
+  });
+
+  it("keeps a dock opened from its strip open beside a dock the person hid while the window resizes", async () => {
+    const registry = LayoutFixture.createRegistry();
+    const fixture = await renderAsync(registry, Layout.createDefault(registry).toggleDock(DockSide.Right));
+    const host = fixture.nativeElement as HTMLElement;
+    fixture.componentInstance.width.set(AppearanceFixture.toPixels(40));
+    await settleAsync(fixture);
+    const layout = TestBed.inject(LayoutService);
+    const closed = layout.geometry().isCollapsed(DockSide.Left);
+
+    host.querySelector<HTMLElement>("tr-dock[data-side=\"Left\"] .tr-dock-strip-view")?.click();
+    await settleAsync(fixture);
+    fixture.componentInstance.width.set(AppearanceFixture.toPixels(40) + 1);
+    await settleAsync(fixture);
+
+    expect(closed).toBe(true);
+    expect(layout.geometry().isCollapsed(DockSide.Left)).toBe(false);
+    expect(host.querySelector("tr-dock[data-side=\"Left\"] tr-sash")).not.toBeNull();
   });
 
   it("leaves the focus where it is when the person moved it while the runtime started again", async () => {

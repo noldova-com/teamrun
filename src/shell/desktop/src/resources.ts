@@ -210,7 +210,7 @@ export class Resources {
   public static readonly descriptionsField: string = "descriptions";
   public static readonly isWaitingField: string = "isWaiting";
   public static readonly windowMinimumWidth: number = 640;
-  public static readonly windowMinimumHeight: number = 400;
+  public static readonly windowMinimumHeight: number = 480;
   public static readonly windowWidth: number = 1280;
   public static readonly windowHeight: number = 800;
   public static readonly windowAreaShare: number = 0.9;
