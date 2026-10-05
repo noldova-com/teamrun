@@ -28,7 +28,7 @@ describe("ConfigurationTableDirective", () => {
   it("marks the owner's table as the configuration table's grid, named by the heading", async () => {
     await renderAsync();
 
-    expect([find("table").classList.contains("tr-configuration-table-grid"), find("table").getAttribute("aria-label")]).toEqual([true, "Environment variables"]);
+    expect([...find("table").classList, find("table").getAttribute("aria-label")]).toEqual(["tr-configuration-table-grid", "Environment variables"]);
   });
 
   it("names the table with its label when it has no heading, and leaves it unnamed without either", async () => {
@@ -42,6 +42,6 @@ describe("ConfigurationTableDirective", () => {
 
     await changeAsync(t => t.label.set(""));
 
-    expect(find("table").hasAttribute("aria-label")).toBe(false);
+    expect(find("table").getAttribute("aria-label")).toBeNull();
   });
 });

@@ -246,23 +246,29 @@ test.describe("gallery", () => {
       const specimen = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Configuration table\"]");
       const table = specimen.getByRole("table", { name: "Environment variables", exact: true });
       const narrow = specimen.getByRole("table", { name: "Narrow environment variables" });
+      const areas = specimen.locator(".tr-configuration-table-scroll");
       await specimen.scrollIntoViewIfNeeded();
 
       await expect(specimen.getByRole("heading", { name: "Environment variables" })).toBeVisible();
       await expect(table.getByRole("columnheader")).toHaveText(["Name", "Value", "Scope", ""]);
       await expect(table.getByRole("columnheader").last()).toHaveAttribute("aria-label", "Actions");
       await expect(table.getByRole("button", { name: "Remove NOTES_HOME" })).toBeVisible();
-      const layout = await specimen.evaluate(t => {
-        const [wide, small] = [...t.querySelectorAll<HTMLElement>(".tr-configuration-table-scroll")];
-        const heading = (t.querySelector(".tr-configuration-table-heading") as HTMLElement).getBoundingClientRect();
-        const add = (t.querySelector(".tr-configuration-table-actions button") as HTMLElement).getBoundingClientRect();
-        const explanation = (t.querySelector(".tr-configuration-table-explanation") as HTMLElement).getBoundingClientRect();
-        const rows = [...(wide as HTMLElement).querySelectorAll("tbody tr")].map(r => r.getBoundingClientRect().height);
-        const separators = [...(wide as HTMLElement).querySelectorAll("th, td")].map(c => getComputedStyle(c).borderBottomStyle);
-        const grid = ((wide as HTMLElement).querySelector("table") as HTMLElement).getBoundingClientRect();
-        const first = document.createRange();
-        first.selectNodeContents((wide as HTMLElement).querySelector("tbody td") as Element);
-        const remove = ((wide as HTMLElement).querySelector("tbody tr td:last-child button:last-child") as HTMLElement).getBoundingClientRect();
+      await expect(areas).toHaveCount(2);
+      await expect(narrow.getByRole("row")).toHaveCount(3);
+      const [wide, small] = [areas.first(), areas.last()];
+      const [heading, add, explanation, grid] = await Promise.all([
+        specimen.locator(".tr-configuration-table-heading").boundingBox(),
+        specimen.locator(".tr-configuration-table-actions button").boundingBox(),
+        specimen.locator(".tr-configuration-table-explanation").boundingBox(),
+        table.boundingBox()
+      ]);
+      const measured = await wide.evaluate((t: HTMLElement) => {
+        const find = (selector: string, root: ParentNode = t): HTMLElement => {
+          const found = root.querySelector<HTMLElement>(selector);
+          if (found === null)
+            throw new Error(`The configuration table has no ${selector}.`);
+          return found;
+        };
         const baseline = (host: Element): number => {
           const probe = document.createElement("span");
           probe.style.display = "inline-block";
@@ -271,34 +277,53 @@ test.describe("gallery", () => {
           probe.remove();
           return bottom;
         };
-        const row = (wide as HTMLElement).querySelector("tbody tr") as HTMLElement;
-        const label = baseline(row.querySelector("td:last-child button [data-truncates]") as Element);
+        const row = find("tbody tr");
+        const first = document.createRange();
+        first.selectNodeContents(find("tbody td"));
         const scope = document.createRange();
-        scope.selectNodeContents(row.children[2] as Element);
-        const token = document.createRange();
-        token.selectNodeContents((small as HTMLElement).querySelectorAll("tbody tr")[1]?.children[1] as Element);
+        scope.selectNodeContents(row.children[2] ?? row);
+        const label = baseline(find("td:last-child button [data-truncates]", row));
         return {
-          edges: [Math.round(first.getBoundingClientRect().left - grid.left), Math.round(grid.right - remove.right), Math.round(heading.left - grid.left), Math.round(grid.right - add.right)],
+          firstLeft: first.getBoundingClientRect().left,
+          removeRight: find("tbody tr td:last-child button:last-child").getBoundingClientRect().right,
+          rowHeights: [...t.querySelectorAll("tbody tr")].map(r => r.getBoundingClientRect().height),
           baselines: [...row.querySelectorAll("td:not(:last-child)")].map(c => Math.round(baseline(c) - label)),
           scopeLines: scope.getClientRects().length,
-          tokenLines: token.getClientRects().length,
-          isAddOnHeadingRow: add.top < heading.bottom && add.bottom > heading.top && add.left > heading.left,
-          isExplanationBetween: explanation.top >= Math.max(heading.bottom, add.bottom) && (wide as HTMLElement).getBoundingClientRect().top >= explanation.bottom,
-          isLongRowTaller: (rows.at(-1) ?? 0) > Math.max(...rows.slice(0, -1)),
-          separators: [...new Set(separators)],
-          isWideScrolling: (wide as HTMLElement).scrollWidth > (wide as HTMLElement).clientWidth,
-          isNarrowScrolling: (small as HTMLElement).scrollWidth > (small as HTMLElement).clientWidth
+          separators: [...new Set([...t.querySelectorAll("th, td")].map(c => getComputedStyle(c).borderBottomStyle))],
+          overflow: t.scrollWidth - t.clientWidth
         };
       });
-      expect(layout).toEqual({ edges: [0, 0, 0, 0], baselines: [0, 0, 0], scopeLines: 1, tokenLines: 1, isAddOnHeadingRow: true, isExplanationBetween: true, isLongRowTaller: true, separators: ["solid"], isWideScrolling: false, isNarrowScrolling: true });
-      await expect(narrow.getByRole("row")).toHaveCount(3);
-      const area = specimen.locator(".tr-configuration-table-scroll").last();
-      await area.evaluate(t => {
+      const measuredNarrow = await small.evaluate((t: HTMLElement) => {
+        const cell = t.querySelectorAll("tbody tr")[1]?.children[1];
+        if (cell === undefined)
+          throw new Error("The narrow configuration table has no second row with a second cell.");
+        const token = document.createRange();
+        token.selectNodeContents(cell);
+        return { tokenLines: token.getClientRects().length, overflow: t.scrollWidth - t.clientWidth };
+      });
+      if (heading === null || add === null || explanation === null || grid === null)
+        throw new Error("The configuration table's heading, Add, explanation or table is not shown.");
+
+      const edges = [measured.firstLeft - grid.x, grid.x + grid.width - measured.removeRight, heading.x - grid.x, grid.x + grid.width - (add.x + add.width)].map(t => Math.round(t));
+      expect(edges).toEqual([0, 0, 0, 0]);
+      expect(measured.baselines).toEqual([0, 0, 0]);
+      expect([measured.scopeLines, measuredNarrow.tokenLines]).toEqual([1, 1]);
+      expect(measured.separators).toEqual(["solid"]);
+      expect(add.y).toBeLessThan(heading.y + heading.height);
+      expect(add.y + add.height).toBeGreaterThan(heading.y);
+      expect(add.x).toBeGreaterThan(heading.x + heading.width);
+      expect(explanation.y).toBeGreaterThanOrEqual(Math.max(heading.y + heading.height, add.y + add.height));
+      expect(grid.y).toBeGreaterThanOrEqual(explanation.y + explanation.height);
+      expect(measured.rowHeights.at(-1)).toBeGreaterThan(Math.max(...measured.rowHeights.slice(0, -1)));
+      expect(measured.overflow).toBeLessThanOrEqual(0);
+      expect(measuredNarrow.overflow).toBeGreaterThan(0);
+      await small.evaluate(t => {
         t.scrollTo({ left: t.scrollWidth });
         t.scrollIntoView({ block: "end" });
       });
-      await area.hover({ position: { x: 8, y: 8 } });
       await expect(narrow.getByRole("button", { name: "Remove LANG" })).toBeInViewport();
+      expect(await ScrollAreaFixture.thumbChangesOnHoverAsync(window, small, "horizontal")).toBe(true);
+      await ScrollAreaFixture.revealThumbColorAsync(window, small);
       await desktop.checkpointAsync(`configuration-table-${mode.toLowerCase()}`);
       await window.mouse.move(0, 0);
     }

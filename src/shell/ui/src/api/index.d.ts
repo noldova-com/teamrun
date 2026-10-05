@@ -806,7 +806,7 @@ export declare class ColorToken {
  *   imports: [ButtonComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective],
  *   template: `
  *     <tr-configuration-table heading="Paths">
- *       <tr-button trConfigurationTableAction>Add</tr-button>
+ *       <button type="button" tr-button trConfigurationTableAction>Add</button>
  *       <table trConfigurationTable>
  *         <thead><tr><th scope="col">Path</th></tr></thead>
  *         <tbody><tr><td>/usr/local/bin</td></tr></tbody>
@@ -846,10 +846,10 @@ export declare class ConfigurationTableActionDirective {
  *   imports: [ButtonComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective, ConfigurationTableFillDirective],
  *   template: `
  *     <tr-configuration-table heading="Environment variables" explanation="Every terminal and tool this project starts gets these.">
- *       <tr-button trConfigurationTableAction>Add</tr-button>
+ *       <button type="button" tr-button trConfigurationTableAction>Add</button>
  *       <table trConfigurationTable>
  *         <thead><tr><th scope="col">Name</th><th scope="col" trConfigurationTableFill>Value</th><th scope="col" aria-label="Actions"></th></tr></thead>
- *         <tbody><tr><td>EDITOR</td><td trConfigurationTableFill>code</td><td><tr-button aria-label="Remove EDITOR">Remove</tr-button></td></tr></tbody>
+ *         <tbody><tr><td>EDITOR</td><td trConfigurationTableFill>code</td><td><button type="button" tr-button aria-label="Remove EDITOR">Remove</button></td></tr></tbody>
  *       </table>
  *     </tr-configuration-table>`
  * })

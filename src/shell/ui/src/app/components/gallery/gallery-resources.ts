@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
+
 export class GalleryResources {
   public static readonly scopeClass: string = "tr-theme-scope";
   public static readonly focusableSelector: string = "button:not(:disabled), input:not(:disabled), [tabindex=\"0\"], [role=\"tab\"][aria-selected=\"true\"]";
@@ -77,8 +79,8 @@ export class GalleryResources {
     configurationEdit: "Edit",
     configurationRemove: "Remove",
     configurationTables: [
-      { heading: "Environment variables", label: "Environment variables", explanation: "Each variable is set for the programs the shell starts, after the system's own.", rowCount: 3 },
-      { heading: "", label: "Narrow environment variables", explanation: "", rowCount: 2 }
+      { heading: "Environment variables", label: "Environment variables", explanation: "Each variable is set for the programs the shell starts, after the system's own.", rowCount: 3, isNarrow: false, hasAdd: true },
+      { heading: String.empty, label: "Narrow environment variables", explanation: String.empty, rowCount: 2, isNarrow: true, hasAdd: false }
     ],
     configurationRows: [
       { name: "EDITOR", value: "code --wait", scope: "Every project", edit: "Edit EDITOR", remove: "Remove EDITOR" },

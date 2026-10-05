@@ -7,6 +7,7 @@
  */
 
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { userEvent } from "vitest/browser";
 
 import type { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import type { Theme } from "../../../../src/app/models/theme";
@@ -31,6 +32,11 @@ describe("ConfigurationTableComponent", () => {
   const box = (selector: string): DOMRect => find(selector).getBoundingClientRect();
   const cells = (): HTMLElement[] => [...fixture.nativeElement.querySelectorAll("th, td")];
   const scroll = (): HTMLElement => find(".tr-configuration-table-scroll");
+  const lines = (cell: Element): number => {
+    const range = document.createRange();
+    range.selectNodeContents(cell);
+    return range.getClientRects().length;
+  };
 
   afterEach(() => AppearanceFixture.reset());
 
@@ -112,11 +118,6 @@ describe("ConfigurationTableComponent", () => {
 
   it("keeps every column but the free-text one on one line, and gives the free-text column the rest of the width", async () => {
     await renderAsync();
-    const lines = (cell: Element): number => {
-      const range = document.createRange();
-      range.selectNodeContents(cell);
-      return range.getClientRects().length;
-    };
     const short = [...fixture.nativeElement.querySelectorAll(".short td:not(.tr-configuration-table-fill):not(:last-child)")].map(t => [getComputedStyle(t).whiteSpace, lines(t)]);
     const others = [...fixture.nativeElement.querySelectorAll(".short td:not(.tr-configuration-table-fill)")].reduce((sum: number, t: Element) => sum + t.getBoundingClientRect().width, 0);
 
@@ -144,28 +145,33 @@ describe("ConfigurationTableComponent", () => {
   it("grows a row to hold text that wraps, without scrolling sideways", async () => {
     await renderAsync();
     const value = find(".long .tr-configuration-table-fill");
-    const range = document.createRange();
-    range.selectNodeContents(value);
-    const lines = range.getClientRects().length;
+    const wrapped = lines(value);
     const style = getComputedStyle(value);
 
-    expect(lines).toBeGreaterThan(1);
+    expect(wrapped).toBeGreaterThan(1);
     expect(box(".long").height).toBeGreaterThan(box(".short").height);
-    expect(box(".long").height).toBeGreaterThanOrEqual(lines * Number.parseFloat(style.lineHeight) + 2 * Number.parseFloat(style.paddingTop));
-    expect(scroll().scrollWidth).toBeLessThanOrEqual(scroll().clientWidth);
+    expect(box(".long").height).toBeGreaterThanOrEqual(wrapped * Number.parseFloat(style.lineHeight) + 2 * Number.parseFloat(style.paddingTop));
+    expect(scroll().scrollWidth - scroll().clientWidth).toBeLessThanOrEqual(0);
   });
 
   it("scrolls sideways only once the table can shrink no further, keeping the free-text column a text field wide and leaving room for a focus outline at its edges", async () => {
     await renderAsync();
-    const room = 3 * Number.parseFloat(getComputedStyle(find("td")).borderBottomWidth);
+    const remove = find(".remove");
+    for (let step = 0; step < 3 && document.activeElement !== remove; step++)
+      await userEvent.tab();
+    const outline = Number.parseFloat(getComputedStyle(remove).outlineWidth) + Number.parseFloat(getComputedStyle(remove).outlineOffset);
+    const room = box(".tr-configuration-table-scroll").right - box(".remove").right;
 
-    expect([getComputedStyle(scroll()).overflowX, scroll().scrollWidth <= scroll().clientWidth]).toEqual(["auto", true]);
-    AppearanceFixture.expectPixels(box(".tr-configuration-table-scroll").right - box(".remove").right, room);
+    expect(document.activeElement).toBe(remove);
+    expect(getComputedStyle(scroll()).overflowX).toBe("auto");
+    expect(scroll().scrollWidth - scroll().clientWidth).toBeLessThanOrEqual(0);
+    expect(outline).toBeGreaterThan(0);
+    expect(room).toBeGreaterThanOrEqual(outline);
     AppearanceFixture.expectPixels(box("table").left - box(".tr-configuration-table-scroll").left, room);
 
     await changeAsync(t => t.width.set("12rem"));
 
-    expect(scroll().scrollWidth).toBeGreaterThan(scroll().clientWidth);
+    expect(scroll().scrollWidth - scroll().clientWidth).toBeGreaterThan(0);
     expect(box("table").width).toBeGreaterThan(box("tr-configuration-table").width);
     expect(box(".short .tr-configuration-table-fill").width).toBeGreaterThanOrEqual(AppearanceFixture.measureLook("text-field-width") - 0.5);
   });

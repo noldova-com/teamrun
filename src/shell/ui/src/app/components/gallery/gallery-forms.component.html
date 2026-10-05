@@ -68,8 +68,8 @@ LICENSE file in the root directory of this source tree.
 
 <tr-gallery-specimen [name]="text.configurationTable">
   @for (table of configurationTables; track table.label) {
-    <tr-configuration-table class="tr-gallery-table" [class.tr-gallery-narrow]="!table.heading" [heading]="table.heading" [label]="table.label" [explanation]="table.explanation">
-      @if (table.heading) {
+    <tr-configuration-table class="tr-gallery-table" [class.tr-gallery-narrow]="table.isNarrow" [heading]="table.heading" [level]="4" [label]="table.label" [explanation]="table.explanation">
+      @if (table.hasAdd) {
         <button type="button" tr-button trConfigurationTableAction [variant]="variants.Secondary">{{ text.configurationAdd }}</button>
       }
       <table trConfigurationTable>

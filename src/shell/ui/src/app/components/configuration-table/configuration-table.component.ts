@@ -26,10 +26,10 @@ import { ConfigurationTableActionDirective } from "./configuration-table-action.
 export class ConfigurationTableComponent {
   private readonly actions: Signal<readonly ConfigurationTableActionDirective[]> = contentChildren(ConfigurationTableActionDirective);
 
+  protected readonly hasHeader: Signal<boolean> = computed(() => !String.isNullOrEmpty(this.heading()) || this.actions().length > 0);
+
   public readonly heading = input<string>(String.empty);
   public readonly label = input<string>(String.empty);
   public readonly level = input<number>(Resources.configurationTableHeadingLevel);
   public readonly explanation = input<string>(String.empty);
-
-  protected readonly hasHeader: Signal<boolean> = computed(() => !String.isNullOrEmpty(this.heading()) || this.actions().length > 0);
 }

@@ -12,9 +12,9 @@ export { CheckboxComponent } from "../app/components/checkbox/checkbox.component
 export { ChipComponent } from "../app/components/chip/chip.component";
 export { ChoicePillsComponent } from "../app/components/choice-pills/choice-pills.component";
 export { ConfigurationTableActionDirective } from "../app/components/configuration-table/configuration-table-action.directive";
+export { ConfigurationTableFillDirective } from "../app/components/configuration-table/configuration-table-fill.directive";
 export { ConfigurationTableComponent } from "../app/components/configuration-table/configuration-table.component";
 export { ConfigurationTableDirective } from "../app/components/configuration-table/configuration-table.directive";
-export { ConfigurationTableFillDirective } from "../app/components/configuration-table/configuration-table-fill.directive";
 export { DialogComponent } from "../app/components/dialog/dialog.component";
 export { DockingGuideComponent } from "../app/components/docking-guide/docking-guide.component";
 export { DockingPlateComponent } from "../app/components/docking-plate/docking-plate.component";

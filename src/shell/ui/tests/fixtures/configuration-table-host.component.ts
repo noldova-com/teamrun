@@ -10,9 +10,9 @@ import { Component, signal } from "@angular/core";
 
 import { ButtonComponent } from "../../src/app/components/button/button.component";
 import { ConfigurationTableActionDirective } from "../../src/app/components/configuration-table/configuration-table-action.directive";
+import { ConfigurationTableFillDirective } from "../../src/app/components/configuration-table/configuration-table-fill.directive";
 import { ConfigurationTableComponent } from "../../src/app/components/configuration-table/configuration-table.component";
 import { ConfigurationTableDirective } from "../../src/app/components/configuration-table/configuration-table.directive";
-import { ConfigurationTableFillDirective } from "../../src/app/components/configuration-table/configuration-table-fill.directive";
 
 @Component({
   imports: [ButtonComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective, ConfigurationTableFillDirective],

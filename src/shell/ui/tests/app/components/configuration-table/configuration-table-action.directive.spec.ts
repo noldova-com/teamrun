@@ -16,7 +16,7 @@ describe("ConfigurationTableActionDirective", () => {
     await fixture.whenStable();
     const element: HTMLElement = fixture.nativeElement;
 
-    expect([element.querySelector(".tr-configuration-table-actions")?.contains(element.querySelector(".add")), element.querySelector(".tr-configuration-table-scroll")?.contains(element.querySelector("table"))])
-      .toEqual([true, true]);
+    expect([element.querySelector(".add")?.parentElement?.className, element.querySelector("table")?.parentElement?.className])
+      .toEqual(["tr-configuration-table-actions", "tr-configuration-table-scroll"]);
   });
 });

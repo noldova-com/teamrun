@@ -11,6 +11,11 @@
   gap: var(--tr-space-4);
 }
 
+.tr-gallery-table {
+  width: 36rem;
+  max-width: 100%;
+}
+
 .tr-gallery-narrow {
   max-width: 12rem;
 }
@@ -28,17 +33,8 @@
   color: var(--tr-error);
 }
 
-.tr-gallery-table {
-  width: 36rem;
-  max-width: 100%;
-}
-
 .tr-gallery-table-actions {
   display: flex;
   gap: var(--tr-space-2);
   justify-content: flex-end;
-}
-
-.tr-gallery-table.tr-gallery-narrow {
-  max-width: 12rem;
 }
