@@ -93,9 +93,10 @@ test.describe("gallery", () => {
     const item = (name: string): Locator => tree.getByRole("treeitem", { name, exact: true });
     await scope(window, "Light").getByRole("button", { name: "Show the keyboard focus on the Tree", exact: true }).focus();
     await window.keyboard.press("Enter");
-    await expect(item("Project")).toBeFocused();
+    await expect(item("Notes")).toBeFocused();
 
-    await window.keyboard.press("ArrowRight");
+    await window.keyboard.press("Home");
+    await expect(item("Project")).toBeFocused();
     await expect(item("Project")).toHaveAttribute("aria-expanded", "true");
     await window.keyboard.press("ArrowRight");
     await expect(item("Source")).toBeFocused();

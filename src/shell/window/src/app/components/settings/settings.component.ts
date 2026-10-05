@@ -50,6 +50,7 @@ export class SettingsComponent {
   private readonly kept: SettingsView = this.viewStates.find(ShellDocuments.settingsTab.key, SettingsView) ?? SettingsView.initial;
   private readonly selected: WritableSignal<string> = signal(this.kept.page);
   private readonly pageList: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("pageList");
+  private readonly pageTree: Signal<TreeComponent> = viewChild.required(TreeComponent);
   private readonly pageSelect: Signal<ElementRef<HTMLElement>> = viewChild.required("pageSelect", { read: ElementRef<HTMLElement> });
   private readonly pageChooser: Signal<SelectComponent> = viewChild.required("pageSelect", { read: SelectComponent });
   private readonly content: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("content");
@@ -158,7 +159,7 @@ export class SettingsComponent {
     if (hidden === list)
       this.pageChooser().focus();
     else
-      (list.querySelector<HTMLElement>(Resources.currentSettingsPageSelector) ?? list.querySelector<HTMLElement>(Resources.settingsPageSelector))?.focus();
+      this.pageTree().focus();
   }
 
   private static matches(definition: SettingDefinition, query: string): boolean {

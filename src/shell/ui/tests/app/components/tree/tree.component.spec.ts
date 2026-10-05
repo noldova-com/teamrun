@@ -21,9 +21,11 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   template: `
     <tr-tree class="nested" label="Files" [nodes]="nodes()" [current]="current()" (activated)="activations.push($event.id)" />
     <tr-tree class="flat" label="Pages" [nodes]="pages" />
+    <tr-tree class="opened" label="Opened" [nodes]="opened" />
   `
 })
 class TreeHostComponent {
+  public readonly opened: readonly TreeNode[] = [new TreeNode("open", "Open", "folder", [new TreeNode("inside", "Inside", "description")], true), new TreeNode("closed", "Closed")];
   public readonly nodes = signal<readonly TreeNode[]>([
     new TreeNode("project", "Project", "folder", [
       new TreeNode("source", "Source", "folder", [new TreeNode("app", "App", "description")]),
@@ -66,7 +68,7 @@ describe("TreeComponent", () => {
     expect([tree("nested").getAttribute("aria-label"), labels()]).toEqual(["Files", ["Project", "Notes", "Trash"]]);
     expect(["aria-level", "aria-posinset", "aria-setsize", "aria-expanded"].map(t => project.getAttribute(t))).toEqual(["1", "1", "3", "false"]);
     expect([row("notes").getAttribute("aria-expanded"), row("notes").getAttribute("aria-selected"), project.getAttribute("aria-selected")]).toEqual([null, "true", "false"]);
-    expect(rows().map(t => t.tabIndex)).toEqual([0, -1, -1]);
+    expect(rows().map(t => t.tabIndex)).toEqual([-1, 0, -1]);
   });
 
   it("shows and hides a branch's children when its row or its twistie is clicked, and reports every row chosen", async () => {
@@ -161,6 +163,35 @@ describe("TreeComponent", () => {
         expect(project.backgroundColor).toBe("rgba(0, 0, 0, 0)");
         expect(getComputedStyle(row("project").querySelector(".tr-tree-twistie") as Element).rotate).toBe("90deg");
       });
+
+  it("puts the Tab stop on the current row and focus() on it, or on the first row when none is current", async () => {
+    await renderAsync();
+    const component = fixture.debugElement.children.map(t => t.componentInstance).find(t => t instanceof TreeComponent) as TreeComponent;
+
+    component.focus();
+    const current = focused();
+    fixture.componentInstance.current.set(null);
+    await fixture.whenStable();
+    (document.activeElement as HTMLElement).blur();
+    component.focus();
+
+    expect([current, focused()]).toEqual(["notes", "project"]);
+  });
+
+  it("opens the branches that start open and keeps the others closed", async () => {
+    await renderAsync();
+
+    expect([labels("opened"), rows("opened").map(t => t.getAttribute("aria-expanded"))]).toEqual([["Open", "Inside", "Closed"], ["true", null, null]]);
+  });
+
+  it("turns a closed twistie to face the end of the row in a right-to-left layout", async () => {
+    await renderAsync();
+    const twistie = row("project").querySelector(".tr-tree-twistie") as HTMLElement;
+    const before = getComputedStyle(twistie).rotate;
+    fixture.nativeElement.dir = "rtl";
+
+    expect([before, getComputedStyle(twistie).rotate]).toEqual(["none", "180deg"]);
+  });
 
   it("shows a focus ring on the row reached by keyboard", async () => {
     await renderAsync();

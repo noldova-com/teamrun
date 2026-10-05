@@ -82,8 +82,6 @@ export class Resources {
   public static readonly dropAxisData: string = "dropAxis";
   public static readonly dropTargetSeparator: string = ":";
   public static readonly tabKeySelector: string = "[data-tab-key]";
-  public static readonly settingsPageSelector: string = "[data-tree-node]";
-  public static readonly currentSettingsPageSelector: string = "[data-tree-node][aria-selected=true]";
   public static readonly tabKeyData: string = "tabKey";
   public static readonly tabGroupSelector: string = "tr-tab-group";
   public static readonly tabGroupData: string = "group";

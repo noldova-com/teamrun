@@ -42,7 +42,7 @@ export class GalleryNavigationComponent {
         new TreeNode(this.text.treeStyles, this.text.treeStyles, this.text.glyphDescription)
       ]),
       new TreeNode(this.text.treeReadme, this.text.treeReadme, this.text.glyphDescription)
-    ]),
+    ], true),
     new TreeNode(this.text.treeNotes, this.text.treeNotes, this.text.glyphDescription),
     new TreeNode(this.text.treeLong, this.text.treeLong, this.text.glyphDescription)
   ];

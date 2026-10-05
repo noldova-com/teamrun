@@ -46,6 +46,10 @@
   rotate: 90deg;
 }
 
+:dir(rtl) .tr-tree-twistie:not(.tr-tree-twistie-open) {
+  rotate: 180deg;
+}
+
 .tr-tree-label {
   flex: auto;
   min-width: 0;
