@@ -7,7 +7,7 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <div class="tr-dialog-header">
-  <h2 class="tr-dialog-title" [id]="titleId">{{ title() }}</h2>
+  <h2 class="tr-dialog-title" [id]="titleId" [attr.data-truncates]="isLarge() ? '' : null">{{ title() }}</h2>
   @if (isLarge()) {
     <button type="button" tr-icon-button class="tr-dialog-close" [icon]="resources.closeGlyph" [label]="resources.dialogCloseLabel" (click)="dismissed.emit()"></button>
   }
