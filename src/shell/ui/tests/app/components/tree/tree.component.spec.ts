@@ -51,7 +51,12 @@ describe("TreeComponent", () => {
 
   const tree = (name: string): HTMLElement => fixture.nativeElement.querySelector(`tr-tree.${name} [role=tree]`);
   const rows = (name: string = "nested"): HTMLElement[] => [...tree(name).querySelectorAll<HTMLElement>("[role=treeitem]")];
-  const row = (label: string): HTMLElement => [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>("[role=treeitem]")].find(t => t.querySelector(".tr-tree-label")?.textContent === label) as HTMLElement;
+  const row = (label: string): HTMLElement => {
+    const found = [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>("[role=treeitem]")].find(t => t.querySelector(".tr-tree-label")?.textContent === label);
+    if (Object.isUndefined(found))
+      throw new Error(`No row labelled ${label}.`);
+    return found;
+  };
   const labels = (name: string = "nested"): string[] => rows(name).map(t => t.querySelector(".tr-tree-label")?.textContent ?? "");
   const focused = (): string | undefined => document.activeElement?.querySelector(".tr-tree-label")?.textContent ?? undefined;
 
@@ -192,17 +197,44 @@ describe("TreeComponent", () => {
     expect([trash, stops()]).toEqual([["Trash"], ["Project"]]);
   });
 
-  it("makes the new current row the Tab stop when it changes while focus is outside the tree, and leaves the focused row when focus is inside", async () => {
+  it("follows the current row with its Tab stop until a row has been focused, then keeps the row last focused", async () => {
     await renderAsync();
+    const stops = (): number[] => rows().map(t => t.tabIndex);
 
     fixture.componentInstance.current.set("trash");
     await fixture.whenStable();
-    const outside = rows().map(t => t.tabIndex);
-    row("Project").focus();
-    fixture.componentInstance.current.set("notes");
+    const before = stops();
+    row("Notes").focus();
+    (document.activeElement as HTMLElement).blur();
+    fixture.componentInstance.current.set("project");
     await fixture.whenStable();
 
-    expect([outside, rows().map(t => t.tabIndex)]).toEqual([[-1, -1, 0], [0, -1, -1]]);
+    expect([before, stops()]).toEqual([[-1, -1, 0], [-1, 0, -1]]);
+  });
+
+  it("moves the Tab stop to the current row, or else the first, when the row that held it leaves the tree", async () => {
+    await renderAsync();
+    const stops = (): number[] => rows().map(t => t.tabIndex);
+    row("Trash").focus();
+    (document.activeElement as HTMLElement).blur();
+    await fixture.whenStable();
+    const held = stops();
+
+    fixture.componentInstance.nodes.update(t => t.filter(u => u.id !== "trash"));
+    await fixture.whenStable();
+    const toCurrent = stops();
+    fixture.componentInstance.current.set(null);
+    await fixture.whenStable();
+
+    expect([held, toCurrent, stops()]).toEqual([[-1, -1, 0], [-1, 0], [0, -1]]);
+  });
+
+  it("gives the current row the selected surface, whose muted text is the row's own text color", async () => {
+    await renderAsync();
+    const property = (name: string, custom: string): string => getComputedStyle(row(name)).getPropertyValue(custom);
+
+    expect(property("Notes", "--tr-text-muted")).toBe(property("Notes", "--tr-text"));
+    expect(property("Trash", "--tr-text-muted")).not.toBe(property("Trash", "--tr-text"));
   });
 
   it("opens a branch that starts open once, so a branch the person closed stays closed when the nodes change", async () => {
