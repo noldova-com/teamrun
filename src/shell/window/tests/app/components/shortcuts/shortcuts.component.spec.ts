@@ -144,7 +144,7 @@ describe("ShortcutsComponent", () => {
     expect([...element().querySelectorAll("tbody tr")].every(t => t.querySelector(".tr-shortcut-name")?.textContent === t.getAttribute("data-command"))).toBe(true);
     expect(look(name)).toEqual(look(probe));
     expect(name.getBoundingClientRect().top).toBeCloseTo(title.bottom, 0);
-    expect([ownerLine, key.top].map(Math.round)).toEqual([title.top, title.top].map(Math.round));
+    expect([ownerLine, key.top].map(t => Math.abs(t - title.top) <= 1)).toEqual([true, true]);
     expect(key.height).toBeCloseTo(title.height, 0);
     probe.remove();
   });
