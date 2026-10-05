@@ -8,13 +8,14 @@
 
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
+import { ProductInfo } from "../models/product-info.js";
 import { Resources } from "../resources.js";
 
 export class DataDirectoryOwnedException extends Exception {
   public readonly root: string;
 
   public constructor(root: string, options?: ExceptionOptions) {
-    super(Resources.formatOwned(root), options);
+    super(Resources.formatOwned(ProductInfo.current.name, root), options);
 
     this.root = root;
   }

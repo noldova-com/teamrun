@@ -7,11 +7,10 @@
  */
 
 import type Git from "../repository/git.ts";
+import GitHubEvent from "./github-event.ts";
 import VerificationScope from "./verification-scope.ts";
 
 export default class ChangeClassifier {
-  private static readonly PUSH_EVENT: string = "push";
-  private static readonly PULL_REQUEST_EVENT: string = "pull_request";
   private static readonly REVISION_PATTERN: RegExp = /^[0-9a-f]{40}$/;
   private static readonly MARKDOWN_EXTENSION: string = ".md";
   private static readonly DOCUMENTATION_FOLDERS: readonly string[] = ["docs/", ".github/"];
@@ -46,9 +45,9 @@ export default class ChangeClassifier {
   }
 
   public async classifyAsync(eventName?: string, baseRevision?: string, headRevision?: string): Promise<VerificationScope> {
-    if (eventName === ChangeClassifier.PUSH_EVENT)
+    if (eventName === GitHubEvent.PUSH)
       return new VerificationScope(true, true, ChangeClassifier.PUSH);
-    if (eventName !== ChangeClassifier.PULL_REQUEST_EVENT)
+    if (eventName !== GitHubEvent.PULL_REQUEST)
       return new VerificationScope(true, true, ChangeClassifier.MANUAL_RUN);
     if (baseRevision === undefined || headRevision === undefined || !await this.existsAsync(baseRevision) || !await this.existsAsync(headRevision))
       return new VerificationScope(true, true, ChangeClassifier.HISTORY_UNAVAILABLE);

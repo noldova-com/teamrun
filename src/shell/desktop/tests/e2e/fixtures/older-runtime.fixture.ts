@@ -12,12 +12,13 @@ import path from "node:path";
 
 import { expect } from "@playwright/test";
 
-import { DataDirectory, DiscoveryReader, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+import { DataDirectory, DiscoveryReader, ProductInfo, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 export default class OlderRuntimeFixture {
   private static readonly VERSION: string = "0.0.0";
   private static readonly START_TIMEOUT: number = 20_000;
   private static readonly DECLARATIONS: readonly string[] = ["_build", "modules", "declarations.json"];
+  private static readonly PRODUCT: readonly string[] = ["_build", "product.json"];
 
   private readonly folder: string;
   private readonly child: ChildProcess;
@@ -36,11 +37,8 @@ export default class OlderRuntimeFixture {
     const copy = path.join(folder, "node_modules", "@noldova", "teamrun-shell-runtime");
     await cp(installed, copy, { recursive: true });
     await cp(path.resolve(...OlderRuntimeFixture.DECLARATIONS), path.join(folder, ...OlderRuntimeFixture.DECLARATIONS));
-    const resources = path.join(copy, "resources.js");
-    const text = (await readFile(resources, "utf8"))
-      .replace(`productVersion = "${RuntimeBuild.identity.productVersion}"`, `productVersion = "${OlderRuntimeFixture.VERSION}"`)
-      .replace(`build = "${RuntimeBuild.identity.fingerprint}"`, `build = "${RuntimeBuild.identity.fingerprint}-${OlderRuntimeFixture.VERSION}"`);
-    await writeFile(resources, text);
+    const product = { ...JSON.parse(await readFile(ProductInfo.file, "utf8")), version: OlderRuntimeFixture.VERSION, build: `${RuntimeBuild.identity.fingerprint}-${OlderRuntimeFixture.VERSION}` };
+    await writeFile(path.join(folder, ...OlderRuntimeFixture.PRODUCT), JSON.stringify(product));
     const child = spawn(process.execPath, [path.join(copy, "services", "runtime-entry.js"), "--data-dir", dataDirectory], { stdio: "ignore", windowsHide: true });
     const processId = child.pid ?? -1;
     await expect.poll(async () => (await DiscoveryReader.readAsync(new DataDirectory(dataDirectory)))?.productVersion, { timeout: OlderRuntimeFixture.START_TIMEOUT })

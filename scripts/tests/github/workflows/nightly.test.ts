@@ -48,7 +48,7 @@ class NightlyWorkflowTests {
 
     test("each target's tests and UI workflows are jobs of their own, on the targets every build and test run validates", { timeout: NightlyWorkflowTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(NightlyWorkflowTests.WORKFLOW);
-      const targets = new BuildMatrix(false).targets.map(t => ({ target: t.name, runner: t.runner, architecture: t.architecture }));
+      const targets = new BuildMatrix("workflow_dispatch").targets.map(t => ({ target: t.name, runner: t.runner, architecture: t.architecture }));
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
       await writeFile(path.join(doubles.directory, "outputs.txt"), "");

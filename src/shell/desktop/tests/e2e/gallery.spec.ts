@@ -47,6 +47,30 @@ test.describe("gallery", () => {
     await desktop.checkpointAsync("gallery-dark");
   });
 
+  test("the Gallery opens at its top, and moving a quick input's active option scrolls only its own list", async ({ desktop }) => {
+    const window = desktop.window;
+    const page = window.locator(".tr-settings-content");
+    const quick = scope(window, "Dark").locator("tr-quick-input");
+    const list = quick.locator(".tr-quick-input-list");
+    const scrollTopAsync = (area: Locator): Promise<number> => area.evaluate(t => t.scrollTop);
+
+    await SettingsFixture.openGalleryAsync(window);
+    await expect(quick.getByRole("option").first()).toBeAttached();
+    await window.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    expect(await scrollTopAsync(page)).toBe(0);
+
+    await quick.scrollIntoViewIfNeeded();
+    await list.evaluate(t => t.style.setProperty("max-height", `${(t.querySelector("[role=option]") as HTMLElement).offsetHeight * 1.5}px`));
+    const top = await scrollTopAsync(page);
+    await quick.locator(".tr-quick-input-field").focus();
+    await window.keyboard.press("End");
+    await expect.poll(() => scrollTopAsync(list)).toBeGreaterThan(0);
+    expect(await scrollTopAsync(page)).toBe(top);
+    await window.keyboard.press("Home");
+    await expect.poll(() => scrollTopAsync(list)).toBe(0);
+    expect(await scrollTopAsync(page)).toBe(top);
+  });
+
   test("each specimen with a control shows the keyboard focus on it from the keyboard, and each scope keeps its own colors", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openGalleryAsync(window);
