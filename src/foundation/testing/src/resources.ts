@@ -126,7 +126,9 @@ export class Resources {
   public static readonly tableTopRight: string = "┐";
   public static readonly tableVertical: string = "│";
   public static readonly totalLengthInvalid: string = "The total length must be a non-negative integer.";
+  public static readonly javaScriptFileSuffix: string = ".js";
   public static readonly typeScriptFileSuffix: string = ".ts";
+  public static readonly declarationFileSuffix: string = ".d.ts";
   public static readonly uncoveredLengthInvalid: string = "The uncovered length must be a non-negative integer no larger than the total length.";
   public static readonly uncoveredRangesInvalid: string = "The uncovered line ranges and the uncovered length must agree: both empty or both present.";
   public static readonly summaryCoverageHeading: string = "### Package coverage";

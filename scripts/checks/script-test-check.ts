@@ -12,11 +12,8 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 
 import BuildVariant from "../modules/build-variant.ts";
-import ModuleException from "../modules/module.exception.ts";
 import type PackageBuild from "../packages/package-build.ts";
-import PackageException from "../packages/package.exception.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
-import ProcessException from "../processes/process.exception.ts";
 import CheckSelection from "./check-selection.ts";
 import CoverageRun from "./coverage-run.ts";
 import type ISelectableCheck from "./interfaces/selectable-check.ts";
@@ -30,7 +27,6 @@ export default class ScriptTestCheck implements ISelectableCheck {
   private static readonly SELECTED_ARGUMENTS: readonly string[] = ["--test", "--test-timeout=30000"];
   private static readonly TEST_ARGUMENTS: readonly string[] = [...ScriptTestCheck.SELECTED_ARGUMENTS, ScriptTestCheck.TEST_PATTERN];
   private static readonly COVERAGE_SEGMENTS: readonly string[] = ["_build", "script-coverage"];
-  private static readonly COVERAGE_VARIABLE: string = "NODE_V8_COVERAGE";
   private static readonly SUMMARY_VARIABLE: string = "GITHUB_STEP_SUMMARY";
   private static readonly PROJECT: string = "scripts";
   private static readonly TESTS_FOLDER: string = "tests";
@@ -50,24 +46,17 @@ export default class ScriptTestCheck implements ISelectableCheck {
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
-    try {
-      await this.build.requireCurrentAsync(BuildVariant.REGULAR);
-    }
-    catch (error) {
-      if (!(error instanceof PackageException || error instanceof ProcessException || error instanceof ModuleException))
-        throw error;
-      output.write(`${error.message}\n`);
+    if (!await this.build.isCurrentReportedAsync(BuildVariant.REGULAR, output))
       return false;
-    }
 
     const coverage = path.join(this.root, ...ScriptTestCheck.COVERAGE_SEGMENTS);
     await rm(coverage, { recursive: true, force: true });
     await mkdir(coverage, { recursive: true });
-    const testsPassed = await this.runner.runAsync(process.execPath, ScriptTestCheck.TEST_ARGUMENTS, this.root, { ...this.environment, [ScriptTestCheck.COVERAGE_VARIABLE]: coverage }) === 0;
+    const testsPassed = await this.runner.runAsync(process.execPath, ScriptTestCheck.TEST_ARGUMENTS, this.root, CoverageRun.recordingIn(this.environment, coverage)) === 0;
     const scripts = path.join(this.root, ScriptTestCheck.PROJECT);
     const environment = { ...this.environment };
     delete environment[ScriptTestCheck.SUMMARY_VARIABLE];
-    const covered = await new CoverageRun(this.root, this.runner).measureAsync(coverage, CoverageRun.project(ScriptTestCheck.PROJECT, scripts, scripts, undefined, [ScriptTestCheck.TESTS_FOLDER]), environment);
+    const covered = await new CoverageRun(this.root, this.runner).measureAsync(coverage, CoverageRun.formatProjectArguments(ScriptTestCheck.PROJECT, scripts, scripts, CoverageRun.NO_EXCLUSIONS, [ScriptTestCheck.TESTS_FOLDER]), environment);
     return testsPassed && covered;
   }
 

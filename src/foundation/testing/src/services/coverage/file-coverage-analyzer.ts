@@ -42,7 +42,7 @@ export class FileCoverageAnalyzer {
   public async analyzeAsync(filePath: string, scriptEntries: readonly (readonly FunctionCoverage[])[]): Promise<FileCoverage> {
     const isTypeScript = filePath.endsWith(Resources.typeScriptFileSuffix);
     const fileText = isTypeScript
-      ? this.stripTypes(filePath, await readFile(filePath, FileCoverageAnalyzer.TEXT_ENCODING), scriptEntries.length > 0)
+      ? this.stripTypes(filePath, await readFile(filePath, FileCoverageAnalyzer.TEXT_ENCODING), scriptEntries.length > 0 ? pathToFileURL(filePath).href : undefined)
       : await readFile(filePath, FileCoverageAnalyzer.TEXT_ENCODING);
     const lineStartOffsets = this.computeLineStartOffsets(fileText);
     const sourceMap = isTypeScript ? undefined : await this.loadSourceMapAsync(filePath);
@@ -125,11 +125,9 @@ export class FileCoverageAnalyzer {
       this.spanHasCoveredPosition(t, coveredPositions)));
   }
 
-  private stripTypes(filePath: string, sourceText: string, isLoaded: boolean): string {
+  private stripTypes(filePath: string, sourceText: string, sourceUrl?: string): string {
     try {
-      return isLoaded
-        ? stripTypeScriptTypes(sourceText, { sourceUrl: pathToFileURL(filePath).href })
-        : stripTypeScriptTypes(sourceText);
+      return Object.isUndefined(sourceUrl) ? stripTypeScriptTypes(sourceText) : stripTypeScriptTypes(sourceText, { sourceUrl });
     }
     catch (error) {
       throw new TestingException(Resources.formatTypeScriptNotStrippable(filePath), new ExceptionOptions(error));

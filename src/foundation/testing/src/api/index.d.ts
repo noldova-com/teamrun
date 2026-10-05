@@ -2016,10 +2016,10 @@ export declare class CoverageAnalyzer {
    *
    * @param coverageDirectory The folder of V8 coverage reports; not
    * whitespace only.
-   * @param projects The packages to measure; at least one.
+   * @param projects The projects to measure; at least one.
    * @returns A promise of the run's coverage.
    * @throws ArgumentException synchronously for an empty folder name or no
-   * packages.
+   * projects.
    * @throws TestingException as a rejection when the projects have no
    * JavaScript or TypeScript files, when a report or source map is missing,
    * malformed or refers to a file outside its project, or when Node.js

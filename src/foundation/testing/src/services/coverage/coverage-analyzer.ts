@@ -20,8 +20,6 @@ import { CoverageReportReader } from "./coverage-report.reader.js";
 import { FileCoverageAnalyzer } from "./file-coverage-analyzer.js";
 
 export class CoverageAnalyzer {
-  private static readonly JAVASCRIPT_FILE_SUFFIX: string = ".js";
-  private static readonly DECLARATION_FILE_SUFFIX: string = ".d.ts";
 
   public async analyzeAsync(coverageDirectory: string, projects: readonly CoverageProject[]): Promise<CoverageResult> {
     ArgumentException.throwIfNullOrWhitespace(coverageDirectory, "coverageDirectory");
@@ -72,8 +70,8 @@ export class CoverageAnalyzer {
   }
 
   private isProductionFile(name: string): boolean {
-    return name.endsWith(CoverageAnalyzer.JAVASCRIPT_FILE_SUFFIX)
-      || (name.endsWith(Resources.typeScriptFileSuffix) && !name.endsWith(CoverageAnalyzer.DECLARATION_FILE_SUFFIX));
+    return name.endsWith(Resources.javaScriptFileSuffix)
+      || (name.endsWith(Resources.typeScriptFileSuffix) && !name.endsWith(Resources.declarationFileSuffix));
   }
 
   private isMeasured(filePath: string, project: CoverageProject): boolean {

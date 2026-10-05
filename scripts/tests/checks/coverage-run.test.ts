@@ -15,9 +15,11 @@ import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
 
 class CoverageRunTests {
   public static register(): void {
-    test("a project's arguments name it, its folders, its exclusions and its test folders, with none of either by default", () => {
-      assert.deepEqual(CoverageRun.project("alpha", "installed", "source"), ["alpha", "installed", "source", "[]", "[]"]);
-      assert.deepEqual(CoverageRun.project("scripts", "scripts", "scripts", "[{\"file\":\"a.ts\",\"reason\":\"b\"}]", ["tests", "deep/tests"]), [
+    test("a project's arguments name it, its folders, its exclusions and its test folders, and the environment names the folder that records the coverage", () => {
+      assert.deepEqual(CoverageRun.formatProjectArguments("alpha", "installed", "source", CoverageRun.NO_EXCLUSIONS, CoverageRun.NO_TEST_FOLDERS), ["alpha", "installed", "source", "[]", "[]"]);
+      assert.deepEqual(CoverageRun.recordingIn({ KEPT: "yes" }, "reports"), { KEPT: "yes", NODE_V8_COVERAGE: "reports" });
+      assert.equal(new CoverageRun("repository", new ProcessRunnerFixture()).locateService("a", "b.js"), path.join("repository", "node_modules", "@noldova", "teamrun-foundation-testing", "services", "a", "b.js"));
+      assert.deepEqual(CoverageRun.formatProjectArguments("scripts", "scripts", "scripts", "[{\"file\":\"a.ts\",\"reason\":\"b\"}]", ["tests", "deep/tests"]), [
         "scripts", "scripts", "scripts", "[{\"file\":\"a.ts\",\"reason\":\"b\"}]", "[\"tests\",\"deep/tests\"]"
       ]);
     });
@@ -25,7 +27,7 @@ class CoverageRunTests {
     test("foundation's coverage run measures the projects' reports with the given environment, and only exit code zero passes", async () => {
       const runner = new ProcessRunnerFixture([0, 1, null]);
       const run = new CoverageRun("repository", runner);
-      const projects = CoverageRun.project("alpha", "installed", "source");
+      const projects = CoverageRun.formatProjectArguments("alpha", "installed", "source", CoverageRun.NO_EXCLUSIONS, CoverageRun.NO_TEST_FOLDERS);
 
       assert.deepEqual([await run.measureAsync("reports", projects, { KEPT: "yes" }), await run.measureAsync("reports", projects, {}), await run.measureAsync("reports", projects, {})], [true, false, false]);
       assert.deepEqual(runner.runs[0], [
