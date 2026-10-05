@@ -67,10 +67,18 @@ class RequireLinkedIssueTests {
 
     test("the check reads the pull request with read-only permissions and runs for every change to its description", async () => {
       const text = (await WorkflowFileFixture.readAsync("require-linked-issue.yml")).text;
-      assert.ok(text.includes("  pull_request_target:\n    branches: [main]\n    types: [opened, edited, synchronize, reopened, ready_for_review]\n"));
+      assert.ok(text.includes("  pull_request:\n    branches: [main]\n    types: [opened, edited, synchronize, reopened, ready_for_review]\n"));
       assert.ok(text.includes("permissions:\n  issues: read\n  pull-requests: read\n"));
+      assert.ok(text.includes("  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number }}\n"));
       assert.doesNotMatch(text, /: write|actions\/checkout/);
       assert.ok(text.includes("    name: Require linked issue\n"));
+    });
+
+    test("no workflow runs on pull_request_target", async () => {
+      const names = await WorkflowFileFixture.listAsync();
+      assert.ok(names.includes("require-linked-issue.yml"));
+      for (const name of names)
+        assert.doesNotMatch((await WorkflowFileFixture.readAsync(name)).text, /^\s*pull_request_target\s*:/m, name);
     });
   }
 
