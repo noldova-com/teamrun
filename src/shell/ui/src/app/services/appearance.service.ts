@@ -15,6 +15,7 @@ import type { Theme } from "../models/theme";
 import { Typography } from "../models/typography";
 import { DefaultTheme } from "../themes/default-theme";
 import { Resources } from "../../resources";
+import { ScrollRevealService } from "./scroll-reveal.service";
 import { ThemePainter } from "./theme-painter";
 import { TypographyPainter } from "./typography-painter";
 
@@ -34,6 +35,7 @@ export class AppearanceService {
   public readonly mode: Signal<ThemeMode> = computed(() => this.resolveMode(this.preferenceState(), this.isSystemDark()));
 
   public constructor() {
+    inject(ScrollRevealService);
     const listener = (event: MediaQueryListEvent): void => this.isSystemDark.set(event.matches);
     this.systemScheme.addEventListener(Resources.changeEvent, listener);
     inject(DestroyRef).onDestroy(() => {

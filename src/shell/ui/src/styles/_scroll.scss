@@ -16,7 +16,7 @@
   transition: --tr-scroll-thumb 150ms linear;
 }
 
-:where(:hover) {
+:where(:hover, [data-tr-scrolling]) {
   --tr-scroll-thumb: var(--tr-scrollbar);
 }
 

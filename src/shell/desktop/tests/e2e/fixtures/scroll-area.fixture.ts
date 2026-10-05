@@ -31,6 +31,13 @@ export default class ScrollAreaFixture {
   }
 
   public static async thumbChangesOnHoverAsync(window: Page, area: Locator, axis: "vertical" | "horizontal"): Promise<boolean> {
+    await ScrollAreaFixture.restAsync(window, area);
+    const rest = await ScrollAreaFixture.scrollbarImageAsync(window, area, axis);
+    await ScrollAreaFixture.hoverAsync(area);
+    return !rest.equals(await ScrollAreaFixture.scrollbarImageAsync(window, area, axis));
+  }
+
+  public static async scrollbarImageAsync(window: Page, area: Locator, axis: "vertical" | "horizontal"): Promise<Buffer> {
     const clip = await area.evaluate((t, direction) => {
       const element = t as HTMLElement;
       const box = element.getBoundingClientRect();
@@ -40,10 +47,7 @@ export default class ScrollAreaFixture {
         ? { x: left + element.clientWidth, y: top, width: element.offsetWidth - element.clientWidth - element.clientLeft * 2, height: element.clientHeight }
         : { x: left, y: top + element.clientHeight, width: element.clientWidth, height: element.offsetHeight - element.clientHeight - element.clientTop * 2 };
     }, axis);
-    await ScrollAreaFixture.restAsync(window, area);
-    const rest = await window.screenshot({ clip });
-    await ScrollAreaFixture.hoverAsync(area);
-    return !rest.equals(await window.screenshot({ clip }));
+    return window.screenshot({ clip });
   }
 
   public static panelEdgeGapAsync(area: Locator): Promise<number> {
@@ -76,6 +80,11 @@ export default class ScrollAreaFixture {
     await window.mouse.move(thumb.x, thumb.y + distance, { steps: ScrollAreaFixture.DRAG_STEPS });
     await window.mouse.up();
     return { start: thumb.start, distance: distance * thumb.ratio };
+  }
+
+  public static async expectThumbShownAsync(area: Locator, isShown: boolean): Promise<void> {
+    const poll = expect.poll(() => ScrollAreaFixture.thumbColorAsync(area));
+    await (isShown ? poll.not : poll).toBe(ScrollAreaFixture.HIDDEN);
   }
 
   private static thumbColorAsync(area: Locator): Promise<string> {
