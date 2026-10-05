@@ -14,7 +14,8 @@ import GitHubJson from "./github-json.ts";
 export default class GitHubApi {
   private static readonly NAME: string = "gh";
   private static readonly TIMEOUT: number = 60_000;
-  private static readonly STATUS_PATTERN: RegExp = /\(HTTP (\d{3})\)/u;
+  private static readonly UPLOAD_TIMEOUT: number = 900_000;
+  private static readonly STATUS_PATTERN: RegExp = /\bHTTP (\d{3})\b/u;
 
   private readonly repository: string;
   private readonly runner: ProcessRunner;
@@ -49,6 +50,19 @@ export default class GitHubApi {
     await this.captureAsync(["api", "--method", "POST", this.locate(resource)]);
   }
 
+  public async sendAsync(method: string, resource: string, texts: readonly (readonly [string, string])[], flags: readonly (readonly [string, boolean])[]): Promise<unknown> {
+    return this.parse(await this.captureAsync(["api", "--method", method, this.locate(resource), ...texts.flatMap(([name, value]) => ["--raw-field", `${name}=${value}`]),
+      ...flags.flatMap(([name, value]) => ["--field", `${name}=${value}`])]), resource);
+  }
+
+  public async deleteAsync(resource: string): Promise<void> {
+    await this.captureAsync(["api", "--method", "DELETE", this.locate(resource)]);
+  }
+
+  public async uploadAsync(tag: string, file: string): Promise<void> {
+    await this.captureAsync(["release", "upload", tag, file, "--repo", this.repository], GitHubApi.UPLOAD_TIMEOUT);
+  }
+
   private locate(resource: string): string {
     return `repos/${this.repository}${resource}`;
   }
@@ -62,8 +76,8 @@ export default class GitHubApi {
     }
   }
 
-  private async captureAsync(gitHubArguments: readonly string[]): Promise<string> {
-    const result = await this.runner.captureAsync(this.executable, gitHubArguments, this.directory, GitHubApi.TIMEOUT);
+  private async captureAsync(gitHubArguments: readonly string[], timeout: number = GitHubApi.TIMEOUT): Promise<string> {
+    const result = await this.runner.captureAsync(this.executable, gitHubArguments, this.directory, timeout);
     if (!result.isSuccessful) {
       const status = GitHubApi.STATUS_PATTERN.exec(result.errorOutput);
       throw new GitHubException(`"gh ${gitHubArguments.join(" ")}" failed with exit code ${result.exitCode}: ${result.errorOutput.trim()}`, undefined,

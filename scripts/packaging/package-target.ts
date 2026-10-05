@@ -37,6 +37,10 @@ export default class PackageTarget {
     return new PackageTarget(PackageTarget.PLATFORMS.get(platform) ?? platform, architecture);
   }
 
+  public static listAll(): readonly PackageTarget[] {
+    return [...PackageTarget.FORMATS.keys()].flatMap(t => PackageTarget.ARCHITECTURES.map(architecture => new PackageTarget(t, architecture)));
+  }
+
   public formatFileName(productName: string, extension: string): string {
     return `${productName}-${this.platform}-${this.architecture}.${extension}`;
   }

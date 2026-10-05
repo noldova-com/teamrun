@@ -54,6 +54,28 @@ class GitHubApiTests {
       assert.deepEqual((runner.captured[0] ?? []).slice(2), ["api", "--method", "POST", "repos/noldova-com/teamrun/actions/runs/9/cancel"]);
     });
 
+    test("a change sends text as raw fields and flags as typed fields, a delete sends only the method, and an upload goes through gh's release upload", async () => {
+      const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "{\"id\":7}", ""), new ProcessResult(0, "", ""), new ProcessResult(0, "", "")]);
+      const api = new GitHubApi(GitHubApiTests.REPOSITORY, runner, "work");
+
+      assert.deepEqual(await api.sendAsync("POST", "/releases", [["tag_name", "v0.0.2"], ["body", "a=b"]], [["draft", true]]), { id: 7 });
+      await api.deleteAsync("/releases/assets/9");
+      await api.uploadAsync("v0.0.2", "out/TeamRun-linux-x64.AppImage");
+
+      assert.deepEqual(runner.captured.map(t => t.slice(2)), [
+        ["api", "--method", "POST", "repos/noldova-com/teamrun/releases", "--raw-field", "tag_name=v0.0.2", "--raw-field", "body=a=b", "--field", "draft=true"],
+        ["api", "--method", "DELETE", "repos/noldova-com/teamrun/releases/assets/9"],
+        ["release", "upload", "v0.0.2", "out/TeamRun-linux-x64.AppImage", "--repo", "noldova-com/teamrun"]
+      ]);
+    });
+
+    test("a failed upload keeps the HTTP status that leads gh's message", async () => {
+      const runner = new ProcessRunnerFixture([], [new ProcessResult(1, "", "HTTP 502: Bad Gateway (https://uploads.github.com/)\n")]);
+
+      await assert.rejects(new GitHubApi(GitHubApiTests.REPOSITORY, runner, "work").uploadAsync("v0.0.2", "TeamRun-linux-x64.AppImage"),
+        (error: unknown) => error instanceof GitHubException && error.status === 502);
+    });
+
     test("a failed request keeps the HTTP status GitHub answered with, when gh names one", async () => {
       const runner = new ProcessRunnerFixture([], [
         new ProcessResult(1, "", "gh: Cannot cancel a workflow run that is completed. (HTTP 409)\n"),

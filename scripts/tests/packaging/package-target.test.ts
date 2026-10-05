@@ -29,6 +29,11 @@ class PackageTargetTests {
       ]);
     });
 
+    test("every target is listed, each platform on x64 and then ARM64", () => {
+      assert.deepEqual(PackageTarget.listAll().map(t => `${t.platform}-${t.architecture}`),
+        ["windows-x64", "windows-arm64", "macos-x64", "macos-arm64", "linux-x64", "linux-arm64"]);
+    });
+
     test("each platform names the formats it is packaged in", () => {
       assert.deepEqual(
         ["windows", "macos", "linux"].map(t => new PackageTarget(t, "x64").formats),

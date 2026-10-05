@@ -31,6 +31,9 @@
   "scripts": {
     "build": "node scripts/build.ts",
     "package": "node scripts/package.ts",
+    "release:assets": "node scripts/release-assets.ts",
+    "release:check": "node scripts/release-check.ts",
+    "release:publish": "node scripts/release-publish.ts",
     "start": "node scripts/desktop/start.ts",
     "teamrun": "node scripts/desktop/teamrun.ts",
     "test": "node scripts/test.ts",
