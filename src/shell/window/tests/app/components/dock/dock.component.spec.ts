@@ -130,6 +130,20 @@ describe("DockComponent", () => {
     expect(query("tr-sash")).not.toBeNull();
   });
 
+  it("opens a dock the narrow window closed from its strip and closes the other dock instead", async () => {
+    await renderAsync(DockSide.Left);
+    layout.setViewport(40, 40);
+    fixture.detectChanges();
+    const closed = [...layout.geometry().closedSides];
+
+    query(".tr-dock-strip-view")?.click();
+    fixture.detectChanges();
+
+    expect(closed).toEqual([DockSide.Right, DockSide.Left]);
+    expect([...layout.geometry().closedSides]).toEqual([DockSide.Right]);
+    expect(query("tr-sash")).not.toBeNull();
+  });
+
   it("shows a side set to icons as a toolbar of its views on the window's edge, group by group, beside the open dock", async () => {
     await renderAsync(DockSide.Left, Layout.createDefault(registry).splitGroup(LayoutFixture.search, 1, PanelEdge.Bottom));
     bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
