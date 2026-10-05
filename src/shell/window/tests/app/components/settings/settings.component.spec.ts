@@ -182,6 +182,70 @@ describe("SettingsComponent", () => {
     expect(box(".tr-settings-column").width).toBeCloseTo(51.5 * rem, 0);
   });
 
+  it("spans its search field from the page list's start to the headings' inset inside the column's end, whether or not the column has reached its reading width", () => {
+    const host = render();
+    const box = (selector: string): DOMRect => (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
+    const column = host.querySelector(".tr-settings-column") as HTMLElement;
+    const inset = parseFloat(getComputedStyle(host.querySelector(".tr-settings-group-title") as HTMLElement).paddingLeft);
+    const edges = ["100rem", "60rem"].map(width => {
+      host.style.width = width;
+      const end = box(".tr-settings-column").right - parseFloat(getComputedStyle(column).paddingRight) - inset;
+      return [Math.round(box(".tr-settings-search-field").left - box(".tr-settings-pages").left), Math.round(box(".tr-settings-search-field").right - end)];
+    });
+
+    expect(edges).toEqual([[0, 0], [0, 0]]);
+  });
+
+  it("tops its first heading level with the page list's first item on a page, on Keyboard shortcuts and in search results", async () => {
+    const host = render();
+    host.style.width = "100rem";
+    const top = (selector: string): number => (host.querySelector(selector) as HTMLElement).getBoundingClientRect().top;
+    const offset = (): number => Math.round(top(".tr-settings-column h2") - top(".tr-settings-pages .tr-tree-row"));
+    const offsets = [offset()];
+    await page.getByRole("treeitem", { name: "Keyboard shortcuts" }).click();
+    fixture.detectChanges();
+    offsets.push(offset());
+    await searchAsync("greeting");
+    offsets.push(offset());
+
+    expect(offsets).toEqual([0, 0, 0]);
+  });
+
+  it("starts and ends the shortcuts table's text, actions and row lines at the headings' inset, whether or not the column has reached its reading width, and Reset all beside the explanation", async () => {
+    const host = render();
+    await page.getByRole("treeitem", { name: "Keyboard shortcuts" }).click();
+    fixture.detectChanges();
+    const textLeft = (element: Element): number => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return range.getBoundingClientRect().left;
+    };
+    const column = host.querySelector(".tr-settings-column") as HTMLElement;
+    const heading = host.querySelector(".tr-settings-group-title") as HTMLElement;
+    const inset = parseFloat(getComputedStyle(heading).paddingLeft);
+    const rows = [...(host.querySelector(".tr-shortcuts-table") as HTMLTableElement).rows];
+    const actions = rows.flatMap(t => [...(t.cells[t.cells.length - 1] as HTMLTableCellElement).querySelectorAll("button")].slice(-1));
+    const textEnd = (): number => column.getBoundingClientRect().right - parseFloat(getComputedStyle(column).paddingRight) - inset;
+    const offsets = ["100rem", "60rem"].map(width => {
+      host.style.width = width;
+      const start = textLeft(heading);
+      const end = textEnd();
+      return [
+        ...rows.map(t => textLeft(t.cells[0] as HTMLTableCellElement) - start),
+        ...rows.map(t => (t.cells[0] as HTMLTableCellElement).getBoundingClientRect().left - start),
+        ...rows.map(t => (t.cells[t.cells.length - 1] as HTMLTableCellElement).getBoundingClientRect().right - end),
+        ...actions.map(t => t.getBoundingClientRect().right - end)
+      ].map(t => Math.round(t));
+    });
+    host.style.width = "100rem";
+    const reset = (host.querySelector(".tr-shortcuts-reset-all") as HTMLElement).getBoundingClientRect().right;
+
+    expect([rows.length > 1, actions.length > 0]).toEqual([true, true]);
+    expect(offsets).toEqual(offsets.map(t => t.map(() => 0)));
+    expect(Math.round(reset - textEnd())).toBe(0);
+    expect(rows.every(t => getComputedStyle(t.cells[0] as HTMLTableCellElement).borderBottomStyle === "solid")).toBe(true);
+  });
+
   it("mirrors its insets right to left, so its scroller meets the left edge and its start inset is on the right", () => {
     const host = render();
     host.dir = "rtl";
@@ -434,7 +498,8 @@ describe("SettingsComponent", () => {
     expect(current.backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "list.inactiveSelectionBackground"));
     AppearanceFixture.expectLook(current.minHeight, DefaultTheme.theme, "tree-row-height", "min-height");
     AppearanceFixture.expectLook(getComputedStyle(element().querySelector(".tr-settings-pages") as Element).width, DefaultTheme.theme, "settings-pages-width", "width");
-    AppearanceFixture.expectLook(heading.marginTop, DefaultTheme.theme, "settings-heading-space", "margin-top");
+    expect(heading.marginTop).toBe("0px");
+    AppearanceFixture.expectLook(heading.marginBottom, DefaultTheme.theme, "settings-heading-space", "margin-bottom");
     AppearanceFixture.expectLook(heading.paddingLeft, DefaultTheme.theme, "settings-heading-inset", "padding-left");
     expect(heading.fontWeight).toBe("600");
     expect(heading.fontSize).toBe(`${parseFloat(getComputedStyle(document.body).fontSize) * 2}px`);

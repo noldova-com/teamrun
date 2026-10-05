@@ -24,6 +24,11 @@ export default class SourceScanner {
   private static readonly CLOSING_BRACKET: string = "]";
   private static readonly OPENING_PARENTHESIS: string = "(";
   private static readonly COLON: string = ":";
+  private static readonly CLOSING_PARENTHESIS: string = ")";
+  private static readonly EQUALS: string = "=";
+  private static readonly GREATER_THAN: string = ">";
+  private static readonly PROPERTY_ACCESS: string = ".";
+  private static readonly FUNCTION_KEYWORD: string = "function";
   private static readonly OPERAND: string = "0";
   private static readonly QUOTES: ReadonlySet<string> = new Set(["\"", "'"]);
   private static readonly WHITESPACE: RegExp = /\s/;
@@ -48,6 +53,7 @@ export default class SourceScanner {
   private braceDepth: number = 0;
   private previousToken: string | null = null;
   private earlierToken: string | null = null;
+  private hasFunctionBody: boolean = false;
 
   public constructor(text: string) {
     this.text = text;
@@ -56,7 +62,7 @@ export default class SourceScanner {
   public scan(): ScannedSource {
     while (this.position < this.text.length)
       this.scanNext(this.text.charAt(this.position));
-    return new ScannedSource(this.imports, this.selectors, this.texts);
+    return new ScannedSource(this.imports, this.selectors, this.texts, this.hasFunctionBody);
   }
 
   private scanNext(character: string): void {
@@ -77,7 +83,7 @@ export default class SourceScanner {
     } else if (character === SourceScanner.SLASH && this.allowsRegularExpression())
       this.readRegularExpression();
     else if (SourceScanner.IDENTIFIER_START.test(character))
-      this.pushToken(this.readWord());
+      this.readIdentifier();
     else if (SourceScanner.DIGIT.test(character)) {
       this.readWord();
       this.pushToken(SourceScanner.OPERAND);
@@ -172,6 +178,13 @@ export default class SourceScanner {
     this.pushToken(SourceScanner.OPERAND);
   }
 
+  private readIdentifier(): void {
+    const word = this.readWord();
+    if (word === SourceScanner.FUNCTION_KEYWORD && this.previousToken !== SourceScanner.PROPERTY_ACCESS)
+      this.hasFunctionBody = true;
+    this.pushToken(word);
+  }
+
   private readWord(): string {
     const start = this.position;
     while (this.position < this.text.length && SourceScanner.WORD_PART.test(this.text.charAt(this.position)))
@@ -186,6 +199,9 @@ export default class SourceScanner {
       this.readTemplate();
       return;
     }
+    if (character === SourceScanner.EQUALS && this.text.charAt(this.position) === SourceScanner.GREATER_THAN
+      || character === SourceScanner.OPENING_BRACE && this.previousToken === SourceScanner.CLOSING_PARENTHESIS)
+      this.hasFunctionBody = true;
     if (character === SourceScanner.OPENING_BRACE)
       this.braceDepth++;
     else if (character === SourceScanner.CLOSING_BRACE)
