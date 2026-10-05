@@ -19,15 +19,18 @@ export class QuickInputItem {
   public readonly keyLabel: string | null;
   public readonly matches: readonly number[];
   public readonly detailMatches: readonly number[];
+  public readonly section: string | null;
 
   public constructor(id: string, title: string, icon: string | null, detail: string | null, keyLabel: string | null, matches: readonly number[] = [],
-    detailMatches: readonly number[] = []) {
+    detailMatches: readonly number[] = [], section: string | null = null) {
     ArgumentException.throwIfNullOrWhitespace(id, "id");
     ArgumentException.throwIfNullOrWhitespace(title, "title");
     if (!QuickInputItem.indexes(matches, title))
       throw new ArgumentException("Each match must be the index of a character of the title.", "matches");
     if (!QuickInputItem.indexes(detailMatches, detail ?? String.empty))
       throw new ArgumentException("Each detail match must be the index of a character of the detail.", "detailMatches");
+    if (!Object.isNull(section))
+      ArgumentException.throwIfNullOrWhitespace(section, "section");
 
     this.id = id;
     this.title = title;
@@ -36,6 +39,7 @@ export class QuickInputItem {
     this.keyLabel = keyLabel;
     this.matches = [...matches];
     this.detailMatches = [...detailMatches];
+    this.section = section;
   }
 
   public get segments(): readonly TitleSegment[] {

@@ -68,9 +68,11 @@ export class Resources {
     ShellMethods.clearNotifications.text,
     ShellMethods.settings.text,
     ShellMethods.setSetting.text,
-    ShellMethods.resetSetting.text
+    ShellMethods.resetSetting.text,
+    ShellMethods.recentCommands.text,
+    ShellMethods.recordCommand.text
   ];
-  public static readonly deviceMethods: readonly string[] = [ShellMethods.settings.text, ShellMethods.setSetting.text, ShellMethods.resetSetting.text];
+  public static readonly deviceMethods: readonly string[] = [ShellMethods.settings.text, ShellMethods.setSetting.text, ShellMethods.resetSetting.text, ShellMethods.recordCommand.text];
   public static readonly deviceField: string = "device";
   public static readonly settingsNeedDevice: string = "This device has no identity, so its settings cannot be read or changed.";
   public static readonly settingsPayloadNotObject: string = "A settings request's payload must be a JSON object.";

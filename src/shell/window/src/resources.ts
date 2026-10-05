@@ -316,6 +316,9 @@ export class Resources {
     ["shell.toggleRightDock", ["Mod+Alt+B"], ["Mod+Alt+B"]]
   ];
   public static readonly commandSearchLabel: string = "Search commands";
+  public static readonly recentCommandsSetting: string = "shell.recentCommands";
+  public static readonly recentlyUsedSection: string = "recently used";
+  public static readonly otherCommandsSection: string = "other commands";
   public static readonly commandSearchPaneClass: string = "tr-command-search-pane";
   public static readonly windowRowSelector: string = "tr-window-row";
   public static readonly detailSeparator: string = " ";

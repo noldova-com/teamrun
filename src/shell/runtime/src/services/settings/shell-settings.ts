@@ -26,6 +26,7 @@ export class ShellSettings {
   public static readonly doNotDisturb: QualifiedName = ShellSettings.named(Resources.doNotDisturbSetting);
   public static readonly mutedModules: QualifiedName = ShellSettings.named(Resources.mutedModulesSetting);
   public static readonly keyBindings: QualifiedName = ShellSettings.named(Resources.keyBindingsSetting);
+  public static readonly recentCommands: QualifiedName = ShellSettings.named(Resources.recentCommandsSetting);
 
   public static readonly all: readonly SettingDefinition[] = [
     ShellSettings.appearance(ShellSettings.theme, Resources.themeTitle, Resources.formatThemeDescription(ProductInfo.current.name),
@@ -50,6 +51,8 @@ export class ShellSettings {
       ShellSettings.choiceOf(Resources.menuBarOptions), Resources.defaultMenuBar, SettingLocality.Shared, Resources.layoutGroup),
     ShellSettings.appearance(ShellSettings.previewTabs, Resources.previewTabsTitle, Resources.previewTabsDescription,
       SettingType.boolean(), true, SettingLocality.Shared, Resources.layoutGroup),
+    ShellSettings.appearance(ShellSettings.recentCommands, Resources.recentCommandsTitle, Resources.recentCommandsDescription,
+      SettingType.number(0, Resources.maximumRecentCommands, 1), Resources.defaultRecentCommands, SettingLocality.Shared, Resources.commandSearchGroup),
     new SettingDefinition(ShellSettings.doNotDisturb, Resources.doNotDisturbTitle, Resources.doNotDisturbDescription,
       SettingType.boolean(), false, SettingLocality.Device, [], Resources.notificationsPage, Resources.notificationsGroup),
     new SettingDefinition(ShellSettings.mutedModules, Resources.mutedModulesTitle, Resources.mutedModulesDescription,

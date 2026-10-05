@@ -18,7 +18,7 @@ import type { MenuItemConstructorOptions } from "electron";
 
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
+import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeBuild, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
 import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
 
@@ -1263,6 +1263,53 @@ export class DesktopApplicationTests {
       ]),
       JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.settingsChanged could not be passed to the window").length);
+  }
+
+  @TestMethod
+  public async addsItsOwnDeviceToItsWindowsRecentCommandsAndAnswersWithoutIt(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.answers.set("shell.recentCommands", Response.success("r", { ids: ["notes.newNote"], device: FakeDeviceIdentity.ID }));
+    connection.answers.set("shell.recordCommand", Response.success("r", null));
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const event = DesktopApplicationTests.trustedEvent("linux");
+    const unidentified = new FakeDeviceIdentity();
+    unidentified.failure = new Error("The identity file is not JSON.");
+    const lost = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(new FakeRuntimeConnection()), new FakeElectron(), unidentified);
+
+    const recent = await DesktopApplicationTests.requestAsync(electron, event, "shell.recentCommands", null);
+    const recorded = await DesktopApplicationTests.requestAsync(electron, event, "shell.recordCommand", { id: "notes.newNote" });
+    const noDevice = await DesktopApplicationTests.requestAsync(lost, event, "shell.recentCommands", null);
+    connection.answers.set("shell.recentCommands", Response.failure("r", new Failure(FailureCode.Internal, "The database is busy.")));
+    const failed = await DesktopApplicationTests.requestAsync(electron, event, "shell.recentCommands", null);
+
+    const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).filter(t => t.startsWith("shell.recentCommands") || t.startsWith("shell.recordCommand"));
+    Assert.areEqual(JSON.stringify([
+      `shell.recentCommands ${JSON.stringify({ device: FakeDeviceIdentity.ID })}`,
+      `shell.recordCommand ${JSON.stringify({ id: "notes.newNote", device: FakeDeviceIdentity.ID })}`,
+      `shell.recentCommands ${JSON.stringify({ device: FakeDeviceIdentity.ID })}`
+    ]), JSON.stringify(sent));
+    Assert.areEqual(JSON.stringify({ ids: ["notes.newNote"] }), JSON.stringify(recent.payload));
+    Assert.isFalse(recorded.hasFailed);
+    Assert.areEqual(FailureCode.Unavailable, noDevice.failure?.code);
+    Assert.areEqual(FailureCode.Internal, failed.failure?.code);
+  }
+
+  @TestMethod
+  public async passesRecentCommandsOnlyToTheDeviceThatRanThemWithoutItsDevice(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher();
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", DesktopApplicationTests.trustedEvent("linux"));
+
+    launcher.listener?.onEvent(new Event(ShellEvents.recentCommandsChanged, new RecentCommands(["notes.newNote"], FakeDeviceIdentity.ID).toJson()));
+    launcher.listener?.onEvent(new Event(ShellEvents.recentCommandsChanged, new RecentCommands(["clock.show"], "another").toJson()));
+    launcher.listener?.onEvent(new Event(ShellEvents.recentCommandsChanged, { device: FakeDeviceIdentity.ID }));
+
+    Assert.areEqual(
+      JSON.stringify([["teamrun:runtimeEvent", "shell.recentCommandsChanged", { ids: ["notes.newNote"] }]]),
+      JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.recentCommandsChanged could not be passed to the window").length);
   }
 
   @TestMethod

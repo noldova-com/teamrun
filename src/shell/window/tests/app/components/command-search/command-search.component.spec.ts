@@ -18,6 +18,7 @@ import { CommandSearchService } from "../../../../src/app/services/command-searc
 import { CommandService } from "../../../../src/app/services/command.service";
 import { MenuBarService } from "../../../../src/app/services/menu-bar.service";
 import { MenuService } from "../../../../src/app/services/menu.service";
+import { RecentCommandsService } from "../../../../src/app/services/recent-commands.service";
 import { Resources } from "../../../../src/resources";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { ModuleStatusFixture } from "../../../fixtures/module-status.fixture";
@@ -27,6 +28,7 @@ describe("CommandSearchComponent", () => {
   let commands: CommandService;
   let search: CommandSearchService;
   let menuBar: MenuBarService;
+  let bridge: DesktopBridgeFixture;
   let runs: string[];
   let received: JsonValue[];
 
@@ -40,7 +42,7 @@ describe("CommandSearchComponent", () => {
   beforeEach(async () => {
     runs = [];
     received = [];
-    DesktopBridgeFixture.install("win32");
+    bridge = DesktopBridgeFixture.install("win32");
     TestBed.configureTestingModule({
       providers: [
         {
@@ -79,6 +81,23 @@ describe("CommandSearchComponent", () => {
     return [...root().querySelectorAll<HTMLElement>("[role=option]")].map(t => t.dataset["item"] ?? "");
   }
 
+  async function showAsync(limit: number, recent: readonly string[]): Promise<void> {
+    await vi.waitFor(() => expect(bridge.requests.map(t => t[0])).toContain("shell.recentCommands"));
+    await fixture.whenStable();
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.recentCommands", value: limit, isSet: true });
+    bridge.publishEvent("shell.recentCommandsChanged", { ids: recent });
+    fixture.detectChanges();
+    await fixture.whenStable();
+  }
+
+  function sections(): (string | null)[] {
+    return [...root().querySelectorAll("[role=option]")].map(t => t.querySelector(".tr-quick-input-section")?.textContent?.trim() ?? null);
+  }
+
+  function separatedIds(): string[] {
+    return [...root().querySelectorAll<HTMLElement>(".tr-quick-input-separator + [role=option]")].map(t => t.dataset["item"] ?? "");
+  }
+
   async function typeAsync(text: string): Promise<void> {
     const field = root().querySelector<HTMLInputElement>(".tr-quick-input-field");
     if (field === null)
@@ -89,32 +108,55 @@ describe("CommandSearchComponent", () => {
     await fixture.whenStable();
   }
 
-  it("lists every enabled command and menu row by category and title, with the ones run this session first, latest first, and leaves out a disabled one", async () => {
-    const rows = [...root().querySelectorAll("[role=option]")].map(t => [t.querySelector(".tr-quick-input-detail")?.textContent?.trim(), t.querySelector(".tr-quick-input-title")?.textContent?.trim()]);
-    expect(rows).toHaveLength(commands.commands().filter(t => t.isEnabled(null)).length + menuBar.searchRows().length);
+  it("lists every enabled command and menu row once, by title, without sections while nothing was run, and leaves out a disabled one", () => {
+    const rows = [...root().querySelectorAll("[role=option]")].map(t => [t.querySelector(".tr-quick-input-title")?.textContent?.trim(), t.querySelector(".tr-quick-input-detail")?.textContent?.trim()]);
+
+    expect(new Set(ids()).size).toBe(ids().length);
     expect(rows).toEqual([...rows].sort((a, b) => String(a[0]).localeCompare(String(b[0])) || String(a[1]).localeCompare(String(b[1]))));
-    expect(rows.slice(-4)).toEqual([["weather", "Open the tools"], ["weather", "Photo"], ["weather", "Pluto"], ["weather", "Today's weather"]]);
+    expect(rows.filter(t => t[1] === "weather")).toEqual([["Open the tools", "weather"], ["Photo", "weather"], ["Pluto", "weather"], ["Today's weather", "weather"]]);
     expect(ids()).not.toContain("notes.archive");
-
-    search.remember("weather.today");
-    search.remember("notes.newNote");
-    fixture.detectChanges();
-    await fixture.whenStable();
-
-    expect(ids().slice(0, 2)).toEqual(["notes.newNote", "weather.today"]);
+    expect([sections().filter(t => t !== null), separatedIds()]).toEqual([[], []]);
   });
 
-  it("keeps the rows whose title, or category followed by the title, contains the query as one run, in the same order, and marks the run", async () => {
+  it("lists the recent commands first, newest first and within the limit, then a line and the others by title, labelling the first of each", async () => {
+    await showAsync(2, ["weather.pluto", "gone.command", "notes.archive", "notes.newNote", "weather.today"]);
+
+    expect(ids().slice(0, 2)).toEqual(["weather.pluto", "notes.newNote"]);
+    expect(ids().filter(t => t === "weather.pluto" || t === "notes.newNote")).toHaveLength(2);
+    expect(sections().slice(0, 3)).toEqual([Resources.recentlyUsedSection, null, Resources.otherCommandsSection]);
+    expect(sections().slice(3).every(t => t === null)).toBe(true);
+    expect(separatedIds()).toEqual([ids()[2]]);
+    const others = [...root().querySelectorAll("[role=option]")].slice(2).map(t => t.querySelector(".tr-quick-input-title")?.textContent?.trim() ?? "");
+    expect(others).toEqual([...others].sort((a, b) => a.localeCompare(b)));
+    expect(root().querySelector("[role=option]")?.textContent).toContain(Resources.recentlyUsedSection);
+  });
+
+  it("follows the Recent commands setting, and shows no recent section at 0", async () => {
+    await showAsync(5, ["weather.pluto", "notes.newNote", "weather.today"]);
+    const five = ids().slice(0, 3);
+    await showAsync(1, ["weather.pluto", "notes.newNote", "weather.today"]);
+    const one = [ids()[0], sections().filter(t => t !== null)];
+    await showAsync(0, ["weather.pluto", "notes.newNote", "weather.today"]);
+
+    expect(five).toEqual(["weather.pluto", "notes.newNote", "weather.today"]);
+    expect(one).toEqual(["weather.pluto", [Resources.recentlyUsedSection, Resources.otherCommandsSection]]);
+    expect([sections().filter(t => t !== null), separatedIds()]).toEqual([[], []]);
+    expect(ids()[0]).not.toBe("weather.pluto");
+  });
+
+  it("keeps the rows whose title, or category followed by the title, contains the query as one run, recent ones first, without sections, and marks the run", async () => {
     const marks = (id: string, part: string): readonly (string | null)[] => [...root().querySelectorAll(`[data-item="${id}"] .tr-quick-input-${part} mark`)].map(t => t.textContent);
-    search.remember("weather.pluto");
+    await showAsync(5, ["weather.today", "weather.pluto"]);
 
     await typeAsync("TO");
-    const to = [ids().filter(t => t.startsWith("weather.") || ids().indexOf(t) === 0), marks("weather.tools", "title"), root().querySelector("[data-item=\"weather.tools\"] .tr-quick-input-title")?.textContent];
+    const to = [ids().filter(t => t.startsWith("weather.")), marks("weather.tools", "title"), root().querySelector("[data-item=\"weather.tools\"] .tr-quick-input-title")?.textContent];
+    const plain = [sections().filter(t => t !== null), separatedIds()];
     await typeAsync("weather p");
     const category = [ids(), marks("weather.photo", "detail"), marks("weather.photo", "title")];
     await typeAsync("nn");
 
-    expect(to).toEqual([["weather.pluto", "weather.tools", "weather.photo", "weather.today"], ["to"], "Open the tools"]);
+    expect(to).toEqual([["weather.today", "weather.pluto", "weather.tools", "weather.photo"], ["to"], "Open the tools"]);
+    expect(plain).toEqual([[], []]);
     expect(category).toEqual([["weather.pluto", "weather.photo"], ["weather"], ["P"]]);
     expect(ids()).toEqual([]);
   });
@@ -127,7 +169,7 @@ describe("CommandSearchComponent", () => {
     expect([key("notes.newNote"), key("shell.showCommands"), key("shell.closeTab")]).toEqual(["Ctrl+Alt+N", "Ctrl+Shift+P", undefined]);
   });
 
-  it("runs the chosen command after closing the search, and remembers it", async () => {
+  it("runs the chosen command after closing the search, and records it", async () => {
     const close = vi.spyOn(search, "close");
     const row = vi.spyOn(menuBar, "run");
     await typeAsync("new note");
@@ -137,7 +179,8 @@ describe("CommandSearchComponent", () => {
     await vi.waitFor(() => expect(runs).toEqual(["notes.newNote"]));
     expect(row).not.toHaveBeenCalled();
     expect(close).toHaveBeenCalledOnce();
-    expect(search.recent()).toEqual(["notes.newNote"]);
+    expect(TestBed.inject(RecentCommandsService).ids()).toEqual(["notes.newNote"]);
+    expect(bridge.requests.filter(t => t[0] === "shell.recordCommand")).toEqual([["shell.recordCommand", { id: "notes.newNote" }]]);
   });
 
   it("lists a menu row that passes arguments, with its menu as the detail and no key, but not one that runs a command alone under any label", async () => {
@@ -158,7 +201,7 @@ describe("CommandSearchComponent", () => {
     expect(ids()).toEqual([]);
   });
 
-  it("runs a chosen menu row with its arguments after closing the search, and remembers it", async () => {
+  it("runs a chosen menu row with its arguments after closing the search, and records it", async () => {
     const close = vi.spyOn(search, "close");
     const template = menuBar.searchRows().find(t => t.title === "New note")?.id ?? "";
     await typeAsync("new note");
@@ -168,7 +211,7 @@ describe("CommandSearchComponent", () => {
     await vi.waitFor(() => expect(received).toEqual([{ template: "plan" }]));
     expect(runs).toEqual(["notes.newNote"]);
     expect(close).toHaveBeenCalledOnce();
-    expect(search.recent()).toEqual([template]);
+    expect(TestBed.inject(RecentCommandsService).ids()).toEqual([template]);
   });
 
   it("closes the search when it is dismissed", () => {
