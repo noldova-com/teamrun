@@ -255,6 +255,7 @@ export interface IWindowPart {
    *
    * export class NotesWindowPart implements IWindowPart {
    *   private context: IWindowPartContext | null = null;
+   *
    *   public readonly moduleId: string = "notes";
    *   public notes: JsonValue = null;
    *
@@ -292,6 +293,7 @@ export interface IWindowPart {
    *
    * export class TickerWindowPart implements IWindowPart {
    *   private timer: ReturnType<typeof setInterval> | null = null;
+   *
    *   public readonly moduleId: string = "ticker";
    *
    *   public activateAsync(): Promise<void> {

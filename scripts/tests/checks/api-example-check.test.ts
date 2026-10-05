@@ -168,32 +168,27 @@ class ApiExampleCheckTests {
     });
 
     test("an Angular part's examples compile against its declarations in source and the source project's dependencies", async t => {
-      const fixture = await ApiPackageFixture.createAsync();
-      t.after(() => fixture.disposeAsync());
-      const declarations = [
-        "/**",
-        " * Doubles a length.",
-        " *",
-        " * @example",
-        " * ```ts",
-        " * import { double } from \"@noldova/teamrun-shell-counter\";",
-        " * import type { Length } from \"@noldova/teamrun-fixture-units\";",
-        " *",
-        " * export const length: Length = double(2);",
-        " * ```",
-        " */",
-        "export declare function double(value: number): number;",
-        ""
-      ].join("\n");
-      await fixture.writePartAsync("src/shell/counter", { "api/index.ts": "export const unused: number = 0;\n" }, declarations);
-      await fixture.writeFilesAsync({
-        "src/node_modules/@noldova/teamrun-fixture-units/package.json": JSON.stringify({ name: "@noldova/teamrun-fixture-units", exports: { ".": { types: "./types/units.d.ts" } }, typings: "./types/units.d.ts" }),
-        "src/node_modules/@noldova/teamrun-fixture-units/types/units.d.ts": "export type Length = number;\n"
-      });
-      const output = new TextOutputFixture();
+      const example = [
+        "import { double } from \"@noldova/teamrun-shell-counter\";",
+        "import type { Length } from \"@noldova/teamrun-fixture-units/lengths\";",
+        "",
+        "export const length: Length = double(2);"
+      ];
 
-      assert.equal(await ApiExampleCheckTests.createCheck(fixture, ["src/shell/counter"]).runAsync(output), true, output.text);
-      assert.equal(output.text, "src/shell/counter: every example compiles\n");
+      assert.equal(await ApiExampleCheckTests.runPartAsync(t, example, true), "src/shell/counter: every example compiles\n");
+    });
+
+    test("an Angular part's example that does not compile fails with its owner, number and line, though the examples compile under node_modules", async t => {
+      const example = [
+        "import { double } from \"@noldova/teamrun-shell-counter\";",
+        "",
+        "export const text: string = double(2);"
+      ];
+
+      const output = await ApiExampleCheckTests.runPartAsync(t, example, false);
+
+      assert.ok(output.startsWith("src/shell/counter:\n  the compiler exited with code 1\n"), output);
+      assert.ok(output.includes("  double example 1, line 3: error TS2322: "), output);
     });
 
     test("an Angular part without declarations fails and names the missing file", async t => {
@@ -240,6 +235,32 @@ class ApiExampleCheckTests {
     const output = new TextOutputFixture();
 
     assert.equal(await ApiExampleCheckTests.createCheck(fixture).runAsync(output), expected, output.text);
+    return output.text;
+  }
+
+  private static async runPartAsync(context: TestContext, example: readonly string[], expected: boolean): Promise<string> {
+    const fixture = await ApiPackageFixture.createAsync();
+    context.after(() => fixture.disposeAsync());
+    const declarations = [
+      "/**",
+      " * Doubles a length.",
+      " *",
+      " * @example",
+      " * ```ts",
+      ...example.map(t => t === "" ? " *" : ` * ${t}`),
+      " * ```",
+      " */",
+      "export declare function double(value: number): number;",
+      ""
+    ].join("\n");
+    await fixture.writePartAsync("src/shell/counter", { "api/index.ts": "export const unused: number = 0;\n" }, declarations);
+    await fixture.writeFilesAsync({
+      "src/node_modules/@noldova/teamrun-fixture-units/package.json": JSON.stringify({ name: "@noldova/teamrun-fixture-units", exports: { "./lengths": { types: "./types/lengths.d.ts" } } }),
+      "src/node_modules/@noldova/teamrun-fixture-units/types/lengths.d.ts": "export type Length = number;\n"
+    });
+    const output = new TextOutputFixture();
+
+    assert.equal(await ApiExampleCheckTests.createCheck(fixture, ["src/shell/counter"]).runAsync(output), expected, output.text);
     return output.text;
   }
 }

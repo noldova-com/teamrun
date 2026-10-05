@@ -40,6 +40,11 @@ import { ViewBadgeComponent } from "../view-badge/view-badge.component";
 })
 export class TabComponent {
   protected readonly resources: typeof Resources = Resources;
+  protected readonly closeLabel: Signal<string> = computed(() => Resources.formatCloseTab(this.label()));
+  protected readonly accessibleName: Signal<string> = computed(() => {
+    const badge = this.badge();
+    return Object.isNull(badge) ? this.label() : Resources.formatBadged(this.label(), badge);
+  });
 
   public readonly label = input.required<string>();
   public readonly icon = input<string>();
@@ -51,35 +56,30 @@ export class TabComponent {
   public readonly badgeCount = input<number | null>(null);
   public readonly activate = output<void>();
   public readonly close = output<void>();
-  public readonly closeLabel: Signal<string> = computed(() => Resources.formatCloseTab(this.label()));
-  public readonly accessibleName: Signal<string> = computed(() => {
-    const badge = this.badge();
-    return Object.isNull(badge) ? this.label() : Resources.formatBadged(this.label(), badge);
-  });
 
-  public onSpace(event: Event): void {
+  protected onSpace(event: Event): void {
     event.preventDefault();
     this.activate.emit();
   }
 
-  public onMouseDown(event: MouseEvent): void {
+  protected onMouseDown(event: MouseEvent): void {
     if (event.button === Resources.middleButton)
       event.preventDefault();
   }
 
-  public onAuxiliaryClick(event: MouseEvent): void {
+  protected onAuxiliaryClick(event: MouseEvent): void {
     if (event.button !== Resources.middleButton)
       return;
     event.preventDefault();
     this.requestClose();
   }
 
-  public onCloseClick(event: MouseEvent): void {
+  protected onCloseClick(event: MouseEvent): void {
     event.stopPropagation();
     this.requestClose();
   }
 
-  public requestClose(): void {
+  protected requestClose(): void {
     if (this.closable())
       this.close.emit();
   }

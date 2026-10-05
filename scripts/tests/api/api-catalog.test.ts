@@ -41,7 +41,7 @@ class ApiCatalogTests {
       assert.deepEqual(found.map(t => t.directory), ["src/foundation/shapes"]);
     });
 
-    test("maps a listed part's alias to its declarations, every other alias to its file and any other module to the source project's dependencies", async t => {
+    test("maps a listed part's alias to its declarations, and every other alias to its file", async t => {
       const fixture = await ApiCatalogTests.createAsync(t);
       const aliases = { "@noldova/teamrun-shell-window": ["./shell/window/src/api/index.ts"], "@noldova/teamrun-shell-ui": ["./shell/ui/src/api/index.ts"] };
       await fixture.writeFilesAsync({ "src/tsconfig.json": JSON.stringify({ compilerOptions: { paths: aliases } }) });
@@ -50,8 +50,7 @@ class ApiCatalogTests {
 
       assert.deepEqual(found?.paths, {
         "@noldova/teamrun-shell-window": [path.join(fixture.directory, "src/shell/window/src/api/index.d.ts")],
-        "@noldova/teamrun-shell-ui": [path.join(fixture.directory, "src/shell/ui/src/api/index.ts")],
-        "*": [path.join(fixture.directory, "src/node_modules/*")]
+        "@noldova/teamrun-shell-ui": [path.join(fixture.directory, "src/shell/ui/src/api/index.ts")]
       });
     });
 
