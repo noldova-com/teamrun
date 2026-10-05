@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { ContentPadding } from "../../src/app/enums/content-padding";
 import type { IWindowPartContext } from "../../src/app/interfaces/i-window-part-context";
 import type { IWindowPart } from "../../src/app/interfaces/i-window-part";
 
@@ -14,6 +15,7 @@ export class WindowPartFixture implements IWindowPart {
   private readonly onActivate: (context: IWindowPartContext) => void;
 
   public readonly moduleId: string;
+  public padding?: ContentPadding;
   public isDeactivationFailing: boolean = false;
   public onReconnect: () => boolean = () => false;
 

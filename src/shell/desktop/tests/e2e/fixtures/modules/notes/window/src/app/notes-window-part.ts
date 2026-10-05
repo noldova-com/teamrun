@@ -9,7 +9,7 @@
 import { JsonReader } from "@noldova/teamrun-foundation-json";
 import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
 import {
-  CommandContribution, DockSide, DocumentContribution, type IViewDialogOptions, type IWindowPart, type IWindowPartContext, MenuRowContribution, type StatusBarItem, StatusBarItemContribution, StatusBarItemState, StatusBarSide,
+  CommandContribution, ContentPadding, DockSide, DocumentContribution, type IViewDialogOptions, type IWindowPart, type IWindowPartContext, MenuRowContribution, type StatusBarItem, StatusBarItemContribution, StatusBarItemState, StatusBarSide,
   TopBarActionContribution, TopBarActionState, TopBarSide, ViewContribution
 } from "@noldova/teamrun-shell-window";
 
@@ -65,7 +65,7 @@ export class NotesWindowPart implements IWindowPart {
     context.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true,
       () => import("./components/notes-list/notes-list.component").then(t => t.NotesListComponent)));
     context.registerView(new ViewContribution("notes.outline", "Outline", "toc", DockSide.Left, true,
-      () => import("./components/notes-outline/notes-outline.component").then(t => t.NotesOutlineComponent)));
+      () => import("./components/notes-outline/notes-outline.component").then(t => t.NotesOutlineComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution("notes.note",
       () => import("./components/note/note.component").then(t => t.NoteComponent)));
     context.openDocument("notes.note", "1", "Note 1");
