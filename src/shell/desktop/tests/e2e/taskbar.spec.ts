@@ -28,6 +28,7 @@ test.describe("the Windows taskbar", () => {
     const command = TaskbarIdentity.create(
       launch.isPackaged,
       launch.executablePath,
+      launch.executablePath,
       path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js"),
       launch.argv,
       launch.workingDirectory).relaunchCommand;

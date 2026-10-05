@@ -6,14 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { AppDetailsOptions, BrowserWindowConstructorOptions } from "electron";
+import type { BrowserWindowConstructorOptions } from "electron";
 
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 
 import type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
 import type { IElectron } from "../interfaces/i-electron.js";
 import type { DesktopSettings } from "../models/desktop-settings.js";
-import { TaskbarIdentity } from "../models/taskbar-identity.js";
+import type { TaskbarIdentity } from "../models/taskbar-identity.js";
 import type { WindowAppearance } from "../models/window-appearance.js";
 import type { WindowState } from "../models/window-state.js";
 import { Resources } from "../resources.js";
@@ -63,7 +63,7 @@ export class WindowFactory {
     }
     const window = this.electron.createWindow(options);
     if (this.settings.platform === Resources.windowsPlatform)
-      window.setAppDetails(this.describe());
+      window.setAppDetails(this.taskbar.toAppDetails());
     const contents = window.webContents;
     contents.on(Resources.willNavigateEvent, (event, url) => {
       if (!this.policy.isWindowUrl(url))
@@ -83,9 +83,5 @@ export class WindowFactory {
     window.setBackgroundColor(appearance.background);
     if (!this.settings.isMac)
       window.setTitleBarOverlay({ color: appearance.titleBar, symbolColor: appearance.titleBarText, height: appearance.titleBarHeight });
-  }
-
-  private describe(): AppDetailsOptions {
-    return new TaskbarIdentity(this.taskbar.appId, this.icons.window, this.taskbar.relaunchCommand).toAppDetails();
   }
 }
