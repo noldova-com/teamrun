@@ -11,6 +11,7 @@ import type { Locator, Page } from "@playwright/test";
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
+import TabRowFixture from "./fixtures/tab-row.fixture.ts";
 
 const notes = "view/notes.list";
 const firstNote = "document/notes.note/1";
@@ -89,6 +90,23 @@ test.describe("document groups", () => {
     await expect.poll(() => TabDragFixture.tabKeysOf(TabDragFixture.groupOf(window, secondNote))).toEqual([secondNote, firstNote]);
     await expect(documentGroups(window)).toHaveCount(1);
     await desktop.checkpointAsync("document-center-joins-group");
+  });
+
+  test("a document group's first tab and last action stand 0.25rem from its card's start and end, in light and dark and in both directions", async ({ desktop }) => {
+    const window = desktop.window;
+    const group = documentGroups(window).first();
+    for (const direction of ["ltr", "rtl"] as const) {
+      await TabRowFixture.setDirectionAsync(window, direction);
+      for (const scheme of ["light", "dark"] as const) {
+        await window.emulateMedia({ colorScheme: scheme });
+        await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+        const insets = await TabRowFixture.insetsOf(group);
+
+        expect(insets.firstTab).toBeCloseTo(insets.rem * 0.25, 0);
+        expect(insets.lastAction).toBeCloseTo(insets.rem * 0.25, 0);
+        await desktop.checkpointAsync(`document-tab-row-${direction}-${scheme}`);
+      }
+    }
   });
 
   test("over a tab row a dragged tab shows only an insertion line and drops there, while over the content a guide previews its area", async ({ desktop }) => {
