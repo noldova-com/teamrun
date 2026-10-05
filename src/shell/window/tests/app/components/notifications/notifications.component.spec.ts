@@ -44,7 +44,7 @@ class FakeNotificationService {
     this.calls.push("clear");
   }
 
-  public dismiss(id: number): void {
+  public dismiss(id: string): void {
     this.calls.push(`dismiss ${id}`);
   }
 
@@ -70,7 +70,7 @@ describe("NotificationsComponent", () => {
     kind: string,
     title: string,
     options: Partial<{ text: string; severity: NotificationSeverity; open: string; actions: readonly string[]; progress: number | typeof NotificationPost.indeterminate; isRead: boolean }> = {}): Notification =>
-    new Notification(id, id, new NotificationPost(
+    new Notification(String(id), id, new NotificationPost(
       QualifiedName.parse(kind), null, title, options.text ?? null, options.severity ?? NotificationSeverity.Info,
       options.open === undefined ? null : run(options.open), (options.actions ?? []).map(t => new NotificationAction(`Run ${t}`, run(t))),
       options.progress ?? null), "2026-10-03T08:05:00.000Z", options.isRead ?? false);

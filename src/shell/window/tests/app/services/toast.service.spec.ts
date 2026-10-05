@@ -35,7 +35,7 @@ describe("ToastService", () => {
     id: number,
     kind: string,
     options: Partial<{ sequence: number; severity: NotificationSeverity; text: string; progress: number | typeof NotificationPost.indeterminate; isRead: boolean }> = {}): Notification =>
-    new Notification(id, options.sequence ?? id, new NotificationPost(
+    new Notification(String(id), options.sequence ?? id, new NotificationPost(
       QualifiedName.parse(kind), null, `Title ${id}`, options.text ?? null, options.severity ?? NotificationSeverity.Info, null, [], options.progress ?? null),
     "2026-10-03T08:00:00.000Z", options.isRead ?? false);
   const latest = (list: readonly Notification[]): number => Math.max(0, ...list.map(t => t.sequence));
@@ -54,7 +54,7 @@ describe("ToastService", () => {
     TestBed.tick();
   }
 
-  const shown = (service: ToastService): number[] => service.toasts().map(t => t.id);
+  const shown = (service: ToastService): number[] => service.toasts().map(t => Number(t.id));
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -152,8 +152,8 @@ describe("ToastService", () => {
 
     post(false, ...list);
     const firstThree = shown(service);
-    notifications.stateValue.set(new NotificationState(list.filter(t => t.id !== 4), false, [], 5));
-    service.close(1);
+    notifications.stateValue.set(new NotificationState(list.filter(t => t.id !== "4"), false, [], 5));
+    service.close("1");
     TestBed.tick();
 
     expect(firstThree).toEqual([1, 2, 3]);
@@ -167,16 +167,16 @@ describe("ToastService", () => {
       notification(3, "notes.failed", { severity: NotificationSeverity.Error }),
       notification(2, "notes.saved", { severity: NotificationSeverity.Success }),
       notification(1, "clock.alarm"));
-    service.close(4);
+    service.close("4");
     post(false, notification(4, "clock.sync", { progress: 0.5 }), notification(3, "notes.failed", { severity: NotificationSeverity.Error }), notification(2, "notes.saved", { severity: NotificationSeverity.Success }));
 
     vi.advanceTimersByTime(3_000);
-    service.pause(1);
-    service.pause(1);
+    service.pause("1");
+    service.pause("1");
     vi.advanceTimersByTime(10_000);
     const whilePaused = shown(service);
-    service.resume(1);
-    service.resume(1);
+    service.resume("1");
+    service.resume("1");
     vi.advanceTimersByTime(4_999);
     const beforeEnd = shown(service);
     vi.advanceTimersByTime(1);
@@ -216,7 +216,7 @@ describe("ToastService", () => {
 });
 
 describe("ToastService with the window parts", () => {
-  const wire = (id: number, title: string): object => ({ id, sequence: id, post: { kind: "notes.saved", title, severity: "Warning", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false });
+  const wire = (id: number, title: string): object => ({ id: String(id), sequence: id, post: { kind: "notes.saved", title, severity: "Warning", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false });
 
   afterEach(() => {
     DesktopBridgeFixture.remove();
@@ -254,7 +254,7 @@ describe("ToastService with the window parts", () => {
     bridge.responses.set("shell.notifications", { payload: { notifications: [wire(1, "Early")], isDoNotDisturb: false, mutedModules: [], sequence: 1 } });
     bridge.publishEvent("shell.notifications", { notifications: [wire(1, "Early")], isDoNotDisturb: false, mutedModules: [], sequence: 1 });
     const readsBeforeAnswer = bridge.requests.filter(t => t[0] === "shell.notifications").length;
-    answerPost({ payload: { id: 1 } });
+    answerPost({ payload: { id: "1" } });
     await vi.waitFor(() => {
       TestBed.tick();
       expect(TestBed.inject(NotificationService).firstRead()?.sequence).toBe(1);

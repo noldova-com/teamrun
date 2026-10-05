@@ -549,40 +549,42 @@ export class RuntimeHostTests {
         new NotificationPost(QualifiedName.parse(kind), "window", title, null, NotificationSeverity.Warning, null, [], null);
 
       const listed = await RuntimeHostTests.callAsync(connection, "desktop:1", ShellMethods.notifications, new NotificationsQuery("laptop").toJson());
+      const synced = NotificationState.fromJson(listed.payload).notifications[0]?.id ?? "";
       connection.sendMessages(new Request("desktop:2", ShellMethods.postNotification, alarm("Posted").toJson()));
       const posted = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
-      connection.sendMessages(new Request("desktop:3", ShellMethods.updateNotification, new NotificationUpdate(2, alarm("Updated")).toJson()));
+      const postedId = NotificationReference.fromJson(posted[1].payload).id;
+      connection.sendMessages(new Request("desktop:3", ShellMethods.updateNotification, new NotificationUpdate(postedId, alarm("Updated")).toJson()));
       const updated = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
-      const missing = await RuntimeHostTests.callAsync(connection, "desktop:4", ShellMethods.updateNotification, new NotificationUpdate(9, alarm("Gone")).toJson());
-      const otherKind = await RuntimeHostTests.callAsync(connection, "desktop:11", ShellMethods.updateNotification, new NotificationUpdate(1, alarm("Other", "clock.other")).toJson());
+      const missing = await RuntimeHostTests.callAsync(connection, "desktop:4", ShellMethods.updateNotification, new NotificationUpdate("9", alarm("Gone")).toJson());
+      const otherKind = await RuntimeHostTests.callAsync(connection, "desktop:11", ShellMethods.updateNotification, new NotificationUpdate(synced, alarm("Other", "clock.other")).toJson());
       const foreign = new NotificationPost(
         QualifiedName.parse("clock.alarm"), "window", "Foreign", null, NotificationSeverity.Info, new CommandRun(QualifiedName.parse("calendar.show"), null), [], null);
-      const foreignUpdate = await RuntimeHostTests.callAsync(connection, "desktop:12", ShellMethods.updateNotification, new NotificationUpdate(1, foreign).toJson());
+      const foreignUpdate = await RuntimeHostTests.callAsync(connection, "desktop:12", ShellMethods.updateNotification, new NotificationUpdate(synced, foreign).toJson());
       const undeclared = await RuntimeHostTests.callAsync(connection, "desktop:6", ShellMethods.postNotification, alarm("Other", "clock.other").toJson());
       const absent = await RuntimeHostTests.callAsync(connection, "desktop:7", ShellMethods.postNotification, alarm("Due", "calendar.due").toJson());
       const invalid = await RuntimeHostTests.callAsync(connection, "desktop:8", ShellMethods.postNotification, { kind: "clock.alarm" });
-      connection.sendMessages(new Request("desktop:9", ShellMethods.dismissNotification, new NotificationReference(2).toJson()));
+      connection.sendMessages(new Request("desktop:9", ShellMethods.dismissNotification, new NotificationReference(postedId).toJson()));
       const dismissed = [await connection.readEventAsync(), await connection.readResponseAsync()] as const;
-      const again = await RuntimeHostTests.callAsync(connection, "desktop:10", ShellMethods.dismissNotification, new NotificationReference(2).toJson());
+      const again = await RuntimeHostTests.callAsync(connection, "desktop:10", ShellMethods.dismissNotification, new NotificationReference(postedId).toJson());
       host.requestStop("test");
       await host.waitForStopAsync();
 
-      const titles = (payload: unknown): string => NotificationBroadcast.fromJson(payload).notifications.map(t => `${t.id}:${t.post.title}`).join(",");
+      const name = (id: string): string => id === synced ? "synced" : id === postedId ? "posted" : id;
+      const titles = (payload: unknown): string => NotificationBroadcast.fromJson(payload).notifications.map(t => `${name(t.id)}:${t.post.title}`).join(",");
       const state = NotificationState.fromJson(listed.payload);
-      Assert.areEqual("1:Synced|false|1", `${state.notifications.map(t => `${t.id}:${t.post.title}`).join(",")}|${String(state.isDoNotDisturb)}|${state.sequence}`);
-      Assert.areEqual(
-        "shell.notifications|2:Posted,1:Synced|2|{\"id\":2}",
-        `${posted[0].name.text}|${titles(posted[0].payload)}|${NotificationBroadcast.fromJson(posted[0].payload).sequence}|${JSON.stringify(posted[1].payload)}`);
-      Assert.areEqual("2:Updated,1:Synced|null", `${titles(updated[0].payload)}|${JSON.stringify(updated[1].payload)}`);
+      Assert.isTrue([synced, postedId].every(t => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(t)) && synced !== postedId);
+      Assert.areEqual("synced:Synced|false|1", `${state.notifications.map(t => `${name(t.id)}:${t.post.title}`).join(",")}|${String(state.isDoNotDisturb)}|${state.sequence}`);
+      Assert.areEqual("shell.notifications|posted:Posted,synced:Synced|2", `${posted[0].name.text}|${titles(posted[0].payload)}|${NotificationBroadcast.fromJson(posted[0].payload).sequence}`);
+      Assert.areEqual("posted:Updated,synced:Synced|null", `${titles(updated[0].payload)}|${JSON.stringify(updated[1].payload)}`);
       Assert.areEqual(`${FailureCode.NotFound}|Notification 9 is gone; it was dismissed or its module stopped.`, `${missing.failure?.code}|${missing.failure?.message}`);
-      Assert.areEqual(`${FailureCode.InvalidParams}|Notification 1 is of the kind clock.alarm, which an update keeps.`, `${otherKind.failure?.code}|${otherKind.failure?.message}`);
+      Assert.areEqual(`${FailureCode.InvalidParams}|Notification ${synced} is of the kind clock.alarm, which an update keeps.`, `${otherKind.failure?.code}|${otherKind.failure?.message}`);
       Assert.areEqual(
         `${FailureCode.InvalidParams}|The module clock may not offer the command calendar.show in a notification; it must be its own or a dependency's.`,
         `${foreignUpdate.failure?.code}|${foreignUpdate.failure?.message}`);
       Assert.areEqual(`${FailureCode.InvalidParams}|The module clock does not declare clock.other among its notifications.`, `${undeclared.failure?.code}|${undeclared.failure?.message}`);
       Assert.areEqual("The notification kind calendar.due belongs to calendar, which is not an active module.", absent.failure?.message);
       Assert.areEqual(FailureCode.InvalidParams, invalid.failure?.code);
-      Assert.areEqual("1:Synced|null|null", `${titles(dismissed[0].payload)}|${JSON.stringify(dismissed[1].payload)}|${JSON.stringify(again.payload)}`);
+      Assert.areEqual("synced:Synced|null|null", `${titles(dismissed[0].payload)}|${JSON.stringify(dismissed[1].payload)}|${JSON.stringify(again.payload)}`);
     });
   }
 

@@ -11,11 +11,12 @@ import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal,
 import "@noldova/teamrun-foundation-core";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import {
-  type CommandInfo, CommandList, CommandRun, ModuleState, ModuleStatus, ModuleStatusList, type NotificationPost, NotificationReference, NotificationUpdate, type SettingScope,
-  type SettingChange, ShellEvents, ShellMethods
+  type CommandInfo, CommandList, CommandRun, FailureCode, ModuleState, ModuleStatus, ModuleStatusList, type NotificationPost, NotificationReference, NotificationUpdate,
+  type SettingScope, type SettingChange, ShellEvents, ShellMethods
 } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../enums/dock-side";
+import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
 import { WindowPartFailureException } from "../exceptions/window-part-failure.exception";
 import type { IWindowPart } from "../interfaces/i-window-part";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
@@ -64,7 +65,6 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly sources: readonly WindowPartSource[] = inject(WindowPartTokens.sources);
   private readonly activations: WindowPartActivation[] = [];
-  private readonly contexts: Set<WindowPartContext> = new Set();
   private readonly posting: Set<Promise<JsonValue>> = new Set();
   private startOpens: PendingDocument[] = [];
   private pendingOpens: PendingDocument[] = [];
@@ -179,7 +179,7 @@ export class WindowPartHostService implements IWindowPartHost {
     return this.commands.runAsync(name, commandArguments);
   }
 
-  public async postNotificationAsync(post: NotificationPost): Promise<number> {
+  public async postNotificationAsync(post: NotificationPost): Promise<string> {
     const request = this.bridge.requestAsync(ShellMethods.postNotification.text, post.toJson());
     this.posting.add(request);
     try {
@@ -190,11 +190,19 @@ export class WindowPartHostService implements IWindowPartHost {
     }
   }
 
-  public async updateNotificationAsync(id: number, post: NotificationPost): Promise<void> {
-    await this.bridge.requestAsync(ShellMethods.updateNotification.text, new NotificationUpdate(id, post).toJson());
+  public async updateNotificationAsync(id: string, post: NotificationPost): Promise<boolean> {
+    try {
+      await this.bridge.requestAsync(ShellMethods.updateNotification.text, new NotificationUpdate(id, post).toJson());
+      return true;
+    }
+    catch (error) {
+      if (error instanceof RuntimeRequestException && error.code === FailureCode.NotFound)
+        return false;
+      throw error;
+    }
   }
 
-  public dismissNotification(id: number): void {
+  public dismissNotification(id: string): void {
     this.bridge.requestAsync(ShellMethods.dismissNotification.text, new NotificationReference(id).toJson()).catch((error: unknown) => this.errors.handleError(error));
   }
 
@@ -226,9 +234,6 @@ export class WindowPartHostService implements IWindowPartHost {
   private follow(state: StartupState): void {
     if (!state.isReady)
       this.runtimeStates.set(null);
-    if (!state.isReady && this.isReady)
-      for (const context of this.contexts)
-        context.forgetNotifications();
     if (state.isReady && !this.isReady) {
       const connection = ++this.connection;
       this.reloading = this.reloading.then(() => this.reloadAsync(connection)).catch((error: unknown) => this.errors.handleError(error));
@@ -428,14 +433,13 @@ export class WindowPartHostService implements IWindowPartHost {
 
     const activation = new WindowPartActivation(source, new WindowPartContext(source, this), part);
     this.activations.push(activation);
-    this.contexts.add(activation.context);
     this.changedModules.add(status.id);
     try {
       await part.activateAsync(activation.context);
     }
     catch (error) {
       this.activations.splice(this.activations.indexOf(activation), 1);
-      this.withdraw(activation);
+      activation.context.withdraw();
       this.errors.handleError(new WindowPartFailureException(status.id, Resources.windowPartActivationFailed, error));
       return status.withState(ModuleState.Failed, Resources.windowPartActivationFailed);
     }
@@ -453,13 +457,8 @@ export class WindowPartHostService implements IWindowPartHost {
         this.errors.handleError(error);
       }
       finally {
-        this.withdraw(activation);
+        activation.context.withdraw();
       }
     }
-  }
-
-  private withdraw(activation: WindowPartActivation): void {
-    activation.context.withdraw();
-    this.contexts.delete(activation.context);
   }
 }
