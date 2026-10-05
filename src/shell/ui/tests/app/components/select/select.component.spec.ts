@@ -22,12 +22,12 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   template: `
     <button type="button" class="outside">Outside</button>
     <div class="scroller" style="height: 6rem; overflow: auto">
-      <div style="height: 20rem"><tr-select label="Mode" [options]="options" [value]="value()" [disabled]="disabled()" (valueChange)="choose($event)" /></div>
+      <div style="height: 20rem"><tr-select label="Mode" [options]="options()" [value]="value()" [disabled]="disabled()" (valueChange)="choose($event)" /></div>
     </div>
   `
 })
 class SelectHostComponent {
-  public readonly options: readonly SelectOption[] = [new SelectOption("Light", "Light"), new SelectOption("Dark", "Dark"), new SelectOption("System", "System")];
+  public readonly options = signal<readonly SelectOption[]>([new SelectOption("Light", "Light"), new SelectOption("Dark", "Dark"), new SelectOption("System", "System")]);
   public readonly value = signal("System");
   public readonly disabled = signal(false);
   public readonly changes: string[] = [];
@@ -178,6 +178,24 @@ describe("SelectComponent", () => {
     fixture.detectChanges();
 
     AppearanceFixture.expectTruncates(button().querySelector(".tr-select-value") as HTMLElement);
+  });
+
+  it("never scrolls its list sideways: an option too long for the window ends with an ellipsis, keeps its full text as its name and shows it in a tooltip, while a short one has none", async () => {
+    const long = "An option whose title keeps going far past the width of any window this list could open in. ".repeat(6).trim();
+    render();
+    fixture.componentInstance.options.set([new SelectOption("Light", "Light"), new SelectOption("Long", long), new SelectOption("System", "System")]);
+    fixture.detectChanges();
+    await openAsync();
+    const surface = list() as HTMLElement;
+    const title = options()[1]?.querySelector<HTMLElement>(".tr-select-option-title") as HTMLElement;
+
+    expect([getComputedStyle(surface).overflowX, surface.scrollWidth, surface.getBoundingClientRect().right <= window.innerWidth]).toEqual(["hidden", surface.clientWidth, true]);
+    AppearanceFixture.expectTruncates(title);
+    await expect.element(page.getByRole("option", { name: long })).toBeVisible();
+    await userEvent.hover(options()[1] as HTMLElement);
+    await expect.poll(() => document.querySelector(".cdk-overlay-container tr-tooltip")?.textContent?.trim(), { timeout: 3000 }).toBe(long);
+    await userEvent.hover(options()[0] as HTMLElement);
+    await expect.poll(() => document.querySelector(".cdk-overlay-container tr-tooltip"), { timeout: 3000 }).toBeNull();
   });
 
   it("shows its list's scrollbar thumb while the pointer is over the list", async () => {

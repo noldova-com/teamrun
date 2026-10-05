@@ -217,6 +217,35 @@ test.describe("gallery", () => {
     }
   });
 
+  test("in the narrowest window a select's list never scrolls sideways, and an option too long for it ends with an ellipsis and shows in full in its tooltip, in light and in dark", async ({ desktop }) => {
+    const window = desktop.window;
+    await desktop.useViewportAsync(640, 480);
+    await SettingsFixture.openGalleryAsync(window);
+
+    for (const mode of ["Light", "Dark"] as const) {
+      const select = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Select\"] tr-select.tr-gallery-narrow");
+      await select.scrollIntoViewIfNeeded();
+      await select.locator(".tr-select-button").click();
+      const list = scope(window, mode).locator(".cdk-overlay-container .tr-select-list");
+      await expect(list).toBeVisible();
+      const option = list.locator(".tr-select-option[data-value=\"long\"]");
+      const fit = await list.evaluate(t => ({ isNarrow: t.scrollWidth === t.clientWidth, isInside: t.getBoundingClientRect().right <= document.documentElement.clientWidth, overflow: getComputedStyle(t).overflowX }));
+
+      expect(fit).toEqual({ isNarrow: true, isInside: true, overflow: "hidden" });
+      expect(await truncationAsync(option)).toEqual({ isInside: true, isCut: true, overflow: "ellipsis" });
+      const title = (await option.textContent())?.trim() ?? "";
+      await expect(list.getByRole("option", { name: title })).toBeVisible();
+      const tooltip = scope(window, mode).locator(".cdk-overlay-container tr-tooltip");
+      await option.hover();
+      await expect(tooltip).toHaveText(title);
+      await desktop.checkpointAsync(`select-list-long-option-${mode.toLowerCase()}`);
+      await window.mouse.move(0, 0);
+      await expect(tooltip).toHaveCount(0);
+      await window.keyboard.press("Escape");
+      await expect(list).toHaveCount(0);
+    }
+  });
+
   test("a button's label too long for it starts at its start padding, ends with an ellipsis and shows in full in its tooltip, in light and in dark", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openGalleryAsync(window);
