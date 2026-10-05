@@ -24,7 +24,8 @@ export class SettingType {
     [SettingKind.Number]: [Resources.minimumField, Resources.maximumField, Resources.stepField],
     [SettingKind.Text]: [Resources.maxLengthField],
     [SettingKind.Modules]: [],
-    [SettingKind.KeyBindings]: []
+    [SettingKind.KeyBindings]: [],
+    [SettingKind.Action]: [Resources.commandField, Resources.labelField]
   };
 
   public readonly kind: SettingKind;
@@ -33,14 +34,26 @@ export class SettingType {
   public readonly maximum: number | null;
   public readonly step: number | null;
   public readonly maxLength: number | null;
+  public readonly command: QualifiedName | null;
+  public readonly label: string | null;
 
-  private constructor(kind: SettingKind, options: readonly SettingOption[], minimum: number | null, maximum: number | null, step: number | null, maxLength: number | null) {
+  private constructor(
+    kind: SettingKind,
+    options: readonly SettingOption[],
+    minimum: number | null,
+    maximum: number | null,
+    step: number | null,
+    maxLength: number | null,
+    command: QualifiedName | null = null,
+    label: string | null = null) {
     this.kind = kind;
     this.options = options;
     this.minimum = minimum;
     this.maximum = maximum;
     this.step = step;
     this.maxLength = maxLength;
+    this.command = command;
+    this.label = label;
   }
 
   public static boolean(): SettingType {
@@ -73,6 +86,12 @@ export class SettingType {
     return new SettingType(SettingKind.KeyBindings, [], null, null, null, null);
   }
 
+  public static action(command: QualifiedName, label: string): SettingType {
+    if (String.isNullOrWhitespace(label))
+      throw new ArgumentException(Resources.settingLabelInvalid, Resources.labelField);
+    return new SettingType(SettingKind.Action, [], null, null, null, null, command, label);
+  }
+
   public static fromJson(value: unknown, path?: string): SettingType {
     const reader = JsonReader.fromValue(value, path);
     const kind = reader.readOneOf(Resources.kindField, Object.values(SettingKind));
@@ -89,6 +108,8 @@ export class SettingType {
           return SettingType.modules();
         case SettingKind.KeyBindings:
           return SettingType.keyBindings();
+        case SettingKind.Action:
+          return SettingType.action(QualifiedName.parse(reader.readString(Resources.commandField), Resources.commandField), reader.readString(Resources.labelField));
         default:
           return SettingType.boolean();
       }
@@ -107,6 +128,8 @@ export class SettingType {
         return typeof value === "string" && value.length <= Number(this.maxLength);
       case SettingKind.Modules:
         return Array.isArray(value) && value.every(t => typeof t === "string" && !String.isNullOrWhitespace(t)) && new Set(value).size === value.length;
+      case SettingKind.Action:
+        return Object.isNull(value);
       default:
         return Object.isObject(value) && !Array.isArray(value) && Object.entries(value).every(([name, key]) => SettingType.isBinding(name, key));
     }
@@ -117,7 +140,8 @@ export class SettingType {
       [Resources.kindField]: this.kind,
       ...this.kind === SettingKind.Choice ? { [Resources.optionsField]: this.options.map(t => t.toJson()) } : {},
       ...this.kind === SettingKind.Number ? { [Resources.minimumField]: this.minimum, [Resources.maximumField]: this.maximum, [Resources.stepField]: this.step } : {},
-      ...this.kind === SettingKind.Text ? { [Resources.maxLengthField]: this.maxLength } : {}
+      ...this.kind === SettingKind.Text ? { [Resources.maxLengthField]: this.maxLength } : {},
+      ...this.kind === SettingKind.Action ? { [Resources.commandField]: String(this.command), [Resources.labelField]: this.label } : {}
     };
   }
 

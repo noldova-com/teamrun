@@ -12,5 +12,6 @@ export enum SettingKind {
   Number = "Number",
   Text = "Text",
   Modules = "Modules",
-  KeyBindings = "KeyBindings"
+  KeyBindings = "KeyBindings",
+  Action = "Action"
 }

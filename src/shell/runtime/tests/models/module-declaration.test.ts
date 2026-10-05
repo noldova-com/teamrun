@@ -137,6 +137,17 @@ export class ModuleDeclarationTests {
       Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, name: "notes.keys", type: { kind: "KeyBindings" }, default: {} }] }), ArgumentException).message);
   }
 
+  @TestMethod
+  public readsAnActionOfItsOwnCommandAndRefusesOneOfACommandItDoesNotContribute(): void {
+    const action = { name: "notes.start", title: "Starting a note", description: "Opens a new note.", type: { kind: "Action", command: "notes.new", label: "Start a note" }, default: null, locality: "Shared", scopes: [], page: "Notes", group: "Writing" };
+
+    const declaration = ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, contributes: { commands: ["notes.new"] }, settings: [action] });
+
+    Assert.areEqual("notes.new", declaration.settings.map(t => t.type.command?.text).join(","));
+    Assert.areEqual("The module notes declares the action setting notes.start, whose command notes.new it does not declare. (Parameter 'settings')",
+      Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [action] }), ArgumentException).message);
+  }
+
   private static without(field: string): Readonly<Record<string, unknown>> {
     return Object.fromEntries(Object.entries(ModuleDeclarationTests.VALID).filter(([name]) => name !== field));
   }
