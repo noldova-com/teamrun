@@ -29,9 +29,11 @@ LICENSE file in the root directory of this source tree.
 </tr-gallery-specimen>
 
 <tr-gallery-specimen [name]="text.sectionHeader">
-  <tr-section-header class="tr-gallery-section" [label]="text.sectionRecent" />
-  <tr-section-header class="tr-gallery-section" [label]="text.sectionOlder" [isSeparated]="true" />
-  <tr-section-header class="tr-gallery-section" [label]="text.sectionLong" [isSeparated]="true" />
+  <div class="tr-gallery-sections">
+    <tr-section-header [label]="text.sectionRecent" />
+    <tr-section-header [label]="text.sectionOlder" [isSeparated]="true" />
+    <tr-section-header [label]="text.sectionLong" [isSeparated]="true" />
+  </div>
 </tr-gallery-specimen>
 
 <tr-gallery-specimen [name]="text.toolbar">
