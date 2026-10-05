@@ -34,6 +34,15 @@ class ProcessRunnerTests {
       assert.equal(result.errorOutput, "warning");
     });
 
+    test("requiring a command passes when it succeeds and otherwise fails naming the command, its arguments, its exit code and its output", async () => {
+      const runner = new ProcessRunner();
+      const script = "process.stdout.write('out '); process.stderr.write(process.env.TEAMRUN_FIXTURE_VALUE ?? 'none'); process.exitCode = Number(process.argv[1])";
+
+      await runner.requireAsync(process.execPath, ["-e", script, "0"], tmpdir(), ProcessRunnerTests.TIMEOUT);
+      await assert.rejects(runner.requireAsync(process.execPath, ["-e", script, "5"], tmpdir(), ProcessRunnerTests.TIMEOUT, { ...process.env, TEAMRUN_FIXTURE_VALUE: "given" }),
+        new ProcessException(`${path.basename(process.execPath)} -e ${script} 5 failed with exit code 5:\nout given`));
+    });
+
     test("capturing stops a process that outlives its deadline", async () => {
       const started = Date.now();
 
@@ -85,6 +94,60 @@ class ProcessRunnerTests {
 
       assert.equal(await new ProcessRunner().runAsync(process.execPath, ["-e", script], tmpdir(), { ...process.env, TEAMRUN_FIXTURE_VALUE: "given" }), 0);
       assert.equal(await new ProcessRunner().runAsync(process.execPath, ["-e", script], tmpdir()), 3);
+      assert.equal((await new ProcessRunner().captureAsync(process.execPath, ["-e", script], tmpdir(), ProcessRunnerTests.TIMEOUT, { ...process.env, TEAMRUN_FIXTURE_VALUE: "given" })).exitCode, 0);
+      assert.equal((await new ProcessRunner().captureAsync(process.execPath, ["-e", script], tmpdir(), ProcessRunnerTests.TIMEOUT)).exitCode, 3);
+    });
+
+    test("starting returns the running process at once, with both output streams going to the log", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const log = path.join(repository.directory, "started.log");
+      const script = "process.stdout.write('passed'); process.stderr.write('failed'); process.exitCode = 6";
+
+      const started = await new ProcessRunner().startAsync(process.execPath, ["-e", script], tmpdir(), log);
+
+      assert.ok(started.id > 0);
+      assert.equal(await started.waitAsync(ProcessRunnerTests.TIMEOUT), true);
+      assert.equal(started.exitCode, 6);
+      assert.ok(["passedfailed", "failedpassed"].includes(await readFile(log, "utf8")));
+    });
+
+    test("starting reports a command that cannot start, keeping the cause", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+
+      await assert.rejects(new ProcessRunner().startAsync("teamrun-missing-command", [], tmpdir(), path.join(repository.directory, "missing.log")),
+        (error: unknown) => error instanceof ProcessException && error.message === "\"teamrun-missing-command\" could not start." && error.cause instanceof Error);
+    });
+
+    test("a process is running until it has exited, and a process ID that is not a number is refused", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const runner = new ProcessRunner();
+      const started = await runner.startAsync(process.execPath, ["-e", ""], tmpdir(), path.join(repository.directory, "ended.log"));
+      await started.waitAsync(ProcessRunnerTests.TIMEOUT);
+
+      assert.equal(runner.isRunning(process.pid), true);
+      assert.equal(runner.isRunning(started.id), false);
+      assert.throws(() => runner.isRunning(Number.NaN), TypeError);
+    });
+
+    test("killing ends a running process, a process that has already ended is left alone, and a process ID that is not a number is refused", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const runner = new ProcessRunner();
+      const started = await runner.startAsync(process.execPath, ["-e", "setInterval(() => {}, 1000)"], tmpdir(), path.join(repository.directory, "killed.log"));
+      t.after(() => {
+        if (!started.hasExited)
+          started.signal("SIGKILL");
+      });
+
+      runner.kill(started.id);
+
+      assert.equal(await started.waitAsync(ProcessRunnerTests.TIMEOUT), true);
+      assert.equal(runner.isRunning(started.id), false);
+      runner.kill(started.id);
+      assert.throws(() => runner.kill(Number.NaN), TypeError);
     });
   }
 }

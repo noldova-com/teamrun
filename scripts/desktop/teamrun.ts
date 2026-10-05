@@ -14,9 +14,9 @@ import ProcessRunner from "../processes/process-runner.ts";
 import DevelopmentBinary from "./development-binary.ts";
 
 export default class TeamRunCommand {
-  private static readonly ENTRY_SEGMENTS: readonly string[] = ["node_modules", "@noldova", "teamrun-shell-cli", "services", "cli-entry.js"];
-  private static readonly RUN_AS_NODE_VARIABLE: string = "ELECTRON_RUN_AS_NODE";
-  private static readonly RUN_AS_NODE_VALUE: string = "1";
+  public static readonly ENTRY_SEGMENTS: readonly string[] = ["node_modules", "@noldova", "teamrun-shell-cli", "services", "cli-entry.js"];
+  public static readonly RUN_AS_NODE_VARIABLE: string = "ELECTRON_RUN_AS_NODE";
+  public static readonly RUN_AS_NODE_VALUE: string = "1";
   private static readonly CHECKOUT_VARIABLE: string = "TEAMRUN_CHECKOUT";
   private static readonly STARTING_FOLDER_VARIABLE: string = "INIT_CWD";
   private static readonly FAILURE_EXIT_CODE: number = 1;

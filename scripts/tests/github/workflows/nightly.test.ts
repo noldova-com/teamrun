@@ -46,7 +46,7 @@ class NightlyWorkflowTests {
       assert.equal(text.match(/persist-credentials: false/g)?.length, 2);
     });
 
-    test("each target's tests and UI workflows are jobs of their own, on the targets every build and test run validates", { timeout: NightlyWorkflowTests.SCRIPT_TIMEOUT }, async t => {
+    test("each target's tests and UI workflows are jobs of their own, on the targets every build and test run validates, and the report also expects the packaging of Linux x64 and Windows x64", { timeout: NightlyWorkflowTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(NightlyWorkflowTests.WORKFLOW);
       const targets = new BuildMatrix("workflow_dispatch").targets.map(t => ({ target: t.name, runner: t.runner, architecture: t.architecture }));
       const doubles = await CommandDoublesFixture.createAsync();
@@ -63,7 +63,7 @@ class NightlyWorkflowTests {
       assert.equal(result.status, 0, result.stderr);
       assert.equal(targets.length, 6);
       assert.deepEqual(JSON.parse(outputs.get("legs") ?? ""), legs);
-      assert.deepEqual(JSON.parse(outputs.get("labels") ?? ""), legs.map(leg => leg.label));
+      assert.deepEqual(JSON.parse(outputs.get("labels") ?? ""), [...legs.map(leg => leg.label), "packaging Linux x64", "packaging Windows x64"]);
       assert.ok(workflow.text.includes("      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(needs.plan.outputs.legs) }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 150\n"));
     });
 
@@ -134,10 +134,10 @@ class NightlyWorkflowTests {
       ]);
     });
 
-    test("the report runs unless the run was cancelled, gathers every job's result and opens or updates the bugs", async () => {
+    test("the report runs unless the run was cancelled, gathers every job's result, packaging included, and opens or updates the bugs", async () => {
       const text = (await WorkflowFileFixture.readAsync(NightlyWorkflowTests.WORKFLOW)).text;
 
-      assert.ok(text.includes("  report:\n    name: Report the failures\n    needs: [plan, repeat]\n    if: ${{ !cancelled() && needs.plan.result == 'success' }}\n"));
+      assert.ok(text.includes("  report:\n    name: Report the failures\n    needs: [plan, repeat, package]\n    if: ${{ !cancelled() && needs.plan.result == 'success' }}\n"));
       assert.ok(/uses: actions\/download-artifact@[0-9a-f]{40} # v[\d.]+\n {8}with:\n {10}pattern: nightly-result-\*\n {10}path: _build\/nightly\/results\n {10}merge-multiple: true\n/.test(text));
       const simulation = new WorkflowSimulation(text, NightlyWorkflowTests.GATHER_STEPS[0], NightlyWorkflowTests.GATHER_STEPS[2]);
       const attempts = NightlyWorkflowTests.GATHER_STEPS.map(t => simulation.find(t));
