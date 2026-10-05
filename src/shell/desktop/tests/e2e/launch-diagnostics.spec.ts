@@ -40,7 +40,7 @@ test("a launch that fails says what the window, the data directory's lock, the p
   expect(await listRoots()).toEqual(rootsBefore);
 });
 
-test("a launch that fails on an unreadable discovery file, whose cleanup then fails on it too, closes the application and reports the launch's failure with the cleanup's kept beside it", async ({}, testInfo) => {
+test("a launch that fails on an unreadable discovery file, whose cleanup steps then fail on it too, still closes the application and removes its folder, and reports the launch's failure with each cleanup failure kept beside it", async ({}, testInfo) => {
   test.setTimeout(90_000);
   const rootsBefore = await listRoots();
 
@@ -60,6 +60,6 @@ test("a launch that fails on an unreadable discovery file, whose cleanup then fa
   expect((failure as Error).stack).not.toContain("disposeAsync");
   const cleanup = testInfo.attachments.filter(t => t.name === "cleanup-failure.txt");
   expect(cleanup).toHaveLength(1);
-  expect(String(cleanup[0]?.body)).toMatch(/runtime\.json is not valid: .*disposeAsync/s);
-  expect(kept).toHaveLength(1);
+  expect(String(cleanup[0]?.body)).toMatch(/runtime\.json is not valid: .*recordProcessesAsync.*disposeAsync.*runtime\.json is not valid: .*stopRuntimeAsync.*disposeAsync/s);
+  expect(kept).toEqual([]);
 });
