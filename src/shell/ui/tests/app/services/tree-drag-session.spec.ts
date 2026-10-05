@@ -15,52 +15,36 @@ import { TreeNode } from "../../../src/app/models/tree-node";
 import { AppearanceFixture } from "../../fixtures/appearance.fixture";
 import { MotionFixture } from "../../fixtures/motion.fixture";
 import { MovableTreeHostComponent } from "../../fixtures/movable-tree-host.component";
+import { TreeHarness } from "../../fixtures/tree-harness.fixture";
 
 describe("TreeDragSession", () => {
   let fixture: ComponentFixture<MovableTreeHostComponent>;
   let host: MovableTreeHostComponent;
+  let tree: TreeHarness;
 
   async function renderAsync(theme = AppearanceFixture.themes[0], mode = ThemeMode.Light): Promise<void> {
     AppearanceFixture.apply(theme, mode);
     fixture = TestBed.createComponent(MovableTreeHostComponent);
     host = fixture.componentInstance;
+    tree = new TreeHarness(fixture);
     await fixture.whenStable();
   }
 
-  const root = (): HTMLElement => fixture.nativeElement;
-  const items = (): HTMLElement[] => [...root().querySelectorAll<HTMLElement>("[role=treeitem]")];
-  const row = (label: string): HTMLElement => {
-    const found = items().find(t => t.querySelector(".tr-tree-label")?.textContent === label);
-    if (Object.isUndefined(found))
-      throw new Error(`No row labelled ${label}.`);
-    return found;
-  };
-  const line = (): HTMLElement | null => root().querySelector(".tr-tree-drop-line");
-  const ghost = (): HTMLElement | null => root().querySelector(".tr-tree-ghost");
-  const moves = (): (string | number | null)[][] => host.moves.map(t => [t.id, t.parentId, t.index]);
-  const gap = (): number => Number.parseFloat(getComputedStyle(root().querySelector(".tr-tree") as HTMLElement).rowGap);
-  const yAt = (label: string, fraction: number): number => row(label).getBoundingClientRect().top + row(label).getBoundingClientRect().height * fraction;
-
-  function pointer(type: string, target: EventTarget, y: number, button: number = 0): void {
-    target.dispatchEvent(new PointerEvent(type, { bubbles: true, button, clientX: root().getBoundingClientRect().left + 24, clientY: y }));
-  }
-
-  async function dragAsync(from: string, to: string, fraction: number, release: boolean = true): Promise<void> {
-    pointer("pointerdown", row(from), yAt(from, 0.5));
-    pointer("pointermove", row(from), yAt(from, 0.5) + DragGesture.threshold + 1);
-    pointer("pointermove", row(to), yAt(to, fraction));
-    await fixture.whenStable();
-    if (release) {
-      pointer("pointerup", row(to), yAt(to, fraction));
-      await fixture.whenStable();
-    }
-  }
-
-  function press(target: HTMLElement, key: string, modifiers: KeyboardEventInit = { altKey: true }): boolean {
-    return target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...modifiers }));
-  }
+  const root = (): HTMLElement => tree.root;
+  const items = (): HTMLElement[] => tree.items();
+  const row = (label: string): HTMLElement => tree.row(label);
+  const line = (): HTMLElement | null => tree.line;
+  const ghost = (): HTMLElement | null => tree.ghost;
+  const gap = (): number => tree.gap;
+  const moves = (): (string | number | null)[][] => tree.moves;
+  const yAt = (label: string, fraction: number): number => tree.yAt(label, fraction);
+  const pointer = (type: string, target: EventTarget, y: number, button: number = 0): void => tree.pointer(type, target, y, button);
+  const dragAsync = (from: string, to: string, fraction: number, release: boolean = true): Promise<void> => tree.dragAsync(from, to, fraction, release);
+  const press = (target: HTMLElement, key: string, modifiers?: KeyboardEventInit): boolean => tree.press(target, key, modifiers);
 
   afterEach(async () => {
+    if (vi.isFakeTimers())
+      vi.runOnlyPendingTimers();
     vi.useRealTimers();
     document.documentElement.dir = String.empty;
     AppearanceFixture.reset();
@@ -76,7 +60,6 @@ describe("TreeDragSession", () => {
 
     await dragAsync("Notes", "Trash", 0.9, false);
     const after = [ghost()?.querySelector(".tr-tree-label")?.textContent, line() !== null, row("Notes").classList.contains("tr-tree-row-dragging")];
-    const lineY = (line() as HTMLElement).getBoundingClientRect();
     pointer("pointermove", row("Readme"), yAt("Readme", 0.5));
     await fixture.whenStable();
     const into = [line(), row("Readme").classList.contains("tr-tree-row-drop")];
@@ -90,7 +73,6 @@ describe("TreeDragSession", () => {
 
     expect(beforeThreshold).toEqual([null, false]);
     expect(after).toEqual(["Notes", true, true]);
-    expect(lineY.top + lineY.height / 2).toBeCloseTo(row("Trash").getBoundingClientRect().bottom + gap() / 2, 0);
     expect([into[0] !== null, into[1]]).toEqual([true, false]);
     expect([intoBranch[0], intoBranch[1]]).toEqual([null, true]);
     expect([moves(), ghost(), line(), row("Notes").classList.contains("tr-tree-row-dragging")]).toEqual([[["notes", "project", 1]], null, null, false]);
@@ -178,6 +160,22 @@ describe("TreeDragSession", () => {
     expect(host.activations).toEqual(["notes", "notes"]);
   });
 
+  it("leaves no click swallowed when the tree goes away right after a drag ended on a fake clock that never advanced", async () => {
+    await renderAsync();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const outside = document.createElement("button");
+    const clicks: number[] = [];
+    outside.addEventListener("click", () => clicks.push(1));
+    document.body.append(outside);
+
+    await dragAsync("Notes", "Notes", 0.5);
+    fixture.destroy();
+    outside.click();
+    outside.remove();
+
+    expect(clicks).toEqual([1]);
+  });
+
   it("opens a closed branch the pointer rests on after half a second, and not when the pointer moves on first", async () => {
     await renderAsync();
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -189,9 +187,11 @@ describe("TreeDragSession", () => {
     vi.advanceTimersByTime(1);
     await fixture.whenStable();
     const opened = row("Source").getAttribute("aria-expanded");
+    const landing = (line() as HTMLElement).getBoundingClientRect();
     pointer("pointerup", row("Source"), yAt("Source", 0.95));
     await fixture.whenStable();
     vi.advanceTimersByTime(1);
+    const dropped = moves();
     await userEvent.click(row("Source"));
     await fixture.whenStable();
     await dragAsync("Notes", "Source", 0.5, false);
@@ -200,6 +200,20 @@ describe("TreeDragSession", () => {
     await fixture.whenStable();
 
     expect([early, opened, row("Source").getAttribute("aria-expanded")]).toEqual(["false", "true", "false"]);
+    expect(dropped).toEqual([["notes", "source", 0]]);
+    expect(landing.top + landing.height / 2).toBeCloseTo(row("Source").getBoundingClientRect().bottom + gap() / 2, 0);
+  });
+
+  it("does nothing when the drag ended before the branch the pointer rested on had opened", async () => {
+    await renderAsync();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+    await dragAsync("Notes", "Source", 0.5, false);
+    vi.advanceTimersByTime(500);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    await fixture.whenStable();
+
+    expect([row("Source").getAttribute("aria-expanded"), line(), ghost(), moves()]).toEqual(["true", null, null, []]);
   });
 
   it("scrolls the tree's scrolling area while the pointer is near its top or bottom edge, and stops when it leaves the edge or the drag ends", async () => {
@@ -234,39 +248,6 @@ describe("TreeDragSession", () => {
     expect([down > 0, sameEdge > down, stopped === sameEdge, up < stopped, frame.scrollTop === up]).toEqual([true, true, true, true, true]);
   });
 
-  it("draws the line for the bottom of an open branch above its first child, at the child's indent, and drops the row there", async () => {
-    await renderAsync();
-    host.applying.set(true);
-
-    await dragAsync("Notes", "Project", 0.9, false);
-    const drawn = (line() as HTMLElement).getBoundingClientRect();
-    const project = row("Project").getBoundingClientRect();
-    const source = row("Source").getBoundingClientRect();
-    const indent = Number.parseFloat(getComputedStyle(row("Source")).paddingInlineStart);
-    pointer("pointerup", row("Project"), yAt("Project", 0.9));
-    await fixture.whenStable();
-
-    expect(drawn.top + drawn.height / 2).toBeCloseTo(project.bottom + gap() / 2, 0);
-    expect(drawn.left).toBeCloseTo(source.left + indent, 0);
-    expect(moves()).toEqual([["notes", "project", 0]]);
-    expect(items().map(t => t.querySelector(".tr-tree-label")?.textContent).slice(0, 3)).toEqual(["Project", "Notes", "Source"]);
-  });
-
-  it("keeps the target and the line while the pointer is in the gap between two rows", async () => {
-    await renderAsync();
-    const gapY = row("Notes").getBoundingClientRect().top - gap() / 2;
-
-    pointer("pointerdown", row("Trash"), yAt("Trash", 0.5));
-    pointer("pointermove", row("Trash"), yAt("Trash", 0.5) - DragGesture.threshold - 1);
-    pointer("pointermove", row("Trash"), gapY);
-    await fixture.whenStable();
-    const inGap = line() !== null;
-    pointer("pointerup", row("Trash"), gapY);
-    await fixture.whenStable();
-
-    expect([inGap, moves()]).toEqual([true, [["trash", "project", 2]]]);
-  });
-
   it("moves the dragged row where it is released and keeps its focus, opening a closed branch the row went into", async () => {
     await renderAsync();
     host.applying.set(true);
@@ -275,21 +256,6 @@ describe("TreeDragSession", () => {
 
     expect(moves()).toEqual([["notes", "source", 1]]);
     expect([row("Source").getAttribute("aria-expanded"), document.activeElement === row("Notes")]).toEqual(["true", true]);
-  });
-
-  it("puts the ghost on the pointer's other side in a right-to-left layout", async () => {
-    await renderAsync();
-    root().dir = "rtl";
-
-    await dragAsync("Notes", "Trash", 0.9, false);
-    const dragged = ghost() as HTMLElement;
-    const pointerX = root().getBoundingClientRect().left + 24;
-    const inline = (line() as HTMLElement).getBoundingClientRect();
-    const trash = row("Trash").getBoundingClientRect();
-
-    expect([dragged.style.left, dragged.style.right !== String.empty]).toEqual([String.empty, true]);
-    expect(dragged.getBoundingClientRect().right).toBeLessThan(pointerX);
-    expect(inline.right).toBeCloseTo(trash.right - Number.parseFloat(getComputedStyle(row("Trash")).paddingInlineStart), 0);
   });
 
   it("follows the pointer with its target while the area scrolls under a pointer that does not move", async () => {

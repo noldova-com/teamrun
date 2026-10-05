@@ -16,6 +16,7 @@ import "@noldova/teamrun-foundation-core";
 import { Resources } from "../../../resources";
 import { TreeDropPlace } from "../../enums/tree-drop-place";
 import { TreeStep } from "../../enums/tree-step";
+import { TreeDragHooks } from "../../models/tree-drag-hooks";
 import type { TreeMove } from "../../models/tree-move";
 import { TreeNode } from "../../models/tree-node";
 import { TreePlace } from "../../models/tree-place";
@@ -51,8 +52,14 @@ export class TreeComponent {
   public readonly activated = output<TreeNode>();
   public readonly moved = output<TreeMove>();
 
-  protected readonly session: TreeDragSession = new TreeDragSession(inject(DOCUMENT), this.host, this.nodes, row => this.nodeOf(row), node => this.elementOf(node), () => Number.parseFloat(getComputedStyle(this.area().nativeElement).rowGap), node => this.tree().isExpanded(node),
-    node => this.tree().expand(node), move => this.commit(move));
+  protected readonly session: TreeDragSession = new TreeDragSession(inject(DOCUMENT), this.host, this.nodes, new TreeDragHooks(
+    row => this.nodeOf(row),
+    node => this.elementOf(node),
+    () => Number.parseFloat(getComputedStyle(this.area().nativeElement).rowGap),
+    node => this.tree().isExpanded(node),
+    node => this.openBranch(node),
+    move => this.commit(move)
+  ));
   protected readonly resources: typeof Resources = Resources;
   protected readonly places: typeof TreeDropPlace = TreeDropPlace;
   protected readonly data: Signal<TreeNode[]> = computed(() => [...this.nodes()]);
@@ -87,9 +94,9 @@ export class TreeComponent {
     this.stopId.set(row.data.id);
   }
 
-  protected press(event: PointerEvent, node: TreeNode): void {
+  protected press(event: PointerEvent, node: TreeNode, element: HTMLElement): void {
     if (this.movable())
-      this.session.begin(event, node);
+      this.session.begin(event, node, element);
   }
 
   protected nudge(event: KeyboardEvent, node: TreeNode): void {
@@ -101,7 +108,6 @@ export class TreeComponent {
     const move = TreePlan.step(this.nodes(), node.id, step);
     if (Object.isNull(move))
       return;
-    this.refocus = node.id;
     this.commit(move);
   }
 
@@ -122,6 +128,11 @@ export class TreeComponent {
     this.refocus = move.id;
     this.moved.emit(move);
     afterNextRender(() => this.settle(before), { injector: this.injector });
+  }
+
+  private openBranch(node: TreeNode): void {
+    this.tree().expand(node);
+    afterNextRender(() => this.session.reevaluate(), { injector: this.injector });
   }
 
   private stepOf(key: string): TreeStep | undefined {
@@ -162,7 +173,7 @@ export class TreeComponent {
       for (const [index, row] of this.rows().entries()) {
         const shift = (tops?.get(row.data.id) ?? next[index] as number) - (next[index] as number);
         if (shift !== 0)
-          items[index]?.animate({ translate: [`0 ${shift}px`, "0 0"] }, { duration: Resources.treeShiftDuration, easing: "ease-out" });
+          items[index]?.animate({ translate: [`0 ${shift}px`, "0 0"] }, { duration: Resources.treeShiftDuration, easing: Resources.treeShiftEasing });
       }
     this.rowOf(refocus)?.focus();
   }

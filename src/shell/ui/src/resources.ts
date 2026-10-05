@@ -342,6 +342,7 @@ export class Resources {
   public static readonly treeScrollInterval: number = 16;
   public static readonly treeDropEdge: number = 0.25;
   public static readonly treeShiftDuration: number = 150;
+  public static readonly treeShiftEasing: string = "ease-out";
   public static readonly treeMoveKeys: string = "Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight";
   public static readonly scrollOverflow: RegExp = /auto|scroll/u;
   public static readonly reducedMotionQuery: string = "(prefers-reduced-motion: reduce)";

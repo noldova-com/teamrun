@@ -17,9 +17,7 @@ import { TreeSpot } from "./tree-spot";
 
 export class TreePlan {
   public static step(nodes: readonly TreeNode[], id: string, step: TreeStep): TreeMove | null {
-    const place = TreePlace.find(nodes, id);
-    if (Object.isNull(place))
-      return null;
+    const place = TreePlace.of(nodes, id);
     const parentId = place.parent?.id ?? null;
     switch (step) {
       case TreeStep.Up:
@@ -43,8 +41,6 @@ export class TreePlan {
     if (Object.isNull(source) || Object.isNull(target) || source.node.contains(targetId))
       return null;
     const isInside = dropPlace === TreeDropPlace.Into || dropPlace === TreeDropPlace.Start;
-    if (isInside && !target.node.isBranch)
-      return null;
     const parent = isInside ? target.node : target.parent;
     const raw = dropPlace === TreeDropPlace.Into ? target.node.children.length : dropPlace === TreeDropPlace.Start ? 0 : target.index + (dropPlace === TreeDropPlace.After ? 1 : 0);
     const sameParent = (parent?.id ?? null) === (source.parent?.id ?? null);

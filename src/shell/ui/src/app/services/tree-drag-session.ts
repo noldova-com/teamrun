@@ -13,12 +13,12 @@ import "@noldova/teamrun-foundation-core";
 import { Resources } from "../../resources";
 import { TreeDropPlace } from "../enums/tree-drop-place";
 import { DragGesture } from "../models/drag-gesture";
+import type { TreeDragHooks } from "../models/tree-drag-hooks";
 import { TreeDrop } from "../models/tree-drop";
 import { TreeGhost } from "../models/tree-ghost";
 import { TreeLine } from "../models/tree-line";
-import type { TreeMove } from "../models/tree-move";
-import { TreePlan } from "../models/tree-plan";
 import type { TreeNode } from "../models/tree-node";
+import { TreePlan } from "../models/tree-plan";
 
 export class TreeDragSession {
   private readonly draggingState: WritableSignal<TreeNode | null> = signal(null);
@@ -28,13 +28,9 @@ export class TreeDragSession {
   private readonly document: Document;
   private readonly host: HTMLElement;
   private readonly nodes: Signal<readonly TreeNode[]>;
-  private readonly nodeAt: (row: Element) => TreeNode | undefined;
-  private readonly rowOf: (node: TreeNode) => HTMLElement | undefined;
-  private readonly gap: () => number;
-  private readonly isOpen: (node: TreeNode) => boolean;
-  private readonly open: (node: TreeNode) => void;
-  private readonly commit: (move: TreeMove) => void;
+  private readonly hooks: TreeDragHooks;
   private stopListening: (() => void) | null = null;
+  private releaseClick: (() => void) | null = null;
   private hoverTimer: ReturnType<typeof setTimeout> | null = null;
   private hoverId: string | null = null;
   private scrollTimer: ReturnType<typeof setInterval> | null = null;
@@ -51,25 +47,19 @@ export class TreeDragSession {
   public readonly ghost: Signal<TreeGhost | null> = this.ghostState.asReadonly();
   public readonly line: Signal<TreeLine | null> = this.lineState.asReadonly();
 
-  public constructor(document: Document, host: HTMLElement, nodes: Signal<readonly TreeNode[]>, nodeAt: (row: Element) => TreeNode | undefined,
-    rowOf: (node: TreeNode) => HTMLElement | undefined, gap: () => number, isOpen: (node: TreeNode) => boolean, open: (node: TreeNode) => void, commit: (move: TreeMove) => void) {
+  public constructor(document: Document, host: HTMLElement, nodes: Signal<readonly TreeNode[]>, hooks: TreeDragHooks) {
     this.document = document;
     this.host = host;
     this.scrollArea = host;
     this.nodes = nodes;
-    this.nodeAt = nodeAt;
-    this.rowOf = rowOf;
-    this.gap = gap;
-    this.isOpen = isOpen;
-    this.open = open;
-    this.commit = commit;
+    this.hooks = hooks;
   }
 
-  public begin(event: PointerEvent, node: TreeNode): void {
+  public begin(event: PointerEvent, node: TreeNode, element: HTMLElement): void {
     if (event.button !== Resources.primaryButton)
       return;
     this.stop();
-    const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const box = element.getBoundingClientRect();
     const onMove = (moved: PointerEvent): void => this.move(moved, node, event, box);
     const onEnd = (): void => this.end();
     const onCancel = (): void => this.stop();
@@ -88,7 +78,18 @@ export class TreeDragSession {
     };
   }
 
+  public reevaluate(): void {
+    const dragged = this.draggingState();
+    if (Object.isNull(dragged))
+      return;
+    this.targetRow = null;
+    this.targetPlace = null;
+    this.refresh(dragged);
+  }
+
   public stop(): void {
+    this.releaseClick?.();
+    this.releaseClick = null;
     this.stopListening?.();
     this.stopListening = null;
     this.draggingState.set(null);
@@ -103,7 +104,7 @@ export class TreeDragSession {
         return;
       this.draggingState.set(node);
       this.scrollArea = this.scroller() ?? this.host;
-      this.rowGap = this.gap();
+      this.rowGap = this.hooks.gap();
     }
     const isRightToLeft = this.host.matches(Resources.rightToLeftSelector);
     const x = isRightToLeft ? this.document.documentElement.clientWidth - event.clientX : event.clientX;
@@ -121,13 +122,15 @@ export class TreeDragSession {
     if (dragged)
       this.swallowClick();
     if (!Object.isNull(drop))
-      this.commit(drop.move);
+      this.hooks.commit(drop.move);
   }
 
   private swallowClick(): void {
     const swallow = (click: Event): void => click.stopPropagation();
+    const release = (): void => this.document.removeEventListener(Resources.clickEvent, swallow, { capture: true });
     this.document.addEventListener(Resources.clickEvent, swallow, { capture: true, once: true });
-    setTimeout(() => this.document.removeEventListener(Resources.clickEvent, swallow, { capture: true }));
+    this.releaseClick = release;
+    setTimeout(release);
   }
 
   private cancelOnEscape(event: KeyboardEvent): void {
@@ -140,14 +143,14 @@ export class TreeDragSession {
 
   private refresh(dragged: TreeNode): void {
     const row = this.rowAtPointer();
-    const node = Object.isUndefined(row) ? undefined : this.nodeAt(row);
+    const node = Object.isUndefined(row) ? undefined : this.hooks.nodeAt(row);
     if (Object.isUndefined(row) || Object.isUndefined(node))
       return this.setTarget(null, null, null);
     const box = row.getBoundingClientRect();
     const fraction = (this.pointerY - box.top) / box.height;
     const edge = Resources.treeDropEdge;
     const place = node.isBranch && fraction >= edge && fraction <= 1 - edge ? TreeDropPlace.Into
-      : fraction < 0.5 ? TreeDropPlace.Before : node.isBranch && this.isOpen(node) ? TreeDropPlace.Start : TreeDropPlace.After;
+      : fraction < 0.5 ? TreeDropPlace.Before : node.isBranch && this.hooks.isOpen(node) ? TreeDropPlace.Start : TreeDropPlace.After;
     if (row === this.targetRow && place === this.targetPlace)
       return;
     const move = TreePlan.drop(this.nodes(), dragged.id, node.id, place);
@@ -177,10 +180,10 @@ export class TreeDragSession {
   private lineOf(drop: TreeDrop): TreeLine | null {
     if (drop.place === TreeDropPlace.Into)
       return null;
-    const row = this.rowOf(drop.target) as HTMLElement;
+    const row = this.hooks.rowOf(drop.target) as HTMLElement;
     const box = row.getBoundingClientRect();
     const frame = this.host.getBoundingClientRect();
-    const first = drop.place === TreeDropPlace.Start ? this.rowOf(drop.target.children[0] as TreeNode) : undefined;
+    const first = drop.place === TreeDropPlace.Start ? this.hooks.rowOf(drop.target.children[0] as TreeNode) : undefined;
     const style = getComputedStyle(first ?? row);
     const inset = Number.parseFloat(style.paddingInlineStart);
     const isRightToLeft = this.host.matches(Resources.rightToLeftSelector);
@@ -195,8 +198,8 @@ export class TreeDragSession {
       clearTimeout(this.hoverTimer);
     this.hoverTimer = null;
     this.hoverId = node?.id ?? null;
-    if (!Object.isUndefined(node) && node.isBranch && !this.isOpen(node))
-      this.hoverTimer = setTimeout(() => this.open(node), Resources.treeHoverOpenDelay);
+    if (!Object.isUndefined(node) && node.isBranch && !this.hooks.isOpen(node))
+      this.hoverTimer = setTimeout(() => this.hooks.open(node), Resources.treeHoverOpenDelay);
   }
 
   private scrollAt(y: number, edge: number): number {

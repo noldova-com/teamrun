@@ -329,6 +329,25 @@ describe("TreeComponent moving rows with the keys", () => {
     expect([host.moves.length, announce.mock.calls.length]).toEqual([edge, 4]);
   });
 
+  it("steps a row among its siblings, into the branch before it as its last child, and out after its parent, and not where that cannot be", async () => {
+    await renderAsync();
+    host.nodes.set([
+      TreeNode.open("project", "Project", "folder", [TreeNode.open("source", "Source", "folder", [new TreeNode("app", "App"), new TreeNode("styles", "Styles")]), new TreeNode("readme", "Readme")]),
+      new TreeNode("notes", "Notes"),
+      new TreeNode("trash", "Trash")
+    ]);
+    await fixture.whenStable();
+
+    press(row("Styles"), "ArrowUp");
+    press(row("App"), "ArrowDown");
+    press(row("Source"), "ArrowLeft");
+    press(row("App"), "ArrowLeft");
+    press(row("Trash"), "ArrowRight");
+    press(row("Source"), "ArrowRight");
+
+    expect(moves()).toEqual([["styles", "source", 0], ["app", "source", 1], ["source", null, 1], ["app", "project", 1]]);
+  });
+
   it("opens a closed branch a row steps into, so the row stays visible and keeps its focus", async () => {
     await renderAsync();
     row("Readme").focus();
