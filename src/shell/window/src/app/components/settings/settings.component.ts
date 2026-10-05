@@ -12,7 +12,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandle
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
-import { SelectComponent, SelectOption, TextFieldComponent } from "@noldova/teamrun-shell-ui";
+import { SelectComponent, SelectOption, TextFieldComponent, TreeComponent, TreeNode } from "@noldova/teamrun-shell-ui";
 
 import { GalleryTokens } from "../../models/gallery-tokens";
 import { SettingsPage } from "../../models/settings/settings-page";
@@ -31,7 +31,7 @@ import { ShortcutsComponent } from "../shortcuts/shortcuts.component";
 
 @Component({
   selector: "tr-settings",
-  imports: [NgComponentOutlet, NgTemplateOutlet, SelectComponent, SettingRowComponent, ShortcutsComponent, TextFieldComponent],
+  imports: [NgComponentOutlet, NgTemplateOutlet, SelectComponent, SettingRowComponent, ShortcutsComponent, TextFieldComponent, TreeComponent],
   templateUrl: "./settings.component.html",
   styleUrl: "./settings.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -50,6 +50,7 @@ export class SettingsComponent {
   private readonly kept: SettingsView = this.viewStates.find(ShellDocuments.settingsTab.key, SettingsView) ?? SettingsView.initial;
   private readonly selected: WritableSignal<string> = signal(this.kept.page);
   private readonly pageList: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("pageList");
+  private readonly pageTree: Signal<TreeComponent> = viewChild.required(TreeComponent);
   private readonly pageSelect: Signal<ElementRef<HTMLElement>> = viewChild.required("pageSelect", { read: ElementRef<HTMLElement> });
   private readonly pageChooser: Signal<SelectComponent> = viewChild.required("pageSelect", { read: SelectComponent });
   private readonly content: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("content");
@@ -74,6 +75,7 @@ export class SettingsComponent {
   ]);
   private readonly currentTitle: Signal<string> = computed(() => this.pages().some(t => t.title === this.selected()) ? this.selected() : Resources.appearancePage);
   protected readonly currentPage: Signal<SettingsPage | undefined> = computed(() => this.pages().find(t => t.title === this.currentTitle()));
+  protected readonly pageNodes: Signal<readonly TreeNode[]> = computed(() => this.pages().map(t => new TreeNode(t.title, t.title)));
   protected readonly pageOptions: Signal<readonly SelectOption[]> = computed(() => this.pages().map(t => new SelectOption(t.title, t.title)));
   protected readonly pageChoice: Signal<string> = computed(() => this.isSearching() ? Resources.settingsSearchResults : this.currentTitle());
   protected readonly shortcuts: Signal<readonly ShortcutRow[]> = computed(() => {
@@ -157,7 +159,7 @@ export class SettingsComponent {
     if (hidden === list)
       this.pageChooser().focus();
     else
-      (list.querySelector<HTMLElement>(Resources.currentSettingsPageSelector) ?? list.querySelector<HTMLElement>(Resources.settingsPageSelector))?.focus();
+      this.pageTree().focus();
   }
 
   private static matches(definition: SettingDefinition, query: string): boolean {

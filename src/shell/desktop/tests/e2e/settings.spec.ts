@@ -26,7 +26,7 @@ function settingsTab(window: Page): Locator {
 }
 
 async function expectSamePageAsync(window: Page, top: number): Promise<void> {
-  await expect(window.locator(".tr-settings-page[aria-current=page]")).toHaveText("Keyboard shortcuts");
+  await expect(window.locator(".tr-settings-pages [aria-selected=true]")).toHaveText("Keyboard shortcuts");
   await expect.poll(() => ScrollAreaFixture.scrollTopAsync(window.locator(".tr-settings-content"))).toBe(top);
 }
 
@@ -74,13 +74,20 @@ test.describe("settings", () => {
 
     await expect(settingsTab(window)).toHaveCount(1);
     await expect(settingsTab(window)).toHaveAttribute("aria-selected", "true");
-    await expect(window.locator(".tr-settings-page")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Gallery"]);
+    await expect(window.locator(".tr-settings-pages .tr-tree-label")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Gallery"]);
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Theme", "Text", "Layout", "Command search"]);
-    await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
+    await window.getByRole("treeitem", { name: "Appearance", exact: true }).focus();
+    await window.keyboard.press("ArrowDown");
+    await window.keyboard.press("Enter");
+    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
+    await expect(window.getByRole("treeitem", { name: "Notifications", exact: true })).toHaveAttribute("aria-selected", "true");
+    await window.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true }).click();
+    await expect(window.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true })).toHaveAttribute("aria-selected", "true");
     for (const scheme of ["light", "dark"] as const) {
       await window.emulateMedia({ colorScheme: scheme });
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
-      expect(await ContrastFixture.measureLowestTextContrastAsync(window.locator(".tr-settings-page[aria-current=page]"), ContrastFixture.SELECTED_ROW_BACKGROUND[scheme])).toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
+      expect(await ContrastFixture.measureLowestTextContrastAsync(window.locator(".tr-settings-pages [role=treeitem][aria-selected=true]"), ContrastFixture.SELECTED_ROW_BACKGROUND[scheme]))
+        .toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
     }
     await expect(window.locator("[data-command=\"shell.openSettings\"] td").first()).toHaveText("Settings…");
     await desktop.checkpointAsync("settings-shortcuts");
@@ -161,7 +168,7 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-search");
     await window.getByRole("searchbox", { name: "Search settings" }).fill("clock.tickStep");
     await expect(window.locator(".tr-settings-result-title")).toHaveText(["Clock"]);
-    await window.getByRole("button", { name: "Notifications", exact: true }).click();
+    await window.getByRole("treeitem", { name: "Notifications", exact: true }).click();
     await expect(window.getByRole("searchbox", { name: "Search settings" })).toHaveValue("");
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
   });
@@ -170,7 +177,7 @@ test.describe("settings", () => {
     const window = desktop.window;
     const note = "document/notes.note/2";
     await SettingsFixture.openAsync(window);
-    await window.getByRole("button", { name: "Keyboard shortcuts", exact: true }).click();
+    await window.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true }).click();
     const top = await window.locator(".tr-settings-content").evaluate(async t => {
       t.scrollTop = 120;
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -290,7 +297,7 @@ test.describe("settings", () => {
   test("a checked checkbox keeps its tick in the forced text color in forced colors", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openAsync(window);
-    await window.getByRole("button", { name: "Notifications", exact: true }).click();
+    await window.getByRole("treeitem", { name: "Notifications", exact: true }).click();
     const control = row(window, "shell.mutedModules").locator(".tr-checkbox-control").first();
     await expect(control.locator("input")).toBeChecked();
     const readAsync = (): Promise<readonly [boolean, string, string, string]> => control.evaluate(t => {

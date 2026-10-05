@@ -32,7 +32,7 @@ export default class SettingsFixture {
       await window.getByRole("listbox", { name: SettingsFixture.PAGES }).getByRole("option", { name: title, exact: true }).click();
       return;
     }
-    await settings.locator(".tr-settings-pages").getByRole("button", { name: title, exact: true }).click();
+    await settings.locator(".tr-settings-pages").getByRole("treeitem", { name: title, exact: true }).click();
   }
 
   public static async openGalleryAsync(window: Page): Promise<void> {

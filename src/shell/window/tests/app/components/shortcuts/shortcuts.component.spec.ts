@@ -89,7 +89,7 @@ describe("ShortcutsComponent", () => {
     ]);
     fixture = TestBed.createComponent(SettingsComponent);
     fixture.detectChanges();
-    await page.getByRole("button", { name: "Keyboard shortcuts" }).click();
+    await page.getByRole("treeitem", { name: "Keyboard shortcuts" }).click();
     await settleAsync();
   }
 
