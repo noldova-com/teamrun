@@ -19,7 +19,9 @@ import { StopPolicy } from "@noldova/teamrun-shell-protocol";
 import { DataDirectory, DiscoveryReader, Endpoint, OwnershipLock, RuntimeBuild, RuntimeClient, type RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
 
 import CleanupSteps from "./cleanup-steps.ts";
+import DesktopLogFixture from "./desktop-log.fixture.ts";
 import ErrorOutputClassifier from "./error-output.classifier.ts";
+import MainProcessAnswer, { type IMainProcessAnswerRecord } from "./main-process-answer.ts";
 import OffCursorPlacement from "./off-cursor-placement.ts";
 import ProcessListFixture from "./process-list.fixture.ts";
 import ProcessorLoadFixture from "./processor-load.fixture.ts";
@@ -89,6 +91,7 @@ export default class DesktopApplicationFixture {
   private placement: string = "The window had not been moved off the cursor.";
   private isPageUnreachable: boolean = false;
   private silence: MainProcessSilence | null = null;
+  private lastAnswer: IMainProcessAnswerRecord | null = null;
   private mainProcessId: number | null = null;
 
   public readonly failures: string[] = [];
@@ -420,13 +423,21 @@ export default class DesktopApplicationFixture {
       evaluation.catch(() => undefined);
       throw new Error(`The main process has not answered since it was asked to ${this.silence.action}, so the test did not wait for it to ${action}.`);
     }
-    const answer = await DesktopApplicationFixture.withinAsync(evaluation, limit);
+    const asked = Date.now();
+    const answer = await DesktopApplicationFixture.withinAsync(evaluation.finally(() => {
+      this.lastAnswer = { action, at: Date.now() };
+    }), limit);
     if (answer !== DesktopApplicationFixture.NO_ANSWER)
       return answer;
-    const since = Date.now() - limit;
+    const lastAnswerLine = MainProcessAnswer.describeLast(this.lastAnswer, asked);
     const processorMilliseconds = await this.readProcessorMillisecondsAsync();
-    this.silence = { action, since, processorMilliseconds };
-    throw new Error(`The main process did not answer within ${limit / 1000} s when asked to ${action}. ${this.placement}`);
+    this.silence = { action, since: asked, processorMilliseconds };
+    throw new Error([
+      `The main process did not answer within ${limit / 1000} s when asked to ${action}.`,
+      lastAnswerLine,
+      await DesktopLogFixture.describeMainProcessFailuresAsync(new DataDirectory(this.dataDirectory).desktopLog),
+      this.placement
+    ].join("\n"));
   }
 
   private async readProcessorMillisecondsAsync(): Promise<number | null> {
@@ -463,6 +474,7 @@ export default class DesktopApplicationFixture {
     this.electronApplication = application;
     this.childProcess = application.process();
     this.mainProcessId = null;
+    this.lastAnswer = null;
     application.process().stderr?.on("data", (data: Buffer) => this.readOutput(data.toString()));
     application.on("console", t => {
       if (t.type() === "error")
