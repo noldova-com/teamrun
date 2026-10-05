@@ -8,9 +8,9 @@ LICENSE file in the root directory of this source tree.
 
 <cdk-tree class="tr-tree" [dataSource]="data()" [childrenAccessor]="childrenOf" [expansionKey]="keyOf" [trackBy]="trackBy" [attr.aria-label]="label()">
   <cdk-tree-node *cdkTreeNodeDef="let node; level as level" #row="cdkTreeNode" class="tr-tree-row" [class.tr-tree-row-current]="node.id === current()"
-    [isExpandable]="node.isBranch" [cdkTreeNodeTypeaheadLabel]="node.label" [attr.aria-selected]="node.id === current()"
+    [isExpandable]="node.isBranch" [cdkTreeNodeTypeaheadLabel]="node.label" [attr.aria-selected]="node.id === current()" [attr.aria-keyshortcuts]="movable() ? resources.treeMoveKeys : null"
     [style.--tr-tree-level]="level" (click)="choose(node)" (activation)="choose(node)" (focus)="take(row)"
-    [class.tr-tree-row-dragging]="session.dragging()?.id === node.id" [class.tr-tree-row-drop]="session.drop()?.targetId === node.id && session.drop()?.place === places.Into"
+    [class.tr-tree-row-dragging]="session.dragging()?.id === node.id" [class.tr-tree-row-drop]="session.drop()?.target.id === node.id && session.drop()?.place === places.Into"
     (pointerdown)="press($event, node)" (keydown)="nudge($event, node)">
     @if (hasBranches()) {
       <span class="tr-tree-twistie material-symbols-rounded" [class.tr-tree-twistie-open]="row.isExpanded" aria-hidden="true">{{ node.isBranch ? resources.twistieGlyph : null }}</span>
@@ -25,7 +25,7 @@ LICENSE file in the root directory of this source tree.
   <div class="tr-drop-line tr-drop-line-row tr-tree-drop-line" [style.top.px]="line.top" [style.inset-inline-start.px]="line.start" [style.width.px]="line.width"></div>
 }
 @if (session.ghost(); as ghost) {
-  <div class="tr-tree-ghost" aria-hidden="true" [style.left.px]="ghost.x" [style.top.px]="ghost.y" [style.max-width.px]="ghost.maxWidth">
+  <div class="tr-tree-ghost" aria-hidden="true" [style.left.px]="ghost.isRightToLeft ? null : ghost.x" [style.right.px]="ghost.isRightToLeft ? ghost.x : null" [style.top.px]="ghost.y" [style.max-width.px]="ghost.maxWidth">
     @if (session.dragging()?.icon; as icon) {
       <span class="tr-tree-icon material-symbols-rounded">{{ icon }}</span>
     }

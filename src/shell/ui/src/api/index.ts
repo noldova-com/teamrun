@@ -50,6 +50,7 @@ export { PanelSurface } from "../app/enums/panel-surface";
 export { SashOrientation } from "../app/enums/sash-orientation";
 export { ThemeMode } from "../app/enums/theme-mode";
 export { ToolbarOrientation } from "../app/enums/toolbar-orientation";
+export { TreeMoveException } from "../app/exceptions/tree-move.exception";
 export { ThemeException } from "../app/exceptions/theme.exception";
 export { ColorToken } from "../app/models/color-token";
 export { DialogTokens } from "../app/models/dialog-tokens";

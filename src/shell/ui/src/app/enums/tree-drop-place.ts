@@ -9,5 +9,6 @@
 export enum TreeDropPlace {
   Before = "Before",
   After = "After",
-  Into = "Into"
+  Into = "Into",
+  Start = "Start"
 }

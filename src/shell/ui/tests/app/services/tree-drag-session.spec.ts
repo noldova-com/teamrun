@@ -6,56 +6,23 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { LiveAnnouncer } from "@angular/cdk/a11y";
-import { Component, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { userEvent } from "vitest/browser";
 
-import { TreeComponent } from "../../../../src/app/components/tree/tree.component";
-import { ThemeMode } from "../../../../src/app/enums/theme-mode";
-import { DragGesture } from "../../../../src/app/models/drag-gesture";
-import { TreeMove } from "../../../../src/app/models/tree-move";
-import { TreeNode } from "../../../../src/app/models/tree-node";
-import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
-import { MotionFixture } from "../../../fixtures/motion.fixture";
+import { ThemeMode } from "../../../src/app/enums/theme-mode";
+import { DragGesture } from "../../../src/app/models/drag-gesture";
+import { TreeNode } from "../../../src/app/models/tree-node";
+import { AppearanceFixture } from "../../fixtures/appearance.fixture";
+import { MotionFixture } from "../../fixtures/motion.fixture";
+import { MovableTreeHostComponent } from "../../fixtures/movable-tree-host.component";
 
-@Component({
-  imports: [TreeComponent],
-  template: `
-    <div class="frame" [style.height]="height()" style="overflow-y: auto">
-      <tr-tree label="Files" [nodes]="nodes()" [movable]="movable()" (activated)="activations.push($event.id)" (moved)="receive($event)" />
-    </div>
-  `
-})
-class MovableHostComponent {
-  public readonly nodes = signal<readonly TreeNode[]>([
-    TreeNode.open("project", "Project", "folder", [
-      new TreeNode("source", "Source", "folder", [new TreeNode("app", "App")]),
-      new TreeNode("readme", "Readme", "description")
-    ]),
-    new TreeNode("notes", "Notes", "description"),
-    new TreeNode("trash", "Trash", "delete")
-  ]);
-  public readonly movable = signal(true);
-  public readonly height = signal("auto");
-  public readonly applying = signal(false);
-  public readonly moves: TreeMove[] = [];
-  public readonly activations: string[] = [];
-
-  public receive(move: TreeMove): void {
-    this.moves.push(move);
-    if (this.applying())
-      this.nodes.update(t => move.apply(t));
-  }
-}
-
-describe("TreeComponent moving rows", () => {
-  let fixture: ComponentFixture<MovableHostComponent>;
-  let host: MovableHostComponent;
+describe("TreeDragSession", () => {
+  let fixture: ComponentFixture<MovableTreeHostComponent>;
+  let host: MovableTreeHostComponent;
 
   async function renderAsync(theme = AppearanceFixture.themes[0], mode = ThemeMode.Light): Promise<void> {
     AppearanceFixture.apply(theme, mode);
-    fixture = TestBed.createComponent(MovableHostComponent);
+    fixture = TestBed.createComponent(MovableTreeHostComponent);
     host = fixture.componentInstance;
     await fixture.whenStable();
   }
@@ -71,6 +38,7 @@ describe("TreeComponent moving rows", () => {
   const line = (): HTMLElement | null => root().querySelector(".tr-tree-drop-line");
   const ghost = (): HTMLElement | null => root().querySelector(".tr-tree-ghost");
   const moves = (): (string | number | null)[][] => host.moves.map(t => [t.id, t.parentId, t.index]);
+  const gap = (): number => Number.parseFloat(getComputedStyle(root().querySelector(".tr-tree") as HTMLElement).rowGap);
   const yAt = (label: string, fraction: number): number => row(label).getBoundingClientRect().top + row(label).getBoundingClientRect().height * fraction;
 
   function pointer(type: string, target: EventTarget, y: number, button: number = 0): void {
@@ -122,7 +90,7 @@ describe("TreeComponent moving rows", () => {
 
     expect(beforeThreshold).toEqual([null, false]);
     expect(after).toEqual(["Notes", true, true]);
-    expect(lineY.top + lineY.height / 2).toBeCloseTo(row("Trash").getBoundingClientRect().bottom, 0);
+    expect(lineY.top + lineY.height / 2).toBeCloseTo(row("Trash").getBoundingClientRect().bottom + gap() / 2, 0);
     expect([into[0] !== null, into[1]]).toEqual([true, false]);
     expect([intoBranch[0], intoBranch[1]]).toEqual([null, true]);
     expect([moves(), ghost(), line(), row("Notes").classList.contains("tr-tree-row-dragging")]).toEqual([[["notes", "project", 1]], null, null, false]);
@@ -164,9 +132,9 @@ describe("TreeComponent moving rows", () => {
     document.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true }));
     const afterCancel = await shown();
     await dragAsync("Notes", "Trash", 0.9, false);
-    pointer("pointermove", document.body, 0);
+    pointer("pointermove", document.body, -50);
     const outside = await shown();
-    pointer("pointerup", document.body, 0);
+    pointer("pointerup", document.body, -50);
     const afterRelease = await shown();
     const idleEscape = escape();
     pointer("pointerdown", row("Notes"), yAt("Notes", 0.5), 2);
@@ -266,69 +234,87 @@ describe("TreeComponent moving rows", () => {
     expect([down > 0, sameEdge > down, stopped === sameEdge, up < stopped, frame.scrollTop === up]).toEqual([true, true, true, true, true]);
   });
 
-  it("moves the focused row with Alt and the arrow keys, keeps its focus, announces where it went and leaves the edges alone", async () => {
+  it("draws the line for the bottom of an open branch above its first child, at the child's indent, and drops the row there", async () => {
     await renderAsync();
     host.applying.set(true);
-    const announce = vi.spyOn(TestBed.inject(LiveAnnouncer), "announce");
-    row("Notes").focus();
 
-    await userEvent.keyboard("{Alt>}{ArrowUp}{/Alt}");
-    await fixture.whenStable();
-    const up = document.activeElement?.querySelector(".tr-tree-label")?.textContent;
-    await userEvent.keyboard("{Alt>}{ArrowDown}{/Alt}");
-    await userEvent.keyboard("{Alt>}{ArrowRight}{/Alt}");
-    await fixture.whenStable();
-    await userEvent.keyboard("{Alt>}{ArrowLeft}{/Alt}");
+    await dragAsync("Notes", "Project", 0.9, false);
+    const drawn = (line() as HTMLElement).getBoundingClientRect();
+    const project = row("Project").getBoundingClientRect();
+    const source = row("Source").getBoundingClientRect();
+    const indent = Number.parseFloat(getComputedStyle(row("Source")).paddingInlineStart);
+    pointer("pointerup", row("Project"), yAt("Project", 0.9));
     await fixture.whenStable();
 
-    expect(moves()).toEqual([["notes", null, 0], ["notes", null, 1], ["notes", "project", 2], ["notes", null, 1]]);
-    expect(announce.mock.calls).toEqual([
-      ["Moved Notes to position 1 of 3", "polite"], ["Moved Notes to position 2 of 3", "polite"], ["Moved Notes into Project, position 3 of 3", "polite"], ["Moved Notes to position 2 of 3", "polite"]
-    ]);
-    expect([up, document.activeElement === row("Notes")]).toEqual(["Notes", true]);
-    const edge = host.moves.length;
-    expect([press(row("Project"), "ArrowUp"), press(row("Trash"), "ArrowDown"), press(row("Trash"), "ArrowLeft"), press(row("Project"), "ArrowRight")]).toEqual([false, false, false, false]);
-    expect([host.moves.length, announce.mock.calls.length]).toEqual([edge, 4]);
+    expect(drawn.top + drawn.height / 2).toBeCloseTo(project.bottom + gap() / 2, 0);
+    expect(drawn.left).toBeCloseTo(source.left + indent, 0);
+    expect(moves()).toEqual([["notes", "project", 0]]);
+    expect(items().map(t => t.querySelector(".tr-tree-label")?.textContent).slice(0, 3)).toEqual(["Project", "Notes", "Source"]);
   });
 
-  it("takes only Alt and an arrow key as a move, so other chords reach the shell and the tree", async () => {
+  it("keeps the target and the line while the pointer is in the gap between two rows", async () => {
     await renderAsync();
+    const gapY = row("Notes").getBoundingClientRect().top - gap() / 2;
 
-    for (const modifiers of [{ altKey: true, ctrlKey: true }, { altKey: true, metaKey: true }, { altKey: true, shiftKey: true }, {}])
-      press(row("Notes"), "ArrowUp", modifiers);
-    const other = press(row("Notes"), "x", { altKey: true });
+    pointer("pointerdown", row("Trash"), yAt("Trash", 0.5));
+    pointer("pointermove", row("Trash"), yAt("Trash", 0.5) - DragGesture.threshold - 1);
+    pointer("pointermove", row("Trash"), gapY);
+    await fixture.whenStable();
+    const inGap = line() !== null;
+    pointer("pointerup", row("Trash"), gapY);
+    await fixture.whenStable();
 
-    expect([moves(), other]).toEqual([[], true]);
+    expect([inGap, moves()]).toEqual([true, [["trash", "project", 2]]]);
   });
 
-  it("mirrors Alt with Left and Right in a right-to-left layout and puts the drop line at the row's start", async () => {
+  it("moves the dragged row where it is released and keeps its focus, opening a closed branch the row went into", async () => {
+    await renderAsync();
+    host.applying.set(true);
+
+    await dragAsync("Notes", "Source", 0.5);
+
+    expect(moves()).toEqual([["notes", "source", 1]]);
+    expect([row("Source").getAttribute("aria-expanded"), document.activeElement === row("Notes")]).toEqual(["true", true]);
+  });
+
+  it("puts the ghost on the pointer's other side in a right-to-left layout", async () => {
     await renderAsync();
     root().dir = "rtl";
-    const left = press(row("Notes"), "ArrowLeft");
-    const right = press(row("Readme"), "ArrowRight");
+
     await dragAsync("Notes", "Trash", 0.9, false);
+    const dragged = ghost() as HTMLElement;
+    const pointerX = root().getBoundingClientRect().left + 24;
     const inline = (line() as HTMLElement).getBoundingClientRect();
     const trash = row("Trash").getBoundingClientRect();
 
-    expect([left, right, moves()]).toEqual([false, false, [["notes", "project", 2], ["readme", null, 1]]]);
+    expect([dragged.style.left, dragged.style.right !== String.empty]).toEqual([String.empty, true]);
+    expect(dragged.getBoundingClientRect().right).toBeLessThan(pointerX);
     expect(inline.right).toBeCloseTo(trash.right - Number.parseFloat(getComputedStyle(row("Trash")).paddingInlineStart), 0);
   });
 
-  it("slides the rows a move displaced for 150 ms, and not when reduced motion is preferred", async () => {
+  it("follows the pointer with its target while the area scrolls under a pointer that does not move", async () => {
     await renderAsync();
+    host.nodes.set(Array.from({ length: 20 }, (_, index) => new TreeNode(`row${index}`, `Row ${index}`)));
+    host.height.set("6rem");
     host.applying.set(true);
+    await fixture.whenStable();
+    const frame = root().querySelector(".frame") as HTMLElement;
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout"] });
+    const edge = frame.getBoundingClientRect().bottom - 1;
+    const rowUnder = (): HTMLElement => document.elementsFromPoint(root().getBoundingClientRect().left + 24, edge).find(t => t.matches("[role=treeitem]")) as HTMLElement;
 
-    await dragAsync("Notes", "Trash", 0.9);
-    const shifted = items().filter(t => t.classList.contains("tr-tree-row-shifting"));
-    const style = getComputedStyle(row("Trash"));
-    const look = [style.animationName.endsWith("tr-tree-shift"), style.animationDuration, row("Trash").style.getPropertyValue("--tr-tree-shift") !== String.empty];
-    shifted.forEach(t => t.dispatchEvent(new AnimationEvent("animationend")));
-    await MotionFixture.reduceAsync();
-    await dragAsync("Trash", "Project", 0.1);
+    pointer("pointerdown", row("Row 0"), yAt("Row 0", 0.5));
+    pointer("pointermove", row("Row 0"), yAt("Row 0", 0.5) + DragGesture.threshold + 1);
+    pointer("pointermove", rowUnder(), edge);
+    vi.advanceTimersByTime(400);
+    const under = Number(rowUnder().querySelector(".tr-tree-label")?.textContent?.replace("Row ", String.empty));
+    const lineTop = (line() as HTMLElement).getBoundingClientRect().top;
+    pointer("pointerup", rowUnder(), edge);
+    vi.advanceTimersByTime(1);
 
-    expect(shifted.map(t => t.querySelector(".tr-tree-label")?.textContent).sort()).toEqual(["Notes", "Trash"]);
-    expect(look).toEqual([true, "0.15s", true]);
-    expect([row("Trash").classList.contains("tr-tree-row-shifting"), getComputedStyle(row("Trash")).animationName]).toEqual([true, "none"]);
+    expect(frame.scrollTop).toBeGreaterThan(0);
+    expect(lineTop).toBeLessThanOrEqual(frame.getBoundingClientRect().bottom);
+    expect(host.moves.map(t => t.index)).toEqual([expect.toSatisfy((index: number) => index >= under - 1 && index <= under)]);
   });
 
   for (const mode of AppearanceFixture.modes)

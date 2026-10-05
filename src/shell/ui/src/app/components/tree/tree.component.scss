@@ -92,19 +92,3 @@
   color: var(--tr-text);
   pointer-events: none;
 }
-
-.tr-tree-row-shifting {
-  animation: tr-tree-shift 150ms ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tr-tree-row-shifting {
-    animation: none;
-  }
-}
-
-@keyframes tr-tree-shift {
-  from {
-    translate: 0 var(--tr-tree-shift);
-  }
-}

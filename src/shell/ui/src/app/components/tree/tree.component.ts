@@ -9,15 +9,17 @@
 import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { CdkTree, CdkTreeNode, CdkTreeNodeDef } from "@angular/cdk/tree";
 import { DOCUMENT } from "@angular/common";
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, type Signal, type WritableSignal, afterRenderEffect, computed, inject, input, output, signal, viewChild, viewChildren } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, inject, input, output, signal, viewChild, viewChildren } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 
 import { Resources } from "../../../resources";
 import { TreeDropPlace } from "../../enums/tree-drop-place";
 import { TreeStep } from "../../enums/tree-step";
-import { TreeMove } from "../../models/tree-move";
+import type { TreeMove } from "../../models/tree-move";
 import { TreeNode } from "../../models/tree-node";
+import { TreePlace } from "../../models/tree-place";
+import { TreePlan } from "../../models/tree-plan";
 import { TreeDragSession } from "../../services/tree-drag-session";
 
 @Component({
@@ -31,9 +33,11 @@ import { TreeDragSession } from "../../services/tree-drag-session";
 export class TreeComponent {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly announcer: LiveAnnouncer = inject(LiveAnnouncer);
+  private readonly injector: Injector = inject(Injector);
   private readonly tree: Signal<CdkTree<TreeNode, string>> = viewChild.required<CdkTree<TreeNode, string>>(CdkTree);
   private readonly rows: Signal<readonly CdkTreeNode<TreeNode, string>[]> = viewChildren<CdkTreeNode<TreeNode, string>>(CdkTreeNode);
 
+  private readonly area: Signal<ElementRef<HTMLElement>> = viewChild.required(CdkTree, { read: ElementRef<HTMLElement> });
   private readonly elements: Signal<readonly ElementRef<HTMLElement>[]> = viewChildren(CdkTreeNode, { read: ElementRef<HTMLElement> });
   private readonly opened: Set<string> = new Set();
   private readonly stopId: WritableSignal<string | null> = signal(null);
@@ -47,7 +51,7 @@ export class TreeComponent {
   public readonly activated = output<TreeNode>();
   public readonly moved = output<TreeMove>();
 
-  protected readonly session: TreeDragSession = new TreeDragSession(inject(DOCUMENT), this.host, this.nodes, row => this.nodeOf(row), node => this.tree().isExpanded(node),
+  protected readonly session: TreeDragSession = new TreeDragSession(inject(DOCUMENT), this.host, this.nodes, row => this.nodeOf(row), node => this.elementOf(node), () => Number.parseFloat(getComputedStyle(this.area().nativeElement).rowGap), node => this.tree().isExpanded(node),
     node => this.tree().expand(node), move => this.commit(move));
   protected readonly resources: typeof Resources = Resources;
   protected readonly places: typeof TreeDropPlace = TreeDropPlace;
@@ -73,10 +77,6 @@ export class TreeComponent {
         else
           row.unfocus();
     });
-    afterRenderEffect(() => {
-      this.nodes();
-      this.settle();
-    });
   }
 
   public focus(): void {
@@ -98,7 +98,7 @@ export class TreeComponent {
       return;
     event.preventDefault();
     event.stopPropagation();
-    const move = TreeMove.step(this.nodes(), node.id, step);
+    const move = TreePlan.step(this.nodes(), node.id, step);
     if (Object.isNull(move))
       return;
     this.refocus = node.id;
@@ -112,10 +112,16 @@ export class TreeComponent {
   }
 
   private commit(move: TreeMove): void {
-    const spot = move.spot(this.nodes());
-    this.announcer.announce(Resources.formatTreeMoved(spot.label, spot.parentLabel, spot.position, spot.count), "polite");
+    const spot = TreePlan.spot(move, this.nodes());
+    void this.announcer.announce(Resources.formatTreeMoved(spot.label, spot.parentLabel, spot.position, spot.count), Resources.politeAnnouncement);
+    const parent = Object.isNull(move.parentId) ? undefined : TreePlace.find(this.nodes(), move.parentId)?.node;
+    if (!Object.isUndefined(parent))
+      this.tree().expand(parent);
+    const before = this.nodes();
     this.tops = this.topsOfRows();
+    this.refocus = move.id;
     this.moved.emit(move);
+    afterNextRender(() => this.settle(before), { injector: this.injector });
   }
 
   private stepOf(key: string): TreeStep | undefined {
@@ -139,26 +145,30 @@ export class TreeComponent {
   }
 
   private topsOfRows(): ReadonlyMap<string, number> {
-    return new Map(this.rows().map((row, index) => [row.data.id, (this.elements()[index] as ElementRef<HTMLElement>).nativeElement.getBoundingClientRect().top]));
+    const tops = this.elements().map(t => t.nativeElement.getBoundingClientRect().top);
+    return new Map(this.rows().map((row, index) => [row.data.id, tops[index] as number]));
   }
 
-  private settle(): void {
-    const before = this.tops;
+  private settle(before: readonly TreeNode[]): void {
+    const tops = this.tops;
+    const refocus = this.refocus;
     this.tops = null;
-    for (const [index, row] of this.rows().entries()) {
-      const item = (this.elements()[index] as ElementRef<HTMLElement>).nativeElement;
-      const shift = (before?.get(row.data.id) ?? item.getBoundingClientRect().top) - item.getBoundingClientRect().top;
-      if (shift === 0)
-        continue;
-      item.style.setProperty(Resources.treeShiftProperty, `${shift}px`);
-      item.classList.remove(Resources.treeShiftingClass);
-      item.getBoundingClientRect();
-      item.classList.add(Resources.treeShiftingClass);
-      item.addEventListener(Resources.animationEndEvent, () => item.classList.remove(Resources.treeShiftingClass), { once: true });
-    }
-    if (!Object.isNull(this.refocus))
-      this.rowOf(this.refocus)?.focus();
     this.refocus = null;
+    if (this.nodes() === before)
+      return;
+    const items = this.elements().map(t => t.nativeElement);
+    const next = items.map(t => t.getBoundingClientRect().top);
+    if (!matchMedia(Resources.reducedMotionQuery).matches)
+      for (const [index, row] of this.rows().entries()) {
+        const shift = (tops?.get(row.data.id) ?? next[index] as number) - (next[index] as number);
+        if (shift !== 0)
+          items[index]?.animate({ translate: [`0 ${shift}px`, "0 0"] }, { duration: Resources.treeShiftDuration, easing: "ease-out" });
+      }
+    this.rowOf(refocus)?.focus();
+  }
+
+  private elementOf(node: TreeNode): HTMLElement | undefined {
+    return this.elements()[this.rows().findIndex(t => t.data.id === node.id)]?.nativeElement;
   }
 
   private rowOf(id: string | null): CdkTreeNode<TreeNode, string> | undefined {

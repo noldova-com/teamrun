@@ -10,10 +10,12 @@ export class TreeGhost {
   public readonly x: number;
   public readonly y: number;
   public readonly maxWidth: number;
+  public readonly isRightToLeft: boolean;
 
-  public constructor(x: number, y: number, maxWidth: number) {
+  public constructor(x: number, y: number, maxWidth: number, isRightToLeft: boolean) {
     this.x = x;
     this.y = y;
     this.maxWidth = maxWidth;
+    this.isRightToLeft = isRightToLeft;
   }
 }

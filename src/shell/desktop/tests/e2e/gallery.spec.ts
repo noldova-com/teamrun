@@ -138,6 +138,10 @@ test.describe("gallery", () => {
       await window.mouse.move(from.x, from.y);
       await window.mouse.down();
       await window.mouse.move(from.x + 8, from.y - 8, { steps: 3 });
+      const branch = await centreOf("Project", 0.5);
+      await window.mouse.move(branch.x, branch.y, { steps: 6 });
+      await expect(item("Project")).toHaveClass(/tr-tree-row-drop/u);
+      await desktop.checkpointAsync(`gallery-tree-drag-branch-${mode.toLowerCase()}`);
       const target = await centreOf("Readme", 0.1);
       await window.mouse.move(target.x, target.y, { steps: 6 });
       await expect(host.locator(".tr-tree-ghost")).toHaveText(/Notes/u);
@@ -146,7 +150,9 @@ test.describe("gallery", () => {
       await window.mouse.up();
 
       await expect(host.locator(".tr-tree-ghost")).toHaveCount(0);
-      expect(await order()).toEqual(["Project", "Source", "Notes", "Readme", "A file name that is far too long to fit the width of its tree"]);
+      await expect.poll(order).toEqual(["Project", "Source", "Notes", "Readme", "A file name that is far too long to fit the width of its tree"]);
+      await expect(item("Readme")).toHaveAttribute("aria-selected", "false");
+      await expect(item("Notes")).toBeFocused();
       await item("Notes").focus();
       await window.keyboard.press("Alt+ArrowLeft");
       await expect.poll(order).toEqual(["Project", "Source", "Readme", "Notes", "A file name that is far too long to fit the width of its tree"]);

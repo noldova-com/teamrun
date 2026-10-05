@@ -7,15 +7,16 @@
  */
 
 import { TreeDropPlace } from "../enums/tree-drop-place";
-import { TreeMove } from "./tree-move";
+import type { TreeMove } from "./tree-move";
+import type { TreeNode } from "./tree-node";
 
 export class TreeDrop {
-  public readonly targetId: string;
+  public readonly target: TreeNode;
   public readonly place: TreeDropPlace;
   public readonly move: TreeMove;
 
-  public constructor(targetId: string, place: TreeDropPlace, move: TreeMove) {
-    this.targetId = targetId;
+  public constructor(target: TreeNode, place: TreeDropPlace, move: TreeMove) {
+    this.target = target;
     this.place = place;
     this.move = move;
   }
