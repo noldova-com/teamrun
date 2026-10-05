@@ -10,7 +10,9 @@ import { Component, type Type } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { userEvent } from "vitest/browser";
 
+import { GalleryResources } from "../../../../src/app/components/gallery/gallery-resources";
 import { GalleryStateDirective } from "../../../../src/app/components/gallery/gallery-state.directive";
+import { GalleryState } from "../../../../src/app/enums/gallery-state";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 import { GalleryFixture } from "../../../fixtures/gallery.fixture";
 import { MotionFixture } from "../../../fixtures/motion.fixture";
@@ -41,7 +43,15 @@ describe("GalleryStateDirective", () => {
     .flatMap(t => [null, "::before", "::after"].map(pseudo => properties.map(p => getComputedStyle(t, pseudo).getPropertyValue(p)).join(" ")));
   const name = (element: Element): string => `${element.closest(".tr-gallery-specimen")?.getAttribute("aria-label") ?? ""} / ${element.closest("tr-gallery-cell")?.getAttribute("aria-label") ?? ""}`;
 
+  let park: HTMLElement;
+
+  beforeEach(() => {
+    park = document.body.appendChild(document.createElement("div"));
+    Object.assign(park.style, { position: "fixed", top: "0", left: "0", width: "4px", height: "4px", zIndex: "2147483647" });
+  });
+
   afterEach(async () => {
+    park.remove();
     AppearanceFixture.reset();
     await MotionFixture.resetAsync();
   });
@@ -69,19 +79,19 @@ describe("GalleryStateDirective", () => {
     await MotionFixture.reduceAsync();
     const fixture = await GalleryFixture.showAsync();
     const frame = GalleryFixture.frames(fixture)[0] as HTMLElement;
-    const marked = [...frame.querySelectorAll<HTMLElement>("[data-tr-state='Hover']")];
+    const marked = [...frame.querySelectorAll<HTMLElement>(`[${GalleryResources.stateAttribute}="${GalleryState.Hover}"]`)];
 
     expect(marked.map(t => name(t))).toEqual(["Button / Hover", "Button / Secondary, hover", "Icon button / Hover", "Choice pills / Hover", "Tab / Hover", "Toolbar button / Hover",
       "Menu / Rows", "Menu / Menu bar, hover"]);
     for (const element of marked) {
       const shown = look(element);
-      element.removeAttribute("data-tr-state");
-      await userEvent.unhover(document.body);
+      element.removeAttribute(GalleryResources.stateAttribute);
+      await userEvent.hover(park);
       const plain = look(element);
       await userEvent.hover(element);
       const real = look(element);
-      await userEvent.unhover(document.body);
-      element.setAttribute("data-tr-state", "Hover");
+      await userEvent.hover(park);
+      element.setAttribute(GalleryResources.stateAttribute, GalleryState.Hover);
 
       expect([name(element), shown]).toEqual([name(element), real]);
       expect([name(element), shown]).not.toEqual([name(element), plain]);
@@ -92,20 +102,20 @@ describe("GalleryStateDirective", () => {
     await MotionFixture.reduceAsync();
     const fixture = await GalleryFixture.showAsync();
     const frame = GalleryFixture.frames(fixture)[0] as HTMLElement;
-    const marked = [...frame.querySelectorAll<HTMLElement>("[data-tr-state='Focus']")];
+    const marked = [...frame.querySelectorAll<HTMLElement>(`[${GalleryResources.stateAttribute}="${GalleryState.Focus}"]`)];
 
     expect(marked.map(t => name(t))).toEqual(["Button / Focus", "Icon button / Focus", "Checkbox / Focus", "Text field / Focus", "Select / Focus", "Choice pills / Focus", "Tab / Focus",
       "Toolbar button / Focus", "Sash / Focus"]);
-    await userEvent.unhover(document.body);
+    await userEvent.hover(park);
     for (const element of marked) {
       const shown = look(element);
-      element.removeAttribute("data-tr-state");
+      element.removeAttribute(GalleryResources.stateAttribute);
       const plain = look(element);
       await userEvent.keyboard("{Shift}");
       element.focus();
       const real = look(element);
       element.blur();
-      element.setAttribute("data-tr-state", "Focus");
+      element.setAttribute(GalleryResources.stateAttribute, GalleryState.Focus);
 
       expect([name(element), shown]).toEqual([name(element), real]);
       expect([name(element), shown]).not.toEqual([name(element), plain]);
