@@ -1520,7 +1520,7 @@ export interface IDesktopWindow {
    * import { type IDesktopWindow, TaskbarIdentity } from "@noldova/teamrun-shell-desktop";
    *
    * export function describe(window: IDesktopWindow): void {
-   *   window.setAppDetails(TaskbarIdentity.create(true, "/opt/teamrun/teamrun", "", [], "/opt/teamrun").toAppDetails());
+   *   window.setAppDetails(TaskbarIdentity.create(true, "/opt/teamrun/teamrun", "", "", [], "/opt/teamrun").toAppDetails());
    * }
    * ```
    */
@@ -3461,7 +3461,7 @@ export declare class TaskbarIdentity {
   public readonly appId: string;
 
   /**
-   * The file whose icon the taskbar shows: the build's program.
+   * The file whose icon the taskbar shows: a packaged build's program, or a development build's icon file.
    */
   public readonly iconPath: string;
 
@@ -3492,10 +3492,13 @@ export declare class TaskbarIdentity {
    * absolute paths, so the relaunch reaches the running instance's single-instance lock from any working directory.
    * A packaged build takes the application ID. A development build takes the development application ID followed by
    * the first eight hexadecimal digits of the SHA-256 of its checkout's path, the folder three levels above the main
-   * script's, so each checkout has its own taskbar entry and relaunches itself.
+   * script's, so each checkout has its own taskbar entry and relaunches itself. A packaged build's taskbar shows its
+   * program's icon, because the Windows shell cannot read a file inside the app's archive; a development build's shows
+   * the icon file.
    *
    * @param isPackaged Whether the build is packaged.
    * @param executablePath The running program.
+   * @param iconFile The icon file a development build's taskbar shows.
    * @param mainScript The desktop's main script, which a development build passes to Electron.
    * @param argv The process's command-line arguments.
    * @param workingDirectory The directory relative paths in the arguments resolve against.
@@ -3504,10 +3507,10 @@ export declare class TaskbarIdentity {
    * ```ts
    * import { TaskbarIdentity } from "@noldova/teamrun-shell-desktop";
    *
-   * export const identity: TaskbarIdentity = TaskbarIdentity.create(false, "/checkout/electron", "/checkout/main.js", ["--data-dir=data"], "/checkout");
+   * export const identity: TaskbarIdentity = TaskbarIdentity.create(false, "/checkout/electron", "/checkout/assets/icons/icon-dark.ico", "/checkout/main.js", ["--data-dir=data"], "/checkout");
    * ```
    */
-  public static create(isPackaged: boolean, executablePath: string, mainScript: string, argv: readonly string[], workingDirectory: string): TaskbarIdentity;
+  public static create(isPackaged: boolean, executablePath: string, iconFile: string, mainScript: string, argv: readonly string[], workingDirectory: string): TaskbarIdentity;
 
   /**
    * The details for `BrowserWindow.setAppDetails`.
