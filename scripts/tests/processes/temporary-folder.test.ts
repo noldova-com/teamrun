@@ -7,8 +7,8 @@
  */
 
 import assert from "node:assert/strict";
-import { existsSync, realpathSync } from "node:fs";
-import { mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -25,7 +25,7 @@ class TemporaryFolderTests {
       const folder = await new TemporaryFolder().createAsync(process.platform, "tr-folder-");
       t.after(() => rm(folder, { recursive: true, force: true }));
 
-      assert.equal(path.dirname(folder), realpathSync(TemporaryFolder.locateRoot(process.platform)));
+      assert.equal(path.dirname(folder), await realpath(TemporaryFolder.locateRoot(process.platform)));
       assert.ok(path.basename(folder).startsWith("tr-folder-"));
       assert.equal((await stat(folder)).isDirectory(), true);
     });
