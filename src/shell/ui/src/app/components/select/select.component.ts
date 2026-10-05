@@ -40,7 +40,7 @@ export class SelectComponent {
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly isOpen: WritableSignal<boolean> = signal(false);
-  protected readonly besideList: OverlaySide = OverlaySide.below;
+  protected readonly optionTooltipSide: OverlaySide = OverlaySide.below;
 
   public readonly isExpanded: Signal<boolean> = this.isOpen.asReadonly();
 
