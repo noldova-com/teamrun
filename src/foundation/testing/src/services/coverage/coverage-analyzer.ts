@@ -70,8 +70,8 @@ export class CoverageAnalyzer {
   }
 
   private isProductionFile(name: string): boolean {
-    return name.endsWith(Resources.javaScriptFileSuffix)
-      || (name.endsWith(Resources.typeScriptFileSuffix) && !name.endsWith(Resources.declarationFileSuffix));
+    return Resources.javaScriptFileSuffixes.some(t => name.endsWith(t))
+      || (Resources.typeScriptFileSuffixes.some(t => name.endsWith(t)) && !Resources.declarationFileSuffixes.some(t => name.endsWith(t)));
   }
 
   private isMeasured(filePath: string, project: CoverageProject): boolean {

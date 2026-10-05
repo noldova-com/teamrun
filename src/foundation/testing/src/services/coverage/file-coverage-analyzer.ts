@@ -40,7 +40,7 @@ export class FileCoverageAnalyzer {
   }
 
   public async analyzeAsync(filePath: string, scriptEntries: readonly (readonly FunctionCoverage[])[]): Promise<FileCoverage> {
-    const isTypeScript = filePath.endsWith(Resources.typeScriptFileSuffix);
+    const isTypeScript = Resources.typeScriptFileSuffixes.some(t => filePath.endsWith(t));
     const fileText = isTypeScript
       ? this.stripTypes(filePath, await readFile(filePath, FileCoverageAnalyzer.TEXT_ENCODING), scriptEntries.length > 0 ? pathToFileURL(filePath).href : undefined)
       : await readFile(filePath, FileCoverageAnalyzer.TEXT_ENCODING);
