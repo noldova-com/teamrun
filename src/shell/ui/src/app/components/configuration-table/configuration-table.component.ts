@@ -20,8 +20,7 @@ import { ConfigurationTableActionDirective } from "./configuration-table-action.
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
   host: {
-    "class": "tr-configuration-table",
-    "[class.tr-configuration-table-flush]": "flush()"
+    "class": "tr-configuration-table"
   }
 })
 export class ConfigurationTableComponent {
@@ -31,7 +30,6 @@ export class ConfigurationTableComponent {
   public readonly label = input<string>(String.empty);
   public readonly level = input<number>(Resources.configurationTableHeadingLevel);
   public readonly explanation = input<string>(String.empty);
-  public readonly flush = input<boolean>(false);
 
   protected readonly hasHeader: Signal<boolean> = computed(() => !String.isNullOrEmpty(this.heading()) || this.actions().length > 0);
 }

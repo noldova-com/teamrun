@@ -68,7 +68,7 @@ LICENSE file in the root directory of this source tree.
 
 <tr-gallery-specimen [name]="text.configurationTable">
   @for (table of configurationTables; track table.label) {
-    <tr-configuration-table class="tr-gallery-table" [class.tr-gallery-narrow]="!table.heading" [heading]="table.heading" [label]="table.label" [explanation]="table.explanation" [flush]="!table.heading">
+    <tr-configuration-table class="tr-gallery-table" [class.tr-gallery-narrow]="!table.heading" [heading]="table.heading" [label]="table.label" [explanation]="table.explanation">
       @if (table.heading) {
         <button type="button" tr-button trConfigurationTableAction [variant]="variants.Secondary">{{ text.configurationAdd }}</button>
       }
@@ -76,7 +76,7 @@ LICENSE file in the root directory of this source tree.
         <thead>
           <tr>
             <th scope="col">{{ text.configurationName }}</th>
-            <th scope="col">{{ text.configurationValue }}</th>
+            <th scope="col" trConfigurationTableFill>{{ text.configurationValue }}</th>
             <th scope="col">{{ text.configurationScope }}</th>
             <th scope="col" [attr.aria-label]="text.configurationActions"></th>
           </tr>
@@ -85,7 +85,7 @@ LICENSE file in the root directory of this source tree.
           @for (row of text.configurationRows.slice(0, table.rowCount); track row.name) {
             <tr>
               <td>{{ row.name }}</td>
-              <td>{{ row.value }}</td>
+              <td trConfigurationTableFill>{{ row.value }}</td>
               <td>{{ row.scope }}</td>
               <td>
                 <span class="tr-gallery-table-actions">

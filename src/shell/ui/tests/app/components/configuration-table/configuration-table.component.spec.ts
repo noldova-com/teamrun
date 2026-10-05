@@ -82,61 +82,90 @@ describe("ConfigurationTableComponent", () => {
 
         for (const cell of cells()) {
           const style = getComputedStyle(cell);
-          for (const side of ["top", "right", "bottom", "left"])
+          const sides = ["top", "bottom", ...cell.previousElementSibling === null ? [] : ["left"], ...cell.nextElementSibling === null ? [] : ["right"]];
+          for (const side of sides)
             AppearanceFixture.expectLook(style.getPropertyValue(`padding-${side}`), theme, "space-2", `padding-${side}`);
           AppearanceFixture.expectLook(style.borderBottomWidth, theme, "border-width", "border-bottom-width");
           expect([style.borderBottomStyle, style.borderBottomColor, style.borderTopStyle, style.textAlign, style.verticalAlign])
-            .toEqual(["solid", AppearanceFixture.readColor(theme, mode, "surface.border"), "none", "start", "top"]);
+            .toEqual(["solid", AppearanceFixture.readColor(theme, mode, "surface.border"), "none", "start", "baseline"]);
         }
-        expect([...fixture.nativeElement.querySelectorAll("th")].map((t: HTMLElement) => getComputedStyle(t).fontWeight)).toEqual(["600", "600", "600"]);
+        expect([...fixture.nativeElement.querySelectorAll("th")].map((t: HTMLElement) => getComputedStyle(t).fontWeight)).toEqual(["600", "600", "600", "600"]);
         expect(getComputedStyle(find("td")).fontWeight).toBe("400");
+        AppearanceFixture.expectLook(getComputedStyle(find("td.tr-configuration-table-fill")).minWidth, theme, "text-field-width", "min-width");
         const heading = getComputedStyle(find(".tr-configuration-table-heading"));
         expect([heading.fontWeight, heading.color, getComputedStyle(find(".tr-configuration-table-explanation")).color])
           .toEqual(["600", AppearanceFixture.readColor(theme, mode, "foreground"), AppearanceFixture.readColor(theme, mode, "foreground")]);
       });
 
-  it("drops the outer padding of the first and last cells when flush, keeping the rest", async () => {
+  it("puts the first cell's text and the last cell's button on the ends of the lines, with no outer padding", async () => {
     await renderAsync();
-    const padding = (): string[][] => [...fixture.nativeElement.querySelectorAll("tr")].map((row: HTMLElement) => [...row.children]
-      .map(t => `${getComputedStyle(t).paddingLeft} ${getComputedStyle(t).paddingRight}`));
-    const space = getComputedStyle(find("td")).paddingTop;
-    const full = `${space} ${space}`;
+    const name = document.createRange();
+    name.selectNodeContents(find(".short td"));
+    const line = box(".short td");
 
-    expect(padding()).toEqual([[full, full, full], [full, full, full], [full, full, full]]);
+    expect([...fixture.nativeElement.querySelectorAll("tr")].map((row: HTMLElement) => [getComputedStyle(row.firstElementChild as Element).paddingLeft, getComputedStyle(row.lastElementChild as Element).paddingRight]))
+      .toEqual([["0px", "0px"], ["0px", "0px"], ["0px", "0px"]]);
+    AppearanceFixture.expectPixels(name.getBoundingClientRect().left, box("table").left);
+    AppearanceFixture.expectPixels(line.left, box("table").left);
+    AppearanceFixture.expectPixels(box(".remove").right, box("table").right);
+  });
 
-    await changeAsync(t => t.flush.set(true));
+  it("keeps every column but the free-text one on one line, and gives the free-text column the rest of the width", async () => {
+    await renderAsync();
+    const lines = (cell: Element): number => {
+      const range = document.createRange();
+      range.selectNodeContents(cell);
+      return range.getClientRects().length;
+    };
+    const short = [...fixture.nativeElement.querySelectorAll(".short td:not(.tr-configuration-table-fill)")].map(t => [getComputedStyle(t).whiteSpace, lines(t)]);
+    const others = [...fixture.nativeElement.querySelectorAll(".short td:not(.tr-configuration-table-fill)")].reduce((sum: number, t: Element) => sum + t.getBoundingClientRect().width, 0);
 
-    expect(padding()).toEqual([[`0px ${space}`, full, `${space} 0px`], [`0px ${space}`, full, `${space} 0px`], [`0px ${space}`, full, `${space} 0px`]]);
-    expect(getComputedStyle(find("td")).paddingTop).toBe(space);
+    expect(short).toEqual([["nowrap", 1], ["nowrap", 1], ["nowrap", 1]]);
+    expect(lines(find(".long .tr-configuration-table-fill"))).toBeGreaterThan(1);
+    AppearanceFixture.expectPixels(box(".short .tr-configuration-table-fill").width + others, box("table").width);
+  });
+
+  it("lines each cell's first line up with the label of the button in its row", async () => {
+    await renderAsync();
+    const baseline = (host: Element): number => {
+      const probe = document.createElement("span");
+      probe.style.display = "inline-block";
+      host.prepend(probe);
+      const bottom = probe.getBoundingClientRect().bottom;
+      probe.remove();
+      return bottom;
+    };
+    const label = baseline(find(".remove [data-truncates]"));
+
+    expect([...fixture.nativeElement.querySelectorAll(".short td:not(:last-child)")].map(t => Math.round(baseline(t) - label))).toEqual([0, 0, 0]);
   });
 
   it("grows a row to hold text that wraps, without scrolling sideways", async () => {
     await renderAsync();
-    const value = find(".long td:nth-child(2)");
+    const value = find(".long .tr-configuration-table-fill");
     const range = document.createRange();
     range.selectNodeContents(value);
     const lines = range.getClientRects().length;
     const style = getComputedStyle(value);
 
     expect(lines).toBeGreaterThan(1);
-    AppearanceFixture.expectPixels(box(".long").height, lines * Number.parseFloat(style.lineHeight) + 2 * Number.parseFloat(style.paddingTop) + Number.parseFloat(style.borderBottomWidth));
     expect(box(".long").height).toBeGreaterThan(box(".short").height);
+    expect(box(".long").height).toBeGreaterThanOrEqual(lines * Number.parseFloat(style.lineHeight) + 2 * Number.parseFloat(style.paddingTop));
     expect(scroll().scrollWidth).toBeLessThanOrEqual(scroll().clientWidth);
   });
 
-  it("scrolls sideways only once the table can shrink no further, leaving room for a focus outline at its edges", async () => {
+  it("scrolls sideways only once the table can shrink no further, keeping the free-text column a text field wide and leaving room for a focus outline at its edges", async () => {
     await renderAsync();
-    await changeAsync(t => t.flush.set(true));
     const room = 3 * Number.parseFloat(getComputedStyle(find("td")).borderBottomWidth);
 
     expect([getComputedStyle(scroll()).overflowX, scroll().scrollWidth <= scroll().clientWidth]).toEqual(["auto", true]);
-    AppearanceFixture.expectPixels(box("tr-configuration-table").right - box(".remove").right, 0);
     AppearanceFixture.expectPixels(box(".tr-configuration-table-scroll").right - box(".remove").right, room);
     AppearanceFixture.expectPixels(box("table").left - box(".tr-configuration-table-scroll").left, room);
 
-    await changeAsync(t => t.width.set("6rem"));
+    await changeAsync(t => t.width.set("12rem"));
 
     expect(scroll().scrollWidth).toBeGreaterThan(scroll().clientWidth);
     expect(box("table").width).toBeGreaterThan(box("tr-configuration-table").width);
+    expect(box(".short .tr-configuration-table-fill").width).toBeGreaterThanOrEqual(AppearanceFixture.measureLook("text-field-width") - 0.5);
   });
 });

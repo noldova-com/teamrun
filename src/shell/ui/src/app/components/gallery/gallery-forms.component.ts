@@ -19,6 +19,7 @@ import { ChoicePillsComponent } from "../choice-pills/choice-pills.component";
 import { ConfigurationTableActionDirective } from "../configuration-table/configuration-table-action.directive";
 import { ConfigurationTableComponent } from "../configuration-table/configuration-table.component";
 import { ConfigurationTableDirective } from "../configuration-table/configuration-table.directive";
+import { ConfigurationTableFillDirective } from "../configuration-table/configuration-table-fill.directive";
 import { ProgressComponent } from "../progress/progress.component";
 import { SelectComponent } from "../select/select.component";
 import { SpinnerComponent } from "../spinner/spinner.component";
@@ -29,7 +30,7 @@ import { GallerySpecimenComponent } from "./gallery-specimen.component";
 
 @Component({
   selector: "tr-gallery-forms",
-  imports: [ButtonComponent, CheckboxComponent, ChipComponent, ChoicePillsComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective, GallerySpecimenComponent, IconButtonComponent, ProgressComponent, SelectComponent, SpinnerComponent, TextFieldComponent, TooltipDirective],
+  imports: [ButtonComponent, CheckboxComponent, ChipComponent, ChoicePillsComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective, ConfigurationTableFillDirective, GallerySpecimenComponent, IconButtonComponent, ProgressComponent, SelectComponent, SpinnerComponent, TextFieldComponent, TooltipDirective],
   templateUrl: "./gallery-forms.component.html",
   styleUrl: "./gallery-forms.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush

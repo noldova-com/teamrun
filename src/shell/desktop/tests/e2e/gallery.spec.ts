@@ -259,7 +259,29 @@ test.describe("gallery", () => {
         const explanation = (t.querySelector(".tr-configuration-table-explanation") as HTMLElement).getBoundingClientRect();
         const rows = [...(wide as HTMLElement).querySelectorAll("tbody tr")].map(r => r.getBoundingClientRect().height);
         const separators = [...(wide as HTMLElement).querySelectorAll("th, td")].map(c => getComputedStyle(c).borderBottomStyle);
+        const grid = ((wide as HTMLElement).querySelector("table") as HTMLElement).getBoundingClientRect();
+        const first = document.createRange();
+        first.selectNodeContents((wide as HTMLElement).querySelector("tbody td") as Element);
+        const remove = ((wide as HTMLElement).querySelector("tbody tr td:last-child button:last-child") as HTMLElement).getBoundingClientRect();
+        const baseline = (host: Element): number => {
+          const probe = document.createElement("span");
+          probe.style.display = "inline-block";
+          host.prepend(probe);
+          const bottom = probe.getBoundingClientRect().bottom;
+          probe.remove();
+          return bottom;
+        };
+        const row = (wide as HTMLElement).querySelector("tbody tr") as HTMLElement;
+        const label = baseline(row.querySelector("td:last-child button [data-truncates]") as Element);
+        const scope = document.createRange();
+        scope.selectNodeContents(row.children[2] as Element);
+        const token = document.createRange();
+        token.selectNodeContents((small as HTMLElement).querySelectorAll("tbody tr")[1]?.children[1] as Element);
         return {
+          edges: [Math.round(first.getBoundingClientRect().left - grid.left), Math.round(grid.right - remove.right), Math.round(heading.left - grid.left), Math.round(grid.right - add.right)],
+          baselines: [...row.querySelectorAll("td:not(:last-child)")].map(c => Math.round(baseline(c) - label)),
+          scopeLines: scope.getClientRects().length,
+          tokenLines: token.getClientRects().length,
           isAddOnHeadingRow: add.top < heading.bottom && add.bottom > heading.top && add.left > heading.left,
           isExplanationBetween: explanation.top >= Math.max(heading.bottom, add.bottom) && (wide as HTMLElement).getBoundingClientRect().top >= explanation.bottom,
           isLongRowTaller: (rows.at(-1) ?? 0) > Math.max(...rows.slice(0, -1)),
@@ -268,9 +290,14 @@ test.describe("gallery", () => {
           isNarrowScrolling: (small as HTMLElement).scrollWidth > (small as HTMLElement).clientWidth
         };
       });
-      expect(layout).toEqual({ isAddOnHeadingRow: true, isExplanationBetween: true, isLongRowTaller: true, separators: ["solid"], isWideScrolling: false, isNarrowScrolling: true });
+      expect(layout).toEqual({ edges: [0, 0, 0, 0], baselines: [0, 0, 0], scopeLines: 1, tokenLines: 1, isAddOnHeadingRow: true, isExplanationBetween: true, isLongRowTaller: true, separators: ["solid"], isWideScrolling: false, isNarrowScrolling: true });
       await expect(narrow.getByRole("row")).toHaveCount(3);
+      const area = specimen.locator(".tr-configuration-table-scroll").last();
+      await area.evaluate(t => t.scrollTo({ left: t.scrollWidth }));
+      await area.hover();
+      await expect(narrow.getByRole("button", { name: "Remove LANG" })).toBeInViewport();
       await desktop.checkpointAsync(`configuration-table-${mode.toLowerCase()}`);
+      await window.mouse.move(0, 0);
     }
   });
 });
