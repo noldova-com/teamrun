@@ -137,7 +137,7 @@ export class DesktopApplicationTests {
   public opensAHiddenSecureWindowWithTrafficLightsOnMacOS(): Promise<void> {
     return DesktopApplicationTests.verifyWindowAsync("darwin", window => {
       Assert.isUndefined(window.options.titleBarOverlay);
-      Assert.areEqual(JSON.stringify({ x: 12, y: 10 }), JSON.stringify(window.options.trafficLightPosition));
+      Assert.areEqual(JSON.stringify({ x: 12, y: 9 }), JSON.stringify(window.options.trafficLightPosition));
     });
   }
 

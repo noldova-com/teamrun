@@ -15,7 +15,8 @@
 .tr-toolbar-band {
   display: flex;
   flex-direction: column;
-  padding-inline: var(--tr-toolbar-gap);
+  gap: var(--tr-band-gap);
+  padding: 0 var(--tr-toolbar-gap) var(--tr-band-gap);
 }
 
 .tr-toolbar-row {
@@ -23,7 +24,7 @@
   align-items: center;
   gap: var(--tr-toolbar-gap);
   box-sizing: border-box;
-  height: var(--tr-toolbar-row);
+  height: var(--tr-toolbar-button);
   min-width: 0;
 }
 

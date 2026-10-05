@@ -144,7 +144,7 @@ export class Resources {
   public static readonly preloadParameter: string = "preloadPath";
   public static readonly hiddenTitleBarStyle: "hidden" = "hidden";
   public static readonly denyWindowOpen: "deny" = "deny";
-  public static readonly trafficLightPosition: Readonly<{ x: number; y: number }> = { x: 12, y: 10 };
+  public static readonly trafficLightPosition: Readonly<{ x: number; y: number }> = { x: 12, y: 9 };
   public static readonly willNavigateEvent: "will-navigate" = "will-navigate";
   public static readonly willRedirectEvent: "will-redirect" = "will-redirect";
   public static readonly willAttachWebviewEvent: "will-attach-webview" = "will-attach-webview";

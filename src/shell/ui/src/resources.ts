@@ -126,7 +126,7 @@ export class Resources {
     "menu-item-inset",
     "menu-item-padding",
     "menu-trail-gap",
-    "toolbar-row",
+    "band-gap",
     "toolbar-button",
     "toolbar-button-padding",
     "toolbar-gap",
