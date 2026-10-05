@@ -102,6 +102,9 @@ export class Resources {
   public static readonly runAsNodeVariable: string = "ELECTRON_RUN_AS_NODE";
   public static readonly runAsNodeValue: string = "1";
   public static readonly workWaitInterval: number = 2000;
+  public static readonly stableConnectionPeriod: number = 30000;
+  public static readonly reconnectionDelays: readonly number[] = [0, 1000, 2000, 4000, 8000];
+  public static readonly endedByRuntime: string = "the runtime ended it.";
   public static readonly deviceDirectoryArgument: string = "--device-dir=";
   public static readonly handoverArguments: readonly string[] = [Resources.dataDirectoryArgument, Resources.userDataArgument, Resources.deviceDirectoryArgument];
   public static readonly windowsPlatform: string = "win32";
@@ -307,6 +310,14 @@ export class Resources {
 
   public static formatConnectionEnded(code: string, message: string): string {
     return `The desktop ended its connection to the runtime, so it connects again (${code}): ${message}`;
+  }
+
+  public static formatEndedByDesktop(code: string, message: string): string {
+    return `the desktop ended it (${code}): ${message}`;
+  }
+
+  public static formatReconnectionStopped(cause: string): string {
+    return `The connection to the runtime ended ${Resources.reconnectionDelays.length + 1} times in a row, each within ${Resources.stableConnectionPeriod / 1000} seconds of connecting, so the desktop stopped connecting again. The last time, ${cause}`;
   }
 
   public static formatEventNotForwarded(name: string, reason: string): string {

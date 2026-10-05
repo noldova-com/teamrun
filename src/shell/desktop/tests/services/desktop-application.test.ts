@@ -633,6 +633,23 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async waitsBeforeReconnectingAfterAConnectionEndsSoonAgainAndStopsWaitingWhenQuitting(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher();
+    const electron = await DesktopStartFixture.startReadyAsync("linux", launcher);
+
+    launcher.listener?.onDisconnected(null);
+    await setImmediate();
+    launcher.listener?.onDisconnected(null);
+    await setImmediate();
+    const waiting = electron.ipcMain.invoke("teamrun:readStartup", DesktopStartFixture.trustedEvent("linux"));
+    electron.app.emit("will-quit");
+    await setImmediate();
+
+    Assert.areEqual(JSON.stringify({ kind: "Connecting", details: [] }), JSON.stringify(waiting));
+    Assert.areEqual(2, launcher.calls.length);
+  }
+
+  @TestMethod
   public async restoresTheSavedBoundsBeforeShowingTheWindow(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     connection.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: false });

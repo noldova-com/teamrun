@@ -8,6 +8,7 @@
 
 import type { Locator, Page } from "@playwright/test";
 
+import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import SettingsFixture from "./fixtures/settings.fixture.ts";
@@ -31,6 +32,11 @@ interface IBridge {
 interface IKeptRecord {
   readonly note: Element | null;
   readonly clock: Element | null;
+}
+
+interface IStartupRecord {
+  readonly kind: string;
+  readonly at: number;
 }
 
 function scrollAsync(content: Locator): Promise<number> {
@@ -183,5 +189,41 @@ test.describe("reconnecting", () => {
     await expect(runtime).toHaveAttribute("data-continued", "1");
     await expect(runtime).toHaveText(first);
     await expect(window.locator("tr-workspace")).not.toHaveAttribute("inert");
+  });
+});
+
+test.describe("reconnecting backoff", () => {
+  test.use({ desktopVariant: BuildVariantFixture.noModules });
+
+  test("a connection that receives an invalid frame each time it is ready ends, after waits that grow, in the start failure with its cause, and trying again connects", async ({ desktop }) => {
+    const window = desktop.window;
+    await window.evaluate(() => {
+      const states: IStartupRecord[] = [];
+      (Reflect.get(globalThis, "teamrun") as IBridge).onStartup(t => states.push({ kind: (t as { kind: string }).kind, at: performance.now() }));
+      Reflect.set(globalThis, "startups", states);
+    });
+    const readAsync = (): Promise<IStartupRecord[]> => window.evaluate(() => Reflect.get(globalThis, "startups") as IStartupRecord[]);
+    const reconnections = (count: number): string[] => Array.from({ length: count }, () => ["Connecting", "Ready"]).flat();
+
+    for (let end = 1; end < 6; end++) {
+      await desktop.receiveInvalidFrameAsync();
+      await expect.poll(async () => (await readAsync()).map(t => t.kind)).toEqual(reconnections(end));
+    }
+    await desktop.receiveInvalidFrameAsync();
+
+    const card = window.locator(".tr-startup-card");
+    await expect(card.locator(".tr-startup-detail")).toHaveText(/^The connection to the runtime ended 6 times in a row, .* The last time, the desktop ended it \(InvalidMessage\): .+/);
+    const stopped = await readAsync();
+    expect(stopped.map(t => t.kind)).toEqual([...reconnections(5), "Failed"]);
+    const waited = (stopped.at(-1)?.at ?? 0) - (stopped[0]?.at ?? 0);
+    expect(waited).toBeGreaterThanOrEqual(14_900);
+    expect(waited).toBeLessThan(30_000);
+    await card.getByRole("button", { name: "Try again" }).click();
+    await expect.poll(async () => (await readAsync()).map(t => t.kind)).toEqual([...reconnections(5), "Failed", "Connecting", "Ready"]);
+    await expect(window.locator("tr-workspace")).not.toHaveAttribute("inert");
+    const logged = desktop.acceptFailures(/The desktop ended its connection to the runtime|The runtime could not be started or reached/);
+    expect(logged).toHaveLength(6);
+    expect(logged.slice(0, 5).every(t => t.includes("so it connects again (InvalidMessage): "))).toBe(true);
+    expect(logged[5]).toContain("so the desktop stopped connecting again. The last time, the desktop ended it (InvalidMessage): ");
   });
 });
