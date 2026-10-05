@@ -207,6 +207,7 @@ test.describe("settings", () => {
     await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
 
     await expect(split.locator(".tr-shortcut-name")).toHaveText("shell.splitTabUp");
+    await window.locator(".tr-settings-content").hover({ position: { x: 4, y: 4 } });
     for (const scheme of ["light", "dark"] as const) {
       await window.emulateMedia({ colorScheme: scheme });
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
@@ -217,6 +218,7 @@ test.describe("settings", () => {
     await expect(split.locator(".tr-shortcut-title")).toHaveText("Split the tab up");
     await expect(split.locator(".tr-shortcut-name mark")).toHaveText(["bU"]);
     await expect(split.locator(".tr-shortcut-title mark")).toHaveCount(0);
+    await expect(window.locator(".tr-settings-pages [aria-selected=true]")).toHaveCount(0);
     expect(await split.locator(".tr-shortcut-name mark").evaluate(t => getComputedStyle(t).textDecorationLine)).toBe("underline");
     for (const scheme of ["light", "dark"] as const) {
       await window.emulateMedia({ colorScheme: scheme });
