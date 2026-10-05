@@ -80,6 +80,20 @@ describe("SettingsComponent", () => {
     await fixture.whenStable();
   }
 
+  function pageSelect(host: HTMLElement): HTMLButtonElement {
+    return host.querySelector(".tr-settings-page-select .tr-select-button") as HTMLButtonElement;
+  }
+
+  async function chooseClockAsync(host: HTMLElement): Promise<void> {
+    host.style.width = "37rem";
+    await page.getByRole("button", { name: "Clock", exact: true }).click();
+    fixture.detectChanges();
+  }
+
+  function framesAsync(): Promise<void> {
+    return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  }
+
   beforeEach(async () => {
     DesktopBridgeFixture.install("linux");
     settings = new FakeSettingsService();
@@ -121,6 +135,91 @@ describe("SettingsComponent", () => {
     });
     expect([texts("[aria-current=page]"), texts(".tr-settings-group-title"), texts(".tr-setting-row-title")]).toEqual([["Clock"], ["Words", "Ticks"], ["Greeting", "Tick step"]]);
     expect(markers).toEqual([true, false]);
+  });
+
+  it("swaps its page list for a Settings pages select at the start of the search row below 34rem inside its padding, and changes page and leaves a search through it", async () => {
+    const host = render();
+    const select = (): HTMLButtonElement => host.querySelector(".tr-settings-page-select .tr-select-button") as HTMLButtonElement;
+    const shown = (): readonly boolean[] => [".tr-settings-pages", ".tr-settings-page-select"].map(t => getComputedStyle(host.querySelector(t) as Element).display !== "none");
+    const box = (selector: string): DOMRect => (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
+    host.style.width = "37rem";
+    const wide = shown();
+    host.style.width = "calc(37rem - 1px)";
+    const narrow = shown();
+    const row = [box(".tr-settings-page-select").top === box(".tr-settings-search-field").top, box(".tr-settings-page-select").left < box(".tr-settings-search-field").left];
+    const filled = Math.abs(box(".tr-settings-content").width - (box(".tr-settings-body").width)) < 1;
+
+    await userEvent.click(select());
+    await page.getByRole("option", { name: "Clock" }).click();
+    fixture.detectChanges();
+    const clock = [select().getAttribute("aria-label"), texts(".tr-settings-group-title")];
+    await searchAsync("greeting");
+    const searching = select().getAttribute("aria-label");
+    await userEvent.click(select());
+    await page.getByRole("option", { name: "Appearance" }).click();
+    fixture.detectChanges();
+    host.style.width = "15rem";
+    const stacked = box(".tr-settings-page-select").bottom <= box(".tr-settings-search-field").top;
+
+    expect([wide, narrow]).toEqual([[true, false], [false, true]]);
+    expect([row, filled]).toEqual([[true, true], true]);
+    expect(clock).toEqual(["Settings pages, Clock", ["Words", "Ticks"]]);
+    expect(searching).toBe("Settings pages, Search results");
+    expect([(host.querySelector(".tr-settings-search-field") as HTMLInputElement).value, select().getAttribute("aria-label"), texts(".tr-settings-group-title")])
+      .toEqual(["", "Settings pages, Appearance", ["Theme", "Text"]]);
+    expect(stacked).toBe(true);
+  });
+
+  it("moves focus to the page control it now shows when it switches between the page list and the select, and to no control that was not focused", async () => {
+    const host = render();
+    const field = host.querySelector(".tr-settings-search-field") as HTMLInputElement;
+    await chooseClockAsync(host);
+
+    host.style.width = "15rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(pageSelect(host)));
+    host.style.width = "37rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(host.querySelector(".tr-settings-page-current")));
+    host.style.width = "15rem";
+    (document.activeElement as HTMLElement).blur();
+    await vi.waitFor(() => expect(document.activeElement).toBe(pageSelect(host)));
+    await searchAsync("greeting");
+    field.focus();
+    host.style.width = "37rem";
+    await framesAsync();
+    const searching = document.activeElement;
+    host.style.width = "15rem";
+    await framesAsync();
+    pageSelect(host).focus();
+    host.style.width = "37rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(host.querySelector(".tr-settings-page")));
+
+    expect(searching).toBe(field);
+  });
+
+  it("closes the Settings pages list when it widens while the list is open, moving focus to the current page, and leaves focus that moved elsewhere", async () => {
+    const host = render();
+    const outside = document.body.appendChild(document.createElement("button"));
+    await chooseClockAsync(host);
+    host.style.width = "15rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(pageSelect(host)));
+    await userEvent.click(pageSelect(host));
+    await expect.element(page.getByRole("listbox")).toBeVisible();
+
+    host.style.width = "37rem";
+    await vi.waitFor(() => expect(document.querySelector("[role=listbox]")).toBeNull());
+    await vi.waitFor(() => expect(document.activeElement).toBe(host.querySelector(".tr-settings-page-current")));
+    host.style.width = "15rem";
+    await vi.waitFor(() => expect(document.activeElement).toBe(pageSelect(host)));
+    await userEvent.click(pageSelect(host));
+    await expect.element(page.getByRole("listbox")).toBeVisible();
+    await userEvent.click(outside);
+    await vi.waitFor(() => expect(document.querySelector("[role=listbox]")).toBeNull());
+    host.style.width = "37rem";
+    await framesAsync();
+    const kept = document.activeElement;
+    outside.remove();
+
+    expect(kept).toBe(outside);
   });
 
   it("reveals the scrollbars of its page list and its content while they are hovered", () => {
