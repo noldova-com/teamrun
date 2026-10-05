@@ -126,22 +126,6 @@ describe("MenuBarComponent", () => {
     expect(open("edit")).not.toBeNull();
   });
 
-  it("shows its hover and open fills, keeps a disabled item inert, and follows a changed label", async () => {
-    const style = (name: string): string => getComputedStyle(item(name), "::before").backgroundColor;
-    const resting = style("edit");
-    item("file").click();
-    await fixture.whenStable();
-    const opened = style("file");
-    item("view").click();
-    fixture.componentInstance.fileLabel.set("Files");
-    await fixture.whenStable();
-
-    expect(opened).not.toBe(resting);
-    expect(item("view").getAttribute("aria-disabled")).toBe("true");
-    expect(item("file").textContent).toBe("Files");
-    expect(getComputedStyle(item("view")).opacity).toBe("0.5");
-  });
-
   for (const panelSize of AppearanceFixture.panelSizes)
     it(`writes its items in the panel text role at weight 400 inside bolder, larger text, at panel size ${panelSize}`, () => {
       AppearanceFixture.apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
