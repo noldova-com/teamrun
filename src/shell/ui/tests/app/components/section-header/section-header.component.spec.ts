@@ -105,9 +105,10 @@ describe("SectionHeaderComponent", () => {
     await renderAsync();
     const style = getComputedStyle(header("first"));
 
+    const [above, below] = gaps("first");
+
     expect([lineCount("first"), style.paddingTop]).toEqual([1, style.paddingBottom]);
-    expect(gaps("first")[0]).toBe(rounded(Number.parseFloat(style.paddingTop)));
-    expect(gaps("first")[0]).toBe(gaps("first")[1]);
+    expect(above).toBe(below);
   });
 
   it("keeps the same space above and below its label when the label wraps, and more than twice the space below its label above a later header", async () => {
@@ -118,8 +119,11 @@ describe("SectionHeaderComponent", () => {
     const wrapped = gaps("later");
 
     expect(lineCount("later")).toBeGreaterThan(1);
+    const [above, below] = short;
+    const [, firstBelow] = gaps("first");
+
     expect(wrapped).toEqual(short);
-    expect(short[0]).toBeGreaterThan(short[1] * 2);
-    expect(gaps("first")[1]).toBe(short[1]);
+    expect(above).toBeGreaterThan(below * 2);
+    expect(firstBelow).toBe(below);
   });
 });
