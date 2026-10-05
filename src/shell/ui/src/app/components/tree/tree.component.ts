@@ -22,10 +22,11 @@ import { TreeNode } from "../../models/tree-node";
 import { TreePlace } from "../../models/tree-place";
 import { TreePlan } from "../../models/tree-plan";
 import { TreeDragSession } from "../../services/tree-drag-session";
+import { TreeRowDirective } from "./tree-row.directive";
 
 @Component({
   selector: "tr-tree",
-  imports: [CdkTree, CdkTreeNode, CdkTreeNodeDef],
+  imports: [CdkTree, CdkTreeNode, CdkTreeNodeDef, TreeRowDirective],
   templateUrl: "./tree.component.html",
   styleUrl: "./tree.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -36,12 +37,9 @@ export class TreeComponent {
   private readonly announcer: LiveAnnouncer = inject(LiveAnnouncer);
   private readonly injector: Injector = inject(Injector);
   private readonly tree: Signal<CdkTree<TreeNode, string>> = viewChild.required<CdkTree<TreeNode, string>>(CdkTree);
-  private readonly rows: Signal<readonly CdkTreeNode<TreeNode, string>[]> = viewChildren<CdkTreeNode<TreeNode, string>>(CdkTreeNode);
-
   private readonly area: Signal<ElementRef<HTMLElement>> = viewChild.required(CdkTree, { read: ElementRef<HTMLElement> });
-  private readonly elements: Signal<readonly ElementRef<HTMLElement>[]> = viewChildren(CdkTreeNode, { read: ElementRef<HTMLElement> });
-  private readonly seats: Signal<readonly (readonly [CdkTreeNode<TreeNode, string>, HTMLElement])[]> = computed(() =>
-    this.rows().flatMap((row, index) => this.elements().slice(index, index + 1).map(t => [row, t.nativeElement] as const)));
+  private readonly seats: Signal<readonly TreeRowDirective[]> = viewChildren(TreeRowDirective);
+  private readonly rows: Signal<readonly CdkTreeNode<TreeNode, string>[]> = computed(() => this.seats().map(t => t.node));
   private readonly opened: Set<string> = new Set();
   private readonly stopId: WritableSignal<string | null> = signal(null);
   private tops: ReadonlyMap<string, number> | null = null;
@@ -154,11 +152,11 @@ export class TreeComponent {
   }
 
   private nodeOf(element: Element): TreeNode | undefined {
-    return this.seats().find(([, item]) => item === element)?.[0].data;
+    return this.seats().find(t => t.element === element)?.node.data;
   }
 
   private topsOfRows(): ReadonlyMap<string, number> {
-    return new Map(this.seats().map(([row, item]) => [row.data.id, item.getBoundingClientRect().top]));
+    return new Map(this.seats().map(t => [t.node.data.id, t.element.getBoundingClientRect().top]));
   }
 
   private settle(before: readonly TreeNode[]): void {
@@ -168,18 +166,18 @@ export class TreeComponent {
     this.refocus = null;
     if (this.nodes() === before)
       return;
-    const next = this.seats().map(([row, item]) => [row.data.id, item, item.getBoundingClientRect().top] as const);
+    const next = this.seats().map(t => [t.node.data.id, t.element, t.element.getBoundingClientRect().top] as const);
     if (!matchMedia(Resources.reducedMotionQuery).matches)
-      for (const [id, item, top] of next) {
+      for (const [id, element, top] of next) {
         const shift = (tops?.get(id) ?? top) - top;
         if (shift !== 0)
-          item.animate({ translate: [`0 ${shift}px`, "0 0"] }, { duration: Resources.treeShiftDuration, easing: Resources.treeShiftEasing });
+          element.animate({ translate: [`0 ${shift}px`, "0 0"] }, { duration: Resources.treeShiftDuration, easing: Resources.treeShiftEasing });
       }
     this.rowOf(refocus)?.focus();
   }
 
   private elementOf(node: TreeNode): HTMLElement | undefined {
-    return this.seats().find(([row]) => row.data.id === node.id)?.[1];
+    return this.seats().find(t => t.node.data.id === node.id)?.element;
   }
 
   private rowOf(id: string | null): CdkTreeNode<TreeNode, string> | undefined {

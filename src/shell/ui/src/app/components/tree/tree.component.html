@@ -7,7 +7,7 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <cdk-tree class="tr-tree" [dataSource]="data()" [childrenAccessor]="childrenOf" [expansionKey]="keyOf" [trackBy]="trackBy" [attr.aria-label]="label()">
-  <cdk-tree-node *cdkTreeNodeDef="let node; level as level" #row="cdkTreeNode" #item class="tr-tree-row" [class.tr-tree-row-current]="node.id === current()"
+  <cdk-tree-node *cdkTreeNodeDef="let node; level as level" #row="cdkTreeNode" #item trTreeRow class="tr-tree-row" [class.tr-tree-row-current]="node.id === current()"
     [isExpandable]="node.isBranch" [cdkTreeNodeTypeaheadLabel]="node.label" [attr.aria-selected]="node.id === current()" [attr.aria-keyshortcuts]="movable() ? resources.treeMoveKeys : null"
     [style.--tr-tree-level]="level" (click)="choose(node)" (activation)="choose(node)" (focus)="take(row)"
     [class.tr-tree-row-dragging]="session.dragging()?.id === node.id" [class.tr-tree-row-drop]="session.drop()?.target.id === node.id && session.drop()?.place === places.Into"
