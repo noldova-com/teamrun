@@ -93,10 +93,8 @@ export class AppearanceFixture {
 
     const park = document.body.appendChild(document.createElement("div"));
     try {
-      const corners = [[0, 0], [innerWidth - 4, 0], [0, innerHeight - 4], [innerWidth - 4, innerHeight - 4]];
-      const [left, top] = corners.find(([x = 0, y = 0]) => !area.contains(document.elementFromPoint(x + 2, y + 2))) ?? [0, 0];
       park.popover = "manual";
-      park.style.cssText = `position: fixed; inset: auto; left: ${left}px; top: ${top}px; width: 4px; height: 4px; margin: 0; padding: 0; border: 0;`;
+      park.style.cssText = "position: fixed; inset: 0 auto auto 0; width: 4px; height: 4px; margin: 0; padding: 0; border: 0;";
       park.showPopover();
       await userEvent.hover(park);
       await vi.waitFor(() => expect([area.matches(":hover"), thumb()]).toEqual([false, AppearanceFixture.HIDDEN]));
