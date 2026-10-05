@@ -30,7 +30,7 @@
 
 .tr-tab-group-title {
   flex: 1;
-  padding-inline-start: calc(var(--tr-tab-inset) * 2 + var(--tr-tab-label-inset));
+  padding-inline-start: calc(var(--tr-tab-inset) * 2 + var(--tr-pill-padding));
   font-size: var(--tr-text-panel);
   font-weight: 600;
   color: var(--tr-text);

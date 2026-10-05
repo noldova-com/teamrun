@@ -171,8 +171,8 @@ describe("StatusBarItemComponent", () => {
       const pill = getComputedStyle(fixture.nativeElement.querySelector(".tr-status-bar-item"));
 
       AppearanceFixture.expectLook(host.height, theme, "status-bar-item-height", "height");
-      AppearanceFixture.expectLook(pill.paddingLeft, theme, "status-bar-item-padding", "padding-left");
-      AppearanceFixture.expectLook(pill.paddingRight, theme, "status-bar-item-padding", "padding-right");
+      AppearanceFixture.expectLook(pill.paddingLeft, theme, "pill-padding", "padding-left");
+      AppearanceFixture.expectLook(pill.paddingRight, theme, "pill-padding", "padding-right");
       AppearanceFixture.expectLook(pill.borderTopLeftRadius, theme, "radius-hover", "border-top-left-radius");
     });
 });

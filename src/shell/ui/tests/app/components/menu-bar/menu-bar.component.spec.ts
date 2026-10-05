@@ -142,6 +142,15 @@ describe("MenuBarComponent", () => {
     expect(getComputedStyle(item("view")).opacity).toBe("0.5");
   });
 
+  for (const theme of AppearanceFixture.themes)
+    it(`leaves the ${theme.id} theme's pill padding on both sides of an item, as toolbar buttons and tabs do`, () => {
+      AppearanceFixture.apply(theme, ThemeMode.Light);
+      const style = getComputedStyle(item("file"));
+
+      AppearanceFixture.expectLook(style.paddingLeft, theme, "pill-padding", "padding-left");
+      AppearanceFixture.expectLook(style.paddingRight, theme, "pill-padding", "padding-right");
+    });
+
   for (const panelSize of AppearanceFixture.panelSizes)
     it(`writes its items in the panel text role at weight 400 inside bolder, larger text, at panel size ${panelSize}`, () => {
       AppearanceFixture.apply(DefaultTheme.theme, ThemeMode.Light, panelSize);
