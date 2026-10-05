@@ -171,6 +171,15 @@ describe("SelectComponent", () => {
     expect([button().textContent?.includes("Sepia"), list(), getComputedStyle(button()).opacity]).toEqual([true, null, "0.5"]);
   });
 
+  it("ends a value too long for its width with an ellipsis", () => {
+    render();
+    (fixture.nativeElement.querySelector(".scroller") as HTMLElement).style.width = "8rem";
+    fixture.componentInstance.value.set("A theme whose name is far too long for the select");
+    fixture.detectChanges();
+
+    AppearanceFixture.expectTruncates(button().querySelector(".tr-select-value") as HTMLElement);
+  });
+
   it("shows its list's scrollbar thumb while the pointer is over the list", async () => {
     render(DefaultTheme.theme, ThemeMode.Dark);
     await openAsync();

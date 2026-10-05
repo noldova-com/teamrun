@@ -153,6 +153,14 @@ describe("StatusBarItemComponent", () => {
         expect([long, short]).toEqual("tooltip" in tooltip ? [tooltip.tooltip, tooltip.tooltip] : [LONG, null]);
       });
 
+  it("ends text too long for its width with an ellipsis", () => {
+    AppearanceFixture.apply();
+    const [fixture] = render(new StatusBarItemState(LONG));
+    (fixture.nativeElement as HTMLElement).style.width = "6rem";
+
+    AppearanceFixture.expectTruncates((fixture.nativeElement as HTMLElement).querySelector(".tr-status-bar-item-text") as HTMLElement);
+  });
+
   for (const theme of AppearanceFixture.themes)
     it(`is a pill with the ${theme.id} theme's status bar item geometry`, () => {
       AppearanceFixture.apply(theme);
@@ -163,8 +171,8 @@ describe("StatusBarItemComponent", () => {
       const pill = getComputedStyle(fixture.nativeElement.querySelector(".tr-status-bar-item"));
 
       AppearanceFixture.expectLook(host.height, theme, "status-bar-item-height", "height");
-      AppearanceFixture.expectLook(pill.paddingLeft, theme, "status-bar-item-padding", "padding-left");
-      AppearanceFixture.expectLook(pill.paddingRight, theme, "status-bar-item-padding", "padding-right");
+      AppearanceFixture.expectLook(pill.paddingLeft, theme, "pill-padding", "padding-left");
+      AppearanceFixture.expectLook(pill.paddingRight, theme, "pill-padding", "padding-right");
       AppearanceFixture.expectLook(pill.borderTopLeftRadius, theme, "radius-hover", "border-top-left-radius");
     });
 });

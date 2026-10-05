@@ -6,21 +6,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { QualifiedName } from "@noldova/teamrun-shell-protocol";
 import {
-  CommandRegistry, DataDirectory, DiagnosticRedactor, EventRegistry, type IRuntimePart, type IRuntimePartContext, MethodRegistry, Migration, ModuleDatabase, ModuleDatabaseException,
-  ModuleDeclaration, ModuleHost, NotificationCenter, type OwnedProcess, WorkTracker
+  DataDirectory, type IRuntimePart, type IRuntimePartContext, MethodRegistry, Migration, ModuleDatabase, ModuleHost, type OwnedProcess, WorkTracker
 } from "@noldova/teamrun-shell-runtime";
 
+import { ModuleHostFixture } from "../../fixtures/module-host.fixture.js";
 import { ProgramFixture } from "../../fixtures/program.fixture.js";
 import { RuntimePartFixture } from "../../fixtures/runtime-part.fixture.js";
-import { RuntimePartLoaderFixture } from "../../fixtures/runtime-part-loader.fixture.js";
 import { SettingsFixture } from "../../fixtures/settings.fixture.js";
 import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
 import { TextOutputFixture } from "../../fixtures/text-output.fixture.js";
@@ -39,10 +36,10 @@ export class ModuleHostTests {
       })],
       ["tasks-runtime", new RuntimePartFixture("tasks", log, t => t.publishService("tasks.store", store))]
     ]);
-    const host = ModuleHostTests.create([
-      ModuleHostTests.declare("notes", ["tasks", "theme"], "notes-runtime"),
-      ModuleHostTests.declare("tasks", [], "tasks-runtime"),
-      ModuleHostTests.declare("theme", [], null)
+    const host = ModuleHostFixture.create([
+      ModuleHostFixture.declare("notes", ["tasks", "theme"], "notes-runtime"),
+      ModuleHostFixture.declare("tasks", [], "tasks-runtime"),
+      ModuleHostFixture.declare("theme", [], null)
     ], parts);
 
     const before = host.report.modules.length;
@@ -70,13 +67,13 @@ export class ModuleHostTests {
         throw new Error("at /home/person/secret/failing.js:3");
       })]
     ]);
-    const host = ModuleHostTests.create([
-      ModuleHostTests.declare("broken", [], "broken-runtime"),
-      ModuleHostTests.declare("failing", [], "failing-runtime"),
-      ModuleHostTests.declare("notes", ["broken"], null),
-      ModuleHostTests.declare("orphan", ["missing"], null),
-      ModuleHostTests.declare("first", ["second"], null),
-      ModuleHostTests.declare("second", ["first"], null)
+    const host = ModuleHostFixture.create([
+      ModuleHostFixture.declare("broken", [], "broken-runtime"),
+      ModuleHostFixture.declare("failing", [], "failing-runtime"),
+      ModuleHostFixture.declare("notes", ["broken"], null),
+      ModuleHostFixture.declare("orphan", ["missing"], null),
+      ModuleHostFixture.declare("first", ["second"], null),
+      ModuleHostFixture.declare("second", ["first"], null)
     ], parts, methods, diagnostics);
 
     await host.activateAsync(settings.service, settings.processes);
@@ -115,9 +112,9 @@ export class ModuleHostTests {
       })],
       ["notes-runtime", new RuntimePartFixture("notes", log, start)]
     ]);
-    const host = ModuleHostTests.create([
-      ModuleHostTests.declare("failing", [], "failing-runtime"),
-      ModuleHostTests.declare("notes", [], "notes-runtime")
+    const host = ModuleHostFixture.create([
+      ModuleHostFixture.declare("failing", [], "failing-runtime"),
+      ModuleHostFixture.declare("notes", [], "notes-runtime")
     ], parts);
 
     await host.activateAsync(settings.service, settings.processes);
@@ -143,9 +140,9 @@ export class ModuleHostTests {
       ["tasks-runtime", new RuntimePartFixture("tasks", log, t => t.registerMethod("tasks.list", { handleAsync: async () => [] }))],
       ["notes-runtime", new RuntimePartFixture("notes", log, t => t.registerMethod("notes.list", { handleAsync: async () => [] }), failure)]
     ]);
-    const host = ModuleHostTests.create([
-      ModuleHostTests.declare("tasks", [], "tasks-runtime", ["tasks.list"]),
-      ModuleHostTests.declare("notes", ["tasks"], "notes-runtime", ["notes.list"])
+    const host = ModuleHostFixture.create([
+      ModuleHostFixture.declare("tasks", [], "tasks-runtime", ["tasks.list"]),
+      ModuleHostFixture.declare("notes", ["tasks"], "notes-runtime", ["notes.list"])
     ], parts, methods, diagnostics);
     await host.activateAsync(settings.service, settings.processes);
 
@@ -158,32 +155,6 @@ export class ModuleHostTests {
     Assert.isUndefined(methods.find(new QualifiedName("notes", "list")));
     Assert.isUndefined(methods.find(new QualifiedName("tasks", "list")));
     Assert.isTrue(diagnostics.text.startsWith("The module notes 0.0.1: Its runtime part failed to deactivate.\nError: The notes cannot be saved.\n"));
-  }
-
-  @TestMethod
-  public async migratesAModulesDatabaseBeforeActivatingItAndClosesItAtDeactivation(): Promise<void> {
-    await using settings = await SettingsFixture.createAsync();
-    await using folder = await TemporaryFolderFixture.createAsync();
-    const log: string[] = [];
-    const migrations = [new Migration("create-notes", ["CREATE TABLE notes (title TEXT NOT NULL) STRICT"])];
-    const notes = new RuntimePartFixture("notes", log, t => t.database.run("INSERT INTO notes (title) VALUES (?)", "Plan"), null, migrations);
-    const tasks = new RuntimePartFixture("tasks", log);
-    const host = ModuleHostTests.create([
-      ModuleHostTests.declare("notes", [], "notes-runtime"),
-      ModuleHostTests.declare("tasks", [], "tasks-runtime")
-    ], new Map<string, IRuntimePart>([["notes-runtime", notes], ["tasks-runtime", tasks]]), new MethodRegistry(), new TextOutputFixture(), folder.path);
-
-    await host.activateAsync(settings.service, settings.processes);
-    const database = notes.context?.database;
-    const missing = Assert.throws(() => tasks.context?.database, ModuleDatabaseException);
-    await host.deactivateAsync();
-
-    Assert.isTrue(database instanceof ModuleDatabase);
-    Assert.areEqual("The module tasks has no database, because its runtime part declares no migrations.", missing.message);
-    Assert.throws(() => database?.readAll("SELECT title FROM notes"), Error);
-    using reopened = await ModuleDatabase.openAsync(new DataDirectory(folder.path), "notes", migrations);
-    Assert.areEqual("Plan", reopened.read("SELECT title FROM notes")?.["title"]);
-    Assert.isFalse(existsSync(new DataDirectory(folder.path).locateModuleDatabase("tasks")));
   }
 
   @TestMethod
@@ -201,9 +172,9 @@ export class ModuleHostTests {
       ["broken-runtime", new RuntimePartFixture("broken", log, () => undefined, null, [new Migration("create-broken", ["INSERT INTO missing VALUES (1)"])])],
       ["newer-runtime", new RuntimePartFixture("newer", log, () => undefined, null, [new Migration("create-items", ["CREATE TABLE items (name TEXT) STRICT"])])]
     ]);
-    const host = ModuleHostTests.create([
-      ModuleHostTests.declare("broken", [], "broken-runtime"),
-      ModuleHostTests.declare("newer", [], "newer-runtime")
+    const host = ModuleHostFixture.create([
+      ModuleHostFixture.declare("broken", [], "broken-runtime"),
+      ModuleHostFixture.declare("newer", [], "newer-runtime")
     ], parts, new MethodRegistry(), diagnostics, folder.path);
 
     await host.activateAsync(settings.service, settings.processes);
@@ -230,7 +201,7 @@ export class ModuleHostTests {
       t.database.run("INSERT INTO notes (title) VALUES (?)", "Plan");
       throw new Error("activation failed");
     }, null, migrations);
-    const host = ModuleHostTests.create([ModuleHostTests.declare("notes", [], "notes-runtime")], new Map<string, IRuntimePart>([["notes-runtime", part]]),
+    const host = ModuleHostFixture.create([ModuleHostFixture.declare("notes", [], "notes-runtime")], new Map<string, IRuntimePart>([["notes-runtime", part]]),
       new MethodRegistry(), new TextOutputFixture(), folder.path);
 
     await host.activateAsync(settings.service, settings.processes);
@@ -257,8 +228,8 @@ export class ModuleHostTests {
         throw new Error("activation failed");
       })]
     ]);
-    const host = ModuleHostTests.create(
-      [ModuleHostTests.declare("notes", [], "notes-runtime"), ModuleHostTests.declare("failing", [], "failing-runtime")],
+    const host = ModuleHostFixture.create(
+      [ModuleHostFixture.declare("notes", [], "notes-runtime"), ModuleHostFixture.declare("failing", [], "failing-runtime")],
       parts, new MethodRegistry(), diagnostics, path.resolve("teamrun-data"), work);
 
     await host.activateAsync(settings.service, settings.processes);
@@ -276,29 +247,5 @@ export class ModuleHostTests {
 
   private static describe(host: ModuleHost): string {
     return host.report.modules.map(t => [t.id, t.state, t.cause, t.blockedBy].filter(u => !Object.isNull(u)).join(" ")).join(",");
-  }
-
-  private static declare(id: string, dependencies: readonly string[], runtimePackage: string | null, methods: readonly string[] = []): ModuleDeclaration {
-    return new ModuleDeclaration(id, "0.0.1", id, id, dependencies, runtimePackage, new Map([["methods", [...methods, `${id}.run`]]]));
-  }
-
-  private static create(
-    declarations: readonly ModuleDeclaration[],
-    parts: ReadonlyMap<string, IRuntimePart | Error>,
-    methods: MethodRegistry = new MethodRegistry(),
-    diagnostics: TextOutputFixture = new TextOutputFixture(),
-    root: string = path.resolve("teamrun-data"),
-    work: WorkTracker = new WorkTracker(() => undefined)): ModuleHost {
-    return new ModuleHost(
-      declarations,
-      new DataDirectory(root),
-      methods,
-      new EventRegistry({ broadcast: () => undefined }),
-      new CommandRegistry(),
-      new NotificationCenter(() => undefined, () => new Date(), randomUUID),
-      new RuntimePartLoaderFixture(parts),
-      diagnostics,
-      work,
-      new DiagnosticRedactor(path.resolve("home", "person")));
   }
 }

@@ -11,13 +11,32 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import "@noldova/teamrun-foundation-core";
-import { type BuildIdentity, Handshake, type Response } from "@noldova/teamrun-shell-protocol";
-import { DataDirectory, DiscoveryReader, Endpoint, type RuntimeDiscovery, RuntimeHost, RuntimeOptions, ServerSettings } from "@noldova/teamrun-shell-runtime";
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { type BuildIdentity, Event, Handshake, NotificationPost, NotificationSeverity, QualifiedName, Request, Response, WireDecoder } from "@noldova/teamrun-shell-protocol";
+import { DataDirectory, DiscoveryReader, Endpoint, type RuntimeDiscovery, RuntimeEntry, RuntimeHost, RuntimeOptions, ServerSettings } from "@noldova/teamrun-shell-runtime";
 
 import { RawConnectionFixture } from "./raw-connection.fixture.js";
 import { SocketFolderFixture } from "./socket-folder.fixture.js";
 
 export class RuntimeHostFixture implements AsyncDisposable {
+  public static readonly PART: string = [
+    "import { mkdir, writeFile } from \"node:fs/promises\";",
+    "import path from \"node:path\";",
+    "",
+    "export class RuntimePart {",
+    "  async activateAsync(context) {",
+    "    this.folder = context.moduleFolder;",
+    "    context.registerMethod(`${context.moduleId}.echo`, { handleAsync: async request => request.payload });",
+    "  }",
+    "",
+    "  async deactivateAsync() {",
+    "    await mkdir(this.folder, { recursive: true });",
+    "    await writeFile(path.join(this.folder, \"deactivated\"), \"yes\");",
+    "  }",
+    "}",
+    ""
+  ].join("\n");
+
   private readonly connections: RawConnectionFixture[] = [];
   private currentHost: RuntimeHost | null = null;
 
@@ -73,6 +92,113 @@ export class RuntimeHostFixture implements AsyncDisposable {
     this.connections.push(connection);
     connection.sendMessages(new Handshake(`${client}:0`, identity, discovery.token, client));
     return [connection, await connection.readResponseAsync()];
+  }
+
+  public static alarm(title: string, kind: string = "clock.alarm"): NotificationPost {
+    return new NotificationPost(QualifiedName.parse(kind), "window", title, null, NotificationSeverity.Warning, null, [], null);
+  }
+
+  public static async readMessagesAsync(connection: RawConnectionFixture, count: number): Promise<[Map<string, Response>, Event[]]> {
+    const responses = new Map<string, Response>();
+    const events: Event[] = [];
+    for (let index = 0; index < count; index++) {
+      const message = new WireDecoder().decode(await connection.readTextAsync());
+      if (message instanceof Response)
+        responses.set(String(message.id), message);
+      else if (message instanceof Event)
+        events.push(message);
+    }
+    return [responses, events];
+  }
+
+  public static async readResponsesAsync(connection: RawConnectionFixture, count: number): Promise<Map<string, Response>> {
+    const responses = new Map<string, Response>();
+    for (let index = 0; index < count; index++) {
+      const response = await connection.readResponseAsync();
+      responses.set(String(response.id), response);
+    }
+    return responses;
+  }
+
+  public static async callAsync(connection: RawConnectionFixture, id: string, method: QualifiedName, payload: JsonValue): Promise<Response> {
+    connection.sendMessages(new Request(id, method, payload));
+    return await connection.readResponseAsync();
+  }
+
+  public static createNotificationPart(): string {
+    const protocol = import.meta.resolve("@noldova/teamrun-shell-protocol");
+    return [
+      `import { CommandRun, NotificationAction, NotificationPost, QualifiedName } from ${JSON.stringify(protocol)};`,
+      "",
+      "export class RuntimePart {",
+      "  async activateAsync(context) {",
+      "    const tick = new NotificationAction(\"Tick\", new CommandRun(QualifiedName.parse(\"clock.tick\"), null));",
+      "    context.postNotification(new NotificationPost(QualifiedName.parse(\"clock.alarm\"), null, \"Synced\", null, \"Success\", null, [tick], 1));",
+      "  }",
+      "",
+      "  async deactivateAsync() {",
+      "  }",
+      "}",
+      ""
+    ].join("\n");
+  }
+
+  public static createCommandPart(): string {
+    const api = pathToFileURL(path.join(path.dirname(RuntimeEntry.entryPath), "..", "api", "index.js")).href;
+    return [
+      `import { RuntimeCommand } from ${JSON.stringify(api)};`,
+      "",
+      "export class RuntimePart {",
+      "  async activateAsync(context) {",
+      "    const tick = new RuntimeCommand(\"clock.tick\", \"Tick\", \"timer\", \"Mod+Alt+T\", { handleAsync: async request => ({ client: request.client, arguments: request.payload }) });",
+      "    const pause = new RuntimeCommand(\"clock.pause\", \"Pause\", null, null, { handleAsync: async () => {",
+      "      pause.setChecked(true);",
+      "      tick.setEnabled(false);",
+      "      return null;",
+      "    } }, false);",
+      "    context.registerCommand(tick);",
+      "    context.registerCommand(pause);",
+      "  }",
+      "",
+      "  async deactivateAsync() {",
+      "  }",
+      "}",
+      ""
+    ].join("\n");
+  }
+
+  public static createWorkPart(): string {
+    const api = pathToFileURL(path.join(path.dirname(RuntimeEntry.entryPath), "..", "api", "index.js")).href;
+    return [
+      "import { writeFileSync } from \"node:fs\";",
+      "import path from \"node:path\";",
+      "",
+      `import { RuntimeCommand } from ${JSON.stringify(api)};`,
+      "",
+      "export class RuntimePart {",
+      "  async activateAsync(context) {",
+      "    context.registerCommand(new RuntimeCommand(\"clock.tick\", \"Tick\", \"timer\", \"Mod+Alt+T\", { handleAsync: async () => {",
+      "      const folder = await context.getWorkFolderAsync();",
+      "      const work = context.beginWork(\"Ticking\");",
+      "      context.log.write(\"Ticking began\");",
+      "      work.signal.addEventListener(\"abort\", () => {",
+      "        writeFileSync(path.join(folder, \"aborted\"), \"\");",
+      "        work[Symbol.dispose]();",
+      "      });",
+      "      return null;",
+      "    } }));",
+      "  }",
+      "",
+      "  async deactivateAsync() {",
+      "  }",
+      "}",
+      ""
+    ].join("\n");
+  }
+
+  public static async runAsync(test: (fixture: RuntimeHostFixture) => Promise<void>): Promise<void> {
+    await using fixture = await RuntimeHostFixture.createAsync();
+    await test(fixture);
   }
 
   public async [Symbol.asyncDispose](): Promise<void> {
