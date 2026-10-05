@@ -21,10 +21,10 @@ export class ToastService {
   private readonly notifications: NotificationService = inject(NotificationService);
   private readonly document: Document = inject(DOCUMENT);
   private readonly announcer: LiveAnnouncer = inject(LiveAnnouncer);
-  private readonly visibleIds: WritableSignal<readonly number[]> = signal([]);
+  private readonly visibleIds: WritableSignal<readonly string[]> = signal([]);
   private readonly lastByKind: Map<string, number> = new Map();
-  private readonly timers: Map<number, { handle: ReturnType<typeof setTimeout> | null; remaining: number; startedAt: number }> = new Map();
-  private queue: number[] = [];
+  private readonly timers: Map<string, { handle: ReturnType<typeof setTimeout> | null; remaining: number; startedAt: number }> = new Map();
+  private queue: string[] = [];
   private shown: Notification[] = [];
   private firstRead: NotificationState | null = null;
   private highestSequence: number = 0;
@@ -47,12 +47,12 @@ export class ToastService {
     });
   }
 
-  public close(id: number): void {
+  public close(id: string): void {
     this.remove(id);
     this.announce();
   }
 
-  public pause(id: number): void {
+  public pause(id: string): void {
     const timer = this.timers.get(id);
     if (Object.isUndefined(timer) || Object.isNull(timer.handle))
       return;
@@ -60,14 +60,14 @@ export class ToastService {
     this.timers.set(id, { handle: null, remaining: Math.max(0, timer.remaining - (Date.now() - timer.startedAt)), startedAt: Date.now() });
   }
 
-  public resume(id: number): void {
+  public resume(id: string): void {
     const timer = this.timers.get(id);
     if (Object.isUndefined(timer) || !Object.isNull(timer.handle))
       return;
     this.startTimer(id, timer.remaining);
   }
 
-  private remove(id: number): void {
+  private remove(id: string): void {
     const timer = this.timers.get(id);
     ToastService.clear(timer?.handle ?? null);
     this.timers.delete(id);
@@ -114,7 +114,7 @@ export class ToastService {
       this.queue.push(notification.id);
   }
 
-  private show(id: number): boolean {
+  private show(id: string): boolean {
     const notification = this.notifications.state().notifications.find(t => t.id === id);
     if (Object.isUndefined(notification))
       return false;
@@ -134,7 +134,7 @@ export class ToastService {
     void this.announcer.announce(text, shown.some(t => t.post.severity === NotificationSeverity.Error) ? Resources.assertiveAnnouncement : Resources.politeAnnouncement);
   }
 
-  private startTimer(id: number, milliseconds: number): void {
+  private startTimer(id: string, milliseconds: number): void {
     this.timers.set(id, { handle: setTimeout(() => this.close(id), milliseconds), remaining: milliseconds, startedAt: Date.now() });
   }
 

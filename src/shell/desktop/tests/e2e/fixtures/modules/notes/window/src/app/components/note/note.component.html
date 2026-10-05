@@ -9,7 +9,7 @@ LICENSE file in the root directory of this source tree.
 <h1 class="tr-notes-note-title" [attr.data-fixture-content]="'notes-note-' + instance()">{{ title() }}</h1>
 <input class="tr-notes-note-tag" type="text" aria-label="Tag" value="draft">
 <textarea class="tr-notes-note-summary" aria-label="Summary"></textarea>
-<p class="tr-notes-note-runtime" data-fixture-content="notes-runtime">Runtime {{ runtime() }}</p>
+<p class="tr-notes-note-runtime" data-fixture-content="notes-runtime" [attr.data-continued]="continued()">Runtime {{ runtime() }}</p>
 @for (section of sections; track section) {
   <h2>{{ section }}</h2>
   <p>This section collects what we decided, what is still open and who follows up. Each item links back to the conversation where it came up, so the reasoning stays next to the decision.</p>

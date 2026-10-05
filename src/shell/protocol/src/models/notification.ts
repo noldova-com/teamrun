@@ -17,14 +17,14 @@ import { NotificationPost } from "./notification-post.js";
 export class Notification {
   private static readonly FIELDS: readonly string[] = [Resources.idField, Resources.sequenceField, Resources.postField, Resources.postedAtField, Resources.isReadField];
 
-  public readonly id: number;
+  public readonly id: string;
   public readonly sequence: number;
   public readonly post: NotificationPost;
   public readonly postedAt: string;
   public readonly isRead: boolean;
 
-  public constructor(id: number, sequence: number, post: NotificationPost, postedAt: string, isRead: boolean) {
-    if (!Number.isSafeInteger(id) || id < 1)
+  public constructor(id: string, sequence: number, post: NotificationPost, postedAt: string, isRead: boolean) {
+    if (String.isNullOrWhitespace(id))
       throw new ArgumentException(Resources.notificationIdInvalid, Resources.idField);
     if (!Number.isSafeInteger(sequence) || sequence < 1)
       throw new ArgumentException(Resources.notificationSequenceInvalid, Resources.sequenceField);
@@ -42,7 +42,7 @@ export class Notification {
     const reader = JsonReader.fromValue(value, path);
     WireContract.requireKnownFields(reader, Notification.FIELDS);
     return WireContract.create(reader, () => {
-      const id = reader.readInteger(Resources.idField);
+      const id = reader.readString(Resources.idField);
       const sequence = reader.readInteger(Resources.sequenceField);
       const post = reader.readObject(Resources.postField);
       return new Notification(

@@ -3157,9 +3157,9 @@ export declare class NotificationPost {
  */
 export declare class Notification {
   /**
-   * The id the runtime gave it, from 1.
+   * The id the runtime gave it: an opaque string that no other notification has, in this run of the runtime or any other.
    */
-  public readonly id: number;
+  public readonly id: string;
 
   /**
    * Its place in the order the runtime received posts, from 1: each post and re-post takes the next number, and an update
@@ -3190,19 +3190,19 @@ export declare class Notification {
    * @param post What was posted.
    * @param postedAt When it was posted.
    * @param isRead Whether it was read.
-   * @throws ArgumentException synchronously when the id or the sequence is not a whole number from 1 or the time is not a date
+   * @throws ArgumentException synchronously when the id is blank, the sequence is not a whole number from 1 or the time is not a date
    * and time.
    *
    * @example
    * ```ts
    * import { Notification, NotificationPost } from "@noldova/teamrun-shell-protocol";
    *
-   * export function hold(post: NotificationPost): Notification {
-   *   return new Notification(1, 1, post, new Date().toISOString(), false);
+   * export function hold(id: string, post: NotificationPost): Notification {
+   *   return new Notification(id, 1, post, new Date().toISOString(), false);
    * }
    * ```
    */
-  public constructor(id: number, sequence: number, post: NotificationPost, postedAt: string, isRead: boolean);
+  public constructor(id: string, sequence: number, post: NotificationPost, postedAt: string, isRead: boolean);
 
   /**
    * Reads the notification from its wire form, which accepts no unknown fields.
@@ -3217,7 +3217,7 @@ export declare class Notification {
    * import { Notification } from "@noldova/teamrun-shell-protocol";
    *
    * export const notification: Notification = Notification.fromJson({
-   *   id: 1, sequence: 1, post: { kind: "clock.alarm", title: "Alarm", severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false
+   *   id: "5f0c3a1e-2b7d-4c9e-8a61-0d4f2e7b9c13", sequence: 1, post: { kind: "clock.alarm", title: "Alarm", severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false
    * });
    * ```
    */
@@ -3305,7 +3305,7 @@ export declare class NotificationUpdate {
   /**
    * The notification's id.
    */
-  public readonly id: number;
+  public readonly id: string;
 
   /**
    * What replaces its post; its kind stays the notification's own.
@@ -3317,18 +3317,18 @@ export declare class NotificationUpdate {
    *
    * @param id The notification's id.
    * @param post The new post.
-   * @throws ArgumentException synchronously when the id is not a whole number from 1.
+   * @throws ArgumentException synchronously when the id is blank.
    *
    * @example
    * ```ts
    * import { NotificationPost, NotificationUpdate } from "@noldova/teamrun-shell-protocol";
    *
-   * export function change(id: number, post: NotificationPost): NotificationUpdate {
+   * export function change(id: string, post: NotificationPost): NotificationUpdate {
    *   return new NotificationUpdate(id, post);
    * }
    * ```
    */
-  public constructor(id: number, post: NotificationPost);
+  public constructor(id: string, post: NotificationPost);
 
   /**
    * Reads the update from its wire form, which accepts no unknown fields.
@@ -3342,7 +3342,7 @@ export declare class NotificationUpdate {
    * ```ts
    * import { NotificationUpdate } from "@noldova/teamrun-shell-protocol";
    *
-   * export const update: NotificationUpdate = NotificationUpdate.fromJson({ id: 1, post: { kind: "clock.alarm", title: "Alarm", severity: "Info", actions: [] } });
+   * export const update: NotificationUpdate = NotificationUpdate.fromJson({ id: "5f0c3a1e-2b7d-4c9e-8a61-0d4f2e7b9c13", post: { kind: "clock.alarm", title: "Alarm", severity: "Info", actions: [] } });
    * ```
    */
   public static fromJson(value: unknown, path?: string): NotificationUpdate;
@@ -3372,22 +3372,22 @@ export declare class NotificationReference {
   /**
    * The notification's id.
    */
-  public readonly id: number;
+  public readonly id: string;
 
   /**
    * Creates the reference.
    *
    * @param id The notification's id.
-   * @throws ArgumentException synchronously when the id is not a whole number from 1.
+   * @throws ArgumentException synchronously when the id is blank.
    *
    * @example
    * ```ts
    * import { NotificationReference } from "@noldova/teamrun-shell-protocol";
    *
-   * export const reference: NotificationReference = new NotificationReference(1);
+   * export const reference: NotificationReference = new NotificationReference("5f0c3a1e-2b7d-4c9e-8a61-0d4f2e7b9c13");
    * ```
    */
-  public constructor(id: number);
+  public constructor(id: string);
 
   /**
    * Reads the reference from its wire form, which accepts no unknown fields.
@@ -3401,7 +3401,7 @@ export declare class NotificationReference {
    * ```ts
    * import { NotificationReference } from "@noldova/teamrun-shell-protocol";
    *
-   * export const reference: NotificationReference = NotificationReference.fromJson({ id: 1 });
+   * export const reference: NotificationReference = NotificationReference.fromJson({ id: "5f0c3a1e-2b7d-4c9e-8a61-0d4f2e7b9c13" });
    * ```
    */
   public static fromJson(value: unknown, path?: string): NotificationReference;
@@ -3416,7 +3416,7 @@ export declare class NotificationReference {
    * import type { JsonObject } from "@noldova/teamrun-foundation-json";
    * import { NotificationReference } from "@noldova/teamrun-shell-protocol";
    *
-   * export const json: JsonObject = new NotificationReference(1).toJson();
+   * export const json: JsonObject = new NotificationReference("5f0c3a1e-2b7d-4c9e-8a61-0d4f2e7b9c13").toJson();
    * ```
    */
   public toJson(): JsonObject;

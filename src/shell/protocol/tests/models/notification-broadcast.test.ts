@@ -14,7 +14,7 @@ import { Notification, NotificationBroadcast, NotificationPost, NotificationSeve
 @TestClass
 export class NotificationBroadcastTests {
   private static readonly NOTIFICATION: Notification = new Notification(
-    1, 2, new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null), "2026-10-03T08:00:00.000Z", false);
+    "n1", 2, new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null), "2026-10-03T08:00:00.000Z", false);
 
   @TestMethod
   public pinsItsWireFormAndGivesEachDeviceItsOwnState(): void {
@@ -23,7 +23,7 @@ export class NotificationBroadcastTests {
     source.push("desk");
 
     Assert.areEqual(
-      "{\"notifications\":[{\"id\":1,\"sequence\":2,\"post\":{\"kind\":\"clock.alarm\",\"title\":\"Alarm\",\"severity\":\"Info\",\"actions\":[]},\"postedAt\":\"2026-10-03T08:00:00.000Z\",\"isRead\":false}],\"quietDevices\":[\"laptop\"],\"mutedModules\":[\"clock\"],\"sequence\":2}",
+      "{\"notifications\":[{\"id\":\"n1\",\"sequence\":2,\"post\":{\"kind\":\"clock.alarm\",\"title\":\"Alarm\",\"severity\":\"Info\",\"actions\":[]},\"postedAt\":\"2026-10-03T08:00:00.000Z\",\"isRead\":false}],\"quietDevices\":[\"laptop\"],\"mutedModules\":[\"clock\"],\"sequence\":2}",
       JSON.stringify(broadcast.toJson()));
     Assert.areEqual("true,false", [broadcast.stateFor("laptop").isDoNotDisturb, broadcast.stateFor("desk").isDoNotDisturb].join(","));
     Assert.areEqual("1|clock|2", `${broadcast.stateFor("desk").notifications.length}|${broadcast.stateFor("desk").mutedModules.join(",")}|${broadcast.stateFor("desk").sequence}`);

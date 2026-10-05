@@ -62,7 +62,7 @@ describe("ToastsComponent", () => {
   let errors: unknown[];
 
   const toast = (id: number, options: Partial<{ severity: NotificationSeverity; open: string; actions: readonly string[]; progress: number | typeof NotificationPost.indeterminate; text: string }> = {}): Notification =>
-    new Notification(id, id, new NotificationPost(
+    new Notification(String(id), id, new NotificationPost(
       QualifiedName.parse(`notes.kind${id}`), null, `Title ${id}`, options.text ?? null, options.severity ?? NotificationSeverity.Warning,
       options.open === undefined ? null : run(options.open), (options.actions ?? []).map(t => new NotificationAction(`Run ${t}`, run(t))), options.progress ?? null),
     "2026-10-03T08:00:00.000Z", false);
@@ -133,7 +133,7 @@ describe("ToastsComponent", () => {
   });
 
   it("names each toast's module, by the display name the runtime reports for it, and the time it was posted", async () => {
-    const clock = new Notification(2, 2, new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null),
+    const clock = new Notification("2", 2, new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null),
       "2026-10-03T08:05:00.000Z", false);
     const fixture = await renderAsync(clock, toast(1));
 
@@ -171,9 +171,9 @@ describe("ToastsComponent", () => {
     const resumedWhileFocused = resume.mock.calls.length;
     close.blur();
 
-    expect(pause).toHaveBeenCalledWith(1);
+    expect(pause).toHaveBeenCalledWith("1");
     expect(resumedWhileFocused).toBe(0);
-    expect(resume).toHaveBeenCalledWith(1);
+    expect(resume).toHaveBeenCalledWith("1");
   });
 
   for (const theme of AppearanceFixture.themes)

@@ -30,6 +30,14 @@ interface MainProcessSilence {
   readonly processorMilliseconds: number | null;
 }
 
+interface IActiveSocket {
+  readonly remoteAddress?: string;
+  readonly remotePort?: number;
+  readonly readable: boolean;
+  readonly writable: boolean;
+  destroy(): void;
+}
+
 export default class DesktopApplicationFixture {
   private static readonly MAIN: string = path.resolve("node_modules", "@noldova", "teamrun-shell-desktop", "main.js");
   private static readonly EXECUTABLE_RECORD: string = path.resolve("_build", "development-app", "path.txt");
@@ -239,6 +247,31 @@ export default class DesktopApplicationFixture {
 
   public async readRuntimeProcessIdAsync(): Promise<number | undefined> {
     return (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.processId;
+  }
+
+  public async breakRuntimeConnectionAsync(): Promise<void> {
+    const discovery = await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory));
+    if (discovery === null)
+      throw new Error(`No runtime discovery file was found in ${this.dataDirectory}, so the test could not tell which connection to break.`);
+    const found = await this.answerAsync("break its connection to the runtime", this.application.evaluate((_, port) => {
+      const handles = (Reflect.get(process, "_getActiveHandles") as () => object[]).call(process);
+      const standard: readonly object[] = [process.stdin, process.stdout, process.stderr];
+      const sockets = handles.filter(t => t.constructor.name === "Socket").map(t => {
+        const socket = t as IActiveSocket;
+        const isRuntime = port === null
+          ? socket.remoteAddress === undefined && socket.readable && socket.writable && !standard.includes(t)
+          : socket.remoteAddress === "127.0.0.1" && socket.remotePort === port;
+        const address = socket.remoteAddress === undefined ? "no remote address" : `${socket.remoteAddress}:${String(socket.remotePort)}`;
+        return { socket, isRuntime, description: `${address}, readable ${String(socket.readable)}, writable ${String(socket.writable)}, standard ${String(standard.includes(t))}` };
+      });
+      const matches = sockets.filter(t => t.isRuntime);
+      if (matches.length === 1)
+        for (const match of matches)
+          match.socket.destroy();
+      return { matched: matches.length, descriptions: sockets.map(t => t.description) };
+    }, Endpoint.parse(discovery.endpoint).port));
+    if (found.matched !== 1)
+      throw new Error(`The main process should hold one connection to the runtime at ${discovery.endpoint} but holds ${found.matched}. It found these sockets through process._getActiveHandles(), which Node does not document: ${found.descriptions.join("; ") || "none"}.`);
   }
 
   public async disposeAsync(hasFailed: boolean = this.testInfo.status !== this.testInfo.expectedStatus): Promise<void> {
