@@ -45,9 +45,9 @@ export class ModuleDeclaration {
     if (!Object.isUndefined(shellOnly))
       throw new ArgumentException(Resources.formatSettingKindReserved(id, shellOnly.name.text, shellOnly.type.kind), Resources.settingsField);
     const commands = contributions.get(Resources.commandsKind) ?? [];
-    const action = settings.find(t => t.type.kind === SettingKind.Action && !commands.includes(t.type.command?.text ?? ""));
+    const action = settings.find(t => t.type.kind === SettingKind.Action && !commands.includes(String(t.type.command)));
     if (!Object.isUndefined(action))
-      throw new ArgumentException(Resources.formatSettingCommandUnknown(id, action.name.text, action.type.command?.text ?? ""), Resources.settingsField);
+      throw new ArgumentException(Resources.formatSettingCommandUnknown(id, action.name.text, String(action.type.command)), Resources.settingsField);
 
     this.id = id;
     this.version = version;

@@ -11,7 +11,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandle
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
+import { type SettingDefinition, SettingKind } from "@noldova/teamrun-shell-protocol";
 import { SelectComponent, SelectOption, TextFieldComponent, TreeComponent, TreeNode } from "@noldova/teamrun-shell-ui";
 
 import { GalleryTokens } from "../../models/gallery-tokens";
@@ -150,14 +150,11 @@ export class SettingsComponent {
   }
 
   protected canRun(definition: SettingDefinition): boolean {
-    const command = definition.type.command;
-    return !Object.isNull(command) && this.commands.isAvailable(command.text);
+    return definition.type.kind === SettingKind.Action && this.commands.isAvailable(String(definition.type.command));
   }
 
   protected run(definition: SettingDefinition): void {
-    const command = definition.type.command;
-    if (!Object.isNull(command))
-      this.commands.run(command.text);
+    this.commands.run(String(definition.type.command));
   }
 
   private keepFocus(): void {
