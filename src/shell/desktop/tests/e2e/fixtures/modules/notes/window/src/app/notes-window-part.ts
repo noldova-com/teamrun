@@ -53,8 +53,11 @@ export class NotesWindowPart implements IWindowPart {
   ];
 
   private static readonly LONG_COUNT: string = "2 notes, neither pinned nor archived, both last changed today by the person who wrote them, and both waiting for review";
+  private static readonly SAVE_FAILED: NotificationPost = new NotificationPost(
+    QualifiedName.parse("notes.saveFailed"), null, "Note 2 couldn't be saved", "The disk is full.", NotificationSeverity.Error, null,
+    [new NotificationAction("New note", new CommandRun(QualifiedName.parse("notes.newNote"), null))], null);
 
-  private connectAsync: () => Promise<JsonReader> = () => Promise.reject(new Error("The notes window part is not active."));
+  private continueAsync: () => Promise<void> = () => Promise.reject(new Error("The notes window part is not active."));
 
   public readonly moduleId: string = "notes";
 
@@ -97,8 +100,14 @@ export class NotesWindowPart implements IWindowPart {
     context.provideMenuGroup("notes.mainRecent", () => [1, 2].map(week => new MenuRowContribution("notes.openNote", { week, title: `Week ${week}` }, `Week ${week}`)));
     context.registerTopBarAction(new TopBarActionContribution("notes.compose", new TopBarActionState("note_add", "New note", "notes.newNote")));
     context.registerTopBarAction(new TopBarActionContribution("notes.back", new TopBarActionState("arrow_back", "Back", "notes.sortByWeek"), TopBarSide.Start));
-    this.connectAsync = () => NotesWindowPart.readRuntimeAsync(context, counter);
-    const options = await this.connectAsync();
+    let saveFailed = await context.postNotificationAsync(NotesWindowPart.SAVE_FAILED);
+    const options = await NotesWindowPart.readOptionsAsync(context, counter);
+    this.continueAsync = async () => {
+      if (!await saveFailed.updateAsync(NotesWindowPart.SAVE_FAILED))
+        saveFailed = await context.postNotificationAsync(NotesWindowPart.SAVE_FAILED);
+      await NotesWindowPart.readOptionsAsync(context, counter);
+      NotesState.continued.update(t => t + 1);
+    };
     if (!options.readBoolean("isMany"))
       return;
     for (const [name, title, icon, side] of NotesWindowPart.MANY_VIEWS)
@@ -110,17 +119,14 @@ export class NotesWindowPart implements IWindowPart {
   }
 
   public async reconnectAsync(): Promise<boolean> {
-    await this.connectAsync();
+    await this.continueAsync();
     return true;
   }
 
   public async deactivateAsync(): Promise<void> {
   }
 
-  private static async readRuntimeAsync(context: IWindowPartContext, counter: StatusBarItem): Promise<JsonReader> {
-    await context.postNotificationAsync(new NotificationPost(
-      QualifiedName.parse("notes.saveFailed"), null, "Note 2 couldn't be saved", "The disk is full.", NotificationSeverity.Error, null,
-      [new NotificationAction("New note", new CommandRun(QualifiedName.parse("notes.newNote"), null))], null));
+  private static async readOptionsAsync(context: IWindowPartContext, counter: StatusBarItem): Promise<JsonReader> {
     const options = JsonReader.fromValue(await context.requestAsync("notes.options", null));
     NotesState.runtime.set(options.readString("runtime"));
     if (options.readBoolean("isLongCount"))

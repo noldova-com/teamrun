@@ -68,7 +68,7 @@ export class NotificationCenterTests {
     Assert.areEqual("2:Saved:00:00:02:false,1:Synced:00:00:01:false", NotificationCenterTests.describe(center.list));
     Assert.areEqual(1, center.list.notifications[1]?.post.progress);
     Assert.areEqual("Notification 1 is of the kind clock.sync, which an update keeps.", changed.message);
-    Assert.isFalse(center.update(9, NotificationCenterTests.post("clock.sync", null, "Gone")));
+    Assert.isFalse(center.update("9", NotificationCenterTests.post("clock.sync", null, "Gone")));
     Assert.areEqual(3, published.length);
   }
 
@@ -135,10 +135,26 @@ export class NotificationCenterTests {
     Assert.areEqual(101, center.list.notifications.length);
   }
 
+  @TestMethod
+  public givesEachNewNotificationARandomIdThatAnotherRunNeverGives(): void {
+    const first = new NotificationCenter(() => undefined, () => new Date());
+    const second = new NotificationCenter(() => undefined, () => new Date());
+
+    const ids = [
+      first.post(NotificationCenterTests.post("clock.alarm", null, "Alarm")),
+      first.post(NotificationCenterTests.post("clock.alarm", null, "Alarm")),
+      second.post(NotificationCenterTests.post("clock.alarm", null, "Alarm"))
+    ];
+
+    Assert.areEqual(3, new Set(ids).size);
+    Assert.isTrue(ids.every(t => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(t)));
+  }
+
   private static create(): { center: NotificationCenter; published: NotificationList[] } {
     const published: NotificationList[] = [];
     let seconds = 0;
-    const center = new NotificationCenter(t => published.push(t), () => new Date(Date.UTC(2026, 9, 3, 0, 0, ++seconds)));
+    let ids = 0;
+    const center = new NotificationCenter(t => published.push(t), () => new Date(Date.UTC(2026, 9, 3, 0, 0, ++seconds)), () => String(++ids));
     return { center, published };
   }
 

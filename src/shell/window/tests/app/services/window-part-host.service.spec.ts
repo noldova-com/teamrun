@@ -61,7 +61,6 @@ class FakeWindowPart implements IWindowPart {
   public readonly moduleId: string;
   public isDeactivationFailing: boolean = false;
   public onReconnect: () => boolean = () => false;
-  public onDeactivate: () => void = () => undefined;
 
   public constructor(moduleId: string, log: string[], onActivate: (context: IWindowPartContext) => void = () => undefined) {
     this.moduleId = moduleId;
@@ -83,7 +82,6 @@ class FakeWindowPart implements IWindowPart {
 
   public deactivateAsync(): Promise<void> {
     this.log.push(`deactivate ${this.moduleId}`);
-    this.onDeactivate();
     return this.isDeactivationFailing ? Promise.reject(new Error(`${this.moduleId} did not stop`)) : Promise.resolve();
   }
 }
@@ -281,22 +279,22 @@ describe("WindowPartHostService", () => {
 
   it("posts, updates and dismisses notifications through the runtime and reports a dismissal that fails", async () => {
     const post = new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Success, null, [], null);
-    bridge.responses.set("shell.postNotification", { payload: { id: 4 } });
+    bridge.responses.set("shell.postNotification", { payload: { id: "n4" } });
     bridge.responses.set("shell.updateNotification", { payload: null });
     bridge.responses.set("shell.dismissNotification", { failure: { code: "Unavailable", message: "Not connected." } });
     const { host } = start([], []);
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
     const id = await host.postNotificationAsync(post);
-    await host.updateNotificationAsync(id, post);
+    const isUpdated = await host.updateNotificationAsync(id, post);
     host.dismissNotification(id);
     await vi.waitFor(() => expect(errors.length).toBe(1));
 
-    expect(id).toBe(4);
+    expect([id, isUpdated]).toEqual(["n4", true]);
     expect(bridge.requests.slice(-3).map(t => [t[0], JSON.stringify(t[1])])).toEqual([
       ["shell.postNotification", JSON.stringify(post.toJson())],
-      ["shell.updateNotification", JSON.stringify({ id: 4, post: post.toJson() })],
-      ["shell.dismissNotification", JSON.stringify({ id: 4 })]
+      ["shell.updateNotification", JSON.stringify({ id: "n4", post: post.toJson() })],
+      ["shell.dismissNotification", JSON.stringify({ id: "n4" })]
     ]);
     expect((errors[0] as Error).message).toContain("Not connected.");
   });
@@ -727,61 +725,38 @@ describe("WindowPartHostService", () => {
     expect(errors).toEqual([]);
   });
 
-  it("forgets the notifications a part posted when the runtime drops, so neither its old handle nor its withdrawal touches a new runtime's notification with the same id", async () => {
+  it("keeps a part's notification handles across a reconnect, so an update reaches a notification the runtime still holds and tells the part when it is gone", async () => {
     const saved = new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Success, null, [], null);
-    const alarm = new NotificationPost(QualifiedName.parse("clock.alarm"), null, "Alarm", null, NotificationSeverity.Info, null, [], null);
-    bridge.responses.set("shell.postNotification", { payload: { id: 1 } });
+    bridge.responses.set("shell.postNotification", { payload: { id: "n1" } });
     bridge.responses.set("shell.updateNotification", { payload: null });
     bridge.responses.set("shell.dismissNotification", { payload: null });
     const handles: NotificationHandle[] = [];
     const notes = new FakeWindowPart("notes", log, t => {
       void t.postNotificationAsync(saved).then(u => handles.push(u));
     });
-    const clock = new FakeWindowPart("clock", log, t => void t.postNotificationAsync(alarm));
     notes.onReconnect = () => true;
-    clock.onReconnect = () => true;
-    const { host } = start(
-      [source("notes", notes, [], [], [], [], [], ["notes.saved"]), source("clock", clock, [], [], [], [], [], ["clock.alarm"])],
-      [status("notes"), status("clock", ModuleState.Failed, "It broke.")]);
+    const { host } = start([source("notes", notes, [], [], [], [], [], ["notes.saved"])], [status("notes")]);
     await vi.waitFor(() => expect(handles.length).toBe(1));
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
-    bridge.responses.set("shell.modules", { payload: { modules: [status("notes"), status("clock")] } });
     bridge.publishStartup({ kind: "Connecting", details: [] });
     bridge.publishStartup({ kind: "Ready", details: [] });
     await vi.waitFor(() => expect(host.generation()).toBe(2));
-    await Promise.all(handles.map(t => t.updateAsync(saved)));
-    bridge.responses.set("shell.modules", { payload: { modules: [status("notes", ModuleState.Failed, "It broke."), status("clock")] } });
+    const isHeld = await Promise.all(handles.map(t => t.updateAsync(saved)));
+    bridge.responses.set("shell.updateNotification", { failure: { code: "NotFound", message: "Notification n1 is gone; it was dismissed or its module stopped." } });
+    const isGone = await Promise.all(handles.map(t => t.updateAsync(saved)));
+    bridge.responses.set("shell.updateNotification", { failure: { code: "Unavailable", message: "TeamRun is not connected to its runtime." } });
+    const refusal = host.updateNotificationAsync("n2", saved);
+    await expect(refusal).rejects.toThrowError("TeamRun is not connected to its runtime.");
+    bridge.responses.set("shell.modules", { payload: { modules: [status("notes", ModuleState.Failed, "It broke.")] } });
     bridge.publishStartup({ kind: "Connecting", details: [] });
     bridge.publishStartup({ kind: "Ready", details: [] });
     await vi.waitFor(() => expect(host.generation()).toBe(3));
 
-    expect(log).toEqual(["activate notes", "reconnect notes", "activate clock", "reconnect clock", "deactivate notes"]);
-    expect(bridge.requests.filter(t => t[0].includes("Notification")).map(t => t[0])).toEqual(["shell.postNotification", "shell.postNotification"]);
-    expect(errors).toEqual([]);
-  });
-
-  it("forgets the notifications of a part still deactivating when the runtime drops, so its withdrawal touches none of the new runtime's", async () => {
-    bridge.responses.set("shell.postNotification", { payload: { id: 1 } });
-    bridge.responses.set("shell.dismissNotification", { payload: null });
-    const saved = new NotificationPost(QualifiedName.parse("notes.saved"), null, "Saved", null, NotificationSeverity.Success, null, [], null);
-    const notes = new FakeWindowPart("notes", log, t => void t.postNotificationAsync(saved));
-    let drops = 1;
-    notes.onDeactivate = () => {
-      if (drops-- === 0)
-        return;
-      bridge.publishStartup({ kind: "Connecting", details: [] });
-      bridge.publishStartup({ kind: "Ready", details: [] });
-    };
-    const { host } = start([source("notes", notes, [], [], [], [], [], ["notes.saved"])], [status("notes")]);
-    await vi.waitFor(() => expect(host.generation()).toBe(1));
-
-    bridge.publishStartup({ kind: "Connecting", details: [] });
-    bridge.publishStartup({ kind: "Ready", details: [] });
-    await vi.waitFor(() => expect(host.generation()).toBe(2));
-
-    expect(log).toEqual(["activate notes", "reconnect notes", "deactivate notes", "activate notes"]);
-    expect(bridge.requests.filter(t => t[0].includes("Notification")).map(t => t[0])).toEqual(["shell.postNotification", "shell.postNotification"]);
+    expect([isHeld, isGone]).toEqual([[true], [false]]);
+    expect(log).toEqual(["activate notes", "reconnect notes", "deactivate notes"]);
+    expect(bridge.requests.filter(t => t[0].includes("Notification")).map(t => t[0]))
+      .toEqual(["shell.postNotification", "shell.updateNotification", "shell.updateNotification", "shell.updateNotification"]);
     expect(errors).toEqual([]);
   });
 

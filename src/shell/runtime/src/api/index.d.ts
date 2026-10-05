@@ -5146,42 +5146,43 @@ export declare class RuntimeCommand {
  */
 export declare class NotificationHandle {
   /**
-   * The notification's id.
+   * The notification's id, which no other notification has, in this run of the runtime or any other.
    */
-  public readonly id: number;
+  public readonly id: string;
 
   /**
    * Creates the handle.
    *
    * @param id The notification's id.
-   * @param change Replaces the notification's post.
+   * @param change Replaces the notification's post and returns whether the notification was still there.
    * @param remove Dismisses the notification.
    * @example
    * ```ts
    * import { NotificationHandle } from "@noldova/teamrun-shell-runtime";
    *
-   * export const handle: NotificationHandle = new NotificationHandle(1, () => undefined, () => undefined);
+   * export const handle: NotificationHandle = new NotificationHandle(crypto.randomUUID(), () => true, () => undefined);
    * ```
    */
-  public constructor(id: number, change: (post: NotificationPost) => void, remove: () => void);
+  public constructor(id: string, change: (post: NotificationPost) => boolean, remove: () => void);
 
   /**
    * Replaces the notification's post, keeping its place, time and whether it was read; the kind stays the same.
    *
    * @param post The new post.
-   * @throws {RegistrationException} When the post's kind or commands are not allowed, its kind differs, or the
-   * notification is gone.
+   * @returns Whether the notification was still there. False means it is gone: the person dismissed it, it was cleared, or
+   * it was dropped from a full list; the part posts it again when it still matters.
+   * @throws {RegistrationException} When the post's kind or commands are not allowed, or its kind differs.
    * @example
    * ```ts
    * import type { NotificationHandle } from "@noldova/teamrun-shell-runtime";
    * import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
    *
-   * export function finish(handle: NotificationHandle): void {
-   *   handle.update(new NotificationPost(QualifiedName.parse("clock.sync"), null, "Synced", null, NotificationSeverity.Success, null, [], 1));
+   * export function finish(handle: NotificationHandle): boolean {
+   *   return handle.update(new NotificationPost(QualifiedName.parse("clock.sync"), null, "Synced", null, NotificationSeverity.Success, null, [], 1));
    * }
    * ```
    */
-  public update(post: NotificationPost): void;
+  public update(post: NotificationPost): boolean;
 
   /**
    * Dismisses the notification; dismissing it again does nothing.
@@ -5208,6 +5209,8 @@ export declare class NotificationCenter {
    *
    * @param publish Receives the whole list after every change.
    * @param now The clock that times new posts.
+   * @param createId Creates the id of each new notification, one that no notification had before; `crypto.randomUUID` by
+   * default.
    * @example
    * ```ts
    * import { NotificationCenter } from "@noldova/teamrun-shell-runtime";
@@ -5215,7 +5218,7 @@ export declare class NotificationCenter {
    * export const notifications: NotificationCenter = new NotificationCenter(t => console.log(t.notifications.length), () => new Date());
    * ```
    */
-  public constructor(publish: (list: NotificationList) => void, now: () => Date);
+  public constructor(publish: (list: NotificationList) => void, now: () => Date, createId?: () => string);
 
   /**
    * The notifications, newest first.
@@ -5236,16 +5239,16 @@ export declare class NotificationCenter {
    * ```ts
    * import type { NotificationCenter } from "@noldova/teamrun-shell-runtime";
    *
-   * export function isPosted(notifications: NotificationCenter, id: number): boolean {
+   * export function isPosted(notifications: NotificationCenter, id: string): boolean {
    *   return notifications.find(id) !== undefined;
    * }
    * ```
    */
-  public find(id: number): Notification | undefined;
+  public find(id: string): Notification | undefined;
 
   /**
-   * Adds a notification at the top, unread, with the next sequence. One with the same kind and key is replaced and keeps its
-   * id.
+   * Adds a notification at the top, unread, with a new id and the next sequence. One with the same kind and key is replaced
+   * and keeps its id.
    *
    * @param post What was posted, already allowed.
    * @returns The notification's id.
@@ -5254,12 +5257,12 @@ export declare class NotificationCenter {
    * import type { NotificationCenter } from "@noldova/teamrun-shell-runtime";
    * import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
    *
-   * export function announce(notifications: NotificationCenter): number {
+   * export function announce(notifications: NotificationCenter): string {
    *   return notifications.post(new NotificationPost(QualifiedName.parse("clock.alarm"), "morning", "Alarm", null, NotificationSeverity.Info, null, [], null));
    * }
    * ```
    */
-  public post(post: NotificationPost): number;
+  public post(post: NotificationPost): string;
 
   /**
    * Replaces a notification's post, keeping its place, sequence, time and whether it was read.
@@ -5273,12 +5276,12 @@ export declare class NotificationCenter {
    * import type { NotificationCenter } from "@noldova/teamrun-shell-runtime";
    * import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
    *
-   * export function change(notifications: NotificationCenter, id: number, post: NotificationPost): boolean {
+   * export function change(notifications: NotificationCenter, id: string, post: NotificationPost): boolean {
    *   return notifications.update(id, post);
    * }
    * ```
    */
-  public update(id: number, post: NotificationPost): boolean;
+  public update(id: string, post: NotificationPost): boolean;
 
   /**
    * Reports the list again unchanged, for a change the list does not hold, such as a device's Do not disturb.
@@ -5331,12 +5334,12 @@ export declare class NotificationCenter {
    * ```ts
    * import type { NotificationCenter } from "@noldova/teamrun-shell-runtime";
    *
-   * export function remove(notifications: NotificationCenter, id: number): void {
+   * export function remove(notifications: NotificationCenter, id: string): void {
    *   notifications.dismiss(id);
    * }
    * ```
    */
-  public dismiss(id: number): void;
+  public dismiss(id: string): void;
 
   /**
    * Removes every notification of a module's kinds.

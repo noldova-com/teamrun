@@ -164,10 +164,9 @@ export class ModuleContext implements IRuntimePartContext, Disposable {
     this.work.endOwnedBy(this.declaration.id);
   }
 
-  private updateNotification(id: number, post: NotificationPost): void {
+  private updateNotification(id: string, post: NotificationPost): boolean {
     this.notificationPolicy.requireDeclared(this.declaration, post);
-    if (!this.notifications.update(id, post))
-      throw new RegistrationException(Resources.formatNotificationNotFound(id));
+    return this.notifications.update(id, post);
   }
 
   private requireContributed(kind: string, name: string): QualifiedName {

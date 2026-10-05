@@ -344,7 +344,7 @@ export class DesktopApplication {
     return [...this.windows.values()].some(t => !t.window.isDestroyed() && t.window.isFocused());
   }
 
-  private openNotification(id: number): void {
+  private openNotification(id: string): void {
     this.focus()?.window.webContents.send(Resources.notificationOpenedChannel, id);
   }
 

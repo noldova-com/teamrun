@@ -12,4 +12,5 @@ export class NotesState {
   public static readonly sortBy: WritableSignal<string> = signal("week");
   public static readonly wrapsLines: WritableSignal<boolean> = signal(false);
   public static readonly runtime: WritableSignal<string> = signal("");
+  public static readonly continued: WritableSignal<number> = signal(0);
 }

@@ -1170,7 +1170,7 @@ export class DesktopApplicationTests {
     Assert.areEqual("Later", electron.notifications.created.map(t => t.title).join(","));
     Assert.isTrue(String(electron.notifications.created[0]?.options.icon).endsWith("icon-dark-512.png"));
     Assert.areEqual("restore,focus", window.calls.filter(t => t === "restore" || t === "focus").join(","));
-    Assert.areEqual(JSON.stringify([["teamrun:notificationOpened", 2]]), JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:notificationOpened")));
+    Assert.areEqual(JSON.stringify([["teamrun:notificationOpened", "2"]]), JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:notificationOpened")));
   }
 
   @TestMethod
@@ -1759,7 +1759,7 @@ export class DesktopApplicationTests {
   }
 
   private static wireNotification(id: number, title: string): JsonObject {
-    return { id, sequence: id, post: { kind: "clock.alarm", title, severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false };
+    return { id: String(id), sequence: id, post: { kind: "clock.alarm", title, severity: "Info", actions: [] }, postedAt: "2026-10-03T08:00:00.000Z", isRead: false };
   }
 
   private static firstWindow(electron: FakeElectron): FakeDesktopWindow {

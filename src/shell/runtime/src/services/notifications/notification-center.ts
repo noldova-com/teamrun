@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { randomUUID } from "node:crypto";
+
 import "@noldova/teamrun-foundation-core";
 import { Notification, NotificationList, NotificationPost } from "@noldova/teamrun-shell-protocol";
 
@@ -15,13 +17,14 @@ import { Resources } from "../../resources.js";
 export class NotificationCenter {
   private readonly publish: (list: NotificationList) => void;
   private readonly now: () => Date;
+  private readonly createId: () => string;
   private entries: readonly Notification[] = [];
-  private nextId: number = 1;
   private lastSequence: number = 0;
 
-  public constructor(publish: (list: NotificationList) => void, now: () => Date) {
+  public constructor(publish: (list: NotificationList) => void, now: () => Date, createId: () => string = randomUUID) {
     this.publish = publish;
     this.now = now;
+    this.createId = createId;
   }
 
   public get list(): NotificationList {
@@ -32,20 +35,20 @@ export class NotificationCenter {
     return this.lastSequence;
   }
 
-  public find(id: number): Notification | undefined {
+  public find(id: string): Notification | undefined {
     return this.entries.find(t => t.id === id);
   }
 
-  public post(post: NotificationPost): number {
+  public post(post: NotificationPost): string {
     const replaced = Object.isNull(post.key) ? undefined : this.entries.find(t => t.post.kind.text === post.kind.text && t.post.key === post.key);
-    const id = replaced?.id ?? this.nextId++;
+    const id = replaced?.id ?? this.createId();
     const posted = new Notification(id, ++this.lastSequence, post, this.now().toISOString(), false);
     this.entries = NotificationCenter.trim([posted, ...this.entries.filter(t => t.id !== id)]);
     this.publish(this.list);
     return id;
   }
 
-  public update(id: number, post: NotificationPost): boolean {
+  public update(id: string, post: NotificationPost): boolean {
     const current = this.find(id);
     if (Object.isUndefined(current))
       return false;
@@ -72,7 +75,7 @@ export class NotificationCenter {
     this.remove(t => !NotificationCenter.isInProgress(t));
   }
 
-  public dismiss(id: number): void {
+  public dismiss(id: string): void {
     this.remove(t => t.id === id);
   }
 
