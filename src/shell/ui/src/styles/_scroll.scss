@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "states";
+
 @property --tr-scroll-thumb {
   syntax: "<color>";
   inherits: false;
@@ -16,7 +18,7 @@
   transition: --tr-scroll-thumb 150ms linear;
 }
 
-:where(:hover) {
+:where(#{states.$hover}) {
   --tr-scroll-thumb: var(--tr-scrollbar);
 }
 
