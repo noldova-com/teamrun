@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { userEvent } from "vitest/browser";
+
 import { ThemeMode } from "../../src/app/enums/theme-mode";
 import type { Theme } from "../../src/app/models/theme";
 import { Typography } from "../../src/app/models/typography";
@@ -20,6 +22,7 @@ export class AppearanceFixture {
   private static readonly SHAPE_ATTRIBUTE: string = "data-tr-tab-shape";
   private static readonly LAYOUT_TOLERANCE: number = 1 / 32;
   private static readonly PIXEL_LENGTH: RegExp = /^-?[\d.]+px$/;
+  private static readonly HIDDEN: string = "rgba(0, 0, 0, 0)";
 
   public static readonly modes: readonly ThemeMode[] = [ThemeMode.Light, ThemeMode.Dark];
   public static readonly themes: readonly Theme[] = [DefaultTheme.theme, FixtureTheme.theme];
@@ -79,6 +82,18 @@ export class AppearanceFixture {
     const height = probe.getBoundingClientRect().height;
     probe.remove();
     return height;
+  }
+
+  public static async expectThumbRevealsOnHoverAsync(area: HTMLElement): Promise<void> {
+    const thumb = (): string => getComputedStyle(area).getPropertyValue("--tr-scroll-thumb");
+    const probe = document.body.appendChild(document.createElement("div"));
+    probe.style.color = "var(--tr-scrollbar)";
+    const shown = getComputedStyle(probe).color;
+    probe.remove();
+
+    expect([shown === AppearanceFixture.HIDDEN, thumb()]).toEqual([false, AppearanceFixture.HIDDEN]);
+    await userEvent.hover(area);
+    await vi.waitFor(() => expect(thumb()).toBe(shown));
   }
 
   public static readColor(theme: Theme, mode: ThemeMode, key: string): string {

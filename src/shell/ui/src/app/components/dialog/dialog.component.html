@@ -12,10 +12,8 @@ LICENSE file in the root directory of this source tree.
     <button type="button" tr-icon-button class="tr-dialog-close" [icon]="resources.closeGlyph" [label]="resources.dialogCloseLabel" (click)="dismissed.emit()"></button>
   }
 </div>
-<div class="tr-dialog-body tr-scroll-reveal">
-  <div class="tr-dialog-text">
-    <ng-content />
-  </div>
+<div class="tr-dialog-body">
+  <ng-content />
 </div>
 <div class="tr-dialog-actions">
   <ng-content select="[trDialogAction]" />
