@@ -43,9 +43,13 @@ export class CommandLineTests {
       [["run"], "The run command needs the name of a command to run."],
       [["run", "probe.echo", "{}", "extra"], "\"extra\" was not expected."],
       [["run", "probe.echo", "{}", "--args-file", "a.json"], "The command's arguments were given more than once."],
-      [["run", "probe.echo", "--timeout", "0"], "The --timeout option takes a number of seconds from 1 to 3600."],
-      [["run", "probe.echo", "--timeout", "3601"], "The --timeout option takes a number of seconds from 1 to 3600."],
-      [["run", "probe.echo", "--timeout", "soon"], "The --timeout option takes a number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "0"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "0.5"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "1.5"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "-1"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "3601"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "soon"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "1e400"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
       [["run", "probe.echo", "--timeout"], "The --timeout option needs a value."],
       [["status", "--data-dir="], "The --data-dir option needs a value."]
     ];

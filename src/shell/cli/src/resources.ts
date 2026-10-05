@@ -31,6 +31,7 @@ export class Resources {
   public static readonly utf8Encoding: BufferEncoding = "utf8";
   public static readonly interruptSignal: string = "SIGINT";
   public static readonly millisecondsPerSecond: number = 1_000;
+  public static readonly minimumTimeoutSeconds: number = 1;
   public static readonly maximumTimeoutSeconds: number = 3_600;
   public static readonly jsonIndent: number = 2;
 
@@ -83,7 +84,7 @@ export class Resources {
   public static readonly commandRequired: string = "A command is required.";
   public static readonly commandNameRequired: string = "The run command needs the name of a command to run.";
   public static readonly argumentsTwice: string = "The command's arguments were given more than once.";
-  public static readonly timeoutInvalid: string = `The --timeout option takes a number of seconds from 1 to ${Resources.maximumTimeoutSeconds}.`;
+  public static readonly timeoutInvalid: string = `The --timeout option takes a whole number of seconds from ${Resources.minimumTimeoutSeconds} to ${Resources.maximumTimeoutSeconds}.`;
   public static get windowCommandsNote(): string {
     return `Commands of ${Resources.productName}'s window are not reachable from the command line.`;
   }
