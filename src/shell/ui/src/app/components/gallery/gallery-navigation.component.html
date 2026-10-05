@@ -28,6 +28,12 @@ LICENSE file in the root directory of this source tree.
   <tr-tree class="tr-gallery-tree" [nodes]="treeNodes" [label]="text.treeLabel" [current]="treeCurrent()" (activated)="treeCurrent.set($event.id)" />
 </tr-gallery-specimen>
 
+<tr-gallery-specimen [name]="text.sectionHeader">
+  <tr-section-header class="tr-gallery-section" [label]="text.sectionRecent" />
+  <tr-section-header class="tr-gallery-section" [label]="text.sectionOlder" [isSeparated]="true" />
+  <tr-section-header class="tr-gallery-section" [label]="text.sectionLong" [isSeparated]="true" />
+</tr-gallery-specimen>
+
 <tr-gallery-specimen [name]="text.toolbar">
   <div trToolbar [trToolbarLabel]="text.toolbarLabel" class="tr-gallery-toolbar">
     <button type="button" tr-icon-button trToolbarItem [icon]="text.glyphAdd" [label]="text.button"></button>

@@ -29,6 +29,7 @@ export { PopoverDirective } from "../app/components/popover/popover.directive";
 export { PopoverTriggerDirective } from "../app/components/popover/popover-trigger.directive";
 export { QuickInputComponent } from "../app/components/quick-input/quick-input.component";
 export { SashComponent } from "../app/components/sash/sash.component";
+export { SectionHeaderComponent } from "../app/components/section-header/section-header.component";
 export { SelectComponent } from "../app/components/select/select.component";
 export { SpinnerComponent } from "../app/components/spinner/spinner.component";
 export { TabComponent } from "../app/components/tab/tab.component";

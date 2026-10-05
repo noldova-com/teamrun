@@ -1,0 +1,28 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--tr-section-header-height);
+  padding-inline: var(--tr-section-header-inset);
+  color: var(--tr-text);
+  font-size: var(--tr-text-label);
+  font-weight: 600;
+  line-height: var(--tr-line-label);
+}
+
+:host(.tr-section-header-separated)::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: var(--tr-section-header-separator-inset);
+  border-block-start: var(--tr-border-width) solid var(--tr-border);
+}

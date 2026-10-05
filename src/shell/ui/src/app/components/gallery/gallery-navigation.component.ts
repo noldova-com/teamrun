@@ -14,6 +14,7 @@ import { TreeNode } from "../../models/tree-node";
 import { IconButtonComponent } from "../icon-button/icon-button.component";
 import { PanelCardComponent } from "../panel-card/panel-card.component";
 import { SashComponent } from "../sash/sash.component";
+import { SectionHeaderComponent } from "../section-header/section-header.component";
 import { TabComponent } from "../tab/tab.component";
 import { ToolbarButtonComponent } from "../toolbar-button/toolbar-button.component";
 import { ToolbarItemDirective } from "../toolbar/toolbar-item.directive";
@@ -26,7 +27,7 @@ import { GallerySpecimenComponent } from "./gallery-specimen.component";
 
 @Component({
   selector: "tr-gallery-navigation",
-  imports: [GallerySpecimenComponent, IconButtonComponent, PanelCardComponent, SashComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, TreeComponent, ViewBadgeComponent],
+  imports: [GallerySpecimenComponent, IconButtonComponent, PanelCardComponent, SashComponent, SectionHeaderComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, TreeComponent, ViewBadgeComponent],
   templateUrl: "./gallery-navigation.component.html",
   styleUrl: "./gallery-navigation.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush

@@ -162,6 +162,9 @@ export class Resources {
     "setting-marker",
     "tree-row-height",
     "tree-indent",
+    "section-header-height",
+    "section-header-inset",
+    "section-header-separator-inset",
     "settings-search-width",
     "settings-pages-width",
     "settings-content-width",
@@ -180,6 +183,7 @@ export class Resources {
   public static readonly defaultThemeId: string = "shell.default";
   public static readonly defaultThemeName: string = "Default";
   public static readonly colorSchemeProperty: string = "color-scheme";
+  public static readonly sectionHeaderLevel: number = 3;
   public static readonly lightScheme: string = "light";
   public static readonly darkScheme: string = "dark";
   public static readonly darkSchemeQuery: string = "(prefers-color-scheme: dark)";
