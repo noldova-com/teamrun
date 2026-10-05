@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import path from "node:path";
 import type { Writable } from "node:stream";
 
 import type AngularProject from "../angular/angular-project.ts";
@@ -18,9 +17,6 @@ import ApiPackage from "./api-package.ts";
 import ApiException from "./api.exception.ts";
 
 export default class ApiCatalog {
-  private static readonly DEPENDENCIES: readonly string[] = ["node_modules", "*"];
-  private static readonly ANY_MODULE: string = "*";
-
   private readonly root: string;
   private readonly packages: PackageCatalog;
   private readonly layout: BuildLayout;
@@ -68,7 +64,6 @@ export default class ApiCatalog {
     const paths: Record<string, readonly string[]> = {};
     for (const [alias, files] of aliases)
       paths[alias] = files.map(t => declared.get(t) ?? t);
-    paths[ApiCatalog.ANY_MODULE] = [path.join(path.dirname(this.angular.projectFile), ...ApiCatalog.DEPENDENCIES)];
     return paths;
   }
 }
