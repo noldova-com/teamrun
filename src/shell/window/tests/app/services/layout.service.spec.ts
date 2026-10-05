@@ -72,6 +72,21 @@ describe("LayoutService", () => {
     expect(service.geometry().frames.map(t => t.group.id)).toEqual([0]);
   });
 
+  it("opens again in the restored layout the documents the person opened before it, the last one active, and changes nothing else", async () => {
+    const saved = Layout.createDefault(registry).openDocument(LayoutFixture.plan);
+    await store.writeAsync(saved.toJson());
+    service.openDocument(LayoutFixture.todo);
+    service.openDocument(LayoutFixture.plan);
+    service.toggleDock(DockSide.Left);
+
+    await service.loadAsync();
+    service.reopenOpened();
+
+    expect(service.layout().documents.tabs).toEqual([LayoutFixture.plan, LayoutFixture.todo]);
+    expect(service.layout().documents.active).toEqual(LayoutFixture.plan);
+    expect(service.layout().dock(DockSide.Left)).toEqual(saved.dock(DockSide.Left));
+  });
+
   function closed(): readonly DockSide[] {
     return [...service.geometry().closedSides];
   }

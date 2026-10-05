@@ -47,6 +47,7 @@ export class LayoutService {
   private readonly revealedState: WritableSignal<TabReveal | null> = signal(null);
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saved: Layout | null = null;
+  private opened: { readonly tab: DocumentTab; readonly isPreview: boolean }[] = [];
   private writing: Promise<void> = Promise.resolve();
 
   public readonly layout: Signal<Layout> = this.layoutState.asReadonly();
@@ -107,8 +108,15 @@ export class LayoutService {
   }
 
   public openDocument(tab: DocumentTab, isPreview: boolean = false): void {
+    if (Object.isNull(this.saved))
+      this.opened.push({ tab, isPreview });
     this.update(this.layoutState().openDocument(tab, isPreview && this.previewTabs()));
     this.reveal(tab);
+  }
+
+  public reopenOpened(): void {
+    for (const { tab, isPreview } of this.opened.splice(0))
+      this.openDocument(tab, isPreview);
   }
 
   public restoreDocument(tab: DocumentTab, isPreview: boolean): void {

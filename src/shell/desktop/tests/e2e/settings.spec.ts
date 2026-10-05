@@ -431,3 +431,23 @@ test.describe("settings on macOS", () => {
     await expect(settingsTab(desktop.window)).toHaveAttribute("aria-selected", "true");
   });
 });
+
+test.describe("settings opened while the window starts", () => {
+  test.use({ desktopDataFiles: { "modules/notes/hold-first-options": "" } });
+
+  test("a Settings tab opened by its key before the saved layout is restored is still open and active after the restore", async ({ desktop }) => {
+    const window = desktop.window;
+    const requestAsync = (method: string): Promise<unknown> => window.evaluate(async name => (await (Reflect.get(globalThis, "teamrun") as { request(name: string, payload: unknown): Promise<{ payload?: unknown }> }).request(name, null)).payload, method);
+
+    await expect.poll(() => requestAsync("notes.heldOptions")).toBe(1);
+    await window.locator("tr-workspace").click({ position: { x: 4, y: 4 } });
+    await window.keyboard.press("ControlOrMeta+Comma");
+    await expect(settingsTab(window)).toHaveAttribute("aria-selected", "true");
+    await requestAsync("notes.releaseOptions");
+
+    await expect(window.locator("[data-fixture-content]").first()).toBeAttached();
+    await expect(settingsTab(window)).toHaveCount(1);
+    await expect(settingsTab(window)).toHaveAttribute("aria-selected", "true");
+    await expect(window.locator("tr-settings")).toBeVisible();
+  });
+});
