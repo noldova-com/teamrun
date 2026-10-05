@@ -18,6 +18,7 @@ import { Wait } from "@noldova/teamrun-foundation-testing";
 import { StopPolicy } from "@noldova/teamrun-shell-protocol";
 import { DataDirectory, DiscoveryReader, Endpoint, OwnershipLock, RuntimeBuild, RuntimeClient, type RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
 
+import CleanupSteps from "./cleanup-steps.ts";
 import ErrorOutputClassifier from "./error-output.classifier.ts";
 import OffCursorPlacement from "./off-cursor-placement.ts";
 import ProcessListFixture from "./process-list.fixture.ts";
@@ -55,7 +56,6 @@ export default class DesktopApplicationFixture {
   private static readonly LOCKED_CODES: readonly string[] = ["EBUSY", "EPERM", "ENOTEMPTY"];
   private static readonly TRACE_FILE: string = "trace.zip";
   private static readonly WINDOWS_FILE: string = "windows.json";
-  private static readonly CLEANUP_FAILURE_FILE: string = "cleanup-failure.txt";
   private static readonly DIAGNOSTIC_TIMEOUT: number = 10_000;
   private static readonly MAIN_PROCESS_TIMEOUT: number = 10_000;
   private static readonly QUIT_TIMEOUT: number = 30_000;
@@ -115,8 +115,7 @@ export default class DesktopApplicationFixture {
       await fixture.recordEnvironmentAsync();
     }
     catch (error) {
-      await fixture.disposeAsync(true).catch((cleanup: unknown) =>
-        testInfo.attach(DesktopApplicationFixture.CLEANUP_FAILURE_FILE, { body: DesktopApplicationFixture.describeFailure(cleanup), contentType: "text/plain" }));
+      await fixture.disposeAsync(true).catch((cleanup: unknown) => CleanupSteps.attachAsync(testInfo, [cleanup]));
       throw error;
     }
     return fixture;
@@ -211,13 +210,13 @@ export default class DesktopApplicationFixture {
   public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
     const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
-    const failures: unknown[] = [];
+    const errors: unknown[] = [];
     try {
       await this.recordProcessesAsync();
     }
     catch (error) {
       if (this.silence === null)
-        failures.push(error);
+        errors.push(error);
     }
     try {
       const started = Date.now();
@@ -226,21 +225,15 @@ export default class DesktopApplicationFixture {
     }
     catch (error) {
       if (this.silence === null)
-        throw error;
-      const processId = this.mainProcessId;
-      const question = this.silence.action === DesktopApplicationFixture.QUIT_ACTION ? await this.describeQuestionAsync() : null;
-      const failure = question ?? `The main process ${processId ?? "(id unknown)"} did not answer for ${Math.round((Date.now() - this.silence.since) / 1000)} s after it was asked to ${this.silence.action}, so the test killed it.`;
-      if (question !== null)
-        this.silence = null;
-      if (processId !== null && DesktopApplicationFixture.isAlive(processId))
-        process.kill(processId, "SIGKILL");
+        errors.push(error);
+      else
+        this.failures.push(await this.killSilentAsync(this.silence));
       child.kill("SIGKILL");
-      this.failures.push(failure);
     }
     const exitCode = await exited;
     this.electronApplication = null;
     this.page = null;
-    await DesktopApplicationFixture.runEachAsync(keepRuntime ? [] : [() => DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory)], failures);
+    CleanupSteps.throwFailures([...errors, ...await CleanupSteps.collectFailuresAsync(keepRuntime ? [] : [() => DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory)])]);
     return exitCode;
   }
 
@@ -252,13 +245,22 @@ export default class DesktopApplicationFixture {
     const isRunning = this.electronApplication !== null && Object.is(this.requireProcess().exitCode, null);
     if (isRunning && this.viewport !== null && this.silence === null)
       await this.checkGuardAsync(this.viewport).catch((error: unknown) => this.failures.push((error as Error).message));
-    if (hasFailed || this.silence !== null)
-      await this.keepDiagnosticsAsync(isRunning);
-    await DesktopApplicationFixture.runEachAsync([
+    CleanupSteps.throwFailures(await CleanupSteps.collectFailuresAsync([
+      ...hasFailed || this.silence !== null ? [() => this.keepDiagnosticsAsync(isRunning)] : [],
       ...isRunning ? [() => this.closeAsync(true)] : [],
       () => DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory),
       () => this.removeFolderAsync()
-    ]);
+    ]));
+  }
+
+  private async killSilentAsync(silence: MainProcessSilence): Promise<string> {
+    const processId = this.mainProcessId;
+    const question = silence.action === DesktopApplicationFixture.QUIT_ACTION ? await this.describeQuestionAsync() : null;
+    if (question !== null)
+      this.silence = null;
+    if (processId !== null && DesktopApplicationFixture.isAlive(processId))
+      process.kill(processId, "SIGKILL");
+    return question ?? `The main process ${processId ?? "(id unknown)"} did not answer for ${Math.round((Date.now() - silence.since) / 1000)} s after it was asked to ${silence.action}, so the test killed it.`;
   }
 
   private async removeFolderAsync(): Promise<void> {
@@ -387,27 +389,6 @@ export default class DesktopApplicationFixture {
 
   private async readProcessorMillisecondsAsync(): Promise<number | null> {
     return this.mainProcessId === null ? null : await ProcessListFixture.readProcessorMillisecondsAsync(this.mainProcessId).catch(() => null);
-  }
-
-  private static async runEachAsync(steps: readonly (() => Promise<unknown>)[], failures: unknown[] = []): Promise<void> {
-    for (const step of steps) {
-      try {
-        await step();
-      }
-      catch (error) {
-        failures.push(error);
-      }
-    }
-    if (failures.length > 1)
-      throw new AggregateError(failures, [`${failures.length} cleanup steps failed:`, ...failures.map(t => t instanceof Error ? t.message : String(t))].join("\n"));
-    if (failures.length === 1)
-      throw failures[0];
-  }
-
-  private static describeFailure(failure: unknown): string {
-    if (failure instanceof AggregateError)
-      return failure.errors.map(t => DesktopApplicationFixture.describeFailure(t)).join("\n\n");
-    return failure instanceof Error && failure.stack !== undefined ? failure.stack : String(failure);
   }
 
   private static async withinAsync<T>(work: Promise<T>, limit: number): Promise<T | typeof DesktopApplicationFixture.NO_ANSWER> {

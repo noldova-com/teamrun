@@ -162,6 +162,7 @@ test.describe("the harness's teardown", () => {
     const failure = await desktop.disposeAsync(false).then(() => null, (error: unknown) => error);
 
     expect(runtime).toBeDefined();
+    expect(failure).not.toBeInstanceOf(AggregateError);
     expect(String(failure)).toContain("The test made listing the processes fail.");
     await expect.poll(() => runtime !== undefined && DesktopApplicationFixture.isAlive(runtime)).toBe(false);
     expect(existsSync(desktop.root)).toBe(false);
