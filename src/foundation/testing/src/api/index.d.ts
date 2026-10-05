@@ -2004,11 +2004,12 @@ export declare class CoverageEnvironment {
  */
 export declare class CoverageAnalyzer {
   /**
-   * Analyzes every report in a folder against every `.js` file and every
-   * `.ts` file other than a `.d.ts` file of the projects, leaving out their
-   * test folders. A `.js` file is mapped to its source through its source
-   * map; a `.ts` file is measured with its types stripped as Node.js runs
-   * it, without a source map. Each process's coverage counts on its own: a
+   * Analyzes every report in a folder against every `.js`, `.cjs` and
+   * `.mjs` file and every `.ts`, `.cts` and `.mts` file other than a
+   * `.d.ts`, `.d.cts` or `.d.mts` file of the projects, leaving out their
+   * test folders. A JavaScript file is mapped to its source through its
+   * source map; a TypeScript file is measured with its types stripped as
+   * Node.js runs it, without a source map. Each process's coverage counts on its own: a
    * position is covered when any process covered it, so the order of the
    * reports never changes the result. A file no report mentions counts as
    * entirely uncovered unless it has no executable text, and a position no
@@ -2023,7 +2024,7 @@ export declare class CoverageAnalyzer {
    * @throws TestingException as a rejection when the projects have no
    * JavaScript or TypeScript files, when a report or source map is missing,
    * malformed or refers to a file outside its project, or when Node.js
-   * cannot strip a `.ts` file's types.
+   * cannot strip a TypeScript file's types.
    * @example
    * ```ts
    * import { CoverageAnalyzer, CoverageProject, type CoverageResult } from "@noldova/teamrun-foundation-testing";

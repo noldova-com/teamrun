@@ -11,7 +11,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandle
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
+import { type SettingDefinition, SettingKind } from "@noldova/teamrun-shell-protocol";
 import { SelectComponent, SelectOption, TextFieldComponent, TreeComponent, TreeNode } from "@noldova/teamrun-shell-ui";
 
 import { GalleryTokens } from "../../models/gallery-tokens";
@@ -149,6 +149,14 @@ export class SettingsComponent {
     this.settings.resetAsync(definition.name.text).catch((error: unknown) => this.errors.handleError(error));
   }
 
+  protected canRun(definition: SettingDefinition): boolean {
+    return definition.type.kind === SettingKind.Action && this.commands.isAvailable(String(definition.type.command));
+  }
+
+  protected run(definition: SettingDefinition): void {
+    this.commands.run(String(definition.type.command));
+  }
+
   private keepFocus(): void {
     const list = this.pageList().nativeElement;
     const select = this.pageSelect().nativeElement;
@@ -163,6 +171,6 @@ export class SettingsComponent {
   }
 
   private static matches(definition: SettingDefinition, query: string): boolean {
-    return [definition.title, definition.description, definition.name.text].some(t => TextMatch.contains(t, query));
+    return [definition.title, definition.description, definition.name.text, definition.type.label].some(t => !Object.isNull(t) && TextMatch.contains(t, query));
   }
 }

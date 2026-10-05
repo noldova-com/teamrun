@@ -26,6 +26,8 @@ export class SettingsFixture {
     SettingType.text(20), "Noon", "Clock", "Words");
   public static readonly tickStep: SettingDefinition = SettingsFixture.define("clock.tickStep", "Tick step", "How far each tick moves the clock.",
     SettingType.number(1, 10, 1), 1, "Clock", "Ticks");
+  public static readonly alarms: SettingDefinition = SettingsFixture.define("clock.alarms", "Alarms", "The times the clock rings, in a tab of their own.",
+    SettingType.action(QualifiedName.parse("clock.openAlarms"), "Open alarms"), null, "Clock", "Ticks");
   public static readonly all: readonly SettingDefinition[] = [
     SettingsFixture.mode, SettingsFixture.panelSize, SettingsFixture.doNotDisturb, SettingsFixture.mutedModules, SettingsFixture.greeting, SettingsFixture.tickStep
   ];

@@ -655,6 +655,8 @@ export class CoverageAnalyzerTests {
     await writeFile(samplePath, sampleText);
     await writeFile(join(includedDirectory, "contract.ts"), "/**\n * License.\n */\n\nimport type { Other } from \"./other.ts\";\n\nexport default interface IContract {\n  readonly other: Other;\n}\n");
     await writeFile(join(includedDirectory, "types.d.ts"), "export declare const declared: number;\n");
+    await writeFile(join(includedDirectory, "common.d.cts"), "export declare const declared: number;\n");
+    await writeFile(join(includedDirectory, "module.d.mts"), "export declare const declared: number;\n");
     await writeFile(helperPath, "export const helper = 1;\n");
     await writeFile(join(includedDirectory, "tests", "never.ts"), "export const never = 1;\n");
     const report = {
@@ -687,6 +689,27 @@ export class CoverageAnalyzerTests {
     Assert.isFalse(result.isComplete);
     Assert.areEqual(orphanText.length, result.fileCoverages[0]?.uncoveredLength);
     Assert.areEqual<string | undefined>("1-2", result.fileCoverages[0]?.uncoveredLineRanges[0]?.displayText);
+  }
+
+  @TestMethod
+  public async measuresCommonJsAndEcmaScriptModuleFilesLikeTheirDefaultKind(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const coverageDirectory = directory.path;
+    const includedDirectory = join(coverageDirectory, "included");
+    await mkdir(includedDirectory);
+    const commonText = "const value: number = 1;\nmodule.exports = value;\n";
+    const commonPath = join(includedDirectory, "common.cts");
+    await writeFile(commonPath, commonText);
+    await writeFile(join(includedDirectory, "module.mts"), "export const value: number = 1;\n");
+    await CompiledScriptFixture.writeAsync(join(includedDirectory, "built.cjs"), "built;\n");
+    await CompiledScriptFixture.writeAsync(join(includedDirectory, "built.mjs"), "built;\n");
+    const report = { result: [{ url: pathToFileURL(commonPath).href, functions: [{ ranges: [{ startOffset: 0, endOffset: this.measureRanLength(commonPath, commonText), count: 1 }] }] }] };
+    await writeFile(join(coverageDirectory, "coverage-1.json"), JSON.stringify(report));
+
+    const result = await new CoverageAnalyzer().analyzeAsync(coverageDirectory, [this.createProject(includedDirectory, includedDirectory)]);
+
+    Assert.areEqual("built.cjs,built.mjs,common.cts,module.mts", result.fileCoverages.map(t => t.relativePath).join(","));
+    Assert.areEqual("false,false,true,false", result.fileCoverages.map(t => t.isFullyCovered).join(","));
   }
 
   @TestMethod
