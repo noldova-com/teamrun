@@ -9,6 +9,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import TabRowFixture from "./fixtures/tab-row.fixture.ts";
 
 const notes = "view/notes.list";
 const outline = "view/notes.outline";
@@ -38,21 +39,6 @@ async function dragAsync(window: Page, source: Locator, target: Locator, down: n
     throw new Error("The drop target is not visible.");
   await window.mouse.move(to.x + to.width / 2, to.y + to.height * down, { steps: 6 });
   await window.mouse.up();
-}
-
-function insetsOf(group: Locator): Promise<Readonly<Record<"rem" | "firstTab" | "actions" | "content", number>>> {
-  return group.evaluate(t => {
-    const card = t.querySelector("tr-panel-card");
-    const box = card?.getBoundingClientRect() ?? new DOMRect(Number.NaN, Number.NaN);
-    const [start, end] = [box.left + (card?.clientLeft ?? 0), box.right - (card?.clientLeft ?? 0)];
-    const content = t.querySelector("tr-tab .tr-tab-pill, .tr-tab-group-title");
-    return {
-      rem: Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
-      firstTab: (t.querySelector("tr-tab")?.getBoundingClientRect().left ?? Number.NaN) - start,
-      actions: end - (t.querySelector(".tr-tab-group-actions")?.getBoundingClientRect().right ?? Number.NaN),
-      content: (content?.getBoundingClientRect().left ?? Number.NaN) + Number.parseFloat(content === null ? "" : getComputedStyle(content).paddingLeft) - start
-    };
-  });
 }
 
 test.describe("activity bar", () => {
@@ -146,7 +132,7 @@ test.describe("activity bar", () => {
     await desktop.checkpointAsync("group-header");
   });
 
-  test("a tab row's first tab stands 0.25rem from its card's start and its actions 0.5rem from its end, and a header's title starts where a tab's icon starts", async ({ desktop }) => {
+  test("a tab row's first tab and last action stand 0.25rem from its card's start and end in both directions, and a header's title starts where a tab's icon starts", async ({ desktop }) => {
     const window = desktop.window;
     const group = window.locator("tr-tab-group[data-side=Left]");
     const schemes = ["light", "dark"] as const;
@@ -155,7 +141,10 @@ test.describe("activity bar", () => {
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
       await desktop.checkpointAsync(`tab-row-${scheme}`);
     }
-    const tabs = await insetsOf(group);
+    const tabs = await TabRowFixture.insetsOf(group);
+    await TabRowFixture.setDirectionAsync(window, "rtl");
+    const reversed = await TabRowFixture.insetsOf(group);
+    await desktop.checkpointAsync("tab-row-rtl");
 
     await setDockStyleAsync(window, "shell.leftDockStyle", "Icons");
     await expect(group.locator(".tr-tab-group-title")).toHaveText("Notes");
@@ -164,12 +153,15 @@ test.describe("activity bar", () => {
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
       await desktop.checkpointAsync(`group-header-${scheme}`);
     }
-    const header = await insetsOf(group);
+    const header = await TabRowFixture.insetsOf(group);
+    await TabRowFixture.setDirectionAsync(window, "rtl");
+    const headerReversed = await TabRowFixture.insetsOf(group);
+    await TabRowFixture.setDirectionAsync(window, "ltr");
 
-    expect(tabs.firstTab).toBeCloseTo(tabs.rem * 0.25, 0);
-    expect(tabs.actions).toBeCloseTo(tabs.rem * 0.5, 0);
-    expect(header.actions).toBeCloseTo(tabs.rem * 0.5, 0);
+    for (const inset of [tabs.firstTab, tabs.lastAction, reversed.firstTab, reversed.lastAction, header.lastAction, headerReversed.lastAction])
+      expect(inset).toBeCloseTo(tabs.rem * 0.25, 0);
     expect(header.content).toBeCloseTo(tabs.content, 0);
+    expect(headerReversed.content).toBeCloseTo(reversed.content, 0);
   });
 
   test("an icon opens its view's tab menu from the keyboard or a right click, so the view can be docked elsewhere from the strip", async ({ desktop }) => {

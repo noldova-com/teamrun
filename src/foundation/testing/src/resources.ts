@@ -52,9 +52,10 @@ export class Resources {
   public static readonly waitLimitInvalid: string = "The wait's limit must be a non-negative integer of milliseconds.";
   public static readonly waitIntervalInvalid: string = "The wait's interval must be a positive integer of milliseconds.";
   public static readonly coverageDirectoryRequired: string = "The coverage run requires the folder of the V8 coverage reports.";
-  public static readonly coverageProjectTripleRequired: string = "Each coverage project requires a package name, a production folder, a source folder and its exclusions.";
+  public static readonly coverageProjectArgumentsRequired: string = "Each coverage project requires a name, a production folder, a source folder, its exclusions and its test folders.";
   public static readonly coverageExclusionsInvalid: string = "A coverage project's exclusions must be a JSON array of objects with a file and a reason.";
   public static readonly repeatedCoverageExclusion: string = "A file is excluded from coverage at most once.";
+  public static readonly coverageTestFoldersInvalid: string = "A coverage project's test folders must be a JSON array of folder paths.";
   public static readonly exclusionFileField: string = "file";
   public static readonly exclusionReasonField: string = "reason";
   public static readonly testProjectPairRequired: string = "Each test project requires a package name and a root directory.";
@@ -94,7 +95,7 @@ export class Resources {
   public static readonly coverageHeading: string = "Coverage";
   public static readonly coverageNotApplicable: string = "-";
   public static readonly coveragePercentSuffix: string = "%";
-  public static readonly coverageUniverseEmpty: string = "The coverage projects contain no production JavaScript files; the coverage universe is empty.";
+  public static readonly coverageUniverseEmpty: string = "The coverage projects contain no production JavaScript or TypeScript files; the coverage universe is empty.";
   public static readonly coverageVariable: string = "NODE_V8_COVERAGE";
   public static readonly emptyExport: string = "export {};";
   public static readonly endLineInvalid: string = "The end line must be an integer no smaller than the start line.";
@@ -125,6 +126,9 @@ export class Resources {
   public static readonly tableTopRight: string = "┐";
   public static readonly tableVertical: string = "│";
   public static readonly totalLengthInvalid: string = "The total length must be a non-negative integer.";
+  public static readonly javaScriptFileSuffix: string = ".js";
+  public static readonly typeScriptFileSuffix: string = ".ts";
+  public static readonly declarationFileSuffix: string = ".d.ts";
   public static readonly uncoveredLengthInvalid: string = "The uncovered length must be a non-negative integer no larger than the total length.";
   public static readonly uncoveredRangesInvalid: string = "The uncovered line ranges and the uncovered length must agree: both empty or both present.";
   public static readonly summaryCoverageHeading: string = "### Package coverage";
@@ -256,6 +260,10 @@ export class Resources {
 
   public static formatCoverageReportMalformedForReason(reportFilePath: string, reason: string): string {
     return `The coverage report "${reportFilePath}" is malformed: ${reason}.`;
+  }
+
+  public static formatTypeScriptNotStrippable(filePath: string): string {
+    return `Node.js cannot strip the types of "${filePath}", so its coverage cannot be measured.`;
   }
 
   public static formatIntegerNoSmallerThanRequired(location: string, lowerBoundName: string): string {
