@@ -26,8 +26,7 @@ import { GallerySpecimenComponent } from "./gallery-specimen.component";
 
 @Component({
   selector: "tr-gallery-navigation",
-import { TooltipDirective } from "../tooltip/tooltip.directive";
-import { TreeComponent } from "../tree/tree.component";
+  imports: [GallerySpecimenComponent, IconButtonComponent, PanelCardComponent, SashComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, TreeComponent, ViewBadgeComponent],
   templateUrl: "./gallery-navigation.component.html",
   styleUrl: "./gallery-navigation.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
