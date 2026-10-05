@@ -314,6 +314,14 @@ describe("QuickInputComponent", () => {
     expect(bare?.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left).toBe(full?.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left);
   });
 
+  it("ends a title too long for its row with an ellipsis", async () => {
+    host.items.set([new QuickInputItem("notes.reopen", "Reopen the closed tab with every note, outline and draft it held ".repeat(4), "undo", "Notes", "Ctrl+Shift+T")]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    AppearanceFixture.expectTruncates(options()[0]?.querySelector(".tr-quick-input-title") as HTMLElement);
+  });
+
   it("labels the first option of each section within the option, draws a line before every section but the first, and shows the first label again on Home", async () => {
     host.items.set(many.map((t, index) => index === 0 || index === 3 ? new QuickInputItem(t.id, t.title, t.icon, "Notes", null, [], [], index === 0 ? "recently used" : "other commands") : t));
     fixture.detectChanges();

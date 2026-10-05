@@ -166,6 +166,17 @@ describe("TabGroupComponent", () => {
     AppearanceFixture.expectPixels(titleText, label);
   });
 
+  it("ends a header's title too long for its width with an ellipsis", async () => {
+    AppearanceFixture.apply();
+    await renderAsync();
+    bridge.publishEvent("shell.settingsChanged", { name: "shell.leftDockStyle", value: "Icons", isSet: true });
+    update();
+    const title = group(1).querySelector<HTMLElement>(".tr-tab-group-title") as HTMLElement;
+    title.style.maxWidth = "2.5rem";
+
+    AppearanceFixture.expectTruncates(title);
+  });
+
   it("shows a tab's title below it only while its label is cut short", async () => {
     await renderAsync();
     const target = tab(1, 1);
