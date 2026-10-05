@@ -331,6 +331,21 @@ export class Resources {
   public static readonly statusBarLook: string = "status-bar-height";
   public static readonly middleButton: number = 1;
   public static readonly primaryButton: number = 0;
+  public static readonly arrowLeftKey: string = "ArrowLeft";
+  public static readonly arrowRightKey: string = "ArrowRight";
+  public static readonly pointerdownEvent: "pointerdown" = "pointerdown";
+  public static readonly pointerupEvent: "pointerup" = "pointerup";
+  public static readonly pointercancelEvent: "pointercancel" = "pointercancel";
+  public static readonly blurEvent: "blur" = "blur";
+  public static readonly treeItemSelector: string = "[role=treeitem]";
+  public static readonly treeHoverOpenDelay: number = 500;
+  public static readonly treeScrollStep: number = 8;
+  public static readonly treeScrollInterval: number = 16;
+  public static readonly treeDropEdgeFraction: number = 4;
+  public static readonly treeShiftProperty: string = "--tr-tree-shift";
+  public static readonly treeShiftingClass: string = "tr-tree-row-shifting";
+  public static readonly animationEndEvent: "animationend" = "animationend";
+  public static readonly rightToLeftSelector: string = ":dir(rtl)";
 
   public static formatLookVariable(name: string): string {
     return `--tr-${name}`;
@@ -346,6 +361,10 @@ export class Resources {
 
   public static formatTextSizeOutOfRange(parameterName: string, size: number): string {
     return `The ${parameterName} must be from ${Resources.minimumTextSize} to ${Resources.maximumTextSize} CSS pixels; ${size} is outside that range.`;
+  }
+
+  public static formatTreeMoved(label: string, parentLabel: string | null, position: number, count: number): string {
+    return `Moved ${label} ${parentLabel === null ? "to" : `into ${parentLabel},`} position ${position} of ${count}`;
   }
 
   public static formatBadgeCount(count: number): string {
