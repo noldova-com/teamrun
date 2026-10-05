@@ -288,10 +288,7 @@ export default class DesktopApplicationFixture {
       const matches = sockets.filter(t => t.isRuntime);
       if (matches.length === 1)
         for (const match of matches)
-          if (frame === null)
-            match.socket.destroy();
-          else
-            match.socket.emit("data", frame);
+          setImmediate(() => frame === null ? match.socket.destroy() : match.socket.emit("data", frame));
       return { matched: matches.length, descriptions: sockets.map(t => t.description) };
     }, { port: Endpoint.parse(discovery.endpoint).port, frame }));
     if (found.matched !== 1)
