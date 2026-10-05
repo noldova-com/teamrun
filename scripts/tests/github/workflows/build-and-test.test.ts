@@ -32,12 +32,12 @@ class BuildAndTestTests {
   private static readonly DOWNLOAD_ACTION: string = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1";
   private static readonly UPLOADS: readonly (readonly [string, string, string, readonly string[]])[] = [
     ["Keep the UI workflow results", "Keep the UI workflow results again", "Keep the UI workflow results a last time",
-      ["name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}", "path: _build/ui", "retention-days: 14", "if-no-files-found: ignore"]],
+      ["name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}", "path: _build/ui", "retention-days: 14", "if-no-files-found: ignore", "overwrite: true"]],
     ["Keep the main window screenshot", "Keep the main window screenshot again", "Keep the main window screenshot a last time",
-      ["path: _build/ui/main-window-*.png", "archive: false", "retention-days: 14", "if-no-files-found: ignore"]]
+      ["path: _build/ui/main-window-*.png", "archive: false", "retention-days: 14", "if-no-files-found: ignore", "overwrite: true"]]
   ];
   private static readonly BUILD_ARTIFACT: string = "name: ui-build-${{ matrix.runner }}-${{ matrix.architecture }}";
-  private static readonly BUILD_UPLOAD_SETTINGS: readonly string[] = [BuildAndTestTests.BUILD_ARTIFACT, "path: ui-build.tar", "retention-days: 3", "if-no-files-found: error"];
+  private static readonly BUILD_UPLOAD_SETTINGS: readonly string[] = [BuildAndTestTests.BUILD_ARTIFACT, "path: ui-build.tar", "retention-days: 3", "if-no-files-found: error", "overwrite: true"];
   private static readonly PACKED: string = "_build/archives _build/modules _build/packages _build/product.json _build/records _build/tests _build/variants _build/window _build/ui-builds.record " +
     "node_modules/.package-lock.json node_modules/@noldova src/generated";
   private static readonly WORKFLOW_NODE_SETUPS: readonly string[] = ["Set up Node.js to classify", "Set up Node.js to install"];
@@ -47,8 +47,8 @@ class BuildAndTestTests {
   private static readonly ANGULAR_UPLOADS: readonly string[] = ["Keep the Angular test output", "Keep the Angular test output again", "Keep the Angular test output a last time"];
   private static readonly ANGULAR_WARNING: string = "Warn that the Angular test output was not kept";
   private static readonly ANGULAR_SETTINGS: readonly string[] = [
-    "name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}", "path: |", "  _build/angular-tests.log", "  _build/angular-tests.json", "retention-days: 14",
-    "if-no-files-found: ignore"
+    "name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}", "path: |", "  _build/angular-tests.log", "  _build/angular-tests.json", "retention-days: 14",
+    "if-no-files-found: ignore", "overwrite: true"
   ];
   private static readonly CACHE_LIST: string = "api --paginate repos/noldova-com/teamrun/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100 --jq .actions_caches[].key";
   private static readonly SPOTLIGHT_STEPS: readonly string[] = ["Stop Spotlight indexing", "Stop Spotlight indexing while saving"];
@@ -491,9 +491,7 @@ class BuildAndTestTests {
 
         assert.deepEqual(attempts.map(t => t.uses), attempts.map(() => BuildAndTestTests.UPLOAD_ACTION));
         assert.deepEqual(attempts.map(t => t.continueOnError), [true, true, true]);
-        assert.deepEqual(attempts[0]?.settings, settings);
-        assert.deepEqual(attempts[1]?.settings, [...settings, "overwrite: true"]);
-        assert.deepEqual(attempts[2]?.settings, [...settings, "overwrite: true"]);
+        assert.deepEqual(attempts.map(t => t.settings), BuildAndTestTests.threeTimes(settings));
         assert.equal(workflow.readStepScript(`${pause} again`), "sleep 15\n");
         assert.equal(workflow.readStepScript(`${pause} a last time`), "sleep 15\n");
       }
@@ -502,9 +500,9 @@ class BuildAndTestTests {
     test("keeping and fetching a target's builds are each tried three times with a pause, and fail the job only when the last attempt fails", async () => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW);
 
-      for (const [first, pause, action, settings, overwrite] of [
-        ["Keep the builds for the UI workflows", "Wait before keeping the builds", BuildAndTestTests.UPLOAD_ACTION, BuildAndTestTests.BUILD_UPLOAD_SETTINGS, ["overwrite: true"]],
-        ["Fetch the builds", "Wait before fetching the builds", BuildAndTestTests.DOWNLOAD_ACTION, [BuildAndTestTests.BUILD_ARTIFACT], []]
+      for (const [first, pause, action, settings] of [
+        ["Keep the builds for the UI workflows", "Wait before keeping the builds", BuildAndTestTests.UPLOAD_ACTION, BuildAndTestTests.BUILD_UPLOAD_SETTINGS],
+        ["Fetch the builds", "Wait before fetching the builds", BuildAndTestTests.DOWNLOAD_ACTION, [BuildAndTestTests.BUILD_ARTIFACT]]
       ] as const) {
         const [again, last] = [`${first} again`, `${first} a last time`];
         const simulation = new WorkflowSimulation(workflow.text, first, last);
@@ -518,7 +516,7 @@ class BuildAndTestTests {
 
         assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[action, true], [action, true], [action, false]], first);
         assert.deepEqual(selfBuilt.ran, first === "Fetch the builds" ? [] : [first], first);
-        assert.deepEqual(attempts.map(t => t.settings), [settings, [...settings, ...overwrite], [...settings, ...overwrite]], first);
+        assert.deepEqual(attempts.map(t => t.settings), BuildAndTestTests.threeTimes(settings), first);
         assert.deepEqual([workflow.readStepScript(`${pause} again`), workflow.readStepScript(`${pause} a last time`)], ["sleep 15\n", "sleep 15\n"], first);
         assert.deepEqual([passed.ran, passed.isJobFailed], [[first], false], first);
         assert.deepEqual([retried.ran, retried.isJobFailed], [[first, `${pause} again`, again], false], first);
@@ -571,8 +569,7 @@ class BuildAndTestTests {
         BuildAndTestTests.ANGULAR_WARNING
       ]);
       assert.deepEqual([first, again, last].map(t => [t?.uses, t?.continueOnError]), [first, again, last].map(() => [BuildAndTestTests.UPLOAD_ACTION, true]));
-      assert.deepEqual(first?.settings, BuildAndTestTests.ANGULAR_SETTINGS);
-      assert.deepEqual([again?.settings, last?.settings], [[...BuildAndTestTests.ANGULAR_SETTINGS, "overwrite: true"], [...BuildAndTestTests.ANGULAR_SETTINGS, "overwrite: true"]]);
+      assert.deepEqual([first, again, last].map(t => t?.settings), BuildAndTestTests.threeTimes(BuildAndTestTests.ANGULAR_SETTINGS));
       assert.equal(workflow.readStepScript("Wait before keeping the Angular test output again"), "sleep 15\n");
       assert.equal(workflow.readStepScript("Wait before keeping the Angular test output a last time"), "sleep 15\n");
       assert.deepEqual([warning.status, warning.stdout], [0, "::warning title=The Angular test output was not kept::The upload failed three times, so it is not attached.\n"]);
@@ -726,6 +723,10 @@ class BuildAndTestTests {
       assert.notEqual((await listing.runAsync(script, environment)).status, 0);
       assert.notEqual((await deletion.runAsync(script, environment)).status, 0);
     });
+  }
+
+  private static threeTimes<T>(value: T): readonly T[] {
+    return [value, value, value];
   }
 }
 
