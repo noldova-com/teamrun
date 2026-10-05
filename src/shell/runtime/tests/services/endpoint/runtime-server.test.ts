@@ -179,10 +179,10 @@ export class RuntimeServerTests {
       fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, "small"));
 
       Assert.areEqual("\"small\"|\"small\"", `${JSON.stringify((await first.readEventAsync()).payload)}|${JSON.stringify((await second.readEventAsync()).payload)}`);
-      const lines = fixture.diagnostics.text.split("\n").filter(t => t.length > 0);
-      Assert.areEqual(2, lines.length);
-      Assert.areEqual("The runtime sent the event notes.echo to no client: ProtocolException: A frame exceeds the maximum length of 1024 characters.", lines[0]);
-      Assert.isTrue(lines[1]?.startsWith("The runtime sent the event notes.echo to no client: TypeError: ") === true);
+      const entries = fixture.diagnostics.text.split("The runtime sent the event notes.echo to no client: ").slice(1);
+      Assert.areEqual(2, entries.length);
+      Assert.areEqual("ProtocolException: A frame exceeds the maximum length of 1024 characters.\n", entries[0]);
+      Assert.isTrue(entries[1]?.startsWith("TypeError: Converting circular structure to JSON") === true);
       Assert.isFalse(first.isClosed || second.isClosed);
     });
   }
