@@ -2746,7 +2746,7 @@ export declare class TabComponent {
  * @Component({
  *   selector: "tr-notes-search",
  *   imports: [TextFieldComponent],
- *   template: "<input tr-text-field type=\"search\" aria-label=\"Search notes\" placeholder=\"Search notes\" [value]=\"query()\" (input)=\"query.set($any($event.target).value)\" />"
+ *   template: "<input #field tr-text-field type=\"search\" aria-label=\"Search notes\" placeholder=\"Search notes\" [value]=\"query()\" (input)=\"query.set(field.value)\" />"
  * })
  * export class NotesSearchComponent {
  *   protected readonly query: WritableSignal<string> = signal("");
@@ -3100,12 +3100,6 @@ export declare class ToolbarItemDirective {
    * The element the directive is on.
    */
   public readonly element: HTMLElement;
-
-  /**
-   * The element's `tabindex`: 0 for the toolbar's tab stop, -1 for the
-   * other items. -1 until the toolbar sets it.
-   */
-  public readonly tabIndex: Signal<number>;
 
   /**
    * Makes the item the tab stop or takes it out of the tab order. The

@@ -196,6 +196,31 @@ class ApiExampleCheckTests {
       assert.equal(output.text, "src/shell/counter: every example compiles\n");
     });
 
+    test("an Angular part's example that does not compile fails with its owner, number and line, though the examples compile under node_modules", async t => {
+      const fixture = await ApiPackageFixture.createAsync();
+      t.after(() => fixture.disposeAsync());
+      const declarations = [
+        "/**",
+        " * Doubles a number.",
+        " *",
+        " * @example",
+        " * ```ts",
+        " * import { double } from \"@noldova/teamrun-shell-counter\";",
+        " *",
+        " * export const text: string = double(2);",
+        " * ```",
+        " */",
+        "export declare function double(value: number): number;",
+        ""
+      ].join("\n");
+      await fixture.writePartAsync("src/shell/counter", { "api/index.ts": "export const unused: number = 0;\n" }, declarations);
+      const output = new TextOutputFixture();
+
+      assert.equal(await ApiExampleCheckTests.createCheck(fixture, ["src/shell/counter"]).runAsync(output), false, output.text);
+      assert.ok(output.text.startsWith("src/shell/counter:\n  the compiler exited with code 1\n"), output.text);
+      assert.ok(output.text.includes("  double example 1, line 3: error TS2322: "), output.text);
+    });
+
     test("an Angular part without declarations fails and names the missing file", async t => {
       const fixture = await ApiPackageFixture.createAsync();
       t.after(() => fixture.disposeAsync());

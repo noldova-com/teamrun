@@ -17,7 +17,7 @@ export default class ApiPackage {
   private static readonly PROJECT_FILE: string = "tsconfig.json";
   private static readonly IMPLEMENTATION: readonly string[] = ["api", "index.ts"];
   private static readonly DECLARATIONS: readonly string[] = ["api", "index.d.ts"];
-  private static readonly PART_EXAMPLE_ROOT: readonly string[] = ["src", "node_modules", ".cache", "teamrun"];
+  private static readonly PART_EXAMPLE_ROOT: readonly string[] = ["node_modules", ".cache", "teamrun"];
 
   public readonly directory: string;
   public readonly id: string;
@@ -53,7 +53,7 @@ export default class ApiPackage {
   public static forPart(root: string, directory: string, project: string, paths: Readonly<Record<string, readonly string[]>>): ApiPackage {
     const declarations = ApiPackage.locatePartDeclarations(root, directory);
     return new ApiPackage(directory, directory.split("/").slice(1).join("-"), project, ApiPackage.locatePartImplementation(root, directory), declarations,
-      `no declarations at ${declarations}`, ApiVisibility.PUBLIC, path.join(root, ...ApiPackage.PART_EXAMPLE_ROOT), paths);
+      `no declarations at ${declarations}`, ApiVisibility.PUBLIC, path.join(path.dirname(project), ...ApiPackage.PART_EXAMPLE_ROOT), paths);
   }
 
   public static locatePartImplementation(root: string, directory: string): string {
