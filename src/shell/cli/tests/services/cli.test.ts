@@ -6,12 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { rm, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { DataDirectory } from "@noldova/teamrun-shell-runtime";
 
 import { CliFixture } from "../fixtures/cli.fixture.js";
 import { ProbeBuildFixture } from "../fixtures/probe-build.fixture.js";
@@ -52,7 +51,7 @@ export class CliTests {
   }
 
   @TestMethod
-  public async refusesInvalidArgumentsAndReportsACommandThatFails(): Promise<void> {
+  public async refusesInvalidArguments(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     await using build = await ProbeBuildFixture.createAsync("1.0.0");
     await fixture.startHostAsync(build.declarationsFile);
@@ -61,41 +60,12 @@ export class CliTests {
     const invalid = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.echo", "{a"]));
     const unreadable = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.echo", "--args-file", missing]));
     const badName = await fixture.runAsync(fixture.withDataDirectory(["run", "Not a name"]));
-    const unknown = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.nothing", "--json"]));
-    const refused = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.fail"]));
-    const refusedJson = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.fail", "--json"]));
 
     Assert.areEqual(2, invalid.code);
     Assert.isTrue(invalid.error.startsWith("The command's arguments are not valid JSON: "), invalid.error);
     Assert.areEqual(2, unreadable.code);
     Assert.isTrue(unreadable.error.startsWith(`The arguments file ${missing} could not be read: `), unreadable.error);
     Assert.areEqual(2, badName.code);
-    Assert.areEqual(1, unknown.code);
-    Assert.areEqual("NotFound", JSON.parse(unknown.error).code);
-    Assert.areEqual(1, refused.code);
-    Assert.areEqual("The runtime failed to handle the request.\n", refused.error);
-    Assert.areEqual("{\"code\":\"Internal\",\"message\":\"The runtime failed to handle the request.\"}\n", refusedJson.error);
-  }
-
-  @TestMethod
-  public async stopsACommandAtItsTimeoutAndWhenInterrupted(): Promise<void> {
-    await using fixture = await CliFixture.createAsync();
-    await using build = await ProbeBuildFixture.createAsync("1.0.0");
-    await fixture.startHostAsync(build.declarationsFile);
-    const marker = path.join(new DataDirectory(fixture.dataDirectory).locateModuleFolder("probe"), ProbeBuildFixture.WAITING_MARKER);
-
-    const timedOut = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--timeout", "0.2", "--json"]));
-    await rm(marker, { force: true });
-    const running = fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--json"]));
-    await ProbeBuildFixture.waitUntilWaitingAsync(marker);
-    fixture.signals.emit("SIGINT");
-    const interrupted = await running;
-
-    Assert.areEqual(6, timedOut.code);
-    Assert.areEqual("DeadlineExceeded", JSON.parse(timedOut.error).code);
-    Assert.areEqual(6, interrupted.code);
-    Assert.areEqual("Cancelled", JSON.parse(interrupted.error).code);
-    Assert.areEqual(0, fixture.signals.listenerCount("SIGINT"));
   }
 
   @TestMethod

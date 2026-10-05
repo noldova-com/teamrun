@@ -13,7 +13,7 @@ import { CliFixture } from "./fixtures/cli.fixture.js";
 @TestClass
 export class ResourcesTests {
   @TestMethod
-  public async describeEveryCommandOptionAndExitCodeUnderTheProductsName(): Promise<void> {
+  public async describesEveryCommandOptionAndExitCodeUnderTheProductsName(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     const parts = [
       "Usage: teamrun <command> [options]\n",

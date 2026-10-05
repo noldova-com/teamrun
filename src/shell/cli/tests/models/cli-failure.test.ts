@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
@@ -109,10 +109,48 @@ export class CliFailureTests {
   }
 
   @TestMethod
+  public async reportsAnUnknownCommandAndOneThatFails(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    await using build = await ProbeBuildFixture.createAsync("1.0.0");
+    await fixture.startHostAsync(build.declarationsFile);
+
+    const unknown = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.nothing", "--json"]));
+    const refused = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.fail"]));
+    const refusedJson = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.fail", "--json"]));
+
+    Assert.areEqual(1, unknown.code);
+    Assert.areEqual("NotFound", JSON.parse(unknown.error).code);
+    Assert.areEqual(1, refused.code);
+    Assert.areEqual("The runtime failed to handle the request.\n", refused.error);
+    Assert.areEqual("{\"code\":\"Internal\",\"message\":\"The runtime failed to handle the request.\"}\n", refusedJson.error);
+  }
+
+  @TestMethod
+  public async reportsACommandStoppedAtItsTimeoutOrByAnInterruption(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    await using build = await ProbeBuildFixture.createAsync("1.0.0");
+    await fixture.startHostAsync(build.declarationsFile);
+    const marker = ProbeBuildFixture.markerPath(fixture.dataDirectory);
+
+    const timedOut = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--timeout", "0.2", "--json"]));
+    await rm(marker, { force: true });
+    const running = fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--json"]));
+    await ProbeBuildFixture.waitUntilWaitingAsync(marker);
+    fixture.signals.emit("SIGINT");
+    const interrupted = await running;
+
+    Assert.areEqual(6, timedOut.code);
+    Assert.areEqual("DeadlineExceeded", JSON.parse(timedOut.error).code);
+    Assert.areEqual(6, interrupted.code);
+    Assert.areEqual("Cancelled", JSON.parse(interrupted.error).code);
+    Assert.areEqual(0, fixture.signals.listenerCount("SIGINT"));
+  }
+
+  @TestMethod
   public async reportsARuntimeThatEndsDuringACommandAndOneThatCannotStart(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     await using build = await ProbeBuildFixture.createAsync("1.0.0");
-    const marker = path.join(new DataDirectory(fixture.dataDirectory).locateModuleFolder("probe"), ProbeBuildFixture.WAITING_MARKER);
+    const marker = ProbeBuildFixture.markerPath(fixture.dataDirectory);
 
     const running = fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--json"]), build);
     await ProbeBuildFixture.waitUntilWaitingAsync(marker);

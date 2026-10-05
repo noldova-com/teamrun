@@ -41,7 +41,22 @@ export class StatusReportTests {
   }
 
   @TestMethod
-  public async reportsARuntimeWithoutModulesAndAFailedModule(): Promise<void> {
+  public async reportsARuntimeWithoutModules(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    const declarations = path.join(fixture.root, "declarations.json");
+    await writeFile(declarations, "{\"formatVersion\":1,\"modules\":[]}");
+    await fixture.startHostAsync(declarations);
+
+    const status = await fixture.runAsync(fixture.withDataDirectory(["status"]));
+    const json = await fixture.runAsync(fixture.withDataDirectory(["status", "--json"]));
+
+    Assert.areEqual(0, status.code);
+    Assert.isTrue(status.output.includes("Modules: none\n"), status.output);
+    Assert.areEqual("[]", JSON.stringify((JSON.parse(json.output) as { modules: unknown }).modules));
+  }
+
+  @TestMethod
+  public async reportsAFailedModule(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     const declarations = path.join(fixture.root, "declarations.json");
     const missing = { id: "broken", version: "0.0.1", displayName: "Broken", description: "Fails to load.", dependencies: [], runtimePackage: "@noldova/teamrun-fixture-missing-runtime", contributes: {} };

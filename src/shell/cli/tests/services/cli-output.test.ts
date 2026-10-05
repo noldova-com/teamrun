@@ -51,9 +51,7 @@ export class CliOutputTests {
     await fixture.startHostAsync(declarations);
 
     const commands = await fixture.runAsync(fixture.withDataDirectory(["commands"]));
-    const status = await fixture.runAsync(fixture.withDataDirectory(["status"]));
 
     Assert.areEqual(`No commands are available.\n\n${CliOutputTests.NOTE}\n`, commands.output);
-    Assert.isTrue(status.output.includes("Modules: none\n"));
   }
 }
