@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { MenuCheck } from "../../../src/app/enums/menu-check";
 import { CommandRow } from "../../../src/app/models/command-row";
 

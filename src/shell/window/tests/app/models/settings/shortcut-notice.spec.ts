@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { KeyChord } from "@noldova/teamrun-shell-protocol";
 
 import { ShortcutNotice } from "../../../../src/app/models/settings/shortcut-notice";

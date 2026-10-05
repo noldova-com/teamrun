@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { Component, Injector } from "@angular/core";
 
 import { TabContent } from "../../../src/app/models/tab-content";

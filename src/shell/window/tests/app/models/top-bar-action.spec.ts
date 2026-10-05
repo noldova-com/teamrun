@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { TopBarSide } from "../../../src/app/enums/top-bar-side";
 import { TopBarAction } from "../../../src/app/models/top-bar-action";
 import { TopBarActionContribution } from "../../../src/app/models/top-bar-action-contribution";

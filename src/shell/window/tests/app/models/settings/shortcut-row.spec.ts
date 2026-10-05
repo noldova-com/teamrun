@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { ShortcutRow } from "../../../../src/app/models/settings/shortcut-row";
 
 describe("ShortcutRow", () => {

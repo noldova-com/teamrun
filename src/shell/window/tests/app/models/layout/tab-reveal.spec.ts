@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { TabReveal } from "../../../../src/app/models/layout/tab-reveal";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 

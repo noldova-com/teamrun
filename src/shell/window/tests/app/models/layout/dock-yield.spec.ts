@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { DockSide } from "../../../../src/app/enums/dock-side";
 import { DockYield } from "../../../../src/app/models/layout/dock-yield";
 

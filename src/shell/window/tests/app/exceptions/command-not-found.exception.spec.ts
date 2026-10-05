@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 import { CommandNotFoundException } from "../../../src/app/exceptions/command-not-found.exception";

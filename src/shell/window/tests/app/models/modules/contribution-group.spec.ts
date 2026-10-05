@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { ContributionGroup } from "../../../../src/app/models/modules/contribution-group";
 import { ContributionRow } from "../../../../src/app/models/modules/contribution-row";
 

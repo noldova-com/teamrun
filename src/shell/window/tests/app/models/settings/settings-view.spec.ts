@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { SettingsView } from "../../../../src/app/models/settings/settings-view";
 
 describe("SettingsView", () => {

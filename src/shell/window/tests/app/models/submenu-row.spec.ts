@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { SubmenuRow } from "../../../src/app/models/submenu-row";
 
 describe("SubmenuRow", () => {

@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { ModuleState } from "@noldova/teamrun-shell-protocol";
 
 import { ModuleFailure } from "../../../src/app/models/module-failure";

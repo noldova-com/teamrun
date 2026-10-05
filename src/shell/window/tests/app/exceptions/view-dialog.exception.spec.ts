@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 import { ViewDialogException } from "../../../src/app/exceptions/view-dialog.exception";

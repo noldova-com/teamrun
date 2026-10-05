@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
 import { StatusBarItem } from "../../../src/app/models/status-bar-item";
 import { StatusBarItemContribution } from "../../../src/app/models/status-bar-item-contribution";

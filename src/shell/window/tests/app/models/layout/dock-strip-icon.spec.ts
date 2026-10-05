@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { DockStripIcon } from "../../../../src/app/models/layout/dock-strip-icon";
 import { TabDropTarget } from "../../../../src/app/models/layout/tab-drop-target";
 import { TabGroup } from "../../../../src/app/models/layout/tab-group";

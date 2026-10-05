@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { Component, type Type } from "@angular/core";
 
 import { ContributionMatch } from "../../../src/app/models/contribution-match";

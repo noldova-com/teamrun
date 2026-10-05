@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { PendingDocument } from "../../../src/app/models/pending-document";
 
 describe("PendingDocument", () => {

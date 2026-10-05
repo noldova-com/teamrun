@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { TestBed } from "@angular/core/testing";
 
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";

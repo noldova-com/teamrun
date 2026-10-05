@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-
 import { ShellMenus } from "../../../src/app/models/shell-menus";
 
 describe("ShellMenus", () => {
