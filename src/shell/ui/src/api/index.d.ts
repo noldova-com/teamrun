@@ -792,6 +792,156 @@ export declare class ColorToken {
 }
 
 /**
+ * Marks content of a {@link ConfigurationTableComponent} that belongs at the
+ * end of the heading's row, `trConfigurationTableAction`, such as an Add
+ * button.
+ *
+ * @example
+ * ```ts
+ * import { Component } from "@angular/core";
+ * import { ButtonComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective } from "@noldova/teamrun-shell-ui";
+ *
+ * @Component({
+ *   selector: "tr-path-list",
+ *   imports: [ButtonComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective],
+ *   template: `
+ *     <tr-configuration-table heading="Paths">
+ *       <tr-button trConfigurationTableAction>Add</tr-button>
+ *       <table trConfigurationTable>
+ *         <thead><tr><th scope="col">Path</th></tr></thead>
+ *         <tbody><tr><td>/usr/local/bin</td></tr></tbody>
+ *       </table>
+ *     </tr-configuration-table>`
+ * })
+ * export class PathListComponent {
+ * }
+ * ```
+ */
+export declare class ConfigurationTableActionDirective {
+}
+
+/**
+ * A configuration table, `tr-configuration-table`: the kit's pattern for a
+ * Settings page that lists items. An optional heading, which names the
+ * table, sits above it, with any content marked
+ * {@link ConfigurationTableActionDirective} at the end of the heading's row,
+ * then an optional explanation, then the owner's own native table, marked
+ * {@link ConfigurationTableDirective}, with its column headers and its row
+ * actions. The heading's row, the explanation and the table stand 0.75rem
+ * apart, and a part that is missing leaves no gap. Cells line up on their
+ * first line's baseline and have 0.5rem padding, except on the outer side of
+ * each row's first and last cells, and a line runs under the header and
+ * every row. Every column keeps to one line except the one marked with
+ * {@link ConfigurationTableFillDirective}, which takes the rest of the width,
+ * stays at least a text field wide and wraps. The table scrolls sideways
+ * only when it can shrink no further.
+ *
+ * @example
+ * ```ts
+ * import { Component } from "@angular/core";
+ * import { ButtonComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective, ConfigurationTableFillDirective } from "@noldova/teamrun-shell-ui";
+ *
+ * @Component({
+ *   selector: "tr-environment-variables",
+ *   imports: [ButtonComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective, ConfigurationTableFillDirective],
+ *   template: `
+ *     <tr-configuration-table heading="Environment variables" explanation="Every terminal and tool this project starts gets these.">
+ *       <tr-button trConfigurationTableAction>Add</tr-button>
+ *       <table trConfigurationTable>
+ *         <thead><tr><th scope="col">Name</th><th scope="col" trConfigurationTableFill>Value</th><th scope="col" aria-label="Actions"></th></tr></thead>
+ *         <tbody><tr><td>EDITOR</td><td trConfigurationTableFill>code</td><td><tr-button aria-label="Remove EDITOR">Remove</tr-button></td></tr></tbody>
+ *       </table>
+ *     </tr-configuration-table>`
+ * })
+ * export class EnvironmentVariablesComponent {
+ * }
+ * ```
+ */
+export declare class ConfigurationTableComponent {
+  /**
+   * The heading above the table, its `heading` input, which also names the
+   * table; no heading when empty, the default.
+   */
+  public readonly heading: InputSignal<string>;
+
+  /**
+   * The table's accessible name when it has no heading, its `label` input;
+   * empty by default.
+   */
+  public readonly label: InputSignal<string>;
+
+  /**
+   * The heading level screen readers announce, its `level` input; 3 when
+   * not bound.
+   */
+  public readonly level: InputSignal<number>;
+
+  /**
+   * The text between the heading's row and the table, its `explanation`
+   * input; none when empty, the default.
+   */
+  public readonly explanation: InputSignal<string>;
+}
+
+/**
+ * Marks the owner's native table inside a
+ * {@link ConfigurationTableComponent}, `table[trConfigurationTable]`, giving
+ * it the kit's cells, lines and alignment, and names it by the component's
+ * heading, or else by its label.
+ *
+ * @example
+ * ```ts
+ * import { Component } from "@angular/core";
+ * import { ConfigurationTableComponent, ConfigurationTableDirective } from "@noldova/teamrun-shell-ui";
+ *
+ * @Component({
+ *   selector: "tr-ignored-files",
+ *   imports: [ConfigurationTableComponent, ConfigurationTableDirective],
+ *   template: `
+ *     <tr-configuration-table label="Ignored files">
+ *       <table trConfigurationTable>
+ *         <thead><tr><th scope="col">Pattern</th></tr></thead>
+ *         <tbody><tr><td>*.log</td></tr></tbody>
+ *       </table>
+ *     </tr-configuration-table>`
+ * })
+ * export class IgnoredFilesComponent {
+ * }
+ * ```
+ */
+export declare class ConfigurationTableDirective {
+}
+
+/**
+ * Marks the free-text column of a {@link ConfigurationTableDirective} table,
+ * on its header and each of its cells, `trConfigurationTableFill`: the one
+ * column that takes the rest of the table's width, stays at least a text
+ * field wide and wraps, while the others keep to one line.
+ *
+ * @example
+ * ```ts
+ * import { Component } from "@angular/core";
+ * import { ConfigurationTableComponent, ConfigurationTableDirective, ConfigurationTableFillDirective } from "@noldova/teamrun-shell-ui";
+ *
+ * @Component({
+ *   selector: "tr-aliases",
+ *   imports: [ConfigurationTableComponent, ConfigurationTableDirective, ConfigurationTableFillDirective],
+ *   template: `
+ *     <tr-configuration-table heading="Aliases">
+ *       <table trConfigurationTable>
+ *         <thead><tr><th scope="col">Alias</th><th scope="col" trConfigurationTableFill>Command</th></tr></thead>
+ *         <tbody><tr><td>gs</td><td trConfigurationTableFill>git status --short --branch</td></tr></tbody>
+ *       </table>
+ *     </tr-configuration-table>`
+ * })
+ * export class AliasesComponent {
+ * }
+ * ```
+ */
+export declare class ConfigurationTableFillDirective {
+}
+
+/**
  * Opens a menu as the context menu of its host element: at the pointer on a
  * right click, or at the host's bottom-left corner on the ContextMenu key or
  * Shift+F10. The menu is the template bound to `trContextMenuTriggerFor`,
