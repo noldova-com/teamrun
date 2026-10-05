@@ -182,14 +182,13 @@ describe("SettingsComponent", () => {
     expect(box(".tr-settings-column").width).toBeCloseTo(51.5 * rem, 0);
   });
 
-  it("spans its search field from the page list's start to the headings' inset inside the column's end, whether or not the column has reached its reading width", () => {
+  it("spans its search field from the page list's start to the end of the column's content, whether or not the column has reached its reading width", () => {
     const host = render();
     const box = (selector: string): DOMRect => (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
     const column = host.querySelector(".tr-settings-column") as HTMLElement;
-    const inset = parseFloat(getComputedStyle(host.querySelector(".tr-settings-group-title") as HTMLElement).paddingLeft);
     const edges = ["100rem", "60rem"].map(width => {
       host.style.width = width;
-      const end = box(".tr-settings-column").right - parseFloat(getComputedStyle(column).paddingRight) - inset;
+      const end = box(".tr-settings-column").right - parseFloat(getComputedStyle(column).paddingRight);
       return [Math.round(box(".tr-settings-search-field").left - box(".tr-settings-pages").left), Math.round(box(".tr-settings-search-field").right - end)];
     });
 
@@ -211,7 +210,7 @@ describe("SettingsComponent", () => {
     expect(offsets).toEqual([0, 0, 0]);
   });
 
-  it("starts and ends the shortcuts table's text, actions and row lines at the headings' inset, whether or not the column has reached its reading width, and Reset all beside the explanation", async () => {
+  it("starts and ends the shortcuts table's text, actions and row lines at the column's content edges, whether or not the column has reached its reading width, and Reset all beside the explanation", async () => {
     const host = render();
     await page.getByRole("treeitem", { name: "Keyboard shortcuts" }).click();
     fixture.detectChanges();
@@ -222,10 +221,9 @@ describe("SettingsComponent", () => {
     };
     const column = host.querySelector(".tr-settings-column") as HTMLElement;
     const heading = host.querySelector(".tr-settings-group-title") as HTMLElement;
-    const inset = parseFloat(getComputedStyle(heading).paddingLeft);
     const rows = [...(host.querySelector(".tr-shortcuts-table") as HTMLTableElement).rows];
     const actions = rows.flatMap(t => [...(t.cells[t.cells.length - 1] as HTMLTableCellElement).querySelectorAll("button")].slice(-1));
-    const textEnd = (): number => column.getBoundingClientRect().right - parseFloat(getComputedStyle(column).paddingRight) - inset;
+    const textEnd = (): number => column.getBoundingClientRect().right - parseFloat(getComputedStyle(column).paddingRight);
     const offsets = ["100rem", "60rem"].map(width => {
       host.style.width = width;
       const start = textLeft(heading);
@@ -317,25 +315,29 @@ describe("SettingsComponent", () => {
     expect([".tr-settings-pages", ".tr-settings-content"].map(t => element().querySelector(t)?.classList.contains("tr-scroll-reveal"))).toEqual([true, true]);
   });
 
-  it("keeps the Gallery's page between the same edges as Keyboard shortcuts' table, at the headings' inset from both ends of the column", async () => {
+  it("sets every page's content between the column's content edges, the Settings inset from its ends: a built-in page's rows, a module's rows, the shortcuts table and the Gallery", async () => {
     gallery = FakeGalleryComponent;
     const host = render();
     host.style.width = "100rem";
-    const edges = (selector: string): readonly number[] => {
+    const column = host.querySelector(".tr-settings-column") as HTMLElement;
+    const columnBox = column.getBoundingClientRect();
+    const content = [columnBox.left + parseFloat(getComputedStyle(column).paddingLeft), columnBox.right - parseFloat(getComputedStyle(column).paddingRight)].map(t => Math.round(t));
+    const edges = async (title: string, selector: string): Promise<readonly number[]> => {
+      await page.getByRole("treeitem", { name: title, exact: true }).click();
+      fixture.detectChanges();
       const box = (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
       return [Math.round(box.left), Math.round(box.right)];
     };
+    const shown = [
+      await edges("Appearance", "tr-setting-row"),
+      await edges("Appearance", ".tr-settings-group-title"),
+      await edges("Clock", "tr-setting-row"),
+      await edges("Keyboard shortcuts", "tr-shortcuts table"),
+      await edges("Gallery", ".fake-gallery")
+    ];
 
-    await page.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true }).click();
-    fixture.detectChanges();
-    const table = edges("tr-shortcuts table");
-    const title = Math.round((host.querySelector(".tr-settings-group-title") as HTMLElement).getBoundingClientRect().left
-      + parseFloat(getComputedStyle(host.querySelector(".tr-settings-group-title") as HTMLElement).paddingLeft));
-    await page.getByRole("treeitem", { name: "Gallery", exact: true }).click();
-    fixture.detectChanges();
-
-    expect(edges(".fake-gallery")).toEqual(table);
-    expect(table[0]).toBe(title);
+    expect(shown).toEqual(shown.map(() => content));
+    AppearanceFixture.expectLook(getComputedStyle(column).paddingLeft, DefaultTheme.theme, "settings-heading-inset", "padding-left");
   });
 
   it("shows the Gallery as the last page when the build has one, and leaves it out of a search", async () => {
@@ -532,7 +534,7 @@ describe("SettingsComponent", () => {
     AppearanceFixture.expectLook(getComputedStyle(element().querySelector(".tr-settings-pages") as Element).width, DefaultTheme.theme, "settings-pages-width", "width");
     expect(heading.marginTop).toBe("0px");
     AppearanceFixture.expectLook(heading.marginBottom, DefaultTheme.theme, "settings-heading-space", "margin-bottom");
-    AppearanceFixture.expectLook(heading.paddingLeft, DefaultTheme.theme, "settings-heading-inset", "padding-left");
+    expect(heading.paddingLeft).toBe("0px");
     expect(heading.fontWeight).toBe("600");
     expect(heading.fontSize).toBe(`${parseFloat(getComputedStyle(document.body).fontSize) * 2}px`);
     expect(heading.color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "settings.headerForeground"));

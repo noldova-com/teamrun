@@ -35,9 +35,7 @@ LICENSE file in the root directory of this source tree.
 
 <ng-template #body let-page let-isResult="isResult">
   @if (page.isGallery) {
-    <div class="tr-settings-gallery">
-      <ng-container [ngComponentOutlet]="gallery" />
-    </div>
+    <ng-container [ngComponentOutlet]="gallery" />
   } @else if (page.isShortcuts) {
     @if (!isResult) {
       <h2 class="tr-settings-group-title">{{ page.title }}</h2>
