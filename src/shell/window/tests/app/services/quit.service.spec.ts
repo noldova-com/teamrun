@@ -37,14 +37,24 @@ describe("QuitService", () => {
     await vi.waitFor(() => expect(quit.bridge.quitAnswers).toEqual(["Stop"]));
   });
 
+  it("stops following the desktop once listening stops", () => {
+    const service = TestBed.inject(QuitService);
+
+    quit.stopListening();
+    quit.bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: false });
+
+    expect(service.question()).toBeNull();
+    expect(QuitFixture.findDialog()).toBeNull();
+  });
+
   it("closes when the desktop takes the question away and returns focus to where it was", async () => {
     quit.bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: false });
-    await vi.waitFor(() => expect(QuitFixture.dialog()).not.toBeNull());
+    await vi.waitFor(() => expect(QuitFixture.findDialog()).not.toBeNull());
 
     quit.bridge.askToQuit(null);
     quit.bridge.askToQuit(null);
 
-    await vi.waitFor(() => expect(QuitFixture.dialog()).toBeNull());
+    await vi.waitFor(() => expect(QuitFixture.findDialog()).toBeNull());
     await vi.waitFor(() => expect(document.activeElement).toBe(quit.opener));
     expect(quit.bridge.quitAnswers).toEqual([]);
   });

@@ -12,15 +12,14 @@ import { QuitService } from "../../src/app/services/quit.service";
 import { DesktopBridgeFixture } from "./desktop-bridge.fixture";
 
 export class QuitFixture {
-  private readonly stop: () => void;
-
   public readonly bridge: DesktopBridgeFixture;
   public readonly opener: HTMLButtonElement;
+  public readonly stopListening: () => void;
 
-  private constructor(bridge: DesktopBridgeFixture, opener: HTMLButtonElement, stop: () => void) {
+  private constructor(bridge: DesktopBridgeFixture, opener: HTMLButtonElement, stopListening: () => void) {
     this.bridge = bridge;
     this.opener = opener;
-    this.stop = stop;
+    this.stopListening = stopListening;
   }
 
   public static start(): QuitFixture {
@@ -32,13 +31,13 @@ export class QuitFixture {
     return new QuitFixture(bridge, opener, TestBed.inject(QuitService).listen());
   }
 
-  public static dialog(): HTMLElement | null {
+  public static findDialog(): HTMLElement | null {
     return document.querySelector("[role=dialog]");
   }
 
   public async endAsync(): Promise<void> {
     this.bridge.askToQuit(null);
-    this.stop();
+    this.stopListening();
     await vi.waitFor(() => expect(document.querySelector("tr-quit-dialog")).toBeNull());
     this.opener.remove();
     DesktopBridgeFixture.remove();

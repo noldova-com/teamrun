@@ -22,7 +22,7 @@ describe("QuitDialogComponent", () => {
   });
 
   function title(): string {
-    return document.getElementById(QuitFixture.dialog()?.getAttribute("aria-labelledby") ?? "")?.textContent ?? "";
+    return document.getElementById(QuitFixture.findDialog()?.getAttribute("aria-labelledby") ?? "")?.textContent ?? "";
   }
 
   function items(): string[] {
@@ -53,7 +53,7 @@ describe("QuitDialogComponent", () => {
       ["Wait, then quit", "Stop the work and quit", "Cancel"],
       true
     ]);
-    expect(QuitFixture.dialog()?.getAttribute("aria-modal")).toBe("true");
+    expect(QuitFixture.findDialog()?.getAttribute("aria-modal")).toBe("true");
     expect(quit.bridge.quitAnswers).toEqual(["Wait", "Stop", "Cancel", "Cancel"]);
   });
 

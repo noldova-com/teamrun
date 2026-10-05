@@ -6,18 +6,17 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { MenuCheck } from "../../../src/app/enums/menu-check";
+import { CommandRow } from "../../../src/app/models/command-row";
 import { MenuRow } from "../../../src/app/models/menu-row";
-
-class TitleRow extends MenuRow {
-  public constructor(title: string, icon: string | null) {
-    super(title, icon);
-  }
-}
+import { SubmenuRow } from "../../../src/app/models/submenu-row";
 
 describe("MenuRow", () => {
-  it("holds a row's title and icon", () => {
-    const row = new TitleRow("Sort", "sort");
+  it("is what a command row and a submenu row share: a title and an icon", () => {
+    const command = new CommandRow("notes.sortBy", {}, "Sort", "sort", null, true, MenuCheck.None, false);
+    const submenu = new SubmenuRow("notes.templates", "Templates");
 
-    expect([row.title, row.icon]).toEqual(["Sort", "sort"]);
+    expect([command instanceof MenuRow, command.title, command.icon]).toEqual([true, "Sort", "sort"]);
+    expect([submenu instanceof MenuRow, submenu.title, submenu.icon]).toEqual([true, "Templates", null]);
   });
 });

@@ -23,28 +23,28 @@ describe("NotificationsComponent", () => {
 
   it("shows a bell with its unread count, capped at 9+, and a silenced bell while Do not disturb is on", async () => {
     const fixture = await NotificationsFixture.renderAsync();
-    const quietLabel = (): string | null => NotificationsFixture.item(fixture).getAttribute("aria-label");
-    const empty = [NotificationsFixture.item(fixture).textContent?.trim(), quietLabel()];
+    const quietLabel = (): string | null => NotificationsFixture.findItem(fixture).getAttribute("aria-label");
+    const empty = [NotificationsFixture.findItem(fixture).textContent?.trim(), quietLabel()];
 
-    service.stateValue.set(new NotificationState(Array.from({ length: 12 }, (_, index) => NotificationsFixture.notification(index + 1, "clock.alarm", `Alarm ${index}`)), true, [], 0));
+    service.stateValue.set(new NotificationState(Array.from({ length: 12 }, (_, index) => NotificationsFixture.createNotification(index + 1, "clock.alarm", `Alarm ${index}`)), true, [], 0));
     await fixture.whenStable();
 
     expect(empty).toEqual(["notifications", "Notifications"]);
-    expect([NotificationsFixture.item(fixture).querySelector(".tr-notifications-icon")?.textContent, NotificationsFixture.item(fixture).querySelector(".tr-notifications-count")?.textContent]).toEqual(["notifications_off", "9+"]);
+    expect([NotificationsFixture.findItem(fixture).querySelector(".tr-notifications-icon")?.textContent, NotificationsFixture.findItem(fixture).querySelector(".tr-notifications-count")?.textContent]).toEqual(["notifications_off", "9+"]);
     expect(quietLabel()).toBe("Notifications, 12 unread, Do not disturb");
-    await NotificationsFixture.expectTooltipAsync(NotificationsFixture.item(fixture), "Notifications, 12 unread, Do not disturb");
+    await NotificationsFixture.expectTooltipAsync(NotificationsFixture.findItem(fixture), "Notifications, 12 unread, Do not disturb");
   });
 
   it("opens its list, marking everything read only when something is unread, and closes on a second click, Escape and a click outside", async () => {
-    service.stateValue.set(new NotificationState([NotificationsFixture.notification(1, "clock.alarm", "Alarm")], false, [], 0));
+    service.stateValue.set(new NotificationState([NotificationsFixture.createNotification(1, "clock.alarm", "Alarm")], false, [], 0));
     const fixture = await NotificationsFixture.renderAsync();
 
     const opened = await NotificationsFixture.openAsync(fixture);
-    const expanded = NotificationsFixture.item(fixture).getAttribute("aria-expanded");
-    NotificationsFixture.item(fixture).click();
+    const expanded = NotificationsFixture.findItem(fixture).getAttribute("aria-expanded");
+    NotificationsFixture.findItem(fixture).click();
     await fixture.whenStable();
-    const afterSecondClick = NotificationsFixture.popover();
-    service.stateValue.set(new NotificationState([NotificationsFixture.notification(1, "clock.alarm", "Alarm", { isRead: true })], false, [], 0));
+    const afterSecondClick = NotificationsFixture.findPopover();
+    service.stateValue.set(new NotificationState([NotificationsFixture.createNotification(1, "clock.alarm", "Alarm", { isRead: true })], false, [], 0));
     await NotificationsFixture.openAsync(fixture);
     await userEvent.keyboard("{Escape}");
     await fixture.whenStable();
@@ -57,8 +57,8 @@ describe("NotificationsComponent", () => {
     expect(opened.getAttribute("aria-label")).toBe("Notifications");
     expect(expanded).toBe("true");
     expect(afterSecondClick).toBeNull();
-    expect(focusAfterEscape).toBe(NotificationsFixture.item(fixture));
-    expect(NotificationsFixture.popover()).toBeNull();
+    expect(focusAfterEscape).toBe(NotificationsFixture.findItem(fixture));
+    expect(NotificationsFixture.findPopover()).toBeNull();
     expect(service.calls).toEqual(["read"]);
   });
 
@@ -68,12 +68,12 @@ describe("NotificationsComponent", () => {
     await NotificationsFixture.openAsync(fixture);
     await userEvent.keyboard("{ArrowDown}");
     await fixture.whenStable();
-    const isOpenAfterKey = NotificationsFixture.popover() !== null;
+    const isOpenAfterKey = NotificationsFixture.findPopover() !== null;
     (fixture.nativeElement as HTMLElement).style.marginTop = "40px";
     (fixture.nativeElement as HTMLElement).dispatchEvent(new Event("scroll"));
     await fixture.whenStable();
 
     expect(isOpenAfterKey).toBe(true);
-    expect(NotificationsFixture.popover()).toBeNull();
+    expect(NotificationsFixture.findPopover()).toBeNull();
   });
 });

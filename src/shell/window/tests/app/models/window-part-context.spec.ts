@@ -9,17 +9,15 @@
 import { Component, type Type } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName, SettingChange, SettingKey, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { WindowPartAccessException } from "../../../src/app/exceptions/window-part-access.exception";
-import type { IWindowPartHost } from "../../../src/app/interfaces/i-window-part-host";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
 import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
 import { DocumentContribution } from "../../../src/app/models/document-contribution";
-import type { MenuItem } from "../../../src/app/models/menu-item";
 import { MenuRowContribution } from "../../../src/app/models/menu-row-contribution";
 import { StatusBarItemContribution } from "../../../src/app/models/status-bar-item-contribution";
 import { StatusBarItemState } from "../../../src/app/models/status-bar-item-state";
@@ -29,115 +27,10 @@ import { ViewBadge } from "../../../src/app/models/view-badge";
 import { ViewContribution } from "../../../src/app/models/view-contribution";
 import { WindowPartContext } from "../../../src/app/models/window-part-context";
 import { WindowPartSource } from "../../../src/app/models/window-part-source";
+import { WindowPartContextHostFixture } from "../../fixtures/window-part-context-host.fixture";
 
 @Component({ template: "" })
 class ListComponent {
-}
-
-class FakeWindowPartHost implements IWindowPartHost {
-  public readonly calls: string[] = [];
-  public isNotificationHeld: boolean = true;
-  public readonly listeners: Set<(name: string, payload: JsonValue) => void> = new Set();
-  public readonly registered: Set<string> = new Set(["notes.taken"]);
-  public readonly settingListeners: Set<(change: SettingChange) => void> = new Set();
-  public readonly dynamicGroups: Set<string> = new Set(["notes.recent"]);
-  public readonly providers: Map<string, (context: JsonObject) => readonly MenuItem[]> = new Map();
-
-  public requestAsync(method: string, payload: JsonValue): Promise<JsonValue> {
-    this.calls.push(`request ${method}`);
-    return Promise.resolve({ method, payload });
-  }
-
-  public onEvent(listener: (name: string, payload: JsonValue) => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-
-  public openDocument(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
-    this.calls.push(`open ${moduleId} ${name} ${instance} ${title}${isPreview ? " as a preview" : ""}`);
-  }
-
-  public keepDocument(moduleId: string, name: string, instance: string): void {
-    this.calls.push(`keep ${moduleId} ${name} ${instance}`);
-  }
-
-  public log(moduleId: string, message: string): void {
-    this.calls.push(`log ${moduleId} ${message}`);
-  }
-
-  public showInDialogAsync(name: string, instance: string | null, title: string | null): Promise<void> {
-    this.calls.push(`show ${name} ${instance ?? "-"} ${title ?? "-"}`);
-    return Promise.resolve();
-  }
-
-  public isCommandRegistered(name: string): boolean {
-    return this.registered.has(name);
-  }
-
-  public declaresDynamicMenuGroup(moduleId: string, group: string): boolean {
-    return moduleId === "notes" && this.dynamicGroups.has(group);
-  }
-
-  public provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuItem[]): () => void {
-    this.providers.set(group, provider);
-    return () => this.providers.delete(group);
-  }
-
-  public runCommandAsync(name: string, commandArguments: JsonValue): Promise<JsonValue> {
-    this.calls.push(`run ${name}`);
-    return Promise.resolve({ name, commandArguments });
-  }
-
-  public postNotificationAsync(post: NotificationPost): Promise<string> {
-    this.calls.push(`post ${post.title}`);
-    return Promise.resolve(String(this.calls.length));
-  }
-
-  public updateNotificationAsync(id: string, post: NotificationPost): Promise<boolean> {
-    this.calls.push(`update ${id} ${post.title}`);
-    return Promise.resolve(this.isNotificationHeld);
-  }
-
-  public dismissNotification(id: string): void {
-    this.calls.push(`dismiss ${id}`);
-  }
-
-  public readSetting(name: string): JsonValue | undefined {
-    return name === "notes.missing" ? undefined : `${name} value`;
-  }
-
-  public writeSettingAsync(name: string, value: JsonValue, scope: SettingScope | null): Promise<void> {
-    this.calls.push(`write ${name} ${JSON.stringify(value)} ${scope?.id ?? "app"}`);
-    return Promise.resolve();
-  }
-
-  public resetSettingAsync(name: string, scope: SettingScope | null): Promise<void> {
-    this.calls.push(`reset ${name} ${scope?.id ?? "app"}`);
-    return Promise.resolve();
-  }
-
-  public onSettingChanged(listener: (change: SettingChange) => void): () => void {
-    this.settingListeners.add(listener);
-    return () => this.settingListeners.delete(listener);
-  }
-
-  public changeSetting(change: SettingChange): void {
-    for (const listener of this.settingListeners)
-      listener(change);
-  }
-
-  public setViewBadge(view: string, badge: ViewBadge | null): void {
-    this.calls.push(`badge ${view} ${badge?.count ?? "dot"} ${badge?.description ?? "none"}`);
-  }
-
-  public refresh(): void {
-    this.calls.push("refresh");
-  }
-
-  public publish(name: string, payload: JsonValue): void {
-    for (const listener of this.listeners)
-      listener(name, payload);
-  }
 }
 
 describe("WindowPartContext", () => {
@@ -146,11 +39,11 @@ describe("WindowPartContext", () => {
     action === null ? [] : [new NotificationAction("Show", new CommandRun(QualifiedName.parse(action), null))], null);
   const load = (): Promise<Type<unknown>> => Promise.resolve(ListComponent);
   const view = (name: string): ViewContribution => new ViewContribution(name, "Notes", "sticky_note_2", DockSide.Left, true, load);
-  let host: FakeWindowPartHost;
+  let host: WindowPartContextHostFixture;
   let context: WindowPartContext;
 
   beforeEach(() => {
-    host = new FakeWindowPartHost();
+    host = new WindowPartContextHostFixture();
     const source = new WindowPartSource("notes", ["tasks"], ["notes.list"], ["notes.note"], ["notes.newNote", "notes.taken"], ["notes.count", "notes.sync"], ["notes.compose", "notes.share"], ["notes.saved"],
       () => Promise.reject<IWindowPart>(new Error("unused")));
     context = new WindowPartContext(source, host);

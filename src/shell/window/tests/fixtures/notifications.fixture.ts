@@ -42,14 +42,14 @@ export class NotificationsFixture {
     DesktopBridgeFixture.remove();
   }
 
-  public static notification(
+  public static createNotification(
     id: number,
     kind: string,
     title: string,
     options: Partial<{ text: string; severity: NotificationSeverity; open: string; actions: readonly string[]; progress: number | typeof NotificationPost.indeterminate; isRead: boolean }> = {}): Notification {
     return new Notification(String(id), id, new NotificationPost(
       QualifiedName.parse(kind), null, title, options.text ?? null, options.severity ?? NotificationSeverity.Info,
-      options.open === undefined ? null : NotificationsFixture.run(options.open), (options.actions ?? []).map(t => new NotificationAction(`Run ${t}`, NotificationsFixture.run(t))),
+      options.open === undefined ? null : NotificationsFixture.createRun(options.open), (options.actions ?? []).map(t => new NotificationAction(`Run ${t}`, NotificationsFixture.createRun(t))),
       options.progress ?? null), "2026-10-03T08:05:00.000Z", options.isRead ?? false);
   }
 
@@ -59,18 +59,18 @@ export class NotificationsFixture {
     return fixture;
   }
 
-  public static item(fixture: ComponentFixture<NotificationsComponent>): HTMLButtonElement {
+  public static findItem(fixture: ComponentFixture<NotificationsComponent>): HTMLButtonElement {
     return (fixture.nativeElement as HTMLElement).querySelector("button.tr-notifications-item") as HTMLButtonElement;
   }
 
-  public static popover(): HTMLElement | null {
+  public static findPopover(): HTMLElement | null {
     return document.querySelector(".tr-notifications-popover");
   }
 
   public static async openAsync(fixture: ComponentFixture<NotificationsComponent>): Promise<HTMLElement> {
-    NotificationsFixture.item(fixture).click();
+    NotificationsFixture.findItem(fixture).click();
     await fixture.whenStable();
-    return NotificationsFixture.popover() as HTMLElement;
+    return NotificationsFixture.findPopover() as HTMLElement;
   }
 
   public static async expectTooltipAsync(button: HTMLElement | null | undefined, text: string): Promise<void> {
@@ -107,7 +107,7 @@ export class NotificationsFixture {
     this.calls.push(`quiet ${String(isOn)}`);
   }
 
-  private static run(name: string): CommandRun {
+  private static createRun(name: string): CommandRun {
     return new CommandRun(QualifiedName.parse(name), null);
   }
 }

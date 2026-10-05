@@ -23,12 +23,12 @@ describe("NotificationsPopoverComponent", () => {
     const fixture = await NotificationsFixture.renderAsync();
     const empty = (await NotificationsFixture.openAsync(fixture)).querySelector(".tr-notifications-empty")?.textContent;
     service.stateValue.set(new NotificationState([
-      NotificationsFixture.notification(3, "notes.saved", "Saved", { severity: NotificationSeverity.Success, text: "Plan.md", open: "notes.open", actions: ["notes.undo", "clock.reset"], isRead: true }),
-      NotificationsFixture.notification(2, "clock.sync", "Syncing", { severity: NotificationSeverity.Warning, progress: NotificationPost.indeterminate, isRead: true }),
-      NotificationsFixture.notification(1, "clock.sync", "Copying", { severity: NotificationSeverity.Error, progress: 0.25, isRead: true })
+      NotificationsFixture.createNotification(3, "notes.saved", "Saved", { severity: NotificationSeverity.Success, text: "Plan.md", open: "notes.open", actions: ["notes.undo", "clock.reset"], isRead: true }),
+      NotificationsFixture.createNotification(2, "clock.sync", "Syncing", { severity: NotificationSeverity.Warning, progress: NotificationPost.indeterminate, isRead: true }),
+      NotificationsFixture.createNotification(1, "clock.sync", "Copying", { severity: NotificationSeverity.Error, progress: 0.25, isRead: true })
     ], false, [], 0));
     await fixture.whenStable();
-    const rows = [...(NotificationsFixture.popover() as HTMLElement).querySelectorAll<HTMLElement>(".tr-notifications-row")];
+    const rows = [...(NotificationsFixture.findPopover() as HTMLElement).querySelectorAll<HTMLElement>(".tr-notifications-row")];
 
     expect(empty).toBe("No notifications");
     expect(rows.map(t => [t.dataset["notification"], t.querySelector(".tr-notifications-severity")?.getAttribute("aria-label"), t.querySelector(".tr-notifications-row-title")?.textContent?.trim()]))
@@ -46,14 +46,14 @@ describe("NotificationsPopoverComponent", () => {
 
   it("runs an action or the open command and closes, dismisses one, clears all and switches Do not disturb", async () => {
     service.stateValue.set(new NotificationState([
-      NotificationsFixture.notification(2, "notes.saved", "Saved", { open: "notes.open", actions: ["notes.undo"], isRead: true }),
-      NotificationsFixture.notification(1, "clock.sync", "Syncing", { progress: 0.5, isRead: true })
+      NotificationsFixture.createNotification(2, "notes.saved", "Saved", { open: "notes.open", actions: ["notes.undo"], isRead: true }),
+      NotificationsFixture.createNotification(1, "clock.sync", "Syncing", { progress: 0.5, isRead: true })
     ], false, [], 0));
     const fixture = await NotificationsFixture.renderAsync();
 
     (await NotificationsFixture.openAsync(fixture)).querySelector<HTMLButtonElement>(".tr-notifications-action")?.click();
     await fixture.whenStable();
-    const closedAfterAction = NotificationsFixture.popover();
+    const closedAfterAction = NotificationsFixture.findPopover();
     (await NotificationsFixture.openAsync(fixture)).querySelector<HTMLButtonElement>("button.tr-notifications-open")?.click();
     await fixture.whenStable();
     const list = await NotificationsFixture.openAsync(fixture);
@@ -79,7 +79,7 @@ describe("NotificationsPopoverComponent", () => {
   });
 
   it("disables Clear all while every notification is in progress and reports an action that fails", async () => {
-    service.stateValue.set(new NotificationState([NotificationsFixture.notification(1, "clock.sync", "Syncing", { progress: 0.5, actions: ["clock.cancel"], isRead: true })], false, [], 0));
+    service.stateValue.set(new NotificationState([NotificationsFixture.createNotification(1, "clock.sync", "Syncing", { progress: 0.5, actions: ["clock.cancel"], isRead: true })], false, [], 0));
     service.failure = new Error("The clock stopped.");
     const fixture = await NotificationsFixture.renderAsync();
 
