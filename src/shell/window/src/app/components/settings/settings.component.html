@@ -21,18 +21,20 @@ LICENSE file in the root directory of this source tree.
     }
   </nav>
   <div #content class="tr-settings-content tr-scroll-reveal" (scroll)="keep()">
-    @if (isSearching()) {
-      @for (page of results(); track page.title) {
-        <section class="tr-settings-result" [attr.aria-label]="page.title">
-          <h2 class="tr-settings-result-title">{{ page.title }}</h2>
-          <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: true }" />
-        </section>
-      } @empty {
-        <p class="tr-settings-empty">{{ resources.noSettingsFound }}</p>
+    <div class="tr-settings-column">
+      @if (isSearching()) {
+        @for (page of results(); track page.title) {
+          <section class="tr-settings-result" [attr.aria-label]="page.title">
+            <h2 class="tr-settings-result-title">{{ page.title }}</h2>
+            <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: true }" />
+          </section>
+        } @empty {
+          <p class="tr-settings-empty">{{ resources.noSettingsFound }}</p>
+        }
+      } @else if (currentPage(); as page) {
+        <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: false }" />
       }
-    } @else if (currentPage(); as page) {
-      <ng-container [ngTemplateOutlet]="body" [ngTemplateOutletContext]="{ $implicit: page, isResult: false }" />
-    }
+    </div>
   </div>
 </div>
 
