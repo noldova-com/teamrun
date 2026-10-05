@@ -6,15 +6,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { Assert, Wait } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity } from "@noldova/teamrun-shell-protocol";
-import { ProductInfo, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+import { DataDirectory, ProductInfo, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 export class ProbeBuildFixture implements AsyncDisposable {
-  public static readonly WAITING_MARKER: string = "waiting";
+  private static readonly WAITING_MARKER: string = "waiting";
+  private static readonly WAIT_LIMIT: number = 15_000;
   private static readonly PROBE_PART: string = [
     "import { writeFile } from \"node:fs/promises\";",
     "import path from \"node:path\";",
@@ -64,6 +67,15 @@ export class ProbeBuildFixture implements AsyncDisposable {
     const declarationsFile = path.join(modules, "declarations.json");
     await writeFile(declarationsFile, JSON.stringify({ formatVersion: 1, modules: [declaration] }));
     return new ProbeBuildFixture(folder, identity, path.join(copy, "services", "runtime-entry.js"), declarationsFile);
+  }
+
+  public static markerPath(dataDirectory: string): string {
+    return path.join(new DataDirectory(dataDirectory).locateModuleFolder("probe"), ProbeBuildFixture.WAITING_MARKER);
+  }
+
+  public static async waitUntilWaitingAsync(marker: string): Promise<void> {
+    Assert.isTrue(await Wait.untilAsync(() => existsSync(marker), ProbeBuildFixture.WAIT_LIMIT),
+      `The probe's command did not start waiting within ${ProbeBuildFixture.WAIT_LIMIT} ms: it did not write ${marker}.`);
   }
 
   public async [Symbol.asyncDispose](): Promise<void> {
