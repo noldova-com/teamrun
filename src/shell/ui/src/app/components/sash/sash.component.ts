@@ -44,6 +44,10 @@ export class SashComponent {
   private hoverTimer: ReturnType<typeof setTimeout> | null = null;
   private lastPosition: number = 0;
 
+  protected readonly isVertical: Signal<boolean> = computed(() => this.orientation() === SashOrientation.Vertical);
+  protected readonly ariaOrientation: Signal<string> = computed(() => this.isVertical() ? Resources.verticalOrientation : Resources.horizontalOrientation);
+  protected readonly isActive: Signal<boolean> = computed(() => this.isHovered() || this.isDragging());
+
   public readonly orientation = input.required<SashOrientation>();
   public readonly label = input.required<string>();
   public readonly value = input<number>();
@@ -51,25 +55,22 @@ export class SashComponent {
   public readonly maximum = input<number>();
   public readonly step = input<number>(Resources.sashKeyboardStep);
   public readonly resize = output<number>();
-  public readonly isVertical: Signal<boolean> = computed(() => this.orientation() === SashOrientation.Vertical);
-  public readonly ariaOrientation: Signal<string> = computed(() => this.isVertical() ? Resources.verticalOrientation : Resources.horizontalOrientation);
-  public readonly isActive: Signal<boolean> = computed(() => this.isHovered() || this.isDragging());
 
   public constructor() {
     inject(DestroyRef).onDestroy(() => this.clearHoverTimer());
   }
 
-  public onPointerEnter(): void {
+  protected onPointerEnter(): void {
     this.clearHoverTimer();
     this.hoverTimer = setTimeout(() => this.isHovered.set(true), Resources.sashHoverDelay);
   }
 
-  public onPointerLeave(): void {
+  protected onPointerLeave(): void {
     this.clearHoverTimer();
     this.isHovered.set(false);
   }
 
-  public onPointerDown(event: PointerEvent): void {
+  protected onPointerDown(event: PointerEvent): void {
     if (event.button !== Resources.primaryButton)
       return;
     event.preventDefault();
@@ -78,7 +79,7 @@ export class SashComponent {
     this.isDragging.set(true);
   }
 
-  public onPointerMove(event: PointerEvent): void {
+  protected onPointerMove(event: PointerEvent): void {
     if (!this.isDragging())
       return;
     const position = this.readPosition(event);
@@ -88,14 +89,14 @@ export class SashComponent {
       this.resize.emit(delta);
   }
 
-  public onPointerEnd(event: PointerEvent): void {
+  protected onPointerEnd(event: PointerEvent): void {
     if (!this.isDragging())
       return;
     this.host.releasePointerCapture(event.pointerId);
     this.isDragging.set(false);
   }
 
-  public onKeyDown(event: KeyboardEvent): void {
+  protected onKeyDown(event: KeyboardEvent): void {
     const orientation = this.orientation();
     if (event.key === Resources.sashDecreaseKeys[orientation])
       this.resize.emit(-this.step());

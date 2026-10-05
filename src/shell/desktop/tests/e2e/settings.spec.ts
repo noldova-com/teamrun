@@ -157,6 +157,40 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-wide-dark");
   });
 
+  test("Settings has one scroller whose scrollbar ends at the panel's edge in its wide and narrow layouts, in light and dark, as a document's and a docked view's do", async ({ desktop }) => {
+    const window = desktop.window;
+    const content = window.locator(".tr-settings-content");
+    const outer = window.locator("tr-tab-content:has(tr-settings)");
+    const expectAtEdgeAsync = async (area: Locator, where: string): Promise<void> => {
+      await expect.poll(async () => Math.abs(await ScrollAreaFixture.panelEdgeGapAsync(area)), { message: `${where}: the scroll area's end to the panel's inner edge` }).toBeLessThan(1);
+      await expect.poll(async () => {
+        const sizes = await ScrollAreaFixture.scrollbarSizesAsync(area);
+        return Math.abs(sizes.vertical - 0.375 * sizes.rem);
+      }, { message: `${where}: the scrollbar's width to 0.375rem` }).toBeLessThan(0.5);
+    };
+    for (const [key, page] of [["view/notes.list", "tr-notes-list"], ["document/notes.note/1", "tr-notes-note"]] as const) {
+      await window.locator(`tr-tab[data-tab-key='${key}']`).click();
+      const area = window.locator(`tr-tab-group:has(tr-tab[data-tab-key='${key}']) tr-tab-content`);
+      await expect(area.locator(page)).toBeVisible();
+      await expectAtEdgeAsync(area, key);
+    }
+    await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
+
+    for (const [layout, width, height] of [["wide", 1600, 900], ["narrow", 1000, 600]] as const) {
+      await desktop.useViewportAsync(width, height);
+      await expect(window.locator(layout === "wide" ? ".tr-settings-pages" : ".tr-settings-page-select")).toBeVisible();
+      for (const mode of WindowModeFixture.modes) {
+        const where = `Settings, ${layout} layout, ${mode}`;
+        await WindowModeFixture.setAsync(window, mode);
+        await expectAtEdgeAsync(content, where);
+        expect((await ScrollAreaFixture.scrollbarSizesAsync(outer)).vertical, `${where}: the tab content's own scrollbar`).toBe(0);
+        expect(await outer.evaluate(t => getComputedStyle(t).scrollbarGutter), `${where}: the tab content's gutter`).toBe("auto");
+        await ScrollAreaFixture.revealThumbColorAsync(window, content);
+        await desktop.checkpointAsync(`settings-edge-${layout}-${mode.toLowerCase()}`);
+      }
+    }
+  });
+
   test("in a 1000 × 600 window Settings swaps its page list for a select, and its content takes the width, its controls work and its scrollbar drags", async ({ desktop }) => {
     const window = desktop.window;
     const content = window.locator(".tr-settings-content");

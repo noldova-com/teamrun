@@ -29,11 +29,12 @@ export class ToolbarDirective {
   private readonly keys: FocusKeyManager<ToolbarItemDirective> = new FocusKeyManager(this.items, inject(Injector)).skipPredicate(() => false).withHomeAndEnd();
   private readonly current: WritableSignal<ToolbarItemDirective | null> = signal(null);
 
+  protected readonly ariaOrientation: Signal<string> = computed(() =>
+    this.orientation() === ToolbarOrientation.Vertical ? Resources.verticalOrientation : Resources.horizontalOrientation);
+
   public readonly orientation = input<ToolbarOrientation>(ToolbarOrientation.Horizontal, { alias: "trToolbarOrientation" });
   public readonly label = input<string | null>(null, { alias: "trToolbarLabel" });
   public readonly isWrapping = input<boolean>(false, { alias: "trToolbarWrap" });
-  public readonly ariaOrientation: Signal<string> = computed(() =>
-    this.orientation() === ToolbarOrientation.Vertical ? Resources.verticalOrientation : Resources.horizontalOrientation);
 
   public constructor() {
     const changes = this.keys.change.subscribe(() => this.current.set(this.keys.activeItem));

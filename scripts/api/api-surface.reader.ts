@@ -18,6 +18,7 @@ import {
 
 import ApiSurface from "./api-surface.ts";
 import ApiValue from "./api-value.ts";
+import type ApiVisibility from "./api-visibility.ts";
 import ApiException from "./api.exception.ts";
 
 export default class ApiSurfaceReader {
@@ -52,9 +53,11 @@ export default class ApiSurfaceReader {
   private static readonly IMPLICIT_CONSTRUCTOR: string = "()";
 
   private readonly project: Project;
+  private readonly hidden: number;
 
-  public constructor(project: Project) {
+  public constructor(project: Project, visibility: ApiVisibility) {
     this.project = project;
+    this.hidden = visibility.includesProtected ? ModifierFlags.Private : ModifierFlags.Private | ModifierFlags.Protected;
   }
 
   public async readAsync(file: string): Promise<ApiSurface> {
@@ -72,7 +75,7 @@ export default class ApiSurfaceReader {
     const symbol = (exported.flags & SymbolFlags.Alias) === 0 ? exported : await this.project.checker.getAliasedSymbol(exported);
     const declarations = await this.resolveAsync(symbol);
     const flags = declarations.reduce((all, t) => all | ApiValue.readModifierFlags(t), ModifierFlags.None);
-    if ((flags & ModifierFlags.Private) !== 0 || (symbol.flags & SymbolFlags.TypeParameter) !== 0)
+    if ((flags & this.hidden) !== 0 || (symbol.flags & SymbolFlags.TypeParameter) !== 0)
       return;
     const kinds = [...ApiSurfaceReader.KINDS].filter(([flag]) => (symbol.flags & flag) !== 0).map(([, name]) => name);
     const modifiers = [...ApiSurfaceReader.MODIFIERS].filter(([flag]) => (flags & flag) !== 0).map(([, name]) => name);
