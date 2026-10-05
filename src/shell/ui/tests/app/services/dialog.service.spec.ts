@@ -7,8 +7,9 @@
  */
 
 import type { DialogRef } from "@angular/cdk/dialog";
-import { Component } from "@angular/core";
+import { ApplicationRef, Component } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
+import { userEvent } from "vitest/browser";
 
 import { DialogService } from "../../../src/app/services/dialog.service";
 
@@ -91,5 +92,16 @@ describe("DialogService", () => {
     second.close();
 
     expect(document.activeElement).toBe(insideOf(0, "other"));
+  });
+
+  it("leaves the focus on the control inside the dialog when the backdrop behind it is clicked", async () => {
+    const reference = await openAsync();
+    const other = insideOf(0, "other");
+    other.focus();
+
+    await userEvent.click(reference.overlayRef.backdropElement as HTMLElement, { position: { x: 1, y: 1 } });
+    await TestBed.inject(ApplicationRef).whenStable();
+
+    expect(document.activeElement).toBe(other);
   });
 });
