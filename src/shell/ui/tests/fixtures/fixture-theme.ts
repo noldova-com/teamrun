@@ -204,7 +204,7 @@ export class FixtureTheme {
     ["field-height", "1.875rem"],
     ["field-padding", "0.5rem"],
     ["window-row-height", "2.5rem"],
-    ["status-bar-height", "1.5rem"],
+    ["status-bar-height", "2rem"],
     ["status-bar-inset", "0.75rem"],
     ["status-bar-item-padding", "0.5rem"],
     ["status-bar-item-height", "1.125rem"],

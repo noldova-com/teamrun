@@ -10,7 +10,7 @@ import { once } from "node:events";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
-import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
+import { ArgumentException, ArgumentOutOfRangeException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import {
@@ -255,6 +255,21 @@ export class RuntimeClientTests {
 
         Assert.areEqual("The connection to the runtime is closed.", exception.message);
         Assert.areEqual(1, listener.disconnections);
+        Assert.areEqual(`${FailureCode.InvalidMessage}|The frame is not a valid message.`, `${listener.failure?.code}|${listener.failure?.message}`);
+      });
+  }
+
+  @TestMethod
+  public disconnectsFromARuntimeThatSendsAFrameOverTheLimitAndSaysWhy(): Promise<void> {
+    return RuntimeClientTests.runRawAsync(
+      (_frame, index) => index === 0 ? [RuntimeClientTests.AUTHENTICATED] : ["x".repeat(2_048)],
+      async (server, listener) => {
+        const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, new ClientSettings(300, 1_000, 50, 1_024));
+
+        await Assert.throwsAsync(() => client.callAsync(RuntimeClientTests.ECHO, null), ConnectionException);
+
+        Assert.areEqual(1, listener.disconnections);
+        Assert.areEqual(`${FailureCode.FrameTooLarge}|A frame exceeds the maximum length of 1024 characters.`, `${listener.failure?.code}|${listener.failure?.message}`);
       });
   }
 
@@ -271,6 +286,32 @@ export class RuntimeClientTests {
         Assert.areEqual("The runtime did not answer notes.echo in time.", exception.message);
         Assert.isTrue(Date.now() - started >= 90, "the client waits for the time limit and the grace");
         Assert.isTrue(client.isConnected);
+      });
+  }
+
+  @TestMethod
+  public answersARequestTooLargeToSendWithAFailureAndLeavesNoCallBehind(): Promise<void> {
+    return RuntimeClientTests.runRawAsync(
+      (frame, index) => index === 0 ? [RuntimeClientTests.AUTHENTICATED] : [Response.success(RawServerFixture.readId(frame), 1).toText()],
+      async (server, listener) => {
+        const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, new ClientSettings(300, 1_000, 50, 1_024));
+
+        const loop: JsonValue[] = [];
+        loop.push(loop);
+
+        const large = await client.callAsync(RuntimeClientTests.ECHO, "x".repeat(2_048));
+        const invalid = Assert.throws(() => client.callAsync(RuntimeClientTests.ECHO, null, 1.5), ArgumentOutOfRangeException);
+        Assert.throws(() => client.callAsync(RuntimeClientTests.ECHO, loop), TypeError);
+        const small = await client.callAsync(RuntimeClientTests.ECHO, null);
+        client.close();
+        await listener.disconnectedAsync;
+        const closed = Assert.throws(() => client.callAsync(RuntimeClientTests.ECHO, null, 0), ArgumentOutOfRangeException);
+
+        Assert.areEqual(`desktop:1|${FailureCode.FrameTooLarge}|A frame exceeds the maximum length of 1024 characters.`, `${large.id}|${large.failure?.code}|${large.failure?.message}`);
+        Assert.areEqual("timeoutMilliseconds|timeoutMilliseconds", `${String(invalid.parameterName)}|${String(closed.parameterName)}`);
+        Assert.areEqual("desktop:3|1", `${small.id}|${JSON.stringify(small.payload)}`);
+        Assert.areEqual(2, server.frames.length);
+        Assert.isNull(listener.failure);
       });
   }
 

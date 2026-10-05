@@ -51,7 +51,8 @@ export declare enum FailureCode {
   InvalidMessage = "InvalidMessage",
 
   /**
-   * A frame exceeds the connection's maximum length; the connection closes.
+   * A frame exceeds the connection's maximum length. A frame received over the limit closes the connection; a request or
+   * answer over the limit is never sent, and only its call fails.
    */
   FrameTooLarge = "FrameTooLarge",
 

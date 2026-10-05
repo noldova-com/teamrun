@@ -46,6 +46,8 @@ export class RuntimeServerTests {
   private static readonly ECHO: QualifiedName = new QualifiedName("notes", "echo");
   private static readonly WAIT: QualifiedName = new QualifiedName("notes", "wait");
   private static readonly MOVE: QualifiedName = new QualifiedName("notes", "move");
+  private static readonly LARGE: QualifiedName = new QualifiedName("notes", "large");
+  private static readonly BROKEN: QualifiedName = new QualifiedName("notes", "broken");
   private static readonly ECHO_HANDLER: IMethodHandler = {
     handleAsync: (context: RequestContext) => Promise.resolve({ client: context.client, payload: context.payload })
   };
@@ -143,6 +145,45 @@ export class RuntimeServerTests {
       Assert.areEqual(FailureCode.FrameTooLarge, response.failure?.code);
       Assert.isNull(response.id);
       await connection.waitForCloseAsync();
+    });
+  }
+
+  @TestMethod
+  public answersAnAnswerItCannotSendWithAFailureAndKeepsTheConnection(): Promise<void> {
+    return RuntimeServerTests.runAsync(new ServerSettings(1_024, 1_000, 1_000, 1_000), async fixture => {
+      fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
+      fixture.methods.register(RuntimeServerTests.LARGE, { handleAsync: () => Promise.resolve("x".repeat(2_048)) });
+      fixture.methods.register(RuntimeServerTests.BROKEN, { handleAsync: () => Promise.resolve(RuntimeServerTests.loop()) });
+      const connection = await fixture.authenticateAsync();
+
+      connection.sendMessages(
+        new Request("tester:1", RuntimeServerTests.LARGE, null),
+        new Request("tester:2", RuntimeServerTests.BROKEN, null),
+        new Request("tester:3", RuntimeServerTests.ECHO, 1));
+
+      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.FrameTooLarge, "A frame exceeds the maximum length of 1024 characters.", "tester:1");
+      RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.Internal, "The runtime failed to handle the request.", "tester:2");
+      Assert.areEqual("{\"client\":\"tester\",\"payload\":1}", JSON.stringify((await connection.readResponseAsync()).payload));
+      Assert.isFalse(connection.isClosed);
+    });
+  }
+
+  @TestMethod
+  public logsAnEventItCannotSendAndSendsItToNoClient(): Promise<void> {
+    return RuntimeServerTests.runAsync(new ServerSettings(1_024, 1_000, 1_000, 1_000), async fixture => {
+      const first = await fixture.authenticateAsync("first");
+      const second = await fixture.authenticateAsync("second");
+
+      fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, "x".repeat(2_048)));
+      fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, RuntimeServerTests.loop()));
+      fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, "small"));
+
+      Assert.areEqual("\"small\"|\"small\"", `${JSON.stringify((await first.readEventAsync()).payload)}|${JSON.stringify((await second.readEventAsync()).payload)}`);
+      const entries = fixture.diagnostics.text.split("The runtime sent the event notes.echo to no client: ").slice(1);
+      Assert.areEqual(2, entries.length);
+      Assert.areEqual("ProtocolException: A frame exceeds the maximum length of 1024 characters.\n", entries[0]);
+      Assert.isTrue(entries[1]?.startsWith("TypeError: Converting circular structure to JSON") === true);
+      Assert.isFalse(first.isClosed || second.isClosed);
     });
   }
 
@@ -420,6 +461,12 @@ export class RuntimeServerTests {
         return "late";
       }
     };
+  }
+
+  private static loop(): JsonValue[] {
+    const loop: JsonValue[] = [];
+    loop.push(loop);
+    return loop;
   }
 
   private static assertFailure(response: Response, code: FailureCode, message: string, id: string | null): void {

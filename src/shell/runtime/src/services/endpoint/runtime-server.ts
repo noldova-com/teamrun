@@ -8,6 +8,7 @@
 
 import { rm } from "node:fs/promises";
 import { type Server, type Socket, createServer } from "node:net";
+import type { Writable } from "node:stream";
 
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
@@ -18,6 +19,7 @@ import {
   type Event,
   Failure,
   FailureCode,
+  FrameWriter,
   Handshake,
   ProtocolException,
   Request,
@@ -49,6 +51,8 @@ export class RuntimeServer implements IEventSink {
   private readonly methods: MethodRegistry;
   private readonly settings: ServerSettings;
   private readonly changed: () => void;
+  private readonly diagnostics: Writable;
+  private readonly writer: FrameWriter;
   private readonly listener: ISessionListener;
   private readonly sessions: Set<ClientSession> = new Set();
   private readonly refusals: Map<ClientSession, Refusal> = new Map();
@@ -62,13 +66,16 @@ export class RuntimeServer implements IEventSink {
     handover: RuntimeHandover,
     methods: MethodRegistry,
     settings: ServerSettings,
-    changed: () => void) {
+    changed: () => void,
+    diagnostics: Writable) {
     this.identity = identity;
     this.token = token;
     this.handover = handover;
     this.methods = methods;
     this.settings = settings;
     this.changed = changed;
+    this.diagnostics = diagnostics;
+    this.writer = new FrameWriter(settings.maximumFrameLength);
     this.listener = {
       onMessage: (session, message) => this.handleMessage(session, message),
       onInvalidFrame: (session, error) => this.handleInvalidFrame(session, error),
@@ -112,9 +119,17 @@ export class RuntimeServer implements IEventSink {
   }
 
   public broadcast(event: Event): void {
+    let frame: string;
+    try {
+      frame = this.writer.write(event);
+    }
+    catch (error) {
+      this.diagnostics.write(Resources.formatEventNotSent(event.name.text, String(error)));
+      return;
+    }
     for (const session of this.sessions)
       if (session.state === SessionState.Authenticated)
-        session.send(event);
+        session.write(frame);
   }
 
   public async closeAsync(): Promise<void> {
@@ -145,6 +160,15 @@ export class RuntimeServer implements IEventSink {
       });
       listen();
     });
+  }
+
+  private static answer(session: ClientSession, response: Response): void {
+    try {
+      session.send(response);
+    }
+    catch (error) {
+      session.send(Response.failure(response.id, RuntimeServer.describeFailure(error)));
+    }
   }
 
   private static describeFailure(error: unknown): Failure {
@@ -255,7 +279,7 @@ export class RuntimeServer implements IEventSink {
       isSettled = true;
       clearTimeout(timer);
       session.releaseRequest(request.id);
-      session.send(response);
+      RuntimeServer.answer(session, response);
     };
     controller.signal.addEventListener(Resources.abortEvent, () => {
       const code = controller.signal.reason === FailureCode.DeadlineExceeded ? FailureCode.DeadlineExceeded : FailureCode.Cancelled;

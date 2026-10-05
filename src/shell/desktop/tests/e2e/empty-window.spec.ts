@@ -100,6 +100,7 @@ test.describe("the empty window", () => {
         isDark: matchMedia("(prefers-color-scheme: dark)").matches,
         body: getComputedStyle(document.body).backgroundColor,
         rowLook: lookHeight("window-row-height"),
+        barLook: lookHeight("status-bar-height"),
         row: { height: row.height, background: row.backgroundColor, color: row.color, borderBottom: row.borderBottomWidth },
         bar: { height: bar.height, paddingLeft: bar.paddingLeft, paddingRight: bar.paddingRight, gap: side.columnGap, background: bar.backgroundColor, borderTop: bar.borderTopWidth },
         card: { border: card.borderTopWidth, borderColor: card.borderTopColor, radius: card.borderTopLeftRadius, background: card.backgroundColor, color: card.color },
@@ -113,7 +114,7 @@ test.describe("the empty window", () => {
 
     expect(measured.body).toBe(expected.window);
     expect(measured.row).toEqual({ height: measured.rowLook, background: expected.titleBar, color: expected.titleBarText, borderBottom: "0px" });
-    expect(measured.bar).toEqual({ height: "28px", paddingLeft: "8px", paddingRight: "8px", gap: "4px", background: expected.window, borderTop: "0px" });
+    expect(measured.bar).toEqual({ height: measured.barLook, paddingLeft: "8px", paddingRight: "8px", gap: "4px", background: expected.window, borderTop: "0px" });
     expect(measured.card).toEqual({ border: "1px", borderColor: expected.cardBorder, radius: "8px", background: expected.panel, color: expected.text });
     expect(measured.cardBounds["x"]).toBe(4);
     expect(measured.cardBounds["y"]).toBe(measured.rowBottom);
