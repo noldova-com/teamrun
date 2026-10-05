@@ -22,22 +22,16 @@ class ListComponent {
 describe("ContributionMatch", () => {
   const load = (): Promise<Type<unknown>> => Promise.resolve(ListComponent);
 
-  it("holds how to load a module's contribution and the context of the window part that registered it", () => {
+  it("holds how to load a module's contribution, the context of the window part that registered it and its page's padding", () => {
     const source = new WindowPartSource("notes", [], [], [], [], [], [], [], () => Promise.resolve(new WindowPartFixture("notes", [])));
     const context = new WindowPartContext(source, new WindowPartContextHostFixture());
 
-    const match = new ContributionMatch(load, context);
+    const match = new ContributionMatch(load, context, ContentPadding.None);
 
-    expect(match.loadComponent).toBe(load);
-    expect(match.context).toBe(context);
+    expect([match.loadComponent, match.context, match.padding]).toEqual([load, context, ContentPadding.None]);
   });
 
   it("has no context for a shell document, which no window part registered", () => {
-    expect(new ContributionMatch(load, null).context).toBeNull();
-  });
-
-  it("takes the shell's padding unless the contribution or its module chose one", () => {
-    expect([new ContributionMatch(load, null).padding, new ContributionMatch(load, null, null).padding, new ContributionMatch(load, null, ContentPadding.None).padding])
-      .toEqual([ContentPadding.Default, ContentPadding.Default, ContentPadding.None]);
+    expect(new ContributionMatch(load, null, ContentPadding.Default).context).toBeNull();
   });
 });

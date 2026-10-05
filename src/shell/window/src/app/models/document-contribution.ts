@@ -18,12 +18,12 @@ export class DocumentContribution {
   public readonly loadComponent: () => Promise<Type<unknown>>;
   public readonly padding: ContentPadding | null;
 
-  public constructor(name: string, loadComponent: () => Promise<Type<unknown>>, padding: ContentPadding | null = null) {
+  public constructor(name: string, loadComponent: () => Promise<Type<unknown>>, padding?: ContentPadding) {
     if (!Resources.contributionNamePattern.test(name))
       throw new ArgumentException(Resources.invalidContributionName, "name");
 
     this.name = name;
     this.loadComponent = loadComponent;
-    this.padding = padding;
+    this.padding = padding ?? null;
   }
 }

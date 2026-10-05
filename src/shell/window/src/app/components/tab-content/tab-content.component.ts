@@ -47,12 +47,12 @@ export class TabContentComponent {
     params: () => ({ tab: this.tab(), revision: this.revision() }),
     loader: ({ params }) => this.loadAsync(params.tab)
   });
-
-  public readonly isLoaded: Signal<boolean> = computed(() => this.content.hasValue());
-  public readonly isPadded: Signal<boolean> = computed(() => {
+  protected readonly isPadded: Signal<boolean> = computed(() => {
     const value = this.content.value();
     return !Object.isNullOrUndefined(value) && (value.pagePadding.value() ?? value.padding) === ContentPadding.Default;
   });
+
+  public readonly isLoaded: Signal<boolean> = computed(() => this.content.hasValue());
 
   private async loadAsync(tab: Tab): Promise<TabContent | null> {
     const match = this.host.findContribution(tab);

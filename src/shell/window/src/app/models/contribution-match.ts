@@ -8,7 +8,7 @@
 
 import type { Type } from "@angular/core";
 
-import { ContentPadding } from "../enums/content-padding";
+import type { ContentPadding } from "../enums/content-padding";
 import type { WindowPartContext } from "./window-part-context";
 
 export class ContributionMatch {
@@ -16,9 +16,9 @@ export class ContributionMatch {
   public readonly context: WindowPartContext | null;
   public readonly padding: ContentPadding;
 
-  public constructor(loadComponent: () => Promise<Type<unknown>>, context: WindowPartContext | null, padding: ContentPadding | null = null) {
+  public constructor(loadComponent: () => Promise<Type<unknown>>, context: WindowPartContext | null, padding: ContentPadding) {
     this.loadComponent = loadComponent;
     this.context = context;
-    this.padding = padding ?? ContentPadding.Default;
+    this.padding = padding;
   }
 }

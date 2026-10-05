@@ -12,7 +12,8 @@ import type { InjectionToken, Signal, Type } from "@angular/core";
  * Whether the shell pads the page a view or document shows. The shell pads
  * every page by default, 0.75rem at the sides in the default theme, so the
  * page's content starts where its tab's icon does, and at the top and bottom
- * 1rem for a document in the middle and 0.5rem for a view in a dock. A page
+ * by where the page shows: 1rem in the middle or a dialog and 0.5rem in a
+ * dock, so a view moved into the middle is padded as a document. A page
  * that runs edge to edge, such as a terminal or a code editor, turns it off at
  * any of three levels: its module for all of its views and documents, its
  * declaration, or the page itself at runtime. The page's choice wins over its
@@ -86,11 +87,19 @@ export declare class ContentPaddingRef {
    *
    * @example
    * ```ts
-   * import { inject } from "@angular/core";
-   * import { WindowPartTokens } from "@noldova/teamrun-shell-window";
+   * import { Component, inject } from "@angular/core";
+   * import { ContentPadding, type ContentPaddingRef, WindowPartTokens } from "@noldova/teamrun-shell-window";
    *
-   * export function followTheDeclaration(): void {
-   *   inject(WindowPartTokens.contentPadding).reset();
+   * @Component({ selector: "tr-notes-preview", template: "<input type=\"checkbox\" (change)=\"showFullWidth($any($event.target).checked)\" />" })
+   * export class NotesPreviewComponent {
+   *   private readonly padding: ContentPaddingRef = inject(WindowPartTokens.contentPadding);
+   *
+   *   protected showFullWidth(isFullWidth: boolean): void {
+   *     if (isFullWidth)
+   *       this.padding.set(ContentPadding.None);
+   *     else
+   *       this.padding.reset();
+   *   }
    * }
    * ```
    */
@@ -107,11 +116,25 @@ export interface IWindowPart {
    *
    * @example
    * ```ts
-   * import { ContentPadding, type IWindowPart } from "@noldova/teamrun-shell-window";
+   * import { ContentPadding, DockSide, type IWindowPart, type IWindowPartContext, ViewContribution } from "@noldova/teamrun-shell-window";
    *
-   * export abstract class TerminalWindowPart implements IWindowPart {
+   * export class TerminalWindowPart implements IWindowPart {
    *   public readonly moduleId: string = "terminal";
    *   public readonly padding: ContentPadding = ContentPadding.None;
+   *
+   *   public activateAsync(context: IWindowPartContext): Promise<void> {
+   *     context.registerView(new ViewContribution("terminal.panel", "Terminal", "terminal", DockSide.Bottom, true,
+   *       () => import("./terminal-panel.component").then(t => t.TerminalPanelComponent)));
+   *     return Promise.resolve();
+   *   }
+   *
+   *   public reconnectAsync(): Promise<boolean> {
+   *     return Promise.resolve(true);
+   *   }
+   *
+   *   public deactivateAsync(): Promise<void> {
+   *     return Promise.resolve();
+   *   }
    * }
    * ```
    */
@@ -136,7 +159,7 @@ export declare class ViewContribution {
    * @param defaultSide The dock it opens in.
    * @param isShownByDefault Whether it shows in a new layout.
    * @param loadComponent Loads the component the view shows.
-   * @param padding The padding of its page; left out or null, its module decides.
+   * @param padding The padding of its page; left out, its module decides.
    * @example
    * ```ts
    * import { ContentPadding, DockSide, ViewContribution } from "@noldova/teamrun-shell-window";
@@ -146,7 +169,7 @@ export declare class ViewContribution {
    * ```
    */
   public constructor(name: string, title: string, icon: string, defaultSide: DockSide, isShownByDefault: boolean, loadComponent: () => Promise<Type<unknown>>,
-    padding?: ContentPadding | null);
+    padding?: ContentPadding);
 }
 
 /**
@@ -163,7 +186,7 @@ export declare class DocumentContribution {
    *
    * @param name The document's name, `<module id>.<name>`.
    * @param loadComponent Loads the component the document shows.
-   * @param padding The padding of its page; left out or null, its module decides.
+   * @param padding The padding of its page; left out, its module decides.
    * @example
    * ```ts
    * import { ContentPadding, DocumentContribution } from "@noldova/teamrun-shell-window";
@@ -172,7 +195,7 @@ export declare class DocumentContribution {
    *   () => import("./file-editor.component").then(t => t.FileEditorComponent), ContentPadding.None);
    * ```
    */
-  public constructor(name: string, loadComponent: () => Promise<Type<unknown>>, padding?: ContentPadding | null);
+  public constructor(name: string, loadComponent: () => Promise<Type<unknown>>, padding?: ContentPadding);
 }
 
 /**

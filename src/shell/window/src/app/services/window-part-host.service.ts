@@ -15,6 +15,7 @@ import {
   type SettingScope, type SettingChange, ShellEvents, ShellMethods
 } from "@noldova/teamrun-shell-protocol";
 
+import { ContentPadding } from "../enums/content-padding";
 import { DockSide } from "../enums/dock-side";
 import { RuntimeDisconnectedException } from "../exceptions/runtime-disconnected.exception";
 import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
@@ -23,6 +24,7 @@ import type { IWindowPart } from "../interfaces/i-window-part";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
 import { CommandContribution } from "../models/command-contribution";
 import { ContributionMatch } from "../models/contribution-match";
+import type { DocumentContribution } from "../models/document-contribution";
 import { DocumentTab } from "../models/layout/document-tab";
 import type { Tab } from "../models/layout/tab";
 import { TabLabel } from "../models/layout/tab-label";
@@ -35,6 +37,7 @@ import { ModuleFailure } from "../models/module-failure";
 import { PendingDocument } from "../models/pending-document";
 import type { StartupState } from "../models/startup-state";
 import type { ViewBadge } from "../models/view-badge";
+import type { ViewContribution } from "../models/view-contribution";
 import { WindowPartActivation } from "../models/window-part-activation";
 import { WindowPartContext } from "../models/window-part-context";
 import type { WindowPartSource } from "../models/window-part-source";
@@ -97,12 +100,12 @@ export class WindowPartHostService implements IWindowPartHost {
   public findContribution(tab: Tab): ContributionMatch | null {
     const shellDocument = ShellDocuments.find(tab);
     if (!Object.isNull(shellDocument))
-      return new ContributionMatch(shellDocument.loadComponent, null, shellDocument.padding);
+      return WindowPartHostService.match(shellDocument, null);
     for (const activation of this.activations) {
       const contributions = tab instanceof DocumentTab ? activation.context.documents : activation.context.views;
       const contribution = contributions.find(t => t.name === tab.name);
       if (!Object.isUndefined(contribution))
-        return new ContributionMatch(contribution.loadComponent, activation.context, contribution.padding ?? activation.part.padding ?? null);
+        return WindowPartHostService.match(contribution, activation.context, activation.part.padding);
     }
     return null;
   }
@@ -468,5 +471,9 @@ export class WindowPartHostService implements IWindowPartHost {
         activation.context.withdraw();
       }
     }
+  }
+
+  private static match(contribution: ViewContribution | DocumentContribution, context: WindowPartContext | null, modulePadding?: ContentPadding): ContributionMatch {
+    return new ContributionMatch(contribution.loadComponent, context, contribution.padding ?? modulePadding ?? ContentPadding.Default);
   }
 }

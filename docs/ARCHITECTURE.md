@@ -165,7 +165,7 @@ A view or document already open in a tab moves into the dialog: its tab stays wh
 
 ### Content padding
 
-The shell pads the page of every view and document, so a module's content keeps the same distance from its panel's edges as every other's without setting one itself: at the sides by the theme's content padding, and at the top and bottom by its view padding in a dock and its document padding in the middle or in a dialog. [UI-STANDARDS.md](UI-STANDARDS.md#8-component-metrics-and-behavior) owns the values. A page that runs edge to edge, such as a terminal, a code editor or a page that sets its own spacing, turns the padding off at one of three levels:
+The shell pads the page of every view and document, so a module's content keeps the same distance from its panel's edges as every other's without setting one itself: at the sides by the theme's content padding, and at the top and bottom by its view padding in a dock and its document padding in the middle or in a dialog. Where a page shows decides its padding, not whether it is a view or a document. [UI-STANDARDS.md](UI-STANDARDS.md#8-component-metrics-and-behavior) owns the values. A page that runs edge to edge, such as a terminal, a code editor or a page that sets its own spacing, turns the padding off at one of three levels:
 
 | Level | Where | Applies to |
 |---|---|---|

@@ -215,7 +215,7 @@ export class FixtureTheme {
     ["setting-marker", "0.75rem"],
     ["tree-row-height", "1.875rem"],
     ["tree-indent", "2rem"],
-    ["content-padding-inline", "1rem"],
+    ["content-padding-inline", "calc(3 * var(--tr-tab-inset) + var(--tr-pill-padding))"],
     ["document-padding-block", "1.25rem"],
     ["view-padding-block", "0.75rem"],
     ["settings-pages-width", "15rem"],
