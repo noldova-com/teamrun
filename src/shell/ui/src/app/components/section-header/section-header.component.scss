@@ -1,0 +1,21 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+  padding-block: calc((var(--tr-section-header-height) - var(--tr-line-label)) / 2);
+  padding-inline: var(--tr-space-2);
+  color: var(--tr-text);
+  font-size: var(--tr-text-label);
+  font-weight: 600;
+  line-height: var(--tr-line-label);
+}
+
+:host(:not(:first-child)) {
+  margin-block-start: var(--tr-space-3);
+}

@@ -55,7 +55,6 @@ export class Resources {
   public static readonly buildMismatchCode: string = "BuildMismatch";
   public static readonly dataDirectoryUnusableCode: string = "DataDirectoryUnusable";
   public static readonly failedCode: string = "Failed";
-  public static readonly unavailableCode: string = "Unavailable";
   public static readonly unusableDirectoryErrorCodes: readonly string[] = ["EACCES", "EPERM", "EROFS", "ENOTDIR", "EEXIST"];
 
   public static get usage(): string {

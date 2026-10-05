@@ -65,7 +65,7 @@ export class CliFailure {
 
   private static fromConnection(error: ConnectionException): CliFailure {
     const failure = error.failure;
-    return Object.isNull(failure) ? new CliFailure(ExitCode.Failed, Resources.unavailableCode, error.message) : CliFailure.fromFailure(failure);
+    return Object.isNull(failure) ? new CliFailure(ExitCode.Failed, FailureCode.Unavailable, error.message) : CliFailure.fromFailure(failure);
   }
 
   private static isUnusableDirectory(error: unknown): boolean {
