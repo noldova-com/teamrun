@@ -309,7 +309,7 @@ describe("SettingsComponent", () => {
     await fixture.whenStable();
 
     expect(left.every(t => t > 0)).toBe(true);
-    expect([texts("[aria-current=page]"), scrollers().map(t => t.scrollTop)]).toEqual([["Keyboard shortcuts"], left]);
+    expect([texts(".tr-settings-pages [aria-selected=true]"), scrollers().map(t => t.scrollTop)]).toEqual([["Keyboard shortcuts"], left]);
   });
 
   it("opens on its first page with no search once its tab was closed", async () => {
@@ -323,7 +323,7 @@ describe("SettingsComponent", () => {
     layout.openDocument(LayoutFixture.settings);
     render();
 
-    expect([texts("[aria-current=page]"), (element().querySelector(".tr-settings-search-field") as HTMLInputElement).value]).toEqual([["Appearance"], ""]);
+    expect([texts(".tr-settings-pages [aria-selected=true]"), (element().querySelector(".tr-settings-search-field") as HTMLInputElement).value]).toEqual([["Appearance"], ""]);
   });
 
   it("shows the search it had when it is created again", async () => {
