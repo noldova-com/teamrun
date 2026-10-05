@@ -136,7 +136,7 @@ Radius tokens: `hover` = 0.1875rem, `small` = 0.25rem, `medium` = 0.375rem, `lar
 
 Use spacing tokens of 0.25, 0.5, 0.75, 1 and 1.5rem with section 8's component measurements.
 
-A hover or selected fill around a label in a bar or a group of pills, such as a tab, a toolbar button, a menu-bar item, a status bar item or a choice pill, leaves the pill padding of 0.375rem between each of its edges and its contents, so fills side by side match. An icon-only button is a square with no side padding. The rows of a menu, list, tree or dropdown fill their column and keep 0.5rem.
+A hover or selected fill around a label in a bar or a group of pills, such as a tab, a toolbar button, a menu-bar item, a status bar item or a choice pill, leaves the pill padding of 0.375rem between its contents and the fill on each side, so fills side by side match. An icon-only button is a square with no side padding. The rows of a menu, list, tree or dropdown fill their column and keep 0.5rem.
 
 - Overlays fit within the window 0.5rem inside its edges, below the window row and above the status bar; an overlay anchored in the window row or the status bar may come within 0.5rem of that edge instead. Reduce preferred widths as needed; bound height and scroll content while keeping essential actions reachable. A popup anchored to a control (a menu, popover, select list, tooltip or the command search) closes when that control scrolls away, is removed or stops rendering.
 - Fields/selects shrink to their container; settings rows and dialog actions wrap or stack. Errors wrap within their owner. Truncated labels retain their full accessible name.
