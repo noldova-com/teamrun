@@ -14,7 +14,7 @@ LICENSE file in the root directory of this source tree.
   <tr-tab-group [frame]="frame">
     @if (frame.group.active; as active) {
       @if (!active.equals(dialogs.shown())) {
-        <tr-tab-content [tab]="active" />
+        <tr-tab-content [tab]="active" [isDocked]="frame.side !== null" />
       }
     } @else if (isEmptyDocuments(frame)) {
       <tr-empty-window />

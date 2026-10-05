@@ -47,6 +47,6 @@ describe("ModuleFailureCardComponent", () => {
         AppearanceFixture.expectLook(surface.borderTopLeftRadius, theme, "radius-medium", "border-top-left-radius");
         AppearanceFixture.expectLook(surface.borderTopWidth, theme, "border-width", "border-top-width");
         AppearanceFixture.expectLook(surface.paddingTop, theme, "space-3", "padding-top");
-        AppearanceFixture.expectLook(getComputedStyle(card).paddingTop, theme, "space-2", "padding-top");
+        expect(getComputedStyle(card).padding).toBe("0px");
       });
 });

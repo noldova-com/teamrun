@@ -12,14 +12,17 @@ import type { IDialogHost } from "@noldova/teamrun-shell-desktop";
 
 export class FakeDialogHost implements IDialogHost {
   public readonly answers: number[];
-  public readonly boxes: { windowId: number; options: MessageBoxOptions }[] = [];
+  public readonly boxes: { windowId: number | null; options: MessageBoxOptions }[] = [];
+  public failure: Error | null = null;
 
   public constructor(answers: readonly number[] = []) {
     this.answers = [...answers];
   }
 
-  public showMessageBox(windowId: number, options: MessageBoxOptions): Promise<MessageBoxReturnValue> {
+  public showMessageBox(windowId: number | null, options: MessageBoxOptions): Promise<MessageBoxReturnValue> {
     this.boxes.push({ windowId, options });
+    if (this.failure !== null)
+      return Promise.reject(this.failure);
     const answer = this.answers.shift();
     if (answer !== undefined)
       return Promise.resolve({ response: answer, checkboxChecked: false });

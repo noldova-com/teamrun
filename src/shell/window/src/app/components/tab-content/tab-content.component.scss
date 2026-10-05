@@ -15,6 +15,14 @@
   scrollbar-gutter: stable;
 }
 
+:host(.tr-tab-content-padded) {
+  padding: var(--tr-document-padding-block) var(--tr-content-padding-inline);
+}
+
+:host(.tr-tab-content-padded.tr-tab-content-docked) {
+  padding: var(--tr-view-padding-block) var(--tr-content-padding-inline);
+}
+
 .tr-tab-content-text {
   display: contents;
   color: var(--tr-text);
