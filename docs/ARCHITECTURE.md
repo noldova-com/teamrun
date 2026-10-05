@@ -84,7 +84,7 @@ Everything a module adds carries its id:
 
 ### Parts
 
-A module has only the parts it needs, in any combination: runtime for data, processes and privileged work; window for views, documents and settings pages; CLI for commands. Parts exchanging messages keep their models in the module's `protocol` package.
+A module has only the parts it needs, in any combination: runtime for data, processes and privileged work; window for views and documents; CLI for commands. Parts exchanging messages keep their models in the module's `protocol` package.
 
 ### Declaration
 
@@ -208,13 +208,13 @@ The window keeps each window's arrangement in its layout: the toolbars of each r
 
 ### Settings
 
-A module defines each setting it contributes in `settings.json`, an object whose only field, `settings`, lists them. A setting has exactly these fields, and the build refuses a file whose settings differ from those `module.json` declares:
+A module adds settings only through the fields below, never with a screen of its own. A module that needs a richer screen opens a document of its own, and an `Action` setting's row can open it. A module defines each setting it contributes in `settings.json`, an object whose only field, `settings`, lists them. A setting has exactly these fields, and the build refuses a file whose settings differ from those `module.json` declares; the build and the runtime both refuse an `Action` whose command the module does not declare:
 
 | Field | Holds |
 |---|---|
 | `name` | The setting's name, `<id>.<name>` |
 | `title`, `description` | What Settings shows for it |
-| `type` | Its `kind` and that kind's limits: `Boolean`; `Choice` with `options`, each a `value` and a `title`; `Number` with `minimum`, `maximum` and `step`; `Text` with `maxLength`; or `Modules`, a list of distinct module ids. `KeyBindings` is the shell's own kind, which a module cannot declare |
+| `type` | Its `kind` and that kind's limits: `Boolean`; `Choice` with `options`, each a `value` and a `title`; `Number` with `minimum`, `maximum` and `step`; `Text` with `maxLength`; `Modules`, a list of distinct module ids; or `Action` with `command`, one of the module's own commands, and `label`, the text of a button that runs the command; an action holds no value, so its default is `null` and nothing is stored. `KeyBindings` is the shell's own kind, which a module cannot declare |
 | `default` | A value its type accepts |
 | `locality` | `Shared`, one value for every device that shares the data directory, or `Device`, a value per device |
 | `scopes` | The setting scopes that may override it, its module's own or a dependency's; a device setting has none |

@@ -29,7 +29,12 @@ class ModuleSettingsTests {
   };
   private static readonly FIELDS: string = "must have exactly the fields name, title, description, type, default, locality, scopes, page, group";
   private static readonly SCOPES: string = "must list distinct scopes, each one its module declares among its settingScopes or a dependency's, and none for a device setting";
-  private static readonly CONTRIBUTIONS: ReadonlyMap<string, readonly string[]> = new Map([["settings", ["notes.sortBy"]], ["settingScopes", ["notes.folder"]]]);
+  private static readonly TEMPLATES: Readonly<Record<string, unknown>> = { kind: "Action", command: "notes.openTemplates", label: "Open templates" };
+  private static readonly CONTRIBUTIONS: ReadonlyMap<string, readonly string[]> = new Map([
+    ["settings", ["notes.sortBy"]],
+    ["settingScopes", ["notes.folder"]],
+    ["commands", ["notes.openTemplates"]]
+  ]);
 
   public static register(): void {
     test("a module's settings are read with every kind of type, and a module without settings needs no file", async t => {
@@ -40,13 +45,14 @@ class ModuleSettingsTests {
         ModuleSettingsTests.setting("notes.wrap", { kind: "Boolean" }, false, "Device"),
         ModuleSettingsTests.setting("notes.size", { kind: "Number", minimum: 10, maximum: 20, step: 0.1 }, 10.3, "Device"),
         ModuleSettingsTests.setting("notes.prefix", { kind: "Text", maxLength: 3 }, "abc", "Shared"),
-        ModuleSettingsTests.setting("notes.hidden", { kind: "Modules" }, ["tasks", "clock"], "Shared")
+        ModuleSettingsTests.setting("notes.hidden", { kind: "Modules" }, ["tasks", "clock"], "Shared"),
+        ModuleSettingsTests.setting("notes.templates", ModuleSettingsTests.TEMPLATES, null, "Shared")
       ];
       const names = settings.map(t => String(t["name"]));
 
       const none = await ModuleSettings.readAsync(repository.directory, ModuleSettingsTests.FOLDER, [], new Map());
       await repository.writeAsync({ [ModuleSettingsTests.FILE]: JSON.stringify({ settings }) });
-      const read = await ModuleSettings.readAsync(repository.directory, ModuleSettingsTests.FOLDER, ["tasks"], new Map([["settings", names], ["settingScopes", ["notes.folder"]]]));
+      const read = await ModuleSettings.readAsync(repository.directory, ModuleSettingsTests.FOLDER, ["tasks"], new Map([["settings", names], ["settingScopes", ["notes.folder"]], ["commands", ["notes.openTemplates"]]]));
 
       assert.deepEqual(none, []);
       assert.deepEqual(read, settings);
@@ -98,7 +104,8 @@ class ModuleSettingsTests {
     test("a type of an unknown kind, with other fields or limits that make no type is refused", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
-      const kind = "must have a type of kind Boolean, Choice, Number, Text or Modules, with exactly that kind's fields";
+      const kind = "must have a type of kind Boolean, Choice, Number, Text, Modules or Action, with exactly that kind's fields";
+      const action = "must have an action type whose command is one its module declares and whose label is not blank";
       const choice = "must have a choice type with options, each with a distinct value and a title, none blank";
       const number = "must have a number type whose minimum is no greater than its maximum and whose step is positive";
       const cases: readonly (readonly [unknown, string])[] = [
@@ -117,14 +124,19 @@ class ModuleSettingsTests {
         [{ kind: "Number", minimum: 3, maximum: 2, step: 1 }, number],
         [{ kind: "Number", minimum: 1, maximum: 2, step: 0 }, number],
         [{ kind: "Text", maxLength: 0 }, "must have a text type whose maxLength is a positive integer"],
-        [{ kind: "Text", maxLength: 1.5 }, "must have a text type whose maxLength is a positive integer"]
+        [{ kind: "Text", maxLength: 1.5 }, "must have a text type whose maxLength is a positive integer"],
+        [{ kind: "Action", command: "notes.openTemplates" }, kind],
+        [{ ...ModuleSettingsTests.TEMPLATES, command: "notes.sortBy" }, action],
+        [{ ...ModuleSettingsTests.TEMPLATES, command: 1 }, action],
+        [{ ...ModuleSettingsTests.TEMPLATES, label: " " }, action]
       ];
 
       for (const [type, problem] of cases)
         await ModuleSettingsTests.assertRefusedAsync(repository, { ...ModuleSettingsTests.SORT, type }, problem);
+      await ModuleSettingsTests.assertRefusedAsync(repository, { ...ModuleSettingsTests.SORT, type: ModuleSettingsTests.TEMPLATES }, action, new Map([["settings", ["notes.sortBy"]]]));
     });
 
-    test("a default outside its number, text or modules type is refused", async t => {
+    test("a default outside its number, text, modules or action type is refused", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       const refused = "must have a default its type accepts";
@@ -138,7 +150,8 @@ class ModuleSettingsTests {
         [{ kind: "Text", maxLength: 3 }, 1],
         [{ kind: "Modules" }, "tasks"],
         [{ kind: "Modules" }, ["tasks", "tasks"]],
-        [{ kind: "Modules" }, [" "]]
+        [{ kind: "Modules" }, [" "]],
+        [ModuleSettingsTests.TEMPLATES, false]
       ];
 
       for (const [type, value] of cases)
@@ -150,9 +163,14 @@ class ModuleSettingsTests {
     return { ...ModuleSettingsTests.SORT, name, type, default: value, locality, scopes: [] };
   }
 
-  private static async assertRefusedAsync(repository: RepositoryFixture, setting: unknown, problem: string): Promise<void> {
+  private static async assertRefusedAsync(
+    repository: RepositoryFixture,
+    setting: unknown,
+    problem: string,
+    contributions: ReadonlyMap<string, readonly string[]> = ModuleSettingsTests.CONTRIBUTIONS
+  ): Promise<void> {
     await repository.writeAsync({ [ModuleSettingsTests.FILE]: JSON.stringify({ settings: [setting] }) });
-    await assert.rejects(ModuleSettings.readAsync(repository.directory, ModuleSettingsTests.FOLDER, ["tasks"], ModuleSettingsTests.CONTRIBUTIONS),
+    await assert.rejects(ModuleSettings.readAsync(repository.directory, ModuleSettingsTests.FOLDER, ["tasks"], contributions),
       new ModuleException(`${ModuleSettingsTests.FILE} settings[0] ${problem}.`));
   }
 }
