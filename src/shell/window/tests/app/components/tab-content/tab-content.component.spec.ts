@@ -230,10 +230,7 @@ describe("TabContentComponent", () => {
   it("reserves no scrollbar gutter around a page that opts out of the padding, so the page's own scroller reaches the panel's edge", async () => {
     const tab = new ViewTab("notes.outline");
     host.contributions.set(tab.key, new ContributionMatch(() => Promise.resolve(TestViewComponent), context, ContentPadding.None));
-    const fixture = TestBed.createComponent(TabContentComponent);
-    fixture.componentRef.setInput("tab", tab);
-    await fixture.whenStable();
-    const element: HTMLElement = fixture.nativeElement;
+    const element = await renderAsync(tab);
 
     expect([element.classList.contains("tr-tab-content-padded"), getComputedStyle(element).scrollbarGutter]).toEqual([false, "auto"]);
   });

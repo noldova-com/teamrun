@@ -160,12 +160,15 @@ test.describe("settings", () => {
   test("Settings has one scroller whose scrollbar ends at the panel's edge in its wide and narrow layouts, in light and dark, as a document's and a docked view's do", async ({ desktop }) => {
     const window = desktop.window;
     const content = window.locator(".tr-settings-content");
-    const others = [window.locator("tr-tab-group:has(tr-tab[data-tab-key='view/notes.list']) tr-tab-content")];
-    await window.locator("tr-tab[data-tab-key='document/notes.note/1']").click();
-    others.push(window.locator("tr-tab-group:has(tr-tab[data-tab-key='document/notes.note/1']) tr-tab-content"));
-    for (const other of others) {
-      const edge = await ScrollAreaFixture.edgeGapAsync(other);
-      expect([Math.abs(edge.gap) < 1, edge.scrollbar > 0]).toEqual([true, true]);
+    const outer = window.locator("tr-tab-content:has(tr-settings)");
+    const expectAtEdgeAsync = async (area: Locator, where: string): Promise<void> => {
+      const sizes = await ScrollAreaFixture.scrollbarSizesAsync(area);
+      expect(Math.abs(await ScrollAreaFixture.panelEdgeGapAsync(area)), `${where}: the scroll area's end to the panel's inner edge`).toBeLessThan(1);
+      expect(sizes.vertical, `${where}: the scrollbar's width`).toBeCloseTo(0.375 * sizes.rem, 0);
+    };
+    for (const key of ["view/notes.list", "document/notes.note/1"]) {
+      await window.locator(`tr-tab[data-tab-key='${key}']`).click();
+      await expectAtEdgeAsync(window.locator(`tr-tab-group:has(tr-tab[data-tab-key='${key}']) tr-tab-content`), key);
     }
     await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
 
@@ -173,11 +176,11 @@ test.describe("settings", () => {
       await desktop.useViewportAsync(width, height);
       await expect(window.locator(layout === "wide" ? ".tr-settings-pages" : ".tr-settings-page-select")).toBeVisible();
       for (const mode of WindowModeFixture.modes) {
+        const where = `Settings, ${layout} layout, ${mode}`;
         await WindowModeFixture.setAsync(window, mode);
-        const edge = await ScrollAreaFixture.edgeGapAsync(content);
-        const outer = await window.locator("tr-tab-content:has(tr-settings)").evaluate(t => [getComputedStyle(t).scrollbarGutter, (t as HTMLElement).offsetWidth - t.clientWidth]);
-
-        expect([Math.abs(edge.gap) < 1, edge.scrollbar > 0, outer]).toEqual([true, true, ["auto", 0]]);
+        await expectAtEdgeAsync(content, where);
+        expect((await ScrollAreaFixture.scrollbarSizesAsync(outer)).vertical, `${where}: the tab content's own scrollbar`).toBe(0);
+        expect(await outer.evaluate(t => getComputedStyle(t).scrollbarGutter), `${where}: the tab content's gutter`).toBe("auto");
         await ScrollAreaFixture.revealThumbColorAsync(window, content);
         await desktop.checkpointAsync(`settings-edge-${layout}-${mode.toLowerCase()}`);
       }
