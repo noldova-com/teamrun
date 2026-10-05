@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { mkdtemp, realpath } from "node:fs/promises";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -20,5 +20,9 @@ export default class TemporaryFolder {
 
   public async createAsync(platform: string, prefix: string): Promise<string> {
     return realpath(await mkdtemp(path.join(TemporaryFolder.locateRoot(platform), prefix)));
+  }
+
+  public async removeAsync(folder: string): Promise<void> {
+    await rm(folder, { recursive: true, force: true });
   }
 }

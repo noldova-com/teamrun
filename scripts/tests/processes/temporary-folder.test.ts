@@ -7,8 +7,8 @@
  */
 
 import assert from "node:assert/strict";
-import { realpathSync } from "node:fs";
-import { rm, stat } from "node:fs/promises";
+import { existsSync, realpathSync } from "node:fs";
+import { mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -28,6 +28,18 @@ class TemporaryFolderTests {
       assert.equal(path.dirname(folder), realpathSync(TemporaryFolder.locateRoot(process.platform)));
       assert.ok(path.basename(folder).startsWith("tr-folder-"));
       assert.equal((await stat(folder)).isDirectory(), true);
+    });
+
+    test("removing a folder removes everything in it, and a folder that is already gone is no failure", async () => {
+      const folders = new TemporaryFolder();
+      const folder = await folders.createAsync(process.platform, "tr-folder-");
+      await mkdir(path.join(folder, "data"));
+      await writeFile(path.join(folder, "data", "log.txt"), "log\n");
+
+      await folders.removeAsync(folder);
+      await folders.removeAsync(folder);
+
+      assert.equal(existsSync(folder), false);
     });
   }
 }

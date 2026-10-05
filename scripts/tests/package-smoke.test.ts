@@ -73,8 +73,10 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
   public readonly environments: (NodeJS.ProcessEnv | undefined)[] = [];
   public readonly starts: (readonly string[])[] = [];
   public readonly checked: number[] = [];
+  public readonly killed: number[] = [];
   public runtimeChecks: number = 1;
   public hasDiscovery: boolean = true;
+  public isKillable: boolean = true;
 
   public constructor(answers: readonly Answer[], desktop: DesktopFixture = new DesktopFixture(0, null), failing: readonly string[] = []) {
     super(failing);
@@ -103,6 +105,13 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
     return this.runtimeChecks-- > 0;
   }
 
+  public override kill(processId: number): void {
+    this.killed.push(processId);
+    if (!this.isKillable)
+      throw new Error(`EPERM: operation not permitted, kill ${processId}`);
+    this.runtimeChecks = 0;
+  }
+
   public override async startAsync(command: string, commandArguments: readonly string[], directory: string, log: string): Promise<StartedProcess> {
     this.starts.push([command.startsWith(directory) ? path.relative(directory, command) : command, ...commandArguments]);
     await writeFile(log, "The desktop's log.\n");
@@ -111,12 +120,12 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
 
   private answer(data: string): ProcessResult {
     const answer = this.answers.length > 1 ? this.answers.shift() : this.answers[0];
+    if ((answer === "running" || answer === "other version") && this.hasDiscovery) {
+      mkdirSync(path.join(data, "discovery"), { recursive: true });
+      writeFileSync(path.join(data, "discovery", "runtime.json"), JSON.stringify({ processId: 5151 }));
+    }
     switch (answer) {
       case "running":
-        if (this.hasDiscovery) {
-          mkdirSync(path.join(data, "discovery"), { recursive: true });
-          writeFileSync(path.join(data, "discovery", "runtime.json"), JSON.stringify({ processId: 5151 }));
-        }
         return new ProcessResult(0, JSON.stringify({ build: { productVersion: "0.0.7" }, dataDirectory: data }), "");
       case "other version":
         return new ProcessResult(0, JSON.stringify({ build: { productVersion: "0.0.6" }, dataDirectory: data }), "");
@@ -159,7 +168,7 @@ class PackageSmokeTests {
         assert.deepEqual(runner.starts, [[appImage, `--data-dir=${path.join(runner.folder, "data")}`]]);
         assert.deepEqual(runner.environments.map(t => [t?.["ELECTRON_RUN_AS_NODE"], t?.["PATH"]]), [1, 2, 3, 4, 5].map(() => ["1", "fixture-path"]));
         assert.deepEqual(runner.desktop.signals, ["SIGTERM"]);
-        assert.deepEqual(runner.checked, [5151, 5151]);
+        assert.deepEqual([runner.checked, runner.killed], [[5151, 5151, 5151], []]);
         assert.equal(output.text, [
           `Installed: ${appImage}`,
           "teamrun status before the start: no runtime.",
@@ -294,7 +303,7 @@ class PackageSmokeTests {
         assert.match(outputs[3].text, /\nThe desktop quit with exit code 5:\n.+desktop\.log:\nThe desktop's log\.\n$/);
       });
 
-    test("a runtime still there 90 s after the desktop quit, one without a discovery file or one status still finds fails the smoke check, and its folder is kept",
+    test("a runtime still there 90 s after the desktop quit is killed, and it, one without a discovery file or one status still finds fails the smoke check, whose folder is then removed",
       { timeout: PackageSmokeTests.TIMEOUT }, async t => {
         const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-linux-x64.AppImage");
         const lingering = new SmokeRunnerFixture(["none", "running"]);
@@ -314,10 +323,39 @@ class PackageSmokeTests {
         assert.deepEqual(exitCodes, [1, 1, 1]);
         assert.match(outputs[0].text, /\nThe desktop quit\.\nThe runtime, process 5151, did not stop within 90000 ms after the desktop quit, although nothing used it:\n.+desktop\.log:\nThe desktop's log\.\n$/);
         assert.equal(lingering.checked.length, 90_000 / 500 + 1);
+        assert.deepEqual(lingering.killed, [5151]);
         assert.match(outputs[1].text, /\nThe runtime's discovery file .+runtime\.json names no process\.\n$/);
         assert.deepEqual(hidden.desktop.signals, ["SIGKILL"]);
         assert.match(outputs[2].text, /\nThe desktop quit\.\nteamrun status after the runtime stopped exited with 0 instead of 3:\n\{"build"/);
-        assert.deepEqual([lingering, hidden, answering].map(t => existsSync(t.folder)), [true, true, true]);
+        assert.deepEqual([lingering, hidden, answering].map(t => existsSync(t.folder)), [false, false, false]);
+      });
+
+    test("after a failure the runtime the check never reached is still waited for, and a runtime that cannot be ended or a folder that cannot be removed is reported after the failure",
+      { timeout: PackageSmokeTests.TIMEOUT }, async t => {
+        const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-linux-x64.AppImage");
+        const other = new SmokeRunnerFixture(["none", "other version"]);
+        const stubborn = new SmokeRunnerFixture(["none", "running"]);
+        const passing = new SmokeRunnerFixture(["none", "running", "none"]);
+        stubborn.runtimeChecks = Number.POSITIVE_INFINITY;
+        stubborn.isKillable = false;
+        const locked = [new TemporaryFolderFixture(repository.directory), new TemporaryFolderFixture(repository.directory)] as const;
+        for (const folders of locked)
+          folders.isRemovable = false;
+        const outputs = [new TextOutputFixture(), new TextOutputFixture(), new TextOutputFixture()] as const;
+
+        const exitCodes = [
+          await PackageSmokeTests.runAsync(t, repository, "linux", other, outputs[0]),
+          await PackageSmokeTests.runAsync(t, repository, "linux", stubborn, outputs[1], "x64", {}, locked[0]),
+          await PackageSmokeTests.runAsync(t, repository, "linux", passing, outputs[2], "x64", {}, locked[1])
+        ];
+
+        assert.deepEqual(exitCodes, [1, 1, 1]);
+        assert.deepEqual([other.checked, other.killed], [[5151, 5151], []]);
+        assert.equal(existsSync(other.folder), false);
+        assert.match(outputs[1].text, new RegExp(`\\nThe runtime, process 5151, did not stop within 90000 ms after the desktop quit, although nothing used it:\\n.+desktop\\.log:\\nThe desktop's log\\.\\n`
+          + `Cleaning up failed:\\nThe runtime, process 5151, could not be ended: Error: EPERM: operation not permitted, kill 5151\\n`
+          + `The smoke's folder .+ could not be removed: Error: EBUSY: resource busy or locked, rmdir '.+'\\n$`, "s"));
+        assert.match(outputs[2].text, /\nThe runtime stopped once idle\.\nCleaning up failed:\nThe smoke's folder .+ could not be removed: Error: EBUSY: resource busy or locked, rmdir '.+'\n$/);
       });
 
     test("a host without packages is refused, an unexpected error reaches the caller, and any argument is refused with the usage", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
@@ -339,10 +377,10 @@ class PackageSmokeTests {
   }
 
   private static async runAsync(t: TestContext, repository: RepositoryFixture, platform: string, runner: SmokeRunnerFixture, output: TextOutputFixture,
-    architecture: string = "x64", variables: NodeJS.ProcessEnv = {}): Promise<number> {
+    architecture: string = "x64", variables: NodeJS.ProcessEnv = {}, folders: TemporaryFolderFixture = new TemporaryFolderFixture(repository.directory)): Promise<number> {
     t.after(() => runner.disposeAsync());
     const environment = { PATH: "fixture-path", LOCALAPPDATA: path.join(repository.directory, "local"), ...variables };
-    const smoke = new PackageSmoke(repository.directory, platform, architecture, runner, new TemporaryFolderFixture(repository.directory), environment, output);
+    const smoke = new PackageSmoke(repository.directory, platform, architecture, runner, folders, environment, output);
     t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
     try {
       let isDone = false;

@@ -122,6 +122,20 @@ class ProcessRunnerTests {
       assert.equal(runner.isRunning(started.id), false);
       assert.throws(() => runner.isRunning(Number.NaN), TypeError);
     });
+
+    test("killing ends a running process, a process that has already ended is left alone, and a process ID that is not a number is refused", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const runner = new ProcessRunner();
+      const started = await runner.startAsync(process.execPath, ["-e", "setInterval(() => {}, 1000)"], tmpdir(), path.join(repository.directory, "killed.log"));
+
+      runner.kill(started.id);
+
+      assert.equal(await started.waitAsync(ProcessRunnerTests.TIMEOUT), true);
+      assert.equal(runner.isRunning(started.id), false);
+      runner.kill(started.id);
+      assert.throws(() => runner.kill(Number.NaN), TypeError);
+    });
   }
 }
 

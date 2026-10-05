@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 import timers from "node:timers/promises";
@@ -61,6 +61,9 @@ export default class PackageSmoke {
   private readonly folders: TemporaryFolder;
   private readonly environment: NodeJS.ProcessEnv;
   private readonly output: Writable;
+  private folder: string | null = null;
+  private runtime: number | null = null;
+  private hasRuntimeOutlived: boolean = false;
 
   public constructor(root: string, platform: string, architecture: string, runner: ProcessRunner, folders: TemporaryFolder, environment: NodeJS.ProcessEnv, output: Writable) {
     this.root = root;
@@ -78,49 +81,93 @@ export default class PackageSmoke {
       return PackageSmoke.USAGE_EXIT_CODE;
     }
 
+    this.folder = null;
+    this.runtime = null;
+    this.hasRuntimeOutlived = false;
+    let hasFailed = false;
     try {
-      const target = PackageTarget.fromProcess(this.platform, this.architecture);
-      const manifest = await RootManifest.readAsync(this.root);
-      const folder = await this.folders.createAsync(this.platform, PackageSmoke.FOLDER_PREFIX);
-      const installed = await new PackageInstaller(this.root, this.runner, this.environment).installAsync(target, manifest.product, folder);
-      this.output.write(`Installed: ${installed.desktop}\n`);
-      const data = path.join(folder, PackageSmoke.DATA_FOLDER);
-      await this.requireNoRuntimeAsync(installed, data, folder, "before the start");
-      this.output.write("teamrun status before the start: no runtime.\n");
-
-      const log = path.join(folder, PackageSmoke.DESKTOP_LOG);
-      const logs = [log, path.join(data, ...PackageSmoke.DATA_LOG_SEGMENTS)];
-      const desktop = await this.runner.startAsync(installed.desktop, [`${PackageSmoke.DATA_DIRECTORY_OPTION}=${data}`], folder, log);
-      let runtime: number;
-      try {
-        this.checkStarted(await this.waitForRuntimeAsync(installed, data, folder, desktop, logs), manifest.productVersion, data);
-        runtime = await PackageSmoke.readRuntimeIdAsync(data);
-        if (target.platform === PackageTarget.MACOS)
-          await this.captureScreenAsync(target, folder);
-
-        await this.quitAsync(target, desktop, folder);
-        if (!await desktop.waitAsync(PackageSmoke.QUIT_LIMIT))
-          throw new PackagingException(`The desktop did not quit within ${PackageSmoke.QUIT_LIMIT} ms; a question on closing, such as one about work in progress, keeps it open:\n${await PackageSmoke.readTailAsync(logs)}`);
-        if (desktop.exitCode !== 0)
-          throw new PackagingException(`The desktop quit with exit code ${desktop.exitCode}:\n${await PackageSmoke.readTailAsync(logs)}`);
-        this.output.write("The desktop quit.\n");
-      }
-      finally {
-        if (!desktop.hasExited)
-          desktop.signal(PackageSmoke.KILL_SIGNAL);
-      }
-      await this.waitForStopAsync(runtime, logs);
-      await this.requireNoRuntimeAsync(installed, data, folder, "after the runtime stopped");
-      this.output.write("The runtime stopped once idle.\n");
-      await rm(folder, { recursive: true, force: true });
-      return 0;
+      await this.checkAsync();
     }
     catch (error) {
-      if (!(error instanceof PackagingException || error instanceof PackageException || error instanceof ProcessException))
+      const isKnown = error instanceof PackagingException || error instanceof PackageException || error instanceof ProcessException;
+      if (isKnown)
+        this.output.write(`${error.message}\n`);
+      await this.cleanUpAsync();
+      if (!isKnown)
         throw error;
-      this.output.write(`${error.message}\n`);
-      return 1;
+      hasFailed = true;
     }
+    return hasFailed || !await this.cleanUpAsync() ? 1 : 0;
+  }
+
+  private async checkAsync(): Promise<void> {
+    const target = PackageTarget.fromProcess(this.platform, this.architecture);
+    const manifest = await RootManifest.readAsync(this.root);
+    const folder = await this.folders.createAsync(this.platform, PackageSmoke.FOLDER_PREFIX);
+    this.folder = folder;
+    const installed = await new PackageInstaller(this.root, this.runner, this.environment).installAsync(target, manifest.product, folder);
+    this.output.write(`Installed: ${installed.desktop}\n`);
+    const data = path.join(folder, PackageSmoke.DATA_FOLDER);
+    await this.requireNoRuntimeAsync(installed, data, folder, "before the start");
+    this.output.write("teamrun status before the start: no runtime.\n");
+
+    const log = path.join(folder, PackageSmoke.DESKTOP_LOG);
+    const logs = [log, path.join(data, ...PackageSmoke.DATA_LOG_SEGMENTS)];
+    const desktop = await this.runner.startAsync(installed.desktop, [`${PackageSmoke.DATA_DIRECTORY_OPTION}=${data}`], folder, log);
+    let runtime: number;
+    try {
+      this.checkStarted(await this.waitForRuntimeAsync(installed, data, folder, desktop, logs), manifest.productVersion, data);
+      const found = await PackageSmoke.readRuntimeIdAsync(data);
+      if (found === null)
+        throw new PackagingException(`The runtime's discovery file ${path.join(data, ...PackageSmoke.DISCOVERY_SEGMENTS)} names no process.`);
+      runtime = found;
+      this.runtime = runtime;
+      if (target.platform === PackageTarget.MACOS)
+        await this.captureScreenAsync(target, folder);
+
+      await this.quitAsync(target, desktop, folder);
+      if (!await desktop.waitAsync(PackageSmoke.QUIT_LIMIT))
+        throw new PackagingException(`The desktop did not quit within ${PackageSmoke.QUIT_LIMIT} ms; a question on closing, such as one about work in progress, keeps it open:\n${await PackageSmoke.readTailAsync(logs)}`);
+      if (desktop.exitCode !== 0)
+        throw new PackagingException(`The desktop quit with exit code ${desktop.exitCode}:\n${await PackageSmoke.readTailAsync(logs)}`);
+      this.output.write("The desktop quit.\n");
+    }
+    finally {
+      if (!desktop.hasExited)
+        desktop.signal(PackageSmoke.KILL_SIGNAL);
+    }
+    if (!await this.waitForExitAsync(runtime)) {
+      this.hasRuntimeOutlived = true;
+      throw new PackagingException(`The runtime, process ${runtime}, did not stop within ${PackageSmoke.STOP_LIMIT} ms after the desktop quit, although nothing used it:\n${await PackageSmoke.readTailAsync(logs)}`);
+    }
+    await this.requireNoRuntimeAsync(installed, data, folder, "after the runtime stopped");
+    this.output.write("The runtime stopped once idle.\n");
+  }
+
+  private async cleanUpAsync(): Promise<boolean> {
+    if (this.folder === null)
+      return true;
+    const problems: string[] = [];
+    const runtime = this.runtime ?? await PackageSmoke.readRuntimeIdAsync(path.join(this.folder, PackageSmoke.DATA_FOLDER));
+    if (runtime !== null) {
+      try {
+        if (this.hasRuntimeOutlived || !await this.waitForExitAsync(runtime))
+          this.runner.kill(runtime);
+      }
+      catch (error) {
+        problems.push(`The runtime, process ${runtime}, could not be ended: ${String(error)}`);
+      }
+    }
+    try {
+      await this.folders.removeAsync(this.folder);
+    }
+    catch (error) {
+      problems.push(`The smoke's folder ${this.folder} could not be removed: ${String(error)}`);
+    }
+    this.folder = null;
+    if (problems.length > 0)
+      this.output.write(`Cleaning up failed:\n${problems.join("\n")}\n`);
+    return problems.length === 0;
   }
 
   private static async readTailAsync(logs: readonly string[]): Promise<string> {
@@ -139,13 +186,11 @@ export default class PackageSmoke {
     }
   }
 
-  private static async readRuntimeIdAsync(data: string): Promise<number> {
+  private static async readRuntimeIdAsync(data: string): Promise<number | null> {
     const file = path.join(data, ...PackageSmoke.DISCOVERY_SEGMENTS);
     const value = existsSync(file) ? PackageSmoke.parse(await readFile(file, "utf8")) : null;
-    const processId = typeof value === "object" && value !== null && "processId" in value ? value.processId : undefined;
-    if (typeof processId !== "number")
-      throw new PackagingException(`The runtime's discovery file ${file} names no process.`);
-    return processId;
+    const processId = typeof value === "object" && value !== null && "processId" in value ? value.processId : null;
+    return typeof processId === "number" ? processId : null;
   }
 
   private statusAsync(installed: InstalledPackage, data: string, folder: string): Promise<ProcessResult> {
@@ -186,13 +231,14 @@ export default class PackageSmoke {
     this.output.write(`teamrun status after the start: version ${reportedVersion} in ${directory}.\n`);
   }
 
-  private async waitForStopAsync(runtime: number, logs: readonly string[]): Promise<void> {
+  private async waitForExitAsync(runtime: number): Promise<boolean> {
     const started = Date.now();
     while (this.runner.isRunning(runtime)) {
       if (Date.now() - started >= PackageSmoke.STOP_LIMIT)
-        throw new PackagingException(`The runtime, process ${runtime}, did not stop within ${PackageSmoke.STOP_LIMIT} ms after the desktop quit, although nothing used it:\n${await PackageSmoke.readTailAsync(logs)}`);
+        return false;
       await timers.setTimeout(PackageSmoke.PAUSE);
     }
+    return true;
   }
 
   private async captureScreenAsync(target: PackageTarget, folder: string): Promise<void> {

@@ -17,6 +17,7 @@ import StartedProcess from "./started-process.ts";
 export default class ProcessRunner {
   private static readonly OUTPUT_LIMIT: number = 16 * 1024 * 1024;
   private static readonly MISSING_PROCESS_CODE: string = "ESRCH";
+  private static readonly KILL_SIGNAL: NodeJS.Signals = "SIGKILL";
 
   public captureAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number, environment?: NodeJS.ProcessEnv): Promise<ProcessResult> {
     return new Promise<ProcessResult>((resolve, reject) => {
@@ -69,8 +70,16 @@ export default class ProcessRunner {
   }
 
   public isRunning(processId: number): boolean {
+    return ProcessRunner.signal(processId, 0);
+  }
+
+  public kill(processId: number): void {
+    ProcessRunner.signal(processId, ProcessRunner.KILL_SIGNAL);
+  }
+
+  private static signal(processId: number, signal: NodeJS.Signals | 0): boolean {
     try {
-      process.kill(processId, 0);
+      process.kill(processId, signal);
       return true;
     }
     catch (error) {
