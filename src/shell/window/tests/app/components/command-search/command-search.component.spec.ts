@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
@@ -19,6 +20,7 @@ import { CommandService } from "../../../../src/app/services/command.service";
 import { MenuBarService } from "../../../../src/app/services/menu-bar.service";
 import { MenuService } from "../../../../src/app/services/menu.service";
 import { RecentCommandsService } from "../../../../src/app/services/recent-commands.service";
+import { WindowPartHostService } from "../../../../src/app/services/window-part-host.service";
 import { Resources } from "../../../../src/resources";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { ModuleStatusFixture } from "../../../fixtures/module-status.fixture";
@@ -45,6 +47,7 @@ describe("CommandSearchComponent", () => {
     bridge = DesktopBridgeFixture.install("win32");
     TestBed.configureTestingModule({
       providers: [
+        { provide: WindowPartHostService, useValue: { generation: signal(1) } },
         {
           provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
             places: [{ name: "notes.templates", title: "New from template", menuBar: false }],
