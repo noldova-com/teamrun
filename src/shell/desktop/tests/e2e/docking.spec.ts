@@ -402,7 +402,7 @@ test.describe("docking", () => {
     expect(measured.preview).toEqual(["1px", "8px"]);
     expect(measured.previewColors).toEqual(measured.surfaces);
     expect(measured.tabHeight).toBeGreaterThanOrEqual(32);
-    expect(ContrastFixture.ratio(measured.tabColors[0] ?? "", measured.tabColors[1] ?? "")).toBeGreaterThanOrEqual(4.5);
+    expect(ContrastFixture.measureContrast(measured.tabColors[0] ?? "", measured.tabColors[1] ?? "")).toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
     expect(measured.sash).toBe(4);
   });
 });

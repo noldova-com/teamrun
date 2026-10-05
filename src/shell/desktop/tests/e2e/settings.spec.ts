@@ -80,7 +80,7 @@ test.describe("settings", () => {
     for (const scheme of ["light", "dark"] as const) {
       await window.emulateMedia({ colorScheme: scheme });
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
-      expect(await ContrastFixture.lowestTextAsync(window.locator(".tr-settings-page[aria-current=page]"))).toBeGreaterThanOrEqual(ContrastFixture.TEXT);
+      expect(await ContrastFixture.measureLowestTextContrastAsync(window.locator(".tr-settings-page[aria-current=page]"))).toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
     }
     await expect(window.locator("[data-command=\"shell.openSettings\"] td").first()).toHaveText("Settings…");
     await desktop.checkpointAsync("settings-shortcuts");

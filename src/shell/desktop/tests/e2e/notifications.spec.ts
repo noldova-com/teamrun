@@ -242,7 +242,7 @@ test.describe("notifications", () => {
       expect(look.fill).not.toBe(look.surface);
       expect(look.fill.startsWith("rgb(")).toBe(true);
       expect(look.surface.startsWith("rgb(")).toBe(true);
-      expect(ContrastFixture.ratio(look.fill, look.surface)).toBeGreaterThanOrEqual(3);
+      expect(ContrastFixture.measureContrast(look.fill, look.surface)).toBeGreaterThanOrEqual(3);
       expect(look.fill).not.toBe(look.track);
       expect(look.fill).not.toMatch(/^rgba\(.*, 0\)$/);
       expect(look.width).toBeGreaterThan(0);

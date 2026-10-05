@@ -91,7 +91,7 @@ test.describe("the Modules document", () => {
         return [style(".tr-modules-link").color, style(".tr-modules-row-current").backgroundColor, style(version).color, top(version) === top(".tr-modules-row-current .tr-modules-id")];
       });
       expect(look).toEqual([colors[mode].link, colors[mode].selected, colors[mode].text, true]);
-      expect(await ContrastFixture.lowestTextAsync(row(window, "clock"))).toBeGreaterThanOrEqual(ContrastFixture.TEXT);
+      expect(await ContrastFixture.measureLowestTextContrastAsync(row(window, "clock"))).toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
       await desktop.checkpointAsync(`modules-document-${mode.toLowerCase()}`);
     }
   });

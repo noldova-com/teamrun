@@ -8,9 +8,9 @@
 import type { Locator } from "@playwright/test";
 
 export default class ContrastFixture {
-  public static readonly TEXT: number = 4.5;
+  public static readonly MINIMUM_TEXT_CONTRAST: number = 4.5;
 
-  public static ratio(foreground: string, background: string): number {
+  public static measureContrast(foreground: string, background: string): number {
     const luminance = (color: string): number => {
       const [red = 0, green = 0, blue = 0] = (color.match(/\d+(\.\d+)?/gu) ?? []).slice(0, 3).map(t => Number(t) / 255)
         .map(t => t <= 0.03928 ? t / 12.92 : ((t + 0.055) / 1.055) ** 2.4);
@@ -20,7 +20,7 @@ export default class ContrastFixture {
     return (lighter + 0.05) / (darker + 0.05);
   }
 
-  public static async lowestTextAsync(row: Locator): Promise<number> {
+  public static async measureLowestTextContrastAsync(row: Locator): Promise<number> {
     const { background, colors } = await row.evaluate(t => ({
       background: getComputedStyle(t).backgroundColor,
       colors: [t, ...t.querySelectorAll("*")]
@@ -29,6 +29,6 @@ export default class ContrastFixture {
     }));
     if (colors.length === 0)
       throw new Error("The row shows no text.");
-    return Math.min(...colors.map(t => ContrastFixture.ratio(t, background)));
+    return Math.min(...colors.map(t => ContrastFixture.measureContrast(t, background)));
   }
 }
