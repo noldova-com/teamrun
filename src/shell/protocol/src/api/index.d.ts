@@ -3197,8 +3197,8 @@ export declare class Notification {
    * ```ts
    * import { Notification, NotificationPost } from "@noldova/teamrun-shell-protocol";
    *
-   * export function hold(post: NotificationPost): Notification {
-   *   return new Notification(crypto.randomUUID(), 1, post, new Date().toISOString(), false);
+   * export function hold(id: string, post: NotificationPost): Notification {
+   *   return new Notification(id, 1, post, new Date().toISOString(), false);
    * }
    * ```
    */

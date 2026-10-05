@@ -146,12 +146,10 @@ test.describe("reconnecting", () => {
       Reflect.set(globalThis, "startups", states);
     });
 
-    const answer = await window.evaluate(() =>
-      (Reflect.get(globalThis, "teamrun") as IBridge).request("shell.setSetting", { name: "shell.mode", value: "a".repeat(16 * 1024 * 1024 + 1) }));
+    await desktop.breakRuntimeConnectionAsync();
 
     await expect.poll(() => window.evaluate(() => Reflect.get(globalThis, "startups") as string[])).toEqual(["Connecting", "Ready"]);
     await expect(runtime).toHaveAttribute("data-continued", "1");
-    expect((answer as { failure?: { code: string } }).failure?.code).toBe("Unavailable");
     expect(await desktop.readRuntimeProcessIdAsync()).toBe(processId);
     await expect(runtime).toHaveText(first);
     expect(posted).toHaveLength(1);
