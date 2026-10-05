@@ -316,18 +316,27 @@ describe("SettingsComponent", () => {
       await AppearanceFixture.expectThumbRevealsOnHoverAsync(element().querySelector(area) as HTMLElement);
   });
 
-  it("sets every page's content between the column's content edges, the Settings inset from its ends: a built-in page's rows, a module's rows, the shortcuts table and the Gallery", async () => {
+  it("sets every page's content between the column's content edges, the Settings inset from its ends, beside the page list and below 37rem with the select: a built-in page's rows, a module's rows, the shortcuts table and the Gallery", async () => {
     gallery = FakeGalleryComponent;
     const host = render();
-    host.style.width = "100rem";
     const column = host.querySelector(".tr-settings-column") as HTMLElement;
-    const columnBox = column.getBoundingClientRect();
-    const content = [columnBox.left + parseFloat(getComputedStyle(column).paddingLeft), columnBox.right - parseFloat(getComputedStyle(column).paddingRight)].map(t => Math.round(t));
-    const edges = async (title: string, selector: string): Promise<readonly number[]> => {
+    const widths = ["100rem", "calc(37rem - 1px)"];
+    const measure = (selector: string): readonly (readonly number[])[] => {
+      const columnBox = column.getBoundingClientRect();
+      const box = (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
+      return [
+        [columnBox.left + parseFloat(getComputedStyle(column).paddingLeft), columnBox.right - parseFloat(getComputedStyle(column).paddingRight)].map(t => Math.round(t)),
+        [box.left, box.right].map(t => Math.round(t))
+      ];
+    };
+    const edges = async (title: string, selector: string): Promise<readonly (readonly (readonly number[])[])[]> => {
+      host.style.width = widths[0];
       await page.getByRole("treeitem", { name: title, exact: true }).click();
       fixture.detectChanges();
-      const box = (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
-      return [Math.round(box.left), Math.round(box.right)];
+      return widths.map(t => {
+        host.style.width = t;
+        return measure(selector);
+      });
     };
     const shown = [
       await edges("Appearance", "tr-setting-row"),
@@ -336,9 +345,14 @@ describe("SettingsComponent", () => {
       await edges("Keyboard shortcuts", "tr-shortcuts table"),
       await edges("Gallery", ".fake-gallery")
     ];
+    const lists = widths.map(t => {
+      host.style.width = t;
+      return [".tr-settings-pages", ".tr-settings-page-select"].map(u => getComputedStyle(host.querySelector(u) as Element).display === "none" ? "hidden" : "shown");
+    });
 
-    expect(shown).toEqual(shown.map(() => content));
-    AppearanceFixture.expectLook(getComputedStyle(column).paddingLeft, DefaultTheme.theme, "settings-heading-inset", "padding-left");
+    expect(lists).toEqual([["shown", "hidden"], ["hidden", "shown"]]);
+    expect(shown.flat().map(t => t[1])).toEqual(shown.flat().map(t => t[0]));
+    AppearanceFixture.expectLook(getComputedStyle(column).paddingLeft, DefaultTheme.theme, "settings-content-inset", "padding-left");
   });
 
   it("shows the Gallery as the last page when the build has one, and leaves it out of a search", async () => {

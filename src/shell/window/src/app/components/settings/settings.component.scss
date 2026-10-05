@@ -24,14 +24,14 @@
   flex: none;
   flex-wrap: wrap;
   gap: var(--tr-space-2);
-  padding-inline-end: calc(var(--tr-settings-column-end) + var(--tr-scrollbar-size) + var(--tr-settings-heading-inset));
+  padding-inline-end: calc(var(--tr-settings-column-end) + var(--tr-scrollbar-size) + var(--tr-settings-content-inset));
   padding-bottom: var(--tr-space-4);
 }
 
 .tr-settings-search-field {
   flex: 1 1 auto;
   min-width: 0;
-  max-width: calc(var(--tr-settings-pages-width) + var(--tr-settings-gap) + var(--tr-settings-content-width) - var(--tr-settings-heading-inset));
+  max-width: calc(var(--tr-settings-pages-width) + var(--tr-settings-gap) + var(--tr-settings-content-width) - var(--tr-settings-content-inset));
 }
 
 .tr-settings-body {
@@ -55,8 +55,8 @@
 }
 
 .tr-settings-column {
-  max-width: calc(var(--tr-settings-content-width) - 2 * var(--tr-settings-heading-inset));
-  padding-inline: var(--tr-settings-heading-inset) calc(var(--tr-settings-column-end) + var(--tr-settings-heading-inset));
+  max-width: calc(var(--tr-settings-content-width) - 2 * var(--tr-settings-content-inset));
+  padding-inline: var(--tr-settings-content-inset) calc(var(--tr-settings-column-end) + var(--tr-settings-content-inset));
   padding-bottom: var(--tr-space-6);
 }
 
