@@ -16,7 +16,7 @@ import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.f
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 
 describe("ModuleActionsComponent", () => {
-  const clock = new ModuleStatus("clock", "Clock", "Tells the time.", [], new Map(), ModuleState.Failed, "Its runtime part failed to activate.");
+  const clock = new ModuleStatus("clock", "0.0.1", "Clock", "Tells the time.", [], new Map(), ModuleState.Failed, "Its runtime part failed to activate.");
   let fixture: ComponentFixture<ModuleActionsComponent>;
   let bridge: DesktopBridgeFixture;
   let errors: unknown[];
@@ -86,8 +86,8 @@ describe("ModuleActionsComponent", () => {
     fixture.detectChanges();
 
     expect(bridge.copied).toEqual([
-      "TeamRun 1.2.3, build abc123\nclock: Failed: Its runtime part failed to activate.",
-      "TeamRun 1.2.3, build abc123\nclock: Failed: Its runtime part failed to activate."
+      "TeamRun 1.2.3, build abc123\nclock 0.0.1: Failed: Its runtime part failed to activate.",
+      "TeamRun 1.2.3, build abc123\nclock 0.0.1: Failed: Its runtime part failed to activate."
     ]);
     expect(copied).toMatch(/^\s*check\s*Copied\s*$/);
     expect(stillCopied).toMatch(/^\s*check\s*Copied\s*$/);

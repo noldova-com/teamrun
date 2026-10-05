@@ -1,5 +1,6 @@
 {
   "id": "clock",
+  "version": "0.0.1",
   "displayName": "Clock",
   "description": "Tells the time, ticks and runs a program that starts one of its own, for the UI workflows.",
   "parts": ["runtime", "window"],

@@ -14,7 +14,7 @@ import { ModuleState, ModuleStatus } from "@noldova/teamrun-shell-protocol";
 @TestClass
 export class ModuleStatusTests {
   private static readonly DECLARED: string =
-    "\"id\":\"notes\",\"displayName\":\"Notes\",\"description\":\"Keeps notes.\",\"dependencies\":[\"tasks\"],\"contributes\":{\"commands\":[\"notes.newNote\"],\"views\":[]}";
+    "\"id\":\"notes\",\"version\":\"1.2.3\",\"displayName\":\"Notes\",\"description\":\"Keeps notes.\",\"dependencies\":[\"tasks\"],\"contributes\":{\"commands\":[\"notes.newNote\"],\"views\":[]}";
   private static readonly CONTRIBUTIONS: ReadonlyMap<string, readonly string[]> = new Map([["commands", ["notes.newNote"]], ["views", []]]);
 
   @TestMethod
@@ -34,11 +34,11 @@ export class ModuleStatusTests {
   public listsWhatItDeclaresByKindAndKeepsItsOwnCopies(): void {
     const dependencies = ["tasks"];
     const commands = ["notes.newNote"];
-    const status = new ModuleStatus("notes", "Notes", "Keeps notes.", dependencies, new Map([["commands", commands]]), ModuleState.Active, null);
+    const status = new ModuleStatus("notes", "1.2.3", "Notes", "Keeps notes.", dependencies, new Map([["commands", commands]]), ModuleState.Active, null);
     dependencies.push("clock");
     commands.push("notes.open");
 
-    Assert.areEqual("Notes Keeps notes.", `${status.displayName} ${status.description}`);
+    Assert.areEqual("1.2.3 Notes Keeps notes.", `${status.version} ${status.displayName} ${status.description}`);
     Assert.areEqual("tasks", status.dependencies.join(","));
     Assert.areEqual("notes.newNote", status.listContributions("commands").join(","));
     Assert.areEqual(0, status.listContributions("menus").length);
@@ -51,7 +51,7 @@ export class ModuleStatusTests {
     const failed = blocked.withState(ModuleState.Failed, "Its window part could not be loaded.");
 
     Assert.areEqual(`Blocked tasks ${ModuleStatusTests.CONTRIBUTIONS.size}`, `${blocked.state} ${blocked.blockedBy} ${blocked.contributions.size}`);
-    Assert.areEqual("Failed null Notes", `${failed.state} ${failed.blockedBy} ${failed.displayName}`);
+    Assert.areEqual("Failed null Notes 1.2.3", `${failed.state} ${failed.blockedBy} ${failed.displayName} ${failed.version}`);
   }
 
   @TestMethod
@@ -64,9 +64,9 @@ export class ModuleStatusTests {
 
   @TestMethod
   public refusesBlankNamesAndACauseOrBlockerThatDoesNotMatchTheState(): void {
-    Assert.throws(() => new ModuleStatus(" ", "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null), ArgumentException);
-    Assert.throws(() => new ModuleStatus("notes", " ", "Keeps notes.", [], new Map(), ModuleState.Active, null), ArgumentException);
-    Assert.throws(() => new ModuleStatus("notes", "Notes", " ", [], new Map(), ModuleState.Active, null), ArgumentException);
+    Assert.throws(() => new ModuleStatus(" ", "1.2.3", "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null), ArgumentException);
+    Assert.throws(() => new ModuleStatus("notes", "1.2.3", " ", "Keeps notes.", [], new Map(), ModuleState.Active, null), ArgumentException);
+    Assert.throws(() => new ModuleStatus("notes", "1.2.3", "Notes", " ", [], new Map(), ModuleState.Active, null), ArgumentException);
     Assert.throws(() => ModuleStatusTests.create(ModuleState.Active, "Its runtime part failed to activate."), ArgumentException);
     Assert.throws(() => ModuleStatusTests.create(ModuleState.Failed, null), ArgumentException);
     Assert.throws(() => ModuleStatusTests.create(ModuleState.Blocked, " ", "tasks"), ArgumentException);
@@ -76,11 +76,21 @@ export class ModuleStatusTests {
   }
 
   @TestMethod
+  public acceptsOnlyAVersionOfThreeNumbers(): void {
+    for (const version of ["0.0.1", "1.20.300", "999999999.0.0"])
+      Assert.areEqual(version, new ModuleStatus("notes", version, "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null).version);
+    for (const version of ["", "1", "1.2", "1.2.3.4", "01.2.3", "1.02.3", "v1.2.3", "1.2.3-beta", "1.2.3 ", "1.-2.3", "1000000000.0.0"])
+      Assert.areEqual("version", Assert.throws(() => new ModuleStatus("notes", version, "Notes", "Keeps notes.", [], new Map(), ModuleState.Active, null), ArgumentException).parameterName);
+  }
+
+  @TestMethod
   public namesTheFieldOfAnInvalidWireForm(): void {
     const declared = JSON.parse(`{${ModuleStatusTests.DECLARED}}`) as Record<string, unknown>;
     const cases: readonly (readonly [Record<string, unknown>, string])[] = [
       [{ ...declared, state: "Failed" }, "$.cause"],
       [{ ...declared, state: "Paused" }, "$.state"],
+      [{ ...declared, state: "Active", version: undefined }, "$.version"],
+      [{ ...declared, state: "Active", version: "1.2" }, "$.version"],
       [{ ...declared, state: "Active", displayName: 1 }, "$.displayName"],
       [{ ...declared, state: "Active", dependencies: "tasks" }, "$.dependencies"],
       [{ ...declared, state: "Active", contributes: [] }, "$.contributes"],
@@ -92,6 +102,6 @@ export class ModuleStatusTests {
   }
 
   private static create(state: ModuleState, cause: string | null, blockedBy: string | null = null): ModuleStatus {
-    return new ModuleStatus("notes", "Notes", "Keeps notes.", ["tasks"], ModuleStatusTests.CONTRIBUTIONS, state, cause, blockedBy);
+    return new ModuleStatus("notes", "1.2.3", "Notes", "Keeps notes.", ["tasks"], ModuleStatusTests.CONTRIBUTIONS, state, cause, blockedBy);
   }
 }

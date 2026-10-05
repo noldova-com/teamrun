@@ -93,7 +93,7 @@ export class ModuleHost {
         await activation.part.deactivateAsync();
       }
       catch (error) {
-        this.writeDiagnostic(activation.context.moduleId, Resources.moduleDeactivationPartFailed, error);
+        this.writeDiagnostic(activation.declaration, Resources.moduleDeactivationPartFailed, error);
         failures.push(error);
       }
       finally {
@@ -131,7 +131,7 @@ export class ModuleHost {
       part = await this.loader.loadAsync(declaration.runtimePackage);
     }
     catch (error) {
-      this.writeDiagnostic(declaration.id, Resources.moduleLoadFailed, error);
+      this.writeDiagnostic(declaration, Resources.moduleLoadFailed, error);
       return ModuleHost.describe(declaration, ModuleState.Failed, Resources.moduleLoadFailed);
     }
 
@@ -142,7 +142,7 @@ export class ModuleHost {
       }
       catch (error) {
         const cause = error instanceof UnknownSchemaException ? Resources.moduleDatabaseUnknown : Resources.moduleDatabaseFailed;
-        this.writeDiagnostic(declaration.id, cause, error);
+        this.writeDiagnostic(declaration, cause, error);
         return ModuleHost.describe(declaration, ModuleState.Failed, cause);
       }
 
@@ -156,19 +156,19 @@ export class ModuleHost {
       await processes.stopOwnedByAsync(declaration.id);
       context[Symbol.dispose]();
       database?.close();
-      this.writeDiagnostic(declaration.id, Resources.moduleActivationFailed, error);
+      this.writeDiagnostic(declaration, Resources.moduleActivationFailed, error);
       return ModuleHost.describe(declaration, ModuleState.Failed, Resources.moduleActivationFailed);
     }
-    this.activations.push(new ModuleActivation(context, part, processes, database));
+    this.activations.push(new ModuleActivation(declaration, context, part, processes, database));
     return ModuleHost.describe(declaration, ModuleState.Active, null);
   }
 
   private static describe(declaration: ModuleDeclaration, state: ModuleState, cause: string | null, blockedBy: string | null = null): ModuleStatus {
     return new ModuleStatus(
-      declaration.id, declaration.displayName, declaration.description, declaration.dependencies, declaration.contributions, state, cause, blockedBy);
+      declaration.id, declaration.version, declaration.displayName, declaration.description, declaration.dependencies, declaration.contributions, state, cause, blockedBy);
   }
 
-  private writeDiagnostic(moduleId: string, cause: string, error: unknown): void {
-    this.diagnostics.write(Resources.formatModuleDiagnostic(moduleId, cause, inspect(error)));
+  private writeDiagnostic(declaration: ModuleDeclaration, cause: string, error: unknown): void {
+    this.diagnostics.write(Resources.formatModuleDiagnostic(declaration.id, declaration.version, cause, inspect(error)));
   }
 }

@@ -83,7 +83,7 @@ class NameUniquenessCheckTests {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       const declare = (id: string, contributes: Readonly<Record<string, readonly string[]>>): string =>
-        JSON.stringify({ id, displayName: id, description: "Used by the tests.", parts: [], dependencies: [], contributes });
+        JSON.stringify({ id, version: "0.0.1", displayName: id, description: "Used by the tests.", parts: [], dependencies: [], contributes });
       await repository.writeAsync({
         "src/modules/notes/module.json": declare("notes", { views: ["notes.list", "notes.list"], documents: ["notes.note"] }),
         "src/modules/clock/module.json": declare("clock", { views: ["clock.face"] }),

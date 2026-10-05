@@ -15,6 +15,7 @@ import { test, type TestContext } from "node:test";
 import BuildLayout from "../../packages/build-layout.ts";
 import PackageBuilder from "../../packages/package-builder.ts";
 import PackageManifest from "../../packages/package-manifest.ts";
+import PackageVersions from "../../packages/package-versions.ts";
 import PackageException from "../../packages/package.exception.ts";
 import ProductIdentity from "../../packages/product-identity.ts";
 import RootManifest from "../../packages/root-manifest.ts";
@@ -150,7 +151,7 @@ class PackageBuilderTests {
   }
 
   private static createBuilder(layout: BuildLayout, npm: NpmCommand): PackageBuilder {
-    return new PackageBuilder(layout, PackageBuilderTests.ROOT, new ProcessRunner(), npm);
+    return new PackageBuilder(layout, PackageBuilderTests.ROOT, new PackageVersions("0.0.7", new Map()), new ProcessRunner(), npm);
   }
 }
 

@@ -19,6 +19,7 @@ export class ModuleStatus {
   private static readonly STATES: readonly ModuleState[] = Object.values(ModuleState);
 
   public readonly id: string;
+  public readonly version: string;
   public readonly displayName: string;
   public readonly description: string;
   public readonly dependencies: readonly string[];
@@ -29,6 +30,7 @@ export class ModuleStatus {
 
   public constructor(
     id: string,
+    version: string,
     displayName: string,
     description: string,
     dependencies: readonly string[],
@@ -37,6 +39,8 @@ export class ModuleStatus {
     cause: string | null,
     blockedBy: string | null = null) {
     ArgumentException.throwIfNullOrWhitespace(id, Resources.idField);
+    if (!Resources.moduleVersionPattern.test(version))
+      throw new ArgumentException(Resources.moduleVersionInvalid, Resources.versionField);
     ArgumentException.throwIfNullOrWhitespace(displayName, Resources.displayNameField);
     ArgumentException.throwIfNullOrWhitespace(description, Resources.descriptionField);
     if ((state === ModuleState.Active) !== Object.isNull(cause) || (!Object.isNull(cause) && String.isNullOrWhitespace(cause)))
@@ -45,6 +49,7 @@ export class ModuleStatus {
       throw new ArgumentException(Resources.moduleBlockerInvalid, Resources.blockedByField);
 
     this.id = id;
+    this.version = version;
     this.displayName = displayName;
     this.description = description;
     this.dependencies = [...dependencies];
@@ -60,6 +65,7 @@ export class ModuleStatus {
       const contributes = reader.readObject(Resources.contributesField);
       return new ModuleStatus(
         reader.readString(Resources.idField),
+        reader.readString(Resources.versionField),
         reader.readString(Resources.displayNameField),
         reader.readString(Resources.descriptionField),
         reader.readStringArray(Resources.dependenciesField),
@@ -75,12 +81,13 @@ export class ModuleStatus {
   }
 
   public withState(state: ModuleState, cause: string | null, blockedBy: string | null = null): ModuleStatus {
-    return new ModuleStatus(this.id, this.displayName, this.description, this.dependencies, this.contributions, state, cause, blockedBy);
+    return new ModuleStatus(this.id, this.version, this.displayName, this.description, this.dependencies, this.contributions, state, cause, blockedBy);
   }
 
   public toJson(): JsonObject {
     return {
       [Resources.idField]: this.id,
+      [Resources.versionField]: this.version,
       [Resources.displayNameField]: this.displayName,
       [Resources.descriptionField]: this.description,
       [Resources.dependenciesField]: [...this.dependencies],
