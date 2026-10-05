@@ -20,6 +20,7 @@ import { PanelSurface } from "../../enums/panel-surface";
   }
 })
 export class PanelCardComponent {
+  protected readonly isShell: Signal<boolean> = computed(() => this.surface() === PanelSurface.Shell);
+
   public readonly surface = input<PanelSurface>(PanelSurface.Panel);
-  public readonly isShell: Signal<boolean> = computed(() => this.surface() === PanelSurface.Shell);
 }

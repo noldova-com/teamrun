@@ -11,6 +11,7 @@ import { test } from "node:test";
 
 import ApiSurface from "../../api/api-surface.ts";
 import ApiSurfaceReader from "../../api/api-surface.reader.ts";
+import ApiVisibility from "../../api/api-visibility.ts";
 import ApiException from "../../api/api.exception.ts";
 import ApiPackageFixture from "../fixtures/api-package.fixture.ts";
 import ApiSessionFixture from "../fixtures/api-session.fixture.ts";
@@ -34,7 +35,7 @@ class ApiSurfaceReaderTests {
       ].join("\n");
 
       const surface = await ApiSessionFixture.useAsync(fixture, { "index.d.ts": declarations }, (project, locate) =>
-        new ApiSurfaceReader(project).readAsync(locate("index.d.ts")));
+        new ApiSurfaceReader(project, ApiVisibility.PUBLIC_AND_PROTECTED).readAsync(locate("index.d.ts")));
 
       assert.deepEqual(surface.compare(new ApiSurface(new Map())), [
         "Base.constructor(0): missing from the declarations; the implementation has new (...names: readonly string[]): Base",
@@ -46,12 +47,41 @@ class ApiSurfaceReaderTests {
       ]);
     });
 
+    test("a public reading leaves out protected members, which a public and protected reading keeps", async t => {
+      const fixture = await ApiPackageFixture.createAsync();
+      t.after(() => fixture.disposeAsync());
+      const declarations = [
+        "export declare class Chip {",
+        "  public readonly label: string;",
+        "  protected readonly isActive: boolean;",
+        "  protected toggle(): void;",
+        "}",
+        ""
+      ].join("\n");
+
+      const [publicOnly, all] = await ApiSessionFixture.useAsync(fixture, { "index.d.ts": declarations }, (project, locate) => Promise.all([
+        new ApiSurfaceReader(project, ApiVisibility.PUBLIC).readAsync(locate("index.d.ts")),
+        new ApiSurfaceReader(project, ApiVisibility.PUBLIC_AND_PROTECTED).readAsync(locate("index.d.ts"))
+      ]));
+
+      assert.deepEqual(publicOnly.compare(new ApiSurface(new Map())), [
+        "Chip#label: missing from the declarations; the implementation has property readonly : string",
+        "Chip.constructor(0): missing from the declarations; the implementation has new ()",
+        "Chip: missing from the declarations; the implementation has class"
+      ]);
+      assert.deepEqual(all.compare(publicOnly), [
+        "Chip#isActive: missing from the declarations; the implementation has property protected readonly : boolean",
+        "Chip#toggle(0): missing from the declarations; the implementation has protected (): void",
+        "Chip#toggle: missing from the declarations; the implementation has method protected"
+      ]);
+    });
+
     test("a file outside the project or without exports is refused", async t => {
       const fixture = await ApiPackageFixture.createAsync();
       t.after(() => fixture.disposeAsync());
 
       await ApiSessionFixture.useAsync(fixture, { "script.ts": "const value: number = 1;\nvalue.toFixed();\n" }, async (project, locate) => {
-        const reader = new ApiSurfaceReader(project);
+        const reader = new ApiSurfaceReader(project, ApiVisibility.PUBLIC_AND_PROTECTED);
 
         await assert.rejects(reader.readAsync(locate("other.ts")), new ApiException(`${locate("other.ts")} is not an ES module of the project.`));
       });
