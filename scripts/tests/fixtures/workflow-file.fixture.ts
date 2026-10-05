@@ -7,7 +7,7 @@
  */
 
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 import SourceTreeFixture from "./source-tree.fixture.ts";
@@ -31,6 +31,11 @@ export default class WorkflowFileFixture {
 
   public static async readAsync(name: string): Promise<WorkflowFileFixture> {
     return new WorkflowFileFixture(await readFile(path.join(SourceTreeFixture.root, WorkflowFileFixture.FOLDER, name), "utf8"));
+  }
+
+  public static async readAllAsync(): Promise<readonly WorkflowFileFixture[]> {
+    const names = (await readdir(path.join(SourceTreeFixture.root, WorkflowFileFixture.FOLDER))).filter(t => t.endsWith(".yml"));
+    return await Promise.all(names.map(t => WorkflowFileFixture.readAsync(t)));
   }
 
   public static async readActionAsync(name: string): Promise<WorkflowFileFixture> {
