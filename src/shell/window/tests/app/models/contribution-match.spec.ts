@@ -8,6 +8,7 @@
 
 import { Component, type Type } from "@angular/core";
 
+import { ContentPadding } from "../../../src/app/enums/content-padding";
 import { ContributionMatch } from "../../../src/app/models/contribution-match";
 import { WindowPartContext } from "../../../src/app/models/window-part-context";
 import { WindowPartSource } from "../../../src/app/models/window-part-source";
@@ -21,17 +22,16 @@ class ListComponent {
 describe("ContributionMatch", () => {
   const load = (): Promise<Type<unknown>> => Promise.resolve(ListComponent);
 
-  it("holds how to load a module's contribution and the context of the window part that registered it", () => {
+  it("holds how to load a module's contribution, the context of the window part that registered it and its page's padding", () => {
     const source = new WindowPartSource("notes", [], [], [], [], [], [], [], () => Promise.resolve(new WindowPartFixture("notes", [])));
     const context = new WindowPartContext(source, new WindowPartContextHostFixture());
 
-    const match = new ContributionMatch(load, context);
+    const match = new ContributionMatch(load, context, ContentPadding.None);
 
-    expect(match.loadComponent).toBe(load);
-    expect(match.context).toBe(context);
+    expect([match.loadComponent, match.context, match.padding]).toEqual([load, context, ContentPadding.None]);
   });
 
   it("has no context for a shell document, which no window part registered", () => {
-    expect(new ContributionMatch(load, null).context).toBeNull();
+    expect(new ContributionMatch(load, null, ContentPadding.Default).context).toBeNull();
   });
 });

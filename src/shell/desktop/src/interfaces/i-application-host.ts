@@ -19,6 +19,8 @@ export interface IApplicationHost {
   requestSingleInstanceLock(): boolean;
   enableSandbox(): void;
   quit(): void;
+  relaunch(): void;
+  exit(exitCode: number): void;
   whenReady(): Promise<unknown>;
   on(event: "second-instance", listener: () => void): unknown;
   on(event: "window-all-closed", listener: () => void): unknown;

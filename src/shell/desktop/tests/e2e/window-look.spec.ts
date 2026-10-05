@@ -101,4 +101,26 @@ test.describe("the window's look", () => {
     expect(lines.lineHeight).toBeGreaterThanOrEqual(lines.fontSize * 1.2);
     expect(lines.tops.slice(1).every((top, index) => top - (lines.tops[index] ?? 0) >= lines.fontSize)).toBe(true);
   });
+
+  test("pads a page 0.75rem across, starting its content on its first tab's icon, a document's 1rem down and a docked view's 0.5rem, but not a view that turns it off", async ({ desktop }) => {
+    const window = desktop.window;
+    const expectPaddingAsync = async (tab: string, page: string, padding: readonly number[], isOnIcon: boolean): Promise<void> => {
+      await window.locator(`tr-tab[data-tab-key='${tab}']`).click();
+      const group = window.locator(`tr-tab-group:has(tr-tab[data-tab-key='${tab}'])`);
+      const content = group.locator("tr-tab-content");
+      await expect(content.locator(page)).toBeVisible();
+      await expect.poll(() => group.evaluate(t => {
+        const host = t.querySelector("tr-tab-content") as HTMLElement;
+        const style = getComputedStyle(host);
+        const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+        const contentStart = host.getBoundingClientRect().left + Number.parseFloat(style.borderLeftWidth) + Number.parseFloat(style.paddingLeft);
+        const icon = (t.querySelector("tr-tab .tr-tab-icon") as HTMLElement).getBoundingClientRect().left + (t.querySelector(".tr-tab-group-scroller") as HTMLElement).scrollLeft;
+        return [...[style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft].map(p => Math.round(Number.parseFloat(p) / rem * 1000) / 1000), Math.round(contentStart - icon) === 0];
+      })).toEqual([...padding, isOnIcon]);
+    };
+
+    await expectPaddingAsync("document/notes.note/1", "tr-notes-note", [1, 0.75, 1, 0.75], true);
+    await expectPaddingAsync("view/clock.face", "tr-clock-face", [0.5, 0.75, 0.5, 0.75], true);
+    await expectPaddingAsync("view/notes.outline", "tr-notes-outline", [0, 0, 0, 0], false);
+  });
 });
