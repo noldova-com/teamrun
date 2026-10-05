@@ -153,7 +153,7 @@ describe("StatusBarItemComponent", () => {
         expect([long, short]).toEqual("tooltip" in tooltip ? [tooltip.tooltip, tooltip.tooltip] : [LONG, null]);
       });
 
-  it("ends a text too long for its width with an ellipsis", () => {
+  it("ends text too long for its width with an ellipsis", () => {
     AppearanceFixture.apply();
     const [fixture] = render(new StatusBarItemState(LONG));
     (fixture.nativeElement as HTMLElement).style.width = "6rem";

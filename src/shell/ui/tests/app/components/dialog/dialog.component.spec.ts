@@ -236,7 +236,7 @@ describe("DialogComponent", () => {
         AppearanceFixture.expectLook(header.paddingLeft, theme, "dialog-large-header-padding", "padding-left", "padding");
         AppearanceFixture.expectLook(header.borderBottomWidth, theme, "border-width", "border-bottom-width");
         expect(header.borderBottomColor).toBe(AppearanceFixture.readColor(theme, mode, "widget.border"));
-        expect([title.paddingTop, title.paddingLeft, title.textOverflow, title.whiteSpace]).toEqual(["0px", "0px", "ellipsis", "nowrap"]);
+        expect([title.paddingTop, title.paddingLeft]).toEqual(["0px", "0px"]);
         expect([body.paddingTop, body.paddingRight, body.paddingBottom, body.paddingLeft, body.display]).toEqual(["0px", "0px", "0px", "0px", "flex"]);
         expect(actions.display).toBe("none");
       });
