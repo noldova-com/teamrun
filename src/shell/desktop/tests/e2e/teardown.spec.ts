@@ -179,13 +179,35 @@ test.describe("the harness's teardown", () => {
     await desktop.disposeAsync(false);
     const report = testInfo.attachments.find(t => t.name === "main-process.txt")?.body?.toString() ?? "";
 
-    expect(failure).toMatch(/^The main process did not answer within 10 s when asked to say whether a window is visible\. Before the move, the cursor was at -?\d+,-?\d+, /);
+    expect(failure).toMatch(/^The main process did not answer within 10 s when asked to say whether a window is visible\.\nThe last call it answered was to .+, \d+ ms before it was asked\.\nThe desktop log shows no main-process failure\.\nBefore the move, the cursor was at -?\d+,-?\d+, /);
     expect(desktop.acceptFailures(new RegExp(`^The main process ${main} did not answer for \\d+ s after it was asked to say whether a window is visible, so the test killed it\\.$`))).toHaveLength(1);
     expect(report).toMatch(new RegExp(`^The main process ${main} stopped answering when it was asked to say whether a window is visible, \\d+ s before this report\\.\\n`));
     expect(report).toMatch(/\nIts processor time was \d+ ms when it stopped answering and \d+ ms now\.\n/);
     expect(report).toMatch(/\nThe window's request to it, teamrun\.readBuild\(\), was answered in \d+ ms\.\n/);
     expect(await ProcessListFixture.waitForSignalsAsync(desktop.recordedProcessIds, 0)).toEqual([]);
     expect(existsSync(desktop.root)).toBe(false);
+  });
+
+  test("a main process that fails and then stops answering fails the call that waited on it with the failure the desktop log holds", async ({ desktop }) => {
+    await desktop.application.evaluate(({ dialog }) => {
+      dialog.showMessageBox = (() => new Promise(() => undefined)) as typeof dialog.showMessageBox;
+      setImmediate(() => {
+        throw new Error("A failure the test threw in the main process.");
+      });
+    });
+    await expect.poll(() => desktop.failures.some(t => t.includes("A failure the test threw in the main process."))).toBe(true);
+    const blocked = desktop.application.evaluate(() => {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 15_000);
+    });
+    blocked.catch(() => undefined);
+
+    const failure = await desktop.isVisibleAsync().then(() => null, (error: unknown) => (error as Error).message);
+    await desktop.disposeAsync(false);
+
+    expect(failure).toMatch(/\nThe desktop log shows this main-process failure:\n\S+ The desktop's main process failed with an uncaught exception: Error: A failure the test threw in the main process\.\n {4}at [^\n]+\n(?: {4}[^\n]*\n)*Before the move, /);
+    expect(desktop.acceptFailures(/^main: (?:\S+ The desktop's main process failed|at )/).length).toBeGreaterThanOrEqual(2);
+    expect(desktop.acceptFailures(/^The main process \d+ did not answer for \d+ s after it was asked to say whether a window is visible, so the test killed it\.$/)).toHaveLength(1);
+    expect(desktop.failures).toEqual([]);
   });
 
   test("a main process that stays silent is still reported, with the window's unanswered request and its threads", async ({ desktop }, testInfo) => {

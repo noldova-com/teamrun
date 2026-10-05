@@ -30,6 +30,11 @@ interface MainProcessSilence {
   readonly processorMilliseconds: number | null;
 }
 
+interface MainProcessAnswer {
+  readonly action: string;
+  readonly at: number;
+}
+
 interface IActiveSocket {
   readonly remoteAddress?: string;
   readonly remotePort?: number;
@@ -76,6 +81,8 @@ export default class DesktopApplicationFixture {
   private static readonly QUIT_ACTION: string = "quit";
   private static readonly QUIT_QUESTION: string = "tr-quit-dialog";
   private static readonly NO_ANSWER: unique symbol = Symbol("no answer");
+  private static readonly LOG_ENTRY: RegExp = /^\d{4}-\d{2}-\d{2}T\S+ /;
+  private static readonly MAIN_PROCESS_FAILURE: RegExp = /main process failed/;
 
   private readonly testInfo: TestInfo;
   private readonly environment: Readonly<Record<string, string>>;
@@ -89,6 +96,7 @@ export default class DesktopApplicationFixture {
   private placement: string = "The window had not been moved off the cursor.";
   private isPageUnreachable: boolean = false;
   private silence: MainProcessSilence | null = null;
+  private lastAnswer: MainProcessAnswer | null = null;
   private mainProcessId: number | null = null;
 
   public readonly failures: string[] = [];
@@ -420,13 +428,35 @@ export default class DesktopApplicationFixture {
       evaluation.catch(() => undefined);
       throw new Error(`The main process has not answered since it was asked to ${this.silence.action}, so the test did not wait for it to ${action}.`);
     }
+    const asked = Date.now();
     const answer = await DesktopApplicationFixture.withinAsync(evaluation, limit);
-    if (answer !== DesktopApplicationFixture.NO_ANSWER)
+    if (answer !== DesktopApplicationFixture.NO_ANSWER) {
+      this.lastAnswer = { action, at: Date.now() };
       return answer;
-    const since = Date.now() - limit;
+    }
     const processorMilliseconds = await this.readProcessorMillisecondsAsync();
-    this.silence = { action, since, processorMilliseconds };
-    throw new Error(`The main process did not answer within ${limit / 1000} s when asked to ${action}. ${this.placement}`);
+    this.silence = { action, since: asked, processorMilliseconds };
+    const last = this.lastAnswer;
+    throw new Error([
+      `The main process did not answer within ${limit / 1000} s when asked to ${action}.`,
+      last === null ? "It had answered no call before." : `The last call it answered was to ${last.action}, ${asked - last.at} ms before it was asked.`,
+      await this.describeMainProcessFailuresAsync(),
+      this.placement
+    ].join("\n"));
+  }
+
+  private async describeMainProcessFailuresAsync(): Promise<string> {
+    const log = await readFile(new DataDirectory(this.dataDirectory).desktopLog, "utf8").catch(() => "");
+    const entries: string[] = [];
+    for (const line of log.split("\n"))
+      if (DesktopApplicationFixture.LOG_ENTRY.test(line))
+        entries.push(line);
+      else if (entries.length > 0)
+        entries[entries.length - 1] += `\n${line}`;
+    const failures = entries.filter(t => DesktopApplicationFixture.MAIN_PROCESS_FAILURE.test(t)).map(t => t.trimEnd());
+    if (failures.length === 0)
+      return "The desktop log shows no main-process failure.";
+    return `The desktop log shows ${failures.length === 1 ? "this main-process failure" : "these main-process failures"}:\n${failures.join("\n")}`;
   }
 
   private async readProcessorMillisecondsAsync(): Promise<number | null> {
