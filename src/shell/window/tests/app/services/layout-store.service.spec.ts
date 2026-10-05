@@ -28,17 +28,21 @@ describe("LayoutStoreService", () => {
     expect(await store.readAsync()).toEqual({ version: 1 });
   });
 
-  it("answers that a layout was not kept while the runtime is unavailable", async () => {
+  it("answers that a layout was not kept while the desktop is not connected to the runtime", async () => {
     const bridge = DesktopBridgeFixture.install();
-    vi.spyOn(bridge, "writeLayout").mockResolvedValue({ failure: { code: "Unavailable", message: "TeamRun is not connected to its runtime." } });
+    vi.spyOn(bridge, "writeLayout").mockResolvedValue({ failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
 
     expect(await TestBed.inject(LayoutStoreService).writeAsync({ version: 1 })).toBe(false);
   });
 
-  it("fails a write the runtime refused", async () => {
+  it("fails a write the runtime refused or could not serve", async () => {
     const bridge = DesktopBridgeFixture.install();
-    vi.spyOn(bridge, "writeLayout").mockResolvedValue({ failure: { code: "Internal", message: "The database is busy." } });
+    const store = TestBed.inject(LayoutStoreService);
+    vi.spyOn(bridge, "writeLayout")
+      .mockResolvedValueOnce({ failure: { code: "Internal", message: "The database is busy." } })
+      .mockResolvedValueOnce({ failure: { code: "Unavailable", message: "The runtime did not answer in time." } });
 
-    await expect(TestBed.inject(LayoutStoreService).writeAsync({ version: 1 })).rejects.toThrow(new RuntimeRequestException("Internal", "The database is busy."));
+    await expect(store.writeAsync({ version: 1 })).rejects.toThrow(new RuntimeRequestException("Internal", "The database is busy."));
+    await expect(store.writeAsync({ version: 1 })).rejects.toThrow(new RuntimeRequestException("Unavailable", "The runtime did not answer in time."));
   });
 });
