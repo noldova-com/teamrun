@@ -133,6 +133,20 @@ describe("SelectComponent", () => {
     expect(fixture.componentInstance.changes).toEqual([]);
   });
 
+  it("opens with no option marked while its value matches none, and reports the one chosen", async () => {
+    render();
+    fixture.componentInstance.value.set("Sepia");
+    fixture.detectChanges();
+
+    await openAsync();
+    const marked = options().map(t => t.getAttribute("aria-selected"));
+    await userEvent.click(page.getByRole("option", { name: "Dark" }));
+    await expect.poll(() => list()).toBeNull();
+
+    expect(marked).toEqual(["false", "false", "false"]);
+    expect(fixture.componentInstance.changes).toEqual(["Dark"]);
+  });
+
   it("shows an unknown value as itself and cannot open while disabled", () => {
     render();
     fixture.componentInstance.value.set("Sepia");

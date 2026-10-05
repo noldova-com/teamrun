@@ -46,6 +46,7 @@ export class SelectComponent {
   public readonly valueChange = output<string>();
 
   protected readonly title: Signal<string> = computed(() => this.options().find(t => t.value === this.value())?.title ?? this.value());
+  protected readonly marked: Signal<readonly string[]> = computed(() => this.options().some(t => t.value === this.value()) ? [this.value()] : []);
 
   public constructor() {
     inject(DestroyRef).onDestroy(() => this.close());
