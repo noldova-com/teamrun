@@ -63,7 +63,7 @@ class TestShellDocumentComponent {
 }
 
 class StubWindowPartHost {
-  public readonly generation: WritableSignal<number> = signal(0);
+  public readonly revisions: WritableSignal<ReadonlyMap<string, number>> = signal(new Map());
   public readonly contributions: Map<string, ContributionMatch> = new Map();
   public readonly failures: Map<string, ModuleFailure> = new Map();
 
@@ -73,6 +73,10 @@ class StubWindowPartHost {
 
   public findFailure(tab: Tab): ModuleFailure | null {
     return this.failures.get(tab.key) ?? null;
+  }
+
+  public revisionOf(tab: Tab): number {
+    return this.revisions().get(tab.key) ?? 0;
   }
 }
 
@@ -144,7 +148,7 @@ describe("TabContentComponent", () => {
     expect(TestShellDocumentComponent.contexts).toEqual([null]);
   });
 
-  it("keeps a shell document while the parts change", async () => {
+  it("keeps its content while only another tab's revision changes", async () => {
     const tab = ShellDocuments.settingsTab;
     TestShellDocumentComponent.contexts = [];
     host.contributions.set(tab.key, new ContributionMatch(() => Promise.resolve(TestShellDocumentComponent), null));
@@ -154,7 +158,7 @@ describe("TabContentComponent", () => {
     const element: HTMLElement = fixture.nativeElement;
     const shown = element.querySelector(".shell-document");
 
-    host.generation.set(1);
+    host.revisions.set(new Map([[new ViewTab("clock.face").key, 1]]));
     await fixture.whenStable();
 
     expect(element.querySelector(".shell-document")).toBe(shown);
@@ -170,7 +174,7 @@ describe("TabContentComponent", () => {
     expect(element.querySelector("tr-module-failure-card")?.textContent).toMatch(/Clock didn't start\s*Its runtime part failed to activate\./);
   });
 
-  it("shows nothing for a tab no module contributes and loads again when the parts change", async () => {
+  it("shows nothing for a tab no module contributes and loads again when its revision changes", async () => {
     const tab = new ViewTab("notes.list");
     const fixture = TestBed.createComponent(TabContentComponent);
     fixture.componentRef.setInput("tab", tab);
@@ -179,7 +183,7 @@ describe("TabContentComponent", () => {
     const isEmpty = element.querySelector(".tr-tab-content-text")?.children.length === 0;
 
     host.contributions.set(tab.key, new ContributionMatch(() => Promise.resolve(TestViewComponent), context));
-    host.generation.set(1);
+    host.revisions.set(new Map([[tab.key, 1]]));
     await fixture.whenStable();
 
     expect(isEmpty).toBe(true);

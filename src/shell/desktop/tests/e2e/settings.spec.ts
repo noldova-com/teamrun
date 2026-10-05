@@ -94,13 +94,35 @@ test.describe("settings", () => {
     await expect.poll(async () => Math.abs(await ScrollAreaFixture.scrollTopAsync(content) - drag.start - drag.distance)).toBeLessThan(drag.distance / 10);
   });
 
+  test("on a wide panel Settings scrolls from its page list to the panel's edge, keeps its column's width and scrolls by the wheel past the column", async ({ desktop }) => {
+    const window = desktop.window;
+    const content = window.locator(".tr-settings-content");
+    await desktop.useViewportAsync(2400, 1000);
+    await SettingsFixture.openGalleryAsync(window);
+    await expect(content.locator("tr-quick-input").getByRole("option").first()).toBeAttached();
+    const [settings, scroller, column] = await Promise.all(["tr-settings", ".tr-settings-content", ".tr-settings-column"].map(t => window.locator(t).boundingBox()));
+    const end = (box: typeof settings): number => (box?.x ?? 0) + (box?.width ?? 0);
+
+    expect(Math.abs(end(scroller) - end(settings))).toBeLessThan(1);
+    expect(await content.evaluate(t => getComputedStyle(t).scrollbarGutter)).toBe("stable");
+    expect(end(column)).toBeLessThan(end(scroller) - 100);
+    await window.mouse.move(end(column) + 50, (column?.y ?? 0) + 200);
+    await window.mouse.wheel(0, 300);
+    await expect.poll(() => ScrollAreaFixture.scrollTopAsync(content)).toBeGreaterThan(0);
+    await ScrollAreaFixture.revealThumbColorAsync(window, content);
+    await desktop.checkpointAsync("settings-wide-light");
+    await WindowModeFixture.setAsync(window, "Dark");
+    await ScrollAreaFixture.revealThumbColorAsync(window, content);
+    await desktop.checkpointAsync("settings-wide-dark");
+  });
+
   test("in a 1000 × 600 window Settings swaps its page list for a select, and its content takes the width, its controls work and its scrollbar drags", async ({ desktop }) => {
     const window = desktop.window;
     const content = window.locator(".tr-settings-content");
     const pages = window.locator(".tr-settings-page-select").getByRole("button");
     await SettingsFixture.openAsync(window);
     await expect(window.locator(".tr-settings-pages")).toBeVisible();
-    await desktop.checkpointAsync("settings-wide-light");
+    await desktop.checkpointAsync("settings-default-light");
 
     await desktop.useViewportAsync(1000, 600);
 
@@ -108,8 +130,10 @@ test.describe("settings", () => {
     await expect(pages).toHaveAccessibleName("Settings pages, Appearance");
     const [body, filled] = await Promise.all([window.locator(".tr-settings-body").boundingBox(), content.boundingBox()]);
     expect(Math.abs((filled?.width ?? 0) - (body?.width ?? -1))).toBeLessThan(1);
+    await ScrollAreaFixture.revealThumbColorAsync(window, content);
     await desktop.checkpointAsync("settings-narrow-light");
     await WindowModeFixture.setAsync(window, "Dark");
+    await ScrollAreaFixture.revealThumbColorAsync(window, content);
     await desktop.checkpointAsync("settings-narrow-dark");
     await chooseAsync(window, "shell.mode", "Light");
     await expect(row(window, "shell.mode").getByRole("radio", { name: "Light", exact: true })).toBeChecked();
