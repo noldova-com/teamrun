@@ -26,6 +26,6 @@ LICENSE file in the root directory of this source tree.
   </div>
   @if (drag.target(); as target) {
     <div class="tr-toolbar-drop tr-drop-line" [class.tr-drop-line-row]="target.isNewRow" [style.left.px]="target.x" [style.top.px]="target.y"
-      [style.width.px]="target.isNewRow ? target.length : null"></div>
+      [style.width.px]="target.isNewRow ? target.rowWidth : null"></div>
   }
 }

@@ -16,7 +16,6 @@
   --tr-drop-line-thickness: calc(2 * var(--tr-border-width));
   --tr-drop-line-length: var(--tr-toolbar-button);
 
-  box-sizing: border-box;
   width: var(--tr-drop-line-thickness);
   height: var(--tr-drop-line-length);
   background-color: var(--tr-accent);
