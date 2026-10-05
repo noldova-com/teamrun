@@ -182,6 +182,19 @@ describe("SettingsComponent", () => {
     expect(box(".tr-settings-column").width).toBeCloseTo(51.5 * rem, 0);
   });
 
+  it("mirrors its insets right to left, so its scroller meets the left edge and its start inset is on the right", () => {
+    const host = render();
+    host.dir = "rtl";
+    host.style.width = "100rem";
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const box = (selector: string): DOMRect => (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
+    const edges = host.getBoundingClientRect();
+
+    expect(Math.abs(box(".tr-settings-content").left - edges.left)).toBeLessThan(1);
+    expect(Math.abs(edges.right - box(".tr-settings-pages").right - 1.5 * rem)).toBeLessThan(1);
+    expect(Math.abs(edges.right - box(".tr-settings-search").right - 1.5 * rem)).toBeLessThan(1);
+  });
+
   it("moves focus to the page control it now shows when it switches between the page list and the select, and to no control that was not focused", async () => {
     const host = render();
     const field = host.querySelector(".tr-settings-search-field") as HTMLInputElement;
