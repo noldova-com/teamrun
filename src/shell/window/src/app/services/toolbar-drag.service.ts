@@ -10,6 +10,7 @@ import { DOCUMENT } from "@angular/common";
 import { Injectable, type Signal, type WritableSignal, inject, signal } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
+import { DragGesture } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../resources";
 import { ToolbarDropTarget } from "../models/toolbar-drop-target";
@@ -52,7 +53,7 @@ export class ToolbarDragService {
 
   private move(name: string, startX: number, startY: number, event: PointerEvent): void {
     if (Object.isNull(this.draggingState())) {
-      if (Math.hypot(event.clientX - startX, event.clientY - startY) < Resources.dragThreshold)
+      if (!DragGesture.hasStarted(startX, startY, event.clientX, event.clientY))
         return;
       this.draggingState.set(name);
     }

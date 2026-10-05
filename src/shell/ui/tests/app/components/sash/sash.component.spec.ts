@@ -57,6 +57,8 @@ describe("SashComponent", () => {
   });
 
   afterEach(() => {
+    if (vi.isFakeTimers())
+      vi.runOnlyPendingTimers();
     vi.useRealTimers();
     styles.splice(0).forEach(t => t.remove());
     AppearanceFixture.reset();
