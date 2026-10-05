@@ -89,7 +89,7 @@ test.describe("settings", () => {
       expect(await ContrastFixture.measureLowestTextContrastAsync(window.locator(".tr-settings-pages [role=treeitem][aria-selected=true]"), ContrastFixture.SELECTED_ROW_BACKGROUND[scheme]))
         .toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
     }
-    await expect(window.locator("[data-command=\"shell.openSettings\"] td").first()).toHaveText("Settings…");
+    await expect(window.locator("[data-command=\"shell.openSettings\"] .tr-shortcut-title")).toHaveText("Settings…");
     await desktop.checkpointAsync("settings-shortcuts");
   });
 
