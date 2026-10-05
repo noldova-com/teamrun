@@ -14,6 +14,7 @@ import type { Locator, Page } from "@playwright/test";
 import ContrastFixture from "./fixtures/contrast.fixture.ts";
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import NotesOptionsFixture from "./fixtures/notes-options.fixture.ts";
 import ScrollAreaFixture from "./fixtures/scroll-area.fixture.ts";
 import SettingsFixture from "./fixtures/settings.fixture.ts";
 import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
@@ -529,5 +530,23 @@ test.describe("settings on macOS", () => {
 
     await expect(desktop.window.locator("tr-settings")).toBeVisible();
     await expect(settingsTab(desktop.window)).toHaveAttribute("aria-selected", "true");
+  });
+});
+
+test.describe("settings opened while the window starts", () => {
+  test.use({ desktopDataFiles: { [NotesOptionsFixture.HOLD_FIRST_MARKER]: "" } });
+
+  test("a Settings tab opened by its key before the window first loads its layout is still open and active after the layout loads", async ({ desktop }) => {
+    const window = desktop.window;
+
+    await expect.poll(() => NotesOptionsFixture.heldAsync(window)).toBe(1);
+    await SettingsFixture.openAsync(window);
+    await expect(settingsTab(window)).toHaveAttribute("aria-selected", "true");
+    await NotesOptionsFixture.releaseAsync(window);
+
+    await expect(window.locator("[data-fixture-content]").first()).toBeAttached();
+    await expect(settingsTab(window)).toHaveCount(1);
+    await expect(settingsTab(window)).toHaveAttribute("aria-selected", "true");
+    await expect(window.locator("tr-settings")).toBeVisible();
   });
 });
