@@ -165,9 +165,9 @@ class AngularProjectTests {
     test("a report that is not JSON or lists no test files is refused", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
 
-      await assert.rejects(AngularProjectTests.create(repository, new AngularReportRunnerFixture("{", [0])).testAsync(), new ProcessException("angular-tests.json could not be read as JSON."));
+      await assert.rejects(AngularProjectTests.create(repository, new AngularReportRunnerFixture("{", [0])).testAsync(), AngularProjectTests.notJson("_build/angular-tests.json"));
       await assert.rejects(AngularProjectTests.create(repository, new AngularReportRunnerFixture("{\"testResults\":[{}]}", [0])).testAsync(),
-        new ProcessException(`The Angular test report ${path.join("_build", "angular-tests.json")} lists no test files.`));
+        new ProcessException("The Angular test report _build/angular-tests.json lists no test files."));
     });
 
     test("the spec files are those the test target's include patterns match under src/", async t => {
@@ -197,7 +197,7 @@ class AngularProjectTests {
       await repository.writeAsync({ "src/angular.json": JSON.stringify({ projects: [] }) });
       await assert.rejects(project.specFilesAsync(), refused);
       await repository.writeAsync({ "src/angular.json": "{" });
-      await assert.rejects(project.specFilesAsync(), new ProcessException("angular.json could not be read as JSON."));
+      await assert.rejects(project.specFilesAsync(), AngularProjectTests.notJson("src/angular.json"));
     });
 
     test("the window is built with the Angular CLI in src/, and a failed build stops with its exit code", async t => {
@@ -257,6 +257,32 @@ class AngularProjectTests {
 
       assert.deepEqual([output.text, runner.runs], ["", []]);
     });
+
+    test("the path aliases of the source project lead to files resolved from src/", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      await repository.writeAsync({ "src/tsconfig.json": JSON.stringify({ compilerOptions: { paths: { "@noldova/teamrun-shell-ui": ["./shell/ui/src/api/index.ts"], "@noldova/x": [] } } }) });
+      const project = AngularProjectTests.create(repository, new ProcessRunnerFixture());
+
+      assert.deepEqual(await project.readPathAliasesAsync(), new Map([
+        ["@noldova/teamrun-shell-ui", [path.join(repository.directory, "src/shell/ui/src/api/index.ts")]],
+        ["@noldova/x", []]
+      ]));
+      assert.equal(project.projectFile, path.join(repository.directory, "src/tsconfig.json"));
+    });
+
+    test("a source project that is missing, is not JSON, or does not map its aliases to lists of files is refused", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      const project = AngularProjectTests.create(repository, new ProcessRunnerFixture());
+      const refused = new ProcessException("src/tsconfig.json must map its path aliases to lists of files in compilerOptions.paths.");
+
+      await assert.rejects(project.readPathAliasesAsync(), new ProcessException("The Angular project has no src/tsconfig.json."));
+      await repository.writeAsync({ "src/tsconfig.json": "{" });
+      await assert.rejects(project.readPathAliasesAsync(), AngularProjectTests.notJson("src/tsconfig.json"));
+      for (const paths of [undefined, [], "./index.ts", { "@noldova/x": "./index.ts" }, { "@noldova/x": [1] }]) {
+        await repository.writeAsync({ "src/tsconfig.json": JSON.stringify({ compilerOptions: { paths } }) });
+        await assert.rejects(project.readPathAliasesAsync(), refused);
+      }
+    });
   }
 
   private static async createProjectAsync(t: { after: (callback: () => Promise<void>) => void }): Promise<RepositoryFixture> {
@@ -264,6 +290,10 @@ class AngularProjectTests {
     t.after(() => repository.disposeAsync());
     await repository.writeAsync({ "src/angular.json": "{}\n", "src/package-lock.json": "{}\n" });
     return repository;
+  }
+
+  private static notJson(file: string): { name: string; message: RegExp } {
+    return { name: ProcessException.name, message: new RegExp(`^${file.replaceAll(".", "\\.")} could not be read as JSON: \\S.*\\.$`) };
   }
 
   private static formatRecord(lockfile: string): string {

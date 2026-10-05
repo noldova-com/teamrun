@@ -11,9 +11,9 @@ import { TestBed } from "@angular/core/testing";
 import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import { DialogService } from "@noldova/teamrun-shell-ui";
 
+import { BuildTokens } from "../../../src/app/models/build-tokens";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { MenuDeclarations } from "../../../src/app/models/menu-declarations";
-import { WindowPartTokens } from "../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../src/app/services/command.service";
 import { MenuBarService } from "../../../src/app/services/menu-bar.service";
 import { MenuService } from "../../../src/app/services/menu.service";
@@ -31,7 +31,7 @@ describe("MenuBarService", () => {
     DesktopBridgeFixture.install();
     TestBed.configureTestingModule({
       providers: [{ provide: DialogService, useValue: { isOpen: isDialogOpen } }, ViewDialogFixture.provideShowing(viewModule), {
-        provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
+        provide: BuildTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
           places: [{ name: "notes.tools", title: "Notes", shows: "menuBar" }, { name: "notes.templates", title: "New from template", shows: "menu" }],
           groups: [
             { name: "notes.create", place: "shell.file", exclusive: false, items: [{ command: "notes.newNote", arguments: {} }] },

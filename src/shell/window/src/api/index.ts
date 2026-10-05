@@ -21,7 +21,6 @@ export { CommandContribution } from "../app/models/command-contribution";
 export { ContentPaddingRef } from "../app/models/content-padding-ref";
 export { NotificationHandle } from "../app/models/notification-handle";
 export { DocumentContribution } from "../app/models/document-contribution";
-export { MenuDeclarations } from "../app/models/menu-declarations";
 export { StatusBarItem } from "../app/models/status-bar-item";
 export { StatusBarItemContribution } from "../app/models/status-bar-item-contribution";
 export { StatusBarItemState } from "../app/models/status-bar-item-state";
@@ -31,5 +30,4 @@ export { TopBarActionContribution } from "../app/models/top-bar-action-contribut
 export { TopBarActionState } from "../app/models/top-bar-action-state";
 export { ViewBadge } from "../app/models/view-badge";
 export { ViewContribution } from "../app/models/view-contribution";
-export { WindowPartSource } from "../app/models/window-part-source";
 export { WindowPartTokens } from "../app/models/window-part-tokens";
