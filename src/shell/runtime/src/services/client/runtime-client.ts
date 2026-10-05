@@ -105,7 +105,7 @@ export class RuntimeClient {
   public callAsync(method: QualifiedName, payload: JsonValue, timeoutMilliseconds: number = this.settings.callTimeout, signal?: AbortSignal): Promise<Response> {
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(timeoutMilliseconds, Resources.timeoutMillisecondsParameterName);
     if (this.isClosed)
-      return Promise.reject(new ConnectionException(Resources.clientClosed));
+      return Promise.reject(RuntimeClient.createDisconnectedException());
 
     const id = `${this.clientName}${Resources.requestIdSeparator}${this.nextId++}`;
     if (signal?.aborted === true)
@@ -152,6 +152,10 @@ export class RuntimeClient {
       socket.once(Resources.errorEvent, (error: Error) => reject(new ConnectionException(Resources.formatUnreachable(endpoint.toString()), null, new ExceptionOptions(error))));
       socket.once(Resources.connectEvent, () => resolve(socket));
     });
+  }
+
+  private static createDisconnectedException(): ConnectionException {
+    return new ConnectionException(Resources.clientClosed, new Failure(FailureCode.Disconnected, Resources.clientClosed));
   }
 
   private async shakeHandsAsync(token: string): Promise<void> {
@@ -233,7 +237,7 @@ export class RuntimeClient {
     this.isClosed = true;
     this.handshake.reject(new ConnectionException(Resources.handshakeRefused));
     for (const call of [...this.pending.values()])
-      call.fail(new ConnectionException(Resources.clientClosed));
+      call.fail(RuntimeClient.createDisconnectedException());
     if (this.isEstablished)
       this.listener.onDisconnected(this.failure);
   }

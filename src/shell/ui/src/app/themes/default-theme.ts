@@ -215,6 +215,7 @@ export class DefaultTheme {
       ["setting-marker", "0.625rem"],
       ["tree-row-height", "1.625rem"],
       ["tree-indent", "1.75rem"],
+      ["section-header-height", "1.75rem"],
       ["content-padding-inline", "calc(3 * var(--tr-tab-inset) + var(--tr-pill-padding))"],
       ["document-padding-block", "1rem"],
       ["view-padding-block", "0.5rem"],

@@ -11,13 +11,12 @@ import type { Writable } from "node:stream";
 
 import { DiagnosticCategory, type Project } from "typescript/unstable/async";
 
-import ApiPackage from "../api/api-package.ts";
+import type ApiCatalog from "../api/api-catalog.ts";
+import type ApiPackage from "../api/api-package.ts";
 import ApiProject from "../api/api-project.ts";
 import ApiServer from "../api/api-server.ts";
 import ApiSurfaceReader from "../api/api-surface.reader.ts";
 import ApiException from "../api/api.exception.ts";
-import type BuildLayout from "../packages/build-layout.ts";
-import type PackageCatalog from "../packages/package-catalog.ts";
 import type ICheck from "./interfaces/check.ts";
 
 export default class ApiDeclarationCheck implements ICheck {
@@ -25,32 +24,32 @@ export default class ApiDeclarationCheck implements ICheck {
   private static readonly NO_PACKAGES: string = "No packages under src/; there are no API declarations to compare.\n";
 
   private readonly root: string;
-  private readonly catalog: PackageCatalog;
-  private readonly layout: BuildLayout;
+  private readonly catalog: ApiCatalog;
   private readonly server: readonly string[];
   private readonly timeout: number;
 
   public readonly title: string = "API declarations";
 
-  public constructor(root: string, catalog: PackageCatalog, layout: BuildLayout, server: readonly string[], timeout: number) {
+  public constructor(root: string, catalog: ApiCatalog, server: readonly string[], timeout: number) {
     this.root = root;
     this.catalog = catalog;
-    this.layout = layout;
     this.server = [...server];
     this.timeout = timeout;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
-    const manifests = await this.catalog.listPackagesAsync(false);
-    if (manifests.length === 0) {
+    const apiPackages = await this.catalog.listOrReportAsync(output);
+    if (apiPackages === undefined)
+      return false;
+    if (apiPackages.length === 0) {
       output.write(ApiDeclarationCheck.NO_PACKAGES);
       return true;
     }
 
     let passed = true;
-    for (const manifest of manifests) {
-      const problems = await this.inspectAsync(new ApiPackage(this.layout, manifest));
-      output.write(problems.length === 0 ? `${manifest.directory}: matches its declarations\n` : `${manifest.directory}:\n${problems.map(t => `  ${t}\n`).join("")}`);
+    for (const apiPackage of apiPackages) {
+      const problems = await this.inspectAsync(apiPackage);
+      output.write(problems.length === 0 ? `${apiPackage.directory}: matches its declarations\n` : `${apiPackage.directory}:\n${problems.map(t => `  ${t}\n`).join("")}`);
       passed &&= problems.length === 0;
     }
     return passed;
@@ -63,7 +62,7 @@ export default class ApiDeclarationCheck implements ICheck {
 
   private async inspectAsync(apiPackage: ApiPackage): Promise<readonly string[]> {
     if (!existsSync(apiPackage.declarations))
-      return [`no installed declarations at ${apiPackage.declarations}; build the packages first`];
+      return [apiPackage.missingDeclarationsMessage];
     const project = new ApiProject(this.root, ApiDeclarationCheck.PURPOSE, apiPackage.id);
     await project.writeAsync(apiPackage.project, this.root, [apiPackage.implementation, apiPackage.declarations]);
     try {

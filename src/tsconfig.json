@@ -29,8 +29,14 @@
       "@noldova/teamrun-shell-ui": [
         "./shell/ui/src/api/index.ts"
       ],
+      "@noldova/teamrun-shell-ui/gallery": [
+        "./shell/ui/src/api/gallery.ts"
+      ],
       "@noldova/teamrun-shell-window": [
         "./shell/window/src/api/index.ts"
+      ],
+      "@noldova/teamrun-shell-window/build": [
+        "./shell/window/src/api/build.ts"
       ]
     }
   },
