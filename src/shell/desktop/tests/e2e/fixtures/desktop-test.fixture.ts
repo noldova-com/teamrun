@@ -37,8 +37,6 @@ export const test = base.extend<{
         await desktop?.disposeAsync();
       }
       finally {
-        if (desktop !== null)
-          await DesktopApplicationFixture.stopRuntimeAsync(desktop.dataDirectory);
         await BuildVariantFixture.restoreAsync();
       }
     }

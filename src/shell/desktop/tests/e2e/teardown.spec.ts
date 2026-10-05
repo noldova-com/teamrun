@@ -151,6 +151,22 @@ test.describe("the harness's teardown", () => {
     expect(existsSync(desktop.root)).toBe(false);
   });
 
+  test("a cleanup step that fails does not stop the later ones, so the runtime is still stopped and the folder removed, and the failure is reported", async ({ desktop }) => {
+    const runtime = await desktop.readRuntimeProcessIdAsync();
+    await desktop.application.evaluate(({ app }) => {
+      app.getAppMetrics = () => {
+        throw new Error("The test made listing the processes fail.");
+      };
+    });
+
+    const failure = await desktop.disposeAsync(false).then(() => null, (error: unknown) => error);
+
+    expect(runtime).toBeDefined();
+    expect(String(failure)).toContain("The test made listing the processes fail.");
+    await expect.poll(() => runtime !== undefined && DesktopApplicationFixture.isAlive(runtime)).toBe(false);
+    expect(existsSync(desktop.root)).toBe(false);
+  });
+
   test("a main process that stops answering fails the call that waited on it, is reported with what it was asked, and is killed", async ({ desktop }, testInfo) => {
     const main = await desktop.application.evaluate(() => process.pid);
     const blocked = desktop.application.evaluate(() => {

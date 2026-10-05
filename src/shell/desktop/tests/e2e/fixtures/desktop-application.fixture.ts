@@ -116,7 +116,7 @@ export default class DesktopApplicationFixture {
     }
     catch (error) {
       await fixture.disposeAsync(true).catch((cleanup: unknown) =>
-        testInfo.attach(DesktopApplicationFixture.CLEANUP_FAILURE_FILE, { body: cleanup instanceof Error && cleanup.stack !== undefined ? cleanup.stack : String(cleanup), contentType: "text/plain" }));
+        testInfo.attach(DesktopApplicationFixture.CLEANUP_FAILURE_FILE, { body: DesktopApplicationFixture.describeFailure(cleanup), contentType: "text/plain" }));
       throw error;
     }
     return fixture;
@@ -211,13 +211,13 @@ export default class DesktopApplicationFixture {
   public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
     const child = this.requireProcess();
     const exited = Object.is(child.exitCode, null) ? new Promise<number | null>(resolve => child.once("exit", resolve)) : Promise.resolve(child.exitCode);
-    let recording: { readonly error: unknown } | null = null;
+    const failures: unknown[] = [];
     try {
       await this.recordProcessesAsync();
     }
     catch (error) {
       if (this.silence === null)
-        recording = { error };
+        failures.push(error);
     }
     try {
       const started = Date.now();
@@ -240,10 +240,7 @@ export default class DesktopApplicationFixture {
     const exitCode = await exited;
     this.electronApplication = null;
     this.page = null;
-    if (recording !== null)
-      throw recording.error;
-    if (!keepRuntime)
-      await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
+    await DesktopApplicationFixture.runEachAsync(keepRuntime ? [] : [() => DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory)], failures);
     return exitCode;
   }
 
@@ -257,10 +254,11 @@ export default class DesktopApplicationFixture {
       await this.checkGuardAsync(this.viewport).catch((error: unknown) => this.failures.push((error as Error).message));
     if (hasFailed || this.silence !== null)
       await this.keepDiagnosticsAsync(isRunning);
-    if (isRunning)
-      await this.closeAsync();
-    await DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory);
-    await this.removeFolderAsync();
+    await DesktopApplicationFixture.runEachAsync([
+      ...isRunning ? [() => this.closeAsync(true)] : [],
+      () => DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory),
+      () => this.removeFolderAsync()
+    ]);
   }
 
   private async removeFolderAsync(): Promise<void> {
@@ -280,9 +278,11 @@ export default class DesktopApplicationFixture {
   private async recordProcessesAsync(): Promise<void> {
     const electron = await this.answerAsync("list its processes", this.application.evaluate(({ app }) => ({ main: process.pid, all: app.getAppMetrics().map(t => t.pid) })));
     this.mainProcessId = electron.main;
-    const runtime = await this.readRuntimeProcessIdAsync();
-    for (const processId of [...electron.all, ...runtime === undefined ? [] : [runtime]])
+    for (const processId of electron.all)
       this.recorded.add(processId);
+    const runtime = await this.readRuntimeProcessIdAsync();
+    if (runtime !== undefined)
+      this.recorded.add(runtime);
   }
 
   private async failIfRunningAsync(running: readonly number[]): Promise<void> {
@@ -387,6 +387,27 @@ export default class DesktopApplicationFixture {
 
   private async readProcessorMillisecondsAsync(): Promise<number | null> {
     return this.mainProcessId === null ? null : await ProcessListFixture.readProcessorMillisecondsAsync(this.mainProcessId).catch(() => null);
+  }
+
+  private static async runEachAsync(steps: readonly (() => Promise<unknown>)[], failures: unknown[] = []): Promise<void> {
+    for (const step of steps) {
+      try {
+        await step();
+      }
+      catch (error) {
+        failures.push(error);
+      }
+    }
+    if (failures.length > 1)
+      throw new AggregateError(failures, [`${failures.length} cleanup steps failed:`, ...failures.map(t => t instanceof Error ? t.message : String(t))].join("\n"));
+    if (failures.length === 1)
+      throw failures[0];
+  }
+
+  private static describeFailure(failure: unknown): string {
+    if (failure instanceof AggregateError)
+      return failure.errors.map(t => DesktopApplicationFixture.describeFailure(t)).join("\n\n");
+    return failure instanceof Error && failure.stack !== undefined ? failure.stack : String(failure);
   }
 
   private static async withinAsync<T>(work: Promise<T>, limit: number): Promise<T | typeof DesktopApplicationFixture.NO_ANSWER> {
