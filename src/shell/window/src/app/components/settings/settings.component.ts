@@ -149,8 +149,15 @@ export class SettingsComponent {
     this.settings.resetAsync(definition.name.text).catch((error: unknown) => this.errors.handleError(error));
   }
 
+  protected canRun(definition: SettingDefinition): boolean {
+    const command = definition.type.command;
+    return !Object.isNull(command) && this.commands.isAvailable(command.text);
+  }
+
   protected run(definition: SettingDefinition): void {
-    this.commands.run(String(definition.type.command));
+    const command = definition.type.command;
+    if (!Object.isNull(command))
+      this.commands.run(command.text);
   }
 
   private keepFocus(): void {

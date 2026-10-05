@@ -41,6 +41,7 @@ export class SettingRowComponent {
   public readonly query = input<string>("");
   public readonly modules = input<readonly SelectOption[]>([]);
   public readonly isInverse = input<boolean>(false);
+  public readonly canRun = input<boolean>(false);
   public readonly changed = output<JsonValue>();
   public readonly reset = output<void>();
   public readonly run = output<void>();

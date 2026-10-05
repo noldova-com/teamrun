@@ -44,6 +44,10 @@ export class ModuleDeclaration {
     const shellOnly = settings.find(t => t.type.kind === SettingKind.KeyBindings);
     if (!Object.isUndefined(shellOnly))
       throw new ArgumentException(Resources.formatSettingKindReserved(id, shellOnly.name.text, shellOnly.type.kind), Resources.settingsField);
+    const commands = contributions.get(Resources.commandsKind) ?? [];
+    const action = settings.find(t => t.type.kind === SettingKind.Action && !commands.includes(t.type.command?.text ?? ""));
+    if (!Object.isUndefined(action))
+      throw new ArgumentException(Resources.formatSettingCommandUnknown(id, action.name.text, action.type.command?.text ?? ""), Resources.settingsField);
 
     this.id = id;
     this.version = version;

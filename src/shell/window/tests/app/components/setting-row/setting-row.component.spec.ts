@@ -73,15 +73,27 @@ describe("SettingRowComponent", () => {
     expect(resets).toBe(1);
   });
 
-  it("shows an action as its title and description with a button that runs it, never as modified", async () => {
+  it("shows an action as its title and description with a button that runs it from the keyboard, never as modified", async () => {
     const row = render(SettingsFixture.alarms, undefined, false, "alarm");
+    fixture.componentRef.setInput("canRun", true);
+    fixture.detectChanges();
 
-    await page.getByRole("button", { name: "Open alarms" }).click();
+    row.querySelector<HTMLButtonElement>(".tr-setting-row-control button")?.focus();
+    await userEvent.keyboard("{Enter}");
 
     expect([row.querySelector(".tr-setting-row-title")?.textContent, row.querySelector(".tr-setting-row-description")?.textContent]).toEqual(["Alarms", "The times the clock rings, in a tab of their own."]);
     expect([...row.querySelectorAll("mark")].map(t => t.textContent)).toEqual(["Alarm", "alarm", "alarm"]);
     expect([row.querySelector(".tr-setting-row-marker"), row.querySelector(".tr-setting-row-reset")]).toEqual([null, null]);
     expect([runs, changes]).toEqual([1, []]);
+  });
+
+  it("disables an action while its command cannot run", () => {
+    const row = render(SettingsFixture.alarms);
+    const button = row.querySelector<HTMLButtonElement>(".tr-setting-row-control button");
+
+    button?.click();
+
+    expect([button?.disabled, runs]).toEqual([true, 0]);
   });
 
   it("changes a boolean with its checkbox, labelled by the description", async () => {

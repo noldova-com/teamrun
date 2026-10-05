@@ -16,7 +16,7 @@ export default class ModuleSettings {
   public static readonly FILE_NAME: string = "settings.json";
   public static readonly SETTINGS_KIND: string = "settings";
   public static readonly SCOPES_KIND: string = "settingScopes";
-  public static readonly COMMANDS_KIND: string = "commands";
+  private static readonly COMMANDS_KIND: string = "commands";
   private static readonly FIELDS: readonly string[] = ["name", "title", "description", "type", "default", "locality", "scopes", "page", "group"];
   private static readonly TEXT_FIELDS: readonly string[] = ["title", "description", "page", "group"];
   private static readonly LOCALITIES: readonly string[] = ["Device", "Shared"];

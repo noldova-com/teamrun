@@ -44,7 +44,7 @@ LICENSE file in the root directory of this source tree.
       <input tr-text-field type="text" [attr.aria-label]="definition().title" [attr.maxlength]="definition().type.maxLength" [value]="asString(current())" (change)="commitText($event)" />
     }
     @case (kinds.Action) {
-      <button type="button" class="tr-setting-row-action" tr-button [variant]="secondary" (click)="run.emit()">
+      <button type="button" tr-button [variant]="secondary" [disabled]="!canRun()" (click)="run.emit()">
         <tr-highlighted-text [text]="asString(definition().type.label)" [query]="query()" />
       </button>
     }

@@ -401,6 +401,16 @@ describe("SettingsComponent", () => {
     expect([texts(".tr-settings-result-title"), texts(".tr-setting-row-title")]).toEqual([["Keyboard shortcuts", "Clock"], ["Alarms"]]);
   });
 
+  it("disables an action while its command is not registered, as for a module that failed", async () => {
+    settings.definitions.set([...SettingsFixture.all, SettingsFixture.alarms]);
+    render();
+
+    await page.getByRole("treeitem", { name: "Clock", exact: true }).click();
+    fixture.detectChanges();
+
+    expect(element().querySelector<HTMLButtonElement>("[data-setting=\"clock.alarms\"] .tr-setting-row-control button")?.disabled).toBe(true);
+  });
+
   it("changes and resets a setting through the settings service, and reports a change or reset that fails", async () => {
     render();
 
