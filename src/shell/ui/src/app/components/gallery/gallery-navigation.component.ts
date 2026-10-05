@@ -11,6 +11,7 @@ import { ChangeDetectionStrategy, Component, type WritableSignal, signal } from 
 import { GallerySize } from "../../enums/gallery-size";
 import { PanelSurface } from "../../enums/panel-surface";
 import { SashOrientation } from "../../enums/sash-orientation";
+import { TreeMove } from "../../models/tree-move";
 import { TreeNode } from "../../models/tree-node";
 import { IconButtonComponent } from "../icon-button/icon-button.component";
 import { PanelCardComponent } from "../panel-card/panel-card.component";
@@ -39,7 +40,7 @@ export class GalleryNavigationComponent {
   protected readonly sizes: typeof GallerySize = GallerySize;
   protected readonly surfaces: typeof PanelSurface = PanelSurface;
   protected readonly orientations: typeof SashOrientation = SashOrientation;
-  protected readonly treeNodes: readonly TreeNode[] = [
+  protected readonly treeNodes: WritableSignal<readonly TreeNode[]> = signal([
     TreeNode.open(this.text.treeProject, this.text.treeProject, this.text.glyphFolder, [
       new TreeNode(this.text.treeSource, this.text.treeSource, this.text.glyphFolder, [
         new TreeNode(this.text.treeApp, this.text.treeApp, this.text.glyphDescription),
@@ -49,6 +50,10 @@ export class GalleryNavigationComponent {
     ]),
     new TreeNode(this.text.treeNotes, this.text.treeNotes, this.text.glyphDescription),
     new TreeNode(this.text.treeLong, this.text.treeLong, this.text.glyphDescription)
-  ];
+  ]);
   protected readonly treeCurrent: WritableSignal<string> = signal(GalleryResources.text.treeNotes);
+
+  protected moveTreeNode(move: TreeMove): void {
+    this.treeNodes.update(t => move.apply(t));
+  }
 }

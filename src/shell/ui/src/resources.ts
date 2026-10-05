@@ -7,7 +7,9 @@
  */
 
 
-import type { FocusOrigin } from "@angular/cdk/a11y";
+import type { AriaLivePoliteness, FocusOrigin } from "@angular/cdk/a11y";
+
+import "@noldova/teamrun-foundation-core";
 
 import { DockingDirection } from "./app/enums/docking-direction";
 import { OverlayAlignment } from "./app/enums/overlay-alignment";
@@ -162,7 +164,6 @@ export class Resources {
     "setting-marker",
     "tree-row-height",
     "tree-indent",
-    "settings-search-width",
     "settings-pages-width",
     "settings-content-width",
     "modules-list-width",
@@ -328,6 +329,24 @@ export class Resources {
   public static readonly statusBarLook: string = "status-bar-height";
   public static readonly middleButton: number = 1;
   public static readonly primaryButton: number = 0;
+  public static readonly arrowLeftKey: string = "ArrowLeft";
+  public static readonly arrowRightKey: string = "ArrowRight";
+  public static readonly pointerupEvent: "pointerup" = "pointerup";
+  public static readonly pointercancelEvent: "pointercancel" = "pointercancel";
+  public static readonly blurEvent: "blur" = "blur";
+  public static readonly treeItemSelector: string = "[role=treeitem]";
+  public static readonly politeAnnouncement: AriaLivePoliteness = "polite";
+  public static readonly treeHoverOpenDelay: number = 500;
+  public static readonly treeGhostOffset: number = 12;
+  public static readonly treeScrollStep: number = 8;
+  public static readonly treeScrollInterval: number = 16;
+  public static readonly treeDropEdge: number = 0.25;
+  public static readonly treeShiftDuration: number = 150;
+  public static readonly treeShiftEasing: string = "ease-out";
+  public static readonly treeMoveKeys: string = "Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight";
+  public static readonly scrollOverflow: RegExp = /auto|scroll/u;
+  public static readonly reducedMotionQuery: string = "(prefers-reduced-motion: reduce)";
+  public static readonly rightToLeftSelector: string = ":dir(rtl)";
 
   public static formatLookVariable(name: string): string {
     return `--tr-${name}`;
@@ -343,6 +362,18 @@ export class Resources {
 
   public static formatTextSizeOutOfRange(parameterName: string, size: number): string {
     return `The ${parameterName} must be from ${Resources.minimumTextSize} to ${Resources.maximumTextSize} CSS pixels; ${size} is outside that range.`;
+  }
+
+  public static formatTreeMoved(label: string, parentLabel: string | null, position: number, count: number): string {
+    return `Moved ${label} ${Object.isNull(parentLabel) ? "to" : `into ${parentLabel},`} position ${position} of ${count}`;
+  }
+
+  public static formatTreeMoveRefused(id: string, parentId: string): string {
+    return `The row "${id}" cannot move into "${parentId}": that parent is missing or inside the row.`;
+  }
+
+  public static formatTreeRowMissing(id: string): string {
+    return `The tree has no row "${id}".`;
   }
 
   public static formatBadgeCount(count: number): string {

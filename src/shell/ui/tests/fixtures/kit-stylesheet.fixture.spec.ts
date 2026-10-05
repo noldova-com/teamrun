@@ -19,6 +19,8 @@ describe("KitStylesheetFixture", () => {
   });
 
   afterEach(() => {
+    if (vi.isFakeTimers())
+      vi.runOnlyPendingTimers();
     vi.useRealTimers();
     [...document.querySelectorAll<HTMLLinkElement>(KitStylesheetFixture.SELECTOR), ...added].filter(t => !page.includes(t)).forEach(t => t.remove());
     page.forEach(t => t.media = "");

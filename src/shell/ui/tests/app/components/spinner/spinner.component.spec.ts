@@ -32,6 +32,8 @@ describe("SpinnerComponent", () => {
   });
 
   afterEach(async () => {
+    if (vi.isFakeTimers())
+      vi.runOnlyPendingTimers();
     vi.useRealTimers();
     AppearanceFixture.reset();
     await MotionFixture.resetAsync();

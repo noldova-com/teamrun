@@ -44,7 +44,7 @@ LICENSE file in the root directory of this source tree.
 
 <tr-gallery-specimen [name]="text.tree" [size]="sizes.Wide">
   <tr-gallery-cell [caption]="text.defaultState">
-    <tr-tree class="tr-gallery-tree" [nodes]="treeNodes" [label]="text.treeLabel" [current]="treeCurrent()" (activated)="treeCurrent.set($event.id)" />
+    <tr-tree class="tr-gallery-tree" [nodes]="treeNodes()" [movable]="true" [label]="text.treeLabel" [current]="treeCurrent()" (activated)="treeCurrent.set($event.id)" (moved)="moveTreeNode($event)" />
   </tr-gallery-cell>
 </tr-gallery-specimen>
 

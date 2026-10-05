@@ -49,6 +49,8 @@ describe("LayoutService", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    if (vi.isFakeTimers())
+      vi.runOnlyPendingTimers();
     vi.useRealTimers();
   });
 
