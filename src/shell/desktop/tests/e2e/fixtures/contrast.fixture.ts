@@ -5,10 +5,11 @@
  * This source code is licensed under the license found in the
  * LICENSE file in the root directory of this source tree.
  */
-import type { Locator } from "@playwright/test";
+import { type Locator, expect } from "@playwright/test";
 
 export default class ContrastFixture {
   public static readonly MINIMUM_TEXT_CONTRAST: number = 4.5;
+  public static readonly SELECTED_ROW_BACKGROUND: { readonly light: string; readonly dark: string } = { light: "rgb(230, 230, 230)", dark: "rgb(56, 56, 56)" };
 
   public static measureContrast(foreground: string, background: string): number {
     const luminance = (color: string): number => {
@@ -20,13 +21,11 @@ export default class ContrastFixture {
     return (lighter + 0.05) / (darker + 0.05);
   }
 
-  public static async measureLowestTextContrastAsync(row: Locator): Promise<number> {
-    const { background, colors } = await row.evaluate(t => ({
-      background: getComputedStyle(t).backgroundColor,
-      colors: [t, ...t.querySelectorAll("*")]
-        .filter(u => [...u.childNodes].some(v => v.nodeType === Node.TEXT_NODE && (v.textContent ?? "").trim() !== ""))
-        .map(u => getComputedStyle(u).color)
-    }));
+  public static async measureLowestTextContrastAsync(row: Locator, background: string): Promise<number> {
+    await expect(row).toHaveCSS("background-color", background);
+    const colors = await row.evaluate(t => [t, ...t.querySelectorAll("*")]
+      .filter(u => [...u.childNodes].some(v => v.nodeType === Node.TEXT_NODE && (v.textContent ?? "").trim() !== ""))
+      .map(u => getComputedStyle(u).color));
     if (colors.length === 0)
       throw new Error("The row shows no text.");
     return Math.min(...colors.map(t => ContrastFixture.measureContrast(t, background)));
