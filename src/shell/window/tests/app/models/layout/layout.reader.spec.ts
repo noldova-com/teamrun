@@ -94,6 +94,7 @@ describe("LayoutReader", () => {
     expect(LayoutReader.read({ ...saved(), middleSize: 20 }).toJson()).toEqual({ ...saved(), middleSize: 20 });
     expect(failure({ ...saved(), middleSize: "wide" }).path).toBe("$.middleSize");
     expect(failure({ ...saved(), middleSize: -1 }).path).toBe("$");
+    expect(failure({ ...saved(), middleSize: 40 }).path).toBe("$");
   });
 
   it("writes back what it read, including views whose modules are absent", () => {

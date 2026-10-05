@@ -101,7 +101,7 @@ describe("LayoutService", () => {
     expect(closed()).toEqual([DockSide.Right, DockSide.Left]);
   });
 
-  it("keeps the middle a side dock's drag leaves under its preferred size as the window narrows, and forgets it once a drag gives the middle that size again", async () => {
+  it("keeps the middle a side dock's drag leaves under its preferred size as the window narrows, and forgets it once a drag gives the middle that size again without moving the other dock", async () => {
     await loadAsync(Layout.createDefault(registry));
     service.setViewport(100, 40);
     const before = [service.layout().middleSize, service.geometry().middle.width];
@@ -114,7 +114,24 @@ describe("LayoutService", () => {
     service.resizeDock(DockSide.Left, 31);
 
     expect([before, dragged, narrowed]).toEqual([[null, 48], [18, 18], [18, 51, 10]]);
-    expect([service.layout().middleSize, service.geometry().middle.width]).toEqual([null, 30]);
+    expect([service.layout().middleSize, service.geometry().middle.width, service.layout().dock(DockSide.Right).size]).toEqual([null, 38, 10]);
+  });
+
+  it("saves the other open side dock at the width it shows when a drag would otherwise move it, and leaves a hidden one as it is", async () => {
+    await loadAsync(Layout.createDefault(registry));
+    service.setViewport(62, 40);
+    const shown = (): number[] => [service.geometry().dock(DockSide.Left).width, service.geometry().dock(DockSide.Right).width, service.geometry().middle.width];
+    const before = shown();
+
+    service.resizeDock(DockSide.Right, 11);
+    const dragged = shown();
+    const saved = [service.layout().dock(DockSide.Left).size, service.layout().middleSize];
+    service.toggleDock(DockSide.Left);
+    service.resizeDock(DockSide.Right, 12);
+    service.toggleDock(DockSide.Left);
+
+    expect([before, dragged, saved]).toEqual([[21, 10, 30], [21, 11, 29], [21, 29]]);
+    expect([service.layout().dock(DockSide.Left).size, service.layout().dock(DockSide.Right).size]).toEqual([21, 12]);
   });
 
   it("keeps a dock open beside one the person hid, opens a closed dock when its command runs and releases a kept dock the person hides", async () => {

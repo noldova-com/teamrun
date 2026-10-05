@@ -161,7 +161,15 @@ export class LayoutService {
 
   public resizeDock(side: DockSide, size: number): void {
     const layout = this.layoutState().resizeDock(side, size);
-    this.update(side === DockSide.Bottom ? layout : layout.withMiddleSize(this.middleAfter(side, size)));
+    if (side === DockSide.Bottom) {
+      this.update(layout);
+      return;
+    }
+    const geometry = this.geometry();
+    const other = side === DockSide.Left ? DockSide.Right : DockSide.Left;
+    const shown = geometry.dock(other).width;
+    const held = geometry.isCollapsed(other) || layout.dock(other).preferredTrack <= shown + Resources.panelGap ? layout : layout.resizeDock(other, shown);
+    this.update(held.withMiddleSize(this.middleAfter(side, size)));
   }
 
   public setBottomSpan(span: BottomDockSpan): void {

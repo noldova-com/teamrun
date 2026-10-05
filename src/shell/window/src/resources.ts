@@ -622,7 +622,7 @@ export class Resources {
   public static readonly previewOutsideGroup: string = "The preview tab must be one of the group's tabs.";
   public static readonly documentOutsideDocuments: string = "Document tabs stay in document groups.";
   public static readonly missingDocumentsGroup: string = "The middle holds at least one document group.";
-  public static readonly invalidMiddleSize: string = "The middle's wanted width is a number of at least zero.";
+  public static readonly invalidMiddleSize: string = "The middle's wanted width is from 0 to its preferred 30rem.";
   public static readonly documentsInDock: string = "Document groups stay in the middle.";
   public static readonly repeatedDock: string = "A layout has one dock for each side.";
   public static readonly repeatedNodeId: string = "Each group and split in a layout has its own id.";

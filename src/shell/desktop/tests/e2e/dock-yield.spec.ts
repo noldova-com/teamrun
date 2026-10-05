@@ -46,8 +46,8 @@ async function expectNoSidewaysScrollAsync(window: Page): Promise<void> {
   expect(await window.evaluate(() => [...document.querySelectorAll("tr-workspace")].every(t => t.scrollWidth <= t.clientWidth))).toBe(true);
 }
 
-async function dragLeftSashAsync(window: Page, distance: number): Promise<void> {
-  const grip = await TabDragFixture.centerOfAsync(window.getByRole("separator", { name: "Resize the left dock" }));
+async function dragSashAsync(window: Page, side: "left" | "right", distance: number): Promise<void> {
+  const grip = await TabDragFixture.centerOfAsync(window.getByRole("separator", { name: `Resize the ${side} dock` }));
   await window.mouse.move(grip.x, grip.y);
   await window.mouse.down();
   await window.mouse.move(grip.x + distance, grip.y, { steps: 8 });
@@ -100,16 +100,24 @@ test.describe("docks giving way", () => {
     await desktop.useViewportAsync(at(53.5), 600);
     await expect(dock(window, "Right")).not.toHaveClass(collapsed);
     await desktop.useViewportAsync(1000, 600);
-    await expectWidthAsync(TabDragFixture.groupOf(window, notes), (await workspaceRemAsync(window) - 41) * rem);
+    const left = (await workspaceRemAsync(window) - 41) * rem;
+    await expectWidthAsync(TabDragFixture.groupOf(window, notes), left);
     await expectNoSidewaysScrollAsync(window);
+
+    await dragSashAsync(window, "right", -rem);
+    await expectWidthAsync(TabDragFixture.groupOf(window, clock), 11 * rem);
+    await expectWidthAsync(middle(window), 29 * rem);
+    await expectWidthAsync(TabDragFixture.groupOf(window, notes), left);
   });
 
   test("the person's own dock width comes back as the window widens, and a dock the person hid stays hidden", async ({ desktop }) => {
     const window = desktop.window;
     const left = TabDragFixture.groupOf(window, notes);
+    const chosen = 26 * await remAsync(window) + 80;
     await desktop.useViewportAsync(1920, 1080);
-    await dragLeftSashAsync(window, 80);
-    const chosen = await widthAsync(left);
+    await expectWidthAsync(left, chosen - 80);
+    await dragSashAsync(window, "left", 80);
+    await expectWidthAsync(left, chosen);
     await window.keyboard.press("ControlOrMeta+Alt+KeyB");
     await expect(dock(window, "Right")).toHaveClass(collapsed);
 
@@ -161,14 +169,14 @@ test.describe("docks giving way", () => {
     await expect(dock(window, "Left").locator(`.tr-dock-strip-view[data-view="${notes}"]`)).toBeFocused();
   });
 
-  test("a dragged dock stops at the document's own minimum, the docks give way to the middle the drag left, also after a restart, and a drag back past 30rem returns to it", async ({ desktop }) => {
+  test("a dragged dock stops at the document's own minimum, the docks give way to the middle the drag left, also after a restart, and a drag back past 30rem widens the middle without moving the other dock", async ({ desktop }) => {
     const window = desktop.window;
     const rem = await remAsync(window);
     await desktop.useViewportAsync(1920, 1080);
 
-    await dragLeftSashAsync(window, 1900 - (await TabDragFixture.centerOfAsync(window.getByRole("separator", { name: "Resize the left dock" }))).x);
+    await dragSashAsync(window, "left", 1900 - (await TabDragFixture.centerOfAsync(window.getByRole("separator", { name: "Resize the left dock" }))).x);
     await expectWidthAsync(middle(window), 13.75 * rem);
-    await dragLeftSashAsync(window, (await widthAsync(middle(window))) - 20 * rem);
+    await dragSashAsync(window, "left", (await widthAsync(middle(window))) - 20 * rem);
     await expectWidthAsync(middle(window), 20 * rem);
 
     await desktop.useViewportAsync(1000, 600);
@@ -179,8 +187,9 @@ test.describe("docks giving way", () => {
     await desktop.useViewportAsync(1000, 600);
     await expectWidthAsync(middle(reopened), 20 * rem);
 
-    await dragLeftSashAsync(reopened, -15 * rem);
-    await expectWidthAsync(middle(reopened), 30 * rem);
+    await dragSashAsync(reopened, "left", -15 * rem);
+    await expectWidthAsync(middle(reopened), 35 * rem);
+    await expectWidthAsync(TabDragFixture.groupOf(reopened, clock), 10 * rem);
   });
 
   test("the docks give way the same way in light and in dark", async ({ desktop }) => {

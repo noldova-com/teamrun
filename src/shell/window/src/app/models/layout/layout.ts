@@ -51,7 +51,7 @@ export class Layout {
       throw new ArgumentException(Resources.repeatedTab);
     if (new Set(ids).size !== ids.length)
       throw new ArgumentException(Resources.repeatedNodeId);
-    if (!Object.isNull(middleSize) && !(Number.isFinite(middleSize) && middleSize >= 0))
+    if (!Object.isNull(middleSize) && !(middleSize >= 0 && middleSize <= Resources.middlePreferredSize))
       throw new ArgumentException(Resources.invalidMiddleSize, "middleSize");
 
     this.dockSides = {
