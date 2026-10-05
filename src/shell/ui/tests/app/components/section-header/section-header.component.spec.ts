@@ -57,7 +57,7 @@ describe("SectionHeaderComponent", () => {
 
   for (const mode of AppearanceFixture.modes)
     for (const theme of AppearanceFixture.themes)
-      it(`takes its height, inset, text and separator, which runs from where its text starts to where it ends, from the ${theme.id} theme in ${mode} mode`, async () => {
+      it(`takes its height, inset, text and separator, which runs from the label's start to the same inset from the header's end, from the ${theme.id} theme in ${mode} mode`, async () => {
         await renderAsync(theme, mode);
         const plain = getComputedStyle(header("plain"));
         const separator = getComputedStyle(header("separated"), "::before");
@@ -65,11 +65,9 @@ describe("SectionHeaderComponent", () => {
 
         AppearanceFixture.expectLook(`${header("plain").getBoundingClientRect().height}px`, theme, "section-header-height", "height");
         AppearanceFixture.expectLook(plain.paddingLeft, theme, "section-header-inset", "padding-left");
-        const text = document.createRange();
-        text.selectNodeContents(header("separated"));
-        const textBox = text.getBoundingClientRect();
-        const headerLeft = header("separated").getBoundingClientRect().left;
-        expect([headerLeft + Number.parseFloat(separator.left), headerLeft + Number.parseFloat(separator.left) + Number.parseFloat(separator.width)].map(Math.round)).toEqual([textBox.left, textBox.right].map(Math.round));
+        const box = header("separated").getBoundingClientRect();
+        const inset = Number.parseFloat(plain.paddingLeft);
+        expect([box.left + Number.parseFloat(separator.left), box.left + Number.parseFloat(separator.left) + Number.parseFloat(separator.width)].map(Math.round)).toEqual([box.left + inset, box.right - inset].map(Math.round));
         expect([plain.fontWeight, plain.color, separator.borderTopColor, separator.borderTopStyle, Number.parseFloat(separator.borderTopWidth)]).toEqual([
           "600", AppearanceFixture.readColor(theme, mode, "foreground"), AppearanceFixture.readColor(theme, mode, "sideBarSectionHeader.border"), "solid",
           Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tr-border-width"))]);
