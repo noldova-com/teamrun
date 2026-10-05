@@ -8,16 +8,17 @@
 
 import { Component } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
-import { By } from "@angular/platform-browser";
+import { userEvent } from "vitest/browser";
 
 import { GalleryCellComponent } from "../../../../src/app/components/gallery/gallery-cell.component";
-import { GalleryHoverDirective } from "../../../../src/app/components/gallery/gallery-hover.directive";
 import { GallerySpecimenComponent } from "../../../../src/app/components/gallery/gallery-specimen.component";
+import { type GalleryComponent } from "../../../../src/app/components/gallery/gallery.component";
 import { GallerySize } from "../../../../src/app/enums/gallery-size";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
+import { GalleryFixture } from "../../../fixtures/gallery.fixture";
 
 @Component({
-  imports: [GalleryCellComponent, GalleryHoverDirective, GallerySpecimenComponent],
+  imports: [GalleryCellComponent, GallerySpecimenComponent],
   template: `
     <div class="page" style="width: 60rem">
       <tr-gallery-specimen name="Regular">
@@ -33,9 +34,6 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
       <tr-gallery-specimen name="Full" [size]="sizes.Full">
         <tr-gallery-cell caption="Empty" />
       </tr-gallery-specimen>
-      <span class="hovered" trGalleryHover></span>
-      <div class="hovered-part" trGalleryHover=".part"><span class="part"></span></div>
-      <div class="missing-part" trGalleryHover=".missing"></div>
     </div>
   `
 })
@@ -44,76 +42,97 @@ class SpecimenHostComponent {
 }
 
 describe("GallerySpecimenComponent", () => {
-  let fixture: ComponentFixture<SpecimenHostComponent>;
-
-  beforeEach(async () => {
-    AppearanceFixture.apply();
-    fixture = TestBed.createComponent(SpecimenHostComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
+  afterEach(() => {
+    AppearanceFixture.reset();
   });
 
-  afterEach(() => AppearanceFixture.reset());
+  describe("in a host", () => {
+    let fixture: ComponentFixture<SpecimenHostComponent>;
 
-  const specimen = (name: string): HTMLElement => fixture.nativeElement.querySelector(`.tr-gallery-specimen[aria-label="${name}"]`);
-  const cells = (name: string): HTMLElement[] => [...specimen(name).querySelectorAll<HTMLElement>(".tr-gallery-specimen-cells > tr-gallery-cell")];
-  const rect = (element: Element): DOMRect => element.getBoundingClientRect();
+    beforeEach(async () => {
+      AppearanceFixture.apply();
+      fixture = TestBed.createComponent(SpecimenHostComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+    });
 
-  it("heads each section with its name, and puts the focus button at the end of the row only when a cell is the focus target", () => {
-    const head = specimen("Regular").querySelector(".tr-gallery-specimen-head") as HTMLElement;
-    const button = head.querySelector(".tr-gallery-specimen-focus") as HTMLButtonElement;
+    const specimen = (name: string): HTMLElement => fixture.nativeElement.querySelector(`.tr-gallery-specimen[aria-label="${name}"]`);
+    const cells = (name: string): HTMLElement[] => [...specimen(name).querySelectorAll<HTMLElement>(".tr-gallery-specimen-cells > tr-gallery-cell")];
+    const rect = (element: Element): DOMRect => element.getBoundingClientRect();
 
-    expect(head.querySelector("h3")?.textContent).toBe("Regular");
-    expect(button.textContent?.trim()).toBe("Show the keyboard focus");
-    expect(button.getAttribute("aria-label")).toBe("Show the keyboard focus on the Regular");
-    AppearanceFixture.expectPixels(rect(button).right, rect(head).right);
-    expect(specimen("Wide").querySelector(".tr-gallery-specimen-focus")).toBeNull();
-    AppearanceFixture.expectPixels(rect(specimen("Wide").querySelector(".tr-gallery-specimen-head") as HTMLElement).height, rect(head).height);
+    it("heads each section with its name, and puts the focus button at the end of the row only when a cell is the focus target", () => {
+      const head = specimen("Regular").querySelector(".tr-gallery-specimen-head") as HTMLElement;
+      const button = head.querySelector(".tr-gallery-specimen-focus") as HTMLButtonElement;
+
+      expect(head.querySelector("h3")?.textContent).toBe("Regular");
+      expect(button.textContent?.trim()).toBe("Show the keyboard focus");
+      expect(button.getAttribute("aria-label")).toBe("Show the keyboard focus on the Regular");
+      AppearanceFixture.expectPixels(rect(button).right, rect(head).right);
+      expect(specimen("Wide").querySelector(".tr-gallery-specimen-focus")).toBeNull();
+      AppearanceFixture.expectPixels(rect(specimen("Wide").querySelector(".tr-gallery-specimen-head") as HTMLElement).height, rect(head).height);
+    });
+
+    it("lays the cells out at one fixed width, sharing their top edge, one gap apart", () => {
+      const shown = cells("Regular");
+
+      expect(shown.map(t => t.getAttribute("aria-label"))).toEqual(["Default", "Disabled", "Focus"]);
+      for (const cell of shown) {
+        AppearanceFixture.expectPixels(rect(cell).width, AppearanceFixture.toPixels(12.5));
+        AppearanceFixture.expectPixels(rect(cell).top, rect(shown[0] as HTMLElement).top);
+      }
+      AppearanceFixture.expectPixels(rect(shown[1] as HTMLElement).left - rect(shown[0] as HTMLElement).right, AppearanceFixture.toPixels(1));
+    });
+
+    it("makes a wide section's cells as wide as two cells and their gap, and a full section's cell as wide as the section", () => {
+      for (const cell of cells("Wide"))
+        AppearanceFixture.expectPixels(rect(cell).width, AppearanceFixture.toPixels(26));
+      AppearanceFixture.expectPixels(rect(cells("Full")[0] as HTMLElement).width, rect(specimen("Full")).width);
+    });
+
+    it("puts a long-text cell in a full-width row below the cells, and leaves the row out of a section without one", () => {
+      const long = specimen("Regular").querySelector(".tr-gallery-specimen-long > tr-gallery-cell") as HTMLElement;
+
+      expect(long.getAttribute("aria-label")).toBe("Long text");
+      AppearanceFixture.expectPixels(rect(long).width, rect(specimen("Regular")).width);
+      expect(rect(long).top).toBeGreaterThan(Math.max(...cells("Regular").map(t => rect(t).bottom)));
+      expect(specimen("Wide").querySelector(".tr-gallery-specimen-long")).toBeNull();
+    });
+
+    it("moves the focus to the focus target's first control from the button", () => {
+      (specimen("Regular").querySelector(".tr-gallery-specimen-focus") as HTMLButtonElement).click();
+
+      expect(document.activeElement).toBe(specimen("Regular").querySelector(".target"));
+    });
   });
 
-  it("lays the cells out at one fixed width, sharing their top edge, each a group named by the caption shown above its specimen", () => {
-    const shown = cells("Regular");
+  describe("in the Gallery", () => {
+    let fixture: ComponentFixture<GalleryComponent>;
 
-    expect(shown.map(t => [t.getAttribute("role"), t.getAttribute("aria-label"), t.querySelector(".tr-gallery-cell-caption")?.textContent])).toEqual([
-      ["group", "Default", "Default"], ["group", "Disabled", "Disabled"], ["group", "Focus", "Focus"]
-    ]);
-    for (const cell of shown) {
-      AppearanceFixture.expectPixels(rect(cell).width, AppearanceFixture.toPixels(12.5));
-      AppearanceFixture.expectPixels(rect(cell).top, rect(shown[0] as HTMLElement).top);
-      expect(rect(cell.querySelector(".tr-gallery-cell-caption") as HTMLElement).bottom).toBeLessThanOrEqual(rect(cell.querySelector(".tr-gallery-cell-specimen") as HTMLElement).top);
-    }
-    AppearanceFixture.expectPixels(rect(shown[1] as HTMLElement).left - rect(shown[0] as HTMLElement).right, AppearanceFixture.toPixels(1));
-  });
+    it("shows the keyboard focus on the control in a specimen's Focus cell when its button is pressed from the keyboard, and not before", async () => {
+      fixture = await GalleryFixture.showAsync();
+      const checkbox = (GalleryFixture.frames(fixture)[2] as HTMLElement).querySelector<HTMLElement>(".tr-gallery-specimen[aria-label=\"Checkbox\"]") as HTMLElement;
+      const button = checkbox.querySelector<HTMLButtonElement>(".tr-gallery-specimen-focus") as HTMLButtonElement;
+      const input = checkbox.querySelector("tr-gallery-cell[aria-label=\"Focus\"] input") as HTMLInputElement;
 
-  it("makes a wide section's cells as wide as two cells and their gap, and a full section's cell as wide as the section", () => {
-    for (const cell of cells("Wide"))
-      AppearanceFixture.expectPixels(rect(cell).width, AppearanceFixture.toPixels(26));
-    AppearanceFixture.expectPixels(rect(cells("Full")[0] as HTMLElement).width, rect(specimen("Full")).width);
-  });
+      expect(document.activeElement).not.toBe(input);
+      expect(button.getAttribute("aria-label")).toBe("Show the keyboard focus on the Checkbox");
+      button.focus();
+      await userEvent.keyboard("{Enter}");
 
-  it("puts a long-text cell in a full-width row below the cells, and leaves the row out of a section without one", () => {
-    const long = specimen("Regular").querySelector(".tr-gallery-specimen-long > tr-gallery-cell") as HTMLElement;
+      expect(document.activeElement).toBe(input);
+      expect(input.matches(":focus-visible")).toBe(true);
+    });
 
-    expect(long.getAttribute("aria-label")).toBe("Long text");
-    AppearanceFixture.expectPixels(rect(long).width, rect(specimen("Regular")).width);
-    expect(rect(long).top).toBeGreaterThan(Math.max(...cells("Regular").map(t => rect(t).bottom)));
-    expect(specimen("Wide").querySelector(".tr-gallery-specimen-long")).toBeNull();
-  });
+    it("offers the focus button on every specimen that has a control to focus, and on no other", async () => {
+      fixture = await GalleryFixture.showAsync();
+      const specimens = [...(GalleryFixture.frames(fixture)[0] as HTMLElement).querySelectorAll<HTMLElement>(".tr-gallery-specimen")];
 
-  it("moves the focus to the focus target's first control from the button, and a cell without a control leaves the focus where it is", () => {
-    const button = specimen("Regular").querySelector(".tr-gallery-specimen-focus") as HTMLButtonElement;
+      const offered = specimens.filter(t => t.querySelector(".tr-gallery-specimen-focus") !== null).map(t => t.getAttribute("aria-label"));
+      const without = specimens.filter(t => t.querySelector(".tr-gallery-specimen-focus") === null).map(t => t.getAttribute("aria-label"));
 
-    button.click();
-    const focused = document.activeElement;
-    (fixture.debugElement.queryAll(By.directive(GalleryCellComponent)).at(-1)?.componentInstance as GalleryCellComponent).focus();
-
-    expect(focused).toBe(specimen("Regular").querySelector(".target"));
-    expect(document.activeElement).toBe(focused);
-  });
-
-  it("marks the element a hover cell names as hovered, its host or the part its selector finds, and nothing when the part is missing", () => {
-    const state = (selector: string): string | null => (fixture.nativeElement.querySelector(selector) as HTMLElement).getAttribute("data-tr-state");
-
-    expect([state(".hovered"), state(".hovered-part"), state(".part"), state(".missing-part")]).toEqual(["hover", null, "hover", null]);
+      expect(offered).toEqual(["Button", "Icon button", "Checkbox", "Text field", "Select", "Choice pills", "Tab", "Tree", "Toolbar", "Toolbar button", "Sash", "Menu", "Popover", "Tooltip",
+        "Dialog", "Quick input"]);
+      expect(without).toEqual(["Progress", "Spinner", "Badge and key chip", "View badge", "Panel card", "Docking guides"]);
+    });
   });
 });

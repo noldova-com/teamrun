@@ -15,6 +15,7 @@ import { DockingDirection } from "../../enums/docking-direction";
 import { GallerySize } from "../../enums/gallery-size";
 import { DialogTokens } from "../../models/dialog-tokens";
 import { OverlaySide } from "../../models/overlay-side";
+import { QueryMatcher } from "../../models/query-matcher";
 import { QuickInputItem } from "../../models/quick-input-item";
 import { ButtonComponent } from "../button/button.component";
 import { DialogComponent } from "../dialog/dialog.component";
@@ -62,9 +63,11 @@ export class GalleryOverlaysComponent {
   protected readonly below: OverlaySide = OverlaySide.below;
   protected readonly isChecked: WritableSignal<boolean> = signal(true);
   protected readonly items: readonly QuickInputItem[] = [
-    new QuickInputItem("one", GalleryResources.text.quickInputOne, GalleryResources.text.glyphAdd, GalleryResources.text.quickInputDetail, GalleryResources.text.quickInputKey, [0]),
-    new QuickInputItem("two", GalleryResources.text.quickInputTwo, null, null, null, [1]),
-    new QuickInputItem("three", GalleryResources.text.quickInputLong, GalleryResources.text.glyphSave, GalleryResources.text.quickInputDetail, null, [0])
+    new QuickInputItem("one", GalleryResources.text.quickInputOne, GalleryResources.text.glyphAdd, GalleryResources.text.quickInputDetail, GalleryResources.text.quickInputKey,
+      QueryMatcher.find(GalleryResources.text.quickInputQuery, GalleryResources.text.quickInputOne)),
+    new QuickInputItem("two", GalleryResources.text.quickInputTwo, null, null, null, QueryMatcher.find(GalleryResources.text.quickInputQuery, GalleryResources.text.quickInputTwo)),
+    new QuickInputItem("three", GalleryResources.text.quickInputLong, GalleryResources.text.glyphSave, GalleryResources.text.quickInputDetail, null,
+      QueryMatcher.find(GalleryResources.text.quickInputQuery, GalleryResources.text.quickInputLong))
   ];
 
   private createDialogInjector(): Injector {

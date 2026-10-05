@@ -729,6 +729,9 @@ export class DesktopApplicationTests {
     const unconnected = await DesktopApplicationTests.invokeAsync(refused, "teamrun:writeLayout", event, { version: 1 });
     connection.isFailing = true;
     const busy = await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", event);
+    connection.rejection = new ConnectionException("The runtime did not answer shell.writeWindowLayout in time.");
+    const late = await DesktopApplicationTests.invokeAsync(electron, "teamrun:writeLayout", event, { version: 1 });
+    connection.isClosed = true;
     connection.rejection = new ConnectionException("The connection to the runtime closed.");
     const closed = await DesktopApplicationTests.invokeAsync(electron, "teamrun:writeLayout", event, { version: 1 });
     connection.rejection = new TypeError("A defect.");
@@ -736,11 +739,12 @@ export class DesktopApplicationTests {
     await Assert.throwsAsync(() => DesktopApplicationTests.invokeAsync(electron, "teamrun:writeLayout", event, { version: 1 }), TypeError);
     Assert.areEqual(
       JSON.stringify([
-        { code: "Unavailable", message: "TeamRun is not connected to its runtime." },
+        { code: "Disconnected", message: "TeamRun is not connected to its runtime." },
         { code: "Internal", message: "The database is busy." },
-        { code: "Unavailable", message: "The connection to the runtime closed." }
+        { code: "Unavailable", message: "The runtime did not answer shell.writeWindowLayout in time." },
+        { code: "Disconnected", message: "The connection to the runtime closed." }
       ]),
-      JSON.stringify([unconnected["failure"], busy["failure"], closed["failure"]]));
+      JSON.stringify([unconnected["failure"], busy["failure"], late["failure"], closed["failure"]]));
   }
 
   @TestMethod
@@ -846,7 +850,7 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async answersUnavailableWithoutARuntimeAndPassesOnDefects(): Promise<void> {
+  public async answersDisconnectedWithoutARuntimeOrAfterItsConnectionEndsAndPassesOnDefects(): Promise<void> {
     const refused = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(new PreShellDataFoundException(new PreShellData("/data/old"))));
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
@@ -854,13 +858,17 @@ export class DesktopApplicationTests {
     await Condition.waitAsync(() => connection.calls.length > 0);
 
     const unconnected = await DesktopApplicationTests.requestAsync(refused, event, "notes.open", null);
+    connection.rejection = new ConnectionException("The runtime did not answer notes.open in time.");
+    const late = await DesktopApplicationTests.requestAsync(electron, event, "notes.open", null);
+    connection.isClosed = true;
     connection.rejection = new ConnectionException("The connection to the runtime closed.");
     const closed = await DesktopApplicationTests.requestAsync(electron, event, "notes.open", null);
     connection.rejection = new TypeError("A defect.");
 
     await Assert.throwsAsync(() => DesktopApplicationTests.requestAsync(electron, event, "notes.open", null), TypeError);
-    Assert.areEqual(JSON.stringify({ code: "Unavailable", message: "TeamRun is not connected to its runtime." }), JSON.stringify(unconnected.failure?.toJson()));
-    Assert.areEqual(JSON.stringify({ code: "Unavailable", message: "The connection to the runtime closed." }), JSON.stringify(closed.failure?.toJson()));
+    Assert.areEqual(JSON.stringify({ code: "Disconnected", message: "TeamRun is not connected to its runtime." }), JSON.stringify(unconnected.failure?.toJson()));
+    Assert.areEqual(JSON.stringify({ code: "Unavailable", message: "The runtime did not answer notes.open in time." }), JSON.stringify(late.failure?.toJson()));
+    Assert.areEqual(JSON.stringify({ code: "Disconnected", message: "The connection to the runtime closed." }), JSON.stringify(closed.failure?.toJson()));
   }
 
   @TestMethod

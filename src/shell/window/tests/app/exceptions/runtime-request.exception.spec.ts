@@ -19,7 +19,7 @@ describe("RuntimeRequestException", () => {
   });
 
   it("has no details when the failure has none", () => {
-    const exception = new RuntimeRequestException("Unavailable", "TeamRun is not connected to its runtime.");
+    const exception = new RuntimeRequestException("Unavailable", "The runtime did not answer notes.open in time.");
 
     expect(exception.details).toBeUndefined();
   });

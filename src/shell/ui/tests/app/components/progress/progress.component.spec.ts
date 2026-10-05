@@ -16,14 +16,13 @@ import { MotionFixture } from "../../../fixtures/motion.fixture";
 @Component({
   imports: [ProgressComponent],
   template: `
-    <div class="frame" [style.width]="'200px'"><tr-progress label="Syncing the clock" [value]="value()" [isDelayed]="isDelayed()" /></div>
+    <div class="frame" [style.width]="'200px'"><tr-progress label="Syncing the clock" [value]="value()" /></div>
     <div class="popover" [style.background]="'var(--tr-menu)'"><tr-progress label="Syncing the clock" [value]="0.5" /></div>
     <div class="toast" [style.background]="'var(--tr-notification)'"><tr-progress label="Syncing the clock" [value]="0.5" /></div>
   `
 })
 class ProgressHostComponent {
   public readonly value = signal<number | null>(null);
-  public readonly isDelayed = signal<boolean>(false);
 }
 
 describe("ProgressComponent", () => {
@@ -107,37 +106,6 @@ describe("ProgressComponent", () => {
           expect(ground.startsWith("rgb(")).toBe(true);
           expect(AppearanceFixture.contrast(fill, ground)).toBeGreaterThanOrEqual(3);
         });
-
-  it("is shown at once when it is not delayed", () => {
-    expect(progress().classList.contains("tr-reveal-pending")).toBe(false);
-    expect(getComputedStyle(progress()).visibility).toBe("visible");
-  });
-
-  it("stays hidden for 300 ms when it is delayed, then appears, so brief work does not flash it", () => {
-    vi.useFakeTimers();
-    host.isDelayed.set(true);
-    fixture.detectChanges();
-
-    expect(getComputedStyle(progress()).visibility).toBe("hidden");
-    vi.advanceTimersByTime(299);
-    fixture.detectChanges();
-    expect(getComputedStyle(progress()).visibility).toBe("hidden");
-    vi.advanceTimersByTime(1);
-    fixture.detectChanges();
-    expect(getComputedStyle(progress()).visibility).toBe("visible");
-  });
-
-  it("never appears when it is dropped from its delay before it ran out", () => {
-    vi.useFakeTimers();
-    host.isDelayed.set(true);
-    fixture.detectChanges();
-    host.isDelayed.set(false);
-    fixture.detectChanges();
-    vi.advanceTimersByTime(1000);
-    fixture.detectChanges();
-
-    expect(progress().classList.contains("tr-reveal-pending")).toBe(false);
-  });
 
   it("shows an unknown amount as a still part of the track when the person prefers reduced motion", async () => {
     await MotionFixture.reduceAsync();

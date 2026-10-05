@@ -10,8 +10,7 @@ import { Injectable, inject } from "@angular/core";
 
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 
-import { Resources } from "../../resources";
-import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
+import { RuntimeDisconnectedException } from "../exceptions/runtime-disconnected.exception";
 import type { ILayoutStore } from "../interfaces/i-layout-store";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 
@@ -29,7 +28,7 @@ export class LayoutStoreService implements ILayoutStore {
       return true;
     }
     catch (error) {
-      if (error instanceof RuntimeRequestException && error.code === Resources.unavailableCode)
+      if (RuntimeDisconnectedException.isIn(error))
         return false;
       throw error;
     }
