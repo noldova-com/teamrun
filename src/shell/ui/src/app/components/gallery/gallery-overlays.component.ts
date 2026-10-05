@@ -14,6 +14,7 @@ import { DialogSize } from "../../enums/dialog-size";
 import { DockingDirection } from "../../enums/docking-direction";
 import { DialogTokens } from "../../models/dialog-tokens";
 import { OverlaySide } from "../../models/overlay-side";
+import { QueryMatcher } from "../../models/query-matcher";
 import { QuickInputItem } from "../../models/quick-input-item";
 import { ButtonComponent } from "../button/button.component";
 import { DialogComponent } from "../dialog/dialog.component";
@@ -59,17 +60,11 @@ export class GalleryOverlaysComponent {
   protected readonly isChecked: WritableSignal<boolean> = signal(true);
   protected readonly items: readonly QuickInputItem[] = [
     new QuickInputItem("one", GalleryResources.text.quickInputOne, GalleryResources.text.glyphAdd, GalleryResources.text.quickInputDetail, GalleryResources.text.quickInputKey,
-      GalleryOverlaysComponent.matchesIn(GalleryResources.text.quickInputOne)),
-    new QuickInputItem("two", GalleryResources.text.quickInputTwo, null, null, null, GalleryOverlaysComponent.matchesIn(GalleryResources.text.quickInputTwo)),
+      QueryMatcher.find(GalleryResources.text.quickInputQuery, GalleryResources.text.quickInputOne)),
+    new QuickInputItem("two", GalleryResources.text.quickInputTwo, null, null, null, QueryMatcher.find(GalleryResources.text.quickInputQuery, GalleryResources.text.quickInputTwo)),
     new QuickInputItem("three", GalleryResources.text.quickInputLong, GalleryResources.text.glyphSave, GalleryResources.text.quickInputDetail, null,
-      GalleryOverlaysComponent.matchesIn(GalleryResources.text.quickInputLong))
+      QueryMatcher.find(GalleryResources.text.quickInputQuery, GalleryResources.text.quickInputLong))
   ];
-
-  private static matchesIn(title: string): readonly number[] {
-    const query = GalleryResources.text.quickInputQuery;
-    const start = title.toLocaleLowerCase().indexOf(query.toLocaleLowerCase());
-    return Array.from({ length: query.length }, (_, offset) => start + offset);
-  }
 
   private createDialogInjector(): Injector {
     return Injector.create({
