@@ -18,8 +18,8 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 const many: readonly QuickInputItem[] = Array.from({ length: 30 }, (_, index) => new QuickInputItem(`notes.command${index}`, `Command ${index}`, null, null, null));
 
-function press(target: Element, key: string): KeyboardEvent {
-  const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+function press(target: Element, key: string, modifiers: KeyboardEventInit = {}): KeyboardEvent {
+  const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...modifiers });
   target.dispatchEvent(event);
   return event;
 }
@@ -170,6 +170,45 @@ describe("QuickInputComponent", () => {
     expect(activeIndex()).toBe(0);
     expect((await pressAsync("a")).defaultPrevented).toBe(false);
     expect(options()[29]?.getBoundingClientRect().bottom).toBeGreaterThan(0);
+  });
+
+  it("leaves Home, End and the arrows to its text field while Shift, Ctrl, Alt or Meta is held, so they select and move the caret and the active option stays", async () => {
+    const held: KeyboardEventInit[] = [{ shiftKey: true }, { ctrlKey: true }, { altKey: true }, { metaKey: true }];
+    await pressAsync("ArrowDown");
+    const active = activeIndex();
+    const unprevented: boolean[] = [];
+    for (const modifiers of held) {
+      for (const key of ["Home", "End", "ArrowUp", "ArrowDown", "PageUp", "PageDown"]) {
+        unprevented.push(!press(field(), key, modifiers).defaultPrevented);
+        fixture.detectChanges();
+        await fixture.whenStable();
+      }
+    }
+
+    expect(unprevented.every(t => t)).toBe(true);
+    expect(unprevented).toHaveLength(24);
+    expect(activeIndex()).toBe(active);
+  });
+
+  it("selects the text of its field with Shift and Home, End, Up or Down, leaving the active option where it is", async () => {
+    await userEvent.type(field(), "hello");
+    await pressAsync("ArrowDown");
+    const active = activeIndex();
+    const selections: [number | null, number | null][] = [];
+    const select = async (from: number, keys: string): Promise<void> => {
+      field().setSelectionRange(from, from);
+      await userEvent.keyboard(keys);
+      selections.push([field().selectionStart, field().selectionEnd]);
+    };
+
+    await select(2, "{Shift>}{Home}{/Shift}");
+    await select(2, "{Shift>}{End}{/Shift}");
+    await select(2, "{Shift>}{ArrowUp}{/Shift}");
+    await select(2, "{Shift>}{ArrowDown}{/Shift}");
+
+    expect(selections).toEqual([[0, 2], [2, 5], [0, 2], [2, 5]]);
+    expect(activeIndex()).toBe(active);
+    expect(host.query()).toBe("hello");
   });
 
   it("scrolls only its own list to show the active option, leaving the page around it where it is", async () => {
