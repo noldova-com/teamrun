@@ -8,6 +8,7 @@
 
 import { ModulesComponent } from "../../../src/app/components/modules/modules.component";
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
+import { ContentPadding } from "../../../src/app/enums/content-padding";
 import { ShellDocuments } from "../../../src/app/models/shell-documents";
 import { Resources } from "../../../src/resources";
 
@@ -20,5 +21,9 @@ describe("ShellDocuments", () => {
     expect([ShellDocuments.modulesTab.key, ShellDocuments.modulesTab.instance]).toEqual(["document/shell.modules", undefined]);
     expect([ShellDocuments.modulesLabel.title, ShellDocuments.modulesLabel.icon]).toEqual(["Modules", Resources.modulesGlyph]);
     expect(await ShellDocuments.modules.loadComponent()).toBe(ModulesComponent);
+  });
+
+  it("lays out Settings and Modules edge to edge, since each pads its own scrolling areas", () => {
+    expect(ShellDocuments.all.map(t => t.padding)).toEqual([ContentPadding.None, ContentPadding.None]);
   });
 });

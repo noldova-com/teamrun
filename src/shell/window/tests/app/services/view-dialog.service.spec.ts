@@ -14,6 +14,7 @@ import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { DialogService } from "@noldova/teamrun-shell-ui";
 
 import { AppearanceFixture } from "../../../../ui/tests/fixtures/appearance.fixture";
+import { ContentPadding } from "../../../src/app/enums/content-padding";
 import { ViewDialogException } from "../../../src/app/exceptions/view-dialog.exception";
 import { ContributionMatch } from "../../../src/app/models/contribution-match";
 import { DocumentTab } from "../../../src/app/models/layout/document-tab";
@@ -60,9 +61,9 @@ describe("ViewDialogService", () => {
   beforeEach(async () => {
     bridge = DesktopBridgeFixture.install();
     const host = new WindowPartHostFixture();
-    host.contributions.set(search.key, new ContributionMatch(() => Promise.resolve(TestSearchComponent), null));
+    host.contributions.set(search.key, new ContributionMatch(() => Promise.resolve(TestSearchComponent), null, ContentPadding.Default));
     for (const note of [new DocumentTab(plan.name, "draft"), plan, LayoutFixture.todo, LayoutFixture.settings])
-      host.contributions.set(note.key, new ContributionMatch(() => Promise.resolve(TestNoteComponent), null));
+      host.contributions.set(note.key, new ContributionMatch(() => Promise.resolve(TestNoteComponent), null, ContentPadding.Default));
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartHostService, useValue: host }] });
     const registry = LayoutFixture.createRegistry();
     await LayoutServiceFixture.prepareAsync(registry, Layout.createDefault(registry).openDocument(plan));

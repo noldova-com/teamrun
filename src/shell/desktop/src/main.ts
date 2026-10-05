@@ -33,7 +33,7 @@ DesktopApplication.start(
     shell,
     dialog: {
       showMessageBox: (windowId, options) => {
-        const window = BrowserWindow.fromId(windowId);
+        const window = Object.isNull(windowId) ? null : BrowserWindow.fromId(windowId);
         return Object.isNull(window) ? dialog.showMessageBox(options) : dialog.showMessageBox(window, options);
       }
     },
@@ -51,7 +51,9 @@ DesktopApplication.start(
     errorOutput: process.stderr,
     processId: process.pid,
     startDetached: (path, args) => spawn(path, [...args], { detached: true, stdio: "ignore" }).unref(),
-    endProcess: t => process.kill(t, "SIGKILL")
+    endProcess: t => process.kill(t, "SIGKILL"),
+    onUncaughtException: t => process.on(Resources.uncaughtExceptionEvent, t),
+    onUnhandledRejection: t => process.on(Resources.unhandledRejectionEvent, t)
   },
   import.meta.url,
   t => new RuntimeLauncher(t, RuntimeBuild.identity, starter),
