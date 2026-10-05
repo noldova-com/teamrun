@@ -1,0 +1,156 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { mkdir, readdir, readFile } from "node:fs/promises";
+import path from "node:path";
+import { after, before, test, type TestContext } from "node:test";
+
+import AngularProject from "../../angular/angular-project.ts";
+import GalleryFile from "../../angular/gallery-file.ts";
+import PackageStage from "../../packaging/package-stage.ts";
+import PackagedBuild from "../../packaging/packaged-build.ts";
+import PackagingException from "../../packaging/packaging.exception.ts";
+import ProcessRunner from "../../processes/process-runner.ts";
+import ProcessException from "../../processes/process.exception.ts";
+import NpmCommand from "../../toolchain/npm-command.ts";
+import PackageArchivesFixture from "../fixtures/package-archives.fixture.ts";
+import PackagedBuildFixture from "../fixtures/packaged-build.fixture.ts";
+import RepositoryFixture from "../fixtures/repository.fixture.ts";
+import TextOutputFixture from "../fixtures/text-output.fixture.ts";
+
+class PackageStageTests {
+  private static readonly TIMEOUT: number = 120_000;
+
+  private static archives: PackageArchivesFixture | null = null;
+
+  public static register(): void {
+    before(async () => {
+      PackageStageTests.archives = await PackageArchivesFixture.createAsync();
+    });
+    after(() => PackageStageTests.archives?.disposeAsync());
+
+    test("the stage is built with --packaged, holds the shipped packages from the build's archives without the Electron the desktop runs in, and the identity's files, and leaves the Gallery file as development had it", { timeout: PackageStageTests.TIMEOUT }, async t => {
+      const repository = await PackageStageTests.createAsync(t, ["tasks", "notes"]);
+      await repository.writeAsync({
+        "src/modules/notes/module.json": JSON.stringify({ id: "notes", version: "0.2.0", displayName: "Notes", description: "Used by the tests.", parts: [], dependencies: [], contributes: {} })
+      });
+      const gallery = new GalleryFile(repository.directory);
+      const build = new PackagedBuildFixture(gallery);
+      const stage = PackageStageTests.createStage(repository, build, gallery);
+      const output = new TextOutputFixture();
+
+      await stage.stageAsync(output);
+
+      const folder = path.join(repository.directory, "_build", "package", "app");
+      assert.equal(stage.folder, folder);
+      assert.deepEqual(build.runs, [[process.execPath, repository.directory, path.join(repository.directory, "scripts", "build.ts"), "--packaged", "--output", path.join(folder, "_build")]]);
+      assert.equal(await gallery.isPackagedAsync(), false);
+      assert.deepEqual(JSON.parse(await readFile(path.join(folder, "package.json"), "utf8")), {
+        name: "fixture-studio",
+        productName: "Fixture Studio",
+        version: "0.0.7",
+        author: "Fixture Works",
+        desktopName: "org.fixtureworks.studio.desktop",
+        private: true,
+        main: "node_modules/@noldova/teamrun-shell-desktop/main.js",
+        dependencies: {
+          "@noldova/teamrun-foundation-alpha": "0.0.7",
+          "@noldova/teamrun-foundation-beta": "0.0.7",
+          "@noldova/teamrun-modules-tasks-runtime": "0.3.0",
+          "@noldova/teamrun-shell-cli": "0.0.7",
+          "@noldova/teamrun-shell-desktop": "0.0.7"
+        }
+      });
+      assert.deepEqual((await readdir(path.join(folder, "node_modules", "@noldova"))).sort(), [
+        "teamrun-foundation-alpha", "teamrun-foundation-beta", "teamrun-modules-tasks-runtime", "teamrun-shell-cli", "teamrun-shell-desktop"
+      ]);
+      assert.equal(JSON.parse(await readFile(path.join(folder, "node_modules", "@noldova", "teamrun-modules-tasks-runtime", "package.json"), "utf8")).version, "0.3.0");
+      assert.equal(existsSync(path.join(folder, "node_modules", "electron")), false);
+      assert.equal(await readFile(path.join(folder, "_build", "window", "browser", "index.html"), "utf8"), PackagedBuildFixture.WINDOW);
+      assert.equal(await readFile(path.join(folder, "assets", "fixture-icons", "icon-dark.ico"), "utf8"), "ico\n");
+      assert.equal(await readFile(path.join(folder, "LICENSE"), "utf8"), "Fixture license\n");
+      assert.equal(output.text, "The packaged window holds no Gallery.\nPackages in the stage: @noldova/teamrun-foundation-beta, @noldova/teamrun-foundation-alpha, "
+        + "@noldova/teamrun-modules-tasks-runtime, @noldova/teamrun-shell-cli, @noldova/teamrun-shell-desktop.\n");
+    });
+
+    test("staging again starts from an empty stage, and a module the build does not list is not shipped", { timeout: PackageStageTests.TIMEOUT }, async t => {
+      const repository = await PackageStageTests.createAsync(t, []);
+      const gallery = new GalleryFile(repository.directory);
+      const stage = PackageStageTests.createStage(repository, new PackagedBuildFixture(gallery), gallery);
+      await mkdir(path.join(stage.folder, "left-over"), { recursive: true });
+
+      await stage.stageAsync(new TextOutputFixture());
+
+      assert.equal(existsSync(path.join(stage.folder, "left-over")), false);
+      assert.equal(existsSync(path.join(stage.folder, "node_modules", "@noldova", "teamrun-modules-tasks-runtime")), false);
+    });
+
+    test("a packaged window that still holds the Gallery stops the stage before anything is installed", async t => {
+      const repository = await PackageStageTests.createAsync(t, []);
+      const gallery = new GalleryFile(repository.directory);
+      const stage = PackageStageTests.createStage(repository, new PackagedBuildFixture(gallery, [], `<p>${GalleryFile.MARKERS[2]}</p>\n`), gallery);
+
+      await assert.rejects(() => stage.stageAsync(new TextOutputFixture()),
+        new ProcessException(`The window built in _build/package/app/_build/window contains ${JSON.stringify(GalleryFile.MARKERS[2])} in ${path.join("browser", "index.html")}.`));
+      assert.equal(existsSync(path.join(stage.folder, "node_modules")), false);
+      assert.equal(await gallery.isPackagedAsync(), false);
+    });
+
+    test("a failed packaged build stops the stage and still leaves the Gallery file as development had it", async t => {
+      const repository = await PackageStageTests.createAsync(t, []);
+      const gallery = new GalleryFile(repository.directory);
+      const stage = PackageStageTests.createStage(repository, new PackagedBuildFixture(gallery, [2]), gallery);
+
+      await assert.rejects(() => stage.stageAsync(new TextOutputFixture()), new PackagingException("The packaged build failed with exit code 2."));
+      assert.equal(await gallery.isPackagedAsync(), false);
+    });
+
+    test("a module whose runtime package is not under src/ is refused", async t => {
+      const repository = await PackageStageTests.createAsync(t, ["tasks", "gone"]);
+      await repository.writeAsync({
+        "src/modules/gone/module.json": JSON.stringify({ id: "gone", version: "0.1.0", displayName: "Gone", description: "Used by the tests.", parts: ["runtime"], dependencies: [], contributes: {} }),
+        "src/modules/gone/runtime/README.md": "No package.\n"
+      });
+      const gallery = new GalleryFile(repository.directory);
+      const stage = PackageStageTests.createStage(repository, new PackagedBuildFixture(gallery), gallery);
+
+      await assert.rejects(() => stage.stageAsync(new TextOutputFixture()),
+        new PackagingException("The stage needs @noldova/teamrun-modules-gone-runtime, which is not a package under src/."));
+    });
+
+    test("installing never reaches the registry: a dependency missing from the build's archives fails the stage", { timeout: PackageStageTests.TIMEOUT }, async t => {
+      const repository = await PackageStageTests.createAsync(t, [], true);
+      const gallery = new GalleryFile(repository.directory);
+      const stage = PackageStageTests.createStage(repository, new PackagedBuildFixture(gallery), gallery);
+
+      const error = await stage.stageAsync(new TextOutputFixture()).then(() => null, (failure: unknown) => failure);
+
+      assert.ok(error instanceof PackagingException, String(error));
+      assert.match(error.message, /^Installing the packages into the stage failed with exit code \d+; it uses only the build's archives and never the registry:\n/);
+      assert.match(error.message, /left-pad/);
+      assert.match(error.message, /ENOTCACHED|cache mode is 'only-if-cached'/);
+    });
+  }
+
+  private static createStage(repository: RepositoryFixture, build: PackagedBuildFixture, gallery: GalleryFile): PackageStage {
+    const npm = new NpmCommand(new ProcessRunner(), process.env);
+    return new PackageStage(repository.directory, npm, new PackagedBuild(repository.directory, build, gallery, new AngularProject(repository.directory, new ProcessRunner(), npm)));
+  }
+
+  private static async createAsync(t: TestContext, modules: readonly string[], hasOutsideDependency: boolean = false): Promise<RepositoryFixture> {
+    const repository = await RepositoryFixture.createAsync();
+    t.after(() => repository.disposeAsync());
+    assert.ok(PackageStageTests.archives !== null);
+    await PackageStageTests.archives.writeSourcesAsync(repository, modules, hasOutsideDependency);
+    return repository;
+  }
+}
+
+PackageStageTests.register();

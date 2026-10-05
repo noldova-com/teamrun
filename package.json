@@ -30,6 +30,7 @@
   },
   "scripts": {
     "build": "node scripts/build.ts",
+    "package": "node scripts/package.ts",
     "start": "node scripts/desktop/start.ts",
     "teamrun": "node scripts/desktop/teamrun.ts",
     "test": "node scripts/test.ts",
@@ -39,6 +40,7 @@
     "@playwright/test": "1.63.0",
     "@types/node": "26.2.0",
     "electron": "44.5.1",
+    "electron-builder": "26.15.3",
     "resedit": "3.1.0",
     "typescript": "7.0.2"
   }
