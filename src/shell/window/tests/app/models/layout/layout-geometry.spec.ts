@@ -99,10 +99,10 @@ describe("LayoutGeometry", () => {
   it("collapses docks that cannot keep their minimum and shows no groups in them", () => {
     const geometry = new LayoutGeometry(30, 20, initial.openView(LayoutFixture.terminal, registry), registry);
 
-    expect(sides.map(t => geometry.isCollapsed(t))).toEqual([true, false, true]);
-    expect(sides.map(t => geometry.dock(t))).toEqual([new Bounds(0.25, 0, 2.75, 16.75), new Bounds(17.25, 0, 12.5, 16.75), new Bounds(0.25, 17, 29.5, 2.75)]);
-    expect(geometry.middle).toEqual(new Bounds(3.25, 0, 13.75, 16.75));
-    expect(geometry.frames.map(t => t.group.id)).toEqual([2, 0]);
+    expect(sides.map(t => geometry.isCollapsed(t))).toEqual([false, true, true]);
+    expect(sides.map(t => geometry.dock(t))).toEqual([new Bounds(0.25, 0, 12.5, 16.75), new Bounds(27, 0, 2.75, 16.75), new Bounds(0.25, 17, 29.5, 2.75)]);
+    expect(geometry.middle).toEqual(new Bounds(13, 0, 13.75, 16.75));
+    expect(geometry.frames.map(t => t.group.id)).toEqual([1, 0]);
   });
 
   it("keeps a collapsed dock's strip without placing its groups", () => {
