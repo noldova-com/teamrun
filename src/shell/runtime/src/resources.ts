@@ -723,8 +723,7 @@ export class Resources {
   }
 
   public static formatEventNotSent(name: string, reason: string): string {
-    return `The runtime sent the event ${name} to no client: ${reason}
-`;
+    return `The runtime sent the event ${name} to no client: ${reason}\n`;
   }
 
   public static formatUnknownMethod(name: string): string {
