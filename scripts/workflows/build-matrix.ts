@@ -7,28 +7,33 @@
  */
 
 import BuildTarget from "./build-target.ts";
+import GitHubEvent from "./github-event.ts";
 import UiShard from "./ui-shard.ts";
 
 export default class BuildMatrix {
   private static readonly SMOKE_GREP: string = "@smoke";
   private static readonly TARGETS: readonly BuildTarget[] = [
-    new BuildTarget("Linux x64", "ubuntu-24.04", "x64", true, false, 2),
-    new BuildTarget("Linux ARM64", "ubuntu-24.04-arm", "arm64", true, false, 2),
-    new BuildTarget("Windows x64", "windows-2025", "x64", true, true, 3),
-    new BuildTarget("Windows ARM64", "windows-11-arm", "arm64", false, true, 3),
-    new BuildTarget("macOS x64", "macos-15-intel", "x64", false, true, 3),
-    new BuildTarget("macOS ARM64", "macos-15", "arm64", true, true, 2)
+    new BuildTarget("Linux x64", "ubuntu-24.04", "x64", { runsOnPullRequests: true, runsSmokeOnPullRequests: false, runsUiOnPushes: true, uiShardCount: 2 }),
+    new BuildTarget("Linux ARM64", "ubuntu-24.04-arm", "arm64", { runsOnPullRequests: true, runsSmokeOnPullRequests: false, runsUiOnPushes: true, uiShardCount: 2 }),
+    new BuildTarget("Windows x64", "windows-2025", "x64", { runsOnPullRequests: true, runsSmokeOnPullRequests: true, runsUiOnPushes: true, uiShardCount: 3 }),
+    new BuildTarget("Windows ARM64", "windows-11-arm", "arm64", { runsOnPullRequests: false, runsSmokeOnPullRequests: true, runsUiOnPushes: true, uiShardCount: 3 }),
+    new BuildTarget("macOS x64", "macos-15-intel", "x64", { runsOnPullRequests: false, runsSmokeOnPullRequests: true, runsUiOnPushes: false, uiShardCount: 3 }),
+    new BuildTarget("macOS ARM64", "macos-15", "arm64", { runsOnPullRequests: true, runsSmokeOnPullRequests: true, runsUiOnPushes: true, uiShardCount: 2 })
   ];
 
   private readonly isPullRequest: boolean;
 
   public readonly targets: readonly BuildTarget[];
   public readonly deferred: readonly BuildTarget[];
+  public readonly uiTargets: readonly BuildTarget[];
+  public readonly uiDeferred: readonly BuildTarget[];
 
-  public constructor(isPullRequest: boolean) {
-    this.isPullRequest = isPullRequest;
-    this.targets = BuildMatrix.TARGETS.filter(t => !isPullRequest || t.runsOnPullRequests);
+  public constructor(eventName: string | undefined) {
+    this.isPullRequest = eventName === GitHubEvent.PULL_REQUEST;
+    this.targets = BuildMatrix.TARGETS.filter(t => !this.isPullRequest || t.runsOnPullRequests);
     this.deferred = BuildMatrix.TARGETS.filter(t => !this.targets.includes(t));
+    this.uiTargets = this.targets.filter(t => eventName !== GitHubEvent.PUSH || t.runsUiOnPushes);
+    this.uiDeferred = this.targets.filter(t => !this.uiTargets.includes(t));
   }
 
   public uiShards(target: BuildTarget): readonly UiShard[] {
