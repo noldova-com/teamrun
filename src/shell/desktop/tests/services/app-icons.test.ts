@@ -9,6 +9,7 @@
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 
 import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
+import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import { FakeDockHost } from "../fixtures/fake-dock-host.fixture.js";
 import { FakeElectron } from "../fixtures/fake-electron.fixture.js";
 
@@ -22,6 +23,15 @@ export class AppIconsTests {
 
     Assert.areEqual(DesktopStartFixture.icon(icon), window.options.icon);
     Assert.areEqual(platform === "win32" ? DesktopStartFixture.icon(icon) : undefined, window.appDetails?.appIconPath);
+  }
+
+  @TestMethod
+  public async pointsAPackagedBuildsTaskbarAtItsProgramWhoseIconTheShellCanRead(): Promise<void> {
+    const process = new FakeDesktopProcess("win32");
+    const window = DesktopStartFixture.firstWindow(await DesktopStartFixture.startReadyAsync("win32", undefined, new FakeElectron(true, true), undefined, process));
+
+    Assert.areEqual(DesktopStartFixture.icon("icon-dark.ico"), window.options.icon);
+    Assert.areEqual(process.execPath, window.appDetails?.appIconPath);
   }
 
   @TestMethod

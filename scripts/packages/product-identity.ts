@@ -14,6 +14,10 @@ import path from "node:path";
 import PackageException from "./package.exception.ts";
 
 export default class ProductIdentity {
+  public static readonly WINDOWS_ICON_FILE: string = "icon-dark.ico";
+  public static readonly MAC_ICON_FILE: string = "icon-dock-512.png";
+  public static readonly LINUX_ICON_FILE: string = "icon-dark-512.png";
+
   private static readonly FILE_NAME: string = "package.json";
   private static readonly SETTINGS: string = "teamrun";
   private static readonly SECTION: string = "product";
