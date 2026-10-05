@@ -216,7 +216,6 @@ export class FixtureTheme {
     ["tree-row-height", "1.875rem"],
     ["tree-indent", "2rem"],
     ["section-header-height", "2.25rem"],
-    ["section-header-inset", "1rem"],
     ["content-padding-inline", "calc(var(--tr-pill-padding) + var(--tr-tab-inset) * 3)"],
     ["document-padding-block", "1.25rem"],
     ["view-padding-block", "0.75rem"],

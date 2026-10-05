@@ -30,11 +30,11 @@ LICENSE file in the root directory of this source tree.
 
 <tr-gallery-specimen [name]="text.sectionHeader">
   <div class="tr-gallery-sections">
-    <tr-section-header [label]="text.sectionRecent" />
+    <tr-section-header [label]="text.sectionRecent" [level]="4" />
     <tr-tree [label]="text.sectionRecent" [nodes]="recentRows" />
-    <tr-section-header [label]="text.sectionOlder" />
+    <tr-section-header [label]="text.sectionOlder" [level]="4" />
     <tr-tree [label]="text.sectionOlder" [nodes]="olderRows" />
-    <tr-section-header [label]="text.sectionLong" />
+    <tr-section-header [label]="text.sectionLong" [level]="4" />
     <tr-tree [label]="text.sectionLong" [nodes]="recentRows" />
   </div>
 </tr-gallery-specimen>

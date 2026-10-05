@@ -165,7 +165,6 @@ export class Resources {
     "tree-row-height",
     "tree-indent",
     "section-header-height",
-    "section-header-inset",
     "content-padding-inline",
     "document-padding-block",
     "view-padding-block",
@@ -186,10 +185,10 @@ export class Resources {
   public static readonly defaultThemeId: string = "shell.default";
   public static readonly defaultThemeName: string = "Default";
   public static readonly colorSchemeProperty: string = "color-scheme";
-  public static readonly sectionHeaderLevel: number = 3;
   public static readonly lightScheme: string = "light";
   public static readonly darkScheme: string = "dark";
   public static readonly darkSchemeQuery: string = "(prefers-color-scheme: dark)";
+  public static readonly sectionHeaderLevel: number = 3;
   public static readonly changeEvent: "change" = "change";
   public static readonly defaultRootSize: number = 16;
   public static readonly defaultPanelSize: number = 13;

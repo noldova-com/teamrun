@@ -9,7 +9,7 @@
 :host {
   display: block;
   padding-block: calc((var(--tr-section-header-height) - var(--tr-line-label)) / 2);
-  padding-inline: var(--tr-section-header-inset);
+  padding-inline: var(--tr-space-2);
   color: var(--tr-text);
   font-size: var(--tr-text-label);
   font-weight: 600;

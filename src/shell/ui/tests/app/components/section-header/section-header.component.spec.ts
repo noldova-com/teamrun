@@ -10,25 +10,28 @@ import { Component, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import { SectionHeaderComponent } from "../../../../src/app/components/section-header/section-header.component";
+import { TreeComponent } from "../../../../src/app/components/tree/tree.component";
 import type { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import type { Theme } from "../../../../src/app/models/theme";
+import { TreeNode } from "../../../../src/app/models/tree-node";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({
-  imports: [SectionHeaderComponent],
+  imports: [SectionHeaderComponent, TreeComponent],
   template: `
     <div class="list">
       <tr-section-header class="first" [label]="label()" />
-      <p class="row">Meeting notes</p>
+      <tr-tree label="Recent" [nodes]="rows" />
       <tr-section-header class="later" [label]="laterLabel()" [level]="2" />
-      <p class="row">Draft</p>
+      <tr-tree label="Older" [nodes]="rows" />
     </div>
   `,
-  styles: [".list { width: 12rem; } .row { margin: 0; }"]
+  styles: [".list { width: 12rem; }"]
 })
 class SectionHeaderHostComponent {
   public readonly label = signal("Recent");
   public readonly laterLabel = signal("Older");
+  public readonly rows: readonly TreeNode[] = [new TreeNode("notes", "Meeting notes", "description"), new TreeNode("draft", "Draft", "description")];
 }
 
 describe("SectionHeaderComponent", () => {
@@ -41,20 +44,26 @@ describe("SectionHeaderComponent", () => {
   }
 
   const header = (name: string): HTMLElement => fixture.nativeElement.querySelector(`.${name}`);
+  const rounded = (value: number): number => Math.round(value * 100) / 100;
 
-  function gaps(name: string): readonly [number, number, number] {
-    const element = header(name);
+  function label(name: string): DOMRect {
     const range = document.createRange();
-    range.selectNodeContents(element);
+    range.selectNodeContents(header(name));
+    return range.getBoundingClientRect();
+  }
+
+  function lineCount(name: string): number {
+    return Math.round(label(name).height / Number.parseFloat(getComputedStyle(header(name)).lineHeight));
+  }
+
+  function gaps(name: string): readonly [number, number] {
+    const element = header(name);
     const style = getComputedStyle(element);
-    const lines = Math.round(range.getBoundingClientRect().height / Number.parseFloat(style.lineHeight));
-    const box = element.getBoundingClientRect();
-    const labelTop = box.top + Number.parseFloat(style.paddingTop);
-    const labelBottom = labelTop + lines * Number.parseFloat(style.lineHeight);
-    const before = element.previousElementSibling?.getBoundingClientRect().bottom ?? box.top;
-    const after = (element.nextElementSibling as Element).getBoundingClientRect().top;
-    const rounded = (value: number): number => Math.round(value * 100) / 100;
-    return [rounded(labelTop - before), rounded(after - labelBottom), lines];
+    const labelTop = element.getBoundingClientRect().top + Number.parseFloat(style.paddingTop);
+    const labelBottom = labelTop + lineCount(name) * Number.parseFloat(style.lineHeight);
+    const before = [...element.previousElementSibling?.querySelectorAll("[role=treeitem]") ?? []].at(-1)?.getBoundingClientRect().bottom ?? element.getBoundingClientRect().top;
+    const after = (element.nextElementSibling?.querySelector("[role=treeitem]") as Element).getBoundingClientRect().top;
+    return [rounded(labelTop - before), rounded(after - labelBottom)];
   }
 
   afterEach(() => AppearanceFixture.reset());
@@ -78,27 +87,38 @@ describe("SectionHeaderComponent", () => {
 
   for (const mode of AppearanceFixture.modes)
     for (const theme of AppearanceFixture.themes)
-      it(`takes its height, inset, text and the space above a later header from the ${theme.id} theme in ${mode} mode`, async () => {
+      it(`takes its height, text and the space above a later header from the ${theme.id} theme in ${mode} mode, with its label where a tree row's icon starts`, async () => {
         await renderAsync(theme, mode);
         const first = getComputedStyle(header("first"));
         const later = getComputedStyle(header("later"));
+        const icon = (header("first").nextElementSibling?.querySelector(".tr-tree-icon") as Element).getBoundingClientRect();
 
         AppearanceFixture.expectLook(`${header("first").getBoundingClientRect().height}px`, theme, "section-header-height", "height");
-        AppearanceFixture.expectLook(first.paddingLeft, theme, "section-header-inset", "padding-left");
+        AppearanceFixture.expectLook(first.paddingLeft, theme, "space-2", "padding-left");
+        AppearanceFixture.expectPixels(label("first").left, icon.left);
         AppearanceFixture.expectLook(later.marginTop, theme, "space-3", "margin-top");
         expect(first.marginTop).toBe("0px");
         expect([first.fontWeight, first.color]).toEqual(["600", AppearanceFixture.readColor(theme, mode, "foreground")]);
       });
 
-  it("keeps the same space above and below its label when the label wraps, and more space above a later header than below its label", async () => {
+  it("has as much space above its label as below it, within the header", async () => {
+    await renderAsync();
+    const style = getComputedStyle(header("first"));
+
+    expect([lineCount("first"), style.paddingTop]).toEqual([1, style.paddingBottom]);
+    expect(gaps("first")[0]).toBe(rounded(Number.parseFloat(style.paddingTop)));
+    expect(gaps("first")[0]).toBe(gaps("first")[1]);
+  });
+
+  it("keeps the same space above and below its label when the label wraps, and more than twice the space below its label above a later header", async () => {
     await renderAsync();
     const short = gaps("later");
     fixture.componentInstance.laterLabel.set("A section name that is far too long to fit the width of the header it is in, so it wraps onto a second line and more");
     await fixture.whenStable();
     const wrapped = gaps("later");
 
-    expect([short[2], wrapped[2] > 1]).toEqual([1, true]);
-    expect(wrapped.slice(0, 2)).toEqual(short.slice(0, 2));
+    expect(lineCount("later")).toBeGreaterThan(1);
+    expect(wrapped).toEqual(short);
     expect(short[0]).toBeGreaterThan(short[1] * 2);
     expect(gaps("first")[1]).toBe(short[1]);
   });
