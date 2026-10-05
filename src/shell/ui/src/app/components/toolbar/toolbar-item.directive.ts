@@ -17,8 +17,9 @@ import { Directive, ElementRef, type Signal, type WritableSignal, inject, signal
 export class ToolbarItemDirective implements FocusableOption {
   private readonly tabIndexValue: WritableSignal<number> = signal(-1);
 
+  protected readonly tabIndex: Signal<number> = this.tabIndexValue.asReadonly();
+
   public readonly element: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-  public readonly tabIndex: Signal<number> = this.tabIndexValue.asReadonly();
 
   public setTabStop(isTabStop: boolean): void {
     this.tabIndexValue.set(isTabStop ? 0 : -1);

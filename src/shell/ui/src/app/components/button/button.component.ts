@@ -21,6 +21,7 @@ import { ButtonVariant } from "../../enums/button-variant";
   }
 })
 export class ButtonComponent {
+  protected readonly isSecondary: Signal<boolean> = computed(() => this.variant() === ButtonVariant.Secondary);
+
   public readonly variant = input<ButtonVariant>(ButtonVariant.Primary);
-  public readonly isSecondary: Signal<boolean> = computed(() => this.variant() === ButtonVariant.Secondary);
 }

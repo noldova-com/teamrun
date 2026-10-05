@@ -24,10 +24,11 @@ import { Resources } from "../../../resources";
   }
 })
 export class ViewBadgeComponent {
-  public readonly count = input<number | null>(null);
-  public readonly isDot: Signal<boolean> = computed(() => Object.isNull(this.count()));
-  public readonly text: Signal<string> = computed(() => {
+  protected readonly isDot: Signal<boolean> = computed(() => Object.isNull(this.count()));
+  protected readonly text: Signal<string> = computed(() => {
     const count = this.count();
     return Object.isNull(count) ? String.empty : Resources.formatBadgeCount(count);
   });
+
+  public readonly count = input<number | null>(null);
 }
