@@ -293,7 +293,10 @@ test.describe("gallery", () => {
       expect(layout).toEqual({ edges: [0, 0, 0, 0], baselines: [0, 0, 0], scopeLines: 1, tokenLines: 1, isAddOnHeadingRow: true, isExplanationBetween: true, isLongRowTaller: true, separators: ["solid"], isWideScrolling: false, isNarrowScrolling: true });
       await expect(narrow.getByRole("row")).toHaveCount(3);
       const area = specimen.locator(".tr-configuration-table-scroll").last();
-      await area.evaluate(t => t.scrollTo({ left: t.scrollWidth }));
+      await area.evaluate(t => {
+        t.scrollTo({ left: t.scrollWidth });
+        t.scrollIntoView({ block: "end" });
+      });
       await area.hover();
       await expect(narrow.getByRole("button", { name: "Remove LANG" })).toBeInViewport();
       await desktop.checkpointAsync(`configuration-table-${mode.toLowerCase()}`);
