@@ -1,6 +1,6 @@
 # Contributing to TeamRun
 
-The [README](../README.md) introduces TeamRun. Contributions follow this issue and PR workflow.
+The [README](../README.md) introduces TeamRun. Anyone may open an issue: a bug, a change, a task or a question. Pull requests come only from the team, and the rest of this guide governs them.
 
 ## Issues and support
 
@@ -26,7 +26,6 @@ Submit without labels or milestones if needed; maintainers manage them:
 
 - `needs triage` marks a report awaiting assessment; remove it after that assessment.
 - `needs information` marks missing details and stays until the required information is supplied.
-- `good first issue` identifies clearly scoped work suitable for newcomers, with enough guidance to get started.
 - `in progress` marks an issue someone is working on; see [Before making a change](#before-making-a-change).
 
 The [labels page](https://github.com/noldova-com/teamrun/labels) describes each label's meaning.
@@ -47,7 +46,7 @@ Each module's version is the `version` in its `module.json` ([architecture](../d
 
 ## Pull requests
 
-Use a focused fork or authorized repository branch; target `main`. Work inside one follows [AGENTS.md](../AGENTS.md).
+Use a focused branch of this repository; target `main`. Work in one follows [AGENTS.md](../AGENTS.md).
 
 Each PR description includes a standalone line with its actual tracking issue. Use either form when the issue should stay open:
 

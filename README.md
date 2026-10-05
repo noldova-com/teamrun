@@ -41,11 +41,11 @@ Some Linux systems restrict unprivileged user namespaces, as Ubuntu does since 2
 sudo chown root:root _build/development-app/chrome-sandbox && sudo chmod 4755 _build/development-app/chrome-sandbox
 ```
 
-## Questions, ideas and contributions
+## Questions, ideas and pull requests
 
 Have a question, found a bug or want to suggest a feature? Search [GitHub Issues](https://github.com/noldova-com/teamrun/issues), then open an issue describing what you need. For security concerns, follow the [private reporting guidance](.github/SECURITY.md).
 
-If you'd like to contribute, start with the [contribution guide](.github/CONTRIBUTING.md). It explains how to discuss a change, prepare a pull request and report what you've checked.
+Issues are welcome from anyone. Pull requests come only from the team; the [contribution guide](.github/CONTRIBUTING.md) describes both.
 
 For a closer look at the project, read the [architecture](docs/ARCHITECTURE.md), [coding standards](docs/CODING-STANDARDS.md), [UI standards](docs/UI-STANDARDS.md) and [testing approach](docs/TESTING.md).
 
