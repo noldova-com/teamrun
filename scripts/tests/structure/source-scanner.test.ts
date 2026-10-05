@@ -31,6 +31,14 @@ class SourceScannerTests {
       assert.deepEqual(source.selectors, []);
     });
 
+    test("a function body is an arrow, a function, or a block after a parameter list, and never one inside a string, a comment or a property name", () => {
+      const bodies = ["const twice = t => t * 2;", "export function run() {}", "class Clock {\n  tick() {\n  }\n}", "class Clock {\n  constructor() {\n  }\n}", "class Clock {\n  get now() {\n    return 1;\n  }\n}"];
+      const others = ["const text = \"t => t\";", "// run() {}\nconst a = 1;", "/* function */\nconst b = 2;", "const c = settings.function;", "export class Empty {\n  name = \"x\";\n}", "const d = (1) + 2;", "const e = a >= b;"];
+
+      assert.deepEqual(bodies.map(t => new SourceScanner(t).scan().hasFunctionBody), bodies.map(() => true));
+      assert.deepEqual(others.map(t => new SourceScanner(t).scan().hasFunctionBody), others.map(() => false));
+    });
+
     test("selectors are the strings that follow a selector key", () => {
       const source = new SourceScanner("@Component({\n  selector: \"tr-panel\",\n  label: \"selector\",\n  other: \"x\"\n})\n").scan();
 

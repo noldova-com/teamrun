@@ -10,10 +10,12 @@ import { Injectable } from "@angular/core";
 
 import { nameof } from "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
+import { FailureCode } from "@noldova/teamrun-shell-protocol";
 
 import type { EditAction } from "../enums/edit-action";
 import type { QuitChoice } from "../enums/quit-choice";
 import { DesktopBridgeException } from "../exceptions/desktop-bridge.exception";
+import { RuntimeDisconnectedException } from "../exceptions/runtime-disconnected.exception";
 import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
 import type { IDesktopBridge } from "../interfaces/i-desktop-bridge";
 import { BuildInfo } from "../models/build-info";
@@ -140,8 +142,11 @@ export class DesktopBridgeService {
     if (!answer.hasField(Resources.failureField))
       return answer.readValue(Resources.payloadField);
     const failure = answer.readObject(Resources.failureField);
+    const code = failure.readString(Resources.codeField);
+    if (code === FailureCode.Disconnected)
+      throw new RuntimeDisconnectedException(failure.readString(Resources.messageField));
     throw new RuntimeRequestException(
-      failure.readString(Resources.codeField),
+      code,
       failure.readString(Resources.messageField),
       failure.hasField(Resources.detailsField) ? failure.readObject(Resources.detailsField).toJson() : undefined);
   }

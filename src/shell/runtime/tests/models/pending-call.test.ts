@@ -20,10 +20,10 @@ export class PendingCallTests {
   @TestMethod
   public rejectsPendingCallsWhenTheConnectionCloses(): Promise<void> {
     return RuntimeClientFixture.runAsync(async (fixture, listener) => {
-      fixture.methods.register(RuntimeClientFixture.WAIT, { handleAsync: (context: RequestContext) => once(context.signal, "abort").then(() => null) });
+      fixture.methods.register(RuntimeServerFixture.WAIT, { handleAsync: (context: RequestContext) => once(context.signal, "abort").then(() => null) });
       const client = await RuntimeClientFixture.connectAsync(fixture, listener);
 
-      const call = client.callAsync(RuntimeClientFixture.WAIT, null);
+      const call = client.callAsync(RuntimeServerFixture.WAIT, null);
       client.close();
 
       Assert.areEqual("The connection to the runtime is closed.", (await Assert.throwsAsync(() => call, ConnectionException)).message);
@@ -38,7 +38,7 @@ export class PendingCallTests {
         const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, RuntimeClientFixture.SETTINGS);
         const started = Date.now();
 
-        const exception = await Assert.throwsAsync(() => client.callAsync(RuntimeClientFixture.ECHO, null, 50), ConnectionException);
+        const exception = await Assert.throwsAsync(() => client.callAsync(RuntimeServerFixture.ECHO, null, 50), ConnectionException);
 
         Assert.areEqual("The runtime did not answer notes.echo in time.", exception.message);
         Assert.isTrue(Date.now() - started >= 90, "the client waits for the time limit and the grace");

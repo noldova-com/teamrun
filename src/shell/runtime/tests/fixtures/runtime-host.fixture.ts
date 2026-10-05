@@ -12,7 +12,10 @@ import { pathToFileURL } from "node:url";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { type BuildIdentity, Event, Handshake, NotificationPost, NotificationSeverity, QualifiedName, Request, Response, WireDecoder } from "@noldova/teamrun-shell-protocol";
+import {
+  type BuildIdentity, Event, Handshake, NotificationBroadcast, NotificationPost, NotificationReference, NotificationSeverity, NotificationState, NotificationsQuery, QualifiedName, Request, Response,
+  ShellMethods, WireDecoder
+} from "@noldova/teamrun-shell-protocol";
 import { DataDirectory, DiscoveryReader, Endpoint, type RuntimeDiscovery, RuntimeEntry, RuntimeHost, RuntimeOptions, ServerSettings } from "@noldova/teamrun-shell-runtime";
 
 import { RawConnectionFixture } from "./raw-connection.fixture.js";
@@ -94,7 +97,7 @@ export class RuntimeHostFixture implements AsyncDisposable {
     return [connection, await connection.readResponseAsync()];
   }
 
-  public static alarm(title: string, kind: string = "clock.alarm"): NotificationPost {
+  public static createAlarm(title: string, kind: string = "clock.alarm"): NotificationPost {
     return new NotificationPost(QualifiedName.parse(kind), "window", title, null, NotificationSeverity.Warning, null, [], null);
   }
 
@@ -123,6 +126,20 @@ export class RuntimeHostFixture implements AsyncDisposable {
   public static async callAsync(connection: RawConnectionFixture, id: string, method: QualifiedName, payload: JsonValue): Promise<Response> {
     connection.sendMessages(new Request(id, method, payload));
     return await connection.readResponseAsync();
+  }
+
+  public static async listAndPostAsync(connection: RawConnectionFixture): Promise<[string, string, Event]> {
+    const listed = await RuntimeHostFixture.callAsync(connection, "desktop:1", ShellMethods.notifications, new NotificationsQuery("laptop").toJson());
+    const synced = NotificationState.fromJson(listed.payload).notifications[0]?.id ?? "";
+    connection.sendMessages(new Request("desktop:2", ShellMethods.postNotification, RuntimeHostFixture.createAlarm("Posted").toJson()));
+    const event = await connection.readEventAsync();
+    const posted = NotificationReference.fromJson((await connection.readResponseAsync()).payload).id;
+    return [synced, posted, event];
+  }
+
+  public static formatTitles(payload: JsonValue, synced: string, posted: string): string {
+    const name = (id: string): string => id === synced ? "synced" : id === posted ? "posted" : id;
+    return NotificationBroadcast.fromJson(payload).notifications.map(t => `${name(t.id)}:${t.post.title}`).join(",");
   }
 
   public static createNotificationPart(): string {

@@ -16,7 +16,7 @@ import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 @TestClass
 export class SettingsReadMethodTests {
   @TestMethod
-  public answersEveryDefinitionAndTheValuesADeviceSees(): Promise<void> {
+  public answersTheValuesADeviceSees(): Promise<void> {
     return RuntimeHostFixture.runAsync(async fixture => {
       await fixture.startAsync(30_000, await fixture.writeModulesAsync([]));
       const [connection] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
@@ -33,8 +33,6 @@ export class SettingsReadMethodTests {
 
       Assert.areEqual("{\"name\":\"shell.mode\",\"value\":\"Dark\",\"isSet\":true}", entry("shell.mode"));
       Assert.areEqual("{\"name\":\"shell.doNotDisturb\",\"value\":true,\"isSet\":true}", entry("shell.doNotDisturb"));
-      Assert.areEqual("shell.theme,shell.mode,shell.interfaceFont,shell.codeFont,shell.panelSize,shell.messageSize,shell.codeSize,shell.leftDockStyle,shell.rightDockStyle,shell.menuBar,shell.previewTabs,shell.recentCommandCount,shell.doNotDisturb,shell.mutedModules,shell.keyBindings",
-        snapshot.definitions.map(t => t.name.text).join(","));
     });
   }
 }

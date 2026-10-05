@@ -22,6 +22,10 @@ export class FakeRuntimeConnection implements IRuntimeConnection {
   public readonly deferred: Map<string, () => Promise<Response>> = new Map();
   public readonly timeouts: (number | undefined)[] = [];
 
+  public get isConnected(): boolean {
+    return !this.isClosed;
+  }
+
   public callAsync(method: QualifiedName, payload: JsonValue, timeout?: number): Promise<Response> {
     this.calls.push(method.text);
     this.payloads.push(payload);
