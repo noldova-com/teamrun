@@ -54,6 +54,14 @@ export class FakeApplicationHost implements IApplicationHost {
     this.calls.push("quit");
   }
 
+  public relaunch(): void {
+    this.calls.push("relaunch");
+  }
+
+  public exit(exitCode: number): void {
+    this.calls.push(`exit ${exitCode}`);
+  }
+
   public whenReady(): Promise<unknown> {
     return this.readiness.promise;
   }

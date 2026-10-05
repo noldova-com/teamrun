@@ -15,6 +15,7 @@ import { ModuleState, type ModuleStatus, NotificationPost, NotificationSeverity,
 
 import { ModulesComponent } from "../../../src/app/components/modules/modules.component";
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
+import { ContentPadding } from "../../../src/app/enums/content-padding";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { WindowPartFailureException } from "../../../src/app/exceptions/window-part-failure.exception";
@@ -171,6 +172,19 @@ describe("WindowPartHostService", () => {
     expect(host.findContribution(new ViewTab("notes.outline"))).toBeNull();
     expect(host.findFailure(new ViewTab("notes.list"))).toBeNull();
     expect(errors).toEqual([]);
+  });
+
+  it("pads each contribution as it declares, else as its module chose, else as the shell does, and lays out Settings and Modules edge to edge", async () => {
+    const notes = new WindowPartFixture("notes", log, t => {
+      t.registerView(new ViewContribution("notes.list", "Notes", "sticky_note_2", DockSide.Left, true, load, ContentPadding.Default));
+      t.registerDocument(new DocumentContribution("notes.note", load));
+    });
+    notes.padding = ContentPadding.None;
+    const { host, loads } = start([source("notes", notes), source("clock", clockPart(log))], [status("notes"), status("clock")]);
+    await vi.waitFor(() => expect(loads).toHaveLength(1));
+
+    expect([new ViewTab("notes.list"), new DocumentTab("notes.note", "1"), new ViewTab("clock.list"), ShellDocuments.settingsTab, ShellDocuments.modulesTab].map(t => host.findContribution(t)?.padding))
+      .toEqual([ContentPadding.Default, ContentPadding.None, ContentPadding.Default, ContentPadding.None, ContentPadding.None]);
   });
 
   it("names the reported modules while their window parts activate and lists them for the Modules document once activation ends", async () => {
