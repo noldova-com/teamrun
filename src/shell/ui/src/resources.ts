@@ -165,7 +165,6 @@ export class Resources {
     "content-padding-inline",
     "document-padding-block",
     "view-padding-block",
-    "settings-search-width",
     "settings-pages-width",
     "settings-content-width",
     "modules-list-width",

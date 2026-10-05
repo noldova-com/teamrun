@@ -218,7 +218,6 @@ export class FixtureTheme {
     ["content-padding-inline", "1rem"],
     ["document-padding-block", "1.25rem"],
     ["view-padding-block", "0.75rem"],
-    ["settings-search-width", "40rem"],
     ["settings-pages-width", "15rem"],
     ["settings-content-width", "55rem"],
     ["modules-list-width", "22rem"],

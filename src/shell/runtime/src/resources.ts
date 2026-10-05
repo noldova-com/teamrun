@@ -233,8 +233,8 @@ export class Resources {
   }
 
   public static readonly modeTitle: string = "Mode";
-  public static readonly modeDescription: string = "Light, dark, or following the operating system.";
-  public static readonly modeOptions: readonly (readonly [string, string])[] = [["Light", "Light"], ["Dark", "Dark"], ["System", "System"]];
+  public static readonly modeDescription: string = "Follow the operating system, or always light or dark.";
+  public static readonly modeOptions: readonly (readonly [string, string])[] = [["System", "System"], ["Light", "Light"], ["Dark", "Dark"]];
   public static readonly defaultMode: string = "System";
   public static readonly leftDockStyleTitle: string = "Left dock";
   public static readonly leftDockStyleDescription: string = "Show the left dock's views as tabs, or as icons along the window's left edge.";

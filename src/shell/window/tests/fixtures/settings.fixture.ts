@@ -10,8 +10,8 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { QualifiedName, SettingDefinition, SettingLocality, SettingOption, SettingType } from "@noldova/teamrun-shell-protocol";
 
 export class SettingsFixture {
-  public static readonly mode: SettingDefinition = SettingsFixture.define("shell.mode", "Mode", "Light, dark, or following the operating system.",
-    SettingType.choice([new SettingOption("Light", "Light"), new SettingOption("Dark", "Dark"), new SettingOption("System", "System")]), "System", "Appearance", "Theme");
+  public static readonly mode: SettingDefinition = SettingsFixture.define("shell.mode", "Mode", "Follow the operating system, or always light or dark.",
+    SettingType.choice([new SettingOption("System", "System"), new SettingOption("Light", "Light"), new SettingOption("Dark", "Dark")]), "System", "Appearance", "Theme");
   public static readonly accent: SettingDefinition = SettingsFixture.define("shell.accent", "Accent", "The color that marks the selection.",
     SettingType.choice(["Blue", "Green", "Orange", "Red", "Violet"].map(t => new SettingOption(t, t))), "Blue", "Appearance", "Theme");
   public static readonly theme: SettingDefinition = SettingsFixture.define("shell.theme", "Theme", "The colors and look of the window.",

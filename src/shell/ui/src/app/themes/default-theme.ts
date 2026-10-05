@@ -218,7 +218,6 @@ export class DefaultTheme {
       ["content-padding-inline", "0.75rem"],
       ["document-padding-block", "1rem"],
       ["view-padding-block", "0.5rem"],
-      ["settings-search-width", "37.5rem"],
       ["settings-pages-width", "12.5rem"],
       ["settings-content-width", "50rem"],
       ["modules-list-width", "20rem"],
