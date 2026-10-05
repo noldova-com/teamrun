@@ -236,7 +236,7 @@ export class RuntimeClientTests {
 
         const exception = await Assert.throwsAsync(() => client.callAsync(RuntimeServerFixture.ECHO, null), ConnectionException);
 
-        Assert.areEqual("The connection to the runtime is closed.", exception.message);
+        Assert.areEqual(`${FailureCode.Disconnected}|The connection to the runtime is closed.`, `${exception.failure?.code}|${exception.failure?.message}`);
         Assert.areEqual(1, listener.disconnections);
         Assert.areEqual(`${FailureCode.InvalidMessage}|The frame is not a valid message.`, `${listener.failure?.code}|${listener.failure?.message}`);
       });
@@ -249,8 +249,9 @@ export class RuntimeClientTests {
       async (server, listener) => {
         const client = await RuntimeClient.connectAsync(server.endpoint, "token", RuntimeServerFixture.IDENTITY, "desktop", listener, new ClientSettings(300, 1_000, 50, 1_024));
 
-        await Assert.throwsAsync(() => client.callAsync(RuntimeServerFixture.ECHO, null), ConnectionException);
+        const exception = await Assert.throwsAsync(() => client.callAsync(RuntimeServerFixture.ECHO, null), ConnectionException);
 
+        Assert.areEqual(`${FailureCode.Disconnected}|The connection to the runtime is closed.`, `${exception.failure?.code}|${exception.failure?.message}`);
         Assert.areEqual(1, listener.disconnections);
         Assert.areEqual(`${FailureCode.FrameTooLarge}|A frame exceeds the maximum length of 1024 characters.`, `${listener.failure?.code}|${listener.failure?.message}`);
       });

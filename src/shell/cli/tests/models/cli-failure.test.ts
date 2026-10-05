@@ -166,17 +166,22 @@ export class CliFailureTests {
   }
 
   @TestMethod
-  public async reportsACommandLeftUnansweredOnAnOpenConnectionAsUnavailableOnlyAfterTheClientsFixedFiveSecondAnswerGrace(): Promise<void> {
+  public async reportsACommandLeftUnansweredOnAnOpenConnectionAsUnavailable(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     await using build = await ProbeBuildFixture.createAsync("1.0.0");
 
-    const unanswered = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.block", "--timeout", "0.2", "--json"]), build);
-    await writeFile(ProbeBuildFixture.releasePath(fixture.dataDirectory), "yes");
+    let unanswered: { code: number; output: string; error: string };
+    try {
+      unanswered = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.block", "--timeout", "0.2", "--json"]), build);
+    }
+    finally {
+      await writeFile(ProbeBuildFixture.releasePath(fixture.dataDirectory), "yes");
+    }
     const answered = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.echo", "1", "--json"]), build);
 
     Assert.areEqual(1, unanswered.code);
     Assert.areEqual(JSON.stringify({ code: "Unavailable", message: "The runtime did not answer shell.runCommand in time." }), JSON.stringify(JSON.parse(unanswered.error)));
-    Assert.isTrue(existsSync(ProbeBuildFixture.markerPath(fixture.dataDirectory)), "the runtime was still blocked in the command");
+    Assert.isTrue(existsSync(ProbeBuildFixture.markerPath(fixture.dataDirectory)), "the probe's command started blocking the runtime");
     Assert.areEqual(0, answered.code);
     Assert.areEqual("1\n", answered.output);
   }

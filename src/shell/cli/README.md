@@ -44,7 +44,7 @@ The exit codes are stable; scripts may rely on them.
 | 5 | The data directory cannot be used: it holds data from before the shell, another program's runtime owns it, or it is not a writable folder. Data from before the shell is reported and never moved. |
 | 6 | The command timed out or was cancelled. |
 
-A failure from the runtime keeps the protocol's code in the JSON error. When the connection to the runtime ends during a command, the code is `Disconnected`, as in the desktop, and the exit code is 1.
+A failure from the runtime keeps the protocol's code in the JSON error. When the connection to the runtime ends during a command, the code is `Disconnected`, as in the desktop, and the exit code is 1. A command the runtime leaves unanswered on an open connection reports `Unavailable`.
 
 ## 5. Development
 
