@@ -33,8 +33,8 @@ import { PopoverTriggerDirective } from "../popover/popover-trigger.directive";
 import { QuickInputComponent } from "../quick-input/quick-input.component";
 import { TooltipComponent } from "../tooltip/tooltip.component";
 import { TooltipDirective } from "../tooltip/tooltip.directive";
-import { GalleryResources } from "./gallery-resources";
 import { GalleryCellComponent } from "./gallery-cell.component";
+import { GalleryResources } from "./gallery-resources";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
 import { GalleryStateDirective } from "./gallery-state.directive";
 

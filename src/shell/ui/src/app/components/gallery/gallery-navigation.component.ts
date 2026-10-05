@@ -23,8 +23,8 @@ import { ToolbarDirective } from "../toolbar/toolbar.directive";
 import { TooltipDirective } from "../tooltip/tooltip.directive";
 import { TreeComponent } from "../tree/tree.component";
 import { ViewBadgeComponent } from "../view-badge/view-badge.component";
-import { GalleryResources } from "./gallery-resources";
 import { GalleryCellComponent } from "./gallery-cell.component";
+import { GalleryResources } from "./gallery-resources";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
 import { GalleryStateDirective } from "./gallery-state.directive";
 

@@ -6,19 +6,20 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component } from "@angular/core";
+import { Component, type Type } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
+import { userEvent } from "vitest/browser";
 
 import { GalleryStateDirective } from "../../../../src/app/components/gallery/gallery-state.directive";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 import { GalleryFixture } from "../../../fixtures/gallery.fixture";
+import { MotionFixture } from "../../../fixtures/motion.fixture";
 
 @Component({
   imports: [GalleryStateDirective],
   template: `
     <span class="hovered" trGalleryHover></span>
     <div class="hovered-part" trGalleryHover=".part"><span class="part"></span></div>
-    <div class="missing-part" trGalleryHover=".missing"></div>
     <span class="focused" trGalleryFocus></span>
     <div class="focused-part" trGalleryFocus=".part"><span class="part"></span></div>
     <span class="plain"></span>
@@ -27,54 +28,87 @@ import { GalleryFixture } from "../../../fixtures/gallery.fixture";
 class StateHostComponent {
 }
 
+@Component({
+  imports: [GalleryStateDirective],
+  template: `<div trGalleryFocus=".missing"></div>`
+})
+class MissingPartHostComponent {
+}
+
 describe("GalleryStateDirective", () => {
-  afterEach(() => {
+  const properties: readonly string[] = ["background-color", "color", "border-top-color", "outline-style", "outline-color", "outline-offset", "opacity", "visibility"];
+  const look = (element: Element): string[] => [element, ...element.querySelectorAll("*")]
+    .flatMap(t => [null, "::before", "::after"].map(pseudo => properties.map(p => getComputedStyle(t, pseudo).getPropertyValue(p)).join(" ")));
+  const name = (element: Element): string => `${element.closest(".tr-gallery-specimen")?.getAttribute("aria-label") ?? ""} / ${element.closest("tr-gallery-cell")?.getAttribute("aria-label") ?? ""}`;
+
+  afterEach(async () => {
     AppearanceFixture.reset();
+    await MotionFixture.resetAsync();
   });
 
-  it("marks its host as hovered or focused, or the part its selector finds, and nothing when the part is missing", async () => {
-    const fixture = TestBed.createComponent(StateHostComponent);
+  const renderAsync = async (host: Type<unknown>): Promise<HTMLElement> => {
+    const fixture = TestBed.createComponent(host);
     fixture.detectChanges();
     await fixture.whenStable();
-    const state = (selector: string): string | null => (fixture.nativeElement.querySelector(selector) as HTMLElement).getAttribute("data-tr-state");
+    return fixture.nativeElement as HTMLElement;
+  };
 
-    expect([state(".hovered"), state(".hovered-part"), state(".hovered-part .part"), state(".missing-part")]).toEqual(["hover", null, "hover", null]);
-    expect([state(".focused"), state(".focused-part"), state(".focused-part .part"), state(".plain")]).toEqual(["focus", null, "focus", null]);
+  it("marks its host as hovered or focused, or the part its selector finds", async () => {
+    const element = await renderAsync(StateHostComponent);
+    const state = (selector: string): string | null => (element.querySelector(selector) as HTMLElement).getAttribute("data-tr-state");
+
+    expect([state(".hovered"), state(".hovered-part"), state(".hovered-part .part")]).toEqual(["Hover", null, "Hover"]);
+    expect([state(".focused"), state(".focused-part"), state(".focused-part .part"), state(".plain")]).toEqual(["Focus", null, "Focus", null]);
   });
 
-  it("shows the hovered look statically in each of the Gallery's Hover cells, through the kit's own hover rules", async () => {
-    const fixture = await GalleryFixture.showAsync();
-    const frame = GalleryFixture.frames(fixture)[0] as HTMLElement;
-    const cell = (specimen: string, caption: string): HTMLElement => frame.querySelector(`.tr-gallery-specimen[aria-label="${specimen}"] tr-gallery-cell[aria-label="${caption}"]`) as HTMLElement;
-    const background = (element: Element | null): string => getComputedStyle(element as Element).backgroundColor;
-
-    const hovered = [...frame.querySelectorAll("[data-tr-state='hover']")].map(t => t.closest("tr-gallery-cell")?.getAttribute("aria-label"));
-
-    expect(hovered).toEqual(["Hover", "Secondary, hover", "Hover", "Hover", "Hover", "Hover", "Rows", "Menu bar, hover"]);
-    expect(background(cell("Button", "Hover").querySelector("button"))).toBe(GalleryFixture.colorOf(frame, "background-color", "var(--tr-button-hover)"));
-    expect(background(cell("Button", "Primary").querySelector("button"))).not.toBe(background(cell("Button", "Hover").querySelector("button")));
-    expect(background(cell("Choice pills", "Hover").querySelector("[data-tr-state='hover']"))).toBe(GalleryFixture.colorOf(frame, "background-color", "var(--tr-toolbar-hover)"));
+  it("fails when the part its selector names is missing, instead of showing the default look", async () => {
+    await expect(renderAsync(MissingPartHostComponent)).rejects.toThrow("The Gallery cell has no part that matches .missing.");
   });
 
-  it("shows the real focus look statically in each of the Gallery's Focus cells, through the kit's own focus rules", async () => {
+  it("shows in each of the Gallery's Hover cells the look its control has when the pointer is really over it", async () => {
+    await MotionFixture.reduceAsync();
     const fixture = await GalleryFixture.showAsync();
     const frame = GalleryFixture.frames(fixture)[0] as HTMLElement;
-    const cell = (specimen: string, caption: string): HTMLElement => frame.querySelector(`.tr-gallery-specimen[aria-label="${specimen}"] tr-gallery-cell[aria-label="${caption}"]`) as HTMLElement;
-    const accent = GalleryFixture.colorOf(frame, "color", "var(--tr-accent)");
-    const ring = (element: Element | null): string[] => {
-      const style = getComputedStyle(element as Element);
-      return [style.outlineStyle, style.outlineColor];
-    };
+    const marked = [...frame.querySelectorAll<HTMLElement>("[data-tr-state='Hover']")];
 
-    const focused = [...frame.querySelectorAll("[data-tr-state='focus']")].map(t => `${t.closest(".tr-gallery-specimen")?.getAttribute("aria-label") ?? ""} / ${t.closest("tr-gallery-cell")?.getAttribute("aria-label") ?? ""}`);
+    expect(marked.map(t => name(t))).toEqual(["Button / Hover", "Button / Secondary, hover", "Icon button / Hover", "Choice pills / Hover", "Tab / Hover", "Toolbar button / Hover",
+      "Menu / Rows", "Menu / Menu bar, hover"]);
+    for (const element of marked) {
+      const shown = look(element);
+      element.removeAttribute("data-tr-state");
+      await userEvent.unhover(document.body);
+      const plain = look(element);
+      await userEvent.hover(element);
+      const real = look(element);
+      await userEvent.unhover(document.body);
+      element.setAttribute("data-tr-state", "Hover");
 
-    expect(focused).toEqual(["Button / Focus", "Icon button / Focus", "Checkbox / Focus", "Text field / Focus", "Select / Focus", "Choice pills / Focus", "Tab / Focus", "Toolbar button / Focus",
-      "Sash / Focus"]);
-    expect(ring(cell("Button", "Focus").querySelector("button"))).toEqual(["solid", accent]);
-    expect(ring(cell("Button", "Primary").querySelector("button"))[0]).toBe("none");
-    expect(ring(cell("Checkbox", "Focus").querySelector(".tr-checkbox-box"))).toEqual(["solid", accent]);
-    expect(getComputedStyle(cell("Text field", "Focus").querySelector("input") as Element).borderColor).toBe(accent);
-    expect(getComputedStyle(cell("Select", "Focus").querySelector(".tr-select-button") as Element).borderColor).toBe(accent);
-    expect(getComputedStyle(cell("Select", "Default").querySelector(".tr-select-button") as Element).borderColor).not.toBe(accent);
+      expect([name(element), shown]).toEqual([name(element), real]);
+      expect([name(element), shown]).not.toEqual([name(element), plain]);
+    }
+  });
+
+  it("shows in each of the Gallery's Focus cells the look its control has when it really holds the keyboard focus", async () => {
+    await MotionFixture.reduceAsync();
+    const fixture = await GalleryFixture.showAsync();
+    const frame = GalleryFixture.frames(fixture)[0] as HTMLElement;
+    const marked = [...frame.querySelectorAll<HTMLElement>("[data-tr-state='Focus']")];
+
+    expect(marked.map(t => name(t))).toEqual(["Button / Focus", "Icon button / Focus", "Checkbox / Focus", "Text field / Focus", "Select / Focus", "Choice pills / Focus", "Tab / Focus",
+      "Toolbar button / Focus", "Sash / Focus"]);
+    await userEvent.unhover(document.body);
+    for (const element of marked) {
+      const shown = look(element);
+      element.removeAttribute("data-tr-state");
+      const plain = look(element);
+      await userEvent.keyboard("{Shift}");
+      element.focus();
+      const real = look(element);
+      element.blur();
+      element.setAttribute("data-tr-state", "Focus");
+
+      expect([name(element), shown]).toEqual([name(element), real]);
+      expect([name(element), shown]).not.toEqual([name(element), plain]);
+    }
   });
 });

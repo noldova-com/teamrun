@@ -8,6 +8,10 @@
 
 import { Directive, ElementRef, afterNextRender, inject, input } from "@angular/core";
 
+import "@noldova/teamrun-foundation-core";
+import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
+
+import { GalleryState } from "../../enums/gallery-state";
 import { GalleryResources } from "./gallery-resources";
 
 @Directive({
@@ -21,15 +25,17 @@ export class GalleryStateDirective {
 
   public constructor() {
     afterNextRender(() => {
-      this.mark(this.hoverPart(), GalleryResources.hoverState);
-      this.mark(this.focusPart(), GalleryResources.focusState);
+      this.mark(this.hoverPart(), GalleryState.Hover);
+      this.mark(this.focusPart(), GalleryState.Focus);
     });
   }
 
-  private mark(part: string | undefined, state: string): void {
-    if (part === undefined)
+  private mark(part: string | undefined, state: GalleryState): void {
+    if (Object.isUndefined(part))
       return;
-    const target = part === "" ? this.host : this.host.querySelector(part);
-    target?.setAttribute(GalleryResources.stateAttribute, state);
+    const target = String.isNullOrEmpty(part) ? this.host : this.host.querySelector(part);
+    if (Object.isNull(target))
+      throw new ArgumentException(GalleryResources.formatMissingPart(part), "part");
+    target.setAttribute(GalleryResources.stateAttribute, state);
   }
 }

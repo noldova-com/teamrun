@@ -111,7 +111,7 @@
   grid-area: 1 / 1;
 }
 
-.tr-tab-close:hover::before {
+.tr-tab-close#{states.$hover}::before {
   background-color: var(--tr-toolbar-hover);
 }
 

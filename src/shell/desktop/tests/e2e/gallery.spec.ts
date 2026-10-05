@@ -117,7 +117,7 @@ test.describe("gallery", () => {
     const dark = scope(window, "Dark");
 
     for (const name of ["Button", "Icon button", "Checkbox", "Text field", "Select", "Choice pills", "Tab", "Toolbar button", "Sash"])
-      await expect(dark.locator(`.tr-gallery-specimen[aria-label="${name}"] tr-gallery-cell[aria-label="Focus"] [data-tr-state="focus"]`)).toHaveCount(1);
+      await expect(dark.locator(`.tr-gallery-specimen[aria-label="${name}"] tr-gallery-cell[aria-label="Focus"] [data-tr-state="Focus"]`)).toHaveCount(1);
     await expect(dark.locator(":focus")).toHaveCount(0);
     await dark.locator(".tr-gallery-specimen[aria-label=\"Button\"]").scrollIntoViewIfNeeded();
     await desktop.checkpointAsync("gallery-focus");
@@ -128,7 +128,6 @@ test.describe("gallery", () => {
   test("with the side docks hidden, every section has its header, and its cells share their width and their row's top edge without overlapping, at 100% and 200% zoom and in a narrow window", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openGalleryAsync(window);
-    const zoomAsync = (factor: number): Promise<void> => desktop.application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(value), factor);
     await window.keyboard.press("ControlOrMeta+B");
     await window.keyboard.press("ControlOrMeta+Alt+B");
     await expect.poll(() => window.locator("tr-tab-group[data-side=Left], tr-tab-group[data-side=Right]").evaluateAll(t => t.filter(u => u.getBoundingClientRect().width > 0).length)).toBe(0);
@@ -141,11 +140,9 @@ test.describe("gallery", () => {
     await desktop.checkpointAsync("gallery-sections-dark");
 
     const width = await window.evaluate(() => innerWidth);
-    await zoomAsync(2);
-    await expect.poll(() => window.evaluate(() => innerWidth)).toBe(width / 2);
+    await desktop.zoomAsync(2, width / 2);
     expect(await layoutProblemsAsync(window)).toEqual([]);
-    await zoomAsync(1);
-    await expect.poll(() => window.evaluate(() => innerWidth)).toBe(width);
+    await desktop.zoomAsync(1, width);
 
     await desktop.useViewportAsync(640, 400);
     expect(await layoutProblemsAsync(window)).toEqual([]);

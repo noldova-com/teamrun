@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-$hover: ":is(:hover, [data-tr-state=\"Hover\"])";
-$focus-visible: ":is(:focus-visible, [data-tr-state=\"Focus\"])";
-$focus: ":is(:focus, [data-tr-state=\"Focus\"])";
+export enum GalleryState {
+  Hover = "Hover",
+  Focus = "Focus"
+}

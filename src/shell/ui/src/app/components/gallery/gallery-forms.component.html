@@ -38,13 +38,13 @@ LICENSE file in the root directory of this source tree.
 <tr-gallery-specimen [name]="text.textField">
   <tr-gallery-cell [caption]="text.defaultState"><input type="text" tr-text-field [placeholder]="text.placeholder" [attr.aria-label]="text.textField" /></tr-gallery-cell>
   <tr-gallery-cell [caption]="text.disabled"><input type="text" tr-text-field [value]="text.disabled" [attr.aria-label]="text.disabled" disabled /></tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.focus"><input type="text" tr-text-field trGalleryFocus [placeholder]="text.placeholder" [attr.aria-label]="text.focus" /></tr-gallery-cell>
   <tr-gallery-cell [caption]="text.error">
     <span class="tr-gallery-invalid">
       <input type="text" tr-text-field [value]="text.invalidField" [attr.aria-label]="text.error" aria-invalid="true" />
       <span class="tr-gallery-error">{{ text.validationText }}</span>
     </span>
   </tr-gallery-cell>
-  <tr-gallery-cell [caption]="text.focus"><input type="text" tr-text-field trGalleryFocus [placeholder]="text.placeholder" [attr.aria-label]="text.focus" /></tr-gallery-cell>
   <tr-gallery-cell long [caption]="text.longCaption">
     <input type="text" tr-text-field [value]="text.longValue" [attr.aria-label]="text.longText" class="tr-gallery-narrow" />
   </tr-gallery-cell>
@@ -53,7 +53,7 @@ LICENSE file in the root directory of this source tree.
 <tr-gallery-specimen [name]="text.select" [size]="sizes.Wide">
   <tr-gallery-cell [caption]="text.defaultState"><tr-select [options]="options" [value]="choice()" [label]="text.select" (valueChange)="choice.set($event)" /></tr-gallery-cell>
   <tr-gallery-cell [caption]="text.disabled"><tr-select [options]="options" value="two" [label]="text.disabled" [disabled]="true" /></tr-gallery-cell>
-  <tr-gallery-cell [caption]="text.focus"><tr-select [trGalleryFocus]="focusedSelect" [options]="options" value="one" [label]="text.focus" /></tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.focus"><tr-select [trGalleryFocus]="focusedSelect" [options]="options" [value]="text.selectInitial" [label]="text.focus" /></tr-gallery-cell>
   <tr-gallery-cell long [caption]="text.longCaption"><tr-select [options]="options" value="long" [label]="text.longText" class="tr-gallery-narrow" /></tr-gallery-cell>
 </tr-gallery-specimen>
 

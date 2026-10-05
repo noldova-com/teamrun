@@ -22,8 +22,8 @@ import { SelectComponent } from "../select/select.component";
 import { SpinnerComponent } from "../spinner/spinner.component";
 import { TextFieldComponent } from "../text-field/text-field.component";
 import { TooltipDirective } from "../tooltip/tooltip.directive";
-import { GalleryResources } from "./gallery-resources";
 import { GalleryCellComponent } from "./gallery-cell.component";
+import { GalleryResources } from "./gallery-resources";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
 import { GalleryStateDirective } from "./gallery-state.directive";
 

@@ -86,7 +86,7 @@
   cursor: pointer;
 }
 
-.tr-select-option:hover {
+.tr-select-option#{states.$hover} {
   background-color: var(--tr-hover);
 }
 

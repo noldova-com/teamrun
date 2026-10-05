@@ -202,6 +202,11 @@ export default class DesktopApplicationFixture {
     await this.applyViewportAsync(this.viewport);
   }
 
+  public async zoomAsync(factor: number, width: number): Promise<void> {
+    await this.answerAsync(`zoom the page to ${factor}`, this.application.evaluate(({ BrowserWindow }, zoom) => BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(zoom), factor));
+    await expect.poll(() => this.window.evaluate(() => innerWidth)).toBe(width);
+  }
+
   public async checkpointAsync(name: string): Promise<Buffer> {
     const image = await this.window.screenshot({ scale: "css" });
     if (this.viewport !== null)

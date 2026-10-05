@@ -11,8 +11,6 @@ export class GalleryResources {
   public static readonly overlayContainerClass: string = "cdk-overlay-container";
   public static readonly longAttribute: string = "long";
   public static readonly stateAttribute: string = "data-tr-state";
-  public static readonly hoverState: string = "hover";
-  public static readonly focusState: string = "focus";
   public static readonly hoveredPill: string = ".tr-choice-pill[aria-checked=\"false\"]";
   public static readonly focusedPill: string = ".tr-choice-pill[aria-checked=\"true\"]";
   public static readonly focusedCheckbox: string = ".tr-checkbox-box";
@@ -182,6 +180,10 @@ export class GalleryResources {
     dockingChosenCaption: "Chosen guide",
     dockingPlateCaption: "Plate, center chosen"
   } as const;
+
+  public static formatMissingPart(part: string): string {
+    return `The Gallery cell has no part that matches ${part}.`;
+  }
 
   public static formatScope(themeName: string, mode: string): string {
     return `${themeName}, ${mode.toLowerCase()} mode`;

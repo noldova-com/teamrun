@@ -8,6 +8,8 @@
 
 import { ChangeDetectionStrategy, Component, HostAttributeToken, inject, input } from "@angular/core";
 
+import "@noldova/teamrun-foundation-core";
+
 import { GalleryResources } from "./gallery-resources";
 
 @Component({
@@ -21,6 +23,6 @@ import { GalleryResources } from "./gallery-resources";
   }
 })
 export class GalleryCellComponent {
-  public readonly isLong: boolean = inject(new HostAttributeToken(GalleryResources.longAttribute), { optional: true }) !== null;
+  public readonly isLong: boolean = !Object.isNull(inject(new HostAttributeToken(GalleryResources.longAttribute), { optional: true }));
   public readonly caption = input.required<string>();
 }

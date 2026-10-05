@@ -9,7 +9,6 @@
 import type { Locator, Page } from "@playwright/test";
 
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
-import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 
@@ -21,11 +20,6 @@ async function showAsync(window: Page, title: string): Promise<void> {
   await CommandSearchFixture.searchAsync(window, title);
   await window.keyboard.press("Enter");
   await expect(dialog(window)).toBeVisible();
-}
-
-async function zoomAsync(desktop: DesktopApplicationFixture, factor: number, width: number): Promise<void> {
-  await desktop.application.evaluate(({ BrowserWindow }, zoom) => BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(zoom), factor);
-  await expect.poll(() => desktop.window.evaluate(() => innerWidth)).toBe(width);
 }
 
 async function expectInsideAsync(window: Page, locator: Locator): Promise<void> {
@@ -128,7 +122,7 @@ test.describe("view dialog", () => {
     await expect(dialog(window)).toHaveCount(0);
     await expect(window.locator("tr-tab[data-tab-key=\"document/shell.settings\"]")).toHaveCount(0);
 
-    await zoomAsync(desktop, 2, 320);
+    await desktop.zoomAsync(2, 320);
     try {
       await showAsync(window, "Show the notes list in a dialog");
       await expectInsideAsync(window, window.locator("tr-dialog"));
@@ -138,7 +132,7 @@ test.describe("view dialog", () => {
       await expect(dialog(window)).toHaveCount(0);
     }
     finally {
-      await zoomAsync(desktop, 1, 640);
+      await desktop.zoomAsync(1, 640);
     }
   });
 });
