@@ -380,8 +380,7 @@ export class WindowPartHostService implements IWindowPartHost {
       this.replay(pending, openAtStart);
     for (const pending of this.pendingOpens.splice(0))
       this.replay(pending, (...t) => this.opener.open(...t));
-    if (this.isLayoutLoaded)
-      this.layout.reopenEarlyDocuments();
+    this.layout.reopenEarlyDocuments();
   }
 
   private replay(pending: PendingDocument, open: DocumentOpenerService["open"]): void {
