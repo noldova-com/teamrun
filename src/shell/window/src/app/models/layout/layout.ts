@@ -32,8 +32,10 @@ export class Layout {
   public readonly documents: TabGroup;
   public readonly bottomSpan: BottomDockSpan;
   public readonly toolbars: ToolbarLayout;
+  public readonly middleSize: number | null;
 
-  public constructor(docks: readonly Dock[], middle: LayoutNode | null, bottomSpan: BottomDockSpan = BottomDockSpan.Full, toolbars: ToolbarLayout = ToolbarLayout.EMPTY, activeDocumentsId?: number) {
+  public constructor(docks: readonly Dock[], middle: LayoutNode | null, bottomSpan: BottomDockSpan = BottomDockSpan.Full, toolbars: ToolbarLayout = ToolbarLayout.EMPTY, activeDocumentsId?: number,
+    middleSize: number | null = null) {
     const documents = middle?.groups.filter(t => t.isDocuments) ?? [];
     const [first] = documents;
     if (Object.isNull(middle) || Object.isUndefined(first))
@@ -49,6 +51,8 @@ export class Layout {
       throw new ArgumentException(Resources.repeatedTab);
     if (new Set(ids).size !== ids.length)
       throw new ArgumentException(Resources.repeatedNodeId);
+    if (!Object.isNull(middleSize) && !(middleSize >= 0 && middleSize <= Resources.middlePreferredSize))
+      throw new ArgumentException(Resources.invalidMiddleSize, "middleSize");
 
     this.dockSides = {
       [DockSide.Left]: Layout.dockOn(DockSide.Left, docks),
@@ -60,6 +64,7 @@ export class Layout {
     this.documents = documents.find(t => t.id === activeDocumentsId) ?? first;
     this.bottomSpan = bottomSpan;
     this.toolbars = toolbars;
+    this.middleSize = middleSize;
   }
 
   public static createDefault(registry: ViewRegistry): Layout {
@@ -126,7 +131,7 @@ export class Layout {
   }
 
   public focusDocuments(groupId: number): Layout {
-    return groupId === this.documents.id || !this.documentGroups.some(t => t.id === groupId) ? this : new Layout(this.docks, this.middle, this.bottomSpan, this.toolbars, groupId);
+    return groupId === this.documents.id || !this.documentGroups.some(t => t.id === groupId) ? this : new Layout(this.docks, this.middle, this.bottomSpan, this.toolbars, groupId, this.middleSize);
   }
 
   public canSplit(tab: Tab, groupId: number): boolean {
@@ -192,11 +197,15 @@ export class Layout {
   }
 
   public withBottomSpan(span: BottomDockSpan): Layout {
-    return span === this.bottomSpan ? this : new Layout(this.docks, this.middle, span, this.toolbars, this.documents.id);
+    return span === this.bottomSpan ? this : new Layout(this.docks, this.middle, span, this.toolbars, this.documents.id, this.middleSize);
   }
 
   public withToolbars(toolbars: ToolbarLayout): Layout {
-    return toolbars === this.toolbars ? this : new Layout(this.docks, this.middle, this.bottomSpan, toolbars, this.documents.id);
+    return toolbars === this.toolbars ? this : new Layout(this.docks, this.middle, this.bottomSpan, toolbars, this.documents.id, this.middleSize);
+  }
+
+  public withMiddleSize(size: number | null): Layout {
+    return size === this.middleSize ? this : new Layout(this.docks, this.middle, this.bottomSpan, this.toolbars, this.documents.id, size);
   }
 
   public resizeSplit(split: SplitNode): Layout {
@@ -223,7 +232,8 @@ export class Layout {
       [Resources.middleField]: this.middle.toJson(),
       [Resources.bottomSpanField]: this.bottomSpan,
       [Resources.activeDocumentsField]: this.documentGroups.findIndex(t => t.id === this.documents.id),
-      ...this.toolbars.isEmpty ? {} : { [Resources.toolbarsField]: this.toolbars.toJson() }
+      ...this.toolbars.isEmpty ? {} : { [Resources.toolbarsField]: this.toolbars.toJson() },
+      ...Object.isNull(this.middleSize) ? {} : { [Resources.middleSizeField]: this.middleSize }
     };
   }
 
@@ -273,6 +283,6 @@ export class Layout {
   }
 
   private copy(docks: readonly Dock[], middle: LayoutNode | null, documentsId: number | undefined = this.documents.id): Layout {
-    return middle === this.middle && docks.every(t => t === this.dock(t.side)) && documentsId === this.documents.id ? this : new Layout(docks, middle, this.bottomSpan, this.toolbars, documentsId);
+    return middle === this.middle && docks.every(t => t === this.dock(t.side)) && documentsId === this.documents.id ? this : new Layout(docks, middle, this.bottomSpan, this.toolbars, documentsId, this.middleSize);
   }
 }
