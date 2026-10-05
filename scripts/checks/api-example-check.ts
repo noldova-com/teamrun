@@ -27,6 +27,7 @@ import type ICheck from "./interfaces/check.ts";
 export default class ApiExampleCheck implements ICheck {
   private static readonly PURPOSE: string = "api-examples";
   private static readonly NO_PACKAGES: string = "No packages under src/; there are no API examples to compile.\n";
+  private static readonly VERDICT: string = "every example compiles";
   private static readonly COMPILER_ARGUMENTS: readonly string[] = ["--pretty", "false", "--project"];
   private static readonly HEADER: string = `${LicenseHeader.BLOCK}\n`;
   private static readonly HEADER_LINES: number = ApiExampleCheck.HEADER.split("\n").length - 1;
@@ -51,21 +52,7 @@ export default class ApiExampleCheck implements ICheck {
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
-    const apiPackages = await this.catalog.listOrReportAsync(output);
-    if (apiPackages === undefined)
-      return false;
-    if (apiPackages.length === 0) {
-      output.write(ApiExampleCheck.NO_PACKAGES);
-      return true;
-    }
-
-    let passed = true;
-    for (const apiPackage of apiPackages) {
-      const problems = await this.inspectAsync(apiPackage);
-      output.write(problems.length === 0 ? `${apiPackage.directory}: every example compiles\n` : `${apiPackage.directory}:\n${problems.map(t => `  ${t}\n`).join("")}`);
-      passed &&= problems.length === 0;
-    }
-    return passed;
+    return await this.catalog.inspectEachAsync(output, ApiExampleCheck.NO_PACKAGES, ApiExampleCheck.VERDICT, t => this.inspectAsync(t));
   }
 
   private static describe(examples: readonly ApiExample[], line: string): string {
@@ -83,7 +70,7 @@ export default class ApiExampleCheck implements ICheck {
       const reading = new ApiProject(this.root, `${ApiExampleCheck.PURPOSE}-reading`, apiPackage.id);
       await reading.writeAsync(apiPackage.project, this.root, [apiPackage.declarations]);
       const found = await ApiServer.useAsync(this.server, this.root, reading.file, this.timeout,
-        t => new ApiExampleReader(t).readAsync(apiPackage.declarations));
+        t => new ApiExampleReader(t, apiPackage.visibility).readAsync(apiPackage.declarations));
       return [...found.undocumented.map(t => `${t} has no @example`), ...await this.compileAsync(apiPackage, found)];
     }
     catch (error) {

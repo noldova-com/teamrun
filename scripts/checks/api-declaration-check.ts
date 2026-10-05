@@ -22,6 +22,7 @@ import type ICheck from "./interfaces/check.ts";
 export default class ApiDeclarationCheck implements ICheck {
   private static readonly PURPOSE: string = "api-declarations";
   private static readonly NO_PACKAGES: string = "No packages under src/; there are no API declarations to compare.\n";
+  private static readonly VERDICT: string = "matches its declarations";
 
   private readonly root: string;
   private readonly catalog: ApiCatalog;
@@ -38,21 +39,7 @@ export default class ApiDeclarationCheck implements ICheck {
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
-    const apiPackages = await this.catalog.listOrReportAsync(output);
-    if (apiPackages === undefined)
-      return false;
-    if (apiPackages.length === 0) {
-      output.write(ApiDeclarationCheck.NO_PACKAGES);
-      return true;
-    }
-
-    let passed = true;
-    for (const apiPackage of apiPackages) {
-      const problems = await this.inspectAsync(apiPackage);
-      output.write(problems.length === 0 ? `${apiPackage.directory}: matches its declarations\n` : `${apiPackage.directory}:\n${problems.map(t => `  ${t}\n`).join("")}`);
-      passed &&= problems.length === 0;
-    }
-    return passed;
+    return await this.catalog.inspectEachAsync(output, ApiDeclarationCheck.NO_PACKAGES, ApiDeclarationCheck.VERDICT, t => this.inspectAsync(t));
   }
 
   private static async readErrorsAsync(project: Project, file: string): Promise<readonly string[]> {

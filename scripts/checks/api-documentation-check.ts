@@ -20,6 +20,7 @@ import type ICheck from "./interfaces/check.ts";
 export default class ApiDocumentationCheck implements ICheck {
   private static readonly PURPOSE: string = "api-documentation";
   private static readonly NO_PACKAGES: string = "No packages under src/; there is no API documentation to check.\n";
+  private static readonly VERDICT: string = "documents every public member";
 
   private readonly root: string;
   private readonly catalog: ApiCatalog;
@@ -36,21 +37,7 @@ export default class ApiDocumentationCheck implements ICheck {
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
-    const apiPackages = await this.catalog.listOrReportAsync(output);
-    if (apiPackages === undefined)
-      return false;
-    if (apiPackages.length === 0) {
-      output.write(ApiDocumentationCheck.NO_PACKAGES);
-      return true;
-    }
-
-    let passed = true;
-    for (const apiPackage of apiPackages) {
-      const problems = await this.inspectAsync(apiPackage);
-      output.write(problems.length === 0 ? `${apiPackage.directory}: documents every public member\n` : `${apiPackage.directory}:\n${problems.map(t => `  ${t}\n`).join("")}`);
-      passed &&= problems.length === 0;
-    }
-    return passed;
+    return await this.catalog.inspectEachAsync(output, ApiDocumentationCheck.NO_PACKAGES, ApiDocumentationCheck.VERDICT, t => this.inspectAsync(t));
   }
 
   private async inspectAsync(apiPackage: ApiPackage): Promise<readonly string[]> {
@@ -60,7 +47,7 @@ export default class ApiDocumentationCheck implements ICheck {
     await project.writeAsync(apiPackage.project, this.root, [apiPackage.declarations]);
     try {
       return await ApiServer.useAsync(this.server, this.root, project.file, this.timeout,
-        t => new ApiDocumentationReader(t, apiPackage.visibility).readAsync(apiPackage.declarations));
+        t => new ApiDocumentationReader(t, apiPackage.visibility, this.root).readAsync(apiPackage.declarations));
     }
     catch (error) {
       return [ApiException.describe(error)];

@@ -55,7 +55,7 @@ class ApiDocumentationCheckTests {
       const output = new TextOutputFixture();
 
       assert.equal(await ApiDocumentationCheckTests.createCheck(fixture, ["src/shell/counter"]).runAsync(output), false);
-      assert.equal(output.text, "src/foundation/counter:\n  Counter#step has no JSDoc\nsrc/shell/counter: documents every public member\n");
+      assert.equal(output.text, "src/foundation/counter:\n  node_modules/@noldova/teamrun-foundation-counter/api/index.d.ts:5: Counter#step has no JSDoc\nsrc/shell/counter: documents every public member\n");
 
       const documented = ApiDocumentationCheckTests.DECLARATIONS.replace("  protected step: number;", "  /**\n   * The step.\n   */\n  protected step: number;");
       await fixture.writePackageAsync("counter", ApiDocumentationCheckTests.IMPLEMENTATION, documented);
