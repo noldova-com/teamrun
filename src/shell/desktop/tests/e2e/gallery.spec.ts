@@ -229,15 +229,23 @@ test.describe("gallery", () => {
       const list = scope(window, mode).locator(".cdk-overlay-container .tr-select-list");
       await expect(list).toBeVisible();
       const option = list.locator(".tr-select-option[data-value=\"long\"]");
-      const fit = await list.evaluate(t => ({ isNarrow: t.scrollWidth === t.clientWidth, isInside: t.getBoundingClientRect().right <= document.documentElement.clientWidth, overflow: getComputedStyle(t).overflowX }));
+      const fit = await list.evaluate(t => ({ hiddenWidth: t.scrollWidth - t.clientWidth, isInside: t.getBoundingClientRect().right <= document.documentElement.clientWidth, overflow: getComputedStyle(t).overflowX }));
 
-      expect(fit).toEqual({ isNarrow: true, isInside: true, overflow: "hidden" });
+      expect(fit).toEqual({ hiddenWidth: 0, isInside: true, overflow: "hidden" });
       expect(await truncationAsync(option)).toEqual({ isInside: true, isCut: true, overflow: "ellipsis" });
       const title = (await option.textContent())?.trim() ?? "";
       await expect(list.getByRole("option", { name: title })).toBeVisible();
       const tooltip = scope(window, mode).locator(".cdk-overlay-container tr-tooltip");
       await option.hover();
       await expect(tooltip).toHaveText(title);
+      const covered = await tooltip.evaluate(t => {
+        const area = t.getBoundingClientRect();
+        return [...document.querySelectorAll(".tr-select-list .tr-select-option")].filter(u => {
+          const row = u.getBoundingClientRect();
+          return row.left < area.right && area.left < row.right && row.top < area.bottom && area.top < row.bottom;
+        }).map(u => u.getAttribute("data-value"));
+      });
+      expect(covered).toEqual([]);
       await desktop.checkpointAsync(`select-list-long-option-${mode.toLowerCase()}`);
       await window.mouse.move(0, 0);
       await expect(tooltip).toHaveCount(0);
