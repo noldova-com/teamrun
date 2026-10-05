@@ -15,5 +15,6 @@ describe("WindowPartTokens", () => {
     expect(TestBed.inject(WindowPartTokens.sources)).toEqual([]);
     expect(TestBed.inject(WindowPartTokens.menus)).toEqual([]);
     expect(WindowPartTokens.context.toString()).toContain("The window part's context");
+    expect(WindowPartTokens.contentPadding.toString()).toContain("The padding of the page a tab shows");
   });
 });

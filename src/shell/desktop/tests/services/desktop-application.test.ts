@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import { setImmediate } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
+import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
@@ -43,7 +44,7 @@ export class DesktopApplicationTests {
 
     Assert.areEqual(
       JSON.stringify(["setName TeamRun", `setAppUserModelId ${DesktopStartFixture.DEVELOPMENT_APP_ID}`, "requestSingleInstanceLock", "enableSandbox"]),
-      JSON.stringify(electron.app.calls.slice(1)));
+      JSON.stringify(electron.app.calls.filter(t => !t.startsWith("setPath"))));
     Assert.areEqual(0, electron.windows.length);
   }
 
@@ -55,7 +56,7 @@ export class DesktopApplicationTests {
     await electron.app.becomeReadyAsync();
 
     Assert.areEqual(
-      JSON.stringify(["setName TeamRun", `setAppUserModelId ${DesktopStartFixture.DEVELOPMENT_APP_ID}`, "requestSingleInstanceLock", "quit"]), JSON.stringify(electron.app.calls.slice(1)));
+      JSON.stringify(["setName TeamRun", `setAppUserModelId ${DesktopStartFixture.DEVELOPMENT_APP_ID}`, "requestSingleInstanceLock", "quit"]), JSON.stringify(electron.app.calls.filter(t => !t.startsWith("setPath"))));
     Assert.areEqual(0, electron.app.count("window-all-closed"));
     Assert.areEqual(0, electron.windows.length);
   }
@@ -508,7 +509,7 @@ export class DesktopApplicationTests {
 
     const [settings] = DesktopStartFixture.start(electron, process);
 
-    Assert.areEqual(`setPath userData ${join(dataDirectory.root, "desktop")}`, electron.app.calls[0]);
+    Assert.areEqual(JSON.stringify([`setPath userData ${join(dataDirectory.root, "desktop")}`]), JSON.stringify(electron.app.calls.filter(t => t.startsWith("setPath"))));
     Assert.areEqual(dataDirectory.root, settings?.dataDirectory.root);
     Assert.areEqual(JSON.stringify(["/electron/electron", RuntimeEntry.entryPath, "linux"]), JSON.stringify([settings?.executablePath, settings?.entryPath, settings?.platform]));
     Assert.areEqual(JSON.stringify({ KEPT: "yes", ELECTRON_RUN_AS_NODE: "1" }), JSON.stringify(settings?.environment));
@@ -1381,6 +1382,51 @@ export class DesktopApplicationTests {
     Assert.areEqual(JSON.stringify([true, true, true, true, true, true, false, false]), JSON.stringify(answers));
     Assert.areEqual(false, refused);
     Assert.areEqual(JSON.stringify(["undo", "redo", "cut", "copy", "paste", "selectAll"]), JSON.stringify(window.webContents.calls));
+  }
+
+  @TestMethod
+  public async writesAnErrorItsMainProcessDoesNotCatchToItsLogRedactedAndOffersTheLogFolderInItsOwnBox(): Promise<void> {
+    const data = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const electron = new FakeElectron();
+      const process = new FakeDesktopProcess("linux", [`--data-dir=${data}`]);
+      electron.dialog.answers.push(1);
+      DesktopStartFixture.start(electron, process);
+
+      for (const listener of process.exceptionListeners)
+        listener(new Error(`The pipe at ${process.homeFolder}/teamrun/runtime.sock broke.`));
+      for (const listener of process.rejectionListeners)
+        listener(new Error("A request was left unhandled."));
+      await electron.app.becomeReadyAsync();
+      await Condition.waitAsync(() => electron.dialog.boxes.length === 2);
+
+      Assert.areEqual(JSON.stringify([1, 1]), JSON.stringify([process.exceptionListeners.length, process.rejectionListeners.length]));
+      Assert.isTrue(process.errors.includes("The desktop's main process failed with an uncaught exception: Error: The pipe at ~/teamrun/runtime.sock broke.\n    at "), process.errors);
+      Assert.isTrue(process.errors.includes("The desktop's main process failed with an unhandled rejection: Error: A request was left unhandled.\n    at "), process.errors);
+      Assert.isTrue(process.errors.includes("desktop-application.test"), "the log keeps the error's stack");
+      Assert.areEqual(JSON.stringify([null, null]), JSON.stringify(electron.dialog.boxes.map(t => t.windowId)));
+      Assert.areEqual(JSON.stringify([join(data, "logs")]), JSON.stringify(electron.shell.opened));
+    }
+    finally {
+      await rm(data, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async catchesAFailureBeforeItFindsItsDataDirectoryAndOffersToRestartOrQuit(): Promise<void> {
+    const electron = new FakeElectron();
+    const process = new FakeDesktopProcess("linux", ["--data-dir=relative/data"]);
+    electron.dialog.answers.push(1);
+
+    const failure = Assert.throws(() => DesktopStartFixture.start(electron, process), ArgumentException);
+    for (const listener of process.exceptionListeners)
+      listener(failure);
+    await electron.app.becomeReadyAsync();
+    await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+    Assert.isTrue(process.errors.includes(`The desktop's main process failed with an uncaught exception: ArgumentException: ${failure.message}`), process.errors);
+    Assert.areEqual(JSON.stringify([["Restart TeamRun", "Quit"]]), JSON.stringify(electron.dialog.boxes.map(t => t.options.buttons)));
+    Assert.areEqual(JSON.stringify(["setName TeamRun", "exit 0"]), JSON.stringify(electron.app.calls));
   }
 
   @TestMethod

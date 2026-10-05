@@ -119,6 +119,21 @@ export declare enum WindowErrorAdmission {
 }
 
 /**
+ * How the desktop's main process failed, for {@link MainProcessRecovery}.
+ */
+export declare enum MainProcessFailureKind {
+  /**
+   * An exception it did not catch.
+   */
+  UncaughtException = "UncaughtException",
+
+  /**
+   * A rejection it did not handle.
+   */
+  UnhandledRejection = "UnhandledRejection"
+}
+
+/**
  * A window that can show the question about work in progress.
  */
 export interface IQuitPrompt {
@@ -405,6 +420,38 @@ export interface IDesktopProcess {
    * ```
    */
   endProcess(processId: number): void;
+
+  /**
+   * Hears every exception the main process does not catch. A listener keeps Electron from showing its own error box,
+   * which would block the main process.
+   *
+   * @param listener Receives the error.
+   * @example
+   * ```ts
+   * import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function listen(process: IDesktopProcess, failures: unknown[]): void {
+   *   process.onUncaughtException(error => failures.push(error));
+   * }
+   * ```
+   */
+  onUncaughtException(listener: (error: unknown) => void): void;
+
+  /**
+   * Hears every rejection the main process does not handle. Electron only warns about one, so it never becomes an
+   * uncaught exception.
+   *
+   * @param listener Receives the rejection's reason.
+   * @example
+   * ```ts
+   * import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function listen(process: IDesktopProcess, failures: unknown[]): void {
+   *   process.onUnhandledRejection(reason => failures.push(reason));
+   * }
+   * ```
+   */
+  onUnhandledRejection(listener: (reason: unknown) => void): void;
 }
 
 /**
@@ -775,6 +822,36 @@ export interface IApplicationHost {
    * ```
    */
   quit(): void;
+
+  /**
+   * Starts the application again once this instance exits, with the same command line.
+   *
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function restart(app: IApplicationHost): void {
+   *   app.relaunch();
+   *   app.exit(0);
+   * }
+   * ```
+   */
+  relaunch(): void;
+
+  /**
+   * Exits at once, without closing the windows or asking them first.
+   *
+   * @param exitCode The process's exit code.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function end(app: IApplicationHost): void {
+   *   app.exit(0);
+   * }
+   * ```
+   */
+  exit(exitCode: number): void;
 
   /**
    * Waits until the application is ready to create windows.
@@ -1336,9 +1413,9 @@ export interface INotificationHost {
  */
 export interface IDialogHost {
   /**
-   * Shows a message box on a window, or on its own when the window is gone.
+   * Shows a message box on a window, or on its own when the window is gone or none is given.
    *
-   * @param windowId The window's id.
+   * @param windowId The window's id, or null for a box of its own.
    * @param options The box's message, buttons and, when it may be dismissed from code, its abort signal.
    * @returns A promise of the chosen button's index, or the cancel button's when the box was dismissed.
    * @example
@@ -1351,7 +1428,7 @@ export interface IDialogHost {
    * }
    * ```
    */
-  showMessageBox(windowId: number, options: MessageBoxOptions): Promise<MessageBoxReturnValue>;
+  showMessageBox(windowId: number | null, options: MessageBoxOptions): Promise<MessageBoxReturnValue>;
 }
 
 /**
@@ -2584,6 +2661,72 @@ export declare class OpenWindow implements IQuitPrompt {
    * ```
    */
   public showNow(): void;
+}
+
+/**
+ * Ends the desktop when its main process fails with an exception it does not catch or a rejection it does not handle,
+ * because its state can no longer be trusted. It records each failure with its stack and asks once, with a native
+ * message box of its own, whether to restart the application or quit, exiting with 0 either way; the log folder opens on
+ * request and the box asks again. Until the desktop log and its folder are attached, records go redacted to standard
+ * error and the box offers only restarting or quitting. Restarting relaunches the application and exits; quitting exits.
+ * Both exit at once, without the windows' close guard or the quit question, which would run through the failed process;
+ * work in the runtime goes on. A box that cannot be shown is recorded, and the application exits with 1.
+ */
+export declare class MainProcessRecovery {
+  /**
+   * Prepares the recovery, before anything else the desktop does; the desktop passes each failure to
+   * {@link MainProcessRecovery.receive}.
+   *
+   * @param app Waits until the application is ready, relaunches it and exits.
+   * @param dialog Shows the message box.
+   * @param errorOutput Receives the records until a log is attached.
+   * @param redactor Redacts those records.
+   * @example
+   * ```ts
+   * import { type IApplicationHost, type IDesktopProcess, type IDialogHost, MainProcessFailureKind, MainProcessRecovery } from "@noldova/teamrun-shell-desktop";
+   * import { DiagnosticRedactor } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function install(app: IApplicationHost, dialog: IDialogHost, desktop: IDesktopProcess): MainProcessRecovery {
+   *   const recovery = new MainProcessRecovery(app, dialog, desktop.errorOutput, new DiagnosticRedactor(desktop.homeFolder));
+   *   desktop.onUncaughtException(error => recovery.receive(error, MainProcessFailureKind.UncaughtException));
+   *   desktop.onUnhandledRejection(reason => recovery.receive(reason, MainProcessFailureKind.UnhandledRejection));
+   *   return recovery;
+   * }
+   * ```
+   */
+  public constructor(app: IApplicationHost, dialog: IDialogHost, errorOutput: Writable, redactor: DiagnosticRedactor);
+
+  /**
+   * Records later failures and choices in the desktop log, and offers its folder in the box.
+   *
+   * @param log The desktop log.
+   * @param openLogFolderAsync Opens the log folder; its promise tells whether it opened.
+   * @example
+   * ```ts
+   * import type { IDesktopLog, MainProcessRecovery } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function attach(recovery: MainProcessRecovery, log: IDesktopLog): void {
+   *   recovery.attach(log, () => Promise.resolve(true));
+   * }
+   * ```
+   */
+  public attach(log: IDesktopLog, openLogFolderAsync: () => Promise<boolean>): void;
+
+  /**
+   * Records a failure and, for the first one, asks the person whether to restart or quit.
+   *
+   * @param error The error or the rejection's reason, recorded with its stack.
+   * @param kind How the main process failed.
+   * @example
+   * ```ts
+   * import { MainProcessFailureKind, type MainProcessRecovery } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function fail(recovery: MainProcessRecovery): void {
+   *   recovery.receive(new Error("The main process failed."), MainProcessFailureKind.UncaughtException);
+   * }
+   * ```
+   */
+  public receive(error: unknown, kind: MainProcessFailureKind): void;
 }
 
 /**

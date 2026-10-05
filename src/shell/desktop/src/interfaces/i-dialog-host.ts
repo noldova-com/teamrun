@@ -9,5 +9,5 @@
 import type { MessageBoxOptions, MessageBoxReturnValue } from "electron";
 
 export interface IDialogHost {
-  showMessageBox(windowId: number, options: MessageBoxOptions): Promise<MessageBoxReturnValue>;
+  showMessageBox(windowId: number | null, options: MessageBoxOptions): Promise<MessageBoxReturnValue>;
 }
