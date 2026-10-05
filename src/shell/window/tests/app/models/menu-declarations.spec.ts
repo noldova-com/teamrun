@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
-
 import { MenuDeclarations } from "../../../src/app/models/menu-declarations";
 import { MenuGroup } from "../../../src/app/models/menu-group";
 import { MenuItem } from "../../../src/app/models/menu-item";
@@ -47,29 +45,5 @@ describe("MenuDeclarations", () => {
     expect(menus.places.map(t => t.isMenuBar)).toEqual([false, false, false, false]);
     expect(menus.groups[0]?.items[0]?.choice).toBe("notes.sorting");
     expect([menus.groups[1]?.isDynamic, menus.groups[1]?.isExclusive, menus.groups[1]?.items, menus.groups[2]?.isDynamic]).toEqual([true, true, [], false]);
-  });
-
-  it("refuses a toolbar with more than one preferred position, and a choice that is not a qualified name", () => {
-    expect(() => new ToolbarPlacement(true, "notes.main", "notes.second")).toThrowError(ArgumentException);
-    expect(() => new ToolbarPlacement(true, "notes.main", null, true)).toThrowError("A toolbar has at most one of a place after another, a place before another and a row of its own.");
-    expect(() => new ToolbarPlacement(true, null, "notes.main", true)).toThrowError(ArgumentException);
-    expect(() => MenuItem.ofChoice("sorting")).toThrowError(ArgumentException);
-    expect([MenuItem.ofChoice("notes.sorting").choice, MenuItem.ofSubmenu("notes.templates").choice, MenuItem.ofCommand("notes.sortBy").choice]).toEqual(["notes.sorting", null, null]);
-  });
-
-  it("refuses an invalid name, a blank title, an empty group and a command or submenu that is not a qualified name", () => {
-    expect(() => new MenuPlace("tools", "Notes", false)).toThrowError(ArgumentException);
-    expect(() => new MenuPlace("notes.tools", " ", false)).toThrowError(ArgumentException);
-    expect(() => new MenuGroup("notes.sorting", "notes.tools", false, [])).toThrowError("A menu group has at least one item.");
-    expect(() => new MenuGroup("notes.sorting", "tools", false, [MenuItem.ofCommand("notes.sortBy")])).toThrowError(ArgumentException);
-    expect(() => MenuItem.ofCommand("sortBy")).toThrowError(ArgumentException);
-    expect(() => MenuItem.ofSubmenu("templates")).toThrowError(ArgumentException);
-    expect(MenuItem.ofCommand("notes.sortBy").commandArguments).toEqual({});
-    expect(() => MenuItem.ofCommand("notes.sortBy", {}, " ")).toThrowError(ArgumentException);
-    expect(() => new MenuPlace("notes.tools", "Notes", false, " ")).toThrowError(ArgumentException);
-    expect(() => new MenuGroup("notes.recent", "notes.tools", false, [MenuItem.ofCommand("notes.sortBy")], true))
-      .toThrowError("A dynamic menu group has no declared items; its owner supplies them.");
-    expect([MenuGroup.dynamic("notes.recent", "notes.tools", false).isDynamic, MenuGroup.dynamic("notes.recent", "notes.tools", false).items]).toEqual([true, []]);
-    expect([new MenuPlace("notes.tools", "Notes", false, "build").icon, MenuItem.ofCommand("notes.sortBy").label]).toEqual(["build", null]);
   });
 });

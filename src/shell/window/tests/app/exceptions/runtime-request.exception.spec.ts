@@ -19,22 +19,8 @@ describe("RuntimeRequestException", () => {
   });
 
   it("has no details when the failure has none", () => {
-    const exception = new RuntimeRequestException("Unavailable", "TeamRun is not connected to its runtime.");
+    const exception = new RuntimeRequestException("Unavailable", "The runtime did not answer notes.open in time.");
 
     expect(exception.details).toBeUndefined();
-  });
-
-  it("recognizes a request that failed because the connection to the runtime ended, anywhere in an error's causes", () => {
-    const disconnected = new RuntimeRequestException("Disconnected", "TeamRun is not connected to its runtime.");
-    const wrapped = new Error("The part failed to continue.", { cause: new Error("Its options were not read.", { cause: disconnected }) });
-
-    expect([disconnected, wrapped].map(t => RuntimeRequestException.isDisconnected(t))).toEqual([true, true]);
-  });
-
-  it("does not take another failure, a failure of another code or a value that is not an error for one", () => {
-    const unavailable = new RuntimeRequestException("Unavailable", "This device has no identity.");
-    const values: unknown[] = [unavailable, new Error("A defect.", { cause: unavailable }), new Error("A defect."), "Disconnected", null];
-
-    expect(values.map(t => RuntimeRequestException.isDisconnected(t))).toEqual([false, false, false, false, false]);
   });
 });

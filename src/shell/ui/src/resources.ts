@@ -88,6 +88,7 @@ export class Resources {
     "space-3",
     "space-4",
     "space-6",
+    "pill-padding",
     "border-width",
     "shadow-large",
     "shadow-xlarge",
@@ -98,8 +99,6 @@ export class Resources {
     "tab-inset",
     "tab-max-width",
     "scrollbar-size",
-    "tab-label-inset",
-    "tab-action-allowance",
     "tab-action-slot",
     "tab-close",
     "icon",
@@ -118,7 +117,6 @@ export class Resources {
     "chip-padding",
     "spinner",
     "choice-pill",
-    "choice-pill-padding",
     "choice-pill-gap",
     "menu-padding",
     "menu-label-padding",
@@ -128,7 +126,6 @@ export class Resources {
     "menu-trail-gap",
     "band-gap",
     "toolbar-button",
-    "toolbar-button-padding",
     "toolbar-gap",
     "toolbar-grip-gap",
     "menu-separator-spacing",
@@ -153,7 +150,6 @@ export class Resources {
     "window-row-height",
     "status-bar-height",
     "status-bar-inset",
-    "status-bar-item-padding",
     "status-bar-item-height",
     "status-bar-item-gap",
     "button-height",
@@ -322,6 +318,7 @@ export class Resources {
   public static readonly hoverSelector: string = ":hover";
   public static readonly secondaryButton: number = 2;
   public static readonly truncationSelector: string = "[data-truncates]";
+  public static readonly regExpSpecialPattern: RegExp = /[.*+?^${}()|[\]\\]/gu;
   public static readonly chromeAttribute: string = "data-tr-chrome";
   public static readonly chromeSelector: string = "[data-tr-chrome]";
   public static readonly topChrome: string = "top";

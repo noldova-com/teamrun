@@ -162,24 +162,31 @@ test.describe("reconnecting", () => {
     expect(await notificationIdsAsync(window, "notes.saveFailed")).toEqual(posted);
   });
 
-  test("a connection that ends again as soon as the runtime is ready, while the window reads it again, leaves no window error and its parts in place", async ({ desktop }) => {
+  test("a connection that ends while a part reads the runtime again leaves no window error and the part in place, and the part reads it again once ready", async ({ desktop }) => {
     const window = desktop.window;
     const runtime = window.locator("tr-notes-note", { has: window.locator("[data-fixture-content=notes-note-2]") }).locator("[data-fixture-content=notes-runtime]");
     await expect(runtime).toHaveText(/^Runtime \S+$/);
+    await expect(window.locator("[data-fixture-content=clock-face]")).toBeVisible();
     const first = await runtime.textContent() ?? "";
     await window.evaluate(() => {
       const states: string[] = [];
       (Reflect.get(globalThis, "teamrun") as IBridge).onStartup(t => states.push((t as { kind: string }).kind));
       Reflect.set(globalThis, "startups", states);
+      Reflect.set(globalThis, "clock", document.querySelector("[data-fixture-content=clock-face]"));
     });
+    const requestAsync = (method: string): Promise<unknown> => window.evaluate(async name => (await (Reflect.get(globalThis, "teamrun") as IBridge).request(name, null) as { payload?: unknown }).payload, method);
     const readyCountAsync = (): Promise<number> => window.evaluate(() => (Reflect.get(globalThis, "startups") as string[]).filter(t => t === "Ready").length);
+    await requestAsync("notes.holdOptions");
 
-    for (let end = 1; end <= 3; end++) {
-      await desktop.breakRuntimeConnectionAsync();
-      await expect.poll(readyCountAsync).toBe(end);
-    }
+    await desktop.breakRuntimeConnectionAsync();
+    await expect.poll(() => requestAsync("notes.heldOptions")).toBe(1);
+    await desktop.breakRuntimeConnectionAsync();
+    await expect.poll(readyCountAsync).toBe(2);
+    await requestAsync("notes.releaseOptions");
 
-    await expect(runtime).toHaveAttribute("data-continued", /^[1-3]$/);
+    await expect.poll(() => window.evaluate(() => [(Reflect.get(globalThis, "clock") as Element).isConnected, document.querySelector("[data-fixture-content=clock-face]") !== null]))
+      .toEqual([false, true]);
+    await expect(runtime).toHaveAttribute("data-continued", "1");
     await expect(runtime).toHaveText(first);
     await expect(window.locator("tr-workspace")).not.toHaveAttribute("inert");
   });

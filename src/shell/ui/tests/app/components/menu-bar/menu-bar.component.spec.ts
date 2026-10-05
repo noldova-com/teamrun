@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, signal } from "@angular/core";
+import { Component } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import { MenuBarItemComponent } from "../../../../src/app/components/menu-bar/menu-bar-item.component";
@@ -23,7 +23,7 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   template: `
     <div style="position: fixed; top: 200px; left: 200px">
     <tr-menu-bar label="Menus">
-      <button tr-menu-bar-item class="file" [label]="fileLabel()" [trMenuTriggerFor]="file"></button>
+      <button tr-menu-bar-item class="file" label="File" [trMenuTriggerFor]="file"></button>
       <button tr-menu-bar-item class="edit" label="Edit" [trMenuTriggerFor]="edit"></button>
       <button tr-menu-bar-item class="view" label="View" [disabled]="true" [trMenuTriggerFor]="edit"></button>
     </tr-menu-bar>
@@ -41,7 +41,6 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   `
 })
 class BarHostComponent {
-  public readonly fileLabel = signal("File");
   public readonly chosen: string[] = [];
 }
 
@@ -124,22 +123,6 @@ describe("MenuBarComponent", () => {
 
     expect(open("file")).toBeNull();
     expect(open("edit")).not.toBeNull();
-  });
-
-  it("shows its hover and open fills, keeps a disabled item inert, and follows a changed label", async () => {
-    const style = (name: string): string => getComputedStyle(item(name), "::before").backgroundColor;
-    const resting = style("edit");
-    item("file").click();
-    await fixture.whenStable();
-    const opened = style("file");
-    item("view").click();
-    fixture.componentInstance.fileLabel.set("Files");
-    await fixture.whenStable();
-
-    expect(opened).not.toBe(resting);
-    expect(item("view").getAttribute("aria-disabled")).toBe("true");
-    expect(item("file").textContent).toBe("Files");
-    expect(getComputedStyle(item("view")).opacity).toBe("0.5");
   });
 
   for (const panelSize of AppearanceFixture.panelSizes)

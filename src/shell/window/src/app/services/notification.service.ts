@@ -13,7 +13,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { type CommandRun, NotificationReference, NotificationState, ShellEvents, ShellMethods } from "@noldova/teamrun-shell-protocol";
 
 import { Resources } from "../../resources";
-import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
+import { ActionNotConfirmedException } from "../exceptions/action-not-confirmed.exception";
 import { CommandService } from "./command.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { SettingsService } from "./settings.service";
@@ -88,10 +88,7 @@ export class NotificationService {
       if (this.eventsSeen === seen)
         this.stateValue.set(state);
       this.firstReadValue.set(state);
-    }).catch((error: unknown) => {
-      if (!RuntimeRequestException.isDisconnected(error))
-        this.errors.handleError(error);
-    });
+    }).catch((error: unknown) => this.errors.handleError(error));
   }
 
   private receive(name: string, payload: JsonValue): void {
@@ -107,6 +104,6 @@ export class NotificationService {
   }
 
   private send(method: string, payload: JsonValue): void {
-    this.bridge.requestAsync(method, payload).catch((error: unknown) => this.errors.handleError(error));
+    this.bridge.requestAsync(method, payload).catch((error: unknown) => this.errors.handleError(ActionNotConfirmedException.from(error, Resources.notificationsNotConfirmed)));
   }
 }
