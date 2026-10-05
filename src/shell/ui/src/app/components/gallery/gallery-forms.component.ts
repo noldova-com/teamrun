@@ -16,6 +16,9 @@ import { CheckboxComponent } from "../checkbox/checkbox.component";
 import { IconButtonComponent } from "../icon-button/icon-button.component";
 import { ChipComponent } from "../chip/chip.component";
 import { ChoicePillsComponent } from "../choice-pills/choice-pills.component";
+import { ConfigurationTableActionDirective } from "../configuration-table/configuration-table-action.directive";
+import { ConfigurationTableComponent } from "../configuration-table/configuration-table.component";
+import { ConfigurationTableDirective } from "../configuration-table/configuration-table.directive";
 import { ProgressComponent } from "../progress/progress.component";
 import { SelectComponent } from "../select/select.component";
 import { SpinnerComponent } from "../spinner/spinner.component";
@@ -26,7 +29,7 @@ import { GallerySpecimenComponent } from "./gallery-specimen.component";
 
 @Component({
   selector: "tr-gallery-forms",
-  imports: [ButtonComponent, CheckboxComponent, ChipComponent, ChoicePillsComponent, GallerySpecimenComponent, IconButtonComponent, ProgressComponent, SelectComponent, SpinnerComponent, TextFieldComponent, TooltipDirective],
+  imports: [ButtonComponent, CheckboxComponent, ChipComponent, ChoicePillsComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective, GallerySpecimenComponent, IconButtonComponent, ProgressComponent, SelectComponent, SpinnerComponent, TextFieldComponent, TooltipDirective],
   templateUrl: "./gallery-forms.component.html",
   styleUrl: "./gallery-forms.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -37,6 +40,7 @@ export class GalleryFormsComponent {
   protected readonly options: readonly SelectOption[] = GalleryResources.text.selectOptions.map(t => new SelectOption(t.value, t.title));
   protected readonly pillOptions: readonly SelectOption[] = GalleryResources.text.choicePillOptions.map(t => new SelectOption(t.value, t.title));
   protected readonly longPillOptions: readonly SelectOption[] = GalleryResources.text.choicePillOptionsLong.map(t => new SelectOption(t.value, t.title));
+  protected readonly configurationTables: typeof GalleryResources.text.configurationTables = GalleryResources.text.configurationTables;
   protected readonly chipKinds: typeof ChipKind = ChipKind;
   protected readonly pill: WritableSignal<string> = signal(GalleryResources.text.choicePillInitial);
   protected readonly choice: WritableSignal<string> = signal(GalleryResources.text.selectInitial);

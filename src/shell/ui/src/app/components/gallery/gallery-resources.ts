@@ -68,6 +68,23 @@ export class GalleryResources {
       { value: "long", title: "An option whose title is far too long to fit the width its group gives it" }
     ],
     choicePillInitial: "light",
+    configurationTable: "Configuration table",
+    configurationAdd: "Add",
+    configurationName: "Name",
+    configurationValue: "Value",
+    configurationScope: "Scope",
+    configurationActions: "Actions",
+    configurationEdit: "Edit",
+    configurationRemove: "Remove",
+    configurationTables: [
+      { heading: "Environment variables", label: "Environment variables", explanation: "Each variable is set for the programs the shell starts, after the system's own.", rowCount: 3 },
+      { heading: "", label: "Narrow environment variables", explanation: "", rowCount: 2 }
+    ],
+    configurationRows: [
+      { name: "EDITOR", value: "code --wait", scope: "Every project", edit: "Edit EDITOR", remove: "Remove EDITOR" },
+      { name: "LANG", value: "en_GB.UTF-8", scope: "Every project", edit: "Edit LANG", remove: "Remove LANG" },
+      { name: "NOTES_HOME", value: "A value that is far too long to fit the width of its cell, so its row grows to hold it", scope: "This project", edit: "Edit NOTES_HOME", remove: "Remove NOTES_HOME" }
+    ],
     tab: "Tab",
     tabNormal: "Notes",
     tabSelected: "Outline",

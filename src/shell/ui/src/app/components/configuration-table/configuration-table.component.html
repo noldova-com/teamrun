@@ -1,0 +1,20 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (hasHeader()) {
+  <div class="tr-configuration-table-header">
+    @if (heading()) {
+      <div class="tr-configuration-table-heading" role="heading" [attr.aria-level]="level()">{{ heading() }}</div>
+    }
+    <div class="tr-configuration-table-actions"><ng-content select="[trConfigurationTableAction]" /></div>
+  </div>
+}
+@if (explanation()) {
+  <p class="tr-configuration-table-explanation">{{ explanation() }}</p>
+}
+<div class="tr-configuration-table-scroll tr-scroll-reveal"><ng-content /></div>

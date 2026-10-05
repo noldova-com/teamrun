@@ -237,4 +237,40 @@ test.describe("gallery", () => {
       await window.mouse.move(0, 0);
     }
   });
+
+  test("a configuration table shows its heading and Add above its explanation and separated rows, grows a row for long text and scrolls sideways only when narrow, in light and in dark", async ({ desktop }) => {
+    const window = desktop.window;
+    await SettingsFixture.openGalleryAsync(window);
+
+    for (const mode of ["Light", "Dark"] as const) {
+      const specimen = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Configuration table\"]");
+      const table = specimen.getByRole("table", { name: "Environment variables", exact: true });
+      const narrow = specimen.getByRole("table", { name: "Narrow environment variables" });
+      await specimen.scrollIntoViewIfNeeded();
+
+      await expect(specimen.getByRole("heading", { name: "Environment variables" })).toBeVisible();
+      await expect(table.getByRole("columnheader")).toHaveText(["Name", "Value", "Scope", ""]);
+      await expect(table.getByRole("columnheader").last()).toHaveAttribute("aria-label", "Actions");
+      await expect(table.getByRole("button", { name: "Remove NOTES_HOME" })).toBeVisible();
+      const layout = await specimen.evaluate(t => {
+        const [wide, small] = [...t.querySelectorAll<HTMLElement>(".tr-configuration-table-scroll")];
+        const heading = (t.querySelector(".tr-configuration-table-heading") as HTMLElement).getBoundingClientRect();
+        const add = (t.querySelector(".tr-configuration-table-actions button") as HTMLElement).getBoundingClientRect();
+        const explanation = (t.querySelector(".tr-configuration-table-explanation") as HTMLElement).getBoundingClientRect();
+        const rows = [...(wide as HTMLElement).querySelectorAll("tbody tr")].map(r => r.getBoundingClientRect().height);
+        const separators = [...(wide as HTMLElement).querySelectorAll("th, td")].map(c => getComputedStyle(c).borderBottomStyle);
+        return {
+          isAddOnHeadingRow: add.top < heading.bottom && add.bottom > heading.top && add.left > heading.left,
+          isExplanationBetween: explanation.top >= Math.max(heading.bottom, add.bottom) && (wide as HTMLElement).getBoundingClientRect().top >= explanation.bottom,
+          isLongRowTaller: (rows.at(-1) ?? 0) > Math.max(...rows.slice(0, -1)),
+          separators: [...new Set(separators)],
+          isWideScrolling: (wide as HTMLElement).scrollWidth > (wide as HTMLElement).clientWidth,
+          isNarrowScrolling: (small as HTMLElement).scrollWidth > (small as HTMLElement).clientWidth
+        };
+      });
+      expect(layout).toEqual({ isAddOnHeadingRow: true, isExplanationBetween: true, isLongRowTaller: true, separators: ["solid"], isWideScrolling: false, isNarrowScrolling: true });
+      await expect(narrow.getByRole("row")).toHaveCount(3);
+      await desktop.checkpointAsync(`configuration-table-${mode.toLowerCase()}`);
+    }
+  });
 });
