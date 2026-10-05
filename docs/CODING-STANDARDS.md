@@ -149,7 +149,7 @@ Node's [child-process documentation](https://nodejs.org/api/child_process.html) 
 
 Each package exposes its API through `src/api/index.ts` and declares/documents it in handwritten `src/api/index.d.ts`. Every public type, member and overload has original JSDoc sufficient for use without reading implementation. IntelliSense and reference pages derive from these declarations using compiler-aware tooling, never text/regex extraction or a second documentation copy; private details are excluded. Shell declarations are the module contract; module declarations are its published API.
 
-The Angular parts are not packages, so this section's declaration and JSDoc rules do not apply to them: their `src/api/index.ts` lists the public API, and the Angular compiler checks its use. They carry no JSDoc and no comments.
+The Angular parts are not packages, but the kit and the window are APIs other parts build on, so each declares and documents its `src/api/index.ts` in a handwritten `src/api/index.d.ts` beside it, under this section's JSDoc and example rules; their examples import the part by its path alias. `npm test` compares each declared part with its implementation, as it does a package. A component or directive is declared by its public inputs, outputs and other public members only; the protected members its template uses are not part of its API. A development-only export, such as the kit's Gallery, stays out of `src/api/index.ts` and has its own entry. The Angular parts' source carries no JSDoc and no comments.
 
 Every public callable signature documents:
 

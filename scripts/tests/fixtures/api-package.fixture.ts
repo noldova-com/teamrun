@@ -16,6 +16,8 @@ export default class ApiPackageFixture {
   private static readonly PREFIX: string = "teamrun-api-fixture-";
   private static readonly SCOPE: string = "@noldova";
   private static readonly NAME_PREFIX: string = "teamrun-foundation-";
+  private static readonly PART_PREFIX: string = "teamrun-";
+  private static readonly PART_PREFIX: string = "teamrun-";
 
   public readonly directory: string;
 
@@ -40,11 +42,31 @@ export default class ApiPackageFixture {
       files[`node_modules/${ApiPackageFixture.SCOPE}/${name}/package.json`] = `${JSON.stringify({ name: `${ApiPackageFixture.SCOPE}/${name}`, types: "api/index.d.ts" })}\n`;
       files[`node_modules/${ApiPackageFixture.SCOPE}/${name}/api/index.d.ts`] = declarations;
     }
+    await this.writeFilesAsync(files);
+    return `${source}/package.json`;
+  }
+
+  public async writePartAsync(directory: string, implementation: Readonly<Record<string, string>>, declarations: string | null): Promise<string> {
+    const alias = `${ApiPackageFixture.SCOPE}/${ApiPackageFixture.PART_PREFIX}${directory.split("/").slice(1).join("-")}`;
+    const project = {
+      extends: path.join(SourceTreeFixture.root, "tsconfig.base.json"),
+      compilerOptions: { types: [], module: "preserve", moduleResolution: "bundler", paths: { [alias]: [`./${directory.split("/").slice(1).join("/")}/src/api/index.ts`] } }
+    };
+    const files: Record<string, string> = {
+      "src/tsconfig.json": `${JSON.stringify(project, null, 2)}\n`,
+      ...Object.fromEntries(Object.entries(implementation).map(([file, text]) => [`${directory}/src/${file}`, text]))
+    };
+    if (declarations !== null)
+      files[`${directory}/src/api/index.d.ts`] = declarations;
+    await this.writeFilesAsync(files);
+    return alias;
+  }
+
+  public async writeFilesAsync(files: Readonly<Record<string, string>>): Promise<void> {
     for (const [file, text] of Object.entries(files)) {
       await mkdir(path.dirname(path.join(this.directory, file)), { recursive: true });
       await writeFile(path.join(this.directory, file), text);
     }
-    return `${source}/package.json`;
   }
 
   public async disposeAsync(): Promise<void> {

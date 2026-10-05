@@ -52,6 +52,7 @@ export default class Test {
   private static readonly NO_MATCH: string = "No test matched the filters.\n";
   private static readonly SUMMARY_VARIABLE: string = "GITHUB_STEP_SUMMARY";
   private static readonly API_TIMEOUT: number = 300_000;
+  private static readonly API_PARTS: readonly string[] = ["src/shell/window"];
 
   private readonly root: string;
   private readonly runner: ProcessRunner;
@@ -167,14 +168,14 @@ export default class Test {
   private async createChecksAsync(): Promise<readonly ICheck[]> {
     const files = new RepositoryFiles(this.root, new Git(this.root, this.runner));
     const documents = new DocumentCheck(this.root, files);
+    const { default: ApiCatalog } = await import("./api/api-catalog.ts");
     const { default: ApiServer } = await import("./api/api-server.ts");
     const { default: ApiDeclarationCheck } = await import("./checks/api-declaration-check.ts");
     const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
     const tree = new SourceTree(this.root, files);
     const build = new PackageBuild(this.root, this.runner, this.environment);
-    const catalog = new PackageCatalog(this.root);
     const modules = new ModuleCatalog(this.root);
-    const layout = new BuildLayout(this.root);
+    const apis = new ApiCatalog(this.root, new PackageCatalog(this.root), new BuildLayout(this.root), Test.API_PARTS);
     const server = [ApiServer.locateCompiler()];
     const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
     return [
@@ -193,8 +194,8 @@ export default class Test {
       new PackageCheck(build),
       new PackageTestCheck(this.root, build, this.runner, this.environment),
       new TypeCheck(this.root, this.runner),
-      new ApiDeclarationCheck(this.root, catalog, layout, server, Test.API_TIMEOUT),
-      new ApiExampleCheck(this.root, catalog, layout, this.runner, server, Test.API_TIMEOUT),
+      new ApiDeclarationCheck(this.root, apis, server, Test.API_TIMEOUT),
+      new ApiExampleCheck(this.root, apis, this.runner, server, Test.API_TIMEOUT),
       new ScriptTestCheck(this.root, build, this.runner, this.environment),
       new AngularTestCheck(angular),
       new PackagedBuildCheck(this.root, this.runner, new GalleryFile(this.root), angular)

@@ -7,8 +7,10 @@
  */
 
 import assert from "node:assert/strict";
+import path from "node:path";
 import { test, type TestContext } from "node:test";
 
+import ApiCatalog from "../../api/api-catalog.ts";
 import ApiServer from "../../api/api-server.ts";
 import ApiExampleCheck from "../../checks/api-example-check.ts";
 import BuildLayout from "../../packages/build-layout.ts";
@@ -168,6 +170,45 @@ class ApiExampleCheckTests {
       assert.equal(output, "src/foundation/counter:\n  An @example of double must start with a ```ts code block on its next line.\n");
     });
 
+    test("an Angular part's examples compile against its declarations in source and the source project's dependencies", async t => {
+      const fixture = await ApiPackageFixture.createAsync();
+      t.after(() => fixture.disposeAsync());
+      const declarations = [
+        "/**",
+        " * Doubles a length.",
+        " *",
+        " * @example",
+        " * ```ts",
+        " * import { double } from \"@noldova/teamrun-shell-counter\";",
+        " * import type { Length } from \"@noldova/teamrun-fixture-units\";",
+        " *",
+        " * const length: Length = double(2);",
+        " * ```",
+        " */",
+        "export declare function double(value: number): number;",
+        ""
+      ].join("\n");
+      await fixture.writePartAsync("src/shell/counter", { "api/index.ts": "export const unused: number = 0;\n" }, declarations);
+      await fixture.writeFilesAsync({
+        "src/node_modules/@noldova/teamrun-fixture-units/package.json": JSON.stringify({ name: "@noldova/teamrun-fixture-units", exports: { ".": { types: "./types/units.d.ts" } }, typings: "./types/units.d.ts" }),
+        "src/node_modules/@noldova/teamrun-fixture-units/types/units.d.ts": "export type Length = number;\n"
+      });
+      const output = new TextOutputFixture();
+
+      assert.equal(await ApiExampleCheckTests.createCheck(fixture, ["src/shell/counter"]).runAsync(output), true, output.text);
+      assert.equal(output.text, "src/shell/counter: every example compiles\n");
+    });
+
+    test("an Angular part without declarations fails and names the missing file", async t => {
+      const fixture = await ApiPackageFixture.createAsync();
+      t.after(() => fixture.disposeAsync());
+      await fixture.writePartAsync("src/shell/counter", ApiExampleCheckTests.IMPLEMENTATION, null);
+      const output = new TextOutputFixture();
+
+      assert.equal(await ApiExampleCheckTests.createCheck(fixture, ["src/shell/counter"]).runAsync(output), false);
+      assert.equal(output.text, `src/shell/counter:\n  no declarations at ${path.join(fixture.directory, "src/shell/counter/src/api/index.d.ts")}\n`);
+    });
+
     test("a package without installed declarations fails and asks for a build", async t => {
       const fixture = await ApiPackageFixture.createAsync();
       t.after(() => fixture.disposeAsync());
@@ -179,9 +220,9 @@ class ApiExampleCheckTests {
     });
   }
 
-  private static createCheck(fixture: ApiPackageFixture): ApiExampleCheck {
-    return new ApiExampleCheck(fixture.directory, new PackageCatalog(fixture.directory), new BuildLayout(fixture.directory), new ProcessRunner(), [ApiServer.locateCompiler()],
-      ApiExampleCheckTests.TIMEOUT);
+  private static createCheck(fixture: ApiPackageFixture, parts: readonly string[] = []): ApiExampleCheck {
+    return new ApiExampleCheck(fixture.directory, new ApiCatalog(fixture.directory, new PackageCatalog(fixture.directory), new BuildLayout(fixture.directory), parts), new ProcessRunner(),
+      [ApiServer.locateCompiler()], ApiExampleCheckTests.TIMEOUT);
   }
 
   private static async runAsync(context: TestContext, declarations: string, expected: boolean): Promise<string> {

@@ -22,12 +22,35 @@ export default class ApiPackage {
   public readonly project: string;
   public readonly implementation: string;
   public readonly declarations: string;
+  public readonly paths?: Readonly<Record<string, readonly string[]>>;
 
-  public constructor(layout: BuildLayout, manifest: PackageManifest) {
-    this.directory = manifest.directory;
-    this.id = manifest.id;
-    this.project = layout.locateSource(manifest, ApiPackage.SOURCE_FOLDER, ApiPackage.PROJECT_FILE);
-    this.implementation = layout.locateSource(manifest, ApiPackage.SOURCE_FOLDER, ...ApiPackage.IMPLEMENTATION);
-    this.declarations = path.join(layout.locateInstalled(manifest), ...ApiPackage.DECLARATIONS);
+  private constructor(directory: string, id: string, project: string, files: readonly [string, string], paths?: Readonly<Record<string, readonly string[]>>) {
+    this.directory = directory;
+    this.id = id;
+    this.project = project;
+    [this.implementation, this.declarations] = files;
+    if (paths !== undefined)
+      this.paths = paths;
+  }
+
+  public get isInstalled(): boolean {
+    return this.paths === undefined;
+  }
+
+  public static forPackage(layout: BuildLayout, manifest: PackageManifest): ApiPackage {
+    const files = [
+      layout.locateSource(manifest, ApiPackage.SOURCE_FOLDER, ...ApiPackage.IMPLEMENTATION),
+      path.join(layout.locateInstalled(manifest), ...ApiPackage.DECLARATIONS)
+    ] as const;
+    return new ApiPackage(manifest.directory, manifest.id, layout.locateSource(manifest, ApiPackage.SOURCE_FOLDER, ApiPackage.PROJECT_FILE), files);
+  }
+
+  public static forPart(root: string, directory: string, project: string, paths: Readonly<Record<string, readonly string[]>>): ApiPackage {
+    return new ApiPackage(directory, directory.split("/").slice(1).join("-"), project, ApiPackage.locatePart(root, directory), paths);
+  }
+
+  public static locatePart(root: string, directory: string): readonly [implementation: string, declarations: string] {
+    const source = path.join(root, ...directory.split("/"), ApiPackage.SOURCE_FOLDER);
+    return [path.join(source, ...ApiPackage.IMPLEMENTATION), path.join(source, ...ApiPackage.DECLARATIONS)];
   }
 }
