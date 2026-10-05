@@ -46,6 +46,7 @@ test("an error the main process does not catch is logged with its stack and asks
     "relaunch",
     "exit 0"
   ]);
+  await desktop.checkpointAsync("main-process-failure-handled");
   await desktop.application.evaluate(() => {
     void Promise.reject(new Error("A rejection the test left unhandled in the main process."));
   });
