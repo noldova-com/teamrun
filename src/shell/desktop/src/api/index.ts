@@ -35,6 +35,7 @@ export type { IUtilityProcessHost } from "../interfaces/i-utility-process-host.j
 export type { IUtilityProcess } from "../interfaces/i-utility-process.js";
 export type { IWindowContents } from "../interfaces/i-window-contents.js";
 export type { IWindowStateStore } from "../interfaces/i-window-state-store.js";
+export { MainProcessFailureKind } from "../enums/main-process-failure-kind.js";
 export { QuitChoice } from "../enums/quit-choice.js";
 export { QuitOutcome } from "../enums/quit-outcome.js";
 export { StartupStateKind } from "../enums/startup-state-kind.js";

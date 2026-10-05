@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import { setImmediate } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
+import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
@@ -1392,13 +1393,16 @@ export class DesktopApplicationTests {
       electron.dialog.answers.push(1);
       DesktopStartFixture.start(electron, process);
 
-      for (const listener of process.uncaughtListeners)
-        listener(new Error(`The pipe at ${process.homeFolder}/teamrun/runtime.sock broke.`), "uncaughtException");
+      for (const listener of process.exceptionListeners)
+        listener(new Error(`The pipe at ${process.homeFolder}/teamrun/runtime.sock broke.`));
+      for (const listener of process.rejectionListeners)
+        listener(new Error("A request was left unhandled."));
       await electron.app.becomeReadyAsync();
       await Condition.waitAsync(() => electron.dialog.boxes.length === 2);
 
-      Assert.areEqual(1, process.uncaughtListeners.length);
+      Assert.areEqual(JSON.stringify([1, 1]), JSON.stringify([process.exceptionListeners.length, process.rejectionListeners.length]));
       Assert.isTrue(process.errors.includes("The desktop's main process failed with an uncaught exception: Error: The pipe at ~/teamrun/runtime.sock broke.\n    at "), process.errors);
+      Assert.isTrue(process.errors.includes("The desktop's main process failed with an unhandled rejection: Error: A request was left unhandled.\n    at "), process.errors);
       Assert.isTrue(process.errors.includes("desktop-application.test"), "the log keeps the error's stack");
       Assert.areEqual(JSON.stringify([null, null]), JSON.stringify(electron.dialog.boxes.map(t => t.windowId)));
       Assert.areEqual(JSON.stringify([join(data, "logs")]), JSON.stringify(electron.shell.opened));
@@ -1406,6 +1410,23 @@ export class DesktopApplicationTests {
     finally {
       await rm(data, { recursive: true, force: true });
     }
+  }
+
+  @TestMethod
+  public async catchesAFailureBeforeItFindsItsDataDirectoryAndOffersToRestartOrQuit(): Promise<void> {
+    const electron = new FakeElectron();
+    const process = new FakeDesktopProcess("linux", ["--data-dir=relative/data"]);
+    electron.dialog.answers.push(1);
+
+    const failure = Assert.throws(() => DesktopStartFixture.start(electron, process), ArgumentException);
+    for (const listener of process.exceptionListeners)
+      listener(failure);
+    await electron.app.becomeReadyAsync();
+    await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+    Assert.isTrue(process.errors.includes(`The desktop's main process failed with an uncaught exception: ArgumentException: ${failure.message}`), process.errors);
+    Assert.areEqual(JSON.stringify([["Restart TeamRun", "Quit"]]), JSON.stringify(electron.dialog.boxes.map(t => t.options.buttons)));
+    Assert.areEqual(JSON.stringify(["exit 0"]), JSON.stringify(electron.app.calls.filter(t => t.startsWith("exit") || t === "relaunch")));
   }
 
   @TestMethod

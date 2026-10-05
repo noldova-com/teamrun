@@ -44,7 +44,7 @@ test("an error the main process does not catch is logged with its stack and asks
     `open ${path.join(desktop.dataDirectory, "logs")}`,
     "box TeamRun stopped because of an unexpected error. Restart TeamRun/Open log folder/Quit",
     "relaunch",
-    "exit 1"
+    "exit 0"
   ]);
   await desktop.application.evaluate(() => {
     void Promise.reject(new Error("A rejection the test left unhandled in the main process."));

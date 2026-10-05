@@ -52,10 +52,8 @@ DesktopApplication.start(
     processId: process.pid,
     startDetached: (path, args) => spawn(path, [...args], { detached: true, stdio: "ignore" }).unref(),
     endProcess: t => process.kill(t, "SIGKILL"),
-    onUncaughtError: t => {
-      process.on("uncaughtException", t);
-      process.on("unhandledRejection", reason => t(reason, "unhandledRejection"));
-    }
+    onUncaughtException: t => process.on(Resources.uncaughtExceptionEvent, t),
+    onUnhandledRejection: t => process.on(Resources.unhandledRejectionEvent, t)
   },
   import.meta.url,
   t => new RuntimeLauncher(t, RuntimeBuild.identity, starter),

@@ -26,6 +26,7 @@ import type { IIpcEvent } from "../interfaces/i-ipc-event.js";
 import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import type { IWindowContents } from "../interfaces/i-window-contents.js";
+import { MainProcessFailureKind } from "../enums/main-process-failure-kind.js";
 import { StartupStateKind } from "../enums/startup-state-kind.js";
 import { WindowErrorAdmission } from "../enums/window-error-admission.js";
 import { DesktopSettings } from "../models/desktop-settings.js";
@@ -123,6 +124,10 @@ export class DesktopApplication {
     createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
     createAppearanceStore: (folder: string) => IAppearanceStore): void {
+    const redactor = new DiagnosticRedactor(process.homeFolder);
+    const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
+    process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
+    process.onUnhandledRejection(t => recovery.receive(t, MainProcessFailureKind.UnhandledRejection));
     const moduleDirectory = dirname(fileURLToPath(moduleUrl));
     const isPackaged = DesktopApplication.isPackagedBuild(electron, process);
     const dataDirectory = DataDirectoryLocator.locate(
@@ -141,14 +146,14 @@ export class DesktopApplication {
       process.platform);
     const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
     const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform);
-    const log = new DesktopLog(dataDirectory, process.errorOutput, new DiagnosticRedactor(process.homeFolder));
-    new DesktopApplication(
-      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, createAppearanceStore, icons).run();
+    const log = new DesktopLog(dataDirectory, process.errorOutput, redactor);
+    const application = new DesktopApplication(
+      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, createAppearanceStore, icons);
+    recovery.attach(log, () => application.openLogFolderAsync());
+    application.run();
   }
 
   private run(): void {
-    const recovery = new MainProcessRecovery(this.electron.app, this.electron.dialog, this.log, () => this.openLogFolderAsync());
-    this.process.onUncaughtError((error, origin) => recovery.receive(error, origin));
     const app = this.electron.app;
     app.setName(Resources.applicationName);
     app.setAppUserModelId(this.taskbar.appId);

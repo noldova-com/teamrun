@@ -21,5 +21,6 @@ export interface IDesktopProcess {
 
   startDetached(executablePath: string, args: readonly string[]): void;
   endProcess(processId: number): void;
-  onUncaughtError(listener: (error: unknown, origin: string) => void): void;
+  onUncaughtException(listener: (error: unknown) => void): void;
+  onUnhandledRejection(listener: (reason: unknown) => void): void;
 }
