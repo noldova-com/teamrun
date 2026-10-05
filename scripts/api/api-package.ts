@@ -22,17 +22,17 @@ export default class ApiPackage {
   public readonly project: string;
   public readonly implementation: string;
   public readonly declarations: string;
-  public readonly missingDeclarations: string;
+  public readonly missingDeclarationsMessage: string;
   public readonly paths?: Readonly<Record<string, readonly string[]>>;
 
-  private constructor(directory: string, id: string, project: string, implementation: string, declarations: string, missingDeclarations: string,
+  private constructor(directory: string, id: string, project: string, implementation: string, declarations: string, missingDeclarationsMessage: string,
     paths?: Readonly<Record<string, readonly string[]>>) {
     this.directory = directory;
     this.id = id;
     this.project = project;
     this.implementation = implementation;
     this.declarations = declarations;
-    this.missingDeclarations = missingDeclarations;
+    this.missingDeclarationsMessage = missingDeclarationsMessage;
     if (paths !== undefined)
       this.paths = paths;
   }

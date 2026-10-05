@@ -53,11 +53,13 @@ export default class AngularProject {
   private readonly npm: NpmCommand;
 
   public readonly projectFile: string;
+  public readonly projectName: string;
 
   public constructor(root: string, runner: ProcessRunner, npm: NpmCommand) {
     this.root = root;
     this.directory = path.join(root, AngularProject.FOLDER);
     this.projectFile = path.join(this.directory, AngularProject.PROJECT_FILE);
+    this.projectName = this.describe(this.projectFile);
     this.runner = runner;
     this.npm = npm;
   }
@@ -134,7 +136,7 @@ export default class AngularProject {
   }
 
   public async specFilesAsync(): Promise<readonly string[]> {
-    const workspace = await AngularProject.readJsonAsync(path.join(this.directory, AngularProject.WORKSPACE_FILE));
+    const workspace = await this.readJsonAsync(path.join(this.directory, AngularProject.WORKSPACE_FILE));
     const projects = AngularProject.field(workspace, "projects");
     const options = (typeof projects === "object" && projects !== null ? Object.values(projects) : [])
       .map(t => AngularProject.OPTIONS_PATH.reduce<unknown>((value, name) => AngularProject.field(value, name), t))
@@ -152,9 +154,9 @@ export default class AngularProject {
 
   public async readPathAliasesAsync(): Promise<ReadonlyMap<string, readonly string[]>> {
     if (!existsSync(this.projectFile))
-      throw new ProcessException(`The Angular project has no src/${AngularProject.PROJECT_FILE}.`);
-    const paths = AngularProject.field(AngularProject.field(await AngularProject.readJsonAsync(this.projectFile), "compilerOptions"), "paths");
-    const refused = new ProcessException(`src/${AngularProject.PROJECT_FILE} must map its path aliases to lists of files in compilerOptions.paths.`);
+      throw new ProcessException(`The Angular project has no ${this.projectName}.`);
+    const paths = AngularProject.field(AngularProject.field(await this.readJsonAsync(this.projectFile), "compilerOptions"), "paths");
+    const refused = new ProcessException(`${this.projectName} must map its path aliases to lists of files in compilerOptions.paths.`);
     if (typeof paths !== "object" || paths === null || Array.isArray(paths))
       throw refused;
     const aliases = new Map<string, readonly string[]>();
@@ -167,10 +169,23 @@ export default class AngularProject {
   }
 
   private async readCollectedAsync(report: string): Promise<readonly string[]> {
-    const results = AngularProject.field(await AngularProject.readJsonAsync(report), "testResults");
+    const results = AngularProject.field(await this.readJsonAsync(report), "testResults");
     if (!Array.isArray(results) || results.some(t => typeof AngularProject.field(t, "name") !== "string"))
-      throw new ProcessException(`The Angular test report ${path.relative(this.root, report)} lists no test files.`);
+      throw new ProcessException(`The Angular test report ${this.describe(report)} lists no test files.`);
     return results.map(t => this.specName(path.resolve(String(AngularProject.field(t, "name"))))).sort();
+  }
+
+  private async readJsonAsync(file: string): Promise<unknown> {
+    try {
+      return JSON.parse(await readFile(file, AngularProject.RECORD_ENCODING));
+    }
+    catch (error) {
+      throw new ProcessException(`${this.describe(file)} could not be read as JSON: ${String(error)}.`, { cause: error });
+    }
+  }
+
+  private describe(file: string): string {
+    return path.relative(this.root, file).split(path.sep).join(path.posix.sep);
   }
 
   private specName(file: string): string {
@@ -179,15 +194,6 @@ export default class AngularProject {
 
   private static selectionArguments(include: readonly string[]): readonly string[] {
     return include.length === 0 ? [] : [AngularProject.NO_COVERAGE_OPTION, ...include.flatMap(t => [AngularProject.INCLUDE_OPTION, t])];
-  }
-
-  private static async readJsonAsync(file: string): Promise<unknown> {
-    try {
-      return JSON.parse(await readFile(file, AngularProject.RECORD_ENCODING));
-    }
-    catch (error) {
-      throw new ProcessException(`${path.basename(file)} could not be read as JSON.`, { cause: error });
-    }
   }
 
   private static field(value: unknown, name: string): unknown {

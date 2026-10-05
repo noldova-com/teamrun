@@ -7,12 +7,14 @@
  */
 
 import assert from "node:assert/strict";
+import { rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
 import ApiException from "../../api/api.exception.ts";
 import ProcessException from "../../processes/process.exception.ts";
 import ApiPackageFixture from "../fixtures/api-package.fixture.ts";
+import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
 class ApiCatalogTests {
   private static readonly SOURCE: Readonly<Record<string, string>> = { "api/index.ts": "export const size: number = 1;\n" };
@@ -69,6 +71,20 @@ class ApiCatalogTests {
       await fixture.writeFilesAsync({ "src/tsconfig.json": "{}" });
 
       await assert.rejects(fixture.createCatalog(["src/shell/window"]).listAsync(), new ProcessException("src/tsconfig.json must map its path aliases to lists of files in compilerOptions.paths."));
+    });
+
+    test("a listing for a check writes a known failure and gives no packages, and lets any other error through", async t => {
+      const fixture = await ApiCatalogTests.createAsync(t);
+      const output = new TextOutputFixture();
+
+      assert.equal(await fixture.createCatalog(["src/shell/window"]).listOrReportAsync(output), undefined);
+      assert.equal(output.text, "The Angular project has no src/tsconfig.json.\n");
+
+      await rm(path.join(fixture.directory, "src"), { recursive: true, force: true });
+      await writeFile(path.join(fixture.directory, "src"), "");
+
+      await assert.rejects(fixture.createCatalog([]).listOrReportAsync(output), /ENOTDIR/);
+      assert.equal(output.text, "The Angular project has no src/tsconfig.json.\n");
     });
   }
 

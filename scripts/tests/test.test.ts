@@ -48,6 +48,8 @@ class TestTests {
       ];
       assert.deepEqual([...output.text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`), titles.map(t => `${t}: passed`));
       assert.ok(output.text.endsWith("\n20 of 20 checks passed.\n"));
+      assert.ok(output.text.includes("\nsrc/shell/window: matches its declarations\n"), output.text);
+      assert.ok(output.text.includes("\nsrc/shell/window: every example compiles\n"), output.text);
       assert.equal(runner.runs.length, 5);
       assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
     });
