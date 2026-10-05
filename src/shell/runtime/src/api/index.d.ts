@@ -1903,6 +1903,8 @@ export interface IMethodHandler {
    *
    * @param context The request's payload and its cancellation signal, which aborts on cancellation, deadline or disconnect.
    * @returns A promise of the response payload. Reject with {@link MethodFailureException} or a protocol exception to answer with a specific failure; a JSON reading error is answered as invalid parameters, and anything else as an internal failure.
+   * A payload too large for one frame is answered as `FrameTooLarge`, and one that cannot be written as JSON as an internal
+   * failure; the connection stays open.
    * @example
    * ```ts
    * import type { JsonValue } from "@noldova/teamrun-foundation-json";
@@ -2482,7 +2484,7 @@ export interface IRuntimeClientListener {
    * @param event The event.
    * @example
    * ```ts
-   * import type { Event } from "@noldova/teamrun-shell-protocol";
+   * import type { Event, Failure } from "@noldova/teamrun-shell-protocol";
    * import type { IRuntimeClientListener } from "@noldova/teamrun-shell-runtime";
    *
    * export class WindowListener implements IRuntimeClientListener {
@@ -2490,8 +2492,8 @@ export interface IRuntimeClientListener {
    *     console.log(event.name.text, event.payload);
    *   }
    *
-   *   public onDisconnected(): void {
-   *     console.log("The connection to the runtime closed.");
+   *   public onDisconnected(failure: Failure | null): void {
+   *     console.log(failure?.message ?? "The connection to the runtime closed.");
    *   }
    * }
    * ```
@@ -2500,9 +2502,12 @@ export interface IRuntimeClientListener {
 
   /**
    * Called once when an established connection closes.
+   *
+   * @param failure Why the client ended the connection: `FrameTooLarge` for a frame over the limit, `InvalidMessage` for
+   * one that is not a valid message. Null when the runtime or the client's own `close` ended it.
    * @example
    * ```ts
-   * import type { Event } from "@noldova/teamrun-shell-protocol";
+   * import type { Event, Failure } from "@noldova/teamrun-shell-protocol";
    * import type { IRuntimeClientListener } from "@noldova/teamrun-shell-runtime";
    *
    * export class WindowListener implements IRuntimeClientListener {
@@ -2510,13 +2515,13 @@ export interface IRuntimeClientListener {
    *     console.log(event.name.text, event.payload);
    *   }
    *
-   *   public onDisconnected(): void {
-   *     console.log("The connection to the runtime closed.");
+   *   public onDisconnected(failure: Failure | null): void {
+   *     console.log(failure?.message ?? "The connection to the runtime closed.");
    *   }
    * }
    * ```
    */
-  onDisconnected(): void;
+  onDisconnected(failure: Failure | null): void;
 }
 
 /**
@@ -3781,6 +3786,7 @@ export declare class RuntimeClient {
    * @returns A promise of the response, successful or failed. A request too large for one frame is not sent; it fails with
    * `FrameTooLarge`, as an answer too large for one frame does.
    * @throws {ArgumentOutOfRangeException} Synchronously when the time limit is not a positive integer.
+   * @throws {TypeError} Synchronously when the payload cannot be written as JSON, such as one that contains itself.
    * @throws {ConnectionException} Rejected when the connection is closed or closes, or the runtime does not answer within the limit and its grace.
    * @example
    * ```ts
@@ -4023,6 +4029,7 @@ export declare class RuntimeServer implements IEventSink {
    * @param methods The registry requests are routed through.
    * @param settings The server's limits.
    * @param changed Called whenever a connection opens or closes.
+   * @param diagnostics Receives a line for each event the server could not send.
    * @example
    * ```ts
    * import { RuntimeHandover } from "@noldova/teamrun-shell-protocol";
@@ -4030,7 +4037,7 @@ export declare class RuntimeServer implements IEventSink {
    *
    * export function createServer(methods: MethodRegistry, changed: () => void): RuntimeServer {
    *   const identity = RuntimeBuild.identity;
-   *   return new RuntimeServer(identity, CapabilityToken.generate(), new RuntimeHandover(identity, process.execPath), methods, new ServerSettings(), changed);
+   *   return new RuntimeServer(identity, CapabilityToken.generate(), new RuntimeHandover(identity, process.execPath), methods, new ServerSettings(), changed, process.stderr);
    * }
    * ```
    */
@@ -4040,7 +4047,8 @@ export declare class RuntimeServer implements IEventSink {
     handover: RuntimeHandover,
     methods: MethodRegistry,
     settings: ServerSettings,
-    changed: () => void);
+    changed: () => void,
+    diagnostics: Writable);
 
   /**
    * The number of open connections, authenticated or not.
@@ -4113,7 +4121,8 @@ export declare class RuntimeServer implements IEventSink {
   public admit(): void;
 
   /**
-   * Sends an event to every authenticated connection of the runtime's build.
+   * Sends an event to every authenticated connection of the runtime's build. An event too large for one frame, or one
+   * that cannot be written as JSON, reaches no connection; the server writes a line to its diagnostics instead.
    *
    * @param event The event.
    * @example

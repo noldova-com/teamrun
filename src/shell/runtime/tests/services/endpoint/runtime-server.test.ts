@@ -153,7 +153,7 @@ export class RuntimeServerTests {
     return RuntimeServerTests.runAsync(new ServerSettings(1_024, 1_000, 1_000, 1_000), async fixture => {
       fixture.methods.register(RuntimeServerTests.ECHO, RuntimeServerTests.ECHO_HANDLER);
       fixture.methods.register(RuntimeServerTests.LARGE, { handleAsync: () => Promise.resolve("x".repeat(2_048)) });
-      fixture.methods.register(RuntimeServerTests.BROKEN, { handleAsync: () => Promise.resolve(1n as unknown as JsonValue) });
+      fixture.methods.register(RuntimeServerTests.BROKEN, { handleAsync: () => Promise.resolve(RuntimeServerTests.loop()) });
       const connection = await fixture.authenticateAsync();
 
       connection.sendMessages(
@@ -165,6 +165,25 @@ export class RuntimeServerTests {
       RuntimeServerTests.assertFailure(await connection.readResponseAsync(), FailureCode.Internal, "The runtime failed to handle the request.", "tester:2");
       Assert.areEqual("{\"client\":\"tester\",\"payload\":1}", JSON.stringify((await connection.readResponseAsync()).payload));
       Assert.isFalse(connection.isClosed);
+    });
+  }
+
+  @TestMethod
+  public logsAnEventItCannotSendAndSendsItToNoClient(): Promise<void> {
+    return RuntimeServerTests.runAsync(new ServerSettings(1_024, 1_000, 1_000, 1_000), async fixture => {
+      const first = await fixture.authenticateAsync("first");
+      const second = await fixture.authenticateAsync("second");
+
+      fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, "x".repeat(2_048)));
+      fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, RuntimeServerTests.loop()));
+      fixture.server.broadcast(new Event(RuntimeServerTests.ECHO, "small"));
+
+      Assert.areEqual("\"small\"|\"small\"", `${JSON.stringify((await first.readEventAsync()).payload)}|${JSON.stringify((await second.readEventAsync()).payload)}`);
+      const lines = fixture.diagnostics.text.split("\n").filter(t => t.length > 0);
+      Assert.areEqual(2, lines.length);
+      Assert.areEqual("The runtime sent the event notes.echo to no client: ProtocolException: A frame exceeds the maximum length of 1024 characters.", lines[0]);
+      Assert.isTrue(lines[1]?.startsWith("The runtime sent the event notes.echo to no client: TypeError: ") === true);
+      Assert.isFalse(first.isClosed || second.isClosed);
     });
   }
 
@@ -442,6 +461,12 @@ export class RuntimeServerTests {
         return "late";
       }
     };
+  }
+
+  private static loop(): JsonValue[] {
+    const loop: JsonValue[] = [];
+    loop.push(loop);
+    return loop;
   }
 
   private static assertFailure(response: Response, code: FailureCode, message: string, id: string | null): void {

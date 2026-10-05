@@ -54,8 +54,12 @@ export class ClientSession {
   }
 
   public send(message: WireMessage): void {
+    this.write(this.writer.write(message));
+  }
+
+  public write(frame: string): void {
     if (this.isOpen)
-      this.socket.write(this.writer.write(message));
+      this.socket.write(frame);
   }
 
   public hasRequest(id: string): boolean {

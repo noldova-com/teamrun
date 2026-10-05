@@ -124,7 +124,8 @@ export class RuntimeHost implements IIdleParticipant {
       new RuntimeHandover(this.identity, process.execPath),
       this.methods,
       options.serverSettings,
-      () => this.idle.check());
+      () => this.idle.check(),
+      log.diagnostics);
     this.events = new EventRegistry(this.server);
     this.publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(platform, new SystemCommand(), environment));
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);

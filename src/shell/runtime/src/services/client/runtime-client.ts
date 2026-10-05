@@ -9,7 +9,7 @@
 import { type Socket, connect } from "node:net";
 
 import "@noldova/teamrun-foundation-core";
-import { ArgumentException, ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
+import { ArgumentException, ArgumentOutOfRangeException, ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   BuildIdentity,
@@ -53,6 +53,7 @@ export class RuntimeClient {
   private readonly handshakeId: string;
   private otherBuild: RuntimeHandover | null = null;
   private preShell: PreShellData | null = null;
+  private failure: Failure | null = null;
   private isEstablished: boolean = false;
   private isClosed: boolean = false;
   private nextId: number = 1;
@@ -102,6 +103,7 @@ export class RuntimeClient {
   }
 
   public callAsync(method: QualifiedName, payload: JsonValue, timeoutMilliseconds: number = this.settings.callTimeout, signal?: AbortSignal): Promise<Response> {
+    ArgumentOutOfRangeException.throwIfNotPositiveInteger(timeoutMilliseconds, Resources.timeoutMillisecondsParameterName);
     if (this.isClosed)
       return Promise.reject(new ConnectionException(Resources.clientClosed));
 
@@ -178,7 +180,8 @@ export class RuntimeClient {
       for (const frame of this.reader.read(chunk))
         this.dispatch(this.decoder.decode(frame));
     }
-    catch {
+    catch (error) {
+      this.failure = error instanceof ProtocolException ? new Failure(error.code, error.message) : new Failure(FailureCode.InvalidMessage, Resources.invalidFrame);
       this.socket.destroy();
     }
   }
@@ -232,6 +235,6 @@ export class RuntimeClient {
     for (const call of [...this.pending.values()])
       call.fail(new ConnectionException(Resources.clientClosed));
     if (this.isEstablished)
-      this.listener.onDisconnected();
+      this.listener.onDisconnected(this.failure);
   }
 }

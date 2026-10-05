@@ -498,7 +498,7 @@ export class DesktopApplicationTests {
     await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(first).length === 1);
     second.close();
     await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(second).length === 1);
-    launcher.listener?.onDisconnected();
+    launcher.listener?.onDisconnected(null);
     await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(second).length === 1);
 
     Assert.areEqual(0, DesktopApplicationTests.quitQuestions(first).length);
@@ -1222,7 +1222,7 @@ export class DesktopApplicationTests {
     await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
     first.answers.set("shell.notifications", Response.success("r", { notifications: [], isDoNotDisturb: false, mutedModules: [], sequence: 1 }));
     await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
-    launcher.listener?.onDisconnected();
+    launcher.listener?.onDisconnected(null);
     reconnect(second);
     await Condition.waitAsync(() => launcher.connections.length === 2);
     await setImmediate();
@@ -1509,7 +1509,7 @@ export class DesktopApplicationTests {
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
     await Condition.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
 
-    launcher.listener?.onDisconnected();
+    launcher.listener?.onDisconnected(null);
     const readsBeforeTheMove = window.boundsReads;
     window.bounds = { x: 40, y: 60, width: 900, height: 640 };
     window.change("move");
@@ -1538,7 +1538,7 @@ export class DesktopApplicationTests {
     electron.ipcMain.send("teamrun:ready", DesktopApplicationTests.trustedEvent("linux"), DesktopApplicationTests.APPEARANCE);
     await Condition.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
 
-    launcher.listener?.onDisconnected();
+    launcher.listener?.onDisconnected(null);
     const readsBeforeTheMove = window.boundsReads;
     window.change("move");
     await Condition.waitAsync(() => window.boundsReads > readsBeforeTheMove);
