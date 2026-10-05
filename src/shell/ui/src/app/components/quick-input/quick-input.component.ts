@@ -69,7 +69,7 @@ export class QuickInputComponent {
   }
 
   protected onKey(event: KeyboardEvent): void {
-    const next = this.indexFor(event.key);
+    const next = QuickInputComponent.isModified(event) ? null : this.indexFor(event.key);
     if (!Object.isNull(next)) {
       event.preventDefault();
       this.activeValue.set(Math.max(0, Math.min(next, this.items().length - 1)));
@@ -127,6 +127,10 @@ export class QuickInputComponent {
     const list = this.list().nativeElement;
     const row = list.querySelector<HTMLElement>(Resources.quickInputOptionSelector);
     return Object.isNull(row) ? 1 : Math.max(1, Math.floor(list.clientHeight / row.offsetHeight));
+  }
+
+  private static isModified(event: KeyboardEvent): boolean {
+    return event.shiftKey || event.ctrlKey || event.altKey || event.metaKey;
   }
 
   private static reveal(list: HTMLElement, row: HTMLElement): void {
