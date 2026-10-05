@@ -223,7 +223,7 @@ test.describe("settings", () => {
     const window = desktop.window;
     await SettingsFixture.openAsync(window);
     const measureAsync = async (): Promise<readonly [number, number, string, string]> => {
-      await window.getByRole("button", { name: "Notifications", exact: true }).click();
+      await SettingsFixture.choosePageAsync(window, "Notifications");
       const control = row(window, "shell.mutedModules").locator(".tr-checkbox-control").first();
       await expect(control.locator("input")).toBeChecked();
       return await control.evaluate(t => {
@@ -244,7 +244,7 @@ test.describe("settings", () => {
     };
 
     const regular = await measureAsync();
-    await window.getByRole("button", { name: "Appearance", exact: true }).click();
+    await SettingsFixture.choosePageAsync(window, "Appearance");
     await row(window, "shell.panelSize").locator("input").fill("18");
     await row(window, "shell.panelSize").locator("input").press("Enter");
     await expect.poll(async () => parseFloat(await rootFontSizeAsync(window))).toBeCloseTo(16 * 18 / 13, 2);

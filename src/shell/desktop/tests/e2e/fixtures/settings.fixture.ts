@@ -20,7 +20,18 @@ export default class SettingsFixture {
 
   public static async openPageAsync(window: Page, title: string): Promise<void> {
     await SettingsFixture.openAsync(window);
-    await window.locator("tr-settings").getByRole("button", { name: title, exact: true }).click();
+    await SettingsFixture.choosePageAsync(window, title);
+  }
+
+  public static async choosePageAsync(window: Page, title: string): Promise<void> {
+    const settings = window.locator("tr-settings");
+    const select = settings.locator(".tr-settings-page-select").getByRole("button");
+    if (await select.isVisible()) {
+      await select.click();
+      await window.getByRole("option", { name: title, exact: true }).click();
+      return;
+    }
+    await settings.locator(".tr-settings-pages").getByRole("button", { name: title, exact: true }).click();
   }
 
   public static async openGalleryAsync(window: Page): Promise<void> {
