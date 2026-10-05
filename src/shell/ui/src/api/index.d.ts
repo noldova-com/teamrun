@@ -2746,10 +2746,15 @@ export declare class TabComponent {
  * @Component({
  *   selector: "tr-notes-search",
  *   imports: [TextFieldComponent],
- *   template: "<input #field tr-text-field type=\"search\" aria-label=\"Search notes\" placeholder=\"Search notes\" [value]=\"query()\" (input)=\"query.set(field.value)\" />"
+ *   template: "<input tr-text-field type=\"search\" aria-label=\"Search notes\" placeholder=\"Search notes\" [value]=\"query()\" (input)=\"search($event)\" />"
  * })
  * export class NotesSearchComponent {
  *   protected readonly query: WritableSignal<string> = signal("");
+ *
+ *   protected search(event: Event): void {
+ *     if (event.target instanceof HTMLInputElement)
+ *       this.query.set(event.target.value);
+ *   }
  * }
  * ```
  */

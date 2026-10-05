@@ -17,7 +17,7 @@ LICENSE file in the root directory of this source tree.
     </div>
   } @else {
     <div class="tr-tab-group-bar" data-drop-tabs>
-      <div #scroller="trTabScroller" class="tr-tab-group-scroller tr-scroll-reveal" [trTabScroller]="actionBar" [trTabScrollerFrame]="frame()">
+      <div #scroller="trTabScroller" class="tr-tab-group-scroller" [trTabScroller]="actionBar" [trTabScrollerFrame]="frame()">
         <div class="tr-tab-group-strip" role="tablist" (keydown)="onStripKey($event)">
           @for (tab of group().tabs; track tab.key; let index = $index) {
             @let label = labels.of(tab);

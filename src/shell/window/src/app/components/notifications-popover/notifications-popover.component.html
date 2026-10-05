@@ -15,7 +15,7 @@ LICENSE file in the root directory of this source tree.
   <p class="tr-notifications-empty">{{ resources.noNotifications }}</p>
 }
 @else {
-  <ul class="tr-notifications-list tr-scroll-reveal">
+  <ul class="tr-notifications-list">
     @for (notification of notifications(); track notification.id) {
       <li class="tr-notifications-row" [attr.data-notification]="notification.id" [attr.data-severity]="notification.post.severity">
         <span class="material-symbols-rounded tr-notifications-severity" role="img" [attr.aria-label]="severityName(notification.post.severity)">{{ glyph(notification.post.severity) }}</span>

@@ -294,6 +294,7 @@ describe("TreeComponent moving rows with the keys", () => {
     return found;
   };
   const moves = (): (string | number | null)[][] => host.moves.map(t => [t.id, t.parentId, t.index]);
+  const slides = (target: HTMLElement): Animation[] => target.getAnimations().filter(t => !(t instanceof CSSTransition));
 
   function press(target: HTMLElement, key: string, modifiers: KeyboardEventInit = { altKey: true }): boolean {
     return target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...modifiers }));
@@ -375,7 +376,7 @@ describe("TreeComponent moving rows with the keys", () => {
     press(row("Notes"), "ArrowUp");
     await fixture.whenStable();
 
-    expect([row("Notes"), row("Project"), row("Trash")].map(t => t.getAnimations().map(a => a.effect?.getTiming().duration))).toEqual([[150], [150], []]);
+    expect([row("Notes"), row("Project"), row("Trash")].map(t => slides(t).map(a => a.effect?.getTiming().duration))).toEqual([[150], [150], []]);
   });
 
   it("does not slide the rows when reduced motion is preferred", async () => {
@@ -385,7 +386,7 @@ describe("TreeComponent moving rows with the keys", () => {
     press(row("Notes"), "ArrowUp");
     await fixture.whenStable();
 
-    expect([row("Notes"), row("Project")].map(t => t.getAnimations())).toEqual([[], []]);
+    expect([row("Notes"), row("Project")].map(t => slides(t))).toEqual([[], []]);
   });
 
   it("forgets a move its owner did not apply, so a later render neither moves the focus nor slides the rows", async () => {
@@ -398,6 +399,6 @@ describe("TreeComponent moving rows with the keys", () => {
     await userEvent.click(row("Source"));
     await fixture.whenStable();
 
-    expect([document.activeElement === row("Source"), row("Notes").getAnimations().length]).toEqual([true, 0]);
+    expect([document.activeElement === row("Source"), slides(row("Notes")).length]).toEqual([true, 0]);
   });
 });

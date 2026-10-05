@@ -191,7 +191,7 @@ describe("TabContentComponent", () => {
     fixture.componentRef.setInput("tab", tab);
     await fixture.whenStable();
     const element: HTMLElement = fixture.nativeElement;
-    const isEmpty = element.querySelector(".tr-tab-content-text")?.children.length === 0;
+    const isEmpty = element.children.length === 0;
 
     host.contributions.set(tab.key, new ContributionMatch(() => Promise.resolve(TestViewComponent), context, ContentPadding.Default));
     host.revisions.set(new Map([[tab.key, 1]]));
@@ -201,7 +201,7 @@ describe("TabContentComponent", () => {
     expect(element.querySelector(".view")?.textContent).toBe("notes");
   });
 
-  it("scrolls with a stable gutter and a hover-revealed thumb while its content keeps the text color", async () => {
+  it("scrolls with a stable gutter and a hover-revealed thumb", async () => {
     AppearanceFixture.apply();
     try {
       const tab = new ViewTab("notes.list");
@@ -210,23 +210,23 @@ describe("TabContentComponent", () => {
       fixture.componentRef.setInput("tab", tab);
       await fixture.whenStable();
       const element: HTMLElement = fixture.nativeElement;
-      const view = element.querySelector(".view") ?? element;
-      const probe = document.createElement("div");
-      probe.style.color = "var(--tr-text)";
-      document.body.append(probe);
-      const text = getComputedStyle(probe).color;
-      probe.remove();
 
-      expect(element.classList.contains("tr-scroll-reveal")).toBe(true);
       expect(getComputedStyle(element).scrollbarGutter).toBe("stable");
-      expect(getComputedStyle(element).color).toBe("rgba(0, 0, 0, 0)");
-      expect(getComputedStyle(view).color).toBe(text);
-      expect(text).not.toBe("rgba(0, 0, 0, 0)");
+      await AppearanceFixture.expectThumbRevealsOnHoverAsync(element);
     }
     finally {
       AppearanceFixture.reset();
     }
   });
+
+  it("reserves no scrollbar gutter around a page that opts out of the padding, so the page's own scroller reaches the panel's edge", async () => {
+    const tab = new ViewTab("notes.outline");
+    host.contributions.set(tab.key, new ContributionMatch(() => Promise.resolve(TestViewComponent), context, ContentPadding.None));
+    const element = await renderAsync(tab);
+
+    expect([element.classList.contains("tr-tab-content-padded"), getComputedStyle(element).scrollbarGutter]).toEqual([false, "auto"]);
+  });
+
   for (const theme of AppearanceFixture.themes)
     it(`pads a page with the ${theme.id} theme's content padding at the sides, and at the top and bottom with its document padding in the middle and its view padding in a dock`, async () => {
       AppearanceFixture.apply(theme);

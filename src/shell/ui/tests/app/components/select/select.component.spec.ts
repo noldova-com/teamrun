@@ -183,13 +183,8 @@ describe("SelectComponent", () => {
   it("shows its list's scrollbar thumb while the pointer is over the list", async () => {
     render(DefaultTheme.theme, ThemeMode.Dark);
     await openAsync();
-    const surface = list() as HTMLElement;
 
-    expect(surface.classList.contains("tr-scroll-reveal")).toBe(true);
-    expect(getComputedStyle(surface).color).toBe("rgba(0, 0, 0, 0)");
-    await userEvent.hover(surface);
-    await vi.waitFor(() => expect(getComputedStyle(surface).color).toBe(resolve("--tr-scrollbar")));
-    expect(getComputedStyle(surface).color).not.toBe("rgba(0, 0, 0, 0)");
+    await AppearanceFixture.expectThumbRevealsOnHoverAsync(list() as HTMLElement);
   });
 
   for (const panelSize of AppearanceFixture.panelSizes)
@@ -227,7 +222,7 @@ describe("SelectComponent", () => {
         AppearanceFixture.expectLook(surface.paddingTop, theme, "dropdown-padding", "padding-top");
         expect([chosen.backgroundColor, chosen.color]).toEqual([AppearanceFixture.readColor(theme, mode, "list.activeSelectionBackground"), AppearanceFixture.readColor(theme, mode, "list.activeSelectionForeground")]);
         expect(other.backgroundColor).toBe("rgba(0, 0, 0, 0)");
-        expect([surface.color, other.color]).toEqual(["rgba(0, 0, 0, 0)", AppearanceFixture.readColor(theme, mode, "input.foreground")]);
+        expect([surface.color, other.color]).toEqual([AppearanceFixture.readColor(theme, mode, "foreground"), AppearanceFixture.readColor(theme, mode, "input.foreground")]);
         AppearanceFixture.expectLook(other.minHeight, theme, "dropdown-row-height", "min-height");
         AppearanceFixture.expectLook(other.paddingLeft, theme, "dropdown-row-padding", "padding-left");
       });
