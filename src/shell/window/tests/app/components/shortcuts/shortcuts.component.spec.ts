@@ -155,10 +155,14 @@ describe("ShortcutsComponent", () => {
     probe.remove();
   });
 
-  it("wraps a long id within its Command cell when the table is narrow", async () => {
+  for (const query of ["", "Group"])
+  it(`wraps a long id within its Command cell, at its word boundaries, when the table is narrow${query === "" ? "" : ` and a search marks "${query}" in it`}`, async () => {
     AppearanceFixture.apply();
     await renderAsync();
     element().style.width = "20rem";
+    const field = element().querySelector<HTMLInputElement>(".tr-settings-search-field") as HTMLInputElement;
+    field.value = query;
+    field.dispatchEvent(new Event("input"));
     await settleAsync();
     const overflows = [...element().querySelectorAll<HTMLElement>("tbody tr")].map(t => {
       const cell = t.querySelector("td") as HTMLElement;
@@ -167,7 +171,12 @@ describe("ShortcutsComponent", () => {
     });
     const long = row("shell.moveTabToPreviousGroup").querySelector(".tr-shortcut-name") as HTMLElement;
     const next = row("shell.moveTabToNextGroup").querySelector(".tr-shortcut-name") as HTMLElement;
-    const pieces = [...next.querySelectorAll("tr-highlighted-text")].flatMap(t => [...t.childNodes]).filter(t => t.nodeType === Node.TEXT_NODE && !String.isNullOrWhitespace(t.textContent)).map(t => {
+    const walker = document.createTreeWalker(next, NodeFilter.SHOW_TEXT);
+    const texts: Node[] = [];
+    for (let node = walker.nextNode(); !Object.isNull(node); node = walker.nextNode())
+      if (!String.isNullOrWhitespace(node.textContent))
+        texts.push(node);
+    const pieces = texts.map(t => {
       const range = document.createRange();
       range.selectNodeContents(t);
       return [t.textContent, range.getClientRects().length, Math.round(range.getBoundingClientRect().left - next.getBoundingClientRect().left)];
@@ -179,6 +188,7 @@ describe("ShortcutsComponent", () => {
     expect(pieces.filter(t => t[1] !== 1)).toEqual([]);
     expect(pieces.at(-1)?.[2]).toBe(0);
     expect(next.getBoundingClientRect().height).toBeGreaterThan(Number.parseFloat(getComputedStyle(next).lineHeight));
+    expect([...next.querySelectorAll("mark")].map(t => t.textContent)).toEqual(query === "" ? [] : [query]);
   });
 
   it("records a new key from the first key pressed after the modifiers, without running the command it would run, and keeps the focus", async () => {

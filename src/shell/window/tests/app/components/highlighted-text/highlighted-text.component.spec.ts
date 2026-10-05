@@ -50,4 +50,17 @@ describe("HighlightedTextComponent", () => {
     expect([element.querySelectorAll("wbr").length, element.textContent, copied]).toEqual([3, "shell.splitTabUp", "shell.splitTabUp"]);
     expect([...element.querySelectorAll("mark")].map(t => [t.textContent, t.querySelectorAll("wbr").length])).toEqual([["bU", 1]]);
   });
+
+  it("puts a break opportunity just before a match that starts at a word boundary", () => {
+    const fixture = TestBed.createComponent(HighlightedTextComponent);
+    const element = fixture.nativeElement as HTMLElement;
+    fixture.componentRef.setInput("text", "shell.moveTabToNextGroup");
+    fixture.componentRef.setInput("query", "Group");
+    fixture.componentRef.setInput("breaksWords", true);
+    fixture.detectChanges();
+    const mark = element.querySelector("mark") as HTMLElement;
+
+    expect([mark.textContent, mark.querySelectorAll("wbr").length, mark.previousElementSibling?.tagName, element.querySelectorAll("wbr").length, element.textContent])
+      .toEqual(["Group", 0, "WBR", 5, "shell.moveTabToNextGroup"]);
+  });
 });

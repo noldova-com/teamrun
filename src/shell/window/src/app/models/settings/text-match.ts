@@ -10,11 +10,13 @@ export class TextMatch {
   public readonly text: string;
   public readonly isMatch: boolean;
   public readonly pieces: readonly string[];
+  public readonly breaksBefore: boolean;
 
-  public constructor(text: string, isMatch: boolean, pieces: readonly string[] = [text]) {
+  public constructor(text: string, isMatch: boolean, pieces: readonly string[] = [text], breaksBefore: boolean = false) {
     this.text = text;
     this.isMatch = isMatch;
     this.pieces = pieces;
+    this.breaksBefore = breaksBefore;
   }
 
   public static contains(text: string, query: string): boolean {

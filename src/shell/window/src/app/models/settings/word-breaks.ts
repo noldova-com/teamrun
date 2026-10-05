@@ -24,13 +24,14 @@ export class WordBreaks {
           start = index;
         }
       pieces.push(part.text.slice(start));
+      const breaksBefore = offset > 0 && WordBreaks.isBreak(text, offset);
       offset += part.text.length;
-      return new TextMatch(part.text, part.isMatch, pieces);
+      return new TextMatch(part.text, part.isMatch, pieces, breaksBefore);
     });
   }
 
   private static isBreak(text: string, index: number): boolean {
     const previous = text.charAt(index - 1);
-    return previous === Resources.contributionSeparator || (Resources.capitalLetterPattern.test(text.charAt(index)) && !Resources.capitalLetterPattern.test(previous));
+    return previous === Resources.idWordSeparator || (Resources.capitalLetterPattern.test(text.charAt(index)) && !Resources.capitalLetterPattern.test(previous));
   }
 }
