@@ -316,7 +316,7 @@ describe("SettingsComponent", () => {
       await AppearanceFixture.expectThumbRevealsOnHoverAsync(element().querySelector(area) as HTMLElement);
   });
 
-  it("sets every page's content between the column's content edges, the Settings inset from its ends, beside the page list and below 37rem with the select: a built-in page's rows, a module's rows, the shortcuts table and the Gallery", async () => {
+  it("sets every page's content between the column's content edges, the Settings content inset from both its ends, beside the page list and below 37rem with the select: a built-in page's rows, a module's rows, the shortcuts table and the Gallery", async () => {
     gallery = FakeGalleryComponent;
     const host = render();
     const column = host.querySelector(".tr-settings-column") as HTMLElement;
@@ -350,10 +350,21 @@ describe("SettingsComponent", () => {
       host.style.width = t;
       return [".tr-settings-pages", ".tr-settings-page-select"].map(u => getComputedStyle(host.querySelector(u) as Element).display === "none" ? "hidden" : "shown");
     });
+    const insets = widths.map(t => {
+      host.style.width = t;
+      const end = document.createElement("div");
+      end.style.width = "var(--tr-settings-column-end)";
+      column.append(end);
+      const columnEnd = end.getBoundingClientRect().width;
+      end.remove();
+      const style = getComputedStyle(column);
+      return [style.paddingLeft, `${parseFloat(style.paddingRight) - columnEnd}px`];
+    });
 
     expect(lists).toEqual([["shown", "hidden"], ["hidden", "shown"]]);
     expect(shown.flat().map(t => t[1])).toEqual(shown.flat().map(t => t[0]));
-    AppearanceFixture.expectLook(getComputedStyle(column).paddingLeft, DefaultTheme.theme, "settings-content-inset", "padding-left");
+    for (const inset of insets.flat())
+      AppearanceFixture.expectLook(inset, DefaultTheme.theme, "settings-content-inset", "padding-left");
   });
 
   it("shows the Gallery as the last page when the build has one, and leaves it out of a search", async () => {
