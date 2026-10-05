@@ -83,7 +83,17 @@
   gap: 0 var(--tr-space-2);
 }
 
-.tr-modules-id,
+.tr-modules-row-meta {
+  display: flex;
+  gap: var(--tr-space-2);
+  min-width: 0;
+}
+
+.tr-modules-row-version {
+  flex: none;
+}
+
+.tr-modules-row-meta,
 .tr-modules-detail-id,
 .tr-modules-contribution-name {
   color: var(--tr-text-muted);

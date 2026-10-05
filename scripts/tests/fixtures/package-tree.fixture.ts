@@ -16,9 +16,9 @@ import SourceTreeFixture from "./source-tree.fixture.ts";
 export default class PackageTreeFixture {
   private static readonly NAME_PREFIX: string = "@noldova/teamrun-";
 
-  public static async writeRootAsync(repository: RepositoryFixture): Promise<void> {
+  public static async writeRootAsync(repository: RepositoryFixture, modules: readonly string[] = []): Promise<void> {
     await repository.writeAsync({
-      "package.json": `${JSON.stringify({ name: "fixture", version: "0.0.7", teamrun: { protocolVersion: 3, modules: [], product: ProductIdentityFixture.json }, private: true, type: "module" }, null, 2)}\n`,
+      "package.json": `${JSON.stringify({ name: "fixture", version: "0.0.7", teamrun: { protocolVersion: 3, modules, product: ProductIdentityFixture.json }, private: true, type: "module" }, null, 2)}\n`,
       "package-lock.json": `${JSON.stringify({ name: "fixture", version: "0.0.7", lockfileVersion: 3, requires: true, packages: { "": { name: "fixture", version: "0.0.7" } } }, null, 2)}\n`,
       "tsconfig.base.json": await readFile(path.join(SourceTreeFixture.root, "tsconfig.base.json"), "utf8"),
       "LICENSE": "Fixture license\n"

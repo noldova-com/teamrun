@@ -126,7 +126,7 @@ export class Resources {
     "menu-item-inset",
     "menu-item-padding",
     "menu-trail-gap",
-    "toolbar-row",
+    "band-gap",
     "toolbar-button",
     "toolbar-button-padding",
     "toolbar-gap",
@@ -315,6 +315,7 @@ export class Resources {
   public static readonly clickEvent: string = "click";
   public static readonly auxclickEvent: string = "auxclick";
   public static readonly mouseenterEvent: "mouseenter" = "mouseenter";
+  public static readonly mousedownEvent: "mousedown" = "mousedown";
   public static readonly pointermoveEvent: "pointermove" = "pointermove";
   public static readonly hoverSelector: string = ":hover";
   public static readonly secondaryButton: number = 2;

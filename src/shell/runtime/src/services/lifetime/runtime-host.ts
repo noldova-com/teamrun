@@ -55,6 +55,9 @@ import { UpdateNotificationMethod } from "../notifications/update-notification-m
 import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
 import { ProcessSupervisor } from "../process/process-supervisor.js";
+import { RecentCommandsMethod } from "../recent-commands/recent-commands-method.js";
+import { RecentCommandsStore } from "../recent-commands/recent-commands-store.js";
+import { RecordCommandMethod } from "../recent-commands/record-command-method.js";
 import { CommandRegistry } from "../registry/command-registry.js";
 import { EventRegistry } from "../registry/event-registry.js";
 import { MethodRegistry } from "../registry/method-registry.js";
@@ -278,6 +281,9 @@ export class RuntimeHost implements IIdleParticipant {
     this.methods.register(ShellMethods.dismissNotification, new DismissNotificationMethod(this.notifications));
     this.methods.register(ShellMethods.markNotificationsRead, new MarkNotificationsReadMethod(this.notifications));
     this.methods.register(ShellMethods.clearNotifications, new ClearNotificationsMethod(this.notifications));
+    const recent = new RecentCommandsStore(database);
+    this.methods.register(ShellMethods.recentCommands, new RecentCommandsMethod(recent));
+    this.methods.register(ShellMethods.recordCommand, new RecordCommandMethod(recent, this.events.declare(ShellEvents.recentCommandsChanged)));
     return settings;
   }
 

@@ -316,6 +316,9 @@ export class Resources {
     ["shell.toggleRightDock", ["Mod+Alt+B"], ["Mod+Alt+B"]]
   ];
   public static readonly commandSearchLabel: string = "Search commands";
+  public static readonly recentCommandCountSetting: string = "shell.recentCommandCount";
+  public static readonly recentlyUsedSection: string = "recently used";
+  public static readonly otherCommandsSection: string = "other commands";
   public static readonly commandSearchPaneClass: string = "tr-command-search-pane";
   public static readonly windowRowSelector: string = "tr-window-row";
   public static readonly detailSeparator: string = " ";
@@ -634,6 +637,7 @@ export class Resources {
     [ModuleState.Failed]: "Failed",
     [ModuleState.Blocked]: "Blocked"
   };
+  public static readonly moduleVersionTitle: string = "Version";
   public static readonly moduleStateTitle: string = "State";
   public static readonly blockedByTitle: string = "Blocked by";
   public static readonly dependenciesTitle: string = "Depends on";
@@ -722,8 +726,8 @@ export class Resources {
     return `${Resources.productName} ${productVersion}, build ${fingerprint}`;
   }
 
-  public static formatModuleDetails(moduleId: string, state: string, cause: string | null): string {
-    return Object.isNull(cause) ? `${moduleId}: ${state}` : `${moduleId}: ${state}: ${cause}`;
+  public static formatModuleDetails(moduleId: string, version: string, state: string, cause: string | null): string {
+    return Object.isNull(cause) ? `${moduleId} ${version}: ${state}` : `${moduleId} ${version}: ${state}: ${cause}`;
   }
 
   public static formatModuleBlocked(dependency: string): string {

@@ -14,11 +14,11 @@ import { ModuleState, ModuleStatus, ModuleStatusList } from "@noldova/teamrun-sh
 export class ModuleStatusListTests {
   @TestMethod
   public pinsItsWireFormAndKeepsItsOwnCopy(): void {
-    const declared = (id: string): string => `"id":"${id}","displayName":"${id}","description":"Used by the tests.","dependencies":[],"contributes":{}`;
+    const declared = (id: string): string => `"id":"${id}","version":"0.0.1","displayName":"${id}","description":"Used by the tests.","dependencies":[],"contributes":{}`;
     const text = `{"modules":[{${declared("tasks")},"state":"Active"},{${declared("notes")},"state":"Failed","cause":"Its runtime part failed to activate."}]}`;
     const statuses = [
-      new ModuleStatus("tasks", "tasks", "Used by the tests.", [], new Map(), ModuleState.Active, null),
-      new ModuleStatus("notes", "notes", "Used by the tests.", [], new Map(), ModuleState.Failed, "Its runtime part failed to activate.")
+      new ModuleStatus("tasks", "0.0.1", "tasks", "Used by the tests.", [], new Map(), ModuleState.Active, null),
+      new ModuleStatus("notes", "0.0.1", "notes", "Used by the tests.", [], new Map(), ModuleState.Failed, "Its runtime part failed to activate.")
     ];
 
     const list = new ModuleStatusList(statuses);
@@ -36,6 +36,6 @@ export class ModuleStatusListTests {
   }
 
   private static declared(id: string, state: string): Readonly<Record<string, unknown>> {
-    return { id, displayName: id, description: "Used by the tests.", dependencies: [], contributes: {}, state };
+    return { id, version: "0.0.1", displayName: id, description: "Used by the tests.", dependencies: [], contributes: {}, state };
   }
 }

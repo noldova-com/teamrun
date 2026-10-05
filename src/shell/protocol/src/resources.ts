@@ -16,6 +16,7 @@ export class Resources {
   public static readonly ownerPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   public static readonly memberPattern: RegExp = /^[a-z][a-zA-Z0-9]*$/;
   public static readonly protocolVersionPattern: RegExp = /^[1-9][0-9]*$/;
+  public static readonly moduleVersionPattern: RegExp = /^(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})$/;
 
   public static readonly kindField: string = "kind";
   public static readonly idField: string = "id";
@@ -40,6 +41,7 @@ export class Resources {
   public static readonly stateField: string = "state";
   public static readonly causeField: string = "cause";
   public static readonly displayNameField: string = "displayName";
+  public static readonly versionField: string = "version";
   public static readonly dependenciesField: string = "dependencies";
   public static readonly contributesField: string = "contributes";
   public static readonly blockedByField: string = "blockedBy";
@@ -76,6 +78,7 @@ export class Resources {
   public static readonly isDoNotDisturbField: string = "isDoNotDisturb";
   public static readonly quietDevicesField: string = "quietDevices";
   public static readonly mutedModulesField: string = "mutedModules";
+  public static readonly idsField: string = "ids";
   public static readonly sequenceField: string = "sequence";
   public static readonly keyParameterName: string = "key";
   public static readonly commandTitleInvalid: string = "A command's title must not be blank.";
@@ -89,6 +92,8 @@ export class Resources {
   public static readonly notificationTimeInvalid: string = "A notification's time must be a date and time.";
   public static readonly quietDeviceInvalid: string = "A device with Do not disturb on must have an id.";
   public static readonly mutedModuleInvalid: string = "A muted module must have an id.";
+  public static readonly recentCommandInvalid: string = "A recent command must have an id.";
+  public static readonly recentCommandRepeated: string = "A recent command is listed once.";
   public static readonly notificationSequenceInvalid: string = "A notification's sequence must be a whole number from 1.";
   public static readonly currentSequenceInvalid: string = "The notifications' sequence must be a whole number from 0.";
   public static readonly workSequenceInvalid: string = "The work's sequence must be a whole number from 0.";
@@ -167,8 +172,11 @@ export class Resources {
   public static readonly settingsMember: string = "settings";
   public static readonly setSettingMember: string = "setSetting";
   public static readonly resetSettingMember: string = "resetSetting";
+  public static readonly recentCommandsMember: string = "recentCommands";
+  public static readonly recordCommandMember: string = "recordCommand";
   public static readonly settingsChangedMember: string = "settingsChanged";
   public static readonly commandsChangedMember: string = "commandsChanged";
+  public static readonly recentCommandsChangedMember: string = "recentCommandsChanged";
   public static readonly optionsField: string = "options";
   public static readonly minimumField: string = "minimum";
   public static readonly maximumField: string = "maximum";
@@ -195,6 +203,7 @@ export class Resources {
   public static readonly timeoutInvalid: string = "The time limit must be a positive integer of milliseconds.";
   public static readonly maximumFrameLengthInvalid: string = "The maximum frame length must be a positive integer.";
   public static readonly responseOutcomeMissing: string = "A response must carry a payload or a failure.";
+  public static readonly moduleVersionInvalid: string = "A module's version must have the form <major>.<minor>.<patch>: three whole numbers of up to nine digits without leading zeros, such as 0.0.1.";
   public static readonly moduleCauseInvalid: string = "An active module has no cause, and a failed or blocked module has one that is not blank.";
   public static readonly moduleBlockerInvalid: string = "A blocked module names the dependency that blocks it, and no other module names one.";
   public static readonly responseOutcomeAmbiguous: string = "A response cannot carry both a payload and a failure.";

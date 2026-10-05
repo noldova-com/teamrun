@@ -80,7 +80,7 @@ class PackageCheckTests {
       await rm(path.join(repository.directory, "package-lock.json"));
       await assert.rejects(PackageCheckTests.create(repository.directory).runAsync(new TextOutputFixture()), /ENOENT/);
 
-      assert.equal(output.text, "src/shell/ui/package.json must have the version \"__VERSION__\"; the build stamps the product version.\n");
+      assert.equal(output.text, "src/shell/ui/package.json must have the version \"__VERSION__\"; the build stamps its module's version or the product version.\n");
     });
   }
 

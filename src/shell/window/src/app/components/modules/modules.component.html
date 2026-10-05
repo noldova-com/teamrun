@@ -22,7 +22,10 @@ LICENSE file in the root directory of this source tree.
           <span class="tr-modules-name" data-truncates [trTooltip]="module.displayName" [trTooltipTruncated]="true">{{ module.displayName }}</span>
           <ng-container [ngTemplateOutlet]="state" [ngTemplateOutletContext]="{ $implicit: module }" />
         </span>
-        <span class="tr-modules-id" data-truncates [trTooltip]="module.id" [trTooltipTruncated]="true">{{ module.id }}</span>
+        <span class="tr-modules-row-meta">
+          <span class="tr-modules-id" data-truncates [trTooltip]="module.id" [trTooltipTruncated]="true">{{ module.id }}</span>
+          <span class="tr-modules-row-version">{{ module.version }}</span>
+        </span>
         <span class="tr-modules-description">{{ module.description }}</span>
       </button>
     } @empty {
@@ -36,6 +39,8 @@ LICENSE file in the root directory of this source tree.
       <p class="tr-modules-detail-id">{{ module.id }}</p>
       <p class="tr-modules-detail-description">{{ module.description }}</p>
       <dl class="tr-modules-facts">
+        <dt>{{ resources.moduleVersionTitle }}</dt>
+        <dd class="tr-modules-fact-version">{{ module.version }}</dd>
         <dt>{{ resources.moduleStateTitle }}</dt>
         <dd class="tr-modules-fact-state">
           <ng-container [ngTemplateOutlet]="state" [ngTemplateOutletContext]="{ $implicit: module }" />

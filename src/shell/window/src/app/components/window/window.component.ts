@@ -14,6 +14,7 @@ import { AppearanceSettingsService } from "../../services/appearance-settings.se
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { LayoutService } from "../../services/layout.service";
 import { QuitService } from "../../services/quit.service";
+import { RecentCommandsService } from "../../services/recent-commands.service";
 import { StartupService } from "../../services/startup.service";
 import { WindowPartHostService } from "../../services/window-part-host.service";
 import { StartupComponent } from "../startup/startup.component";
@@ -41,6 +42,7 @@ export class WindowComponent {
     inject(AppearanceService);
     inject(AppearanceSettingsService);
     inject(WindowPartHostService);
+    inject(RecentCommandsService);
     const destroyed = inject(DestroyRef);
     destroyed.onDestroy(this.bridge.onCloseRequest(t => void this.closeAsync(t)));
     destroyed.onDestroy(inject(QuitService).listen());

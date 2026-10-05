@@ -18,7 +18,7 @@ import type { MenuItemConstructorOptions } from "electron";
 
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
+import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, DataDirectoryLocator, type LaunchSettings, PreShellDataFoundException, RuntimeBuild, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
 import { DesktopApplication, DesktopSettings, DeviceIdentity, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
 
@@ -137,7 +137,7 @@ export class DesktopApplicationTests {
   public opensAHiddenSecureWindowWithTrafficLightsOnMacOS(): Promise<void> {
     return DesktopApplicationTests.verifyWindowAsync("darwin", window => {
       Assert.isUndefined(window.options.titleBarOverlay);
-      Assert.areEqual(JSON.stringify({ x: 12, y: 10 }), JSON.stringify(window.options.trafficLightPosition));
+      Assert.areEqual(JSON.stringify({ x: 12, y: 9 }), JSON.stringify(window.options.trafficLightPosition));
     });
   }
 
@@ -1031,7 +1031,7 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async refusesASettingsRequestWithoutAnObjectOrADevice(): Promise<void> {
+  public async refusesADeviceRequestWithoutAnObjectOrADevice(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const device = new FakeDeviceIdentity();
@@ -1042,15 +1042,19 @@ export class DesktopApplicationTests {
     const failures = [
       await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", null),
       await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", [1]),
-      await DesktopApplicationTests.requestAsync(anonymous, event, "shell.settings", {})
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.recentCommands", null),
+      await DesktopApplicationTests.requestAsync(anonymous, event, "shell.settings", {}),
+      await DesktopApplicationTests.requestAsync(anonymous, event, "shell.recordCommand", { id: "notes.newNote" })
     ].map(t => t.failure?.toJson());
 
     Assert.areEqual(JSON.stringify([
-      { code: "InvalidMessage", message: "A settings request's payload must be a JSON object." },
-      { code: "InvalidMessage", message: "A settings request's payload must be a JSON object." },
-      { code: "Unavailable", message: "This device has no identity, so its settings cannot be read or changed." }
+      { code: "InvalidMessage", message: "A request that belongs to this device must have a JSON object as its payload." },
+      { code: "InvalidMessage", message: "A request that belongs to this device must have a JSON object as its payload." },
+      { code: "InvalidMessage", message: "A request that belongs to this device must have a JSON object as its payload." },
+      { code: "Unavailable", message: "This device has no identity, so a request that belongs to it cannot be made." },
+      { code: "Unavailable", message: "This device has no identity, so a request that belongs to it cannot be made." }
     ]), JSON.stringify(failures));
-    Assert.isFalse(connection.calls.some(t => t.includes("etting")));
+    Assert.isFalse(connection.calls.some(t => t.includes("etting") || t.includes("ommand")));
   }
 
   @TestMethod
@@ -1263,6 +1267,44 @@ export class DesktopApplicationTests {
       ]),
       JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
     Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.settingsChanged could not be passed to the window").length);
+  }
+
+  @TestMethod
+  public async addsItsOwnDeviceToItsWindowsRecentCommandsRequests(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.answers.set("shell.recentCommands", Response.success("r", { ids: ["notes.newNote"] }));
+    connection.answers.set("shell.recordCommand", Response.success("r", null));
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
+    const event = DesktopApplicationTests.trustedEvent("linux");
+
+    const recent = await DesktopApplicationTests.requestAsync(electron, event, "shell.recentCommands", {});
+    const recorded = await DesktopApplicationTests.requestAsync(electron, event, "shell.recordCommand", { id: "notes.newNote" });
+
+    const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).filter(t => t.startsWith("shell.recentCommands") || t.startsWith("shell.recordCommand"));
+    Assert.areEqual(JSON.stringify([
+      `shell.recentCommands ${JSON.stringify({ device: FakeDeviceIdentity.ID })}`,
+      `shell.recordCommand ${JSON.stringify({ id: "notes.newNote", device: FakeDeviceIdentity.ID })}`
+    ]), JSON.stringify(sent));
+    Assert.areEqual(JSON.stringify({ ids: ["notes.newNote"] }), JSON.stringify(recent.payload));
+    Assert.isFalse(recorded.hasFailed);
+  }
+
+  @TestMethod
+  public async passesRecentCommandsOnlyToTheDeviceThatRanThemWithoutItsDevice(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher();
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopApplicationTests.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopApplicationTests.firstWindow(electron);
+    await DesktopApplicationTests.invokeAsync(electron, "teamrun:readLayout", DesktopApplicationTests.trustedEvent("linux"));
+
+    launcher.listener?.onEvent(new Event(ShellEvents.recentCommandsChanged, new RecentCommands(["notes.newNote"], FakeDeviceIdentity.ID).toJson()));
+    launcher.listener?.onEvent(new Event(ShellEvents.recentCommandsChanged, new RecentCommands(["clock.show"], "another").toJson()));
+    launcher.listener?.onEvent(new Event(ShellEvents.recentCommandsChanged, { device: FakeDeviceIdentity.ID }));
+
+    Assert.areEqual(
+      JSON.stringify([["teamrun:runtimeEvent", "shell.recentCommandsChanged", { ids: ["notes.newNote"] }]]),
+      JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:runtimeEvent")));
+    Assert.areEqual(1, DesktopApplicationTests.readErrors(process, "The runtime's event shell.recentCommandsChanged could not be passed to the window").length);
   }
 
   @TestMethod

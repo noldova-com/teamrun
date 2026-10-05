@@ -32,12 +32,12 @@ class BuildAndTestTests {
   private static readonly DOWNLOAD_ACTION: string = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1";
   private static readonly UPLOADS: readonly (readonly [string, string, string, readonly string[]])[] = [
     ["Keep the UI workflow results", "Keep the UI workflow results again", "Keep the UI workflow results a last time",
-      ["name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}", "path: _build/ui", "retention-days: 14", "if-no-files-found: ignore"]],
+      ["name: ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}", "path: _build/ui", "retention-days: 14", "if-no-files-found: ignore", "overwrite: true"]],
     ["Keep the main window screenshot", "Keep the main window screenshot again", "Keep the main window screenshot a last time",
-      ["path: _build/ui/main-window-*.png", "archive: false", "retention-days: 14", "if-no-files-found: ignore"]]
+      ["path: _build/ui/main-window-*.png", "archive: false", "retention-days: 14", "if-no-files-found: ignore", "overwrite: true"]]
   ];
   private static readonly BUILD_ARTIFACT: string = "name: ui-build-${{ matrix.runner }}-${{ matrix.architecture }}";
-  private static readonly BUILD_UPLOAD_SETTINGS: readonly string[] = [BuildAndTestTests.BUILD_ARTIFACT, "path: ui-build.tar", "retention-days: 3", "if-no-files-found: error"];
+  private static readonly BUILD_UPLOAD_SETTINGS: readonly string[] = [BuildAndTestTests.BUILD_ARTIFACT, "path: ui-build.tar", "retention-days: 3", "if-no-files-found: error", "overwrite: true"];
   private static readonly PACKED: string = "_build/archives _build/modules _build/packages _build/product.json _build/records _build/tests _build/variants _build/window _build/ui-builds.record " +
     "node_modules/.package-lock.json node_modules/@noldova src/generated";
   private static readonly WORKFLOW_NODE_SETUPS: readonly string[] = ["Set up Node.js to classify", "Set up Node.js to install"];
@@ -47,8 +47,8 @@ class BuildAndTestTests {
   private static readonly ANGULAR_UPLOADS: readonly string[] = ["Keep the Angular test output", "Keep the Angular test output again", "Keep the Angular test output a last time"];
   private static readonly ANGULAR_WARNING: string = "Warn that the Angular test output was not kept";
   private static readonly ANGULAR_SETTINGS: readonly string[] = [
-    "name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}", "path: |", "  _build/angular-tests.log", "  _build/angular-tests.json", "retention-days: 14",
-    "if-no-files-found: ignore"
+    "name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}", "path: |", "  _build/angular-tests.log", "  _build/angular-tests.json", "retention-days: 14",
+    "if-no-files-found: ignore", "overwrite: true"
   ];
   private static readonly CACHE_LIST: string = "api --paginate repos/noldova-com/teamrun/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100 --jq .actions_caches[].key";
   private static readonly SPOTLIGHT_STEPS: readonly string[] = ["Stop Spotlight indexing", "Stop Spotlight indexing while saving"];
@@ -138,7 +138,7 @@ class BuildAndTestTests {
         await writeFile(path.join(doubles.directory, "summary.md"), "");
 
         const result = await doubles.runAsync(script, {
-          CHANGES_RESULT: changes, RUN_CODE: runCode, RUN_UI: runUi, VALIDATION_RESULT: validation, UI_TARGETS: uiTargets, UI_RESULTS: uiResults, DEFERRED: "",
+          CHANGES_RESULT: changes, RUN_CODE: runCode, RUN_UI: runUi, VALIDATION_RESULT: validation, UI_TARGETS: uiTargets, UI_RESULTS: uiResults, DEFERRED: "", UI_DEFERRED: "",
           GITHUB_STEP_SUMMARY: "summary.md"
         });
 
@@ -164,11 +164,35 @@ class BuildAndTestTests {
         const uiResults = BuildAndTestTests.ALL_UI_TARGETS.split(" ").map(t => `${t}=${uiTargets.split(" ").includes(t) ? planned : "skipped"}`).join(" ");
 
         const result = await doubles.runAsync(script, {
-          CHANGES_RESULT: "success", RUN_CODE: "true", RUN_UI: runUi, VALIDATION_RESULT: "success", UI_TARGETS: uiTargets, UI_RESULTS: uiResults, DEFERRED: "Windows ARM64, macOS x64",
+          CHANGES_RESULT: "success", RUN_CODE: "true", RUN_UI: runUi, VALIDATION_RESULT: "success", UI_TARGETS: uiTargets, UI_RESULTS: uiResults, DEFERRED: "Windows ARM64, macOS x64", UI_DEFERRED: "",
           GITHUB_STEP_SUMMARY: "summary.md"
         });
 
         assert.equal(result.status, 0, result.stderr);
+        assert.equal(await doubles.readFileAsync("summary.md"), summary);
+      }
+    });
+
+    test("the aggregate check expects no UI workflows from the targets a push leaves to manual and nightly runs, names them, and still requires every planned target", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
+      const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
+      const uiTargets = BuildAndTestTests.ALL_UI_TARGETS.split(" ").filter(t => t !== "macos-x64").join(" ");
+      for (const [changed, status, summary] of [
+        [{}, 0, "The document checks passed, and the build, tests and UI workflows passed on every target, with the UI workflows of macOS x64 left to manual and nightly runs.\n"],
+        [{ "macos-x64": "success" }, 1, ""],
+        [{ "windows-arm64": "skipped" }, 1, ""]
+      ] as const) {
+        const doubles = await CommandDoublesFixture.createAsync();
+        t.after(() => doubles.disposeAsync());
+        await writeFile(path.join(doubles.directory, "summary.md"), "");
+        const results: Readonly<Record<string, string>> = { "macos-x64": "skipped", ...changed };
+        const uiResults = BuildAndTestTests.ALL_UI_TARGETS.split(" ").map(t => `${t}=${results[t] ?? "success"}`).join(" ");
+
+        const result = await doubles.runAsync(script, {
+          CHANGES_RESULT: "success", RUN_CODE: "true", RUN_UI: "true", VALIDATION_RESULT: "success", UI_TARGETS: uiTargets, UI_RESULTS: uiResults, DEFERRED: "", UI_DEFERRED: "macOS x64",
+          GITHUB_STEP_SUMMARY: "summary.md"
+        });
+
+        assert.equal(result.status, status, `${uiResults}: ${result.stderr}`);
         assert.equal(await doubles.readFileAsync("summary.md"), summary);
       }
     });
@@ -200,30 +224,31 @@ class BuildAndTestTests {
       assert.ok(text.indexOf("Check the documents") < text.indexOf("Select the verification scope and the jobs"));
       assert.ok(text.includes("          EVENT_NAME: ${{ github.event_name }}\n          BASE_SHA: ${{ github.event.pull_request.base.sha }}\n" +
         "          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}\n"));
-      for (const output of ["run-code", "run-ui", "targets", "target-table", "ui-targets", "ui-plan", "deferred"])
+      for (const output of ["run-code", "run-ui", "targets", "target-table", "ui-targets", "ui-plan", "deferred", "ui-deferred"])
         assert.ok(text.includes(`      ${output}: \${{ steps.scope.outputs.${output} }}\n`), output);
       assert.ok(text.includes("  validate:\n    name: Build and test (${{ matrix.target }})\n    needs: changes\n" +
         "    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}\n" +
         "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(needs.changes.outputs.targets) }}\n    runs-on: ${{ matrix.runner }}\n"));
       assert.equal(workflow.readStepScript("Build"), "npm run build\n");
       assert.equal(workflow.readStepScript("Test"), "npm test\n");
-      const callers = new BuildMatrix(false).targets.map(t => `ui-${t.key}`).join(", ");
+      const callers = new BuildMatrix("workflow_dispatch").targets.map(t => `ui-${t.key}`).join(", ");
       assert.ok(text.includes(`    name: Build and test (all targets)\n    needs: [changes, validate, ${callers}]\n    if: always()\n`));
-      assert.ok(text.includes(`          UI_RESULTS: >-\n${new BuildMatrix(false).targets.map(t => `            ${t.key}=\${{ needs.ui-${t.key}.result }}\n`).join("")}`));
+      assert.ok(text.includes(`          UI_RESULTS: >-\n${new BuildMatrix("workflow_dispatch").targets.map(t => `            ${t.key}=\${{ needs.ui-${t.key}.result }}\n`).join("")}`));
       assert.ok(text.includes("          UI_TARGETS: ${{ needs.changes.outputs.ui-targets }}\n"));
+      assert.ok(text.includes("          UI_DEFERRED: ${{ needs.changes.outputs.ui-deferred }}\n"));
     });
 
     test("each target's UI workflows run in their own called workflow, which waits for nothing but the classification", async () => {
       const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
       const ui = (await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW)).text;
 
-      for (const target of new BuildMatrix(false).targets)
+      for (const target of new BuildMatrix("workflow_dispatch").targets)
         assert.ok(text.includes(`  ui-${target.key}:\n    name: UI workflows (${target.name})\n    needs: changes\n` +
           "    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && " +
           `contains(format(' {0} ', needs.changes.outputs.ui-targets), ' ${target.key} ') }}\n` +
           "    uses: ./.github/workflows/ui-workflows.yml\n    with:\n" +
           `      plan: \${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['${target.key}']) }}\n\n`), target.name);
-      assert.equal(text.match(/^ {4}uses: \.\/\.github\/workflows\/ui-workflows\.yml$/gm)?.length, new BuildMatrix(false).targets.length);
+      assert.equal(text.match(/^ {4}uses: \.\/\.github\/workflows\/ui-workflows\.yml$/gm)?.length, new BuildMatrix("workflow_dispatch").targets.length);
       assert.ok(ui.includes("on:\n  workflow_call:\n    inputs:\n      plan:\n"));
       assert.ok(ui.includes("  build:\n    name: Build (${{ matrix.target }})\n    if: ${{ fromJSON(inputs.plan).build[0] != null }}\n" +
         "    strategy:\n      matrix:\n        include: ${{ fromJSON(inputs.plan).build }}\n    runs-on: ${{ matrix.runner }}\n"));
@@ -269,7 +294,7 @@ class BuildAndTestTests {
       const text = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
       const operatingSystems: Readonly<Record<string, string>> = { ubuntu: "Linux", windows: "Windows", macos: "macOS" };
 
-      assert.deepEqual(new BuildMatrix(false).targets.map(t => [t.name, t.runner, t.operatingSystem, t.architecture]), BuildAndTestTests.TARGETS.map(t => [...t]));
+      assert.deepEqual(new BuildMatrix("push").targets.map(t => [t.name, t.runner, t.operatingSystem, t.architecture]), BuildAndTestTests.TARGETS.map(t => [...t]));
       for (const [, runner, os] of BuildAndTestTests.TARGETS)
         assert.equal(operatingSystems[runner.split("-")[0] ?? ""], os, runner);
       assert.ok(text.includes("  cache-plan:\n    name: Find the missing dependency caches\n    needs: changes\n"));
@@ -466,9 +491,7 @@ class BuildAndTestTests {
 
         assert.deepEqual(attempts.map(t => t.uses), attempts.map(() => BuildAndTestTests.UPLOAD_ACTION));
         assert.deepEqual(attempts.map(t => t.continueOnError), [true, true, true]);
-        assert.deepEqual(attempts[0]?.settings, settings);
-        assert.deepEqual(attempts[1]?.settings, [...settings, "overwrite: true"]);
-        assert.deepEqual(attempts[2]?.settings, [...settings, "overwrite: true"]);
+        assert.deepEqual(attempts.map(t => t.settings), BuildAndTestTests.threeTimes(settings));
         assert.equal(workflow.readStepScript(`${pause} again`), "sleep 15\n");
         assert.equal(workflow.readStepScript(`${pause} a last time`), "sleep 15\n");
       }
@@ -477,9 +500,9 @@ class BuildAndTestTests {
     test("keeping and fetching a target's builds are each tried three times with a pause, and fail the job only when the last attempt fails", async () => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW);
 
-      for (const [first, pause, action, settings, overwrite] of [
-        ["Keep the builds for the UI workflows", "Wait before keeping the builds", BuildAndTestTests.UPLOAD_ACTION, BuildAndTestTests.BUILD_UPLOAD_SETTINGS, ["overwrite: true"]],
-        ["Fetch the builds", "Wait before fetching the builds", BuildAndTestTests.DOWNLOAD_ACTION, [BuildAndTestTests.BUILD_ARTIFACT], []]
+      for (const [first, pause, action, settings] of [
+        ["Keep the builds for the UI workflows", "Wait before keeping the builds", BuildAndTestTests.UPLOAD_ACTION, BuildAndTestTests.BUILD_UPLOAD_SETTINGS],
+        ["Fetch the builds", "Wait before fetching the builds", BuildAndTestTests.DOWNLOAD_ACTION, [BuildAndTestTests.BUILD_ARTIFACT]]
       ] as const) {
         const [again, last] = [`${first} again`, `${first} a last time`];
         const simulation = new WorkflowSimulation(workflow.text, first, last);
@@ -493,7 +516,7 @@ class BuildAndTestTests {
 
         assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[action, true], [action, true], [action, false]], first);
         assert.deepEqual(selfBuilt.ran, first === "Fetch the builds" ? [] : [first], first);
-        assert.deepEqual(attempts.map(t => t.settings), [settings, [...settings, ...overwrite], [...settings, ...overwrite]], first);
+        assert.deepEqual(attempts.map(t => t.settings), BuildAndTestTests.threeTimes(settings), first);
         assert.deepEqual([workflow.readStepScript(`${pause} again`), workflow.readStepScript(`${pause} a last time`)], ["sleep 15\n", "sleep 15\n"], first);
         assert.deepEqual([passed.ran, passed.isJobFailed], [[first], false], first);
         assert.deepEqual([retried.ran, retried.isJobFailed], [[first, `${pause} again`, again], false], first);
@@ -546,8 +569,7 @@ class BuildAndTestTests {
         BuildAndTestTests.ANGULAR_WARNING
       ]);
       assert.deepEqual([first, again, last].map(t => [t?.uses, t?.continueOnError]), [first, again, last].map(() => [BuildAndTestTests.UPLOAD_ACTION, true]));
-      assert.deepEqual(first?.settings, BuildAndTestTests.ANGULAR_SETTINGS);
-      assert.deepEqual([again?.settings, last?.settings], [[...BuildAndTestTests.ANGULAR_SETTINGS, "overwrite: true"], [...BuildAndTestTests.ANGULAR_SETTINGS, "overwrite: true"]]);
+      assert.deepEqual([first, again, last].map(t => t?.settings), BuildAndTestTests.threeTimes(BuildAndTestTests.ANGULAR_SETTINGS));
       assert.equal(workflow.readStepScript("Wait before keeping the Angular test output again"), "sleep 15\n");
       assert.equal(workflow.readStepScript("Wait before keeping the Angular test output a last time"), "sleep 15\n");
       assert.deepEqual([warning.status, warning.stdout], [0, "::warning title=The Angular test output was not kept::The upload failed three times, so it is not attached.\n"]);
@@ -701,6 +723,10 @@ class BuildAndTestTests {
       assert.notEqual((await listing.runAsync(script, environment)).status, 0);
       assert.notEqual((await deletion.runAsync(script, environment)).status, 0);
     });
+  }
+
+  private static threeTimes<T>(value: T): readonly T[] {
+    return [value, value, value];
   }
 }
 

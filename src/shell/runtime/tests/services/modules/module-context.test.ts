@@ -45,6 +45,7 @@ export class ModuleContextTests {
   private static readonly HOME: string = path.resolve("home", "person");
   private static readonly NOTES: ModuleDeclaration = new ModuleDeclaration(
     "notes",
+    "0.0.1",
     "Notes",
     "Keeps notes.",
     ["tasks"],

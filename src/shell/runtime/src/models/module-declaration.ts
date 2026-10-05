@@ -15,6 +15,7 @@ import { Resources } from "../resources.js";
 
 export class ModuleDeclaration {
   public readonly id: string;
+  public readonly version: string;
   public readonly displayName: string;
   public readonly description: string;
   public readonly dependencies: readonly string[];
@@ -24,6 +25,7 @@ export class ModuleDeclaration {
 
   public constructor(
     id: string,
+    version: string,
     displayName: string,
     description: string,
     dependencies: readonly string[],
@@ -32,6 +34,8 @@ export class ModuleDeclaration {
     settings: readonly SettingDefinition[] = []) {
     if (!Resources.moduleIdPattern.test(id) || id === Resources.reservedModuleId)
       throw new ArgumentException(Resources.moduleIdInvalid, Resources.idParameterName);
+    if (!Resources.moduleVersionPattern.test(version))
+      throw new ArgumentException(Resources.moduleVersionInvalid, Resources.versionParameterName);
     ArgumentException.throwIfNullOrWhitespace(displayName, Resources.displayNameParameterName);
     ArgumentException.throwIfNullOrWhitespace(description, Resources.descriptionParameterName);
     const foreign = settings.find(t => t.name.owner !== id);
@@ -42,6 +46,7 @@ export class ModuleDeclaration {
       throw new ArgumentException(Resources.formatSettingKindReserved(id, shellOnly.name.text, shellOnly.type.kind), Resources.settingsField);
 
     this.id = id;
+    this.version = version;
     this.displayName = displayName;
     this.description = description;
     this.dependencies = [...dependencies];
@@ -56,6 +61,9 @@ export class ModuleDeclaration {
     const id = ModuleDeclaration.readText("id" in value ? value.id : undefined, Resources.idParameterName);
     if (!Resources.moduleIdPattern.test(id) || id === Resources.reservedModuleId)
       throw new DeclarationsFormatException(Resources.formatDeclarationField(Resources.idParameterName));
+    const version = ModuleDeclaration.readText("version" in value ? value.version : undefined, Resources.versionParameterName);
+    if (!Resources.moduleVersionPattern.test(version))
+      throw new DeclarationsFormatException(Resources.formatDeclarationField(Resources.versionParameterName));
 
     const runtimePackage = "runtimePackage" in value ? value.runtimePackage : undefined;
     const contributes = "contributes" in value ? value.contributes : undefined;
@@ -63,6 +71,7 @@ export class ModuleDeclaration {
       throw new DeclarationsFormatException(Resources.formatDeclarationField(Resources.contributesParameterName));
     return new ModuleDeclaration(
       id,
+      version,
       ModuleDeclaration.readText("displayName" in value ? value.displayName : undefined, Resources.displayNameParameterName),
       ModuleDeclaration.readText("description" in value ? value.description : undefined, Resources.descriptionParameterName),
       ModuleDeclaration.readNames("dependencies" in value ? value.dependencies : undefined, Resources.dependenciesParameterName),
