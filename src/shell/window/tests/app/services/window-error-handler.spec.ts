@@ -8,7 +8,7 @@
 
 import { TestBed } from "@angular/core/testing";
 
-import { ActionNotSentException } from "../../../src/app/exceptions/action-not-sent.exception";
+import { ActionNotConfirmedException } from "../../../src/app/exceptions/action-not-confirmed.exception";
 import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { WindowPartFailureException } from "../../../src/app/exceptions/window-part-failure.exception";
 import { WindowErrorHandler } from "../../../src/app/services/window-error-handler";
@@ -60,15 +60,15 @@ describe("WindowErrorHandler", () => {
     expect(written).toHaveBeenCalledTimes(3);
   });
 
-  it("drops a failure because the connection to the runtime ended, anywhere in its causes, but sends an action that was not sent", () => {
+  it("drops a failure because the connection to the runtime ended, anywhere in its causes, but sends an action the runtime did not confirm", () => {
     const disconnected = new RuntimeDisconnectedException("TeamRun is not connected to its runtime.");
-    const action = new ActionNotSentException("The command notes.save did not finish because the connection to the runtime ended.");
+    const action = new ActionNotConfirmedException("The command notes.save did not finish because the connection to the runtime ended.", disconnected);
 
     handler.handleError(disconnected);
     handler.handleError(new WindowPartFailureException("notes", "Its views failed to load.", disconnected));
     handler.handleError(action);
 
-    expect(bridge.errorsLogged).toEqual([[null, action.stack]]);
+    expect(bridge.errorsLogged).toEqual([[null, `${action.stack}\nCaused by: ${disconnected.stack}`]]);
     expect(written).toHaveBeenCalledTimes(1);
   });
 

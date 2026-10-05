@@ -10,12 +10,12 @@ import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 import { RuntimeDisconnectedException } from "./runtime-disconnected.exception";
 
-export class ActionNotSentException extends Exception {
-  public constructor(message: string) {
-    super(message);
+export class ActionNotConfirmedException extends Exception {
+  public constructor(message: string, cause: unknown) {
+    super(message, { cause });
   }
 
   public static from(error: unknown, message: string): unknown {
-    return RuntimeDisconnectedException.isIn(error) ? new ActionNotSentException(message) : error;
+    return RuntimeDisconnectedException.isIn(error) ? new ActionNotConfirmedException(message, error) : error;
   }
 }

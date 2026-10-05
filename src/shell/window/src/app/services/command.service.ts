@@ -14,7 +14,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type { KeyChord } from "@noldova/teamrun-shell-protocol";
 import { DialogService } from "@noldova/teamrun-shell-ui";
 
-import { ActionNotSentException } from "../exceptions/action-not-sent.exception";
+import { ActionNotConfirmedException } from "../exceptions/action-not-confirmed.exception";
 import { CommandNotFoundException } from "../exceptions/command-not-found.exception";
 import type { CommandContribution } from "../models/command-contribution";
 import { KeyBindings } from "../models/key-bindings";
@@ -142,7 +142,7 @@ export class CommandService {
       return await command.runAsync(commandArguments);
     }
     catch (error) {
-      throw ActionNotSentException.from(error, Resources.formatCommandNotFinished(command.name));
+      throw ActionNotConfirmedException.from(error, Resources.formatCommandNotFinished(command.name));
     }
   }
 

@@ -13,7 +13,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { type CommandRun, NotificationReference, NotificationState, ShellEvents, ShellMethods } from "@noldova/teamrun-shell-protocol";
 
 import { Resources } from "../../resources";
-import { ActionNotSentException } from "../exceptions/action-not-sent.exception";
+import { ActionNotConfirmedException } from "../exceptions/action-not-confirmed.exception";
 import { CommandService } from "./command.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { SettingsService } from "./settings.service";
@@ -104,6 +104,6 @@ export class NotificationService {
   }
 
   private send(method: string, payload: JsonValue): void {
-    this.bridge.requestAsync(method, payload).catch((error: unknown) => this.errors.handleError(ActionNotSentException.from(error, Resources.notificationsNotConfirmed)));
+    this.bridge.requestAsync(method, payload).catch((error: unknown) => this.errors.handleError(ActionNotConfirmedException.from(error, Resources.notificationsNotConfirmed)));
   }
 }

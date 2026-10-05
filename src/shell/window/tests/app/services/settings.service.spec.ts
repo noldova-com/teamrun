@@ -21,7 +21,7 @@ import {
   SettingsSnapshot
 } from "@noldova/teamrun-shell-protocol";
 
-import { ActionNotSentException } from "../../../src/app/exceptions/action-not-sent.exception";
+import { ActionNotConfirmedException } from "../../../src/app/exceptions/action-not-confirmed.exception";
 import { RuntimeRequestException } from "../../../src/app/exceptions/runtime-request.exception";
 import { SettingsService } from "../../../src/app/services/settings.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
@@ -77,14 +77,14 @@ describe("SettingsService", () => {
     ]);
   });
 
-  it("rejects a change the runtime did not confirm because the connection ended as an action not sent, and passes any other failure on", async () => {
+  it("rejects a change the runtime did not confirm because the connection ended as an action not confirmed, and passes any other failure on", async () => {
     bridge.responses.set("shell.setSetting", { failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
     bridge.responses.set("shell.resetSetting", { failure: { code: "Unavailable", message: "The runtime did not answer shell.resetSetting in time." } });
 
     const set = await service.setAsync("shell.mode", "Light").catch((error: unknown) => error);
     const reset = await service.resetAsync("shell.mode").catch((error: unknown) => error);
 
-    expect([set instanceof ActionNotSentException, (set as Error).message])
+    expect([set instanceof ActionNotConfirmedException, (set as Error).message])
       .toEqual([true, "The runtime did not confirm the change to the setting shell.mode because the connection to it ended."]);
     expect([reset instanceof RuntimeRequestException, (reset as RuntimeRequestException).code]).toEqual([true, "Unavailable"]);
   });

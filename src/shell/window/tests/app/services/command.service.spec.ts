@@ -12,7 +12,7 @@ import { TestBed } from "@angular/core/testing";
 import { DialogService } from "@noldova/teamrun-shell-ui";
 
 import { EditAction } from "../../../src/app/enums/edit-action";
-import { ActionNotSentException } from "../../../src/app/exceptions/action-not-sent.exception";
+import { ActionNotConfirmedException } from "../../../src/app/exceptions/action-not-confirmed.exception";
 import { CommandNotFoundException } from "../../../src/app/exceptions/command-not-found.exception";
 import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
@@ -281,7 +281,7 @@ describe("CommandService", () => {
     expect(runs).toEqual(["notes.newNote {\"folder\":\"inbox\"}"]);
   });
 
-  it("reports a command that did not finish because the connection to the runtime ended as an action not sent, whether run by name or by its key", async () => {
+  it("reports a command that did not finish because the connection to the runtime ended as an action not confirmed, whether run by name or by its key", async () => {
     const service = start("win32");
     const disconnected = new RuntimeDisconnectedException("TeamRun is not connected to its runtime.");
     service.setCommands([command("notes.save", "Mod+Alt+S", new Error("The note was not saved.", { cause: disconnected }))]);
@@ -290,7 +290,7 @@ describe("CommandService", () => {
     press({ key: "s", code: "KeyS", ctrlKey: true, altKey: true });
 
     await vi.waitFor(() => expect(errors).toHaveLength(1));
-    expect([run, errors[0]].map(t => [t instanceof ActionNotSentException, (t as Error).message])).toEqual([
+    expect([run, errors[0]].map(t => [t instanceof ActionNotConfirmedException, (t as Error).message])).toEqual([
       [true, "The command notes.save did not finish because the connection to the runtime ended."],
       [true, "The command notes.save did not finish because the connection to the runtime ended."]
     ]);

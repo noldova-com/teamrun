@@ -23,7 +23,7 @@ import {
   type SettingScope
 } from "@noldova/teamrun-shell-protocol";
 
-import { ActionNotSentException } from "../exceptions/action-not-sent.exception";
+import { ActionNotConfirmedException } from "../exceptions/action-not-confirmed.exception";
 import { Resources } from "../../resources";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 
@@ -97,7 +97,7 @@ export class SettingsService {
       await this.bridge.requestAsync(method, payload);
     }
     catch (error) {
-      throw ActionNotSentException.from(error, Resources.formatSettingNotConfirmed(name));
+      throw ActionNotConfirmedException.from(error, Resources.formatSettingNotConfirmed(name));
     }
   }
 

@@ -11,7 +11,7 @@ import { TestBed } from "@angular/core/testing";
 
 import { CommandRun, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
-import { ActionNotSentException } from "../../../src/app/exceptions/action-not-sent.exception";
+import { ActionNotConfirmedException } from "../../../src/app/exceptions/action-not-confirmed.exception";
 import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { CommandService } from "../../../src/app/services/command.service";
@@ -119,7 +119,7 @@ describe("NotificationService", () => {
     expect(service.firstRead()?.sequence).toBe(1);
   });
 
-  it("asks the runtime to mark read, clear and dismiss, sets Do not disturb, and reports the requests that fail, one not confirmed because the connection ended as an action not sent", async () => {
+  it("asks the runtime to mark read, clear and dismiss, sets Do not disturb, and reports the requests that fail, one the runtime did not confirm because the connection ended as such", async () => {
     const service = start();
     await settleAsync(() => !Object.is(service.firstRead(), null));
     bridge.responses.set("shell.clearNotifications", { failure: { code: "Unavailable", message: "The runtime did not answer shell.clearNotifications in time." } });
@@ -132,7 +132,7 @@ describe("NotificationService", () => {
     service.setDoNotDisturb(true);
     await vi.waitFor(() => expect(errors.length).toBe(3));
 
-    expect(errors.filter(t => t instanceof ActionNotSentException).map(t => (t as Error).message))
+    expect(errors.filter(t => t instanceof ActionNotConfirmedException).map(t => (t as Error).message))
       .toEqual(["The runtime did not confirm the change to the notifications because the connection to it ended."]);
     expect(bridge.requests.slice(-4)).toEqual([
       ["shell.markNotificationsRead", null],

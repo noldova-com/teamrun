@@ -23,5 +23,4 @@ describe("RuntimeRequestException", () => {
 
     expect(exception.details).toBeUndefined();
   });
-
 });
