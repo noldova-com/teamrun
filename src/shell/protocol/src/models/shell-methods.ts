@@ -29,4 +29,6 @@ export class ShellMethods {
   public static readonly settings: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.settingsMember);
   public static readonly setSetting: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.setSettingMember);
   public static readonly resetSetting: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.resetSettingMember);
+  public static readonly recentCommands: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.recentCommandsMember);
+  public static readonly recordCommand: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.recordCommandMember);
 }

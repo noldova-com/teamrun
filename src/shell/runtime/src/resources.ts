@@ -215,12 +215,14 @@ export class Resources {
   public static readonly doNotDisturbSetting: string = "doNotDisturb";
   public static readonly mutedModulesSetting: string = "mutedModules";
   public static readonly keyBindingsSetting: string = "keyBindings";
+  public static readonly recentCommandCountSetting: string = "recentCommandCount";
   public static readonly appearancePage: string = "Appearance";
   public static readonly notificationsPage: string = "Notifications";
   public static readonly shortcutsPage: string = "Keyboard shortcuts";
   public static readonly themeGroup: string = "Theme";
   public static readonly textGroup: string = "Text";
   public static readonly layoutGroup: string = "Layout";
+  public static readonly commandSearchGroup: string = "Command search";
   public static readonly notificationsGroup: string = "Notifications";
   public static readonly shortcutsGroup: string = "Keys";
   public static readonly defaultThemeId: string = "shell.default";
@@ -270,6 +272,10 @@ export class Resources {
   public static readonly mutedModulesDescription: string = "A module turned off still adds its notifications to the list, without toasts or operating system notifications.";
   public static readonly keyBindingsTitle: string = "Keyboard shortcuts";
   public static readonly keyBindingsDescription: string = "The keys you chose for commands, in place of their default keys, on every device.";
+  public static readonly recentCommandCountTitle: string = "Recent commands";
+  public static readonly recentCommandCountDescription: string = "How many commands you recently ran from command search are listed first. 0 lists none.";
+  public static readonly maximumRecentCommands: number = 20;
+  public static readonly defaultRecentCommands: number = 5;
   public static readonly settingScopesKind: string = "settingScopes";
   public static readonly settingsField: string = "settings";
   public static readonly nameParameterName: string = "name";
@@ -397,6 +403,15 @@ export class Resources {
   public static readonly launchDescriptorsUnavailable: string = "Starting a program on Linux requires access to /proc/self/fd. Ensure procfs is mounted at /proc and this process can read and traverse its descriptor directory.";
   public static readonly dataDirectoryRequired: string = "The --data-dir argument is required.";
   public static readonly usage: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>] [--start-log <start log name>]";
+  public static readonly recentCommandsMigration: string = "recent-commands";
+  public static readonly createRecentCommandsStatement: string =
+    "CREATE TABLE recent_commands (device TEXT NOT NULL, id TEXT NOT NULL, used INTEGER NOT NULL, PRIMARY KEY (device, id)) STRICT";
+  public static readonly readRecentCommandsStatement: string = "SELECT id FROM recent_commands WHERE device = ? ORDER BY used DESC";
+  public static readonly recordRecentCommandStatement: string =
+    "INSERT INTO recent_commands (device, id, used) SELECT ?1, ?2, COALESCE(MAX(used), 0) + 1 FROM recent_commands WHERE device = ?1 " +
+    "ON CONFLICT (device, id) DO UPDATE SET used = excluded.used";
+  public static readonly trimRecentCommandsStatement: string =
+    "DELETE FROM recent_commands WHERE device = ?1 AND id NOT IN (SELECT id FROM recent_commands WHERE device = ?1 ORDER BY used DESC LIMIT ?2)";
   public static readonly ownedProcessesMigration: string = "owned-processes";
   public static readonly createOwnedProcessesStatement: string =
     "CREATE TABLE owned_processes (id INTEGER PRIMARY KEY, module TEXT NOT NULL, process_id INTEGER NOT NULL, program TEXT NOT NULL, executable TEXT NOT NULL, " +
