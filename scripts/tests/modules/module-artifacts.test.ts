@@ -26,7 +26,7 @@ class ModuleArtifactsTests {
     " */",
     ""
   ].join("\n");
-  private static readonly SOURCE_IMPORT: string = "import { MenuDeclarations, WindowPartSource } from \"@noldova/teamrun-shell-window\";\n";
+  private static readonly SOURCE_IMPORT: string = "import { MenuDeclarations, WindowPartSource } from \"@noldova/teamrun-shell-window/build\";\n";
   private static readonly MENUS: Readonly<Record<string, unknown>> = {
     places: [{ name: "notes.templates", title: "New from template" }],
     groups: [

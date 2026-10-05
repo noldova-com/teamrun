@@ -14,7 +14,7 @@ import type { Writable } from "node:stream";
 
 import { Data, NtExecutable, NtExecutableResource, Resource } from "resedit";
 
-import type ProductIdentity from "../packages/product-identity.ts";
+import ProductIdentity from "../packages/product-identity.ts";
 import RootManifest from "../packages/root-manifest.ts";
 import ProcessRunner from "../processes/process-runner.ts";
 import DesktopException from "./desktop.exception.ts";
@@ -28,8 +28,6 @@ export default class DevelopmentBinary {
   private static readonly MANIFEST_SEGMENTS: readonly string[] = ["node_modules", "electron", "package.json"];
   private static readonly INSTALLER_SEGMENTS: readonly string[] = ["node_modules", "electron", "install.js"];
   private static readonly INSTALL_TIMEOUT: number = 600_000;
-  private static readonly WINDOWS_ICON_FILE: string = "icon-dark.ico";
-  private static readonly MAC_ICON_SOURCE_FILE: string = "icon-dock-512.png";
   private static readonly MAC_ICON_EXTENSION: string = ".icns";
   private static readonly ELECTRON_ICON_FILE: string = "electron.icns";
   private static readonly ICONSET_EXTENSION: string = ".iconset";
@@ -88,8 +86,8 @@ export default class DevelopmentBinary {
       .update(await readFile(path.join(this.root, ...DevelopmentBinary.MANIFEST_SEGMENTS)))
       .update(JSON.stringify([manifest.productVersion, product, product.formatDevelopmentApplicationId(this.root), this.platform, this.architecture]))
       .update(await readFile(import.meta.filename))
-      .update(await readFile(path.join(icons, DevelopmentBinary.WINDOWS_ICON_FILE)))
-      .update(await readFile(path.join(icons, DevelopmentBinary.MAC_ICON_SOURCE_FILE)))
+      .update(await readFile(path.join(icons, ProductIdentity.WINDOWS_ICON_FILE)))
+      .update(await readFile(path.join(icons, ProductIdentity.MAC_ICON_FILE)))
       .digest("hex");
     const stampPath = path.join(output, DevelopmentBinary.STAMP_FILE);
     if (!existsSync(stampPath) || await readFile(stampPath, "utf8") !== stamp || !existsSync(binary)) {
@@ -143,7 +141,7 @@ export default class DevelopmentBinary {
     info.setFileVersion(version, language.lang);
     info.setProductVersion(version, language.lang);
     info.outputToResourceEntries(resource.entries);
-    const icon = Data.IconFile.from(await readFile(path.join(icons, DevelopmentBinary.WINDOWS_ICON_FILE)));
+    const icon = Data.IconFile.from(await readFile(path.join(icons, ProductIdentity.WINDOWS_ICON_FILE)));
     Resource.IconGroupEntry.replaceIconsForResource(resource.entries, DevelopmentBinary.ICON_GROUP, language.lang, icon.icons.map(t => t.data));
     resource.outputResource(executable);
     await writeFile(binary, Buffer.from(executable.generate()));
@@ -173,7 +171,7 @@ export default class DevelopmentBinary {
 
   private async replaceMacIconAsync(output: string, bundle: string, product: ProductIdentity, icons: string): Promise<void> {
     const iconset = path.join(output, `${product.name}${DevelopmentBinary.ICONSET_EXTENSION}`);
-    const source = path.join(icons, DevelopmentBinary.MAC_ICON_SOURCE_FILE);
+    const source = path.join(icons, ProductIdentity.MAC_ICON_FILE);
     const iconFile = `${product.slug}${DevelopmentBinary.MAC_ICON_EXTENSION}`;
     await mkdir(iconset, { recursive: true });
     for (const [name, size] of DevelopmentBinary.ICONSET)

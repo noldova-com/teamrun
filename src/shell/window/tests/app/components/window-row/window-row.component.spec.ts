@@ -14,12 +14,12 @@ import { AppearanceService, DefaultTheme, DialogService, ModePreference, type Th
 
 import { WindowRowComponent } from "../../../../src/app/components/window-row/window-row.component";
 import { TopBarSide } from "../../../../src/app/enums/top-bar-side";
+import { BuildTokens } from "../../../../src/app/models/build-tokens";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { MenuDeclarations } from "../../../../src/app/models/menu-declarations";
 import { TopBarAction } from "../../../../src/app/models/top-bar-action";
 import { TopBarActionContribution } from "../../../../src/app/models/top-bar-action-contribution";
 import { TopBarActionState } from "../../../../src/app/models/top-bar-action-state";
-import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { BarItemsService } from "../../../../src/app/services/bar-items.service";
 import { CommandSearchService } from "../../../../src/app/services/command-search.service";
 import { CommandService } from "../../../../src/app/services/command.service";
@@ -187,7 +187,7 @@ describe("WindowRowComponent", () => {
   function useNotesMenus(runs: JsonValue[]): void {
     TestBed.configureTestingModule({
       providers: [{
-        provide: WindowPartTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
+        provide: BuildTokens.menus, useValue: [MenuDeclarations.fromJson("notes", {
           places: [], groups: [{ name: "notes.create", place: "shell.file", exclusive: false, items: [{ command: "notes.newNote", arguments: { template: "plan" } }] }]
         })]
       }]

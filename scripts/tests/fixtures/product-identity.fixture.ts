@@ -19,7 +19,7 @@ export default class ProductIdentityFixture {
     icons: "assets/fixture-icons"
   };
 
-  public static manifest(overrides: Readonly<Record<string, unknown>> = {}): Readonly<Record<string, unknown>> {
-    return { version: "0.0.7", teamrun: { protocolVersion: 3, modules: [], product: { ...ProductIdentityFixture.json, ...overrides } } };
+  public static manifest(overrides: Readonly<Record<string, unknown>> = {}, modules: readonly string[] = []): Readonly<Record<string, unknown>> {
+    return { version: "0.0.7", teamrun: { protocolVersion: 3, modules, product: { ...ProductIdentityFixture.json, ...overrides } } };
   }
 }

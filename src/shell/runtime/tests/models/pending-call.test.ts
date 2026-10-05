@@ -10,6 +10,7 @@ import { once } from "node:events";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import { FailureCode } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, type RequestContext, RuntimeClient } from "@noldova/teamrun-shell-runtime";
 
 import { RuntimeClientFixture } from "../fixtures/runtime-client.fixture.js";
@@ -26,7 +27,10 @@ export class PendingCallTests {
       const call = client.callAsync(RuntimeServerFixture.WAIT, null);
       client.close();
 
-      Assert.areEqual("The connection to the runtime is closed.", (await Assert.throwsAsync(() => call, ConnectionException)).message);
+      const exception = await Assert.throwsAsync(() => call, ConnectionException);
+
+      Assert.areEqual("The connection to the runtime is closed.", exception.message);
+      Assert.areEqual(FailureCode.Disconnected, exception.failure?.code);
     });
   }
 
@@ -41,6 +45,7 @@ export class PendingCallTests {
         const exception = await Assert.throwsAsync(() => client.callAsync(RuntimeServerFixture.ECHO, null, 50), ConnectionException);
 
         Assert.areEqual("The runtime did not answer notes.echo in time.", exception.message);
+        Assert.isNull(exception.failure);
         Assert.isTrue(Date.now() - started >= 90, "the client waits for the time limit and the grace");
         Assert.isTrue(client.isConnected);
       });

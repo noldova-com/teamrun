@@ -16,7 +16,7 @@ export default class GalleryFile {
 
   private static readonly FILE_SEGMENTS: readonly string[] = ["src", "generated", "gallery.ts"];
   private static readonly TYPE_IMPORT: string = "import type { Type } from \"@angular/core\";\n";
-  private static readonly GALLERY_IMPORT: string = "import { GalleryComponent } from \"@noldova/teamrun-shell-ui\";\n";
+  private static readonly GALLERY_IMPORT: string = "import { GalleryComponent } from \"@noldova/teamrun-shell-ui/gallery\";\n";
 
   private readonly root: string;
 

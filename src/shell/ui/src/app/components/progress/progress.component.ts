@@ -28,13 +28,14 @@ import { RevealDelayDirective } from "./reveal-delay.directive";
   }
 })
 export class ProgressComponent {
-  public readonly minimum: number = Resources.progressMinimum;
-  public readonly maximum: number = Resources.progressMaximum;
-  public readonly label = input.required<string>();
-  public readonly value = input<number | null>(null);
-  public readonly fraction: Signal<number | null> = computed(() => {
+  protected readonly minimum: number = Resources.progressMinimum;
+  protected readonly maximum: number = Resources.progressMaximum;
+  protected readonly fraction: Signal<number | null> = computed(() => {
     const value = this.value();
     return value === null ? null : Math.min(Math.max(value, this.minimum), this.maximum);
   });
-  public readonly isIndeterminate: Signal<boolean> = computed(() => this.fraction() === null);
+  protected readonly isIndeterminate: Signal<boolean> = computed(() => this.fraction() === null);
+
+  public readonly label = input.required<string>();
+  public readonly value = input<number | null>(null);
 }

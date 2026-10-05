@@ -19,7 +19,6 @@ import { Resources } from "../../../resources";
   changeDetection: ChangeDetectionStrategy.OnPush,
   hostDirectives: [CdkMenu, CdkTargetMenuAim],
   host: {
-    "class": "tr-scroll-reveal",
     "[class.tr-menu-pointer-still]": "isPointerStill()"
   }
 })

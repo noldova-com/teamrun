@@ -18,11 +18,12 @@ import { TaskbarIdentity } from "@noldova/teamrun-shell-desktop";
 export class TaskbarIdentityTests {
   private static readonly WORK: string = path.resolve("work folder");
   private static readonly PROGRAM: string = path.resolve("Team Run", "TeamRun.exe");
+  private static readonly ICON: string = path.resolve("checkout", "assets", "icons", "icon-dark.ico");
 
   @TestMethod
-  public relaunchesAPackagedBuildByItsProgramWithItsPathsMadeAbsolute(): void {
+  public relaunchesAPackagedBuildByItsProgramWithItsPathsMadeAbsoluteAndShowsTheProgramsIcon(): void {
     const data = path.resolve("data");
-    const identity = TaskbarIdentity.create(true, TaskbarIdentityTests.PROGRAM, "main.js", [
+    const identity = TaskbarIdentity.create(true, TaskbarIdentityTests.PROGRAM, TaskbarIdentityTests.ICON, "main.js", [
       TaskbarIdentityTests.PROGRAM,
       `--data-dir=${data}`,
       "--inspect=0",
@@ -41,8 +42,8 @@ export class TaskbarIdentityTests {
   }
 
   @TestMethod
-  public relaunchesADevelopmentBuildWithItsMainScriptMadeAbsoluteUnderItsOwnAppId(): void {
-    const identity = TaskbarIdentity.create(false, TaskbarIdentityTests.PROGRAM, "main.js", [], TaskbarIdentityTests.WORK);
+  public relaunchesADevelopmentBuildWithItsMainScriptMadeAbsoluteUnderItsOwnAppIdAndShowsTheIconFile(): void {
+    const identity = TaskbarIdentity.create(false, TaskbarIdentityTests.PROGRAM, TaskbarIdentityTests.ICON, "main.js", [], TaskbarIdentityTests.WORK);
     const command = `"${TaskbarIdentityTests.PROGRAM}" "${path.join(TaskbarIdentityTests.WORK, "main.js")}"`;
     const checkout = path.resolve(TaskbarIdentityTests.WORK, "..", "..", "..");
     const appId = `com.noldova.teamrun.development.${createHash("sha256").update(checkout).digest("hex").slice(0, 8)}`;
@@ -51,7 +52,7 @@ export class TaskbarIdentityTests {
     Assert.areEqual(command, identity.relaunchCommand);
     Assert.areEqual(JSON.stringify({
       appId,
-      appIconPath: TaskbarIdentityTests.PROGRAM,
+      appIconPath: TaskbarIdentityTests.ICON,
       appIconIndex: 0,
       relaunchCommand: command,
       relaunchDisplayName: "TeamRun"
@@ -67,7 +68,7 @@ export class TaskbarIdentityTests {
       await mkdir(checkout);
       await symlink(checkout, linked, "junction");
       const appId = (folder: string): string =>
-        TaskbarIdentity.create(false, TaskbarIdentityTests.PROGRAM, path.join(folder, "node_modules", "@noldova", "teamrun-shell-desktop", "main.js"), [], TaskbarIdentityTests.WORK).appId;
+        TaskbarIdentity.create(false, TaskbarIdentityTests.PROGRAM, TaskbarIdentityTests.ICON, path.join(folder, "node_modules", "@noldova", "teamrun-shell-desktop", "main.js"), [], TaskbarIdentityTests.WORK).appId;
 
       Assert.areEqual(appId(checkout), appId(linked));
     }
@@ -79,7 +80,7 @@ export class TaskbarIdentityTests {
   @TestMethod
   public givesEachCheckoutItsOwnDevelopmentAppIdAndAPackagedBuildThePlainOne(): void {
     const appId = (checkout: string, isPackaged: boolean = false): string =>
-      TaskbarIdentity.create(isPackaged, TaskbarIdentityTests.PROGRAM, path.join(checkout, "node_modules", "@noldova", "teamrun-shell-desktop", "main.js"), [], TaskbarIdentityTests.WORK).appId;
+      TaskbarIdentity.create(isPackaged, TaskbarIdentityTests.PROGRAM, TaskbarIdentityTests.ICON, path.join(checkout, "node_modules", "@noldova", "teamrun-shell-desktop", "main.js"), [], TaskbarIdentityTests.WORK).appId;
     const first = path.resolve("lanes", "first");
 
     Assert.isTrue(/^com\.noldova\.teamrun\.development\.[0-9a-f]{8}$/.test(appId(first)));

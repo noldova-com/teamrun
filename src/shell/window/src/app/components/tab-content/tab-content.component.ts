@@ -28,7 +28,6 @@ import { ModuleFailureCardComponent } from "../module-failure-card/module-failur
   styleUrl: "./tab-content.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    "class": "tr-scroll-reveal",
     "[class.tr-tab-content-padded]": "isPadded()",
     "[class.tr-tab-content-docked]": "isDocked()"
   }

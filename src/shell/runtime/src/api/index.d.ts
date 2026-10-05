@@ -1481,7 +1481,8 @@ export declare enum EndpointKind {
  */
 export declare class ConnectionException extends Exception {
   /**
-   * The failure the runtime answered with, or `null` when it could not be reached or closed the connection.
+   * The failure the runtime answered with, a `Disconnected` failure when an established connection has ended,
+   * or `null` when the runtime could not be reached, did not finish the handshake or did not answer in time.
    */
   public readonly failure: Failure | null;
 
@@ -3789,7 +3790,7 @@ export declare class RuntimeClient {
    * `FrameTooLarge`, as an answer too large for one frame does.
    * @throws {ArgumentOutOfRangeException} Synchronously when the time limit is not a positive integer.
    * @throws {TypeError} Synchronously when the payload cannot be written as JSON, such as one that contains itself.
-   * @throws {ConnectionException} Rejected when the connection is closed or closes, or the runtime does not answer within the limit and its grace.
+   * @throws {ConnectionException} Rejected with a `Disconnected` failure when the connection is closed or closes, and with none when the runtime does not answer within the limit and its grace.
    * @example
    * ```ts
    * import { QualifiedName, type Response } from "@noldova/teamrun-shell-protocol";
