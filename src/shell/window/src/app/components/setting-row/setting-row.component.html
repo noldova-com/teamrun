@@ -43,6 +43,11 @@ LICENSE file in the root directory of this source tree.
     @case (kinds.Text) {
       <input tr-text-field type="text" [attr.aria-label]="definition().title" [attr.maxlength]="definition().type.maxLength" [value]="asString(current())" (change)="commitText($event)" />
     }
+    @case (kinds.Action) {
+      <button type="button" tr-button [variant]="secondary" [disabled]="!canRun()" (click)="run.emit()">
+        <tr-highlighted-text [text]="asString(definition().type.label)" [query]="query()" />
+      </button>
+    }
     @case (kinds.Modules) {
       <div class="tr-setting-row-modules" role="group" [attr.aria-label]="definition().title">
         @for (module of modules(); track module.value) {

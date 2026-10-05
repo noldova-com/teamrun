@@ -182,6 +182,7 @@ export class Resources {
   public static readonly maximumField: string = "maximum";
   public static readonly stepField: string = "step";
   public static readonly maxLengthField: string = "maxLength";
+  public static readonly labelField: string = "label";
   public static readonly descriptionField: string = "description";
   public static readonly typeField: string = "type";
   public static readonly defaultField: string = "default";
@@ -212,7 +213,8 @@ export class Resources {
   public static readonly settingOptionsInvalid: string = "A choice needs at least one option, each with a distinct value and a title, none of them blank.";
   public static readonly settingRangeInvalid: string = "A number needs a finite minimum no greater than its finite maximum and a positive step.";
   public static readonly settingMaxLengthInvalid: string = "A text's maximum length must be a positive integer.";
-  public static readonly settingTypeFieldsInvalid: string = "A setting's type carries only the fields of its kind: options for a choice, minimum, maximum and step for a number, maxLength for a text.";
+  public static readonly settingLabelInvalid: string = "An action's label must not be blank.";
+  public static readonly settingTypeFieldsInvalid: string = "A setting's type carries only the fields of its kind: options for a choice, minimum, maximum and step for a number, maxLength for a text, command and label for an action.";
   public static readonly settingDefaultInvalid: string = "A setting's default must be a value its type accepts.";
   public static readonly settingScopesInvalid: string = "A setting's scopes must be distinct, and a device setting takes none.";
   public static readonly settingScopeIdInvalid: string = "A scope's object id must not be blank.";

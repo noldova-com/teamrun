@@ -17,6 +17,7 @@
     "documents": ["notes.note"],
     "statusBarItems": ["notes.count"],
     "topBarActions": ["notes.compose", "notes.back"],
+    "settings": ["notes.start"],
     "menus": ["notes.listItem", "notes.templates", "notes.tools", "notes.sortChoice", "notes.main", "notes.second", "notes.spare"]
   }
 }

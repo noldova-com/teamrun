@@ -101,6 +101,16 @@ describe("ToolbarButtonComponent", () => {
     expect(button().getAttribute("aria-haspopup")).toBe("menu");
   });
 
+  for (const theme of AppearanceFixture.themes)
+    it(`leaves the ${theme.id} theme's pill padding on both sides of its label, as a tab's pill does`, () => {
+      AppearanceFixture.apply(theme);
+      set(t => t.isShowingLabel.set(true));
+      const style = getComputedStyle(button());
+
+      AppearanceFixture.expectLook(style.paddingLeft, theme, "pill-padding", "padding-left");
+      AppearanceFixture.expectLook(style.paddingRight, theme, "pill-padding", "padding-right");
+    });
+
   it("exposes its pressed state and fills when pressed", () => {
     expect(button().hasAttribute("aria-pressed")).toBe(false);
 

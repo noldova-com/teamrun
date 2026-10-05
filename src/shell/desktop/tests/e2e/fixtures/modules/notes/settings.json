@@ -1,0 +1,15 @@
+{
+  "settings": [
+    {
+      "name": "notes.start",
+      "title": "Starting a note",
+      "description": "Opens a new note in a tab of its own.",
+      "type": { "kind": "Action", "command": "notes.newNote", "label": "Start a note" },
+      "default": null,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "Notes",
+      "group": "Writing"
+    }
+  ]
+}

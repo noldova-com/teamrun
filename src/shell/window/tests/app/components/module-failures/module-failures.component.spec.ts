@@ -96,7 +96,7 @@ describe("ModuleFailuresComponent", () => {
 
         expect(itemStyle.backgroundColor).toBe("rgba(0, 0, 0, 0)");
         expect(icon.color).toBe(AppearanceFixture.readColor(theme, mode, "errorForeground"));
-        AppearanceFixture.expectLook(itemStyle.paddingLeft, theme, "status-bar-item-padding", "padding-left");
+        AppearanceFixture.expectLook(itemStyle.paddingLeft, theme, "pill-padding", "padding-left");
         AppearanceFixture.expectLook(itemStyle.height, theme, "status-bar-item-height", "height");
         AppearanceFixture.expectLook(itemStyle.borderTopLeftRadius, theme, "radius-hover", "border-top-left-radius");
         AppearanceFixture.expectLook(icon.fontSize, theme, "icon", "font-size");
