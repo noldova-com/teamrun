@@ -170,6 +170,18 @@ describe("SettingsComponent", () => {
     expect(stacked).toBe(true);
   });
 
+  it("scrolls its content from the page list to its end edge with a stable gutter, and keeps its column at the reading width", () => {
+    const host = render();
+    host.style.width = "100rem";
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const box = (selector: string): DOMRect => (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
+    const content = host.querySelector(".tr-settings-content") as HTMLElement;
+
+    expect(Math.abs(box(".tr-settings-content").right - host.getBoundingClientRect().right)).toBeLessThan(1);
+    expect(getComputedStyle(content).scrollbarGutter).toBe("stable");
+    expect(box(".tr-settings-column").width).toBeCloseTo(56.5 * rem, 0);
+  });
+
   it("moves focus to the page control it now shows when it switches between the page list and the select, and to no control that was not focused", async () => {
     const host = render();
     const field = host.querySelector(".tr-settings-search-field") as HTMLInputElement;
