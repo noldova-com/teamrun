@@ -62,8 +62,10 @@ test.describe("view dialog", () => {
     await window.keyboard.press("ControlOrMeta+KeyW");
     await window.keyboard.press("ControlOrMeta+KeyB");
     const behind = await other.boundingBox();
-    await window.mouse.click((behind?.x ?? 0) + (behind?.width ?? 0) / 2, (behind?.y ?? 0) + (behind?.height ?? 0) / 2);
-    await summary.focus();
+    const point = { x: (behind?.x ?? 0) + (behind?.width ?? 0) / 2, y: (behind?.y ?? 0) + (behind?.height ?? 0) / 4 };
+    expect(point.y).toBeLessThan(bounds?.y ?? 0);
+    await window.mouse.click(point.x, point.y);
+    await expect(summary).toBeFocused();
     await window.keyboard.press("End");
     await window.keyboard.type("!");
     await expect(summary).toHaveValue("Plan the week!");
