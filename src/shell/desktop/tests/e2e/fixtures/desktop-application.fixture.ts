@@ -36,6 +36,7 @@ interface IActiveSocket {
   readonly readable: boolean;
   readonly writable: boolean;
   destroy(): void;
+  emit(event: string, chunk: string): boolean;
 }
 
 export default class DesktopApplicationFixture {
@@ -249,11 +250,31 @@ export default class DesktopApplicationFixture {
     return (await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory)))?.processId;
   }
 
-  public async breakRuntimeConnectionAsync(): Promise<void> {
+  public breakRuntimeConnectionAsync(): Promise<void> {
+    return this.reachRuntimeConnectionAsync("break its connection to the runtime", null);
+  }
+
+  public receiveInvalidFrameAsync(): Promise<void> {
+    return this.reachRuntimeConnectionAsync("receive an invalid frame on its connection to the runtime", "This line is not a message.\n");
+  }
+
+  public async disposeAsync(hasFailed: boolean = this.testInfo.status !== this.testInfo.expectedStatus): Promise<void> {
+    const isRunning = this.electronApplication !== null && Object.is(this.requireProcess().exitCode, null);
+    if (isRunning && this.viewport !== null && this.silence === null)
+      await this.checkGuardAsync(this.viewport).catch((error: unknown) => this.failures.push((error as Error).message));
+    CleanupSteps.throwFailures(await CleanupSteps.collectFailuresAsync([
+      ...hasFailed || this.silence !== null ? [() => this.keepDiagnosticsAsync(isRunning)] : [],
+      ...isRunning ? [() => this.closeAsync(true)] : [],
+      () => DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory),
+      () => this.removeFolderAsync()
+    ]));
+  }
+
+  private async reachRuntimeConnectionAsync(action: string, frame: string | null): Promise<void> {
     const discovery = await DiscoveryReader.readAsync(new DataDirectory(this.dataDirectory));
     if (discovery === null)
-      throw new Error(`No runtime discovery file was found in ${this.dataDirectory}, so the test could not tell which connection to break.`);
-    const found = await this.answerAsync("break its connection to the runtime", this.application.evaluate((_, port) => {
+      throw new Error(`No runtime discovery file was found in ${this.dataDirectory}, so the test could not tell which connection to reach.`);
+    const found = await this.answerAsync(action, this.application.evaluate((_, { port, frame }) => {
       const handles = (Reflect.get(process, "_getActiveHandles") as () => object[]).call(process);
       const standard: readonly object[] = [process.stdin, process.stdout, process.stderr];
       const sockets = handles.filter(t => t.constructor.name === "Socket").map(t => {
@@ -267,23 +288,14 @@ export default class DesktopApplicationFixture {
       const matches = sockets.filter(t => t.isRuntime);
       if (matches.length === 1)
         for (const match of matches)
-          match.socket.destroy();
+          if (frame === null)
+            match.socket.destroy();
+          else
+            match.socket.emit("data", frame);
       return { matched: matches.length, descriptions: sockets.map(t => t.description) };
-    }, Endpoint.parse(discovery.endpoint).port));
+    }, { port: Endpoint.parse(discovery.endpoint).port, frame }));
     if (found.matched !== 1)
       throw new Error(`The main process should hold one connection to the runtime at ${discovery.endpoint} but holds ${found.matched}. It found these sockets through process._getActiveHandles(), which Node does not document: ${found.descriptions.join("; ") || "none"}.`);
-  }
-
-  public async disposeAsync(hasFailed: boolean = this.testInfo.status !== this.testInfo.expectedStatus): Promise<void> {
-    const isRunning = this.electronApplication !== null && Object.is(this.requireProcess().exitCode, null);
-    if (isRunning && this.viewport !== null && this.silence === null)
-      await this.checkGuardAsync(this.viewport).catch((error: unknown) => this.failures.push((error as Error).message));
-    CleanupSteps.throwFailures(await CleanupSteps.collectFailuresAsync([
-      ...hasFailed || this.silence !== null ? [() => this.keepDiagnosticsAsync(isRunning)] : [],
-      ...isRunning ? [() => this.closeAsync(true)] : [],
-      () => DesktopApplicationFixture.stopRuntimeAsync(this.dataDirectory),
-      () => this.removeFolderAsync()
-    ]));
   }
 
   private async killSilentAsync(silence: MainProcessSilence): Promise<string> {
