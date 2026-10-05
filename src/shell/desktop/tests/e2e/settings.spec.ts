@@ -74,7 +74,7 @@ test.describe("settings", () => {
 
     await expect(settingsTab(window)).toHaveCount(1);
     await expect(settingsTab(window)).toHaveAttribute("aria-selected", "true");
-    await expect(window.locator(".tr-settings-pages .tr-tree-label")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Gallery"]);
+    await expect(window.locator(".tr-settings-pages .tr-tree-label")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Notes", "Gallery"]);
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Theme", "Text", "Layout", "Command search"]);
     await window.getByRole("treeitem", { name: "Appearance", exact: true }).focus();
     await window.keyboard.press("ArrowDown");
@@ -91,6 +91,34 @@ test.describe("settings", () => {
     }
     await expect(window.locator("[data-command=\"shell.openSettings\"] td").first()).toHaveText("Settings…");
     await desktop.checkpointAsync("settings-shortcuts");
+  });
+
+  test("a module's action setting opens the module's own document from its row once per press, by pointer or Enter, and stores nothing", async ({ desktop }) => {
+    const window = desktop.window;
+    const note = (id: number): Locator => window.locator(`tr-tab[data-tab-key="document/notes.note/${id}"]`);
+    const count = window.locator("tr-status-bar-item[data-tr-item=\"notes.count\"]");
+    const start = row(window, "notes.start").getByRole("button", { name: "Start a note" });
+    await expect(count).toHaveText("2 notes");
+    await SettingsFixture.openPageAsync(window, "Notes");
+
+    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Writing"]);
+    await expect(row(window, "notes.start").locator(".tr-setting-row-description")).toHaveText("Opens a new note in a tab of its own.");
+    await expect(start).toBeEnabled();
+    await desktop.checkpointAsync("settings-action");
+    await start.click();
+
+    await expect(note(3)).toHaveAttribute("aria-selected", "true");
+    await expect(count).toHaveText("3 notes");
+    await settingsTab(window).click();
+    await expect(window.getByRole("treeitem", { name: "Notes", exact: true })).toHaveAttribute("aria-selected", "true");
+    await start.focus();
+    await window.keyboard.press("Enter");
+
+    await expect(note(4)).toHaveAttribute("aria-selected", "true");
+    await expect(count).toHaveText("4 notes");
+    await settingsTab(window).click();
+    await expect(row(window, "notes.start").locator(".tr-setting-row-marker, .tr-setting-row-reset")).toHaveCount(0);
+    await expect(window.locator("tr-tab[data-tab-key^=\"document/notes.note/\"]")).toHaveCount(4);
   });
 
   test("the page list reveals its scrollbar's thumb colour while hovered, a long page shows its thumb while hovered, and dragging that thumb scrolls the page", async ({ desktop }) => {
