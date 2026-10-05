@@ -7,8 +7,7 @@
  */
 
 import { CdkTree, CdkTreeNode, CdkTreeNodeDef } from "@angular/cdk/tree";
-import { DOCUMENT } from "@angular/common";
-import { ChangeDetectionStrategy, Component, ElementRef, type Signal, afterRenderEffect, computed, inject, input, output, viewChild, viewChildren } from "@angular/core";
+import { ChangeDetectionStrategy, Component, type Signal, type WritableSignal, afterRenderEffect, computed, input, output, signal, viewChild, viewChildren } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 
@@ -23,12 +22,11 @@ import { Resources } from "../../../resources";
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TreeComponent {
-  private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-  private readonly document: Document = inject(DOCUMENT);
   private readonly tree: Signal<CdkTree<TreeNode, string>> = viewChild.required<CdkTree<TreeNode, string>>(CdkTree);
   private readonly rows: Signal<readonly CdkTreeNode<TreeNode, string>[]> = viewChildren<CdkTreeNode<TreeNode, string>>(CdkTreeNode);
 
   private readonly opened: Set<string> = new Set();
+  private readonly stopId: WritableSignal<string | null> = signal(null);
 
   public readonly nodes = input.required<readonly TreeNode[]>();
   public readonly label = input.required<string>();
@@ -50,10 +48,12 @@ export class TreeComponent {
       }
     });
     afterRenderEffect(() => {
-      const row = this.rowOf(this.current());
-      if (Object.isUndefined(row) || this.host.contains(this.document.activeElement))
-        return;
-      this.take(row);
+      const stop = this.rowOf(this.stopId()) ?? this.rowOf(this.current()) ?? this.rows()[0];
+      for (const row of this.rows())
+        if (row === stop)
+          row.makeFocusable();
+        else
+          row.unfocus();
     });
   }
 
@@ -62,11 +62,7 @@ export class TreeComponent {
   }
 
   protected take(row: CdkTreeNode<TreeNode, string>): void {
-    for (const other of this.rows())
-      if (other === row)
-        other.makeFocusable();
-      else
-        other.unfocus();
+    this.stopId.set(row.data.id);
   }
 
   protected choose(node: TreeNode): void {
