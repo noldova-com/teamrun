@@ -51,7 +51,14 @@ export default class ApiExampleCheck implements ICheck {
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
-    const apiPackages = await this.catalog.listAsync();
+    let apiPackages: readonly ApiPackage[];
+    try {
+      apiPackages = await this.catalog.listAsync();
+    }
+    catch (error) {
+      output.write(`${ApiException.describe(error)}\n`);
+      return false;
+    }
     if (apiPackages.length === 0) {
       output.write(ApiExampleCheck.NO_PACKAGES);
       return true;
@@ -76,7 +83,7 @@ export default class ApiExampleCheck implements ICheck {
 
   private async inspectAsync(apiPackage: ApiPackage): Promise<readonly string[]> {
     if (!existsSync(apiPackage.declarations))
-      return [apiPackage.isInstalled ? `no installed declarations at ${apiPackage.declarations}; build the packages first` : `no declarations at ${apiPackage.declarations}`];
+      return [apiPackage.missingDeclarations];
     try {
       const reading = new ApiProject(this.root, `${ApiExampleCheck.PURPOSE}-reading`, apiPackage.id);
       await reading.writeAsync(apiPackage.project, this.root, [apiPackage.declarations]);

@@ -257,6 +257,32 @@ class AngularProjectTests {
 
       assert.deepEqual([output.text, runner.runs], ["", []]);
     });
+
+    test("the path aliases of the source project lead to files resolved from src/", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      await repository.writeAsync({ "src/tsconfig.json": JSON.stringify({ compilerOptions: { paths: { "@noldova/teamrun-shell-ui": ["./shell/ui/src/api/index.ts"], "@noldova/x": [] } } }) });
+      const project = AngularProjectTests.create(repository, new ProcessRunnerFixture());
+
+      assert.deepEqual(await project.readPathAliasesAsync(), new Map([
+        ["@noldova/teamrun-shell-ui", [path.join(repository.directory, "src/shell/ui/src/api/index.ts")]],
+        ["@noldova/x", []]
+      ]));
+      assert.equal(project.projectFile, path.join(repository.directory, "src/tsconfig.json"));
+    });
+
+    test("a source project that is missing, is not JSON, or does not map its aliases to lists of files is refused", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      const project = AngularProjectTests.create(repository, new ProcessRunnerFixture());
+      const refused = new ProcessException("src/tsconfig.json must map its path aliases to lists of files in compilerOptions.paths.");
+
+      await assert.rejects(project.readPathAliasesAsync(), new ProcessException("The Angular project has no src/tsconfig.json."));
+      await repository.writeAsync({ "src/tsconfig.json": "{" });
+      await assert.rejects(project.readPathAliasesAsync(), new ProcessException("tsconfig.json could not be read as JSON."));
+      for (const paths of [undefined, [], "./index.ts", { "@noldova/x": "./index.ts" }, { "@noldova/x": [1] }]) {
+        await repository.writeAsync({ "src/tsconfig.json": JSON.stringify({ compilerOptions: { paths } }) });
+        await assert.rejects(project.readPathAliasesAsync(), refused);
+      }
+    });
   }
 
   private static async createProjectAsync(t: { after: (callback: () => Promise<void>) => void }): Promise<RepositoryFixture> {

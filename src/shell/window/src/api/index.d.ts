@@ -254,8 +254,8 @@ export interface IWindowPart {
    * import type { IWindowPart, IWindowPartContext } from "@noldova/teamrun-shell-window";
    *
    * export class NotesWindowPart implements IWindowPart {
-   *   public readonly moduleId: string = "notes";
    *   private context: IWindowPartContext | null = null;
+   *   public readonly moduleId: string = "notes";
    *   public notes: JsonValue = null;
    *
    *   public async activateAsync(context: IWindowPartContext): Promise<void> {
@@ -291,8 +291,8 @@ export interface IWindowPart {
    * import type { IWindowPart } from "@noldova/teamrun-shell-window";
    *
    * export class TickerWindowPart implements IWindowPart {
-   *   public readonly moduleId: string = "ticker";
    *   private timer: ReturnType<typeof setInterval> | null = null;
+   *   public readonly moduleId: string = "ticker";
    *
    *   public activateAsync(): Promise<void> {
    *     this.timer = setInterval(() => undefined, 1000);
@@ -523,8 +523,8 @@ export interface IWindowPartContext {
    * runtime refuses the post.
    * @example
    * ```ts
-   * import { type IWindowPartContext, type NotificationHandle } from "@noldova/teamrun-shell-window";
    * import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   * import { type IWindowPartContext, type NotificationHandle } from "@noldova/teamrun-shell-window";
    *
    * export function announceSaved(context: IWindowPartContext): Promise<NotificationHandle> {
    *   return context.postNotificationAsync(new NotificationPost(QualifiedName.parse("notes.saved"), null, "Note saved", null, NotificationSeverity.Info, null, [], null));
@@ -702,8 +702,8 @@ export interface IWindowPartContext {
    * refuses the request.
    * @example
    * ```ts
-   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
    * import { QualifiedName, SettingScope } from "@noldova/teamrun-shell-protocol";
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
    *
    * export function resetForProject(context: IWindowPartContext, project: string): Promise<void> {
    *   return context.resetSettingAsync("notes.wrapLines", new SettingScope(QualifiedName.parse("notes.project"), project));
@@ -876,15 +876,19 @@ export declare class ContentPaddingRef {
    * import { Component, inject } from "@angular/core";
    * import { ContentPadding, type ContentPaddingRef, WindowPartTokens } from "@noldova/teamrun-shell-window";
    *
-   * @Component({ selector: "tr-notes-preview", template: "<input type=\"checkbox\" (change)=\"showFullWidth($any($event.target).checked)\" />" })
+   * @Component({
+   *   selector: "tr-notes-preview",
+   *   template: "<button type=\"button\" (click)=\"showFullWidth()\">Full width</button><button type=\"button\" (click)=\"showDefault()\">Default</button>"
+   * })
    * export class NotesPreviewComponent {
    *   private readonly padding: ContentPaddingRef = inject(WindowPartTokens.contentPadding);
    *
-   *   protected showFullWidth(isFullWidth: boolean): void {
-   *     if (isFullWidth)
-   *       this.padding.set(ContentPadding.None);
-   *     else
-   *       this.padding.reset();
+   *   protected showFullWidth(): void {
+   *     this.padding.set(ContentPadding.None);
+   *   }
+   *
+   *   protected showDefault(): void {
+   *     this.padding.reset();
    *   }
    * }
    * ```
@@ -1015,8 +1019,8 @@ export declare class NotificationHandle {
    * {@link IWindowPartContext.postNotificationAsync}.
    * @example
    * ```ts
-   * import type { NotificationHandle } from "@noldova/teamrun-shell-window";
    * import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+   * import type { NotificationHandle } from "@noldova/teamrun-shell-window";
    *
    * export function reportProgress(handle: NotificationHandle, share: number): Promise<boolean> {
    *   return handle.updateAsync(new NotificationPost(QualifiedName.parse("notes.export"), null, "Exporting notes", null, NotificationSeverity.Info, null, [], share));
@@ -1468,7 +1472,8 @@ export declare class WindowPartTokens {
 export declare class MenuDirective {
   /**
    * The place the menu shows, `trMenu`; one of the module's or a
-   * dependency's. Setting another module's place throws.
+   * dependency's. Setting another module's place reports an error to
+   * Angular's error handler.
    */
   public readonly place: InputSignal<string>;
 

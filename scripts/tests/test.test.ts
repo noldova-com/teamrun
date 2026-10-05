@@ -13,6 +13,7 @@ import { cp, readFile } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
+import LicenseHeader from "../structure/license-header.ts";
 import Test from "../test.ts";
 import TestOptions from "../test-options.ts";
 import AngularReportRunnerFixture from "./fixtures/angular-report-runner.fixture.ts";
@@ -25,6 +26,10 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 class TestTests {
   private static readonly REPORT: string = JSON.stringify({ testResults: [] });
   private static readonly PASSING: string = "import { test } from \"node:test\";\n\ntest(\"passes\", () => undefined);\n";
+  private static readonly PROJECT: Readonly<Record<string, unknown>> = {
+    extends: path.join(SourceTreeFixture.root, "tsconfig.base.json"),
+    compilerOptions: { types: [], module: "preserve", moduleResolution: "bundler", paths: { "@noldova/teamrun-shell-window": ["./shell/window/src/api/index.ts"] } }
+  };
 
   public static register(): void {
     test("the complete gate runs every check in order and writes the step summary", async t => {
@@ -304,7 +309,10 @@ class TestTests {
       "README.md": "# TeamRun\n",
       "package.json": `${JSON.stringify(ProductIdentityFixture.manifest(), null, 2)}\n`,
       "src/modules/checkpoints/README.md": "# Checkpoints\n",
-      "src/angular.json": `${JSON.stringify({ projects: { teamrun: { architect: { test: { options: { include: ["shell/*/tests/**/*.spec.ts"] } } } } } })}\n`
+      "src/angular.json": `${JSON.stringify({ projects: { teamrun: { architect: { test: { options: { include: ["shell/*/tests/**/*.spec.ts"] } } } } } })}\n`,
+      "src/tsconfig.json": `${JSON.stringify(TestTests.PROJECT)}\n`,
+      "src/shell/window/src/api/index.ts": `${LicenseHeader.BLOCK}\nexport const size: number = 1;\n`,
+      "src/shell/window/src/api/index.d.ts": `${LicenseHeader.BLOCK}\nexport declare const size: number;\n`
     });
     return repository;
   }

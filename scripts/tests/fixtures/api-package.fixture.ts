@@ -10,6 +10,12 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import AngularProject from "../../angular/angular-project.ts";
+import ApiCatalog from "../../api/api-catalog.ts";
+import BuildLayout from "../../packages/build-layout.ts";
+import PackageCatalog from "../../packages/package-catalog.ts";
+import ProcessRunner from "../../processes/process-runner.ts";
+import NpmCommand from "../../toolchain/npm-command.ts";
 import SourceTreeFixture from "./source-tree.fixture.ts";
 
 export default class ApiPackageFixture {
@@ -59,6 +65,12 @@ export default class ApiPackageFixture {
       files[`${directory}/src/api/index.d.ts`] = declarations;
     await this.writeFilesAsync(files);
     return alias;
+  }
+
+  public createCatalog(parts: readonly string[]): ApiCatalog {
+    const runner = new ProcessRunner();
+    const angular = new AngularProject(this.directory, runner, new NpmCommand(runner, {}));
+    return new ApiCatalog(this.directory, new PackageCatalog(this.directory), new BuildLayout(this.directory), angular, parts);
   }
 
   public async writeFilesAsync(files: Readonly<Record<string, string>>): Promise<void> {

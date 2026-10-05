@@ -10,11 +10,8 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
-import ApiCatalog from "../../api/api-catalog.ts";
 import ApiServer from "../../api/api-server.ts";
 import ApiExampleCheck from "../../checks/api-example-check.ts";
-import BuildLayout from "../../packages/build-layout.ts";
-import PackageCatalog from "../../packages/package-catalog.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
 import ApiPackageFixture from "../fixtures/api-package.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
@@ -209,6 +206,17 @@ class ApiExampleCheckTests {
       assert.equal(output.text, `src/shell/counter:\n  no declarations at ${path.join(fixture.directory, "src/shell/counter/src/api/index.d.ts")}\n`);
     });
 
+    test("a listed Angular part that no path alias leads to fails the check with the reason", async t => {
+      const fixture = await ApiPackageFixture.createAsync();
+      t.after(() => fixture.disposeAsync());
+      await fixture.writeFilesAsync({ "src/tsconfig.json": JSON.stringify({ compilerOptions: { paths: {} } }) });
+      const output = new TextOutputFixture();
+
+      assert.equal(await ApiExampleCheckTests.createCheck(fixture, ["src/shell/counter"]).runAsync(output), false);
+      assert.equal(output.text,
+        "No path alias in src/tsconfig.json leads to src/shell/counter/src/api/index.ts, so the examples of src/shell/counter cannot be compiled against its declarations.\n");
+    });
+
     test("a package without installed declarations fails and asks for a build", async t => {
       const fixture = await ApiPackageFixture.createAsync();
       t.after(() => fixture.disposeAsync());
@@ -221,7 +229,7 @@ class ApiExampleCheckTests {
   }
 
   private static createCheck(fixture: ApiPackageFixture, parts: readonly string[] = []): ApiExampleCheck {
-    return new ApiExampleCheck(fixture.directory, new ApiCatalog(fixture.directory, new PackageCatalog(fixture.directory), new BuildLayout(fixture.directory), parts), new ProcessRunner(),
+    return new ApiExampleCheck(fixture.directory, fixture.createCatalog(parts), new ProcessRunner(),
       [ApiServer.locateCompiler()], ApiExampleCheckTests.TIMEOUT);
   }
 

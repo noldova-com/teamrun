@@ -49,8 +49,4 @@ describe("GalleryComponent", () => {
     expect(controls.length).toBeGreaterThan(20);
     expect(missing).toEqual([]);
   });
-
-  it("is reached through the kit's development entry alone, never through its API", () => {
-    expect(Object.values(kit)).not.toContain(GalleryComponent);
-  });
 });

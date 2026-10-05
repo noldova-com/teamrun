@@ -175,9 +175,9 @@ export default class Test {
     const tree = new SourceTree(this.root, files);
     const build = new PackageBuild(this.root, this.runner, this.environment);
     const modules = new ModuleCatalog(this.root);
-    const apis = new ApiCatalog(this.root, new PackageCatalog(this.root), new BuildLayout(this.root), Test.API_PARTS);
-    const server = [ApiServer.locateCompiler()];
     const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
+    const apis = new ApiCatalog(this.root, new PackageCatalog(this.root), new BuildLayout(this.root), angular, Test.API_PARTS);
+    const server = [ApiServer.locateCompiler()];
     return [
       documents,
       new LicenseHeaderCheck(this.root, files),

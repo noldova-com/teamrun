@@ -22,6 +22,7 @@ export default class AngularProject {
 
   private static readonly FOLDER: string = "src";
   private static readonly WORKSPACE_FILE: string = "angular.json";
+  private static readonly PROJECT_FILE: string = "tsconfig.json";
   private static readonly LOCKFILE: string = "package-lock.json";
   private static readonly INSTALL_RECORD: string = "node_modules/.teamrun-install";
   private static readonly RECORD_ENCODING: BufferEncoding = "utf8";
@@ -51,9 +52,12 @@ export default class AngularProject {
   private readonly runner: ProcessRunner;
   private readonly npm: NpmCommand;
 
+  public readonly projectFile: string;
+
   public constructor(root: string, runner: ProcessRunner, npm: NpmCommand) {
     this.root = root;
     this.directory = path.join(root, AngularProject.FOLDER);
+    this.projectFile = path.join(this.directory, AngularProject.PROJECT_FILE);
     this.runner = runner;
     this.npm = npm;
   }
@@ -144,6 +148,22 @@ export default class AngularProject {
     for await (const file of glob(include as string[], { cwd: this.directory }))
       files.push(this.specName(path.resolve(this.directory, file)));
     return files.sort();
+  }
+
+  public async readPathAliasesAsync(): Promise<ReadonlyMap<string, readonly string[]>> {
+    if (!existsSync(this.projectFile))
+      throw new ProcessException(`The Angular project has no src/${AngularProject.PROJECT_FILE}.`);
+    const paths = AngularProject.field(AngularProject.field(await AngularProject.readJsonAsync(this.projectFile), "compilerOptions"), "paths");
+    const refused = new ProcessException(`src/${AngularProject.PROJECT_FILE} must map its path aliases to lists of files in compilerOptions.paths.`);
+    if (typeof paths !== "object" || paths === null || Array.isArray(paths))
+      throw refused;
+    const aliases = new Map<string, readonly string[]>();
+    for (const [alias, targets] of Object.entries(paths)) {
+      if (!Array.isArray(targets) || targets.some(t => typeof t !== "string"))
+        throw refused;
+      aliases.set(alias, targets.map(t => path.resolve(this.directory, String(t))));
+    }
+    return aliases;
   }
 
   private async readCollectedAsync(report: string): Promise<readonly string[]> {

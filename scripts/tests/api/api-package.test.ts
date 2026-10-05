@@ -24,7 +24,8 @@ class ApiPackageTests {
       assert.equal(found.project, path.join(root, "src/foundation/json/src/tsconfig.json"));
       assert.equal(found.implementation, path.join(root, "src/foundation/json/src/api/index.ts"));
       assert.equal(found.declarations, path.join(root, "node_modules/@noldova/teamrun-foundation-json/api/index.d.ts"));
-      assert.deepEqual([found.isInstalled, found.paths], [true, undefined]);
+      assert.equal(found.missingDeclarations, `no installed declarations at ${found.declarations}; build the packages first`);
+      assert.equal(found.paths, undefined);
     });
 
     test("an Angular part's API is its directory, an id from its path, the shared project, and its API source and declarations in source", () => {
@@ -34,10 +35,12 @@ class ApiPackageTests {
 
       assert.deepEqual([found.directory, found.id], ["src/shell/window", "shell-window"]);
       assert.equal(found.project, path.join(root, "src/tsconfig.json"));
-      assert.deepEqual([found.implementation, found.declarations], ApiPackage.locatePart(root, "src/shell/window"));
       assert.equal(found.implementation, path.join(root, "src/shell/window/src/api/index.ts"));
+      assert.equal(found.implementation, ApiPackage.locatePartImplementation(root, "src/shell/window"));
       assert.equal(found.declarations, path.join(root, "src/shell/window/src/api/index.d.ts"));
-      assert.deepEqual([found.isInstalled, found.paths], [false, paths]);
+      assert.equal(found.declarations, ApiPackage.locatePartDeclarations(root, "src/shell/window"));
+      assert.equal(found.missingDeclarations, `no declarations at ${found.declarations}`);
+      assert.deepEqual(found.paths, paths);
     });
   }
 }
