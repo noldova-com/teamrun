@@ -42,7 +42,7 @@ describe("SectionHeaderComponent", () => {
 
   const header = (name: string): HTMLElement => fixture.nativeElement.querySelector(`.${name}`);
 
-  function gaps(name: string): readonly number[] {
+  function gaps(name: string): readonly [number, number, number] {
     const element = header(name);
     const range = document.createRange();
     range.selectNodeContents(element);
@@ -53,7 +53,8 @@ describe("SectionHeaderComponent", () => {
     const labelBottom = labelTop + lines * Number.parseFloat(style.lineHeight);
     const before = element.previousElementSibling?.getBoundingClientRect().bottom ?? box.top;
     const after = (element.nextElementSibling as Element).getBoundingClientRect().top;
-    return [labelTop - before, after - labelBottom, lines].map(t => Math.round(t * 100) / 100);
+    const rounded = (value: number): number => Math.round(value * 100) / 100;
+    return [rounded(labelTop - before), rounded(after - labelBottom), lines];
   }
 
   afterEach(() => AppearanceFixture.reset());
