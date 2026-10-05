@@ -128,6 +128,7 @@ export class DesktopApplication {
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
     process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
     process.onUnhandledRejection(t => recovery.receive(t, MainProcessFailureKind.UnhandledRejection));
+    electron.app.setName(Resources.applicationName);
     const moduleDirectory = dirname(fileURLToPath(moduleUrl));
     const isPackaged = DesktopApplication.isPackagedBuild(electron, process);
     const dataDirectory = DataDirectoryLocator.locate(
@@ -155,7 +156,6 @@ export class DesktopApplication {
 
   private run(): void {
     const app = this.electron.app;
-    app.setName(Resources.applicationName);
     app.setAppUserModelId(this.taskbar.appId);
     if (this.settings.platform === Resources.linuxPlatform)
       app.setDesktopName(`${this.taskbar.appId}${Resources.desktopFileSuffix}`);

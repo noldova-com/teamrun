@@ -221,7 +221,7 @@ export class Resources {
   }
 
   public static get mainProcessFailedBeforeStartDetail(): string {
-    return `It stopped while starting, before it had a log folder. Restart ${Resources.applicationName} to try again.`;
+    return `This happened while ${Resources.applicationName} was starting. Restart ${Resources.applicationName} to try again.`;
   }
 
   public static get restartButton(): string {

@@ -50,7 +50,7 @@ class Failed {
 export class MainProcessRecoveryTests {
   private static readonly BOX: string = "null warning TeamRun stopped because of an unexpected error. | Work running in the runtime continues. Changes from the last few seconds may not have been saved. "
     + "Restart TeamRun to go on, or open the log folder to see what happened. | [\"Restart TeamRun\",\"Open log folder\",\"Quit\"] 0 2";
-  private static readonly EARLY_BOX: string = "null warning TeamRun stopped because of an unexpected error. | It stopped while starting, before it had a log folder. Restart TeamRun to try again. "
+  private static readonly EARLY_BOX: string = "null warning TeamRun stopped because of an unexpected error. | This happened while TeamRun was starting. Restart TeamRun to try again. "
     + "| [\"Restart TeamRun\",\"Quit\"] 0 1";
 
   @TestMethod

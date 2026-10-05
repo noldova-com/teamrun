@@ -44,7 +44,7 @@ export class DesktopApplicationTests {
 
     Assert.areEqual(
       JSON.stringify(["setName TeamRun", `setAppUserModelId ${DesktopStartFixture.DEVELOPMENT_APP_ID}`, "requestSingleInstanceLock", "enableSandbox"]),
-      JSON.stringify(electron.app.calls.slice(1)));
+      JSON.stringify(electron.app.calls.filter(t => !t.startsWith("setPath"))));
     Assert.areEqual(0, electron.windows.length);
   }
 
@@ -56,7 +56,7 @@ export class DesktopApplicationTests {
     await electron.app.becomeReadyAsync();
 
     Assert.areEqual(
-      JSON.stringify(["setName TeamRun", `setAppUserModelId ${DesktopStartFixture.DEVELOPMENT_APP_ID}`, "requestSingleInstanceLock", "quit"]), JSON.stringify(electron.app.calls.slice(1)));
+      JSON.stringify(["setName TeamRun", `setAppUserModelId ${DesktopStartFixture.DEVELOPMENT_APP_ID}`, "requestSingleInstanceLock", "quit"]), JSON.stringify(electron.app.calls.filter(t => !t.startsWith("setPath"))));
     Assert.areEqual(0, electron.app.count("window-all-closed"));
     Assert.areEqual(0, electron.windows.length);
   }
@@ -509,7 +509,7 @@ export class DesktopApplicationTests {
 
     const [settings] = DesktopStartFixture.start(electron, process);
 
-    Assert.areEqual(`setPath userData ${join(dataDirectory.root, "desktop")}`, electron.app.calls[0]);
+    Assert.areEqual(JSON.stringify([`setPath userData ${join(dataDirectory.root, "desktop")}`]), JSON.stringify(electron.app.calls.filter(t => t.startsWith("setPath"))));
     Assert.areEqual(dataDirectory.root, settings?.dataDirectory.root);
     Assert.areEqual(JSON.stringify(["/electron/electron", RuntimeEntry.entryPath, "linux"]), JSON.stringify([settings?.executablePath, settings?.entryPath, settings?.platform]));
     Assert.areEqual(JSON.stringify({ KEPT: "yes", ELECTRON_RUN_AS_NODE: "1" }), JSON.stringify(settings?.environment));
@@ -1426,7 +1426,7 @@ export class DesktopApplicationTests {
 
     Assert.isTrue(process.errors.includes(`The desktop's main process failed with an uncaught exception: ArgumentException: ${failure.message}`), process.errors);
     Assert.areEqual(JSON.stringify([["Restart TeamRun", "Quit"]]), JSON.stringify(electron.dialog.boxes.map(t => t.options.buttons)));
-    Assert.areEqual(JSON.stringify(["exit 0"]), JSON.stringify(electron.app.calls.filter(t => t.startsWith("exit") || t === "relaunch")));
+    Assert.areEqual(JSON.stringify(["setName TeamRun", "exit 0"]), JSON.stringify(electron.app.calls));
   }
 
   @TestMethod
