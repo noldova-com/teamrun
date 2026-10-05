@@ -17,7 +17,7 @@ import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 const colors = {
   light: { error: "rgb(161, 38, 13)", raised: "rgb(248, 248, 248)", cardBorder: "rgb(229, 229, 229)" },
-  dark: { error: "rgb(244, 135, 113)", raised: "rgb(43, 43, 43)", cardBorder: "rgb(37, 37, 38)" }
+  dark: { error: "rgb(244, 135, 113)", raised: "rgb(43, 43, 43)", cardBorder: "rgb(37, 37, 37)" }
 };
 
 const tab = (desktop: DesktopApplicationFixture, key: string): ReturnType<DesktopApplicationFixture["window"]["locator"]> =>

@@ -18,8 +18,8 @@ import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 const colors = {
-  Light: { link: "rgb(0, 95, 184)", error: "rgb(161, 38, 13)", selected: "rgb(228, 230, 241)", muted: "rgb(97, 97, 97)" },
-  Dark: { link: "rgb(77, 170, 252)", error: "rgb(244, 135, 113)", selected: "rgb(55, 55, 61)", muted: "rgb(157, 157, 157)" }
+  Light: { link: "rgb(0, 95, 184)", error: "rgb(161, 38, 13)", selected: "rgb(230, 230, 230)", muted: "rgb(97, 97, 97)" },
+  Dark: { link: "rgb(77, 170, 252)", error: "rgb(244, 135, 113)", selected: "rgb(56, 56, 56)", muted: "rgb(157, 157, 157)" }
 };
 
 function modulesTab(window: Page): Locator {
