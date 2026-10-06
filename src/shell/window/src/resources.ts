@@ -762,7 +762,7 @@ export class Resources {
   public static readonly unknownUpdateState: string = "The update state is not one the window knows.";
   public static readonly invalidUpdateProgress: string = "An update's progress is a percentage from 0 to 100.";
   public static readonly missingUpdateVersion: string = "An update that is available, downloading or ready names its version.";
-  public static readonly invalidUpdateMove: string = "Only an available or failed update says TeamRun must move to Applications, and an available one always does.";
+  public static readonly invalidUpdateMove: string = `Only an available or failed update says ${productName} must move to Applications, and an available one always does.`;
   public static readonly progressField: string = "progress";
   public static readonly checkedAtField: string = "checkedAt";
   public static readonly reasonField: string = "reason";

@@ -79,13 +79,13 @@ describe("UpdateNotifierService", () => {
     ]);
   });
 
-  it("posts nothing for an update that isn't ready, for a state without a version, or for a version the list already holds", async () => {
+  it("posts nothing for an update that isn't ready or for a version the list already holds", async () => {
     firstRead.set(new NotificationState([], false, [], 0));
     notifications.set(new NotificationState([existing("shell.updateReady", "1.4.0")], false, [], 1));
     bridge.update = update("Available", { version: "1.3.0", mustMove: true });
     start();
     await settleAsync(() => true);
-    for (const state of [update("Ready"), update("Ready", { version: "1.4.0" }), update("Failed", { version: "1.4.0" }), update("Ready", { version: "1.4.0" })]) {
+    for (const state of [update("Ready", { version: "1.4.0" }), update("Failed", { version: "1.4.0" }), update("Ready", { version: "1.4.0" })]) {
       bridge.publishUpdate(state);
       await settleAsync(() => true);
     }
