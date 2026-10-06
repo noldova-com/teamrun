@@ -16,6 +16,8 @@ import { type OwnedProcess, ProcessClock, ProcessSettings, ProcessSupervisor, Sy
 import { ProcessClockFixture } from "./process-clock.fixture.js";
 import { ProgramFixture } from "./program.fixture.js";
 import type { SettingsFixture } from "./settings.fixture.js";
+import { SystemCommandFixture } from "./system-command.fixture.js";
+import type { WindowsProcessApiFixture } from "./windows-process-api.fixture.js";
 
 export class ProcessSupervisorFixture {
   public static readonly MODULE: string = "notes";
@@ -65,8 +67,8 @@ export class ProcessSupervisorFixture {
     return ProcessSupervisorFixture.create(settings, "linux", process.env, command, ProcessSupervisorFixture.LINUX);
   }
 
-  public static createWindows(settings: SettingsFixture, environment: NodeJS.ProcessEnv, command: SystemCommand): ProcessSupervisor {
-    return ProcessSupervisorFixture.create(settings, "win32", environment, command, ProcessSupervisorFixture.WINDOWS);
+  public static createWindows(settings: SettingsFixture, windows: WindowsProcessApiFixture, command: SystemCommand = new SystemCommandFixture([])): ProcessSupervisor {
+    return ProcessSupervisorFixture.create(settings, "win32", { SystemRoot: ProcessSupervisorFixture.SYSTEM_ROOT }, command, ProcessSupervisorFixture.WINDOWS, windows);
   }
 
   public static createSeeing(settings: SettingsFixture): ProcessSupervisor {
@@ -78,7 +80,8 @@ export class ProcessSupervisorFixture {
     platform: string = process.platform,
     environment: NodeJS.ProcessEnv = process.env,
     command: SystemCommand = new SystemCommand(),
-    clock: ProcessClock = ProcessClock.create(process.platform)): ProcessSupervisor {
-    return new ProcessSupervisor(settings.database, platform, environment, command, settings.diagnostics, new ProcessSettings(300, 500), clock);
+    clock: ProcessClock = ProcessClock.create(process.platform),
+    windows?: WindowsProcessApiFixture): ProcessSupervisor {
+    return new ProcessSupervisor(settings.database, platform, environment, command, settings.diagnostics, new ProcessSettings(300, 500), clock, windows);
   }
 }

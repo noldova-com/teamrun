@@ -1896,6 +1896,129 @@ export interface IProcessStarter {
 }
 
 /**
+ * The Windows functions the runtime reads the process table and ends processes with. Each call returns at once, and creating an implementation loads
+ * nothing, so a supervisor can be created on any platform.
+ */
+export interface IWindowsProcessApi {
+  /**
+   * Lists the processes running now, as `CreateToolhelp32Snapshot` sees them.
+   *
+   * @returns Each process's id and its parent's id.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function listChildren(api: IWindowsProcessApi, parentId: number): number[] {
+   *   return api.listProcesses().filter(([, parent]) => parent === parentId).map(([processId]) => processId);
+   * }
+   * ```
+   */
+  listProcesses(): readonly (readonly [number, number])[];
+
+  /**
+   * Opens a process, as `OpenProcess` does.
+   *
+   * @param processId The process to open.
+   * @param access The access rights asked for.
+   * @returns The process's handle, or the Windows error code when it could not be opened: 87 when no process has the id.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isOpenable(api: IWindowsProcessApi, processId: number): boolean {
+   *   const handle = api.openProcess(processId, 0x1000);
+   *   if (typeof handle === "number")
+   *     return false;
+   *   api.closeHandle(handle);
+   *   return true;
+   * }
+   * ```
+   */
+  openProcess(processId: number, access: number): bigint | number;
+
+  /**
+   * Reads when a process was created, as `GetProcessTimes` does.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess}.
+   * @returns The creation time in 100-nanosecond units since 1601, or `null` when it could not be read.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readCreated(api: IWindowsProcessApi, handle: bigint): number | null {
+   *   const created = api.readCreationTime(handle);
+   *   return created === null ? null : Number(created / 10_000n) - 11_644_473_600_000;
+   * }
+   * ```
+   */
+  readCreationTime(handle: bigint): bigint | null;
+
+  /**
+   * Reads the full path of the executable a process runs, as `QueryFullProcessImageNameW` does.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess}.
+   * @returns The path, or `null` when it could not be read.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function runs(api: IWindowsProcessApi, handle: bigint, executable: string): boolean {
+   *   return api.readImagePath(handle)?.toLowerCase() === executable.toLowerCase();
+   * }
+   * ```
+   */
+  readImagePath(handle: bigint): string | null;
+
+  /**
+   * Ends a process, as `TerminateProcess` does.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess} with the right to terminate.
+   * @returns Whether the process was told to end.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function end(api: IWindowsProcessApi, handle: bigint): string {
+   *   return api.terminateProcess(handle) ? "ending" : "refused";
+   * }
+   * ```
+   */
+  terminateProcess(handle: bigint): boolean;
+
+  /**
+   * Checks whether a process has exited, as `WaitForSingleObject` does with no wait.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess} with the right to synchronize.
+   * @returns Whether the process has exited.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function countRunning(api: IWindowsProcessApi, handles: readonly bigint[]): number {
+   *   return handles.filter(t => !api.hasExited(t)).length;
+   * }
+   * ```
+   */
+  hasExited(handle: bigint): boolean;
+
+  /**
+   * Closes a handle, as `CloseHandle` does.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess}, which is not used again.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function closeAll(api: IWindowsProcessApi, handles: readonly bigint[]): void {
+   *   for (const handle of handles)
+   *     api.closeHandle(handle);
+   * }
+   * ```
+   */
+  closeHandle(handle: bigint): void;
+}
+
+/**
  * Handles requests for one registered method.
  */
 export interface IMethodHandler {
@@ -5998,13 +6121,15 @@ export declare class ProcessSupervisor {
    * @param database The shell's database, which holds the records.
    * @param platform The platform, as in `process.platform`.
    * @param environment The runtime's environment, which programs inherit from.
-   * @param command Reads the process table.
+   * @param command Reads the process table on macOS and Linux.
    * @param diagnostics The runtime's log, which receives the programs that
    * had to be killed or could not be ended.
    * @param settings How long programs may take to end.
    * @param clock The clock that times programs' starts and names the boot;
    * {@link ProcessClock.create} for the platform this process runs on by
    * default.
+   * @param windows Reads the process table and ends processes on Windows.
+   * Defaults to the system's own functions.
    * @example
    * ```ts
    * import { ProcessSettings, ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";
@@ -6021,7 +6146,8 @@ export declare class ProcessSupervisor {
     command: SystemCommand,
     diagnostics: Writable,
     settings?: ProcessSettings,
-    clock?: ProcessClock);
+    clock?: ProcessClock,
+    windows?: IWindowsProcessApi);
 
   /**
    * The programs running, in the order they started, then the programs that

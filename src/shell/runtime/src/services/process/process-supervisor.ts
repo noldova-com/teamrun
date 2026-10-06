@@ -17,6 +17,7 @@ import { ProgramStatusList } from "@noldova/teamrun-shell-protocol";
 
 import { ProcessStartException } from "../../exceptions/process-start.exception.js";
 import type { IProcessEnder } from "../../interfaces/i-process-ender.js";
+import type { IWindowsProcessApi } from "../../interfaces/i-windows-process-api.js";
 import { KeptProgram } from "../../models/kept-program.js";
 import { OwnedProcess } from "../../models/owned-process.js";
 import type { ProcessEnding } from "../../models/process-ending.js";
@@ -37,6 +38,7 @@ import { ProcessEnderFactory } from "./process-ender-factory.js";
 import { ProcessEnvironment } from "./process-environment.js";
 import { ProcessRecordStore } from "./process-record-store.js";
 import { ProgramLocator } from "./program-locator.js";
+import { WindowsProcessApi } from "./windows-process-api.js";
 
 export class ProcessSupervisor {
   private readonly platform: string;
@@ -64,13 +66,14 @@ export class ProcessSupervisor {
     command: SystemCommand,
     diagnostics: Writable,
     settings: ProcessSettings = new ProcessSettings(),
-    clock: ProcessClock = ProcessClock.create(process.platform)) {
+    clock: ProcessClock = ProcessClock.create(process.platform),
+    windows: IWindowsProcessApi = new WindowsProcessApi()) {
     this.platform = platform;
     this.environment = environment;
     this.records = new ProcessRecordStore(database);
     this.locator = new ProgramLocator(platform);
     this.clock = clock;
-    this.ender = ProcessEnderFactory.create(platform, command, environment, settings, clock);
+    this.ender = ProcessEnderFactory.create(platform, command, windows, settings, clock);
     this.diagnostics = diagnostics;
     this.seenMilliseconds = settings.seenMilliseconds;
   }
