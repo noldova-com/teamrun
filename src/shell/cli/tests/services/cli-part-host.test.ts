@@ -93,38 +93,45 @@ export class CliPartHostTests {
   }
 
   @TestMethod
-  public async startsNoPartAfterAStopAndStopsAPartThatFinishesStartingAfterIt(): Promise<void> {
+  public async startsNoPartAndRunsNoCommandAfterAStopAndStopsAPartThatFinishesStartingAfterIt(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
     await fixture.startHostAsync(build.declarationsFile);
-    const interruptAsync = async (): Promise<{ code: number; error: string; beforeRelease: string; readLaterError: () => string }> => {
+    const stopped = "activate slow\ndeactivate slow\n";
+    const interruptAsync = async (target: string): Promise<{ code: number; error: string; beforeRelease: string; readLaterError: () => string }> => {
       await rm(build.locate(ProbeBuildFixture.SLOW_MARKER), { force: true });
       await rm(build.locate(ProbeBuildFixture.SLOW_RELEASE), { force: true });
       await rm(build.locate(ProbeBuildFixture.PARTS_LOG), { force: true });
-      const running = fixture.runModuleAsync(build, ["tardy", "run", "--json"]);
+      const running = fixture.runModuleAsync(build, [target, "run", "--json"]);
       await ProbeBuildFixture.waitUntilWaitingAsync(build.locate(ProbeBuildFixture.SLOW_MARKER));
       fixture.signals.emit("SIGINT");
       const interrupted = await running;
       const beforeRelease = await build.readPartsLogAsync();
       await writeFile(build.locate(ProbeBuildFixture.SLOW_RELEASE), "yes");
-      Assert.isTrue(await Wait.untilAsync(async () => await build.readPartsLogAsync() === "activate slow\ndeactivate slow\n", 15_000), await build.readPartsLogAsync());
+      Assert.isTrue(await Wait.untilAsync(async () => await build.readPartsLogAsync() === stopped, 15_000), await build.readPartsLogAsync());
       return { ...interrupted, beforeRelease };
     };
 
-    const clean = await interruptAsync();
-    const cleanLate = clean.readLaterError();
-    await writeFile(build.locate(ProbeBuildFixture.SLOW_STICKS), "yes");
-    const stuck = await interruptAsync();
-    let stuckLate = "";
-    const isReported = await Wait.untilAsync(() => (stuckLate += stuck.readLaterError()) !== "", 15_000);
+    const results: { code: number; error: string; beforeRelease: string; late: string; afterReport: string }[] = [];
+    for (const target of ["tardy", "slow"]) {
+      const clean = await interruptAsync(target);
+      const cleanLate = clean.readLaterError();
+      results.push({ ...clean, late: cleanLate, afterReport: await build.readPartsLogAsync() });
+      await writeFile(build.locate(ProbeBuildFixture.SLOW_STICKS), "yes");
+      const stuck = await interruptAsync(target);
+      let stuckLate = "";
+      Assert.isTrue(await Wait.untilAsync(() => (stuckLate += stuck.readLaterError()) !== "", 15_000), "The late part's failure to stop was not reported within 15 s.");
+      results.push({ ...stuck, late: stuckLate, afterReport: await build.readPartsLogAsync() });
+      await rm(build.locate(ProbeBuildFixture.SLOW_STICKS), { force: true });
+    }
 
-    for (const run of [clean, stuck]) {
+    const report = `${JSON.stringify({ code: "PartNotStopped", message: "A command-line part failed to stop: The slow part would not let go." })}\n`;
+    Assert.areEqual(JSON.stringify(["", report, "", report]), JSON.stringify(results.map(t => t.late)));
+    for (const run of results) {
       Assert.areEqual(6, run.code, run.error);
       Assert.areEqual("Cancelled", (JSON.parse(run.error) as { code: string }).code);
       Assert.areEqual("activate slow\n", run.beforeRelease);
+      Assert.areEqual(stopped, run.afterReport);
     }
-    Assert.areEqual("", cleanLate);
-    Assert.isTrue(isReported, "The late part's failure to stop was not reported within 15 s.");
-    Assert.areEqual(`${JSON.stringify({ code: "PartNotStopped", message: "A command-line part failed to stop: The slow part would not let go." })}\n`, stuckLate);
   }
 }

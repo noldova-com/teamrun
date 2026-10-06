@@ -27,7 +27,7 @@ The runtime then stays up under its idle policy, so later calls attach to it.
 |---|---|
 | `--data-dir <path>` | The data directory. Without it, the command line uses the same one the desktop would. |
 | `--device-dir <path>` | The device folder, which keeps the device's identity and each installation's record and launch barrier. Without it, the command line uses the same one the desktop would. |
-| `--json` | Prints exactly one JSON value on standard output, and an error as `{"code","message","details"}` on standard error. |
+| `--json` | Prints exactly one JSON value on standard output, and each error as a line of `{"code","message","details"}` on standard error. |
 | `--no-start` | `commands`, `run` and module commands fail with exit code 3 instead of starting a runtime. |
 | `--take-over` | `commands`, `run` and module commands take over another build's runtime when this build is newer and that runtime is idle. |
 | `--timeout <seconds>` | How long `run`'s command or a module command may take, in whole seconds from 1 to 3600. |
@@ -94,10 +94,11 @@ The [architecture](../../../docs/ARCHITECTURE.md#command-line-commands) owns how
   The command line then reaches the runtime as `run` does, starting one unless `--no-start` is given.
   It runs the command only when the command's module is active, after starting that module's command-line part and those of its dependencies, direct and indirect; otherwise it exits with code 7.
   A part that fails to start also exits with code 7.
-  `--timeout` and an interruption cover starting the parts as well as running the command, and exit with code 6; no part starts after them.
-  Every part that started, or began to start, is stopped afterwards in reverse order, even when one fails to stop; a part still starting then is stopped once its start settles.
+  `--timeout` and an interruption cover starting the parts as well as running the command, and exit with code 6; no part starts, and the command does not run, after them.
+  Every part that started is stopped afterwards in reverse order, even when one fails to stop.
+  A part still starting then is stopped once its start settles, whenever that is, so it may stop while the others do; the command line ends once it has written its result, so a part whose start settles later is never stopped, and the process ends even while that start holds a timer, socket or child process.
   A part that fails to stop is reported on standard error after the command's result or error, and makes a command that succeeded exit with code 9.
-  Stopping the parts is not bounded by `--timeout`: the command line waits for each part to stop, and an interruption while it waits ends the command line at once.
+  Stopping the parts is not bounded by `--timeout`: the command line waits for each part to stop, and an interruption while it waits ends the command line at once, with the exit code the system gives an interrupted program, 130 in a Linux or macOS shell and `0xC000013A` on Windows.
   A part reaches only the methods of its own module and of the modules it declares as dependencies, not of their dependencies.
   `teamrun run` exits with code 7 too for a runtime command whose module is not active.
 - **Output.**

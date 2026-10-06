@@ -8,10 +8,13 @@
 
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { homedir } from "node:os";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import path from "node:path";
 import { PassThrough } from "node:stream";
+import { pathToFileURL } from "node:url";
 
-import { Assert, CoverageEnvironment, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import { Assert, CoverageEnvironment, TestClass, TestMethod, Wait } from "@noldova/teamrun-foundation-testing";
 import { CliEntry } from "@noldova/teamrun-shell-cli";
 import { RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
@@ -42,24 +45,51 @@ export class CliEntryTests {
   }
 
   @TestMethod
-  public async settlesTheExitCodeARunEndsWith(): Promise<void> {
-    const error = new PassThrough({ encoding: "utf8" });
-    const exit: Pick<NodeJS.Process, "exitCode"> = { exitCode: undefined };
+  public async endsTheProgramAfterItsResultEvenWhileAnotherTaskWouldKeepItRunning(): Promise<void> {
+    const folder = await mkdtemp(path.join(tmpdir(), "teamrun-cli-entry-"));
+    try {
+      const keeper = path.join(folder, "keeper.mjs");
+      await writeFile(keeper, "setInterval(() => undefined, 60_000);\n");
+      const child = spawn(process.execPath, ["--import", pathToFileURL(keeper).href, CliEntry.entryPath, "frobnicate"],
+        { env: CoverageEnvironment.forChild(process.env), stdio: ["ignore", "ignore", "ignore"], windowsHide: true });
 
-    await CliEntry.settleAsync(Promise.resolve(4), error, exit);
+      const hasEnded = await Wait.untilAsync(() => child.exitCode !== null, 15_000);
+      child.kill();
+
+      Assert.isTrue(hasEnded, "The program still ran 15 s after its result.");
+      Assert.areEqual(2, child.exitCode);
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async settlesTheExitCodeARunEndsWithAndEndsTheProcessAfterTheStreamsAreWritten(): Promise<void> {
+    const output = new PassThrough({ encoding: "utf8" });
+    const error = new PassThrough({ encoding: "utf8" });
+    const exited: string[] = [];
+    const exit: Pick<NodeJS.Process, "exitCode"> & { exit(): void } = { exitCode: undefined, exit: () => void exited.push(String(output.read() ?? "")) };
+    output.write("Result.\n");
+
+    await CliEntry.settleAsync(Promise.resolve(4), output, error, exit);
 
     Assert.areEqual(4, exit.exitCode);
+    Assert.areEqual(JSON.stringify(["Result.\n"]), JSON.stringify(exited));
     Assert.isNull(error.read());
   }
 
   @TestMethod
   public async writesARejectedRunAndExitsWithAFailure(): Promise<void> {
+    const output = new PassThrough({ encoding: "utf8" });
     const error = new PassThrough({ encoding: "utf8" });
-    const exit: Pick<NodeJS.Process, "exitCode"> = { exitCode: undefined };
+    let exits = 0;
+    const exit: Pick<NodeJS.Process, "exitCode"> & { exit(): void } = { exitCode: undefined, exit: () => void exits++ };
 
-    await CliEntry.settleAsync(Promise.reject(new RangeError("The run broke.")), error, exit);
+    await CliEntry.settleAsync(Promise.reject(new RangeError("The run broke.")), output, error, exit);
 
     Assert.areEqual(1, exit.exitCode);
+    Assert.areEqual(1, exits);
     Assert.isTrue(String(error.read()).startsWith("RangeError: The run broke."));
   }
 }

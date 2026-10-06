@@ -43,6 +43,7 @@ export class CliPartHost {
     for (const module of this.modules)
       if (needed.has(module.id) && !Object.isNull(module.cliPackage))
         await this.startPartAsync(module, module.cliPackage, signal);
+    signal.throwIfAborted();
     const handler = this.handlers.get(command.name);
     if (Object.isUndefined(handler))
       throw new ModuleNotActiveException(target.id, Resources.formatCommandNotRegistered(command.name));

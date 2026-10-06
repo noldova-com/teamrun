@@ -317,22 +317,25 @@ export declare class CliEntry {
 
   /**
    * Sets the exit code a run ends with, or writes a run that rejected and
-   * sets {@link ExitCode.Failed}.
+   * sets {@link ExitCode.Failed}, then ends the process once both streams
+   * have written what they hold, even while a command-line part that never
+   * finished starting still holds a timer, socket or child process.
    *
    * @param run The run.
+   * @param output The standard output the run writes to.
    * @param error Receives a rejection.
-   * @param exit Takes the exit code.
-   * @returns A promise that settles once the exit code is set.
+   * @param exit Takes the exit code and ends the process.
+   * @returns A promise that settles once the process is told to exit.
    * @example
    * ```ts
    * import { Cli, CliEntry } from "@noldova/teamrun-shell-cli";
    *
    * export function settleAsync(): Promise<void> {
-   *   return CliEntry.settleAsync(new Cli(CliEntry.createContext(process)).runAsync(process.argv.slice(2)), process.stderr, process);
+   *   return CliEntry.settleAsync(new Cli(CliEntry.createContext(process)).runAsync(process.argv.slice(2)), process.stdout, process.stderr, process);
    * }
    * ```
    */
-  public static settleAsync(run: Promise<number>, error: Writable, exit: Pick<NodeJS.Process, "exitCode">): Promise<void>;
+  public static settleAsync(run: Promise<number>, output: Writable, error: Writable, exit: Pick<NodeJS.Process, "exitCode"> & { exit(): void }): Promise<void>;
 }
 
 /**
