@@ -79,14 +79,15 @@ class ModuleArtifactsTests {
       assert.deepEqual(JSON.parse(await readFile(artifacts.declarationsFile, "utf8")), {
         formatVersion: 1,
         modules: [
-          { id: "tasks", version: "0.0.1", displayName: "Tasks", description: "Used by the tests.", dependencies: [], runtimePackage: "@noldova/teamrun-modules-tasks-runtime", contributes: {}, settings: [] },
-          { id: "clock", version: "0.0.1", displayName: "Clock", description: "Used by the tests.", dependencies: [], runtimePackage: null, contributes: {}, settings: [] },
+          { id: "tasks", version: "0.0.1", displayName: "Tasks", description: "Used by the tests.", dependencies: [], runtimePackage: "@noldova/teamrun-modules-tasks-runtime", cliPackage: null, contributes: {}, settings: [], cliCommands: [] },
+          { id: "clock", version: "0.0.1", displayName: "Clock", description: "Used by the tests.", dependencies: [], runtimePackage: null, cliPackage: null, contributes: {}, settings: [], cliCommands: [] },
           {
-            id: "notes", version: "0.0.1", displayName: "Notes", description: "Used by the tests.", dependencies: ["tasks"], runtimePackage: null, contributes: {
+            id: "notes", version: "0.0.1", displayName: "Notes", description: "Used by the tests.", dependencies: ["tasks"], runtimePackage: null, cliPackage: null, contributes: {
               views: ["notes.list", "notes.outline"], commands: ["notes.newNote"], documents: ["notes.note"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"],
               menus: ["notes.templates"], settings: ["notes.wrap"]
             },
-            settings: [ModuleArtifactsTests.WRAP]
+            settings: [ModuleArtifactsTests.WRAP],
+            cliCommands: []
           }
         ]
       });
