@@ -368,7 +368,7 @@ class TestTests {
   }
 
   private static specReport(repository: RepositoryFixture): string {
-    return JSON.stringify({ testResults: [{ name: path.join(repository.directory, "src", "shell", "ui", "tests", "a.spec.ts"), status: "passed", assertionResults: [] }] });
+    return JSON.stringify({ testResults: [{ name: path.join(repository.directory, "src", "shell", "ui", "tests", "a.spec.ts"), status: "passed", assertionResults: [{ ancestorTitles: ["A"], title: "works", status: "passed" }] }] });
   }
 
   private static async createRepositoryAsync(t: TestContext): Promise<RepositoryFixture> {
