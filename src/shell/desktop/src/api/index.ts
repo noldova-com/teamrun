@@ -21,6 +21,8 @@ export type { IIpcEvent } from "../interfaces/i-ipc-event.js";
 export type { IIpcHost } from "../interfaces/i-ipc-host.js";
 export type { IMenuHost } from "../interfaces/i-menu-host.js";
 export type { INotificationHost } from "../interfaces/i-notification-host.js";
+export type { ITray } from "../interfaces/i-tray.js";
+export type { ITrayHost } from "../interfaces/i-tray-host.js";
 export type { IParentPort } from "../interfaces/i-parent-port.js";
 export type { IPathCommandFiles } from "../interfaces/i-path-command-files.js";
 export type { IPermissionHost } from "../interfaces/i-permission-host.js";

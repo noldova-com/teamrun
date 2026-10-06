@@ -5607,6 +5607,118 @@ export declare class ModuleDeclarationReader {
 }
 
 /**
+ * The shell's own settings: their names, and their definitions as the runtime declares them on a platform.
+ */
+export declare class ShellSettings {
+  /**
+   * The theme, `shell.theme`.
+   */
+  public static readonly theme: QualifiedName;
+
+  /**
+   * Light, dark or the system's mode, `shell.mode`.
+   */
+  public static readonly mode: QualifiedName;
+
+  /**
+   * The interface font, `shell.interfaceFont`.
+   */
+  public static readonly interfaceFont: QualifiedName;
+
+  /**
+   * The code font, `shell.codeFont`.
+   */
+  public static readonly codeFont: QualifiedName;
+
+  /**
+   * The panels' text size, `shell.panelSize`.
+   */
+  public static readonly panelSize: QualifiedName;
+
+  /**
+   * The messages' text size, `shell.messageSize`.
+   */
+  public static readonly messageSize: QualifiedName;
+
+  /**
+   * The code's text size, `shell.codeSize`.
+   */
+  public static readonly codeSize: QualifiedName;
+
+  /**
+   * The left dock's style, `shell.leftDockStyle`.
+   */
+  public static readonly leftDockStyle: QualifiedName;
+
+  /**
+   * The right dock's style, `shell.rightDockStyle`.
+   */
+  public static readonly rightDockStyle: QualifiedName;
+
+  /**
+   * Where the menu bar shows, `shell.menuBar`.
+   */
+  public static readonly menuBar: QualifiedName;
+
+  /**
+   * Whether opening a document previews it in a tab, `shell.previewTabs`.
+   */
+  public static readonly previewTabs: QualifiedName;
+
+  /**
+   * Do not disturb, a device setting, `shell.doNotDisturb`.
+   */
+  public static readonly doNotDisturb: QualifiedName;
+
+  /**
+   * The modules whose notifications are turned off, `shell.mutedModules`.
+   */
+  public static readonly mutedModules: QualifiedName;
+
+  /**
+   * Whether the desktop shows its tray icon, a device setting, `shell.trayIcon`.
+   */
+  public static readonly trayIcon: QualifiedName;
+
+  /**
+   * The keys chosen for commands, `shell.keyBindings`.
+   */
+  public static readonly keyBindings: QualifiedName;
+
+  /**
+   * How many recent commands command search lists first, `shell.recentCommandCount`.
+   */
+  public static readonly recentCommandCount: QualifiedName;
+
+  /**
+   * Whether spelling is checked, `shell.spellCheck`.
+   */
+  public static readonly spellCheck: QualifiedName;
+
+  /**
+   * The languages spelling is checked in, a device setting, `shell.spellCheckLanguages`.
+   */
+  public static readonly spellCheckLanguages: QualifiedName;
+
+  /**
+   * The shell's setting definitions, in the order Settings shows them. The tray icon's title names the place the
+   * platform shows it, the notification area on Windows, the menu bar on macOS and the tray elsewhere, and it is on
+   * by default except on macOS.
+   *
+   * @param platform The runtime's platform, as `process.platform` names it.
+   * @returns The definitions.
+   * @example
+   * ```ts
+   * import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
+   * import { ShellSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const definitions: readonly SettingDefinition[] = ShellSettings.definitionsFor(process.platform);
+   * ```
+   */
+  public static definitionsFor(platform: string): readonly SettingDefinition[];
+}
+
+/**
  * The shell's settings: the definitions the shell and the modules declare,
  * and their values in the shell's database, per scope object and, for a
  * device setting, per device. A stored value that no longer fits its

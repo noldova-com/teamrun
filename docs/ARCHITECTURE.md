@@ -425,10 +425,11 @@ The shell owns notifications.
 A module decides when something deserves one; muting, for example for one conversation, is a setting at that object's scope, applied by the module.
 The shell shows a notification without taking focus.
 Opening it brings TeamRun's window forward and runs the notification's command.
-Settings' Notifications page holds two settings.
+Settings' Notifications page holds three settings.
 Do not disturb, `shell.doNotDisturb`, is a device setting: on that device it stops the window's toasts and the operating system's notifications and shows the silenced bell.
 Notifications from modules, `shell.mutedModules`, lists the modules turned off on every device, choosing among the modules that declare notification kinds, whatever their parts, as `shell.modules` reports them: their notifications still enter the list, without a toast, an operating system notification or a place in the unread count.
 Either way each notification stays in the list.
+Showing TeamRun's icon in the tray, `shell.trayIcon`, is a device setting whose title depends on the platform, described in [Tray](#tray).
 
 A module declares its notification kinds in `contributes.notifications`.
 A part posts a notification of one of them through its context and gets a handle that updates or dismisses it.
@@ -769,6 +770,24 @@ Persisted tabs and layout restore the person's saved workspace without opening u
 The saved layout also keeps the arrangement of the toolbars, as [toolbars](#toolbars) describe, and whether the bottom dock spans the window or stays between the side docks; a new or reset layout, and one saved without it, spans the window.
 It keeps the middle width the person left by dragging a side dock when that is under the middle's preferred width; a new or reset layout, and one saved without it, has none.
 
+### Tray
+
+The desktop shows TeamRun's icon in the Windows notification area, the macOS menu bar or the Linux tray while the device setting `shell.trayIcon` is on.
+The runtime declares the setting with its own platform's title and default: "Show TeamRun in the notification area", on by default, on Windows; "in the menu bar", off by default, on macOS; and "in the tray", on by default, elsewhere.
+Both follow the runtime's platform, not the desktop's, so a desktop attached to a runtime on another system would show that system's title and default.
+The desktop reads the setting for its device once the runtime is ready, follows its changes for that device, and until it has read it uses its platform's default.
+On Linux the icon shows only while a StatusNotifierItem host is registered: the desktop asks the session bus through `/usr/bin/gdbus` whether `org.kde.StatusNotifierWatcher` reports `IsStatusNotifierHostRegistered`, and keeps `gdbus monitor` on that name to ask again when its owner changes or a host registers or leaves.
+A missing `gdbus`, no watcher or a failed answer means no host; when the monitor ends, the desktop asks once and starts it again after a wait that begins at a second and doubles up to a minute.
+Windows and macOS always have a place for the icon.
+When the operating system cannot show the icon, the desktop logs it once and shows none.
+
+The icon has four images: idle, work running, unread notifications, and both.
+Running work is the runtime's newest `shell.work` report; unread notifications are counted as the bell counts them, leaving out those read and those of modules turned off.
+The desktop reads both once the runtime is ready, follows their events, and shows the idle image while the runtime is not ready.
+Its tooltip names the counts that are not zero.
+Its menu lists Open TeamRun; the titles of up to five pieces of running work and "and N more", or No work running; the three newest unread notifications, each opening TeamRun and running the notification's command as an operating system notification does; Do not disturb for this device, as a checkbox; and Quit TeamRun.
+On Windows and Linux a click on the icon brings a window forward, opening one when none is open, and the host shows the menu; on macOS a click opens the menu.
+
 ## 9. Active work, closing and shutdown
 
 A runtime part reports the work it has in progress, such as a running reply or command, through its context, and ends it when the work is done; stopping the work aborts it, and the part's work ends when the part deactivates.
@@ -899,6 +918,9 @@ Each target is packaged on its own platform and processor.
   On macOS the system's spell checker chooses the languages, and the desktop copies and offers none.
 - **Installation.**
   The Windows installer installs for the current user without elevation and keeps the data directory when TeamRun is uninstalled.
+  Uninstalling tries for up to 30 seconds to remove the program's files, since another program, such as a virus scanner reading a freshly updated file, can hold one for a moment.
+  A file still held after that stays, and the uninstall says so: an interactive uninstall shows which files are left in which folder, and a silent one, run with `/S`, shows no message.
+  Without elevation the uninstaller cannot have Windows remove a file at the next restart.
 - **Command on the PATH (Windows).**
   The install folder holds `bin\teamrun.cmd`, named after the slug.
   It runs the installed program in Node mode with the command line's entry, waits for it and returns its exit code, so `teamrun` works from cmd and PowerShell.
@@ -908,7 +930,7 @@ Each target is packaged on its own platform and processor.
   Uninstalling removes exactly that entry, and the value itself when nothing else is left.
   A `Path` that cannot be read, or is too long for the installer's strings, is left unchanged.
   The [command line's document](../src/shell/cli/README.md#5-installed-teamrun) says what cmd does to its arguments.
-  The installer's include is `assets/installer/command-path.nsh`.
+  The installer's include is `assets/installer/installer.nsh`.
 - **Command on the PATH (macOS).**
   The bundle holds `Contents/Resources/bin/teamrun`, named after the slug.
   The script follows the links to itself back to the bundle and runs the bundle's program in Node mode with the command line's entry.
