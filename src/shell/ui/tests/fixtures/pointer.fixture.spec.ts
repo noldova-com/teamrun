@@ -35,4 +35,12 @@ describe("PointerFixture", () => {
 
     expect([target.isConnected, earlier[0]?.isConnected, target.matches(":hover"), target.hasAttribute("data-testid")]).toEqual([true, false, true, false]);
   });
+
+  it("refuses a target that already has a test id and leaves that id in place", async () => {
+    const target = append();
+    target.dataset["testid"] = "given";
+
+    await expect(PointerFixture.hoverAsync(target)).rejects.toThrow(new Error("The element to hover already has the test id given."));
+    expect(target.dataset["testid"]).toBe("given");
+  });
 });

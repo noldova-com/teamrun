@@ -13,6 +13,8 @@ export class PointerFixture {
   private static targets: number = 0;
 
   public static async hoverAsync(target: HTMLElement): Promise<void> {
+    if ("testid" in target.dataset)
+      throw new Error(`The element to hover already has the test id ${target.dataset["testid"]}.`);
     const id = `${PointerFixture.TARGET_PREFIX}${++PointerFixture.targets}`;
     target.dataset["testid"] = id;
     try {
