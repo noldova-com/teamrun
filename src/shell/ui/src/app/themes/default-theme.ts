@@ -96,7 +96,7 @@ export class DefaultTheme {
       ["input.background", "#313131"],
       ["input.border", "#858585"],
       ["input.foreground", "#CCCCCC"],
-      ["input.placeholderForeground", "#989898"],
+      ["input.placeholderForeground", "#9A9A9A"],
       ["button.background", "#0078D4"],
       ["button.foreground", "#FFFFFF"],
       ["button.hoverBackground", "#026EC1"],
