@@ -27,6 +27,7 @@ export class Resources {
   public static readonly idWordSeparator: string = ".";
   public static readonly windowPartContextToken: string = "The window part's context";
   public static readonly contentPaddingToken: string = "The padding of the page a tab shows";
+  public static readonly shownToken: string = "Whether the page a tab shows is in view";
   public static readonly windowPartSourcesToken: string = "The build's window parts";
   public static readonly documentsGroupId: number = 0;
   public static readonly layoutFormatVersion: number = 1;
@@ -80,6 +81,7 @@ export class Resources {
   public static readonly dropTabsSelector: string = "[data-drop-tabs]";
   public static readonly dropPlateSelector: string = "[data-drop-plate]";
   public static readonly directionSelector: string = "[data-direction]";
+  public static readonly scrollEvent: "scroll" = "scroll";
   public static readonly directionData: string = "direction";
   public static readonly tabIndexSelector: string = "[data-tab-index]";
   public static readonly tabIndexData: string = "tabIndex";
@@ -622,6 +624,9 @@ export class Resources {
   public static readonly windowPartMenusToken: string = "The build's module menus";
   public static readonly placeInput: string = "place";
   public static readonly contextInput: string = "context";
+  public static readonly tabInput: string = "tab";
+  public static readonly dockedInput: string = "isDocked";
+  public static readonly shownInput: string = "isShown";
   public static readonly invalidContributionName: string = "A contribution name has the form <module id>.<name>.";
   public static readonly invalidModuleId: string = "A module id is lowercase kebab-case.";
   public static readonly windowPartLoadFailed: string = "Its window part could not be loaded.";

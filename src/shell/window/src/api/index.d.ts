@@ -1613,6 +1613,15 @@ export declare class WindowPartTokens {
    * The {@link ContentPaddingRef} of the page the component is shown on.
    */
   public static readonly contentPadding: InjectionToken<ContentPaddingRef>;
+
+  /**
+   * Whether the page the component is shown on is in view.
+   * @remarks The window keeps a tab's page while the tab is open. A hidden
+   * page is taken out of the document and gets no change detection until it
+   * shows again, so a component reads this signal to pause work of its own,
+   * such as timers, while it is hidden.
+   */
+  public static readonly shown: InjectionToken<Signal<boolean>>;
 }
 
 /**
