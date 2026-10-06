@@ -22,7 +22,7 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   template: `
     <button type="button" class="outside">Outside</button>
     <div class="scroller" style="height: 6rem; overflow: auto">
-      <div style="height: 20rem"><tr-select label="Mode" [options]="options()" [value]="value()" [disabled]="disabled()" (valueChange)="choose($event)" /></div>
+      <div style="height: 20rem"><tr-select label="Mode" [describedBy]="describedBy()" [options]="options()" [value]="value()" [disabled]="disabled()" (valueChange)="choose($event)" /></div>
     </div>
   `
 })
@@ -30,6 +30,7 @@ class SelectHostComponent {
   public readonly options = signal<readonly SelectOption[]>([new SelectOption("Light", "Light"), new SelectOption("Dark", "Dark"), new SelectOption("System", "System")]);
   public readonly value = signal("System");
   public readonly disabled = signal(false);
+  public readonly describedBy = signal<string | null>(null);
   public readonly changes: string[] = [];
 
   public choose(value: string): void {
@@ -85,6 +86,15 @@ describe("SelectComponent", () => {
     expect(opened).toEqual({ expanded: "true", focused: "System", role: "listbox", options: ["Light:option:false", "Dark:option:false", "System:option:true"] });
     expect(fixture.componentInstance.changes).toEqual(["Dark"]);
     expect([list(), document.activeElement, button().getAttribute("aria-expanded"), button().getAttribute("aria-label")]).toEqual([null, button(), "false", "Mode, Dark"]);
+  });
+
+  it("describes its button by the elements it is given, and by nothing when given none", () => {
+    render();
+    const unbound = button().getAttribute("aria-describedby");
+    fixture.componentInstance.describedBy.set("hint error");
+    fixture.detectChanges();
+
+    expect([unbound, button().getAttribute("aria-describedby")]).toEqual([null, "hint error"]);
   });
 
   it("chooses from the keyboard and reports nothing when the value is chosen again", async () => {
