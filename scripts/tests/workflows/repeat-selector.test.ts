@@ -33,7 +33,8 @@ class RepeatSelectorTests {
     "src/shell/desktop/src/main.ts": "export {};\n",
     "src/shell/desktop/tests/e2e/menus.spec.ts": "import { test } from \"./fixtures/desktop.fixture\";\n",
     "src/shell/desktop/tests/e2e/settings.spec.ts": "import { test } from './fixtures/desktop.fixture.ts';\n",
-    "src/shell/desktop/tests/e2e/quit.spec.ts": "export {};\n",
+    "src/shell/desktop/tests/e2e/quit.spec.ts":
+      "test.describe(\"quitting\", () => {\n  test(\"quits\", async () => {});\n  test( 'closes', async () => {});\n  test(`waits`, async () => {});\n});\ncontest(\"no\");\nconst test2 = 1;\n",
     "src/shell/desktop/tests/e2e/fixtures/desktop.fixture.ts": "export { park } from \"./pointer\";\n",
     "src/shell/desktop/tests/e2e/fixtures/pointer/index.ts": "export const park = 1;\n",
     "src/shell/desktop/tests/e2e/fixtures/unused.fixture.ts": "export {};\n",
@@ -68,6 +69,15 @@ class RepeatSelectorTests {
       const selection = await selector.selectAsync(["src/shell/desktop/src/main.ts", "src/shell/desktop/tests/e2e/quit.spec.ts"], ["src/shell/desktop/tests/e2e/quit.spec.ts", "scripts/tests/other.test.ts"]);
 
       assert.deepEqual([selection.tests, selection.workflows], [["scripts/tests/other.test.ts"], ["src/shell/desktop/tests/e2e/quit.spec.ts"]]);
+    });
+
+    test("the selected UI workflow files' tests are counted by their test calls with a written title, not their describe blocks", async t => {
+      const selector = await RepeatSelectorTests.createAsync(t);
+
+      const both = await selector.selectAsync(["src/shell/desktop/tests/e2e/quit.spec.ts", "src/shell/desktop/tests/e2e/fixtures/pointer/index.ts"], []);
+      const none = await selector.selectAsync(["scripts/tests/other.test.ts"], []);
+
+      assert.deepEqual([both.workflows.length, both.workflowTests, none.workflowTests], [3, 3, 0]);
     });
 
     test("a Repeat line that names a file which isn't a test of this revision is refused, with every such name", async t => {
