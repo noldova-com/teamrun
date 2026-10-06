@@ -252,7 +252,7 @@ describe("Layout", () => {
     expect(initial.toggleDock(DockSide.Left).dock(DockSide.Left).isCollapsed).toBe(true);
     expect(initial.toggleDock(DockSide.Left).toggleDock(DockSide.Left).dock(DockSide.Left).isCollapsed).toBe(false);
     expect(initial.resizeDock(DockSide.Left, 30).dock(DockSide.Left).size).toBe(30);
-    expect(initial.resizeDock(DockSide.Left, 2).dock(DockSide.Left).size).toBe(10);
+    expect(initial.resizeDock(DockSide.Left, 2).dock(DockSide.Left).size).toBe(2);
     expect(initial.resizeDock(DockSide.Left, null)).toBe(initial);
   });
 

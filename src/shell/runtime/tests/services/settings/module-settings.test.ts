@@ -36,6 +36,8 @@ export class ModuleSettingsTests {
     Assert.areEqual("The module notes may only read its own settings, its dependencies' and the shell's, not clock.speed.",
       Assert.throws(() => context.settings.read("clock.speed"), RegistrationException).message);
     Assert.throws(() => context.settings.read("notes.missing"), SettingException);
+    const unlisted = Assert.throws(() => context.settings.read("notes.sortBy", tasks), SettingException);
+    Assert.areEqual("InvalidParams: The setting notes.sortBy does not list the scope tasks.list.", `${unlisted.failure.code}: ${unlisted.message}`);
     Assert.areEqual("The module notes may only change its own settings, not tasks.size.",
       Assert.throws(() => context.settings.write("tasks.size", "b"), RegistrationException).message);
     Assert.throws(() => context.settings.reset("shell.mode"), RegistrationException);

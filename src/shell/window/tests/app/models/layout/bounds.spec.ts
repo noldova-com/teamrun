@@ -44,9 +44,9 @@ describe("Bounds", () => {
     expect(bounds.edgeStrip(PanelEdge.Right, 4)).toEqual(new Bounds(38, 3, 4, 20));
     expect(bounds.edgeStrip(PanelEdge.Top, 4)).toEqual(new Bounds(2, 3, 40, 4));
     expect(bounds.edgeStrip(PanelEdge.Bottom, 4)).toEqual(new Bounds(2, 19, 40, 4));
-    expect(bounds.edgeHalf(PanelEdge.Left)).toEqual(new Bounds(2, 3, 19.875, 20));
-    expect(bounds.edgeHalf(PanelEdge.Bottom)).toEqual(new Bounds(2, 13.125, 40, 9.875));
-    expect(new Bounds(0, 0, 0.1, 5).edgeHalf(PanelEdge.Right)).toEqual(new Bounds(0.1, 0, 0, 5));
+    expect(bounds.edgeHalf(PanelEdge.Left, 0.25)).toEqual(new Bounds(2, 3, 19.875, 20));
+    expect(bounds.edgeHalf(PanelEdge.Bottom, 0.25)).toEqual(new Bounds(2, 13.125, 40, 9.875));
+    expect(new Bounds(0, 0, 0.1, 5).edgeHalf(PanelEdge.Right, 0.25)).toEqual(new Bounds(0.1, 0, 0, 5));
   });
 
   it("overlaps another bounds only where they share area", () => {

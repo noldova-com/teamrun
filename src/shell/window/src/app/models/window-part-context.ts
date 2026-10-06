@@ -7,7 +7,7 @@
  */
 
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { NotificationPost, SettingScope } from "@noldova/teamrun-shell-protocol";
+import type { NotificationPost, SettingEntry, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import { WindowPartAccessException } from "../exceptions/window-part-access.exception";
 import type { IWindowPartContext } from "../interfaces/i-window-part-context";
@@ -184,6 +184,11 @@ export class WindowPartContext implements IWindowPartContext {
     return this.host.readSetting(name);
   }
 
+  public async readSettingAsync(name: string, scope: SettingScope | null = null): Promise<SettingEntry> {
+    this.requireReadable(name);
+    return await this.host.readSettingAsync(name, scope);
+  }
+
   public async writeSettingAsync(name: string, value: JsonValue, scope: SettingScope | null = null): Promise<void> {
     this.requireOwn(name);
     await this.host.writeSettingAsync(name, value, scope);
@@ -194,11 +199,11 @@ export class WindowPartContext implements IWindowPartContext {
     await this.host.resetSettingAsync(name, scope);
   }
 
-  public onSettingChanged(name: string, listener: (value: JsonValue, scope: SettingScope | null) => void): () => void {
+  public onSettingChanged(name: string, listener: (value: JsonValue, scope: SettingScope | null, isSet: boolean) => void): () => void {
     this.requireReadable(name);
     const unsubscribe = this.host.onSettingChanged(t => {
       if (t.key.name.text === name)
-        listener(t.value, t.key.scope);
+        listener(t.value, t.key.scope, t.isSet);
     });
     this.subscriptions.push(unsubscribe);
     return unsubscribe;

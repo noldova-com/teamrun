@@ -17,6 +17,7 @@ import { TabGroup } from "../../../../src/app/models/layout/tab-group";
 import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
 import { ViewTab } from "../../../../src/app/models/layout/view-tab";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
+import { LayoutMetricsFixture } from "../../../fixtures/layout-metrics.fixture";
 
 describe("TabGroup", () => {
   const { files, search, changes, plan, terminal, secondTerminal } = LayoutFixture;
@@ -97,7 +98,7 @@ describe("TabGroup", () => {
     const frames: GroupFrame[] = [];
     const bounds = new Bounds(0, 0, 30, 20);
 
-    expect([group.minimumLength(SplitAxis.Horizontal), group.minimumLength(SplitAxis.Vertical)]).toEqual([10, 6.25]);
+    expect([group.minimumLength(SplitAxis.Horizontal, LayoutMetricsFixture.standard), group.minimumLength(SplitAxis.Vertical, LayoutMetricsFixture.standard)]).toEqual([10, 6.25]);
     group.arrange(bounds, DockSide.Right, frames);
     expect(frames.map(t => [t.group, t.bounds, t.side])).toEqual([[group, bounds, DockSide.Right]]);
   });

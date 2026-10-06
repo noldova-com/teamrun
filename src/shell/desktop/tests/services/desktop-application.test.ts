@@ -798,21 +798,23 @@ export class DesktopApplicationTests {
   @TestMethod
   public async addsThisDeviceToItsWindowsSettingsRequests(): Promise<void> {
     const connection = new FakeRuntimeConnection();
-    for (const name of ["shell.settings", "shell.setSetting", "shell.resetSetting"])
+    for (const name of ["shell.settings", "shell.readSetting", "shell.setSetting", "shell.resetSetting"])
       connection.answers.set(name, Response.success("r", name));
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopStartFixture.trustedEvent("linux");
 
     const answers = [
       await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", {}),
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.readSetting", { name: "notes.wrapLines", scope: { name: "notes.project", id: "p1" } }),
       await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", { name: "shell.panelSize", value: 15 }),
       await DesktopApplicationTests.requestAsync(electron, event, "shell.resetSetting", { name: "shell.panelSize", device: "another" })
     ];
     const sent = connection.calls.flatMap((t, index) => t.includes("Setting") || t === "shell.settings" ? [connection.payloads[index]] : []);
 
-    Assert.areEqual("shell.settings,shell.setSetting,shell.resetSetting", answers.map(t => t.payload).join(","));
+    Assert.areEqual("shell.settings,shell.readSetting,shell.setSetting,shell.resetSetting", answers.map(t => t.payload).join(","));
     Assert.areEqual(JSON.stringify([
       { device: FakeDeviceIdentity.ID },
+      { name: "notes.wrapLines", scope: { name: "notes.project", id: "p1" }, device: FakeDeviceIdentity.ID },
       { name: "shell.panelSize", value: 15, device: FakeDeviceIdentity.ID },
       { name: "shell.panelSize", device: FakeDeviceIdentity.ID }
     ]), JSON.stringify(sent));
