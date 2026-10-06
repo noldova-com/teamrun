@@ -15,17 +15,19 @@ import ProcessRunner from "./processes/process-runner.ts";
 import ProcessException from "./processes/process.exception.ts";
 import ReleaseException from "./release/release.exception.ts";
 import ReleaseFileSet from "./release/release-file-set.ts";
+import ReleaseNotes from "./release/release-notes.ts";
 import ReleasePublisher from "./release/release-publisher.ts";
 import ReleaseRequest from "./release/release-request.ts";
+import SupportedTargets from "./release/supported-targets.ts";
 import GitHubApi from "./repository/github-api.ts";
 import GitHubException from "./repository/github.exception.ts";
 
 export default class ReleasePublish {
   private static readonly USAGE: string = "Usage: RELEASE_REPOSITORY=<owner/name> RELEASE_VERSION=<N.N.N> RELEASE_REVISION=<commit> RELEASE_FOLDER=<folder> "
-    + "RELEASE_NOTES=<text> npm run release:publish\n";
+    + "RELEASE_RUN_URL=<url> npm run release:publish\n";
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly FOLDER_VARIABLE: string = "RELEASE_FOLDER";
-  private static readonly NOTES_VARIABLE: string = "RELEASE_NOTES";
+  private static readonly RUN_VARIABLE: string = "RELEASE_RUN_URL";
   private static readonly LABEL_MARK: string = "#";
 
   private readonly root: string;
@@ -64,11 +66,8 @@ export default class ReleasePublish {
       throw new ReleaseException(`${ReleasePublish.FOLDER_VARIABLE} must be the absolute path of the folder that holds the release's files, not "${folder}".`);
     if (folder.includes(ReleasePublish.LABEL_MARK))
       throw new ReleaseException(`${ReleasePublish.FOLDER_VARIABLE} must not contain ${ReleasePublish.LABEL_MARK}, which gh release upload reads as the start of a file's label: "${folder}".`);
-    const notes = this.environment[ReleasePublish.NOTES_VARIABLE] ?? "";
-    if (notes.trim().length === 0)
-      throw new ReleaseException(`${ReleasePublish.NOTES_VARIABLE} must hold the release's notes.`);
-
     const manifest = await RootManifest.readAsync(this.root);
+    const notes = ReleaseNotes.compose(manifest.product, await SupportedTargets.readAsync(this.root), request.repository, request.version, this.environment[ReleasePublish.RUN_VARIABLE] ?? "");
     const files = await new ReleaseFileSet(manifest.product.name).verifyAsync(folder, request.version.text);
     await new ReleasePublisher(new GitHubApi(request.repository, this.runner, this.root), this.output).publishAsync(request.version, request.revision, folder, files, notes);
   }
