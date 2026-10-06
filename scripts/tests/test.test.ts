@@ -242,6 +242,7 @@ class TestTests {
 
     test("the totals of a run that reruns failed tests say how many of a runner's failed tests passed when run again in that run", async t => {
       const repository = await TestTests.createRepositoryAsync(t);
+      await repository.writeAsync({ ".gitignore": "_build/\n" });
       const directory = path.join(repository.directory, "src", "shell", "ui", "tests");
       const report = JSON.stringify({ testResults: [
         { name: path.join(directory, "a.spec.ts"), status: "passed", assertionResults: [{ ancestorTitles: ["A"], title: "retries", fullName: "A retries", status: "passed", failureMessages: ["Error: once"] }] },
