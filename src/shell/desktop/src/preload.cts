@@ -75,6 +75,9 @@ contextBridge.exposeInMainWorld("teamrun", {
   openLink(url: string): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:openLink", url) as Promise<boolean>;
   },
+  installCommand(): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:installCommand") as Promise<boolean>;
+  },
   keepAppearance(preferences: unknown): void {
     ipcRenderer.send("teamrun:keepAppearance", preferences);
   },

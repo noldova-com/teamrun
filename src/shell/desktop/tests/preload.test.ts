@@ -18,7 +18,7 @@ export class PreloadTests {
 
     Assert.areEqual([
       "platform", "appearance", "notifyReady", "notifyAppearance", "onCloseRequest", "answerClose", "readStartup", "onStartup", "actOnStartup", "readLayout",
-      "writeLayout", "request", "onEvent", "readBuild", "copyText", "openLogFolder", "openLink", "keepAppearance", "edit", "setMenuBar", "onMenuCommand",
+      "writeLayout", "request", "onEvent", "readBuild", "copyText", "openLogFolder", "openLink", "installCommand", "keepAppearance", "edit", "setMenuBar", "onMenuCommand",
       "onNotificationOpened", "onQuitQuestion", "answerQuit", "logModule", "logError"
     ].join(","), Object.keys(api).join(","));
     Assert.areEqual(process.platform, api["platform"]);
@@ -70,6 +70,7 @@ export class PreloadTests {
       PreloadTests.invoke(api["copyText"], "text"),
       PreloadTests.invoke(api["openLogFolder"]),
       PreloadTests.invoke(api["openLink"], "https://example.com/"),
+      PreloadTests.invoke(api["installCommand"]),
       PreloadTests.invoke(api["edit"], "Copy"),
       PreloadTests.invoke(api["answerQuit"], "wait")
     ]);
@@ -85,6 +86,7 @@ export class PreloadTests {
       ["teamrun:copyText", "text"],
       ["teamrun:openLogFolder"],
       ["teamrun:openLink", "https://example.com/"],
+      ["teamrun:installCommand"],
       ["teamrun:edit", "Copy"],
       ["teamrun:quitAnswer", "wait"]
     ]), JSON.stringify(electron.invoked));

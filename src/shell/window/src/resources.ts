@@ -210,6 +210,9 @@ export class Resources {
   public static readonly settingsDocument: string = "shell.settings";
   public static readonly settingsTitle: string = "Settings";
   public static readonly settingsGlyph: string = "settings";
+  public static readonly installCommandCommand: string = "shell.installCommand";
+  public static readonly installCommandTitle: string = "Install command in PATH";
+  public static readonly installCommandGlyph: string = "terminal";
   public static readonly openModulesCommand: string = "shell.openModules";
   public static readonly openModulesTitle: string = "Modules…";
   public static readonly modulesDocument: string = "shell.modules";
@@ -510,6 +513,10 @@ export class Resources {
   public static readonly windowMenuTitle: string = "Window";
   public static readonly helpMenuTitle: string = "Help";
   public static readonly tabMenuTitle: string = "Tab";
+  public static readonly fieldMenu: string = "shell.field";
+  public static readonly fieldMenuTitle: string = "Text field";
+  public static readonly fieldEditingGroup: string = "shell.fieldEditing";
+  public static readonly fieldEditActions: readonly EditAction[] = [EditAction.Cut, EditAction.Copy, EditAction.Paste, EditAction.SelectAll];
   public static readonly closeGroup: string = "shell.close";
   public static readonly tabMoveToMenu: string = "shell.tabMoveTo";
   public static readonly tabSplitMenu: string = "shell.tabSplit";
@@ -605,6 +612,7 @@ export class Resources {
   public static readonly toolbarMenuKey: string = "ContextMenu";
   public static readonly toolbarMenuShiftKey: string = "F10";
   public static readonly settingsGroup: string = "shell.settings";
+  public static readonly commandLineGroup: string = "shell.commandLine";
   public static readonly windowPartMenusToken: string = "The build's module menus";
   public static readonly placeInput: string = "place";
   public static readonly contextInput: string = "context";

@@ -37,7 +37,7 @@ describe("WindowComponent", () => {
     await fixture.whenStable();
     const root: HTMLElement = fixture.nativeElement;
 
-    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-toolbar-band", "tr-workspace", "tr-status-bar", "tr-toasts"]);
+    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-toolbar-band", "tr-workspace", "tr-status-bar", "tr-toasts", "tr-field-menu"]);
     expect(root.getBoundingClientRect().height).toBe(innerHeight);
     expect(root.querySelector("tr-empty-window")).not.toBeNull();
   });
@@ -90,7 +90,7 @@ describe("WindowComponent", () => {
     await fixture.whenStable();
     const root: HTMLElement = fixture.nativeElement;
 
-    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-toolbar-band", "tr-startup", "tr-status-bar", "tr-toasts"]);
+    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-toolbar-band", "tr-startup", "tr-status-bar", "tr-toasts", "tr-field-menu"]);
     bridge.publishStartup({ kind: "Ready", details: [] });
     await fixture.whenStable();
 
@@ -114,7 +114,7 @@ describe("WindowComponent", () => {
     bridge.publishStartup({ kind: "Ready", details: [] });
     await fixture.whenStable();
 
-    expect(tags).toEqual(["tr-window-row", "tr-toolbar-band", "tr-workspace", "tr-startup", "tr-status-bar", "tr-toasts"]);
+    expect(tags).toEqual(["tr-window-row", "tr-toolbar-band", "tr-workspace", "tr-startup", "tr-status-bar", "tr-toasts", "tr-field-menu"]);
     expect(cardBox).toEqual(workspaceBox);
     expect(announced).toEqual(["Starting TeamRun…", true]);
     expect(root.querySelector("tr-workspace")).toBe(workspace);

@@ -18,6 +18,7 @@ import { QuitService } from "../../services/quit.service";
 import { RecentCommandsService } from "../../services/recent-commands.service";
 import { StartupService } from "../../services/startup.service";
 import { WindowPartHostService } from "../../services/window-part-host.service";
+import { FieldMenuComponent } from "../field-menu/field-menu.component";
 import { StartupComponent } from "../startup/startup.component";
 import { StatusBarComponent } from "../status-bar/status-bar.component";
 import { ToolbarBandComponent } from "../toolbar-band/toolbar-band.component";
@@ -27,7 +28,7 @@ import { WorkspaceComponent } from "../workspace/workspace.component";
 
 @Component({
   selector: "tr-window",
-  imports: [StartupComponent, StatusBarComponent, ToastsComponent, ToolbarBandComponent, WindowRowComponent, WorkspaceComponent],
+  imports: [FieldMenuComponent, StartupComponent, StatusBarComponent, ToastsComponent, ToolbarBandComponent, WindowRowComponent, WorkspaceComponent],
   templateUrl: "./window.component.html",
   styleUrl: "./window.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
