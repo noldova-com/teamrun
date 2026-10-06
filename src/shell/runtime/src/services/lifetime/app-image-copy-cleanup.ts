@@ -15,39 +15,52 @@ import { Resources } from "../../resources.js";
 import type { DataDirectory } from "../data-directory/data-directory.js";
 
 export class AppImageCopyCleanup {
-  public static async removeAsync(directory: DataDirectory, ownStartLogName: string | null): Promise<void> {
+  public static async removeAsync(directory: DataDirectory): Promise<void> {
     await mkdir(directory.logsFolder, { recursive: true });
-    const stale = (await readdir(directory.logsFolder)).filter(t => Resources.startLogNamePattern.test(t) && t !== ownStartLogName);
-    const texts = await Promise.allSettled(stale.map(t => readFile(path.join(directory.logsFolder, t), Resources.utf8Encoding)));
-    const records = texts.flatMap(t => t.status === "fulfilled" ? t.value.split("\n") : []);
-    await Promise.allSettled(records.map(t => AppImageCopyCleanup.endAsync(t)));
+    const records = (await readdir(directory.logsFolder)).filter(t => Resources.copyRecordNamePattern.test(t));
+    await Promise.allSettled(records.map(t => AppImageCopyCleanup.endAsync(path.join(directory.logsFolder, t))));
   }
 
   private static async endAsync(record: string): Promise<void> {
-    const mount = Resources.copyMountRecord.exec(record);
-    if (!Object.isNull(mount)) {
-      const [, holder = "", mounter = "", image = ""] = mount;
-      const separator = Resources.commandLineSeparator;
-      const mounting = `${separator}${await AppImageCopyCleanup.readCommandLineAsync(mounter)}`;
-      if (!await AppImageCopyCleanup.isHolderRunningAsync(holder) && mounting.endsWith(`${separator}${image}${separator}${Resources.appImageMountOption}${separator}`))
-        process.kill(Number(mounter), Resources.copyEndSignal);
+    const lines = (await readFile(record, Resources.utf8Encoding)).split("\n");
+    const mounts = lines.map(t => Resources.copyMountRecord.exec(t)).filter(t => !Object.isNull(t));
+    const extractions = lines.map(t => Resources.copyExtractionRecord.exec(t)).filter(t => !Object.isNull(t));
+    const holders = [...mounts.map(([, holder = ""]) => holder), ...extractions.map(([, holder = ""]) => holder)];
+    if ((await Promise.all(holders.map(t => AppImageCopyCleanup.isHolderRunningAsync(t)))).includes(true))
       return;
-    }
-    const extraction = Resources.copyExtractionRecord.exec(record);
-    if (Object.isNull(extraction))
-      return;
-    const [, holder = "", folder = ""] = extraction;
+    for (const [, , mounter = "", image = ""] of mounts)
+      await AppImageCopyCleanup.endMountAsync(mounter, image);
+    for (const [, , folder = ""] of extractions)
+      await AppImageCopyCleanup.removeExtractionAsync(folder);
+    await rm(record, { force: true });
+  }
+
+  private static async endMountAsync(mounter: string, image: string): Promise<void> {
+    const separator = Resources.processArgumentSeparator;
+    const mounting = `${separator}${await AppImageCopyCleanup.readCommandLineAsync(mounter)}`;
+    if (mounting.endsWith(`${separator}${image}${separator}${Resources.appImageMountOption}${separator}`))
+      process.kill(Number(mounter), Resources.copyEndSignal);
+  }
+
+  private static async removeExtractionAsync(folder: string): Promise<void> {
     const location = path.resolve(folder);
-    if (path.dirname(location) === path.resolve(tmpdir()) && Resources.copyExtractionName.test(path.basename(location)) && !await AppImageCopyCleanup.isHolderRunningAsync(holder))
+    if (path.dirname(location) === path.resolve(tmpdir()) && Resources.copyExtractionName.test(path.basename(location)))
       await rm(location, { recursive: true, force: true });
   }
 
   private static async isHolderRunningAsync(processId: string): Promise<boolean> {
     const commandLine = await AppImageCopyCleanup.readCommandLineAsync(processId);
-    return commandLine.split(Resources.commandLineSeparator).includes(`${ProductInfo.current.slug}${Resources.launchNameSuffix}`);
+    return commandLine.split(Resources.processArgumentSeparator).includes(`${ProductInfo.current.slug}${Resources.launchNameSuffix}`);
   }
 
-  private static readCommandLineAsync(processId: string): Promise<string> {
-    return readFile(path.join(Resources.processFolder, processId, Resources.commandLineFile), Resources.utf8Encoding).catch(() => "");
+  private static async readCommandLineAsync(processId: string): Promise<string> {
+    try {
+      return await readFile(path.join(Resources.processFolder, processId, Resources.commandLineFile), Resources.utf8Encoding);
+    }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === Resources.missingFileCode)
+        return "";
+      throw error;
+    }
   }
 }

@@ -2947,7 +2947,7 @@ export declare class LaunchSettings {
 }
 
 /**
- * The program and arguments that start a detached runtime. On Linux it wraps the program in Bash that closes inherited descriptors above standard error, without startup files or inherited options. A program inside an AppImage runs from the runtime's own copy of it instead, which that Bash holds for as long as the program runs: a mount of the AppImage when the program's folder is mounted, or else an extraction in a `teamrun-runtime-` folder of the temporary folder. Bash records the copy in its standard error, which is the start log, and passes an end signal on to the program.
+ * The program and arguments that start a detached runtime. On Linux it wraps the program in Bash that closes inherited descriptors above standard error, without startup files or inherited options. Given a copy record, a program inside an AppImage runs from its own copy of the AppImage instead, which that Bash holds for as long as the program runs: a mount of the AppImage when the program's folder is mounted, or else an extraction in a `teamrun-runtime-` folder of the temporary folder. Bash writes the copy to the record, removes the record once the copy ends, and passes an end signal on to the program.
  */
 export declare class ProcessLaunchCommand {
   /**
@@ -2967,6 +2967,7 @@ export declare class ProcessLaunchCommand {
    * @param executablePath The program that runs the runtime.
    * @param launchArguments Its arguments; the array is copied.
    * @param environment The environment the program is started with, whose `APPIMAGE` and `APPDIR` name the AppImage it runs from; empty by default.
+   * @param copyRecord The file Bash records the program's own copy of its AppImage in, or `null`, the default, to start a program inside an AppImage as any other.
    * @throws {ArgumentException} When the program's path is empty or whitespace.
    * @throws {LaunchException} On Linux, when `/bin/bash` is not executable or `/proc/self/fd` cannot be read.
    * @example
@@ -2981,7 +2982,7 @@ export declare class ProcessLaunchCommand {
    * }
    * ```
    */
-  public constructor(platform: string, executablePath: string, launchArguments: readonly string[], environment?: NodeJS.ProcessEnv);
+  public constructor(platform: string, executablePath: string, launchArguments: readonly string[], environment?: NodeJS.ProcessEnv, copyRecord?: string | null);
 }
 
 /**
@@ -4245,16 +4246,13 @@ export interface IEventSink {
 }
 
 /**
- * Ends the AppImage copies that runtimes started by launchers left behind on Linux, as their start logs record them.
+ * Ends the AppImage copies that runtimes started by launchers left behind on Linux, as their copy records in the logs folder name them.
  */
 export declare class AppImageCopyCleanup {
-  private constructor();
-
   /**
-   * Reads the start logs other than the runtime's own. A recorded mount ends when the Bash that held it no longer runs and the recorded process is still the mount of the recorded AppImage; a recorded extraction is removed when that Bash no longer runs and the folder is a `teamrun-runtime-` folder directly in the temporary folder. Logs, processes and folders that cannot be read or ended are left. The logs folder is created when it is missing.
+   * Reads each copy record, `logs/copy-<id>.log`. When the Bash that held its copies no longer runs, a recorded mount ends if the recorded process is still the mount of the recorded AppImage, a recorded extraction is removed if its folder is a `teamrun-runtime-` folder directly in the temporary folder, and the record is removed. Records of a Bash that still runs, or whose command line cannot be read, are left, as are records, processes and folders that cannot be read, ended or removed; a process without a command line no longer runs. The logs folder is created when it is missing.
    *
    * @param directory The data directory, whose ownership the runtime holds.
-   * @param ownStartLogName The start log of the launcher that started this runtime, which is not read, or `null`.
    * @returns A promise that resolves once the leftover copies are ended.
    * @throws {Error} Rejected when the logs folder cannot be created or listed.
    * @example
@@ -4262,11 +4260,11 @@ export declare class AppImageCopyCleanup {
    * import { AppImageCopyCleanup, type OwnershipLock } from "@noldova/teamrun-shell-runtime";
    *
    * export function cleanAsync(lock: OwnershipLock): Promise<void> {
-   *   return AppImageCopyCleanup.removeAsync(lock.dataDirectory, null);
+   *   return AppImageCopyCleanup.removeAsync(lock.dataDirectory);
    * }
    * ```
    */
-  public static removeAsync(directory: DataDirectory, ownStartLogName: string | null): Promise<void>;
+  public static removeAsync(directory: DataDirectory): Promise<void>;
 }
 
 /**

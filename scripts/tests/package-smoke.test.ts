@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { ChildProcess, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
@@ -26,6 +26,7 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 type Answer = "none" | "running" | "failed" | "other version" | "unreadable";
 type Discovery = "written" | "missing" | "unreadable";
 type Killing = "ends" | "refused" | "ignored";
+type Copy = "none" | "mount" | "extraction" | "two";
 
 class DesktopFixture extends StartedProcess {
   private readonly quitCode: number | null;
@@ -69,7 +70,10 @@ class DesktopFixture extends StartedProcess {
 }
 
 class SmokeRunnerFixture extends InstallRunnerFixture {
+  private static readonly MOUNTER: number = 6161;
+
   private readonly answers: Answer[];
+  private copies: string[] = [];
 
   public readonly desktop: DesktopFixture;
   public readonly environments: (NodeJS.ProcessEnv | undefined)[] = [];
@@ -79,6 +83,9 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
   public runtimeChecks: number = 1;
   public discovery: Discovery = "written";
   public killing: Killing = "ends";
+  public copy: Copy = "mount";
+  public copyEnds: boolean = true;
+  public mounterRuns: boolean = true;
 
   public constructor(answers: readonly Answer[], desktop: DesktopFixture = new DesktopFixture(0, null), failing: readonly string[] = []) {
     super(failing);
@@ -103,8 +110,15 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
   }
 
   public override isRunning(processId: number): boolean {
+    if (processId === SmokeRunnerFixture.MOUNTER)
+      return this.mounterRuns && this.copies.some(t => existsSync(t));
     this.checked.push(processId);
-    return this.runtimeChecks-- > 0;
+    const isRunning = this.runtimeChecks-- > 0;
+    if (!isRunning && this.copyEnds) {
+      for (const copy of this.copies)
+        rmSync(copy, { recursive: true, force: true });
+    }
+    return isRunning;
   }
 
   public override kill(processId: number): void {
@@ -121,8 +135,28 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
     return this.desktop;
   }
 
+  private writeCopy(data: string): void {
+    const logs = path.join(data, "logs");
+    const extraction = path.join(data, "..", "teamrun-runtime-Ab3dE6");
+    const records = ["copy-11111111-2222-4333-8444-555555555555.log", "copy-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.log"]
+      .slice(0, { none: 0, mount: 1, extraction: 1, two: 2 }[this.copy])
+      .map(t => path.join(logs, t));
+    const line = this.copy === "extraction" ? `teamrun-copy extraction 6060 ${extraction}\n` : `teamrun-copy mount 6060 ${SmokeRunnerFixture.MOUNTER} /fixture.AppImage\n`;
+    mkdirSync(logs, { recursive: true });
+    for (const record of records)
+      writeFileSync(record, line);
+    this.copies = records;
+    if (this.copy === "extraction") {
+      mkdirSync(path.join(extraction, "squashfs-root"), { recursive: true });
+      writeFileSync(path.join(extraction, "squashfs-root", "fixture-studio"), Buffer.alloc(524_288));
+      this.copies.push(extraction);
+    }
+  }
+
   private answer(data: string): ProcessResult {
     const answer = this.answers.length > 1 ? this.answers.shift() : this.answers[0];
+    if (answer === "running" || answer === "other version")
+      this.writeCopy(data);
     if ((answer === "running" || answer === "other version") && this.discovery === "written") {
       mkdirSync(path.join(data, "discovery"), { recursive: true });
       writeFileSync(path.join(data, "discovery", "runtime.json"), JSON.stringify({ processId: 5151 }));
@@ -183,10 +217,56 @@ class PackageSmokeTests {
           "teamrun status before the start: no runtime.",
           `teamrun status after the start: version 0.0.7 in ${path.join(runner.folder, "data")}.`,
           "The desktop quit.",
+          "The runtime holds its own mount of the AppImage, process 6161.",
           "The runtime stopped once idle.",
+          "The runtime's copy of the AppImage ended with it.",
           ""
         ].join("\n"));
         assert.equal(existsSync(runner.folder), false);
+      });
+
+    test("on Linux with APPIMAGE_EXTRACT_AND_RUN the runtime holds its own extraction of the AppImage, which ends with it", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
+      const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-linux-x64.AppImage");
+      const runner = new SmokeRunnerFixture(["none", "running", "none"]);
+      runner.copy = "extraction";
+      const output = new TextOutputFixture();
+
+      const exitCode = await PackageSmokeTests.runAsync(t, repository, "linux", runner, output, "x64", { APPIMAGE_EXTRACT_AND_RUN: "1" });
+
+      assert.equal(exitCode, 0, output.text);
+      assert.match(output.text, /\nThe desktop quit\.\nThe runtime holds its own extraction of the AppImage in .+teamrun-runtime-Ab3dE6, 0\.5 MiB\.\nThe runtime stopped once idle\.\nThe runtime's copy of the AppImage ended with it\.\n$/);
+    });
+
+    test("on Linux a runtime without exactly one copy, with a copy of the other kind or one that is gone, or a copy that outlives the runtime by 10 s fails the smoke check",
+      { timeout: PackageSmokeTests.TIMEOUT }, async t => {
+        const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-linux-x64.AppImage");
+        const cases: readonly (readonly [Copy, boolean, boolean, NodeJS.ProcessEnv])[] = [
+          ["none", true, true, {}],
+          ["two", true, true, {}],
+          ["extraction", true, true, {}],
+          ["mount", false, true, {}],
+          ["mount", true, true, { APPIMAGE_EXTRACT_AND_RUN: "1" }],
+          ["mount", true, false, {}]
+        ];
+        const texts: string[] = [];
+
+        for (const [copy, mounterRuns, copyEnds, variables] of cases) {
+          const runner = new SmokeRunnerFixture(["none", "running", "none"]);
+          Object.assign(runner, { copy, mounterRuns, copyEnds });
+          const output = new TextOutputFixture();
+          assert.equal(await PackageSmokeTests.runAsync(t, repository, "linux", runner, output, "x64", variables), 1, output.text);
+          texts.push(output.text.slice(output.text.indexOf("The desktop quit.\n") + "The desktop quit.\n".length));
+        }
+
+        const logs = /.+[/\\]data[/\\]logs/.source;
+        const record = `${logs}[/\\\\]copy-11111111-2222-4333-8444-555555555555\\.log`;
+        assert.match(texts[0] ?? "", new RegExp(`^After the desktop quit, ${logs} held 0 copy records of the runtime's AppImage instead of one\\.\\n`));
+        assert.match(texts[1] ?? "", new RegExp(`^After the desktop quit, ${logs} held 2 copy records of the runtime's AppImage instead of one\\.\\n`));
+        assert.match(texts[2] ?? "", new RegExp(`^The runtime's copy record ${record} names no mount of the AppImage that is still running: teamrun-copy extraction 6060 .+\\n`));
+        assert.match(texts[3] ?? "", new RegExp(`^The runtime's copy record ${record} names no mount of the AppImage that is still running: teamrun-copy mount 6060 6161 /fixture\\.AppImage\\n`));
+        assert.match(texts[4] ?? "", new RegExp(`^The runtime's copy record ${record} names no extraction of the AppImage that is still there: teamrun-copy mount 6060 6161 /fixture\\.AppImage\\n`));
+        assert.equal(texts[5], "The runtime holds its own mount of the AppImage, process 6161.\nThe runtime stopped once idle.\n"
+          + "The runtime's copy of the AppImage was still there 10000 ms after the runtime stopped: teamrun-copy mount 6060 6161 /fixture.AppImage\n");
       });
 
     test("on Windows the installer installs silently for the user, and the desktop is closed through its window", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
@@ -336,12 +416,12 @@ class PackageSmokeTests {
         ];
 
         assert.deepEqual(exitCodes, [1, 1, 1]);
-        assert.match(outputs[0].text, /\nThe desktop quit\.\nThe runtime, process 5151, did not stop within 90000 ms after the desktop quit, although nothing used it:\n.+desktop\.log:\nThe desktop's log\.\n$/);
+        assert.match(outputs[0].text, /\nThe desktop quit\.\nThe runtime holds its own mount of the AppImage, process 6161\.\nThe runtime, process 5151, did not stop within 90000 ms after the desktop quit, although nothing used it:\n.+desktop\.log:\nThe desktop's log\.\n$/);
         assert.equal(lingering.checked.length, 90_000 / 500 + 2);
         assert.deepEqual(lingering.killed, [5151]);
         assert.match(outputs[1].text, /\nThe runtime's discovery file .+runtime\.json names no process\.\n$/);
         assert.deepEqual(hidden.desktop.signals, ["SIGKILL"]);
-        assert.match(outputs[2].text, /\nThe desktop quit\.\nteamrun status after the runtime stopped exited with 0 instead of 3:\n\{"build"/);
+        assert.match(outputs[2].text, /\nThe desktop quit\.\nThe runtime holds its own mount of the AppImage, process 6161\.\nteamrun status after the runtime stopped exited with 0 instead of 3:\n\{"build"/);
         assert.deepEqual([lingering, hidden, answering].map(t => existsSync(t.folder)), [false, false, false]);
       });
 
@@ -370,7 +450,7 @@ class PackageSmokeTests {
         assert.match(outputs[1].text, new RegExp(`\\nThe runtime, process 5151, did not stop within 90000 ms after the desktop quit, although nothing used it:\\n.+desktop\\.log:\\nThe desktop's log\\.\\n`
           + `Cleaning up failed:\\nThe runtime, process 5151, could not be ended: Error: EPERM: operation not permitted, kill 5151\\n`
           + `The smoke's folder .+ could not be removed: Error: EBUSY: resource busy or locked, rmdir '.+'\\n$`, "s"));
-        assert.match(outputs[2].text, /\nThe runtime stopped once idle\.\nCleaning up failed:\nThe smoke's folder .+ could not be removed: Error: EBUSY: resource busy or locked, rmdir '.+'\n$/);
+        assert.match(outputs[2].text, /\nThe runtime stopped once idle\.\nThe runtime's copy of the AppImage ended with it\.\nCleaning up failed:\nThe smoke's folder .+ could not be removed: Error: EBUSY: resource busy or locked, rmdir '.+'\n$/);
       });
 
     test("a runtime still running after the kill is reported once the kill's 10 s have passed, and a discovery file that cannot be read is reported, with the folder removed either way",

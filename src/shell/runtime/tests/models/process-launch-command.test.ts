@@ -96,21 +96,24 @@ export class ProcessLaunchCommandTests {
   @TestMethod
   public startsAProgramInsideAnAppImageThroughBashThatHoldsItsOwnCopy(): void {
     const environment = { APPIMAGE: "/home/ada/TeamRun.AppImage", APPDIR: "/tmp/.mount_TeamRuX" };
+    const record = "/data/logs/copy-1.log";
     const table = "98 29 0:62 / /tmp/.mount_TeamRuX ro,nosuid shared:51 - fuse.TeamRun.AppImage TeamRun.AppImage ro\n";
     const commands = [table, ""].map(t => {
       using _fileSystem = new FileSystemPatchFixture(null, t);
-      return new ProcessLaunchCommand("linux", "/tmp/.mount_TeamRuX/teamrun", ["entry.js"], environment);
+      return new ProcessLaunchCommand("linux", "/tmp/.mount_TeamRuX/teamrun", ["entry.js"], environment, record);
     });
     using _fileSystem = new FileSystemPatchFixture(null);
-    const outside = new ProcessLaunchCommand("linux", "/opt/teamrun/teamrun", ["entry.js"], environment);
+    const unrecorded = new ProcessLaunchCommand("linux", "/tmp/.mount_TeamRuX/teamrun", ["entry.js"], environment);
+    const outside = new ProcessLaunchCommand("linux", "/opt/teamrun/teamrun", ["entry.js"], environment, record);
 
     const shown = commands.map(t => [t.executable, ...t.arguments.slice(0, 4), ...t.arguments.slice(5)].join("|"));
     Assert.areEqual(
-      "/bin/bash|--noprofile|--norc|-p|-c|teamrun-launch|/home/ada/TeamRun.AppImage|/tmp/.mount_TeamRuX|mount|/tmp/.mount_TeamRuX/teamrun|entry.js",
+      "/bin/bash|--noprofile|--norc|-p|-c|teamrun-launch|/home/ada/TeamRun.AppImage|/tmp/.mount_TeamRuX|mount|/data/logs/copy-1.log|/tmp/.mount_TeamRuX/teamrun|entry.js",
       shown[0]);
     Assert.areEqual(
-      "/bin/bash|--noprofile|--norc|-p|-c|teamrun-launch|/home/ada/TeamRun.AppImage|/tmp/.mount_TeamRuX|extract|/tmp/.mount_TeamRuX/teamrun|entry.js",
+      "/bin/bash|--noprofile|--norc|-p|-c|teamrun-launch|/home/ada/TeamRun.AppImage|/tmp/.mount_TeamRuX|extract|/data/logs/copy-1.log|/tmp/.mount_TeamRuX/teamrun|entry.js",
       shown[1]);
+    Assert.areEqual(`${ProcessLaunchCommandTests.SHELL_ARGUMENTS}|/tmp/.mount_TeamRuX/teamrun|entry.js`, unrecorded.arguments.join("|"));
     Assert.areEqual(`${ProcessLaunchCommandTests.SHELL_ARGUMENTS}|/opt/teamrun/teamrun|entry.js`, outside.arguments.join("|"));
   }
 
@@ -121,13 +124,15 @@ export class ProcessLaunchCommandTests {
 
     const run = await ProcessLaunchCommandTests.runCopyAsync(fixture, true, { TEAMRUN_FIXTURE_EXIT: "3" });
 
-    const [, holder = "", mounter = ""] = /^teamrun-copy mount (\d+) (\d+) (.+)$/m.exec(run.error) ?? [];
-    const mount = path.join(fixture.folder, `mount-${mounter}`);
+    const mount = ProcessLaunchCommandTests.readCopy(await fixture.readRecordAsync());
     Assert.areEqual(3, run.exitCode);
-    Assert.areEqual(`teamrun-copy mount ${holder} ${mounter} ${fixture.image}\n`, run.error);
+    Assert.areEqual("", run.error);
+    Assert.areEqual(fixture.folder, path.dirname(mount));
+    Assert.isTrue(path.basename(mount).startsWith("mount-"), mount);
     Assert.areEqual(`${mount}/teamrun|entry.js|${mount}/resources/app.asar|--data-dir=/data|${mount}|`, await fixture.readRecordAsync());
     Assert.areEqual("", (await fixture.listMountsAsync()).join(","));
     Assert.areEqual("", (await fixture.listExtractionsAsync()).join(","));
+    Assert.isFalse(existsSync(fixture.copyRecord));
   }
 
   @PlatformFixture.linuxOnly()
@@ -151,25 +156,30 @@ export class ProcessLaunchCommandTests {
 
     const run = await ProcessLaunchCommandTests.runCopyAsync(fixture, true);
 
-    const [, holder = "", extraction = ""] = /^teamrun-copy extraction (\d+) (.+)$/m.exec(run.error) ?? [];
     Assert.areEqual(1, run.exitCode);
     Assert.areEqual(
-      `${fixture.image} could not be mounted, so the runtime starts from an extraction of it.\nteamrun-copy extraction ${holder} ${extraction}\n`
+      `${fixture.image} could not be mounted, so the runtime starts from an extraction of it.\n`
       + `${fixture.image} could be neither mounted nor extracted, so the runtime cannot start.\n`,
       run.error);
     Assert.isFalse(existsSync(fixture.record));
+    Assert.isFalse(existsSync(fixture.copyRecord));
     Assert.areEqual("", (await fixture.listExtractionsAsync()).join(","));
   }
 
   @PlatformFixture.linuxOnly()
   @TestMethod
-  public async passesAnEndSignalToTheProgramAndThenEndsTheMount(): Promise<void> {
+  public async recordsTheMountWhileItHoldsItAndPassesAnEndSignalToTheProgram(): Promise<void> {
     await using fixture = await AppImageFixture.createAsync();
 
     const run = await ProcessLaunchCommandTests.runCopyAsync(fixture, true, {}, ["wait"], "SIGTERM");
 
+    const mounter = path.basename(ProcessLaunchCommandTests.readCopy(await fixture.readRecordAsync())).slice("mount-".length);
+    const [, holder = ""] = run.recordedCopy.split(" ").slice(1);
     Assert.areEqual(143, run.exitCode);
+    Assert.areEqual(`teamrun-copy mount ${holder} ${mounter} ${fixture.image}\n`, run.recordedCopy);
+    Assert.isTrue(Number(holder) > 0, run.recordedCopy);
     Assert.areEqual("", (await fixture.listMountsAsync()).join(","));
+    Assert.isFalse(existsSync(fixture.copyRecord));
   }
 
   private static async runExtractedAsync(isMounted: boolean): Promise<void> {
@@ -178,15 +188,21 @@ export class ProcessLaunchCommandTests {
 
     const run = await ProcessLaunchCommandTests.runCopyAsync(fixture, isMounted);
 
-    const [, holder = "", extraction = ""] = /^teamrun-copy extraction (\d+) (.+)$/m.exec(run.error) ?? [];
-    const copy = path.join(extraction, "squashfs-root");
+    const copy = ProcessLaunchCommandTests.readCopy(await fixture.readRecordAsync());
+    const extraction = path.dirname(copy);
     const refused = isMounted ? `${fixture.image} could not be mounted, so the runtime starts from an extraction of it.\n` : "";
     Assert.areEqual(0, run.exitCode);
-    Assert.areEqual(`${refused}teamrun-copy extraction ${holder} ${extraction}\n`, run.error);
+    Assert.areEqual(refused, run.error);
+    Assert.areEqual("squashfs-root", path.basename(copy));
     Assert.areEqual(fixture.temporary, path.dirname(extraction));
     Assert.isTrue(/^teamrun-runtime-[A-Za-z0-9]{6}$/.test(path.basename(extraction)), extraction);
     Assert.areEqual(`${copy}/teamrun|entry.js|${copy}/resources/app.asar|--data-dir=/data|${copy}|`, await fixture.readRecordAsync());
     Assert.areEqual("", (await fixture.listExtractionsAsync()).join(","));
+    Assert.isFalse(existsSync(fixture.copyRecord));
+  }
+
+  private static readCopy(record: string): string {
+    return record.split("|").at(-2) ?? "";
   }
 
   private static runCopyAsync(fixture: AppImageFixture, isMounted: boolean, environment: NodeJS.ProcessEnv = {}, launchArguments: readonly string[] = [],
@@ -199,7 +215,7 @@ export class ProcessLaunchCommandTests {
   private static createCopyCommand(fixture: AppImageFixture, table: string, launchArguments: readonly string[]): ProcessLaunchCommand {
     using _fileSystem = new FileSystemPatchFixture(null, table);
     const programArguments = launchArguments.length > 0 ? launchArguments : ["entry.js", path.join(fixture.root, "resources", "app.asar"), "--data-dir=/data"];
-    return new ProcessLaunchCommand("linux", fixture.program, programArguments, { APPIMAGE: fixture.image, APPDIR: fixture.root });
+    return new ProcessLaunchCommand("linux", fixture.program, programArguments, { APPIMAGE: fixture.image, APPDIR: fixture.root }, fixture.copyRecord);
   }
 
   private static async listDescriptorsAsync(executable: string, launchArguments: readonly string[]): Promise<number[]> {

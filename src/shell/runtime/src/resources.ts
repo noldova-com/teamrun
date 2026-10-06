@@ -38,6 +38,7 @@ export class Resources {
   public static readonly previousDesktopLogFileName: string = "desktop.previous.log";
   public static readonly startLogPrefix: string = "start-";
   public static readonly startLogExtension: string = ".log";
+  public static readonly copyRecordPrefix: string = "copy-";
   public static readonly discoveryFileName: string = "runtime.json";
   public static readonly backupsFolderName: string = "backups";
   public static readonly profileFolderName: string = "desktop";
@@ -346,8 +347,8 @@ export class Resources {
       "shopt -s failglob",
       "for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done",
       "shopt -u failglob",
-      "image=$1 root=$2 mode=$3",
-      "shift 3",
+      "image=$1 root=$2 mode=$3 record=$4",
+      "shift 4",
       "copy= mounter= extraction= status=1",
       "if [[ $mode == mount ]]; then",
       "  listing=$(mktemp) || exit 1",
@@ -361,7 +362,7 @@ export class Resources {
       "  done",
       "  rm -f -- \"$listing\"",
       "  if [[ -n $copy ]]; then",
-      "    echo \"teamrun-copy mount $$ $mounter $image\" >&2",
+      "    echo \"teamrun-copy mount $$ $mounter $image\" >> \"$record\"",
       "  else",
       "    kill \"$mounter\" 2> /dev/null",
       "    wait \"$mounter\" 2> /dev/null",
@@ -371,11 +372,11 @@ export class Resources {
       "fi",
       "if [[ -z $copy ]]; then",
       "  extraction=$(mktemp -d \"${TMPDIR:-/tmp}/teamrun-runtime-XXXXXX\") || exit 1",
-      "  echo \"teamrun-copy extraction $$ $extraction\" >&2",
+      "  echo \"teamrun-copy extraction $$ $extraction\" >> \"$record\"",
       "  if ( cd -- \"$extraction\" && \"$image\" --appimage-extract > /dev/null ); then",
       "    copy=$extraction/squashfs-root",
       "  else",
-      "    rm -rf -- \"$extraction\"",
+      "    rm -rf -- \"$extraction\" \"$record\"",
       "    echo \"$image could be neither mounted nor extracted, so the runtime cannot start.\" >&2",
       "    exit 1",
       "  fi",
@@ -393,6 +394,7 @@ export class Resources {
       "while kill -0 \"$runtime\" 2> /dev/null; do wait \"$runtime\"; status=$?; done",
       "if [[ -n $mounter ]]; then kill -TERM \"$mounter\" 2> /dev/null; wait \"$mounter\" 2> /dev/null; fi",
       "if [[ -n $extraction ]]; then rm -rf -- \"$extraction\"; fi",
+      "rm -f -- \"$record\"",
       "exit \"$status\""
     ].join("\n")
   ];
@@ -410,7 +412,7 @@ export class Resources {
   public static readonly octalRadix: number = 8;
   public static readonly processFolder: string = "/proc";
   public static readonly commandLineFile: string = "cmdline";
-  public static readonly commandLineSeparator: string = "\0";
+  public static readonly processArgumentSeparator: string = "\0";
   public static readonly copyMountRecord: RegExp = /^teamrun-copy mount (\d+) (\d+) (.+)$/;
   public static readonly copyExtractionRecord: RegExp = /^teamrun-copy extraction (\d+) (.+)$/;
   public static readonly copyExtractionName: RegExp = /^teamrun-runtime-[A-Za-z0-9]{6}$/;
@@ -463,6 +465,7 @@ export class Resources {
   public static readonly runtimeExitedWithoutReason: string = "The runtime exited while starting and left no reason.";
   public static readonly startLogArgument: string = "--start-log";
   public static readonly startLogNamePattern: RegExp = /^start-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.log$/;
+  public static readonly copyRecordNamePattern: RegExp = /^copy-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.log$/;
   public static readonly startLogTailLength: number = 4096;
   public static readonly homeAbbreviation: string = "~";
   public static readonly redactedValue: string = "[redacted]";
@@ -861,6 +864,10 @@ export class Resources {
 
   public static formatRuntimeLogUnavailable(reason: string): string {
     return `The runtime's log could not be written, so it is no longer written to: ${reason}`;
+  }
+
+  public static formatCopyRecordName(unique: string): string {
+    return `${Resources.copyRecordPrefix}${unique}${Resources.startLogExtension}`;
   }
 
   public static formatStartLogName(unique: string): string {

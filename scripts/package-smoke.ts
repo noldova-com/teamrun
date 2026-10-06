@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 import timers from "node:timers/promises";
@@ -59,6 +59,13 @@ export default class PackageSmoke {
   private static readonly PROCESS_OPTION: string = "/PID";
   private static readonly QUIT_SIGNAL: NodeJS.Signals = "SIGTERM";
   private static readonly KILL_SIGNAL: NodeJS.Signals = "SIGKILL";
+  private static readonly LOGS_FOLDER: string = "logs";
+  private static readonly COPY_RECORD: RegExp = /^copy-[0-9a-f-]{36}\.log$/;
+  private static readonly MOUNT_RECORD: RegExp = /^teamrun-copy mount \d+ (\d+) .+$/;
+  private static readonly EXTRACTION_RECORD: RegExp = /^teamrun-copy extraction \d+ (.+)$/;
+  private static readonly EXTRACT_AND_RUN_VARIABLE: string = "APPIMAGE_EXTRACT_AND_RUN";
+  private static readonly EXTRACT_AND_RUN_VALUE: string = "1";
+  private static readonly MEBIBYTE: number = 1_048_576;
 
   private readonly root: string;
   private readonly platform: string;
@@ -124,6 +131,7 @@ export default class PackageSmoke {
     const logs = [log, path.join(data, ...PackageSmoke.DATA_LOG_SEGMENTS)];
     const desktop = await this.runner.startAsync(installed.desktop, [`${PackageSmoke.DATA_DIRECTORY_OPTION}=${data}`], folder, log);
     let runtime: number;
+    let copy: readonly [string, string] | null = null;
     try {
       this.checkStarted(await this.waitForRuntimeAsync(installed, data, folder, desktop, logs), manifest.productVersion, data);
       const found = await PackageSmoke.readRuntimeIdAsync(data);
@@ -140,6 +148,8 @@ export default class PackageSmoke {
       if (desktop.exitCode !== 0)
         throw new PackagingException(`The desktop quit with exit code ${desktop.exitCode}:\n${await PackageSmoke.readTailAsync(logs)}`);
       this.output.write("The desktop quit.\n");
+      if (target.platform === PackageTarget.LINUX)
+        copy = await this.requireCopyAsync(data);
     }
     finally {
       if (!desktop.hasExited)
@@ -153,6 +163,49 @@ export default class PackageSmoke {
     this.hasRuntimeStopped = true;
     await this.requireNoRuntimeAsync(installed, data, folder, "after the runtime stopped");
     this.output.write("The runtime stopped once idle.\n");
+    if (copy !== null)
+      await this.requireCopyEndedAsync(copy);
+  }
+
+  private async requireCopyAsync(data: string): Promise<readonly [string, string]> {
+    const logs = path.join(data, PackageSmoke.LOGS_FOLDER);
+    const records = (await readdir(logs)).filter(t => PackageSmoke.COPY_RECORD.test(t));
+    const [name = ""] = records;
+    if (records.length !== 1)
+      throw new PackagingException(`After the desktop quit, ${logs} held ${records.length} copy records of the runtime's AppImage instead of one.`);
+    const record = path.join(logs, name);
+    const line = (await readFile(record, "utf8")).trim();
+    if (this.environment[PackageSmoke.EXTRACT_AND_RUN_VARIABLE] === PackageSmoke.EXTRACT_AND_RUN_VALUE) {
+      const [, extraction = ""] = PackageSmoke.EXTRACTION_RECORD.exec(line) ?? [];
+      if (!existsSync(extraction))
+        throw new PackagingException(`The runtime's copy record ${record} names no extraction of the AppImage that is still there: ${line}`);
+      this.output.write(`The runtime holds its own extraction of the AppImage in ${extraction}, ${(await PackageSmoke.measureAsync(extraction) / PackageSmoke.MEBIBYTE).toFixed(1)} MiB.\n`);
+      return [record, line];
+    }
+    const [, mounter = ""] = PackageSmoke.MOUNT_RECORD.exec(line) ?? [];
+    if (mounter.length === 0 || !this.runner.isRunning(Number(mounter)))
+      throw new PackagingException(`The runtime's copy record ${record} names no mount of the AppImage that is still running: ${line}`);
+    this.output.write(`The runtime holds its own mount of the AppImage, process ${mounter}.\n`);
+    return [record, line];
+  }
+
+  private static async measureAsync(folder: string): Promise<number> {
+    let size = 0;
+    for (const entry of (await readdir(folder, { recursive: true, withFileTypes: true })).filter(t => t.isFile()))
+      size += (await stat(path.join(entry.parentPath, entry.name))).size;
+    return size;
+  }
+
+  private async requireCopyEndedAsync([record, line]: readonly [string, string]): Promise<void> {
+    const [, mounter = ""] = PackageSmoke.MOUNT_RECORD.exec(line) ?? [];
+    const [, extraction = ""] = PackageSmoke.EXTRACTION_RECORD.exec(line) ?? [];
+    const started = Date.now();
+    while (existsSync(record) || (mounter.length > 0 && this.runner.isRunning(Number(mounter))) || existsSync(extraction)) {
+      if (Date.now() - started >= PackageSmoke.KILL_LIMIT)
+        throw new PackagingException(`The runtime's copy of the AppImage was still there ${PackageSmoke.KILL_LIMIT} ms after the runtime stopped: ${line}`);
+      await timers.setTimeout(PackageSmoke.PAUSE);
+    }
+    this.output.write("The runtime's copy of the AppImage ended with it.\n");
   }
 
   private async cleanUpAsync(): Promise<boolean> {

@@ -21,11 +21,13 @@ export class AppImageRun {
   public readonly exitCode: number | null;
   public readonly signal: NodeJS.Signals | null;
   public readonly error: string;
+  public readonly recordedCopy: string;
 
-  public constructor(exitCode: number | null, signal: NodeJS.Signals | null, error: string) {
+  public constructor(exitCode: number | null, signal: NodeJS.Signals | null, error: string, recordedCopy: string) {
     this.exitCode = exitCode;
     this.signal = signal;
     this.error = error;
+    this.recordedCopy = recordedCopy;
   }
 }
 
@@ -86,6 +88,10 @@ export class AppImageFixture implements AsyncDisposable {
     return path.join(this.folder, "record");
   }
 
+  public get copyRecord(): string {
+    return path.join(this.folder, "copy.log");
+  }
+
   public get temporary(): string {
     return path.join(this.folder, "temporary");
   }
@@ -126,14 +132,16 @@ export class AppImageFixture implements AsyncDisposable {
     let error = "";
     child.stderr.setEncoding("utf8").on("data", (chunk: string) => error += chunk);
     const closed = once(child, "close");
+    let recordedCopy = "";
     if (!Object.isNull(signalWhenStarted)) {
       const started = `${this.record}.started`;
       if (!await Wait.untilAsync(() => existsSync(started), AppImageFixture.WAIT_LIMIT))
         throw new Error(`The program in the fixture AppImage did not start within ${AppImageFixture.WAIT_LIMIT} ms.`);
+      recordedCopy = await readFile(this.copyRecord, "utf8");
       child.kill(signalWhenStarted);
     }
     const [exitCode, signal] = await closed as [number | null, NodeJS.Signals | null];
-    return new AppImageRun(exitCode, signal, error);
+    return new AppImageRun(exitCode, signal, error, recordedCopy);
   }
 
   public async startMounterAsync(): Promise<number> {
