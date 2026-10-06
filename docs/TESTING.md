@@ -400,6 +400,7 @@ Section 4's gate rules apply to every required target; targeted runs establish o
 Pin the test dependencies when tooling is introduced.
 Verify the exact Playwright/Electron combination and its application configuration on each target before relying on it, and repeat the relevant compatibility checks when those dependencies or runner images change.
 The test host must supply the required native libraries and a working display; Linux CI may use Xvfb.
+Linux UI workflows run with a session bus of their own (`dbus-run-session`), as on a Linux desktop, so the programs the desktop starts on that bus run during them.
 A local WSL graphical-session pass is not a GitHub-hosted VM or Xvfb witness.
 
 Keep the application's sandbox, context isolation, web security and content security policy intact.

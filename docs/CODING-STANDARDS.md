@@ -415,7 +415,7 @@ Files in `.github/workflows` may use small inline scripts, toolchain commands an
 Pass untrusted event data through environment variables or API responses, never script interpolation.
 Pin Actions to full commit SHAs and record release versions.
 
-Linux runtime startup and AppImage restart may use fixed Bash programs under their launch owner to close inherited descriptors.
+Linux runtime startup, the programs the desktop starts and AppImage restart may use fixed Bash programs under their launch owner to close inherited descriptors.
 Pass paths/arguments positionally, never as interpolated code.
 Runtime startup disables Bash startup files and inherited shell options.
 This exception permits no general shell-based execution or standalone shell scripts.
