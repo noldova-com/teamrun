@@ -32,6 +32,7 @@ import {
   ConnectionException,
   MethodFailureException,
   Refusal,
+  RequestContext,
   ServerSettings
 } from "@noldova/teamrun-shell-runtime";
 
@@ -43,6 +44,7 @@ export class RuntimeServerTests {
   private static readonly MOVE: QualifiedName = new QualifiedName("notes", "move");
   private static readonly LARGE: QualifiedName = new QualifiedName("notes", "large");
   private static readonly BROKEN: QualifiedName = new QualifiedName("notes", "broken");
+  private static readonly COUNT: QualifiedName = new QualifiedName("notes", "count");
 
   @TestMethod
   public answersTheHandshakeWithItsIdentityAndServesRequests(): Promise<void> {
@@ -60,6 +62,26 @@ export class RuntimeServerTests {
       Assert.areEqual("desktop:1", response.id);
       Assert.areEqual("{\"client\":\"desktop\",\"payload\":{\"path\":\"notes.md\"}}", JSON.stringify(response.payload));
       Assert.areEqual(1, fixture.server.sessionCount);
+    });
+  }
+
+  @TestMethod
+  public countsTheAuthenticatedConnectionsBesideTheAskingOneWhateverTheirClientsAreCalled(): Promise<void> {
+    return RuntimeServerFixture.runAsync(undefined, async fixture => {
+      fixture.methods.register(RuntimeServerTests.COUNT, { handleAsync: (context: RequestContext) => Promise.resolve(fixture.server.countOtherClients(context)) });
+      const desktop = await fixture.authenticateAsync("desktop");
+      await fixture.authenticateAsync("desktop");
+      await fixture.authenticateAsync("cli");
+      const [, other] = await fixture.handshakeAsync("tool", RuntimeServerFixture.OTHER_IDENTITY);
+      await fixture.connectAsync();
+      await fixture.waitUntilAsync(() => fixture.server.sessionCount === 5);
+
+      desktop.sendMessages(new Request("desktop:1", RuntimeServerTests.COUNT, null));
+      const counted = await desktop.readResponseAsync();
+
+      Assert.areEqual(FailureCode.BuildMismatch, other.failure?.code);
+      Assert.areEqual(2, counted.payload);
+      Assert.areEqual(3, fixture.server.countOtherClients(new RequestContext("desktop", null, new AbortController().signal)));
     });
   }
 

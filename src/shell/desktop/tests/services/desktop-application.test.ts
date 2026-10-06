@@ -1328,6 +1328,39 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async keepsBoundsWhoseConnectionClosesAsItBecomesReadyForTheNextConnection(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    const second = new FakeRuntimeConnection();
+    const third = new FakeRuntimeConnection();
+    second.deferred.set("shell.writeWindowBounds", () => {
+      second.isClosed = true;
+      return Promise.reject(new ConnectionException("The connection to the runtime is closed."));
+    });
+    const reconnections = [Promise.withResolvers<FakeRuntimeConnection>(), Promise.withResolvers<FakeRuntimeConnection>()];
+    const launcher = new FakeRuntimeLauncher(first, ...reconnections.map(t => t.promise));
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopStartFixture.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopStartFixture.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
+
+    launcher.listener?.onDisconnected(null);
+    const readsBeforeTheMove = window.boundsReads;
+    window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+    window.change("move");
+    await Condition.waitAsync(() => window.boundsReads > readsBeforeTheMove);
+    reconnections[0]?.resolve(second);
+    await Condition.waitAsync(() => second.calls.includes("shell.writeWindowBounds"));
+    await setImmediate();
+    launcher.listener?.onDisconnected(null);
+    reconnections[1]?.resolve(third);
+    await Condition.waitAsync(() => third.calls.includes("shell.writeWindowBounds"));
+
+    Assert.areEqual(JSON.stringify({ x: 40, y: 60, width: 900, height: 640, maximized: false }), JSON.stringify(third.states.get(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`)));
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's bounds").length);
+  }
+
+  @TestMethod
   public async reportsBoundsTheRuntimeRefusesOnceItIsReadyAgain(): Promise<void> {
     const first = new FakeRuntimeConnection();
     const second = new FakeRuntimeConnection();
