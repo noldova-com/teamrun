@@ -28,20 +28,19 @@ export class QuickInputComponent {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly injector: Injector = inject(Injector);
   private readonly list: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("list");
-  private readonly activeValue: WritableSignal<number> = linkedSignal({
+  private readonly movedId: WritableSignal<string | null> = linkedSignal({
     source: () => ({ items: this.items(), query: this.query() }),
-    computation: (source, previous?: { readonly source: { readonly items: readonly QuickInputItem[]; readonly query: string }; readonly value: number }) => {
-      if (Object.isUndefined(previous) || previous.source.query !== source.query)
-        return 0;
-      const id = previous.source.items[previous.value]?.id;
-      return Math.max(0, source.items.findIndex(t => t.id === id));
-    }
+    computation: (source, previous?: { readonly source: { readonly items: readonly QuickInputItem[]; readonly query: string }; readonly value: string | null }) =>
+      !Object.isUndefined(previous) && previous.source.query === source.query && source.items.some(t => t.id === previous.value) ? previous.value : null
   });
   private shownQuery: string = String.empty;
   private isChoosing: boolean = false;
 
   protected readonly listId: string = `${Resources.quickInputIdPrefix}${QuickInputComponent.count++}`;
-  protected readonly active: Signal<number> = this.activeValue.asReadonly();
+  protected readonly active: Signal<number> = computed(() => {
+    const id = this.movedId();
+    return Math.max(0, this.items().findIndex(t => t.id === id));
+  });
   protected readonly activeId: Signal<string | null> = computed(() => this.items().length === 0 ? null : this.optionId(this.active()));
   protected readonly status: Signal<string> = computed(() => Resources.formatResultCount(this.items().length));
 
@@ -76,7 +75,7 @@ export class QuickInputComponent {
     const next = QuickInputComponent.isModified(event) ? null : this.indexFor(event.key);
     if (!Object.isNull(next)) {
       event.preventDefault();
-      this.activeValue.set(Math.max(0, Math.min(next, this.items().length - 1)));
+      this.movedId.set(this.items()[Math.max(0, Math.min(next, this.items().length - 1))]?.id ?? null);
       return;
     }
     if (event.key === Resources.enterKey) {

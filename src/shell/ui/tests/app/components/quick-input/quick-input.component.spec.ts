@@ -318,6 +318,22 @@ describe("QuickInputComponent", () => {
     expect(host.chosen).toEqual(["notes.command29"]);
   });
 
+  it("starts at the first option when the options for a new query arrive after the query, though the options listed before are among them", async () => {
+    await pressAsync("End");
+    host.query.set("Command 2");
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const typed = activeIndex();
+
+    host.items.set([...many.slice(2, 3), ...many.slice(0, 1), ...many.slice(20)]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await pressAsync("Enter");
+
+    expect([typed, activeIndex()]).toEqual([0, 0]);
+    expect(host.chosen).toEqual(["notes.command2"]);
+  });
+
   it("starts at the first option again when its active one is no longer listed, and chooses nothing and announces no results when it has none", async () => {
     await pressAsync("End");
     host.items.set(many.slice(0, 2));
@@ -325,6 +341,10 @@ describe("QuickInputComponent", () => {
     await fixture.whenStable();
     const status = fixture.nativeElement.querySelector("[role=status]") as HTMLElement;
     const twoResults = status.textContent;
+    expect(activeIndex()).toBe(0);
+    host.items.set(many);
+    fixture.detectChanges();
+    await fixture.whenStable();
     expect(activeIndex()).toBe(0);
 
     host.items.set([]);
