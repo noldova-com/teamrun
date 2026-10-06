@@ -11,6 +11,7 @@ import { Exception } from "@noldova/teamrun-foundation-exceptions";
 import { Resources } from "../resources.js";
 
 export class NoRuntimeException extends Exception {
+  public override readonly name: string = "NoRuntimeException";
   public readonly root: string;
 
   public constructor(root: string) {

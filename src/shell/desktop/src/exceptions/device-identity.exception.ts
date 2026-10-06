@@ -9,6 +9,8 @@
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 export class DeviceIdentityException extends Exception {
+  public override readonly name: string = "DeviceIdentityException";
+
   public constructor(message: string, options?: ExceptionOptions) {
     super(message, options);
   }

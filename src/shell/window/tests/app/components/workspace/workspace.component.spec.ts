@@ -276,22 +276,24 @@ describe("WorkspaceComponent", () => {
     expect(getComputedStyle(docked[0] ?? fixture.nativeElement).backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "sideBar.background"));
   });
 
-  it("leaves an open tab's place empty while a dialog shows it and shows it there again once the dialog closes", async () => {
+  it("moves an open tab's view into a dialog that shows it, leaving its place empty, and back once the dialog closes", async () => {
     const registry = LayoutFixture.createRegistry();
     const fixture = await renderAsync(registry, Layout.createDefault(registry).openDocument(LayoutFixture.plan));
     const host: HTMLElement = fixture.nativeElement;
     const dialogs = TestBed.inject(ViewDialogService);
-    const before = host.querySelectorAll("tr-tab-content").length;
+    const before = [...host.querySelectorAll("tr-tab-content")];
 
     const shown = dialogs.showAsync(LayoutFixture.plan);
     await settleAsync(fixture);
     const whileShown = host.querySelectorAll("tr-tab-content").length;
-    const inDialog = document.querySelectorAll("tr-view-dialog tr-tab-content").length;
+    const inDialog = [...document.querySelectorAll("tr-view-dialog tr-tab-content")];
     dialogs.close();
     await shown;
     await settleAsync(fixture);
 
-    expect([whileShown, inDialog, host.querySelectorAll("tr-tab-content").length]).toEqual([before - 1, 1, before]);
+    expect([whileShown, inDialog.length]).toEqual([before.length - 1, 1]);
+    expect(before).toContain(inDialog[0]);
+    expect(new Set(host.querySelectorAll("tr-tab-content"))).toEqual(new Set(before));
   });
 
   it("renders the docks with their sashes, the groups, the split sashes and the docking guides", async () => {

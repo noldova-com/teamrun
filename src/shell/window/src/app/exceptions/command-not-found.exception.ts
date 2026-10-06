@@ -9,6 +9,8 @@
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 export class CommandNotFoundException extends Exception {
+  public override readonly name: string = "CommandNotFoundException";
+
   public constructor(message: string) {
     super(message);
   }

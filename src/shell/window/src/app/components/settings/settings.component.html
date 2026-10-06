@@ -12,10 +12,10 @@ LICENSE file in the root directory of this source tree.
     [value]="query()" (input)="search($event)" />
 </div>
 <div class="tr-settings-body">
-  <div #pageList class="tr-settings-pages" (scroll)="keep()">
+  <div #pageList class="tr-settings-pages">
     <tr-tree [nodes]="pageNodes()" [label]="resources.settingsPagesLabel" [current]="isSearching() ? null : currentPage()?.title ?? null" (activated)="select($event.id)" />
   </div>
-  <div #content class="tr-settings-content" (scroll)="keep()">
+  <div class="tr-settings-content">
     <div class="tr-settings-column">
       @if (isSearching()) {
         @for (page of results(); track page.title) {

@@ -79,7 +79,8 @@ export class Resources {
     ShellMethods.setSetting.text,
     ShellMethods.resetSetting.text,
     ShellMethods.recentCommands.text,
-    ShellMethods.recordCommand.text
+    ShellMethods.recordCommand.text,
+    ShellMethods.programs.text
   ];
   public static readonly deviceMethods: readonly string[] = [
     ShellMethods.settings.text,
@@ -173,6 +174,8 @@ export class Resources {
   public static readonly closedEvent: "closed" = "closed";
   public static readonly clickEvent: "click" = "click";
   public static readonly failedEvent: "failed" = "failed";
+  public static readonly dataEvent: "data" = "data";
+  public static readonly errorEvent: "error" = "error";
   public static readonly secondInstanceEvent: "second-instance" = "second-instance";
   public static readonly windowAllClosedEvent: "window-all-closed" = "window-all-closed";
   public static readonly activateEvent: "activate" = "activate";
@@ -285,6 +288,18 @@ export class Resources {
   public static readonly windowAreaShare: number = 0.9;
   public static readonly closeAnswerTimeout: number = 5000;
   public static readonly workQueryTimeout: number = 2000;
+  public static readonly programTimeout: number = 5000;
+  public static readonly programOutputLimit: number = 65536;
+  public static readonly gdbusPath: string = "/usr/bin/gdbus";
+  public static readonly trayHostQueryArguments: readonly string[] = [
+    "call", "--session", "--dest", "org.kde.StatusNotifierWatcher", "--object-path", "/StatusNotifierWatcher",
+    "--method", "org.freedesktop.DBus.Properties.Get", "org.kde.StatusNotifierWatcher", "IsStatusNotifierHostRegistered"
+  ];
+  public static readonly trayHostMonitorArguments: readonly string[] = ["monitor", "--session", "--dest", "org.kde.StatusNotifierWatcher"];
+  public static readonly trayHostRegisteredAnswer: string = "(<true>,)";
+  public static readonly trayMonitorFirstDelay: number = 1000;
+  public static readonly trayMonitorLongestDelay: number = 60_000;
+  public static readonly trayMonitorDelayGrowth: number = 2;
   public static readonly windowLogLimit: number = 65536;
   public static readonly windowErrorBurst: number = 10;
   public static readonly windowErrorPeriod: number = 60000;
@@ -433,6 +448,10 @@ export class Resources {
 
   public static formatPathCommandFailed(link: string, reason: string): string {
     return `The ${Resources.commandName} command could not be linked at ${link}: ${reason}`;
+  }
+
+  public static formatProgramFailed(file: string, reason: string): string {
+    return `${file} failed: ${reason}`;
   }
 
   public static formatSystemNotificationFailed(reason: string): string {

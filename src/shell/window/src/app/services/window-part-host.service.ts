@@ -26,6 +26,7 @@ import { BuildTokens } from "../models/build-tokens";
 import { CommandContribution } from "../models/command-contribution";
 import { ContributionMatch } from "../models/contribution-match";
 import type { DocumentContribution } from "../models/document-contribution";
+import type { DocumentHeading } from "../models/document-heading";
 import { DocumentTab } from "../models/layout/document-tab";
 import type { Tab } from "../models/layout/tab";
 import { TabLabel } from "../models/layout/tab-label";
@@ -49,6 +50,7 @@ import { DesktopBridgeService } from "./desktop-bridge.service";
 import { DocumentOpenerService } from "./document-opener.service";
 import { LayoutService } from "./layout.service";
 import { LinkService } from "./link.service";
+import { LiveViewService } from "./live-view.service";
 import { MenuService } from "./menu.service";
 import { ModuleStatusService } from "./module-status.service";
 import { SettingsService } from "./settings.service";
@@ -60,6 +62,7 @@ export class WindowPartHostService implements IWindowPartHost {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly links: LinkService = inject(LinkService);
   private readonly layout: LayoutService = inject(LayoutService);
+  private readonly liveViews: LiveViewService = inject(LiveViewService);
   private readonly opener: DocumentOpenerService = inject(DocumentOpenerService);
   private readonly labels: TabLabelService = inject(TabLabelService);
   private readonly commands: CommandService = inject(CommandService);
@@ -150,11 +153,11 @@ export class WindowPartHostService implements IWindowPartHost {
     return this.settings.onChanged(listener);
   }
 
-  public openDocument(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
+  public openDocument(moduleId: string, name: string, instance: string, heading: DocumentHeading, isPreview: boolean): void {
     if (this.isActivating)
-      this.pendingOpens.push(new PendingDocument(moduleId, name, instance, title, isPreview));
+      this.pendingOpens.push(new PendingDocument(moduleId, name, instance, heading, isPreview));
     else
-      this.opener.open(moduleId, name, instance, title, isPreview);
+      this.opener.open(moduleId, name, instance, heading, isPreview);
   }
 
   public listSaves(): ReadonlyMap<string, readonly (() => Promise<void>)[]> {
@@ -174,6 +177,13 @@ export class WindowPartHostService implements IWindowPartHost {
     this.pendingOpens = this.pendingOpens.map(t => t.kept(moduleId, name, instance));
     if (this.isLayoutLoaded)
       this.opener.keep(moduleId, name, instance);
+  }
+
+  public updateDocument(moduleId: string, name: string, instance: string, title: string | null, breadcrumb: readonly string[] | null): void {
+    this.startOpens = this.startOpens.map(t => t.updated(moduleId, name, instance, title, breadcrumb));
+    this.pendingOpens = this.pendingOpens.map(t => t.updated(moduleId, name, instance, title, breadcrumb));
+    if (this.isLayoutLoaded)
+      this.opener.update(moduleId, name, instance, title, breadcrumb);
   }
 
   public async showInDialogAsync(name: string, instance: string | null, title: string | null): Promise<void> {
@@ -403,7 +413,7 @@ export class WindowPartHostService implements IWindowPartHost {
 
   private replay(pending: PendingDocument, open: DocumentOpenerService["open"]): void {
     try {
-      open(pending.moduleId, pending.name, pending.instance, pending.title, pending.isPreview);
+      open(pending.moduleId, pending.name, pending.instance, pending.heading, pending.isPreview);
     }
     catch (error) {
       this.errors.handleError(error);
@@ -483,6 +493,7 @@ export class WindowPartHostService implements IWindowPartHost {
 
   private async deactivateAsync(activations: readonly WindowPartActivation[]): Promise<void> {
     for (const activation of [...activations].reverse()) {
+      this.liveViews.destroy(t => WindowPartHostService.owns(activation.context, t));
       this.activations.splice(this.activations.indexOf(activation), 1);
       this.changedModules.add(activation.context.moduleId);
       try {
@@ -495,6 +506,11 @@ export class WindowPartHostService implements IWindowPartHost {
         activation.context.withdraw();
       }
     }
+  }
+
+  private static owns(context: WindowPartContext, tab: Tab): boolean {
+    const contributions = tab instanceof DocumentTab ? context.documents : context.views;
+    return contributions.some(t => t.name === tab.name);
   }
 
   private static match(contribution: ViewContribution | DocumentContribution, context: WindowPartContext | null, modulePadding?: ContentPadding): ContributionMatch {

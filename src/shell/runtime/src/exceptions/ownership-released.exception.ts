@@ -11,6 +11,8 @@ import { Exception } from "@noldova/teamrun-foundation-exceptions";
 import { Resources } from "../resources.js";
 
 export class OwnershipReleasedException extends Exception {
+  public override readonly name: string = "OwnershipReleasedException";
+
   public constructor() {
     super(Resources.ownershipReleased);
   }

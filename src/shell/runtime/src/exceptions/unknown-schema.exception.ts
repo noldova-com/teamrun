@@ -9,6 +9,8 @@
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 export class UnknownSchemaException extends Exception {
+  public override readonly name: string = "UnknownSchemaException";
+
   public constructor(message: string) {
     super(message);
   }

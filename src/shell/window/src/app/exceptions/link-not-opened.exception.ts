@@ -9,6 +9,8 @@
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 export class LinkNotOpenedException extends Exception {
+  public override readonly name: string = "LinkNotOpenedException";
+
   public constructor(message: string) {
     super(message);
   }

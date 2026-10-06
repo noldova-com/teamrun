@@ -9,6 +9,8 @@
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 export class ThemeException extends Exception {
+  public override readonly name: string = "ThemeException";
+
   public constructor(message: string) {
     super(message);
   }
