@@ -103,26 +103,6 @@ describe("kit styles", () => {
     }
   });
 
-  it("mark a selected tab along its top, and the current row, a checked pill and the active result along their start, with a bar in the accent twice the border width that mirrors right to left", async () => {
-    AppearanceFixture.apply();
-    const frame = GalleryFixture.frames(await GalleryFixture.showAsync())[0] as HTMLElement;
-    const accent = GalleryFixture.colorOf(frame, "color", "var(--tr-accent)");
-    const starts = [".tr-tree-row-current", ".tr-choice-pill-selected", ".tr-quick-input-option[aria-selected=\"true\"]"];
-    const shadow = (selector: string): string => getComputedStyle(frame.querySelector(selector) as Element).boxShadow;
-
-    const tab = shadow(".tr-tab.tr-tab-selected .tr-tab-pill");
-    const ltr = starts.map(shadow);
-    document.documentElement.dir = "rtl";
-    const rtl = starts.map(shadow);
-    const rtlTab = shadow(".tr-tab.tr-tab-selected .tr-tab-pill");
-    document.documentElement.removeAttribute("dir");
-
-    expect([tab, rtlTab]).toEqual([`${accent} 0px 2px 0px 0px inset`, `${accent} 0px 2px 0px 0px inset`]);
-    expect(ltr).toEqual(starts.map(() => `${accent} 2px 0px 0px 0px inset`));
-    expect(rtl).toEqual(starts.map(() => `${accent} -2px 0px 0px 0px inset`));
-    expect(shadow(".tr-tab:not(.tr-tab-selected) .tr-tab-pill")).toBe("none");
-  });
-
   for (const theme of AppearanceFixture.themes)
     it(`give every scroll area, without a class, thin scrollbars without arrows whose thumb shows on hover while it and its content keep the text color, with the ${theme.id} theme`, async () => {
       AppearanceFixture.apply(theme, ThemeMode.Light);
@@ -275,7 +255,7 @@ describe("kit styles in forced colors", () => {
     return width;
   }
 
-  it("fills a selected tab, the current tree row, a checked pill, the active result, pressed buttons, the chosen guide and a badge with the highlight, their text and icons in the highlighted text without the backplate the system draws behind text, and drops the accent bar the fill replaces", () => {
+  it("fills a selected tab, the current tree row, a checked pill, the active result, pressed buttons, the chosen guide and a badge with the highlight, their text and icons in the highlighted text without the backplate the system draws behind text", () => {
     const highlight = ForcedColorsFixture.resolve("Highlight");
     const text = ForcedColorsFixture.resolve("HighlightText");
     const filled: readonly (readonly [string, string | null])[] = [
@@ -290,12 +270,10 @@ describe("kit styles in forced colors", () => {
     ];
 
     const shown = filled.map(([selector, part]) => [selector, getComputedStyle(one(selector), part).backgroundColor, getComputedStyle(one(selector)).color, getComputedStyle(one(selector)).forcedColorAdjust]);
-    const cues = [".tr-tab.tr-tab-selected .tr-tab-pill", ".tr-tree-row-current", ".tr-choice-pill-selected", ".tr-quick-input-option[aria-selected=\"true\"]"].map(t => getComputedStyle(one(t)).boxShadow);
     const labels = [".tr-tree-row-current .tr-tree-label", ".tr-tab.tr-tab-selected .tr-tab-label", ".tr-quick-input-option[aria-selected=\"true\"] .tr-quick-input-detail"].map(t => getComputedStyle(one(t)).color);
 
     expect(shown).toEqual(filled.map(([selector]) => [selector, highlight, text, "none"]));
     expect(labels).toEqual([text, text, text]);
-    expect(cues).toEqual(["none", "none", "none", "none"]);
   });
 
   it("outlines every hovered control with a dashed highlight, since the hover fill is forced away", () => {

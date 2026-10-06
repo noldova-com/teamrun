@@ -110,7 +110,7 @@ describe("DefaultTheme contrast", () => {
     ...on("removed", [["panel"], ["code"]], textRatio),
     ...on("added", [["panel"], ["code"]], textRatio),
     ...on("icon-color", [["window"], ["panel"], ["menu"], ["window", "hover"], ["window", "selected"], ["window", "toolbar-hover"], ["panel", "toolbar-hover"]], partRatio),
-    ...on("accent", [["window"], ["panel"], ["raised"], ["dialog"], ["menu"], ["quick-input"], ["input"], ["dropdown-list"], ["window", "selected"], ["panel", "selected"], ["menu", "selected"], ["quick-input", "selected"], ["dropdown-list", "list-active"]], partRatio),
+    ...on("accent", [["window"], ["panel"], ["raised"], ["dialog"], ["menu"], ["quick-input"], ["input"], ["window", "selected"]], partRatio),
     ...on("sash-active", [["window"]], partRatio),
     ...on("progress", [["window"], ["panel"]], partRatio),
     ...on("button", [["window"], ["panel"], ["dialog"]], partRatio),
@@ -132,6 +132,11 @@ describe("DefaultTheme contrast", () => {
     ["scrollbar", "Scrollbar thumb, kept as a standard scrollbar by decision; the wheel, the keys and touch scroll without it."],
     ["scrollbar-active", "Scrollbar thumb while dragged, kept as a standard scrollbar by decision; the wheel, the keys and touch scroll without it."]
   ]);
+  const fillCues: readonly (readonly [string, string, string])[] = [
+    ["selected", "window", "Selection shows by its fill alone, by decision; its semantics and forced colors' Highlight fill convey it."],
+    ["selected", "panel", "Selection shows by its fill alone, by decision; its semantics and forced colors' Highlight fill convey it."],
+    ["list-active", "dropdown-list", "The keyboard-active option shows by its fill alone, by the same decision as selection."]
+  ];
 
   function channels(theme: Theme, mode: ThemeMode, name: string): readonly number[] {
     const token = Resources.colorTokens.find(t => t.variable === `--tr-${name}`);
@@ -172,10 +177,19 @@ describe("DefaultTheme contrast", () => {
 
   it("checks or exempts every color of the theme, each exemption with its reason", () => {
     const checked = new Set(pairs.flatMap(([foreground, grounds]) => [foreground, ...grounds]));
-    const unaccounted = Resources.colorTokens.map(t => t.variable.slice("--tr-".length)).filter(t => !checked.has(t) && !exempt.has(t));
+    const fills = new Set(fillCues.map(([color]) => color));
+    const unaccounted = Resources.colorTokens.map(t => t.variable.slice("--tr-".length)).filter(t => !checked.has(t) && !exempt.has(t) && !fills.has(t));
 
     expect(unaccounted).toEqual([]);
     expect([...exempt.keys()].filter(t => checked.has(t))).toEqual([]);
-    expect([...exempt.values()].every(t => t.length > 0)).toBe(true);
+    expect([...exempt.values(), ...fillCues.map(([, , reason]) => reason)].every(t => t.length > 0)).toBe(true);
+  });
+
+  it("lists the selected and active-list fills as cues shown by their fill alone, which need no 3:1 against their surface, only while they stand under it", () => {
+    const passing = themes.flatMap(theme => modes.flatMap(mode => fillCues
+      .filter(([cue, surface]) => ratio(theme, mode, cue, [surface]) >= partRatio)
+      .map(([cue, surface]) => `${theme.id} ${mode}: ${cue} on ${surface}`)));
+
+    expect(passing).toEqual([]);
   });
 });

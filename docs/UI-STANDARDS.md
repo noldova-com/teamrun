@@ -101,7 +101,7 @@ Decorative borders may remain subtle; boundaries needed to identify controls mus
 | `--tr-icon-color` | `icon.foreground`, fallback `foreground` | #3B3B3B | #CCCCCC | Interface icons |
 | `--tr-card-border` | `surface.border`, fallback `widget.border` | #E5E5E5 | #252525 | Decorative panel border |
 | `--tr-border` | `sideBarSectionHeader.border` | #E5E5E5 | #2B2B2B | Dock strip separators and other functional borders |
-| `--tr-accent` | `focusBorder`, contrast-adjusted | #005FB8 | #4DAAFC | Focus, active resize indicators and the selection bar |
+| `--tr-accent` | `focusBorder`, contrast-adjusted | #005FB8 | #4DAAFC | Focus and active resize indicators |
 | `--tr-sash-active` | `sash.hoverBorder`, fallback `focusBorder` | #005FB8 | #4DAAFC | Bar of a sash in use |
 | `--tr-link` | `textLink.foreground` | #005FB8 | #4DAAFC | Links |
 | `--tr-hover` | `list.hoverBackground` | #F2F2F2 | #2C2C2C | Row, tab and menu-item hover |
@@ -134,9 +134,8 @@ Decorative borders may remain subtle; boundaries needed to identify controls mus
 | `--tr-added` | Semantic addition foreground | #3F6212 | #B5CEA8 | Added lines/counts and copy-success icon |
 | `--tr-added-background`, `--tr-removed-background` | Respective semantic foreground mixed over the local surface | 12% foreground | 12% foreground | Diff backgrounds; normal code text remains readable |
 
-Muted text inside a selected surface takes the surface's normal text color, and the kit's `selected-surface` mixin sets the fill, that color and the selection bar together, so every selected state uses it.
-The selected fill stands under 3:1 against its surface, so the bar is the selection's visible cue: an inset accent bar twice the border width at the part's start, mirrored right to left, and along the top of a tab.
-A keyboard-active option carries the same bar on the active-list fill.
+Muted text inside a selected surface takes the surface's normal text color, and the kit's `selected-surface` mixin sets the fill and that color together, so every selected state uses it.
+Selection, and a keyboard-active option, show by their fill alone, without a bar or other marker; the fill needs no 3:1 against its surface, since the part's semantics convey the state and forced colors give it the Highlight fill.
 Use another validated token when muted text loses contrast on any other surface.
 Sections 6 and 7 distinguish readable secondary text from disabled controls.
 
@@ -264,7 +263,7 @@ The rows of a menu, list, tree or dropdown fill their column and keep 0.5rem.
   A checkbox or field does not need an extra hover fill.
   Hover-only actions also appear on keyboard focus and remain usable while the pointer moves to them.
 - **Pointer:** buttons, links, tabs, selectable rows and menu items use a hand cursor; editable text uses the text cursor, resize handles use their resize cursor, and disabled controls use the default cursor.
-- **Selection:** rows, tabs and choice pills use the selected surface with its accent bar; keyboard-active options use the active-list pair with the same bar.
+- **Selection:** rows, tabs and choice pills use the selected surface; keyboard-active options use the active-list pair.
   A checked checkbox shows its mark.
   Section 7 governs semantics and non-color cues.
 - **Focus:** editable fields use the accent border; an invalid field keeps its error border while focused.
@@ -345,7 +344,7 @@ The rows of a menu, list, tree or dropdown fill their column and keep 0.5rem.
   Do not hide focus or selection cues when a custom theme or color preference changes.
   Provide text alternatives for images and meaningful status announcements without repeatedly stealing focus.
 - When the system forces its colors (`forced-colors: active`), the system's palette replaces the theme's, fills and shadows drop away, and every state keeps a cue in system colors through the kit's forced-colors partial:
-  - Selected, current, checked, pressed and chosen parts, such as a selected tab, the current tree or list row, a checked pill, the active result or option, a pressed button, the chosen docking guide and a view badge, take the Highlight fill, with their text and icons in HighlightText, and drop the accent bar the fill replaces.
+  - Selected, current, checked, pressed and chosen parts, such as a selected tab, the current tree or list row, a checked pill, the active result or option, a pressed button, the chosen docking guide and a view badge, take the Highlight fill, with their text and icons in HighlightText.
   - A hovered control or row takes a dashed Highlight outline.
   - Focus is a Highlight ring at twice the border width, including on fields, selects and keys being recorded, whose focus is otherwise a border color.
   - Progress, the spinner's arc, the sash's bar and drop lines are drawn in Highlight, and grips and separators in CanvasText.
