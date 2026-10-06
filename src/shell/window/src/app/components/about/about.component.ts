@@ -76,7 +76,7 @@ export class AboutComponent {
       case UpdateStateKind.Downloading:
         return Resources.formatDownloadingLine(state.version);
       case UpdateStateKind.Ready:
-        return Resources.formatUpdateReady(state.version ?? String.empty);
+        return Resources.formatUpdateReady(String(state.version));
       case UpdateStateKind.Failed:
         return Resources.updateFailed;
     }
