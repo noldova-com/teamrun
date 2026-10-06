@@ -17,7 +17,19 @@ class TestOptionsTests {
     test("no arguments select the complete gate once", () => {
       const options = TestOptions.parse([]);
 
-      assert.deepEqual([options.isDocuments, options.filters, options.repeat], [false, [], 1]);
+      assert.deepEqual([options.isDocuments, options.filters, options.repeat, options.selection], [false, [], 1, undefined]);
+    });
+
+    test("packages, the Angular tests and the script tests select a run of every check with only those tests, which a repeat count applies to", () => {
+      const options = TestOptions.parse(["--package", "@noldova/teamrun-foundation-core", "--script-tests", "--repeat", "2", "--package", "@noldova/teamrun-shell-protocol", "--angular-tests"]);
+      const scripts = TestOptions.parse(["--script-tests"]).selection;
+      const checksOnly = TestOptions.parse(["--checks-only"]);
+
+      assert.deepEqual([options.isDocuments, options.filters, options.repeat], [false, [], 2]);
+      assert.deepEqual(options.selection?.packages, ["@noldova/teamrun-foundation-core", "@noldova/teamrun-shell-protocol"]);
+      assert.deepEqual([options.selection?.runsAngularTests, options.selection?.runsScriptTests], [true, true]);
+      assert.deepEqual([scripts?.packages, scripts?.runsAngularTests, scripts?.runsScriptTests], [[], false, true]);
+      assert.deepEqual([checksOnly.repeat, checksOnly.selection?.packages, checksOnly.selection?.runsAngularTests, checksOnly.selection?.runsScriptTests], [1, [], false, false]);
     });
 
     test("documents alone selects the document checks", () => {
@@ -54,7 +66,15 @@ class TestOptionsTests {
         [["--repeat", "2", "--repeat", "3"], "--repeat may be given only once."],
         [["coverage"], "\"coverage\" is not an option of npm test."],
         [["--filter", "alpha", "extra"], "\"extra\" is not an option of npm test."],
-        [["--repeat", "2", "documents"], "\"documents\" is not an option of npm test."]
+        [["--repeat", "2", "documents"], "\"documents\" is not an option of npm test."],
+        [["--package"], "--package takes a package's name that is not blank and does not start with --."],
+        [["--package", " "], "--package takes a package's name that is not blank and does not start with --."],
+        [["--package", "--script-tests"], "--package takes a package's name that is not blank and does not start with --."],
+        [["--filter", "alpha", "--package", "@noldova/teamrun-foundation-core"], "--filter selects tests by name and takes no --package, --angular-tests, --script-tests or --checks-only."],
+        [["--angular-tests", "--filter", "alpha"], "--filter selects tests by name and takes no --package, --angular-tests, --script-tests or --checks-only."],
+        [["--filter", "alpha", "--checks-only"], "--filter selects tests by name and takes no --package, --angular-tests, --script-tests or --checks-only."],
+        [["--checks-only", "--script-tests"], "--checks-only runs no tests, so it takes no --package, --angular-tests or --script-tests."],
+        [["--package", "@noldova/teamrun-foundation-core", "--checks-only"], "--checks-only runs no tests, so it takes no --package, --angular-tests or --script-tests."]
       ];
 
       for (const [args, reason] of refused)

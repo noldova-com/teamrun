@@ -26,6 +26,7 @@ import PackageTestCheck from "./checks/package-test-check.ts";
 import PackagedBuildCheck from "./checks/packaged-build-check.ts";
 import ProductIdentityCheck from "./checks/product-identity-check.ts";
 import ScriptTestCheck from "./checks/script-test-check.ts";
+import type SelectedTests from "./checks/selected-tests.ts";
 import ShellIndependenceCheck from "./checks/shell-independence-check.ts";
 import TestMirrorCheck from "./checks/test-mirror-check.ts";
 import TestWaitCheck from "./checks/test-wait-check.ts";
@@ -46,11 +47,12 @@ import TestOptionsException from "./test-options.exception.ts";
 import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Test {
-  private static readonly USAGE: string = "Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>]]\n";
+  private static readonly USAGE: string = "Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] | [--package <name>]... [--angular-tests] [--script-tests] [--repeat <count>] | --checks-only [--repeat <count>]]\n";
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly SUMMARY_HEADER: string = "| Check | Result |\n|---|---|\n";
   private static readonly FILTERED_SUMMARY_HEADER: string = "| Check | Result | Unit | Discovered | Selected | Unselected |\n|---|---|---|---|---|---|\n";
   private static readonly NO_MATCH: string = "No test matched the filters.\n";
+  private static readonly DOCUMENTS_NOTICE: string = "Filtered run: documents. A filtered run is not the complete gate.\n";
   private static readonly SUMMARY_VARIABLE: string = "GITHUB_STEP_SUMMARY";
   private static readonly API_TIMEOUT: number = 300_000;
   private static readonly API_PARTS: readonly string[] = ["src/shell/ui", "src/shell/window"];
@@ -79,14 +81,16 @@ export default class Test {
       return Test.USAGE_EXIT_CODE;
     }
     if (options.isDocuments)
-      return await this.runChecksAsync(this.createDocumentChecks(), "documents");
+      return await this.runChecksAsync(this.createDocumentChecks(), Test.DOCUMENTS_NOTICE);
 
     for (let run = 1; run <= options.repeat; run++) {
       if (options.repeat > 1)
         this.output.write(`\nRun ${run} of ${options.repeat}\n`);
-      const exitCode = options.filters.length === 0
-        ? await this.runChecksAsync(await this.createChecksAsync(), null)
-        : await this.runFilteredAsync(options.filters);
+      const exitCode = options.selection !== undefined
+        ? await this.runChecksAsync(await this.createChecksAsync(options.selection), `Selected run: every check other than the tests, and ${options.selection.description}. A selected run is not the complete gate.\n`)
+        : options.filters.length === 0
+          ? await this.runChecksAsync(await this.createChecksAsync(), null)
+          : await this.runFilteredAsync(options.filters);
       if (exitCode !== 0) {
         if (options.repeat > 1)
           this.output.write(`\nRun ${run} of ${options.repeat} failed; the repeats stop there.\n`);
@@ -98,9 +102,9 @@ export default class Test {
     return 0;
   }
 
-  private async runChecksAsync(checks: readonly ICheck[], label: string | null): Promise<number> {
-    if (label !== null)
-      this.output.write(`Filtered run: ${label}. A filtered run is not the complete gate.\n`);
+  private async runChecksAsync(checks: readonly ICheck[], notice: string | null): Promise<number> {
+    if (notice !== null)
+      this.output.write(notice);
 
     let summary = Test.SUMMARY_HEADER;
     let failures = 0;
@@ -166,7 +170,7 @@ export default class Test {
     return [new DocumentCheck(this.root, new RepositoryFiles(this.root, new Git(this.root, this.runner)))];
   }
 
-  private async createChecksAsync(): Promise<readonly ICheck[]> {
+  private async createChecksAsync(selection?: SelectedTests): Promise<readonly ICheck[]> {
     const files = new RepositoryFiles(this.root, new Git(this.root, this.runner));
     const documents = new DocumentCheck(this.root, files);
     const { default: ApiCatalog } = await import("./api/api-catalog.ts");
@@ -194,13 +198,13 @@ export default class Test {
       new NameUniquenessCheck(tree, modules),
       new DeclaredDependencyCheck(tree),
       new PackageCheck(build),
-      new PackageTestCheck(this.root, build, this.runner, this.environment),
+      ...selection === undefined || selection.packages.length > 0 ? [new PackageTestCheck(this.root, build, this.runner, this.environment, selection?.packages)] : [],
       new TypeCheck(this.root, this.runner),
       new ApiDeclarationCheck(this.root, apis, server, Test.API_TIMEOUT),
       new ApiDocumentationCheck(this.root, apis, server, Test.API_TIMEOUT),
       new ApiExampleCheck(this.root, apis, this.runner, server, Test.API_TIMEOUT),
-      new ScriptTestCheck(this.root, build, this.runner, this.environment),
-      new AngularTestCheck(angular),
+      ...selection === undefined || selection.runsScriptTests ? [new ScriptTestCheck(this.root, build, this.runner, this.environment)] : [],
+      ...selection === undefined || selection.runsAngularTests ? [new AngularTestCheck(angular)] : [],
       new PackagedBuildCheck(this.root, new PackagedBuild(this.root, this.runner, new GalleryFile(this.root), angular), angular)
     ];
   }
