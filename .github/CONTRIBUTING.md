@@ -159,7 +159,7 @@ Only the maintainer starts the **Release** workflow or a signed **Package** run,
 
 - The `release` environment holds the signing credentials.
   The jobs that sign wait in it for the maintainer's approval.
-  It allows only `main` and `v*` tags, requires the maintainer's review and cannot be bypassed by administrators.
+  It allows only `main`, requires the maintainer's review and cannot be bypassed by administrators.
 - The `publish` environment guards the publish job, the only job that may write to the repository, and waits for the maintainer's approval the same way.
 - The `release` environment's secrets, named here and nowhere given a value:
   - `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`: the service principal that signs Windows packages with the Artifact Signing values in the code.
