@@ -60,9 +60,9 @@ export default class AngularTestCheck implements ISelectableCheck {
   private async checkAsync(output: Writable, include: readonly string[] = []): Promise<boolean> {
     try {
       const run = await this.project.testAsync(include, this.flaky !== null);
+      await this.flaky?.addAsync(run.retried.map(t => new FlakyTest(AngularTestCheck.RUNNER, t.file, t.name, t.failure)), output);
       if (!run.isSuccessful)
         return false;
-      await this.flaky?.addAsync(run.retried.map(t => new FlakyTest(AngularTestCheck.RUNNER, t.file, t.name, t.failure)), output);
       if (run.collected === null) {
         output.write(AngularTestCheck.NO_REPORT);
         return false;

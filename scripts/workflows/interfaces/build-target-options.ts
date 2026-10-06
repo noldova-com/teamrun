@@ -11,4 +11,5 @@ export default interface IBuildTargetOptions {
   readonly runsSmokeOnPullRequests: boolean;
   readonly runsUiOnPushes: boolean;
   readonly uiShardCount: number;
+  readonly splitsTests: boolean;
 }

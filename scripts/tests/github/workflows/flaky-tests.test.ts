@@ -26,14 +26,14 @@ class FlakyTestsWorkflowTests {
       assert.ok(text.includes("    concurrency:\n      group: ${{ github.workflow }}-record\n      cancel-in-progress: false\n"));
     });
 
-    test("only runs of this repository record, on main, in the merge queue or for a pull request, so a fork's records never reach an issue", async () => {
+    test("only runs of this repository record, on main or for a pull request, so a fork's records never reach an issue", async () => {
       const text = (await WorkflowFileFixture.readAsync(FlakyTestsWorkflowTests.WORKFLOW)).text;
 
       assert.ok(text.includes([
         "    if: >-",
         "      github.event_name == 'workflow_run' &&",
         "      github.event.workflow_run.head_repository.full_name == github.repository &&",
-        "      (github.event.workflow_run.event == 'merge_group' || github.event.workflow_run.event == 'pull_request' ||",
+        "      (github.event.workflow_run.event == 'pull_request' ||",
         "      (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'))",
         ""
       ].join("\n")));

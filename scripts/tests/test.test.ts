@@ -57,6 +57,30 @@ class TestTests {
       assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
     });
 
+    test("each part runs only its own checks, in the complete gate's order, and says that only all parts together are the complete gate", async t => {
+      const repository = await TestTests.createRepositoryAsync(t);
+      const parts = ["packages", "scripts", "angular-and-checks"];
+      const outputs: TextOutputFixture[] = [];
+
+      for (const part of parts) {
+        const output = new TextOutputFixture();
+        assert.equal(await new Test(repository.directory, new AngularReportRunnerFixture(TestTests.REPORT, [0, 0]), output, {}).runAsync(["--part", part]), 0, output.text);
+        outputs.push(output);
+      }
+
+      const titles = outputs.map(t => [...t.text.matchAll(/^(.+): passed$/gm)].map(u => u[1]));
+      assert.deepEqual(titles, [
+        ["Package tests and coverage"],
+        ["Script tests and coverage"],
+        [
+          "Documents", "License headers", "Test waits", "Field order", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages",
+          "Script types", "API declarations", "API documentation", "API examples", "Angular tests and coverage", "Packaged build leaves out the Gallery"
+        ]
+      ]);
+      for (const [index, output] of outputs.entries())
+        assert.ok(output.text.startsWith(`Part run: ${parts[index]}. Only all 3 parts together are the complete gate.\n`), output.text);
+    });
+
     test("a failing check fails the gate after the remaining checks have run", async t => {
       const repository = await TestTests.createRepositoryAsync(t);
       const runner = new AngularReportRunnerFixture(TestTests.REPORT, [1, 0]);
@@ -223,7 +247,7 @@ class TestTests {
         const output = new TextOutputFixture();
 
         assert.equal(await new Test("unused", new ProcessRunnerFixture(), output, {}).runAsync(selection), 2);
-        assert.equal(output.text, `${reason}Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] [--rerun-failed]]\n`);
+        assert.equal(output.text, `${reason}Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] [--rerun-failed] | --part <part> [--repeat <count>] [--rerun-failed]]\n`);
       }
     });
 

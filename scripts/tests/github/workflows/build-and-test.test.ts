@@ -21,6 +21,7 @@ class BuildAndTestTests {
   private static readonly SCRIPT_TIMEOUT: number = 30_000;
   private static readonly WORKFLOW: string = "build-and-test.yml";
   private static readonly UI_WORKFLOW: string = "ui-workflows.yml";
+  private static readonly TARGET_WORKFLOW: string = "build-and-test-target.yml";
   private static readonly ACTION: string = "prepare";
   private static readonly ACTION_STEP: string = "      - name: Prepare the job\n        uses: ./.github/actions/prepare\n        with:\n          architecture: ${{ matrix.architecture }}\n";
   private static readonly TOOLCHAIN_STEP: string = "Verify the toolchain";
@@ -43,21 +44,14 @@ class BuildAndTestTests {
   private static readonly WORKFLOW_NODE_SETUPS: readonly string[] = ["Set up Node.js to classify", "Set up Node.js to install"];
   private static readonly ACTION_NODE_SETUP: string = "Set up Node.js";
   private static readonly NODE_ACTION: string = "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0";
-  private static readonly TEST_STEP: string = "Test";
-  private static readonly ANGULAR_UPLOADS: readonly string[] = ["Keep the Angular test output", "Keep the Angular test output again", "Keep the Angular test output a last time"];
-  private static readonly ANGULAR_WARNING: string = "Warn that the Angular test output was not kept";
   private static readonly FLAKY_STEPS: readonly string[] = ["Keep the flaky test record", "Keep the flaky test record again", "Keep the flaky test record a last time"];
   private static readonly FLAKY_WARNING: string = "Warn that the flaky test record was not kept";
   private static readonly FLAKY_UPLOADS: readonly (readonly [string, string, string, string])[] = [
-    [BuildAndTestTests.WORKFLOW, BuildAndTestTests.TEST_STEP, "flaky-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}", "job"],
+    [BuildAndTestTests.TARGET_WORKFLOW, "Test", "flaky-tests-${{ inputs.runner }}-${{ inputs.architecture }}-${{ matrix.part || 'all' }}-${{ github.run_attempt }}", "job"],
     [BuildAndTestTests.UI_WORKFLOW, BuildAndTestTests.UI_STEP, "flaky-tests-ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}", "shard"]
   ];
-  private static readonly ANGULAR_SETTINGS: readonly string[] = [
-    "name: angular-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}", "path: |", "  _build/angular-tests.log", "  _build/angular-tests.json", "retention-days: 14",
-    "if-no-files-found: ignore", "overwrite: true"
-  ];
   private static readonly CACHE_LIST: string = "api --paginate repos/noldova-com/teamrun/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100 --jq .actions_caches[].key";
-  private static readonly SPOTLIGHT_STEPS: readonly string[] = ["Stop Spotlight indexing", "Stop Spotlight indexing while saving"];
+  private static readonly SPOTLIGHT_STEPS: readonly string[] = ["Stop Spotlight indexing while saving"];
   private static readonly UI_SPOTLIGHT_STEPS: readonly string[] = ["Stop Spotlight indexing before building", "Stop Spotlight indexing before the UI workflows"];
   private static readonly PULL_REQUEST_UI_TARGETS: string = "linux-x64 linux-arm64 windows-x64 macos-arm64";
   private static readonly ALL_UI_TARGETS: string = "linux-x64 linux-arm64 windows-x64 windows-arm64 macos-x64 macos-arm64";
@@ -215,7 +209,7 @@ class BuildAndTestTests {
         assert.equal((await doubles.runAsync(file.readStepScript(step))).status, 0, step);
 
       assert.deepEqual(await doubles.readCallsAsync(), steps.map(() => "sudo mdutil -i off /System/Volumes/Data"));
-      for (const [text, job, next] of [[workflow.text, "validate", "ui-linux-x64"], [workflow.text, "cache", "caches"], [ui.text, "build", "shards"], [ui.text, "shards", ""]] as const) {
+      for (const [text, job, next] of [[workflow.text, "cache", "caches"], [ui.text, "build", "shards"], [ui.text, "shards", ""]] as const) {
         const end = next === "" ? text.length : text.indexOf(`  ${next}:\n`);
         const jobSteps = text.slice(text.indexOf(`  ${job}:\n`), end).split("    steps:\n")[1] ?? "";
         assert.match(jobSteps, /^ {6}- name: Stop Spotlight indexing[^\n]*\n {8}if: runner\.os == 'macOS'\n {8}run: sudo mdutil -i off \/System\/Volumes\/Data\n\n {6}- name: Check out the revision/, job);
@@ -234,9 +228,8 @@ class BuildAndTestTests {
         assert.ok(text.includes(`      ${output}: \${{ steps.scope.outputs.${output} }}\n`), output);
       assert.ok(text.includes("  validate:\n    name: Build and test (${{ matrix.target }})\n    needs: changes\n" +
         "    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}\n" +
-        "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(needs.changes.outputs.targets) }}\n    runs-on: ${{ matrix.runner }}\n"));
-      assert.equal(workflow.readStepScript("Build"), "npm run build\n");
-      assert.equal(workflow.readStepScript("Test"), "npm test -- --rerun-failed\n");
+        "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(needs.changes.outputs.targets) }}\n" +
+        "    uses: ./.github/workflows/build-and-test-target.yml\n    with:\n      runner: ${{ matrix.runner }}\n      architecture: ${{ matrix.architecture }}\n      jobs: ${{ toJSON(matrix.jobs) }}\n\n"));
       const callers = new BuildMatrix("workflow_dispatch").targets.map(t => `ui-${t.key}`).join(", ");
       assert.ok(text.includes(`    name: Build and test (all targets)\n    needs: [changes, validate, ${callers}]\n    if: always()\n`));
       assert.ok(text.includes(`          UI_RESULTS: >-\n${new BuildMatrix("workflow_dispatch").targets.map(t => `            ${t.key}=\${{ needs.ui-${t.key}.result }}\n`).join("")}`));
@@ -284,9 +277,8 @@ class BuildAndTestTests {
       assert.equal(restored.stdout, paths.map(t => `${t}\n`).join(""));
       assert.equal(workflow.readStepScript("Build the test build and its variants"), "npm run test:ui -- --list\n");
       const main = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).text;
-      const validate = main.slice(main.indexOf("  validate:\n"), main.indexOf("  ui-linux-x64:\n"));
       const [build, shards] = [text.slice(text.indexOf("  build:\n"), text.indexOf("  shards:\n")), text.slice(text.indexOf("  shards:\n"))];
-      for (const job of [validate, build, shards])
+      for (const job of [build, shards])
         assert.equal(job.split(BuildAndTestTests.ACTION_STEP).length, 2);
       assert.doesNotMatch(main, /test:ui|Test the UI workflows/);
       assert.doesNotMatch(build, /npm run build|npm test\n|--shard/);
@@ -323,12 +315,12 @@ class BuildAndTestTests {
       assert.ok(text.includes("    name: Remove outdated dependency caches\n    needs: [cache-plan, cache]\n" +
         "    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.cache-plan.result == 'success' && " +
         "(needs.cache.result == 'success' || needs.cache.result == 'skipped') }}\n"));
-      assert.equal(text.match(/persist-credentials: false/g)?.length, 5);
+      assert.equal(text.match(/persist-credentials: false/g)?.length, 4);
       assert.ok(text.includes("cancel-in-progress: ${{ github.event_name == 'pull_request' }}"));
       for (const trigger of ["  pull_request:\n    branches: [main]", "  merge_group:\n    types: [checks_requested]\n", "  push:\n    branches: [main]", "  workflow_dispatch:"])
         assert.ok(text.includes(trigger), trigger);
       for (const use of [...text.matchAll(/uses: (\S+)/g), ...ui.matchAll(/uses: (\S+)/g), ...action.matchAll(/uses: (\S+)/g)])
-        assert.match(use[1] ?? "", /^(actions\/[a-z-]+(\/[a-z-]+)?@[0-9a-f]{40}|\.\/\.github\/actions\/prepare|\.\/\.github\/workflows\/ui-workflows\.yml)$/);
+        assert.match(use[1] ?? "", /^(actions\/[a-z-]+(\/[a-z-]+)?@[0-9a-f]{40}|\.\/\.github\/actions\/prepare|\.\/\.github\/workflows\/(ui-workflows|build-and-test-target)\.yml)$/);
       assert.doesNotMatch(action, /permissions|secrets|token/);
     });
 
@@ -404,7 +396,7 @@ class BuildAndTestTests {
       assert.equal(workflow.readStepScript("Verify the toolchain to install"), action.readStepScript(BuildAndTestTests.TOOLCHAIN_STEP));
       assert.equal(workflow.readStepScript("Install the dependencies to save"), action.readStepScript("Install dependencies"));
       assert.equal(workflow.readStepScript("Install Electron to save"), action.readStepScript("Install Electron"));
-      assert.equal(workflow.readStepScript("Install the Angular project to save"), workflow.readStepScript("Build"));
+      assert.equal(workflow.readStepScript("Install the Angular project to save"), (await WorkflowFileFixture.readAsync(BuildAndTestTests.TARGET_WORKFLOW)).readStepScript("Build"));
       const order = [
         "Stop Spotlight indexing while saving", "Check out the revision to install", "Set up Node.js to install", "Verify the toolchain to install",
         "Restore the saved installed dependencies", "Look up the Angular project's saved dependencies", "Install the dependencies to save", "Install Electron to save",
@@ -554,33 +546,6 @@ class BuildAndTestTests {
       }
     });
 
-    test("failed tests keep the Angular tests' output and report, tried three times with a pause, and a passing test step keeps nothing", async t => {
-      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
-      const simulation = new WorkflowSimulation(workflow.text, BuildAndTestTests.TEST_STEP, BuildAndTestTests.ANGULAR_WARNING);
-      const [first, again, last] = BuildAndTestTests.ANGULAR_UPLOADS.map(t => simulation.find(t));
-      const doubles = await CommandDoublesFixture.createAsync();
-      t.after(() => doubles.disposeAsync());
-
-      const passed = simulation.run({}, {});
-      const failed = simulation.run({}, { [BuildAndTestTests.TEST_STEP]: "failure" });
-      const unkept = simulation.run({}, Object.fromEntries([BuildAndTestTests.TEST_STEP, ...BuildAndTestTests.ANGULAR_UPLOADS].map(t => [t, "failure"])));
-      const warning = await doubles.runAsync(workflow.readStepScript(BuildAndTestTests.ANGULAR_WARNING));
-
-      assert.deepEqual([passed.ran, passed.isJobFailed], [[BuildAndTestTests.TEST_STEP], false]);
-      assert.deepEqual([failed.ran, failed.isJobFailed], [[BuildAndTestTests.TEST_STEP, "Keep the Angular test output"], true]);
-      assert.deepEqual(unkept.ran, [
-        BuildAndTestTests.TEST_STEP,
-        "Keep the Angular test output", "Wait before keeping the Angular test output again", "Keep the Angular test output again",
-        "Wait before keeping the Angular test output a last time", "Keep the Angular test output a last time",
-        BuildAndTestTests.ANGULAR_WARNING
-      ]);
-      assert.deepEqual([first, again, last].map(t => [t?.uses, t?.continueOnError]), [first, again, last].map(() => [BuildAndTestTests.UPLOAD_ACTION, true]));
-      assert.deepEqual([first, again, last].map(t => t?.settings), BuildAndTestTests.threeTimes(BuildAndTestTests.ANGULAR_SETTINGS));
-      assert.equal(workflow.readStepScript("Wait before keeping the Angular test output again"), "sleep 15\n");
-      assert.equal(workflow.readStepScript("Wait before keeping the Angular test output a last time"), "sleep 15\n");
-      assert.deepEqual([warning.status, warning.stdout], [0, "::warning title=The Angular test output was not kept::The upload failed three times, so it is not attached.\n"]);
-    });
-
     test("each test job and UI shard keeps its flaky test record whatever happened, tried three times with a pause, and only warns when every upload fails", async t => {
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
@@ -589,9 +554,9 @@ class BuildAndTestTests {
         const workflow = await WorkflowFileFixture.readAsync(name);
         const simulation = new WorkflowSimulation(workflow.text, first, BuildAndTestTests.FLAKY_WARNING);
         const attempts = BuildAndTestTests.FLAKY_STEPS.map(t => simulation.find(t));
-        const passed = simulation.run({}, {});
-        const failed = simulation.run({}, { [first]: "failure" });
-        const unkept = simulation.run({}, Object.fromEntries([first, ...BuildAndTestTests.FLAKY_STEPS].map(t => [t, "failure"])));
+        const passed = simulation.run({ angular: "false" }, {});
+        const failed = simulation.run({ angular: "false" }, { [first]: "failure" });
+        const unkept = simulation.run({ angular: "false" }, Object.fromEntries([first, ...BuildAndTestTests.FLAKY_STEPS].map(t => [t, "failure"])));
         const warning = await doubles.runAsync(workflow.readStepScript(BuildAndTestTests.FLAKY_WARNING));
         const flaky = (result: { readonly ran: readonly string[] }): readonly string[] => result.ran.filter(u => u.includes("flaky test record"));
 
