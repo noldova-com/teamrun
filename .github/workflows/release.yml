@@ -1,0 +1,325 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to release, which is the root manifest's, such as 0.0.2.
+        required: true
+        type: string
+      revision:
+        description: The full commit SHA on main to release.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    name: Check the release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Refuse an unsigned release of TeamRun
+        if: github.repository == 'noldova-com/teamrun'
+        timeout-minutes: 1
+        run: |
+          echo '::error::TeamRun publishes no unsigned release, so its releases start once its packages are signed. Run a trial in a test repository.'
+          exit 1
+
+      - name: Require the workflow from main
+        timeout-minutes: 1
+        env:
+          REFERENCE: ${{ github.ref }}
+        run: |
+          if [ "$REFERENCE" != refs/heads/main ]; then
+            echo "::error::A release runs the workflow from main, not from $REFERENCE."
+            exit 1
+          fi
+
+      - name: Check out the revision
+        timeout-minutes: 5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.revision }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        id: node
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js again
+        if: steps.node.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Set up Node.js again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js a last time
+        if: steps.node-again.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Set up Node.js a last time
+        if: steps.node-again.outcome == 'failure'
+        timeout-minutes: 5
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Check the version and the revision
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_REVISION: ${{ inputs.revision }}
+        run: node scripts/release-check.ts
+
+  build:
+    name: Build, test and package (${{ matrix.target }})
+    needs: check
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { target: Linux x64, runner: ubuntu-24.04, architecture: x64 }
+          - { target: Linux ARM64, runner: ubuntu-24.04-arm, architecture: arm64 }
+          - { target: Windows x64, runner: windows-2025, architecture: x64 }
+          - { target: Windows ARM64, runner: windows-11-arm, architecture: arm64 }
+          - { target: macOS x64, runner: macos-15-intel, architecture: x64 }
+          - { target: macOS ARM64, runner: macos-15, architecture: arm64 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - name: Stop Spotlight indexing
+        if: runner.os == 'macOS'
+        timeout-minutes: 2
+        run: sudo mdutil -i off /System/Volumes/Data
+
+      - name: Check out the revision
+        timeout-minutes: 5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.revision }}
+          persist-credentials: false
+
+      - name: Prepare the job
+        timeout-minutes: 15
+        uses: ./.github/actions/prepare
+        with:
+          architecture: ${{ matrix.architecture }}
+
+      - name: Remove libfuse2, which a stock Ubuntu does not install
+        if: runner.os == 'Linux'
+        timeout-minutes: 5
+        run: |
+          for name in libfuse2 libfuse2t64; do
+            if dpkg-query -W -f='${Status}' "$name" 2>/dev/null | grep 'ok installed' > /dev/null; then
+              sudo apt-get remove -y "$name"
+            fi
+          done
+          if ldconfig -p | grep 'libfuse\.so\.2' > /dev/null; then
+            echo "::error::libfuse2 is still installed."
+            exit 1
+          fi
+          echo "libfuse2 is not installed."
+
+      - name: Build
+        timeout-minutes: 20
+        run: npm run build
+
+      - name: Test
+        timeout-minutes: 30
+        run: npm test
+
+      - name: Make the package
+        timeout-minutes: 25
+        run: npm run package
+
+      - name: Install, start and quit the package
+        timeout-minutes: 15
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run package:smoke
+          else
+            npm run package:smoke
+          fi
+
+      - name: Write the checksums and the update information
+        timeout-minutes: 5
+        run: npm run release:assets
+
+      - name: Keep the release files
+        id: keep
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: |
+            _build/package/out/TeamRun-*.exe
+            _build/package/out/TeamRun-*.dmg
+            _build/package/out/TeamRun-*.zip
+            _build/package/out/TeamRun-*.AppImage
+            _build/package/out/TeamRun-*.sha256
+            _build/package/out/latest-*.yml
+          retention-days: 14
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Wait before keeping the release files again
+        if: steps.keep.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Keep the release files again
+        id: keep-again
+        if: steps.keep.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: |
+            _build/package/out/TeamRun-*.exe
+            _build/package/out/TeamRun-*.dmg
+            _build/package/out/TeamRun-*.zip
+            _build/package/out/TeamRun-*.AppImage
+            _build/package/out/TeamRun-*.sha256
+            _build/package/out/latest-*.yml
+          retention-days: 14
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Wait before keeping the release files a last time
+        if: steps.keep-again.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Keep the release files a last time
+        if: steps.keep-again.outcome == 'failure'
+        timeout-minutes: 10
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: |
+            _build/package/out/TeamRun-*.exe
+            _build/package/out/TeamRun-*.dmg
+            _build/package/out/TeamRun-*.zip
+            _build/package/out/TeamRun-*.AppImage
+            _build/package/out/TeamRun-*.sha256
+            _build/package/out/latest-*.yml
+          retention-days: 14
+          if-no-files-found: error
+          overwrite: true
+
+  publish:
+    name: Publish the release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: publish
+    permissions:
+      contents: write
+    concurrency:
+      group: release-publish-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - name: Check out the revision
+        timeout-minutes: 5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.revision }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        id: node
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js again
+        if: steps.node.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Set up Node.js again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js a last time
+        if: steps.node-again.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Set up Node.js a last time
+        if: steps.node-again.outcome == 'failure'
+        timeout-minutes: 5
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Take this run's release files
+        timeout-minutes: 10
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: _build/release
+
+      - name: Publish the release
+        timeout-minutes: 20
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_REVISION: ${{ inputs.revision }}
+          RELEASE_FOLDER: ${{ github.workspace }}/_build/release
+          RELEASE_NOTES: >-
+            TeamRun ${{ inputs.version }} for Windows, Linux and macOS, each on x64 and ARM64. Its packages are unsigned.
+            Windows x64, Linux x64 and macOS x64 passed their install check natively;
+            Windows ARM64, Linux ARM64 and macOS ARM64 passed it in CI runs only.
+        run: node scripts/release-publish.ts
