@@ -7,6 +7,7 @@
  */
 
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
+import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 test.use({ desktopVariant: BuildVariantFixture.noModules });
@@ -26,14 +27,15 @@ test.describe("restarting", () => {
     await desktop.checkpointAsync("restart-reopened");
   });
 
-  test("TeamRun reopened within the runtime's idle grace attaches to the runtime still running @smoke", async ({ desktop }) => {
+  test("TeamRun quit and reopened stops its idle runtime as it quits and starts a new one @smoke", async ({ desktop }) => {
     const runtime = await desktop.readRuntimeProcessIdAsync();
 
     await desktop.reopenAsync();
 
-    expect(desktop.closeMilliseconds, "the close finishes without waiting for the runtime").toBeLessThan(10_000);
+    expect(desktop.closeMilliseconds, "the close finishes without waiting for the runtime to exit").toBeLessThan(10_000);
     expect(runtime).toBeDefined();
-    expect(await desktop.readRuntimeProcessIdAsync()).toBe(runtime);
+    await expect.poll(() => DesktopApplicationFixture.isAlive(runtime ?? 0), { timeout: 30_000 }).toBe(false);
+    expect(await desktop.readRuntimeProcessIdAsync()).not.toBe(runtime);
     await expect(desktop.window.locator("tr-empty-window")).toHaveText(/TeamRun\s*No modules/);
   });
 });

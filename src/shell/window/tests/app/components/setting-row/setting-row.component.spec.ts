@@ -313,7 +313,7 @@ describe("SettingRowComponent", () => {
     const row = render(SettingsFixture.spellCheckLanguages);
 
     expect(row.querySelector(".tr-setting-row-note")).toBeNull();
-    fixture.componentRef.setInput("languagesNote", "No spelling languages are offered on this device.");
+    fixture.componentRef.setInput("note", "No spelling languages are offered on this device.");
     fixture.detectChanges();
     expect(row.querySelector(".tr-setting-row-note")?.textContent).toBe("No spelling languages are offered on this device.");
     expect(row.querySelector("tr-checkbox")).toBeNull();

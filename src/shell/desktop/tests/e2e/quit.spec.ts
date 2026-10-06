@@ -15,8 +15,8 @@ import ClockWorkFixture from "./fixtures/clock-work.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
-async function closeWindowAsync(desktop: DesktopApplicationFixture): Promise<void> {
-  await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
+async function quitAsync(desktop: DesktopApplicationFixture): Promise<void> {
+  await desktop.application.evaluate(({ app }) => app.quit());
 }
 
 async function waitForExitAsync(desktop: DesktopApplicationFixture): Promise<number | null> {
@@ -41,7 +41,7 @@ test.describe("quitting while a module works", () => {
     await ClockWorkFixture.beginAsync(desktop);
     const asking = window.getByRole("dialog", { name: "Work is still running" });
 
-    await closeWindowAsync(desktop);
+    await quitAsync(desktop);
     await expect(asking).toBeVisible();
     await expect(asking.getByRole("listitem")).toHaveText([ClockWorkFixture.WORK]);
     await expect(asking.getByRole("button", { name: "Wait, then quit" })).toBeFocused();
@@ -54,7 +54,7 @@ test.describe("quitting while a module works", () => {
     await expect(asking).toHaveCount(0);
     expect(await desktop.isVisibleAsync()).toBe(true);
 
-    await closeWindowAsync(desktop);
+    await quitAsync(desktop);
     await asking.getByRole("button", { name: "Wait, then quit" }).click();
     const waiting = window.getByRole("dialog", { name: "Waiting for the work to finish" });
     await expect(waiting).toBeVisible();
@@ -76,7 +76,7 @@ test.describe("quitting while a module works", () => {
     const asking = window.getByRole("dialog", { name: "Work is still running" });
     const wait = asking.getByRole("button", { name: "Wait, then quit" });
 
-    await closeWindowAsync(desktop);
+    await quitAsync(desktop);
     await expect(wait).toBeFocused();
     await window.keyboard.press("F10");
     await expect(wait).toBeFocused();
@@ -106,7 +106,7 @@ test.describe("quitting while a module works", () => {
     for (const scheme of ["light", "dark"] as const) {
       await window.emulateMedia({ colorScheme: scheme });
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
-      await closeWindowAsync(desktop);
+      await quitAsync(desktop);
       await expect(asking).toBeVisible();
       await expect(asking.locator(".tr-quit-text")).toHaveText(["TeamRun is still working on:", "Wait for it to finish, or stop it now."]);
 
@@ -139,7 +139,7 @@ test.describe("quitting while a module works", () => {
     await ClockWorkFixture.beginAsync(desktop);
     const runtime = await desktop.readRuntimeProcessIdAsync() ?? 0;
 
-    await closeWindowAsync(desktop);
+    await quitAsync(desktop);
     const exited = waitForExitAsync(desktop);
     await window.getByRole("dialog", { name: "Work is still running" }).getByRole("button", { name: "Stop the work and quit" }).click();
 
@@ -161,7 +161,7 @@ test.describe("saving before quitting", () => {
     await window.locator("[data-fixture-content=notes-save-fails]:visible").click();
     const toast = window.locator(".tr-toast", { hasText: "Notes couldn't save, so TeamRun stayed open" });
 
-    await closeWindowAsync(desktop);
+    await quitAsync(desktop);
 
     await expect(toast).toBeVisible();
     await expect(toast.locator(".tr-toast-text")).toHaveText("The disk is full.");
@@ -172,7 +172,7 @@ test.describe("saving before quitting", () => {
     await desktop.checkpointAsync("quit-save-failed");
     await window.locator("[data-fixture-content=notes-save-saves]:visible").click();
     const exited = waitForExitAsync(desktop);
-    await closeWindowAsync(desktop);
+    await quitAsync(desktop);
 
     expect(await exited).toBe(0);
     expect(desktop.acceptFailures(/Window error in notes: |^renderer: ERROR WindowPartFailureException: Its window part failed to save while TeamRun was closing\./).length).toBeGreaterThan(0);
@@ -185,7 +185,7 @@ test.describe("saving before quitting", () => {
     const exited = waitForExitAsync(desktop);
     const started = Date.now();
 
-    await closeWindowAsync(desktop);
+    await quitAsync(desktop);
 
     expect(await exited).toBe(0);
     expect(Date.now() - started).toBeGreaterThanOrEqual(4000);

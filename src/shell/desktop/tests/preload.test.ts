@@ -19,7 +19,7 @@ export class PreloadTests {
     Assert.areEqual([
       "platform", "appearance", "notifyReady", "notifyAppearance", "onCloseRequest", "answerClose", "onUpdateSaveRequest", "answerUpdateSave", "readStartup", "onStartup", "actOnStartup", "readLayout",
       "writeLayout", "request", "onEvent", "readBuild", "copyText", "openLogFolder", "openLink", "installCommand", "keepAppearance", "readSpelling", "keepSpelling", "onFieldMenu", "replaceMisspelling", "addToDictionary", "edit", "setMenuBar", "onMenuCommand",
-      "onNotificationOpened", "onQuitQuestion", "answerQuit", "logModule", "logError"
+      "onNotificationOpened", "onQuitQuestion", "answerQuit", "readTrayAvailable", "onTrayAvailable", "logModule", "logError"
     ].join(","), Object.keys(api).join(","));
     Assert.areEqual(process.platform, api["platform"]);
     Assert.areEqual("{\"background\":\"#181818\"}", JSON.stringify(api["appearance"]));
@@ -78,7 +78,8 @@ export class PreloadTests {
       PreloadTests.invoke(api["replaceMisspelling"], "world"),
       PreloadTests.invoke(api["addToDictionary"], "TeamRun"),
       PreloadTests.invoke(api["edit"], "Copy"),
-      PreloadTests.invoke(api["answerQuit"], "wait")
+      PreloadTests.invoke(api["answerQuit"], "wait"),
+      PreloadTests.invoke(api["readTrayAvailable"])
     ]);
 
     Assert.areEqual(JSON.stringify([
@@ -98,7 +99,8 @@ export class PreloadTests {
       ["teamrun:replaceMisspelling", "world"],
       ["teamrun:addToDictionary", "TeamRun"],
       ["teamrun:edit", "Copy"],
-      ["teamrun:quitAnswer", "wait"]
+      ["teamrun:quitAnswer", "wait"],
+      ["teamrun:readTrayAvailable"]
     ]), JSON.stringify(electron.invoked));
     Assert.areEqual(JSON.stringify(electron.invoked.map(t => t.length)), JSON.stringify(replies));
   }
@@ -112,6 +114,7 @@ export class PreloadTests {
   @TestData("onFieldMenu", "teamrun:fieldMenu", 1)
   @TestData("onNotificationOpened", "teamrun:notificationOpened", 1)
   @TestData("onQuitQuestion", "teamrun:quitQuestion", 1)
+  @TestData("onTrayAvailable", "teamrun:trayAvailable", 1)
   public passesEachEventToItsListenerUntilTheListenerIsRemoved(member: string, channel: string, valueCount: number): void {
     const electron = FakePreloadElectron.load();
     const heard: unknown[][] = [];

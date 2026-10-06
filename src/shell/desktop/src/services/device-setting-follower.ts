@@ -32,6 +32,10 @@ export class DeviceSettingFollower {
     return this.current;
   }
 
+  public startFrom(value: JsonValue): void {
+    this.current = value;
+  }
+
   public async refreshAsync(device: string): Promise<void> {
     const generation = ++this.generation;
     const response = await this.readAsync(new SettingKey(this.name, null, device));

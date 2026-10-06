@@ -63,10 +63,10 @@ LICENSE file in the root directory of this source tree.
           }
         </div>
       }
-      @if (languagesNote(); as note) {
-        <div class="tr-setting-row-note">{{ note }}</div>
-      }
     }
+  }
+  @if (note(); as text) {
+    <div class="tr-setting-row-note">{{ text }}</div>
   }
 </div>
 @if (error(); as message) {
