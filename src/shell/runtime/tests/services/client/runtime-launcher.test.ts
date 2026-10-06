@@ -60,7 +60,7 @@ export class RuntimeLauncherTests {
   @TestMethod
   public async startsARuntimeAndStopsItOnRequest(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
-    const client = await new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity).attachAsync("desktop", new ClientListenerFixture());
+    const client = await new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter).attachAsync("desktop", new ClientListenerFixture());
     const processId = await launch.readProcessIdAsync();
 
     const response = await client.stopAsync(StopPolicy.IfIdle);
@@ -76,12 +76,12 @@ export class RuntimeLauncherTests {
   @TestMethod
   public async clientsStartingTogetherShareOneRuntime(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
-    const launchers = [1, 2, 3].map(() => new RuntimeLauncher(launch.createSettings(1_000), RuntimeBuild.identity));
+    const launchers = [1, 2, 3].map(() => new RuntimeLauncher(launch.createSettings(1_000), RuntimeBuild.identity, launch.starter));
 
     const clients = await Promise.all(launchers.map((t, index) => t.attachAsync(`client${index}`, new ClientListenerFixture())));
     const processId = await launch.readProcessIdAsync();
     const listener = new ClientListenerFixture();
-    const late = await new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity).attachAsync("late", listener);
+    const late = await new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter).attachAsync("late", listener);
 
     Assert.areEqual(3, clients.filter(t => t.isConnected).length);
     Assert.areEqual(processId, await launch.readProcessIdAsync());
@@ -94,7 +94,7 @@ export class RuntimeLauncherTests {
   public async anIdleRuntimeEndsItsProcess(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
     const listener = new ClientListenerFixture();
-    const client = await new RuntimeLauncher(launch.createSettings(300), RuntimeBuild.identity).attachAsync("desktop", listener);
+    const client = await new RuntimeLauncher(launch.createSettings(300), RuntimeBuild.identity, launch.starter).attachAsync("desktop", listener);
     const processId = await launch.readProcessIdAsync();
 
     client.close();
@@ -109,11 +109,11 @@ export class RuntimeLauncherTests {
   public async aNewerBuildTakesOverAnOlderRuntime(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
     await using older = await RuntimeBuildFixture.createAsync("0.0.0");
-    const olderClient = await new RuntimeLauncher(launch.createSettings(30_000, older.entryPath), older.identity).attachAsync("older", new ClientListenerFixture());
+    const olderClient = await new RuntimeLauncher(launch.createSettings(30_000, older.entryPath), older.identity, launch.starter).attachAsync("older", new ClientListenerFixture());
     const olderProcessId = await launch.readProcessIdAsync();
     olderClient.close();
 
-    const client = await new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity).attachAsync("desktop", new ClientListenerFixture());
+    const client = await new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter).attachAsync("desktop", new ClientListenerFixture());
     const processId = await launch.readProcessIdAsync();
 
     Assert.isNull(client.handover);
@@ -127,11 +127,11 @@ export class RuntimeLauncherTests {
   public async anOlderBuildHandsOverToANewerRuntime(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
     await using newer = await RuntimeBuildFixture.createAsync("999.0.0");
-    const newerClient = await new RuntimeLauncher(launch.createSettings(30_000, newer.entryPath), newer.identity).attachAsync("newer", new ClientListenerFixture());
+    const newerClient = await new RuntimeLauncher(launch.createSettings(30_000, newer.entryPath), newer.identity, launch.starter).attachAsync("newer", new ClientListenerFixture());
     const processId = await launch.readProcessIdAsync();
 
     const handover = await Assert.throwsAsync(
-      () => new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity).attachAsync("desktop", new ClientListenerFixture()),
+      () => new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter).attachAsync("desktop", new ClientListenerFixture()),
       RuntimeHandoverException);
 
     Assert.areEqual("999.0.0", handover.handover.identity.productVersion);
@@ -146,7 +146,7 @@ export class RuntimeLauncherTests {
   public async aModuleWhoseRuntimePartImportsTheRuntimesApiActivatesInTheRuntimesProcess(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
     await using build = await RuntimeBuildFixture.createWithModuleAsync("0.0.0", "probe", "probe.count", RuntimeLauncherTests.PROBE_PART);
-    const client = await new RuntimeLauncher(launch.createSettings(30_000, build.entryPath), build.identity).attachAsync("desktop", new ClientListenerFixture());
+    const client = await new RuntimeLauncher(launch.createSettings(30_000, build.entryPath), build.identity, launch.starter).attachAsync("desktop", new ClientListenerFixture());
     const processId = await launch.readProcessIdAsync();
 
     const response = await client.callAsync(RuntimeLauncherTests.PROBE_COUNT, null);
