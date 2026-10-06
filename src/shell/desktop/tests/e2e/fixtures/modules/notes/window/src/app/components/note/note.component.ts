@@ -60,6 +60,10 @@ export class NoteComponent {
     NotesState.saving.set(saving);
   }
 
+  protected openHelp(): void {
+    void this.context.openLinkAsync("https://example.com/help");
+  }
+
   private readWrapping(note: SettingScope): void {
     const read = ++this.reads;
     const show = (text: string): void => {

@@ -38,6 +38,7 @@ describe("DesktopBridgeService", () => {
     readBuild: (): Promise<unknown> => Promise.resolve(null),
     copyText: (): Promise<boolean> => Promise.resolve(true),
     openLogFolder: (): Promise<boolean> => Promise.resolve(true),
+    openLink: (): Promise<boolean> => Promise.resolve(true),
     installCommand: (): Promise<boolean> => Promise.resolve(true),
     keepAppearance: (): void => undefined,
     onNotificationOpened: (): (() => void) => () => undefined,
@@ -64,6 +65,7 @@ describe("DesktopBridgeService", () => {
     ["no readBuild", { ...complete, readBuild: null }],
     ["no copyText", { ...complete, copyText: null }],
     ["no openLogFolder", { ...complete, openLogFolder: null }],
+    ["no openLink", { ...complete, openLink: null }],
     ["no installCommand", { ...complete, installCommand: null }],
     ["no keepAppearance", { ...complete, keepAppearance: null }],
     ["no onNotificationOpened", { ...complete, onNotificationOpened: null }],
@@ -211,17 +213,20 @@ describe("DesktopBridgeService", () => {
     expect(events).toEqual([["notes.changed", { path: "/notes/a.md" }]]);
   });
 
-  it("reads the build, copies text and opens the log folder through the desktop", async () => {
+  it("reads the build, copies text, opens the log folder and links, and installs the command through the desktop", async () => {
     const bridge = DesktopBridgeFixture.install();
     const service = TestBed.inject(DesktopBridgeService);
 
     const build = await service.readBuildAsync();
     const isCopied = await service.writeTextAsync("clock: Failed");
     const isOpened = await service.openLogFolderAsync();
+    const isLinkOpened = await service.openLinkAsync("https://example.com/");
+    bridge.isLinkOpened = false;
+    const isRefusedLinkOpened = await service.openLinkAsync("file:///etc/passwd");
     const isInstalled = await service.installCommandAsync();
 
-    expect([build.productVersion, build.fingerprint, isCopied, isOpened, isInstalled]).toEqual(["1.2.3", "abc123", true, true, true]);
-    expect([bridge.copied, bridge.logFolderOpens, bridge.commandInstalls]).toEqual([["clock: Failed"], 1, 1]);
+    expect([build.productVersion, build.fingerprint, isCopied, isOpened, isLinkOpened, isRefusedLinkOpened, isInstalled]).toEqual(["1.2.3", "abc123", true, true, true, false, true]);
+    expect([bridge.copied, bridge.logFolderOpens, bridge.links, bridge.commandInstalls]).toEqual([["clock: Failed"], 1, ["https://example.com/", "file:///etc/passwd"], 1]);
   });
 
   it("passes on the id of a notification opened from the operating system and ignores a blank one", () => {
