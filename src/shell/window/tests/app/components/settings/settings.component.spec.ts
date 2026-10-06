@@ -553,7 +553,7 @@ describe("SettingsComponent", () => {
     AppearanceFixture.expectLook(getComputedStyle(element().querySelector(".tr-settings-pages") as Element).width, DefaultTheme.theme, "settings-pages-width", "width");
     expect(heading.marginTop).toBe("0px");
     AppearanceFixture.expectLook(heading.marginBottom, DefaultTheme.theme, "settings-heading-space", "margin-bottom");
-    expect(heading.paddingLeft).toBe("0px");
+    AppearanceFixture.expectLook(heading.paddingLeft, DefaultTheme.theme, "settings-item-padding", "padding-left", "padding");
     expect(heading.fontWeight).toBe("600");
     expect(heading.fontSize).toBe(`${parseFloat(getComputedStyle(document.body).fontSize) * 2}px`);
     expect(heading.color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "settings.headerForeground"));
