@@ -2078,7 +2078,8 @@ export interface IModuleSettings {
    * @returns The value in effect.
    * @throws {RegistrationException} When the setting is another module's that
    * is not a dependency.
-   * @throws {SettingException} When no such setting is declared.
+   * @throws {SettingException} When no such setting is declared, or the
+   * setting does not list the scope.
    * @example
    * ```ts
    * import type { JsonValue } from "@noldova/teamrun-foundation-json";
@@ -4687,7 +4688,8 @@ export declare class SettingsService {
    *
    * @param key Which value.
    * @returns The value in effect.
-   * @throws {SettingException} When no such setting is declared.
+   * @throws {SettingException} When no such setting is declared, or the
+   * setting does not list the key's scope.
    * @example
    * ```ts
    * import type { JsonValue } from "@noldova/teamrun-foundation-json";

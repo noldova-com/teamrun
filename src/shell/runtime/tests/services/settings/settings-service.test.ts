@@ -180,16 +180,21 @@ export class SettingsServiceTests {
   public async refusesAnUnknownSettingAValueItsTypeRefusesAndAScopeItDoesNotList(): Promise<void> {
     await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
     const unknown = QualifiedName.parse("chat.speed");
+    const thread = new SettingScope(QualifiedName.parse("chat.thread"), "t1");
 
     const failures = [
       Assert.throws(() => settings.service.read(new SettingKey(unknown)), SettingException),
       Assert.throws(() => settings.service.readDevices(unknown), SettingException),
       Assert.throws(() => settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND), "yes")), SettingException),
-      Assert.throws(() => settings.service.reset(new SettingKey(SettingsServiceTests.SEND, new SettingScope(QualifiedName.parse("chat.thread"), "t1"))), SettingException)
+      Assert.throws(() => settings.service.reset(new SettingKey(SettingsServiceTests.SEND, thread)), SettingException),
+      Assert.throws(() => settings.service.read(new SettingKey(SettingsServiceTests.SEND, thread)), SettingException),
+      Assert.throws(() => settings.service.read(new SettingKey(SettingsServiceTests.QUIET, thread, "d1")), SettingException)
     ];
 
-    Assert.areEqual("NotFound,NotFound,InvalidParams,InvalidParams", failures.map(t => t.failure.code).join(","));
+    Assert.areEqual("NotFound,NotFound,InvalidParams,InvalidParams,InvalidParams,InvalidParams", failures.map(t => t.failure.code).join(","));
     Assert.areEqual("No setting named chat.speed is declared.", failures[0]?.message);
+    Assert.areEqual("The setting chat.sendWithEnter does not list the scope chat.thread.", failures[4]?.message);
+    Assert.areEqual("The setting chat.quiet does not list the scope chat.thread.", failures[5]?.message);
   }
 
   @TestMethod

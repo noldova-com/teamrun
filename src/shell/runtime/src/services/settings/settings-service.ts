@@ -49,7 +49,9 @@ export class SettingsService {
   }
 
   public read(key: SettingKey): JsonValue {
-    return this.resolve(this.define(key.name), key)?.value ?? this.define(key.name).defaultValue;
+    const definition = this.define(key.name);
+    SettingsService.requireListedScope(definition, key);
+    return this.resolve(definition, key)?.value ?? definition.defaultValue;
   }
 
   public readDevices(name: QualifiedName): ReadonlyMap<string, JsonValue> {
@@ -113,13 +115,16 @@ export class SettingsService {
     return [key.name.text, key.scope?.name.text ?? Resources.applicationScope, key.scope?.id ?? Resources.applicationScope, key.device ?? Resources.sharedDevice];
   }
 
+  private static requireListedScope(definition: SettingDefinition, key: SettingKey): void {
+    if (!Object.isNull(key.scope) && !definition.isScopedBy(key.scope.name))
+      throw new SettingException(Resources.formatSettingScopeNotAllowed(key.name.text, key.scope.name.text), FailureCode.InvalidParams);
+  }
+
   private normalize(definition: SettingDefinition, key: SettingKey): SettingKey {
-    if (definition.locality === SettingLocality.Shared) {
-      if (!Object.isNull(key.scope) && !definition.isScopedBy(key.scope.name))
-        throw new SettingException(Resources.formatSettingScopeNotAllowed(key.name.text, key.scope.name.text), FailureCode.InvalidParams);
+    SettingsService.requireListedScope(definition, key);
+    if (definition.locality === SettingLocality.Shared)
       return new SettingKey(key.name, key.scope);
-    }
-    if (Object.isNull(key.device) || !Object.isNull(key.scope))
+    if (Object.isNull(key.device))
       throw new SettingException(Resources.formatSettingNeedsDevice(key.name.text), FailureCode.InvalidParams);
     return key;
   }
