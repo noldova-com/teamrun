@@ -40,7 +40,6 @@
   min-width: 0;
   max-width: calc(100% - var(--tr-window-row-drag));
   overflow: hidden;
-  app-region: no-drag;
 }
 
 .tr-window-row-segment,

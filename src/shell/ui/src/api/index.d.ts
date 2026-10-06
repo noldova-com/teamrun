@@ -3596,10 +3596,9 @@ export declare class TooltipDirective {
 
   /**
    * Whether the tooltip shows only while the host's text is cut off,
-   * `trTooltipTruncated`; false when not bound. The text checked is each of
-   * the host's descendants marked `data-truncates`, or else the host, and
-   * the tooltip shows when any of it is cut off. Such a tooltip repeats
-   * visible text, so it is not the host's description.
+   * `trTooltipTruncated`; false when not bound. The text checked is the
+   * host's descendant marked `data-truncates`, or else the host. Such a
+   * tooltip repeats visible text, so it is not the host's description.
    */
   public readonly isTruncatedOnly: InputSignal<boolean>;
 

@@ -589,14 +589,14 @@ describe("WindowRowComponent", () => {
 
     expect(empty).toEqual([null, "", Resources.productName]);
     expect(plan).toEqual(["Notes › Drafts › Plan", "Notes|Drafts|Plan", Resources.formatWindowTitle("Plan")]);
-    expect([styles[0]?.[0], styles[1]?.[1]]).toEqual(["no-drag", "600"]);
+    expect([styles[0]?.[0], styles[1]?.[1]]).toEqual(["drag", "600"]);
     expect(hidden).toBe(5);
     expect(renamed).toEqual(["Launch plan", "Launch plan", Resources.formatWindowTitle("Launch plan")]);
     expect(settings).toEqual(["Settings", "Settings", Resources.formatWindowTitle("Settings")]);
     expect(read()).toEqual(["Settings", "Settings", Resources.formatWindowTitle("Settings")]);
   });
 
-  it("cuts the breadcrumb before the title, leaves 6rem for dragging, and shows the whole heading in a tooltip only when cut", async () => {
+  it("cuts the breadcrumb before the title and leaves 6rem before the actions, without a tooltip that a drag region could not show", async () => {
     DesktopBridgeFixture.install("win32");
     apply();
     const layout = useHeadings();
@@ -606,10 +606,8 @@ describe("WindowRowComponent", () => {
     layout.openDocument(LayoutFixture.todo);
     fixture.detectChanges();
     await settle(fixture);
-    const tooltip = fixture.debugElement.query(By.css(".tr-window-row-heading")).injector.get(TooltipDirective);
     const isCut = (selector: string): boolean[] => [...row.querySelectorAll<HTMLElement>(selector)].map(t => t.scrollWidth > t.clientWidth);
-    tooltip.show();
-    const wide = [isCut(".tr-window-row-segment"), isCut(".tr-window-row-title"), tooltip.isShown];
+    const wide = [isCut(".tr-window-row-segment"), isCut(".tr-window-row-title")];
 
     row.style.width = "640px";
     await settle(fixture);
@@ -619,14 +617,12 @@ describe("WindowRowComponent", () => {
     const heading = row.querySelector(".tr-window-row-heading") as HTMLElement;
     const actions = row.querySelector(".tr-window-row-actions") as HTMLElement;
     const drag = actions.getBoundingClientRect().left - heading.getBoundingClientRect().right;
-    tooltip.show();
-    await vi.waitFor(() => expect(document.querySelector(".cdk-overlay-container tr-tooltip")?.textContent?.trim()).toBe(heading.getAttribute("aria-label")));
-    tooltip.hide();
 
-    expect(wide).toEqual([[false, false], [false], false]);
+    expect(wide).toEqual([[false, false], [false]]);
     expect(middle).toEqual([[true, true], [false]]);
     expect(isCut(".tr-window-row-title")).toEqual([true]);
     expect(getComputedStyle(row.querySelector(".tr-window-row-title") as HTMLElement).textOverflow).toBe("ellipsis");
     expect(drag).toBeGreaterThanOrEqual(AppearanceFixture.toPixels(6) - 0.5);
+    expect(fixture.debugElement.query(By.css(".tr-window-row-heading")).injector.get(TooltipDirective, null)).toBeNull();
   });
 });

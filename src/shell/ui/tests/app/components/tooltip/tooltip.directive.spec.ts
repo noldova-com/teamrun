@@ -275,18 +275,6 @@ describe("TooltipDirective", () => {
     await shownAsync();
   });
 
-  it("shows when any of its marked texts is truncated", async () => {
-    update(() => host.isTruncatedOnly.set(true));
-    const second = anchor().ownerDocument.createElement("span");
-    second.setAttribute("data-truncates", "");
-    second.style.cssText = "display: block; width: 1rem; overflow: hidden; white-space: nowrap;";
-    second.textContent = host.text();
-    anchor().append(second);
-    host.tooltip().show();
-
-    await shownAsync();
-  });
-
   it("measures truncation on the anchor itself when nothing inside is marked", async () => {
     update(() => host.isTruncatedOnly.set(true));
     anchor().querySelector("[data-truncates]")?.removeAttribute("data-truncates");

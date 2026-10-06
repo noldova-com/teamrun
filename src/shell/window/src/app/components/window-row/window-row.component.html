@@ -35,7 +35,7 @@ LICENSE file in the root directory of this source tree.
 <div class="tr-window-row-breadcrumb">
   @let current = heading();
   @if (current !== null) {
-    <div class="tr-window-row-heading" role="group" [attr.aria-label]="current.text" [trTooltip]="current.text" [trTooltipSide]="below" [trTooltipTruncated]="true">
+    <div class="tr-window-row-heading" role="group" [attr.aria-label]="current.text">
       @for (segment of current.breadcrumb; track $index) {
         <span class="tr-window-row-segment" data-truncates aria-hidden="true">{{ segment }}</span>
         <span class="tr-window-row-separator material-symbols-rounded" aria-hidden="true">{{ resources.breadcrumbGlyph }}</span>

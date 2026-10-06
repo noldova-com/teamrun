@@ -48,7 +48,7 @@ test.describe("the active document's heading", () => {
     await expect(heading(window).locator(".tr-window-row-title")).toHaveText("Note 1");
     await expectTitledAsync(desktop, "Note 1");
     expect(await heading(window).evaluate(t => [getComputedStyle(t).getPropertyValue("app-region"), getComputedStyle(t.closest("tr-window-row") as Element).getPropertyValue("app-region")]))
-      .toEqual(["no-drag", "drag"]);
+      .toEqual(["drag", "drag"]);
     await desktop.checkpointAsync("document-heading");
 
     await tab(window, "document/notes.note/2").click();
@@ -61,7 +61,7 @@ test.describe("the active document's heading", () => {
     await expectTitledAsync(desktop, "Settings");
   });
 
-  test("takes a module's new title and breadcrumb, and cuts a long breadcrumb before the title in the smallest window, showing all of it in a tooltip", async ({ desktop }) => {
+  test("takes a module's new title and breadcrumb, and cuts a long breadcrumb before the title in the smallest window", async ({ desktop }) => {
     const window = desktop.window;
     await tab(window, "document/notes.note/2").click();
     await CommandSearchFixture.searchAsync(window, "Move note 2 deep");
@@ -83,8 +83,6 @@ test.describe("the active document's heading", () => {
     expect(parts.cut.slice(0, deepBreadcrumb.length)).toEqual(deepBreadcrumb.map(() => [true, "ellipsis"]));
     expect(parts.cut.at(-1)?.[1]).toBe("ellipsis");
     expect(parts.drag).toBeGreaterThanOrEqual(6);
-    await heading(window).hover();
-    await expect(window.locator(".cdk-overlay-container tr-tooltip")).toHaveText([...deepBreadcrumb, movedTitle].join(" › "));
     await desktop.checkpointAsync("document-heading-small");
   });
 });

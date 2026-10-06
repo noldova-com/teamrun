@@ -151,8 +151,8 @@ export class TooltipDirective {
   }
 
   private isTruncated(): boolean {
-    const marked = [...this.host.querySelectorAll<HTMLElement>(Resources.truncationSelector)];
-    return (marked.length > 0 ? marked : [this.host]).some(t => t.scrollWidth > t.clientWidth);
+    const target = this.host.querySelector<HTMLElement>(Resources.truncationSelector) ?? this.host;
+    return target.scrollWidth > target.clientWidth;
   }
 
   private isWithinTooltip(target: EventTarget | null): boolean {
