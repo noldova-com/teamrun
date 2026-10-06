@@ -27,6 +27,7 @@ class BuildAndTestTargetTests {
     "node_modules/.package-lock.json node_modules/@noldova src/generated";
   private static readonly SPOTLIGHT_STEPS: readonly string[] = ["Stop Spotlight indexing before building", "Stop Spotlight indexing before testing"];
   private static readonly BUILD_STEP: string = "Build for the tests";
+  private static readonly PREBUILT: Readonly<Record<string, string>> = { prebuilt: "true" };
   private static readonly TEST_STEP: string = "Test";
   private static readonly ANGULAR_UPLOADS: readonly string[] = ["Keep the Angular test output", "Keep the Angular test output again", "Keep the Angular test output a last time"];
   private static readonly ANGULAR_WARNING: string = "Warn that the Angular test output was not kept";
@@ -138,9 +139,9 @@ class BuildAndTestTargetTests {
         const simulation = new WorkflowSimulation(workflow.text, first, last);
         const attempts = [first, again, last].map(t => simulation.find(t));
 
-        const passed = simulation.run({}, {});
-        const retried = simulation.run({}, { [first]: "failure" });
-        const failed = simulation.run({}, { [first]: "failure", [again]: "failure", [last]: "failure" });
+        const passed = simulation.run(BuildAndTestTargetTests.PREBUILT, {});
+        const retried = simulation.run(BuildAndTestTargetTests.PREBUILT, { [first]: "failure" });
+        const failed = simulation.run(BuildAndTestTargetTests.PREBUILT, { [first]: "failure", [again]: "failure", [last]: "failure" });
 
         assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[action, true], [action, true], [action, false]], first);
         assert.deepEqual(attempts.map(t => t.settings), [settings, settings, settings], first);
