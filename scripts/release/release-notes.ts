@@ -20,13 +20,14 @@ export default class ReleaseNotes {
   ]);
   private static readonly ARCHITECTURE_NAMES: ReadonlyMap<string, string> = new Map([["x64", "x64"], ["arm64", "ARM64"]]);
 
-  public static compose(product: ProductIdentity, supported: readonly PackageTarget[], repository: string, version: ReleaseVersion, runUrl: string): string {
+  public static compose(product: ProductIdentity, supported: readonly PackageTarget[], signed: readonly string[], repository: string, version: ReleaseVersion,
+    runUrl: string): string {
     if (!URL.canParse(runUrl) || new URL(runUrl).protocol !== ReleaseNotes.SECURE_PROTOCOL)
       throw new ReleaseException(`${ReleaseNotes.RUN_VARIABLE} must be the https address of the run that built the release, not "${runUrl}".`);
     const name = product.name;
     const ciOnly = PackageTarget.listAll().filter(t => !supported.some(s => s.id === t.id));
     const paragraphs = [
-      `${name} ${version.text} for Windows, Linux and macOS, each on x64 and ARM64. Its packages are unsigned.`,
+      `${name} ${version.text} for Windows, Linux and macOS, each on x64 and ARM64. ${ReleaseNotes.describeSigning(signed)}`,
       supported.length === 0
         ? "No target has passed its native acceptance yet, so every target was accepted by a CI run only."
         : `Supported after their native acceptance: ${ReleaseNotes.formatTargets(supported)}.`
@@ -36,6 +37,20 @@ export default class ReleaseNotes {
     if (!product.isReleaseRepository(repository))
       paragraphs.unshift(`Unsigned test release of ${name}, published in ${repository}; an installed ${name} never updates from it.`);
     return paragraphs.join(ReleaseNotes.PARAGRAPH);
+  }
+
+  private static describeSigning(signed: readonly string[]): string {
+    const platforms = [...ReleaseNotes.PLATFORM_NAMES.keys()];
+    const unsigned = platforms.filter(t => !signed.includes(t));
+    if (unsigned.length === 0)
+      return "Its packages are signed.";
+    if (unsigned.length === platforms.length)
+      return "Its packages are unsigned.";
+    return `The ${ReleaseNotes.formatPlatforms(platforms.filter(t => signed.includes(t)))} packages are signed; the ${ReleaseNotes.formatPlatforms(unsigned)} packages are unsigned.`;
+  }
+
+  private static formatPlatforms(platforms: readonly string[]): string {
+    return platforms.map(t => ReleaseNotes.PLATFORM_NAMES.get(t)).join(" and ");
   }
 
   private static formatTargets(targets: readonly PackageTarget[]): string {
