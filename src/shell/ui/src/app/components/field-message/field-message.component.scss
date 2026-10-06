@@ -1,0 +1,15 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+  min-width: 0;
+  margin-top: var(--tr-space-1);
+  color: var(--tr-error);
+  overflow-wrap: anywhere;
+}

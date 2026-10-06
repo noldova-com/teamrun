@@ -18,13 +18,14 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   imports: [ChoicePillsComponent],
   template: `
     <button type="button" class="before">Before</button>
-    <div class="row" style="background: var(--tr-hover); width: 20rem"><tr-choice-pills label="Mode" [options]="options()" [value]="value()" (valueChange)="choose($event)" /></div>
+    <div class="row" style="background: var(--tr-hover); width: 20rem"><tr-choice-pills label="Mode" [describedBy]="describedBy()" [options]="options()" [value]="value()" (valueChange)="choose($event)" /></div>
     <button type="button" class="after">After</button>
   `
 })
 class ChoicePillsHostComponent {
   public readonly options = signal<readonly SelectOption[]>([new SelectOption("system", "System"), new SelectOption("light", "Light"), new SelectOption("dark", "Dark")]);
   public readonly value = signal("light");
+  public readonly describedBy = signal<string | null>(null);
   public readonly changes: string[] = [];
 
   public choose(value: string): void {
@@ -63,6 +64,15 @@ describe("ChoicePillsComponent", () => {
     expect(pills().map(t => [t.getAttribute("role"), t.textContent?.trim(), t.getAttribute("aria-checked")])).toEqual([["radio", "System", "false"], ["radio", "Light", "true"], ["radio", "Dark", "false"]]);
     expect(pills().every(t => getComputedStyle(t).borderTopWidth === "0px")).toBe(true);
     expect(pills().every(t => t.querySelector("svg, .tr-icon") === null)).toBe(true);
+  });
+
+  it("describes its group by the elements it is given, and by nothing when given none", () => {
+    render();
+    const unbound = group().getAttribute("aria-describedby");
+    host.describedBy.set("hint error");
+    fixture.detectChanges();
+
+    expect([unbound, group().getAttribute("aria-describedby")]).toEqual([null, "hint error"]);
   });
 
   it("has one tab stop: the checked pill, or the first when nothing is checked", () => {
