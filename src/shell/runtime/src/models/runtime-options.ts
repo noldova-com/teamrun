@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import "@noldova/teamrun-foundation-core";
@@ -14,6 +13,7 @@ import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 
 import { Resources } from "../resources.js";
 import { DataDirectory } from "../services/data-directory/data-directory.js";
+import { ModuleDeclarationReader } from "../services/modules/module-declaration.reader.js";
 import { ServerSettings } from "./server-settings.js";
 
 export class RuntimeOptions {
@@ -72,6 +72,6 @@ export class RuntimeOptions {
   }
 
   private static locateDeclarations(): string {
-    return path.join(path.dirname(fileURLToPath(import.meta.url)), ...Resources.installRootSegments, ...Resources.declarationsFileSegments);
+    return ModuleDeclarationReader.locate(fileURLToPath(import.meta.url));
   }
 }

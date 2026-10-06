@@ -1,0 +1,16 @@
+{
+  "commands": [
+    {
+      "name": "clock.showTime",
+      "summary": "Prints the clock's time.",
+      "description": "Asks the clock's runtime part for the time and prints it after the given words.",
+      "arguments": [],
+      "options": [
+        { "name": "prefix", "description": "The words before the time.", "type": "Text", "default": "It is" }
+      ],
+      "examples": [
+        { "arguments": "--prefix Now", "description": "Prints the time after Now." }
+      ]
+    }
+  ]
+}

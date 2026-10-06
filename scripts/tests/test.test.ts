@@ -16,6 +16,7 @@ import { test, type TestContext } from "node:test";
 import LicenseHeader from "../structure/license-header.ts";
 import Test from "../test.ts";
 import TestOptions from "../test-options.ts";
+import ChangeSelector from "../workflows/change-selector.ts";
 import AngularReportRunnerFixture from "./fixtures/angular-report-runner.fixture.ts";
 import ProcessRunnerFixture from "./fixtures/process-runner.fixture.ts";
 import ProductIdentityFixture from "./fixtures/product-identity.fixture.ts";
@@ -325,6 +326,8 @@ class TestTests {
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({ ".gitattributes": "* text=auto eol=lf\n", "README.md": "# TeamRun\n", "package.json": await readFile(path.join(SourceTreeFixture.root, "package.json"), "utf8") });
       await cp(path.join(SourceTreeFixture.root, "scripts"), path.join(repository.directory, "scripts"), { recursive: true });
+      for (const source of ChangeSelector.SCRIPT_SOURCES)
+        await cp(path.join(SourceTreeFixture.root, source), path.join(repository.directory, source));
       const environment = { ...process.env };
       delete environment["GITHUB_STEP_SUMMARY"];
 

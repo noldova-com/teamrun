@@ -10,6 +10,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { CommandLineNames } from "../../src/shell/cli/src/models/command-line-names.ts";
 import ModuleException from "./module.exception.ts";
 
 export default class ModuleCliCommands {
@@ -22,7 +23,6 @@ export default class ModuleCliCommands {
   private static readonly BOOLEAN_FIELDS: readonly string[] = ["name", "description", "type"];
   private static readonly EXAMPLE_FIELDS: readonly string[] = ["arguments", "description"];
   private static readonly TYPES: readonly string[] = ["Text", "Number", "Boolean"];
-  private static readonly GLOBAL_OPTIONS: readonly string[] = ["data-dir", "device-dir", "json", "no-start", "take-over", "timeout", "help"];
   private static readonly MEMBER_PATTERN: RegExp = /^[a-z][a-zA-Z0-9]*$/;
 
   public static async readAsync(root: string, folder: string, contributions: ReadonlyMap<string, readonly string[]>): Promise<readonly Readonly<Record<string, unknown>>[]> {
@@ -70,7 +70,7 @@ export default class ModuleCliCommands {
       throw fail("must not have a required argument after an optional one");
     if (commandArguments.slice(0, -1).some(t => t["variadic"] === true))
       throw fail("must have only its last argument variadic");
-    const global = options.map(t => ModuleCliCommands.toKebabCase(String(t["name"]))).filter(t => ModuleCliCommands.GLOBAL_OPTIONS.includes(t));
+    const global = options.map(t => ModuleCliCommands.toKebabCase(String(t["name"]))).filter(t => CommandLineNames.ownOptions.includes(t));
     if (global.length > 0)
       throw fail(`must not have options the command line has itself: ${global.map(t => `--${t}`).join(", ")}`);
     return { name: record.get("name"), summary: record.get("summary"), description, arguments: commandArguments, options, examples };

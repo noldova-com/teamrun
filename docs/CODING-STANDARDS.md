@@ -409,6 +409,7 @@ These standards apply to scripts. npm commands expose TypeScript entry points wi
 Spawn subprocesses without a shell using argument arrays; validate the executable, arguments, working directory and environment.
 Section 7 governs deadlines, retries and shutdown.
 Dependencies need an explicit decision, exact pins and a present need.
+Build scripts may import from `src/` only import-free, side-effect-free data files, which the change selector lists so that changing one runs the script tests.
 Scripts use native value checks so they can run before foundation is built.
 
 GitHub configuration uses YAML under `.github`.
