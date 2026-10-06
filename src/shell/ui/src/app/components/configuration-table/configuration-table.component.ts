@@ -27,6 +27,7 @@ export class ConfigurationTableComponent {
   private readonly actions: Signal<readonly ConfigurationTableActionDirective[]> = contentChildren(ConfigurationTableActionDirective);
 
   protected readonly hasHeader: Signal<boolean> = computed(() => !String.isNullOrEmpty(this.heading()) || this.actions().length > 0);
+  protected readonly isExplanationLeading: Signal<boolean> = computed(() => String.isNullOrEmpty(this.heading()) && this.actions().length > 0 && !String.isNullOrEmpty(this.explanation()));
 
   public readonly heading = input<string>(String.empty);
   public readonly label = input<string>(String.empty);
