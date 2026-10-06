@@ -123,6 +123,34 @@ class SentenceBreakerTests {
       SentenceBreakerTests.assertFormats(["Text.", "---", "After it. Two."], ["Text.", "---", "After it.", "Two."]);
     });
 
+    test("the text of a setext heading is left as it is, while a dashed line after a blank line underlines nothing", () => {
+      const unchanged = [
+        "A heading. With two sentences",
+        "===",
+        "",
+        "A longer heading. Over",
+        "two lines. Here",
+        "---",
+        "",
+        "> A quoted heading. Two sentences",
+        "> ===",
+        ""
+      ];
+
+      SentenceBreakerTests.assertFormats(
+        [...unchanged, "Prose. Two.", "", "---", "After a rule. Two."],
+        [...unchanged, "Prose.", "Two.", "", "---", "After a rule.", "Two."]);
+    });
+
+    test("indented code blocks are left as they are, while indented lines that continue a paragraph or a list item are prose", () => {
+      const code = ["Text.", "", "    const a = 1. Two;", "", "    Still code. Two sentences.", "\tTab code. Two."];
+      const quotedCode = ["> A quote.", ">", ">     Quoted code. Two."];
+
+      SentenceBreakerTests.assertFormats(
+        [...code, "Prose after code. Two.", "    Continues it. Not code.", "", "- An item. Two.", "", "    Its second paragraph. Two.", "", ...quotedCode],
+        [...code, "Prose after code.", "Two.", "    Continues it.", "    Not code.", "", "- An item.", "  Two.", "", "    Its second paragraph.", "    Two.", "", ...quotedCode]);
+    });
+
     test("the check finds exactly the lines the formatter changes", () => {
       const breaker = new SentenceBreaker();
       const text = "# Title\n\nOne. Two.\n\n- Item.\n- Item. Two.\n\n```\nA. B.\n```\n";

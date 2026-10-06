@@ -10,6 +10,11 @@ export default class SentenceBreaker {
   private static readonly LINE_SEPARATOR: string = "\n";
   private static readonly PREFIX: RegExp = /^(?:[ \t]*>[ \t]?)*[ \t]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?/;
   private static readonly PREFIX_MARKER: RegExp = /[^>\s]/g;
+  private static readonly QUOTE: RegExp = /^(?:[ \t]*>[ \t]?)*/;
+  private static readonly INDENTED_CODE: RegExp = /^(?: {4}| {0,3}\t)/;
+  private static readonly LIST_ITEM: RegExp = /^[ \t]*(?:[-*+]|\d{1,9}[.)])(?:[ \t]|$)/;
+  private static readonly INDENTED: RegExp = /^[ \t]/;
+  private static readonly SETEXT_UNDERLINE: RegExp = /^(?:=+|-+)[ \t]*$/;
   private static readonly FENCE: RegExp = /^(`{3,}|~{3,})/;
   private static readonly FRONT_MATTER: string = "---";
   private static readonly COMMENT_START: string = "<!--";
@@ -43,8 +48,13 @@ export default class SentenceBreaker {
     let fence: string | null = null;
     let isComment = false;
     let isFrontMatter = lines[0] === SentenceBreaker.FRONT_MATTER;
+    let isCode = false;
+    let isList = false;
+    let isAfterBlank = true;
     for (const [index, line] of lines.entries()) {
       const content = line.replace(SentenceBreaker.PREFIX, "");
+      const body = line.replace(SentenceBreaker.QUOTE, "");
+      const isBlank = content.trim() === "";
       const opening = SentenceBreaker.FENCE.exec(content)?.[1];
       if (isFrontMatter) {
         isFrontMatter = index === 0 || line !== SentenceBreaker.FRONT_MATTER;
@@ -60,10 +70,25 @@ export default class SentenceBreaker {
         isComment = line.lastIndexOf(SentenceBreaker.COMMENT_START) > end || isComment && end === -1;
         prose.push(false);
       }
+      else if (isBlank)
+        prose.push(false);
+      else if ((isCode || isAfterBlank && !isList) && SentenceBreaker.INDENTED_CODE.test(body)) {
+        isCode = true;
+        prose.push(false);
+      }
+      else if (SentenceBreaker.SETEXT_UNDERLINE.test(content)) {
+        isCode = false;
+        for (let previous = index - 1; prose[previous] === true; previous--)
+          prose[previous] = false;
+        prose.push(false);
+      }
       else {
+        isCode = false;
+        isList = SentenceBreaker.LIST_ITEM.test(body) || isList && (!isAfterBlank || SentenceBreaker.INDENTED.test(body));
         fence = opening ?? null;
         prose.push(fence === null && !SentenceBreaker.NOT_PROSE.test(content));
       }
+      isAfterBlank = isBlank;
     }
     return prose;
   }
