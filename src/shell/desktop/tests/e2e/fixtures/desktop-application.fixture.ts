@@ -46,6 +46,7 @@ export default class DesktopApplicationFixture {
   private static readonly EXECUTABLE_RECORD: string = path.resolve("_build", "development-app", "path.txt");
   private static readonly VIEWPORT_WIDTH: number = 1920;
   private static readonly VIEWPORT_HEIGHT: number = 1080;
+  private static readonly PIXEL_RATIO_DIGITS: number = 6;
   private static readonly LAUNCH_ARGUMENTS: readonly string[] = ["--disable-gpu", "--disable-software-rasterizer"];
   private static readonly PLATFORM_LOG_ANNOTATION: string = "platform-log";
   private static readonly ROOT_PREFIX: string = "teamrun-ui-";
@@ -204,6 +205,15 @@ export default class DesktopApplicationFixture {
     return await this.answerAsync("say whether a window is visible", this.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some(t => t.isVisible())));
   }
 
+  public static roundPixelRatio(ratio: number): number {
+    return Number(ratio.toFixed(DesktopApplicationFixture.PIXEL_RATIO_DIGITS));
+  }
+
+  public async readViewportAsync(): Promise<readonly number[]> {
+    const [width, height, ratio] = await this.window.evaluate(() => [innerWidth, innerHeight, devicePixelRatio]);
+    return [width, height, DesktopApplicationFixture.roundPixelRatio(ratio)];
+  }
+
   public async useViewportAsync(width: number, height: number): Promise<void> {
     this.viewport = { width, height };
     await this.applyViewportAsync(this.viewport);
@@ -216,7 +226,7 @@ export default class DesktopApplicationFixture {
 
   public async checkpointAsync(name: string): Promise<Buffer> {
     const zoom = await this.readZoomAsync();
-    const image = zoom === 1 ? await this.window.screenshot({ scale: "css" }) : await this.captureZoomedAsync();
+    const image = await this.window.screenshot({ scale: zoom === 1 ? "css" : "device" });
     if (this.viewport !== null)
       expect([image.readUInt32BE(16), image.readUInt32BE(20)]).toEqual([this.viewport.width, this.viewport.height]);
     await this.testInfo.attach(name, { body: image, contentType: "image/png" });
@@ -439,20 +449,10 @@ export default class DesktopApplicationFixture {
     return await this.answerAsync("report its zoom", this.application.browserWindow(this.window).then(t => t.evaluate(u => u.webContents.getZoomFactor())));
   }
 
-  private async captureZoomedAsync(): Promise<Buffer> {
-    const session = await this.window.context().newCDPSession(this.window);
-    try {
-      return Buffer.from((await session.send("Page.captureScreenshot", { format: "png" })).data, "base64");
-    }
-    finally {
-      await session.detach();
-    }
-  }
-
   private async readAppearanceAsync(zoom: number): Promise<object> {
     const settings = await this.readSettingsAsync();
     const page = await this.window.evaluate(() => ({ colorScheme: getComputedStyle(document.documentElement).colorScheme, viewport: { width: innerWidth, height: innerHeight }, pixelRatio: devicePixelRatio }));
-    return { ...settings, colorScheme: page.colorScheme, zoom, viewport: page.viewport, pixelRatio: page.pixelRatio };
+    return { ...settings, colorScheme: page.colorScheme, zoom, viewport: page.viewport, pixelRatio: DesktopApplicationFixture.roundPixelRatio(page.pixelRatio) };
   }
 
   private async readSettingsAsync(): Promise<object> {
@@ -607,9 +607,8 @@ export default class DesktopApplicationFixture {
 
   private async applyViewportAsync(viewport: { width: number; height: number }): Promise<void> {
     await this.moveOffCursorAsync();
-    const session = await this.window.context().newCDPSession(this.window);
-    await session.send("Emulation.setDeviceMetricsOverride", { width: viewport.width, height: viewport.height, deviceScaleFactor: 1, mobile: false });
-    await expect.poll(() => this.window.evaluate(() => [innerWidth, innerHeight, devicePixelRatio])).toEqual([viewport.width, viewport.height, 1]);
+    await this.window.setViewportSize(viewport);
+    await expect.poll(() => this.readViewportAsync()).toEqual([viewport.width, viewport.height, 1]);
   }
 
   private async checkGuardAsync(viewport: { width: number; height: number }): Promise<void> {
