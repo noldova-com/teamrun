@@ -19,10 +19,14 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly menuListeners: Set<(id: string) => void> = new Set();
   private readonly openedListeners: Set<(id: string) => void> = new Set();
   private readonly quitListeners: Set<(question: unknown) => void> = new Set();
+  private readonly fieldMenuListeners: Set<(request: unknown) => void> = new Set();
 
   public platform: string;
   public appearance: unknown = null;
   public readonly keptAppearances: JsonObject[] = [];
+  public spelling: Promise<unknown> = Promise.resolve({ languages: [], fallback: null });
+  public readonly keptSpellings: (readonly [boolean, readonly string[]])[] = [];
+  public readonly replacements: string[] = [];
   public readonly appearances: JsonObject[] = [];
   public readonly changes: JsonObject[] = [];
   public readonly answers: string[] = [];
@@ -73,6 +77,10 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public get listenerCount(): number {
     return this.listeners.size + this.startupListeners.size + this.eventListeners.size + this.menuListeners.size + this.openedListeners.size;
+  }
+
+  public get fieldMenuListenerCount(): number {
+    return this.fieldMenuListeners.size;
   }
 
   public get closeListenerCount(): number {
@@ -142,6 +150,29 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public keepAppearance(preferences: JsonObject): void {
     this.keptAppearances.push(preferences);
+  }
+
+  public readSpelling(): Promise<unknown> {
+    return this.spelling;
+  }
+
+  public keepSpelling(isChecking: boolean, languages: readonly string[]): void {
+    this.keptSpellings.push([isChecking, languages]);
+  }
+
+  public onFieldMenu(listener: (request: unknown) => void): () => void {
+    this.fieldMenuListeners.add(listener);
+    return () => this.fieldMenuListeners.delete(listener);
+  }
+
+  public replaceMisspelling(text: string): Promise<boolean> {
+    this.replacements.push(text);
+    return Promise.resolve(true);
+  }
+
+  public publishFieldMenu(request: unknown): void {
+    for (const listener of this.fieldMenuListeners)
+      listener(request);
   }
 
   public openLogFolder(): Promise<boolean> {

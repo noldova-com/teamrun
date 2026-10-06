@@ -51,6 +51,7 @@ export default class PackageArchivesFixture {
       "package.json": JSON.stringify(ProductIdentityFixture.manifest({}, modules)),
       "LICENSE": "Fixture license\n",
       "assets/fixture-icons/icon-dark.ico": "ico\n",
+      "assets/dictionaries/dictionaries.json": "{\"dictionaries\":[]}\n",
       "src/angular.json": "{}\n",
       "src/modules/tasks/module.json": JSON.stringify({ id: "tasks", version: "0.3.0", displayName: "Tasks", description: "Used by the tests.", parts: ["runtime"], dependencies: [], contributes: {} }),
       ...Object.fromEntries(PackageArchivesFixture.PACKAGES.map(t => [`${t.directory}/package.json`, JSON.stringify({

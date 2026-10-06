@@ -75,6 +75,7 @@ class PackageStageTests {
       assert.equal(existsSync(path.join(folder, "node_modules", "electron")), false);
       assert.equal(await readFile(path.join(folder, "_build", "window", "browser", "index.html"), "utf8"), PackagedBuildFixture.WINDOW);
       assert.equal(await readFile(path.join(folder, "assets", "fixture-icons", "icon-dark.ico"), "utf8"), "ico\n");
+      assert.equal(await readFile(path.join(folder, "assets", "dictionaries", "dictionaries.json"), "utf8"), "{\"dictionaries\":[]}\n");
       assert.equal(await readFile(path.join(folder, "LICENSE"), "utf8"), "Fixture license\n");
       assert.equal(output.text, "The packaged window holds no Gallery.\nPackages in the stage: @noldova/teamrun-foundation-beta, @noldova/teamrun-foundation-alpha, "
         + "@noldova/teamrun-modules-tasks-runtime, @noldova/teamrun-shell-cli, @noldova/teamrun-shell-desktop.\n");

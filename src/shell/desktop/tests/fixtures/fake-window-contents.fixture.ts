@@ -8,7 +8,7 @@
 
 import type { WindowOpenHandlerResponse } from "electron";
 
-import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+import type { IContextMenuParams, IWindowContents } from "@noldova/teamrun-shell-desktop";
 
 import { FakePreventableEvent } from "./fake-preventable-event.fixture.js";
 import { ListenerRegistry } from "./listener-registry.fixture.js";
@@ -81,8 +81,16 @@ export class FakeWindowContents implements IWindowContents {
     this.calls.push("selectAll");
   }
 
+  public replaceMisspelling(text: string): void {
+    this.calls.push(`replaceMisspelling ${text}`);
+  }
+
   public getOSProcessId(): number {
     return this.osProcessId;
+  }
+
+  public askForMenu(params: IContextMenuParams): void {
+    this.listeners.emit("context-menu", {}, params);
   }
 
   public startLoading(): void {
