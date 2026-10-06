@@ -9,8 +9,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
+import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import LayoutFixture from "./fixtures/layout.fixture.ts";
 import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
@@ -18,8 +18,7 @@ import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 test.use({ desktopVariant: BuildVariantFixture.noModules });
 
 test.describe("the harness's viewport and cursor guard", () => {
-  const readViewport = (desktop: DesktopApplicationFixture): Promise<readonly number[]> =>
-    desktop.window.evaluate(() => [innerWidth, innerHeight, devicePixelRatio]);
+  const readViewport = (desktop: DesktopApplicationFixture): Promise<readonly number[]> => desktop.readViewportAsync();
   const isCursorInside = (desktop: DesktopApplicationFixture): Promise<boolean> => desktop.application.evaluate(({ BrowserWindow, screen }) => {
     const cursor = screen.getCursorScreenPoint();
     const bounds = BrowserWindow.getAllWindows()[0]?.getBounds();
@@ -41,6 +40,12 @@ test.describe("the harness's viewport and cursor guard", () => {
     expect([await readViewport(desktop), await isCursorInside(desktop)]).toEqual([[1920, 1080, 1], false]);
     expect(await isHovered(desktop)).toBe(false);
     await desktop.checkpointAsync("harness-suite-viewport");
+  });
+
+  test("a pixel ratio off by a rounding error, as a display scaled above 100% reports one, reads as the ratio it is, while one really different stays different", () => {
+    const ratios = [1.0000000149011612, 2.0000000298023224, 1.2500000186264515, 1.25, 1.000002];
+
+    expect(ratios.map(t => DesktopApplicationFixture.roundPixelRatio(t))).toEqual([1, 2, 1.25, 1.25, 1.000002]);
   });
 
   test("a workflow starts with nothing hovered even when the pointer left the window without moving", async ({ desktop }) => {
