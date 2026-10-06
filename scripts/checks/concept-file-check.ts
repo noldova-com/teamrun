@@ -26,7 +26,6 @@ export default class ConceptFileCheck implements ICheck {
   private static readonly DECLARATIONS: string = ".d.ts";
   private static readonly MANIFEST: string = "package.json";
   private static readonly MANIFEST_ENCODING: BufferEncoding = "utf8";
-  private static readonly SCRIPTS: string = "scripts";
   private static readonly PRODUCT_NAMES: readonly string[] = ["GitHub", "TypeScript", "TeamRun"];
   private static readonly ROLE_WORDS: ReadonlySet<string> = new Set(["node", "parser", "lexer", "reader", "validator", "exception", "service", "component", "directive"]);
   private static readonly WORD_SEPARATOR: string = "-";
@@ -123,9 +122,9 @@ export default class ConceptFileCheck implements ICheck {
     }
     if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest))
       return null;
-    if (!(ConceptFileCheck.SCRIPTS in manifest))
+    if (!("scripts" in manifest))
       return [];
-    const scripts: unknown = Reflect.get(manifest, ConceptFileCheck.SCRIPTS);
+    const scripts = manifest.scripts;
     if (typeof scripts !== "object" || scripts === null || Array.isArray(scripts))
       return null;
     return Object.values(scripts).filter(t => typeof t === "string").map(t => String(t));
