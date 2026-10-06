@@ -30,6 +30,11 @@
   overflow: hidden;
 }
 
+:host(.tr-dialog-maximized) {
+  width: var(--tr-dialog-bounds-width);
+  height: var(--tr-dialog-bounds-height);
+}
+
 .tr-dialog-header {
   display: flex;
   flex: none;
@@ -57,8 +62,10 @@
   padding: 0;
 }
 
-.tr-dialog-close {
+.tr-dialog-controls {
+  display: flex;
   flex: none;
+  align-items: center;
 }
 
 .tr-dialog-body {

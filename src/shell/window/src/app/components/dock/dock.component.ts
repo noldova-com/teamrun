@@ -77,7 +77,7 @@ export class DockComponent {
   public readonly side = input.required<DockSide>();
 
   protected iconsOf(root: LayoutNode): readonly (readonly DockStripIcon[])[] {
-    const groups = root.groups.map(t => [t, t.tabs.filter(u => u.isAvailable(this.layout.registry()))] as const).filter(([, tabs]) => tabs.length > 0);
+    const groups = root.groups.map(t => [t, t.tabs.filter(u => u.isAvailable(this.layout.registry()) && !u.equals(this.layout.hidden()))] as const).filter(([, tabs]) => tabs.length > 0);
     return groups.map(([group, tabs], position) => tabs.map((tab, order) => {
       const index = group.tabs.findIndex(t => t.equals(tab));
       const previous = order === 0 ? groups[position - 1]?.[0] : undefined;
