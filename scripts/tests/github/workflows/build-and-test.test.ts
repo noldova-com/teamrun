@@ -223,7 +223,7 @@ class BuildAndTestTests {
       assert.ok(text.includes("  validate:\n    name: Build and test (${{ matrix.target }})\n    needs: changes\n" +
         "    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}\n" +
         "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(needs.changes.outputs.targets) }}\n" +
-        "    uses: ./.github/workflows/build-and-test-target.yml\n    with:\n      runner: ${{ matrix.runner }}\n      architecture: ${{ matrix.architecture }}\n\n"));
+        "    uses: ./.github/workflows/build-and-test-target.yml\n    with:\n      runner: ${{ matrix.runner }}\n      architecture: ${{ matrix.architecture }}\n      jobs: ${{ toJSON(matrix.jobs) }}\n\n"));
       const callers = new BuildMatrix("workflow_dispatch").targets.map(t => `ui-${t.key}`).join(", ");
       assert.ok(text.includes(`    name: Build and test (all targets)\n    needs: [changes, validate, ${callers}]\n    if: always()\n`));
       assert.ok(text.includes(`          UI_RESULTS: >-\n${new BuildMatrix("workflow_dispatch").targets.map(t => `            ${t.key}=\${{ needs.ui-${t.key}.result }}\n`).join("")}`));

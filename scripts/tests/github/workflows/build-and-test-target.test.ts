@@ -9,7 +9,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import TestPart from "../../../test-part.ts";
+import BuildMatrix from "../../../workflows/build-matrix.ts";
+import TestJobPlan from "../../../workflows/test-job-plan.ts";
 import CommandDoublesFixture from "../../fixtures/command-doubles.fixture.ts";
 import WorkflowFileFixture from "../../fixtures/workflow-file.fixture.ts";
 import WorkflowSimulation from "../../fixtures/workflow-simulation.fixture.ts";
@@ -25,7 +26,7 @@ class BuildAndTestTargetTests {
   private static readonly PACKED: string = "_build/archives _build/modules _build/packages _build/product.json _build/records _build/tests _build/window " +
     "node_modules/.package-lock.json node_modules/@noldova src/generated";
   private static readonly SPOTLIGHT_STEPS: readonly string[] = ["Stop Spotlight indexing before building", "Stop Spotlight indexing before testing"];
-  private static readonly FINISH_STEP: string = "Finish the build for the Angular tests";
+  private static readonly BUILD_STEP: string = "Build for the tests";
   private static readonly TEST_STEP: string = "Test";
   private static readonly ANGULAR_UPLOADS: readonly string[] = ["Keep the Angular test output", "Keep the Angular test output again", "Keep the Angular test output a last time"];
   private static readonly ANGULAR_WARNING: string = "Warn that the Angular test output was not kept";
@@ -35,11 +36,12 @@ class BuildAndTestTargetTests {
   ];
 
   public static register(): void {
-    test("a call takes the target's runner and architecture, reads the repository only and uses only pinned actions and the shared setup", async () => {
+    test("a call takes the target's runner, architecture and planned test jobs, reads the repository only and uses only pinned actions and the shared setup", async () => {
       const text = (await WorkflowFileFixture.readAsync(BuildAndTestTargetTests.WORKFLOW)).text;
 
       assert.ok(text.includes("on:\n  workflow_call:\n    inputs:\n      runner:\n        description: The runner label of the target.\n        type: string\n        required: true\n" +
-        "      architecture:\n        description: The CPU architecture of the target.\n        type: string\n        required: true\n\npermissions:\n  contents: read\n"));
+        "      architecture:\n        description: The CPU architecture of the target.\n        type: string\n        required: true\n" +
+        "      jobs:\n        description: The target's test jobs, as the classification plans them.\n        type: string\n        required: true\n\npermissions:\n  contents: read\n"));
       assert.deepEqual(text.match(/^ *\S+: (read|write)$/gm), ["  contents: read"]);
       assert.equal(text.match(/persist-credentials: false/g)?.length, 2);
       assert.doesNotMatch(text, /concurrency|secrets|token/);
@@ -47,39 +49,48 @@ class BuildAndTestTargetTests {
         assert.match(use[1] ?? "", /^(actions\/[a-z-]+@[0-9a-f]{40}|\.\/\.github\/actions\/prepare)$/);
     });
 
-    test("the target builds once, and each of the parts reuses that build to run its own part of the tests", { timeout: BuildAndTestTargetTests.SCRIPT_TIMEOUT }, async t => {
+    test("a target builds once when its jobs reuse a build, and each job runs its part of the tests, or all of them", { timeout: BuildAndTestTargetTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTargetTests.WORKFLOW);
       const text = workflow.text;
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
       doubles.respond("npm", "test -- --part scripts", "");
+      doubles.respond("npm", "test", "");
 
-      const tested = await doubles.runAsync(workflow.readStepScript(BuildAndTestTargetTests.TEST_STEP), { PART: "scripts" });
+      const part = await doubles.runAsync(workflow.readStepScript(BuildAndTestTargetTests.TEST_STEP), { PART: "scripts" });
+      const whole = await doubles.runAsync(workflow.readStepScript(BuildAndTestTargetTests.TEST_STEP), { PART: "" });
 
-      assert.equal(tested.status, 0, tested.stderr);
-      assert.deepEqual(await doubles.readCallsAsync(), ["npm test -- --part scripts"]);
-      assert.ok(text.includes("  build:\n    name: Build\n    runs-on: ${{ inputs.runner }}\n    timeout-minutes: 20\n"));
-      assert.ok(text.includes("  parts:\n    name: ${{ matrix.name }}\n    needs: build\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n" +
-        "          - part: packages\n            name: Package tests\n          - part: scripts\n            name: Script tests\n" +
-        "          - part: angular-and-checks\n            name: Angular tests and checks\n    runs-on: ${{ inputs.runner }}\n    timeout-minutes: 20\n"));
-      assert.deepEqual([...text.matchAll(/^ {10}- part: (\S+)$/gm)].map(t => t[1]), TestPart.ALL);
+      assert.deepEqual([part.status, whole.status], [0, 0], part.stderr + whole.stderr);
+      assert.deepEqual(await doubles.readCallsAsync(), ["npm test -- --part scripts", "npm test"]);
+      assert.ok(text.includes("  build:\n    name: Build\n    if: ${{ fromJSON(inputs.jobs)[0].prebuilt }}\n    runs-on: ${{ inputs.runner }}\n    timeout-minutes: 20\n"));
+      assert.ok(text.includes("  tests:\n    name: ${{ matrix.name }}\n    needs: build\n" +
+        "    if: ${{ !cancelled() && contains(fromJSON('[\"success\", \"skipped\"]'), needs.build.result) }}\n" +
+        "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(inputs.jobs) }}\n    runs-on: ${{ inputs.runner }}\n    timeout-minutes: 20\n"));
       assert.ok(text.includes("          PART: ${{ matrix.part }}\n"));
       assert.equal(workflow.readStepScript("Build"), "npm run build\n");
-      assert.equal(workflow.readStepScript(BuildAndTestTargetTests.FINISH_STEP), "npm run build\n");
-      const [build, parts] = [text.slice(text.indexOf("  build:\n"), text.indexOf("  parts:\n")), text.slice(text.indexOf("  parts:\n"))];
-      for (const job of [build, parts])
+      assert.equal(workflow.readStepScript(BuildAndTestTargetTests.BUILD_STEP), "npm run build\n");
+      const [build, tests] = [text.slice(text.indexOf("  build:\n"), text.indexOf("  tests:\n")), text.slice(text.indexOf("  tests:\n"))];
+      for (const job of [build, tests])
         assert.equal(job.split(BuildAndTestTargetTests.ACTION_STEP).length, 2);
       assert.doesNotMatch(build, /npm test/);
-      const order = ["Build", "Pack the build", "Keep the build for the test parts", "Fetch the build", "Unpack the build", BuildAndTestTargetTests.FINISH_STEP, BuildAndTestTargetTests.TEST_STEP]
+      const order = ["Build", "Pack the build", "Keep the build for the test parts", "Fetch the build", "Unpack the build", BuildAndTestTargetTests.BUILD_STEP, BuildAndTestTargetTests.TEST_STEP]
         .map(t => text.indexOf(`      - name: ${t}\n`));
       assert.ok(order.every((position, index) => position > 0 && (index === 0 || position > (order[index - 1] ?? 0))), order.join(","));
     });
 
-    test("only the Angular part finishes the build before testing", async () => {
-      const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTargetTests.WORKFLOW)).text, BuildAndTestTargetTests.FINISH_STEP, BuildAndTestTargetTests.TEST_STEP);
+    test("a planned part fetches the build, and only the Angular part and a target's one job build for the tests", async () => {
+      const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTargetTests.WORKFLOW)).text, "Fetch the build", BuildAndTestTargetTests.TEST_STEP);
+      const targets = new BuildMatrix("workflow_dispatch").targets;
+      const jobs = [...TestJobPlan.plan(targets[0] ?? assert.fail()), ...TestJobPlan.plan(targets[targets.length - 1] ?? assert.fail())];
 
-      assert.deepEqual(TestPart.ALL.map(t => simulation.run({ part: t }, {}).ran), [
-        [BuildAndTestTargetTests.TEST_STEP], [BuildAndTestTargetTests.TEST_STEP], [BuildAndTestTargetTests.FINISH_STEP, BuildAndTestTargetTests.TEST_STEP]
+      const ran = jobs.map(t => simulation.run({ prebuilt: String(t.prebuilt), build: String(t.build) }, {}).ran);
+
+      const fetched = ["Fetch the build", "Unpack the build"];
+      assert.deepEqual(ran, [
+        [...fetched, BuildAndTestTargetTests.TEST_STEP],
+        [...fetched, BuildAndTestTargetTests.TEST_STEP],
+        [...fetched, BuildAndTestTargetTests.BUILD_STEP, BuildAndTestTargetTests.TEST_STEP],
+        [BuildAndTestTargetTests.BUILD_STEP, BuildAndTestTargetTests.TEST_STEP]
       ]);
     });
 
@@ -140,18 +151,18 @@ class BuildAndTestTargetTests {
       }
     });
 
-    test("a failed Angular part keeps the Angular tests' output and report, tried three times with a pause, and other parts and a passing test keep nothing", async t => {
+    test("a failed job that runs the Angular tests keeps their output and report, tried three times with a pause, and other parts and a passing test keep nothing", async t => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTargetTests.WORKFLOW);
       const simulation = new WorkflowSimulation(workflow.text, BuildAndTestTargetTests.TEST_STEP, BuildAndTestTargetTests.ANGULAR_WARNING);
       const [first, again, last] = BuildAndTestTargetTests.ANGULAR_UPLOADS.map(u => simulation.find(u));
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      const angular = { part: TestPart.ANGULAR_AND_CHECKS };
+      const angular = { angular: "true" };
       const testFailed = { [BuildAndTestTargetTests.TEST_STEP]: "failure" };
 
       const passed = simulation.run(angular, {});
       const failed = simulation.run(angular, testFailed);
-      const otherPart = simulation.run({ part: TestPart.SCRIPTS }, testFailed);
+      const otherPart = simulation.run({ angular: "false" }, testFailed);
       const unkept = simulation.run(angular, Object.fromEntries([BuildAndTestTargetTests.TEST_STEP, ...BuildAndTestTargetTests.ANGULAR_UPLOADS].map(u => [u, "failure"])));
       const warning = await doubles.runAsync(workflow.readStepScript(BuildAndTestTargetTests.ANGULAR_WARNING));
 

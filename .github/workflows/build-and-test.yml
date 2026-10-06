@@ -103,6 +103,7 @@ jobs:
     with:
       runner: ${{ matrix.runner }}
       architecture: ${{ matrix.architecture }}
+      jobs: ${{ toJSON(matrix.jobs) }}
 
   ui-linux-x64:
     name: UI workflows (Linux x64)
