@@ -17,7 +17,17 @@ class TestOptionsTests {
     test("no arguments select the complete gate once", () => {
       const options = TestOptions.parse([]);
 
-      assert.deepEqual([options.isDocuments, options.filters, options.repeat, options.isRerunningFailed], [false, [], 1, false]);
+      assert.deepEqual([options.isDocuments, options.filters, options.repeat, options.part, options.isRerunningFailed], [false, [], 1, null, false]);
+    });
+
+    test("a part selects its checks, once, repeated or rerunning its failed tests", () => {
+      const once = TestOptions.parse(["--part", "packages"]);
+      const repeated = TestOptions.parse(["--repeat", "3", "--part", "angular-and-checks"]);
+      const rerunning = TestOptions.parse(["--part", "scripts", "--rerun-failed"]);
+
+      assert.deepEqual([once.isDocuments, once.filters, once.repeat, once.part, once.isRerunningFailed], [false, [], 1, "packages", false]);
+      assert.deepEqual([repeated.isDocuments, repeated.filters, repeated.repeat, repeated.part], [false, [], 3, "angular-and-checks"]);
+      assert.deepEqual([rerunning.filters, rerunning.repeat, rerunning.part, rerunning.isRerunningFailed], [[], 1, "scripts", true]);
     });
 
     test("documents alone selects the document checks", () => {
@@ -62,6 +72,11 @@ class TestOptionsTests {
         [["--repeat", "2", "--repeat", "3"], "--repeat may be given only once."],
         [["--rerun-failed", "--rerun-failed"], "--rerun-failed may be given only once."],
         [["documents", "--rerun-failed"], "documents takes no other option."],
+        [["--part"], "--part takes one of packages, scripts, angular-and-checks."],
+        [["--part", "ui"], "--part takes one of packages, scripts, angular-and-checks."],
+        [["--part", "scripts", "--part", "packages"], "--part may be given only once."],
+        [["--part", "scripts", "--filter", "alpha"], "--part runs a whole part, so it takes no --filter."],
+        [["--filter", "alpha", "--part", "scripts"], "--part runs a whole part, so it takes no --filter."],
         [["coverage"], "\"coverage\" is not an option of npm test."],
         [["--filter", "alpha", "extra"], "\"extra\" is not an option of npm test."],
         [["--repeat", "2", "documents"], "\"documents\" is not an option of npm test."]

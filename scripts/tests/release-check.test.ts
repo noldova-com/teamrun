@@ -21,6 +21,8 @@ class ReleaseCheckTests {
   private static readonly REVISION: string = "0123456789abcdef0123456789abcdef01234567";
   private static readonly COMPARE: string = `/compare/${ReleaseCheckTests.REVISION}...main`;
   private static readonly TAG: string = "/git/ref/tags/v0.0.7";
+  private static readonly RUNS: string = `/actions/workflows/build-and-test.yml/runs?event=push&branch=main&per_page=1&head_sha=${ReleaseCheckTests.REVISION}`;
+  private static readonly PASSED: Readonly<Record<string, unknown>> = { workflow_runs: [{ status: "completed", conclusion: "success" }] };
   private static readonly NOT_FOUND: string = "gh: Not Found (HTTP 404)";
   private static readonly USAGE: string = "Usage: RELEASE_REPOSITORY=<owner/name> RELEASE_VERSION=<N.N.N> RELEASE_REVISION=<commit> npm run release:check\n";
 
@@ -32,16 +34,18 @@ class ReleaseCheckTests {
       const output = new TextOutputFixture();
       github.answer("/releases/latest", { tag_name: "v0.0.6" });
       github.answer(ReleaseCheckTests.COMPARE, { status: "ahead" });
+      github.answer(ReleaseCheckTests.RUNS, ReleaseCheckTests.PASSED);
       github.fail(ReleaseCheckTests.TAG, ReleaseCheckTests.NOT_FOUND);
       first.fail("/releases/latest", ReleaseCheckTests.NOT_FOUND);
       first.fail(ReleaseCheckTests.TAG, ReleaseCheckTests.NOT_FOUND);
       first.answer(ReleaseCheckTests.COMPARE, { status: "identical" });
+      first.answer(ReleaseCheckTests.RUNS, ReleaseCheckTests.PASSED);
 
       const exitCodes = [await ReleaseCheckTests.checkAsync(repository, github, output), await ReleaseCheckTests.checkAsync(repository, first, new TextOutputFixture())];
 
       assert.deepEqual(exitCodes, [0, 0]);
-      assert.equal(output.text, `v0.0.7 of noldova-com/teamrun from ${ReleaseCheckTests.REVISION}: the version is new and the revision is on main.\n`);
-      assert.deepEqual(github.requests, ["GET /releases/latest", `GET ${ReleaseCheckTests.TAG}`, `GET ${ReleaseCheckTests.COMPARE}`]);
+      assert.equal(output.text, `v0.0.7 of noldova-com/teamrun from ${ReleaseCheckTests.REVISION}: the version is new, the revision is on main and its Build and test run there passed.\n`);
+      assert.deepEqual(github.requests, ["GET /releases/latest", `GET ${ReleaseCheckTests.TAG}`, `GET ${ReleaseCheckTests.COMPARE}`, `GET ${ReleaseCheckTests.RUNS}`]);
     });
 
     test("another version than the manifest's, one that is not newer or already tagged, a revision off main or unknown, or a malformed request fails with the reason", async t => {
@@ -72,6 +76,30 @@ class ReleaseCheckTests {
           github.answer(ReleaseCheckTests.COMPARE, comparison);
 
         assert.equal(await ReleaseCheckTests.checkAsync(repository, github, output, version), 1, reason);
+        assert.equal(output.text, reason);
+      }
+    });
+
+    test("a revision whose latest Build and test run on main did not pass, or that no run on main checked, fails with the run's state", async t => {
+      const repository = await ReleaseCheckTests.createAsync(t);
+      const passed = "release a revision whose run on main passed.\n";
+      const cases: readonly (readonly [readonly unknown[], string])[] = [
+        [[], `No Build and test run on main has checked ${ReleaseCheckTests.REVISION}; ${passed}`],
+        [[{ status: "in_progress", conclusion: null }], `The Build and test run on main for ${ReleaseCheckTests.REVISION} is in_progress, not success; ${passed}`],
+        [[{ status: "completed", conclusion: "failure" }], `The Build and test run on main for ${ReleaseCheckTests.REVISION} is failure, not success; ${passed}`],
+        [[{ status: "completed", conclusion: "cancelled" }, { status: "completed", conclusion: "success" }],
+          `The Build and test run on main for ${ReleaseCheckTests.REVISION} is cancelled, not success; ${passed}`]
+      ];
+
+      for (const [runs, reason] of cases) {
+        const github = new GitHubApiFixture();
+        const output = new TextOutputFixture();
+        github.fail("/releases/latest", ReleaseCheckTests.NOT_FOUND);
+        github.fail(ReleaseCheckTests.TAG, ReleaseCheckTests.NOT_FOUND);
+        github.answer(ReleaseCheckTests.COMPARE, { status: "ahead" });
+        github.answer(ReleaseCheckTests.RUNS, { workflow_runs: runs });
+
+        assert.equal(await ReleaseCheckTests.checkAsync(repository, github, output), 1, reason);
         assert.equal(output.text, reason);
       }
     });
