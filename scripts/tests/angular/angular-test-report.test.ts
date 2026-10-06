@@ -38,10 +38,24 @@ class AngularTestReportTests {
       assert.deepEqual(result.files, ["named/a.spec.ts", "named/b.spec.ts"]);
     });
 
-    test("a file that failed without a failed test, as when it cannot load, counts as one failed test", () => {
-      const result = new AngularTestReport("report.json", t => t).read([{ name: "broken.spec.ts", status: "failed", assertionResults: [] }]);
+    test("a file that failed without a failed test, as when it cannot load or, as Vitest reports it, has no test, counts as one failed test", () => {
+      const result = new AngularTestReport("report.json", t => t).read([
+        { name: "broken.spec.ts", status: "failed", message: "Cannot find module './missing'", assertionResults: [] },
+        { name: "empty.spec.ts", status: "failed", message: "No test suite found in file /repository/src/empty.spec.ts", assertionResults: [] }
+      ]);
 
-      assert.deepEqual([result.passed, result.failed, result.files], [0, 1, ["broken.spec.ts"]]);
+      assert.deepEqual([result.passed, result.failed, result.files], [0, 2, ["broken.spec.ts", "empty.spec.ts"]]);
+    });
+
+    test("tests of one file with the same suites and title are named once as duplicates", () => {
+      const same = { ancestorTitles: ["D"], title: "same", status: "passed" };
+      const result = new AngularTestReport("report.json", t => t).read([
+        { name: "b.spec.ts", status: "passed", assertionResults: [same, same, { ...same, status: "skipped" }, { ancestorTitles: [], title: "D same", status: "passed" }] },
+        { name: "c.spec.ts", status: "passed", assertionResults: [same] }
+      ]);
+
+      assert.deepEqual([result.passed, result.skipped, result.failed], [4, 1, 0]);
+      assert.deepEqual(result.duplicates, [{ file: "b.spec.ts", names: ["D", "same"] }]);
     });
 
     test("a test that passed only when Vitest ran it again counts as failed, as it did in its first run", () => {

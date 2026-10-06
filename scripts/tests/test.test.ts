@@ -240,6 +240,23 @@ class TestTests {
       assert.equal(runner.environments.at(-1)?.["TEAMRUN_TEST_RETRY"], "1");
     });
 
+    test("the totals of a run that reruns failed tests say how many of a runner's failed tests passed when run again in that run", async t => {
+      const repository = await TestTests.createRepositoryAsync(t);
+      await repository.writeAsync({ ".gitignore": "_build/\n" });
+      const directory = path.join(repository.directory, "src", "shell", "ui", "tests");
+      const report = JSON.stringify({ testResults: [
+        { name: path.join(directory, "a.spec.ts"), status: "passed", assertionResults: [{ ancestorTitles: ["A"], title: "retries", fullName: "A retries", status: "passed", failureMessages: ["Error: once"] }] },
+        { name: path.join(directory, "b.spec.ts"), status: "passed", assertionResults: [{ ancestorTitles: ["B"], title: "works", fullName: "B works", status: "passed", failureMessages: [] }] }
+      ] });
+      const output = new TextOutputFixture();
+
+      const exitCode = await new Test(repository.directory, new AngularReportRunnerFixture(report, [0, 0, 0, 0]), output, {}).runAsync(["--part", "angular-and-checks", "--rerun-failed", "--repeat", "2"]);
+
+      assert.equal(exitCode, 0, output.text);
+      const line = "Angular tests: 2 discovered, 2 executed, 1 passed, 1 failed (1 passed when run again; see the flaky record), 0 skipped, 0 unselected, 0 unreached; coverage Not measured.\n";
+      assert.equal(output.text.split(line).length, 3, output.text);
+    });
+
     test("a repeat without filters repeats the complete gate", async t => {
       const repository = await TestTests.createRepositoryAsync(t);
       await repository.writeAsync({ ".gitignore": "_build/\n" });
@@ -379,7 +396,7 @@ class TestTests {
   }
 
   private static specReport(repository: RepositoryFixture): string {
-    return JSON.stringify({ testResults: [{ name: path.join(repository.directory, "src", "shell", "ui", "tests", "a.spec.ts"), status: "passed", assertionResults: [] }] });
+    return JSON.stringify({ testResults: [{ name: path.join(repository.directory, "src", "shell", "ui", "tests", "a.spec.ts"), status: "passed", assertionResults: [{ ancestorTitles: ["A"], title: "works", status: "passed" }] }] });
   }
 
   private static async createRepositoryAsync(t: TestContext): Promise<RepositoryFixture> {

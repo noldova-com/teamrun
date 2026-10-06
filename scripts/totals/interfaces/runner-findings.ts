@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type ITestName from "./test-name.ts";
-
-export default interface IRunnerSkip extends ITestName {
-  readonly reason: string;
+export default interface IRunnerFindings {
+  readonly duplicates: readonly string[];
+  readonly empty: readonly string[];
+  readonly missing: readonly string[];
 }

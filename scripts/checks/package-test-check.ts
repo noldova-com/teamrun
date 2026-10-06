@@ -122,7 +122,7 @@ export default class PackageTestCheck implements ISelectableCheck {
       await rm(coverageResult, { force: true });
       const projects = packages.flatMap(t => CoverageRun.formatProjectArguments(t.name, layout.locateInstalled(t), layout.locateSource(t, PackageTestCheck.SOURCE_FOLDER), t.coverageExclusions, CoverageRun.NO_TEST_FOLDERS));
       const coverageComplete = await new CoverageRun(this.root, this.runner).measureAsync(coverage, projects, CoverageRun.countingIn(this.environment, coverageResult));
-      const recorded = await result.toTotals(PackageTestCheck.RUNNER, PackageTestCheck.TOTALS_TITLE, await CoverageRun.readCountAsync(this.root, coverageResult)).recordAsync(this.root, output);
+      const recorded = await result.toTotals(PackageTestCheck.RUNNER, PackageTestCheck.TOTALS_TITLE, await CoverageRun.readCountAsync(this.root, coverageResult), result.files).recordAsync(this.root, output);
       return new CheckSelection(testsPassed && coverageComplete && recorded, PackageTestCheck.UNIT, 0, 0);
     }
     catch (error) {

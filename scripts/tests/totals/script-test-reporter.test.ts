@@ -32,11 +32,13 @@ class ScriptTestReporterTests {
     "test(\"parent\", async t => {",
     "  await t.test(\"child\", () => {});",
     "});",
+    "test(\"twice\", () => {});",
+    "test(\"twice\", () => {});",
     ""
   ].join("\n");
 
   public static register(): void {
-    test("a run's tests are counted by outcome, with each skipped one named by its file and nesting, and a file that fails to load counts as a failed test", async t => {
+    test("a run's tests are counted by outcome, with each skipped and duplicate one named by its file and nesting, a file that fails to load counts as a failed test, and one without tests is empty", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({ "tests/a.test.mjs": ScriptTestReporterTests.TESTS, "tests/empty.test.mjs": "", "tests/broken.test.mjs": "throw new Error(\"cannot load\");\n" });
@@ -53,7 +55,7 @@ class ScriptTestReporterTests {
 
       assert.equal(run.status, 1, run.stderr);
       assert.deepEqual(JSON.parse(await readFile(path.join(repository.directory, "result.json"), "utf8")), {
-        passed: 3,
+        passed: 5,
         failed: 2,
         skipped: 4,
         unreached: 0,
@@ -63,11 +65,13 @@ class ScriptTestReporterTests {
           { file: "tests/a.test.mjs", names: ["outer", "later"], reason: "To do: Waits for the API." },
           { file: "tests/a.test.mjs", names: ["outer", "someday"], reason: "To do." }
         ],
-        files: ["tests/a.test.mjs", "tests/broken.test.mjs", "tests/empty.test.mjs"]
+        files: ["tests/a.test.mjs", "tests/broken.test.mjs", "tests/empty.test.mjs"],
+        duplicates: [{ file: "tests/a.test.mjs", names: ["twice"] }],
+        empty: ["tests/empty.test.mjs"]
       });
     });
 
-    test("the runner's events count each test by its outcome, leave suites and a file's own passing wrapper out, named by its path in either form, and count a wrapper that fails", async () => {
+    test("the runner's events count each test by its outcome, leave suites and a file's own passing wrapper out, named by its path in either form, which leaves its file empty, and count a wrapper that fails", async () => {
       const reporter = new ScriptTestReporter(path.resolve("root"));
       const file = path.resolve("root", "a.test.ts");
       const run = (type: string, name: string, nesting: number, options: object = {}, at: string = file): void => {
@@ -100,7 +104,9 @@ class ScriptTestReporterTests {
           { file: "a.test.ts", names: ["outer", "later"], reason: "To do: Waits for the API." },
           { file: "a.test.ts", names: ["outer", "someday"], reason: "To do." }
         ],
-        files: ["a.test.ts", "broken.test.ts", "deep/empty.test.ts", "empty.test.ts", "other.test.ts"]
+        files: ["a.test.ts", "broken.test.ts", "deep/empty.test.ts", "empty.test.ts", "other.test.ts"],
+        duplicates: [],
+        empty: ["deep/empty.test.ts", "empty.test.ts", "other.test.ts"]
       });
     });
 
@@ -136,7 +142,7 @@ class ScriptTestReporterTests {
       reporter.write({ type: "test:fail", data: { name: "cut short", nesting: 1, file, details: { type: "test", error: Object.assign(new Error("cancelled"), { failureType: "cancelledByParent" }) } } });
       reporter.end();
 
-      assert.deepEqual(JSON.parse(await text(reporter)), { passed: 0, failed: 0, skipped: 1, unreached: 1, skips: [{ file: "a.test.ts", names: ["unstarted"], reason: "No reason given." }], files: [] });
+      assert.deepEqual(JSON.parse(await text(reporter)), { passed: 0, failed: 0, skipped: 1, unreached: 1, skips: [{ file: "a.test.ts", names: ["unstarted"], reason: "No reason given." }], files: [], duplicates: [], empty: [] });
     });
 
     test("without a root, files are named relative to the working directory", async () => {
