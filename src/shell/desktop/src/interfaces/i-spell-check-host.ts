@@ -10,4 +10,5 @@ export interface ISpellCheckHost {
   setSpellCheckerEnabled(isEnabled: boolean): void;
   setSpellCheckerLanguages(languages: string[]): void;
   setSpellCheckerDictionaryDownloadURL(url: string): void;
+  addWordToSpellCheckerDictionary(word: string): boolean;
 }
