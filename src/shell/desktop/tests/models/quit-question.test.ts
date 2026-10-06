@@ -15,12 +15,12 @@ export class QuitQuestionTests {
   public keepsItsOwnCopyOfTheWorkAndWritesItAsJson(): void {
     const descriptions = ["Indexing the project"];
 
-    const question = new QuitQuestion(descriptions, true);
+    const question = new QuitQuestion(descriptions, true, true);
     descriptions.push("Building");
 
     Assert.areEqual(JSON.stringify(["Indexing the project"]), JSON.stringify(question.descriptions));
     Assert.isTrue(question.isWaiting);
-    Assert.areEqual(JSON.stringify({ descriptions: ["Indexing the project"], isWaiting: true }), JSON.stringify(question.toJson()));
-    Assert.areEqual(JSON.stringify({ descriptions: [], isWaiting: false }), JSON.stringify(new QuitQuestion([], false).toJson()));
+    Assert.areEqual(JSON.stringify({ descriptions: ["Indexing the project"], isWaiting: true, isUpdate: true }), JSON.stringify(question.toJson()));
+    Assert.areEqual(JSON.stringify({ descriptions: [], isWaiting: false, isUpdate: false }), JSON.stringify(new QuitQuestion([], false, false).toJson()));
   }
 }

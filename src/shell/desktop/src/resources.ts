@@ -166,6 +166,7 @@ export class Resources {
   public static readonly payloadNotJson: string = "The payload must be a JSON value.";
   public static readonly layoutNotObject: string = "The layout must be a JSON object.";
   public static readonly clientName: string = "desktop";
+  public static readonly handoffRole: string = "handoff";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly stopWorkAction: string = "stopWork";
   public static readonly waitAction: string = "wait";
@@ -367,6 +368,7 @@ export class Resources {
   public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout and Do not disturb are not kept.";
   public static readonly descriptionsField: string = "descriptions";
   public static readonly isWaitingField: string = "isWaiting";
+  public static readonly isUpdateField: string = "isUpdate";
   public static readonly windowMinimumWidth: number = 640;
   public static readonly windowMinimumHeight: number = 480;
   public static readonly windowWidth: number = 1280;

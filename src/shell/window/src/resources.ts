@@ -768,6 +768,7 @@ export class Resources {
   public static readonly missingBridge: string = "The window needs the desktop's bridge, which the preload provides.";
   public static readonly descriptionsField: string = "descriptions";
   public static readonly isWaitingField: string = "isWaiting";
+  public static readonly isUpdateField: string = "isUpdate";
   public static readonly quitTitle: string = "Work is still running";
   public static readonly quitText: string = `${Resources.productName} is still working on:`;
   public static readonly quitHint: string = "Wait for it to finish, or stop it now.";
@@ -775,6 +776,9 @@ export class Resources {
   public static readonly quitWaitingText: string = `${Resources.productName} quits when this work finishes:`;
   public static readonly waitThenQuit: string = "Wait, then quit";
   public static readonly stopWorkAndQuit: string = "Stop the work and quit";
+  public static readonly updateWaitingText: string = `${Resources.productName} updates when this work finishes:`;
+  public static readonly waitThenUpdate: string = "Wait, then update";
+  public static readonly stopWorkAndUpdate: string = "Stop the work and update";
   public static readonly cancel: string = "Cancel";
   public static readonly quitListLimit: number = 5;
   public static readonly waitFocusSelector: string = "[data-tr-quit=Wait]";

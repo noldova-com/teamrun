@@ -242,29 +242,35 @@ export declare class QuitQuestion {
   public readonly isWaiting: boolean;
 
   /**
+   * Whether TeamRun asks before it stops for an update rather than before it quits.
+   */
+  public readonly isUpdate: boolean;
+
+  /**
    * Creates the question.
    *
    * @param descriptions The work in progress.
    * @param isWaiting Whether the person chose to wait.
+   * @param isUpdate Whether TeamRun asks before it stops for an update.
    * @example
    * ```ts
    * import { QuitQuestion } from "@noldova/teamrun-shell-desktop";
    *
-   * export const question: QuitQuestion = new QuitQuestion(["Indexing the project"], false);
+   * export const question: QuitQuestion = new QuitQuestion(["Indexing the project"], false, false);
    * ```
    */
-  public constructor(descriptions: readonly string[], isWaiting: boolean);
+  public constructor(descriptions: readonly string[], isWaiting: boolean, isUpdate: boolean);
 
   /**
    * Returns the form the window receives.
    *
-   * @returns The `descriptions` and `isWaiting` fields.
+   * @returns The `descriptions`, `isWaiting` and `isUpdate` fields.
    * @example
    * ```ts
    * import type { JsonObject } from "@noldova/teamrun-foundation-json";
    * import { QuitQuestion } from "@noldova/teamrun-shell-desktop";
    *
-   * export const json: JsonObject = new QuitQuestion([], true).toJson();
+   * export const json: JsonObject = new QuitQuestion([], true, false).toJson();
    * ```
    */
   public toJson(): JsonObject;
@@ -283,8 +289,9 @@ export declare class UpdateStop {
    * @param presence Finds processes in the process table.
    * @param connectAsync Connects to the runtime of a recorded data directory as the client `update`, without starting
    * one; resolves `null` when the directory is not in use by this installation.
-   * @param askAsync Asks the person about the work in progress, listed by data directory; resolves `true` to stop it
-   * and go on, `false` to cancel the update.
+   * @param askAsync Asks the person about the work in progress, listed by data directory, and can read it again to
+   * keep the list current while the person waits for it; resolves the work the person agreed to stop, the list shown
+   * when they chose Stop or empty when they waited until none was left, or `null` to cancel the update.
    * @param processId The coordinating desktop's process id.
    * @param productVersion The coordinating desktop's product version.
    * @param now Reads the current time, in milliseconds.
@@ -298,7 +305,7 @@ export declare class UpdateStop {
    *
    * export function create(installation: Installation): UpdateStop {
    *   return new UpdateStop(
-   *     installation, ProcessPresence.create(process.platform, new SystemCommand()), () => Promise.resolve(null), () => Promise.resolve(false),
+   *     installation, ProcessPresence.create(process.platform, new SystemCommand()), () => Promise.resolve(null), () => Promise.resolve(null),
    *     process.pid, "0.2.0", Date.now, t => delay(t));
    * }
    * ```
@@ -307,7 +314,7 @@ export declare class UpdateStop {
     installation: Installation,
     presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">,
     connectAsync: (dataDirectory: string) => Promise<IUpdateTarget | null>,
-    askAsync: (work: readonly string[]) => Promise<boolean>,
+    askAsync: (work: readonly string[], readWorkAsync: () => Promise<readonly string[]>) => Promise<readonly string[] | null>,
     processId: number,
     productVersion: string,
     now: () => number,
@@ -315,31 +322,33 @@ export declare class UpdateStop {
 
   /**
    * Stops the installation for an update and calls the handoff. It holds the launch barrier as `Preparing`, asks each
-   * runtime `shell.update`, then reads each runtime's work again: work the person was not asked about fails the
+   * runtime `shell.update`, then reads each runtime's work again: work the person did not agree to stop fails the
    * update, and `shell.stop` stops the work of a runtime that still has the work they agreed to stop and otherwise
-   * stops only if idle. It waits up to 10 seconds for every runtime and every process they listed except the desktops
-   * to exit, sets the barrier to `Closing`, waits up to 10 more seconds for the other desktops, those the runtimes
-   * listed and those recorded in the installation that still run, then sets it to `HandedOff`. Every connection
-   * closes when it ends.
+   * stops only if idle. It waits up to 10 seconds for every runtime and every process they listed except the desktops to exit,
+   * sets the barrier to `Closing`, waits up to 10 more seconds for the other desktops, those the runtimes listed and
+   * those recorded in the installation that still run, then sets it to `HandedOff`. Every connection closes when it
+   * ends. When the handoff names the process that took over, the barrier records it, so the barrier holds while that
+   * process runs; when that process cannot be found or the record cannot be written, the barrier stays without it.
    *
    * @param version The version being installed.
-   * @param handOffAsync The updater's handoff, which replaces the application's files.
+   * @param handOffAsync The updater's handoff, which starts what replaces the application's files and resolves that
+   * process's id, or `null` when the platform does not give one.
    * @returns A promise of `true` once the handoff has run, or `false` when the person cancelled at the question about
    * work, with nothing changed.
    * @throws {UpdateStopException} Rejected with the reason when another update holds the barrier, work started
    * meanwhile, a runtime refused or something did not save, a process or desktop did not exit in time or could not be
    * checked, or the handoff failed; the barrier it held is removed first, so every surviving runtime and desktop
-   * resumes.
+   * resumes. Once the handoff has run, the barrier stays.
    * @example
    * ```ts
    * import type { UpdateStop } from "@noldova/teamrun-shell-desktop";
    *
-   * export function restartAsync(stop: UpdateStop, handOffAsync: () => Promise<void>): Promise<boolean> {
+   * export function restartAsync(stop: UpdateStop, handOffAsync: () => Promise<number | null>): Promise<boolean> {
    *   return stop.runAsync("0.3.0", handOffAsync);
    * }
    * ```
    */
-  public runAsync(version: string, handOffAsync: () => Promise<void>): Promise<boolean>;
+  public runAsync(version: string, handOffAsync: () => Promise<number | null>): Promise<boolean>;
 }
 
 /**
@@ -624,6 +633,24 @@ export interface IUpdateHost {
    * ```
    */
   saveAsync(): Promise<readonly string[]>;
+
+  /**
+   * Tells the person about the launch barrier a runtime start found, and settles it when they confirm, as
+   * {@link UpdateBarrierGate.askAsync} does.
+   *
+   * @param status What the barrier means for this installation.
+   * @returns A promise of `true` to start the runtime again, `false` when the desktop quits.
+   * @example
+   * ```ts
+   * import type { IUpdateHost } from "@noldova/teamrun-shell-desktop";
+   * import { UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function askAsync(host: IUpdateHost): Promise<boolean> {
+   *   return host.passBarrierAsync(UpdateBarrierStatus.Held);
+   * }
+   * ```
+   */
+  passBarrierAsync(status: UpdateBarrierStatus): Promise<boolean>;
 
   /**
    * Quits the desktop at once, without asking about work or saving again.
@@ -3200,6 +3227,69 @@ export declare class CloseCoordinator {
 }
 
 /**
+ * Asks in the window where an update began whether to wait for the work in progress or to stop it, listing the work by
+ * data directory. Waiting keeps the list current, reading the work again every interval, and goes on once none is
+ * left; Cancel, or a window that can no longer ask, ends the update with nothing changed.
+ */
+export declare class UpdateWorkQuestion {
+  /**
+   * Creates the question.
+   *
+   * @param prompt The window that asks.
+   * @param readWorkAsync Reads the work again while the person waits; a runtime that has gone leaves the list.
+   * @param interval How long to wait between readings of the work, in milliseconds.
+   * @param wait Resolves after the given number of milliseconds, or rejects when the signal aborts.
+   * @example
+   * ```ts
+   * import { setTimeout as delay } from "node:timers/promises";
+   *
+   * import { type IQuitPrompt, UpdateWorkQuestion } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function create(prompt: IQuitPrompt, readWorkAsync: () => Promise<readonly string[]>): UpdateWorkQuestion {
+   *   return new UpdateWorkQuestion(prompt, readWorkAsync, 1000, (t, signal) => delay(t, undefined, { signal }));
+   * }
+   * ```
+   */
+  public constructor(prompt: IQuitPrompt, readWorkAsync: () => Promise<readonly string[]>, interval: number, wait: (milliseconds: number, signal: AbortSignal) => Promise<void>);
+
+  /**
+   * Shows the question and settles with the person's choice. It asks once; withdraws the question when it settles.
+   *
+   * @param work The work in progress, each named with its data directory.
+   * @returns A promise of the work the person agreed to stop: the list shown when they chose Stop, or empty when they
+   * waited until none was left, which agrees to nothing; `null` when they cancelled.
+   * @throws Error Rejected with the error of a reading that fails while the person waits.
+   * @example
+   * ```ts
+   * import type { UpdateWorkQuestion } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function askAsync(question: UpdateWorkQuestion): Promise<readonly string[] | null> {
+   *   return question.askAsync(["Indexing the project (/work/data)"]);
+   * }
+   * ```
+   */
+  public askAsync(work: readonly string[]): Promise<readonly string[] | null>;
+
+  /**
+   * Takes the person's choice from the window that asks.
+   *
+   * @param prompt The window that answered.
+   * @param choice `Wait`, `Stop` or `Cancel`.
+   * @returns `true` when the answer was taken; `false` for another window, an unknown choice, a second Wait or a
+   * question already settled.
+   * @example
+   * ```ts
+   * import { type IQuitPrompt, QuitChoice, type UpdateWorkQuestion } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function stop(question: UpdateWorkQuestion, prompt: IQuitPrompt): boolean {
+   *   return question.answer(prompt, QuitChoice.Stop);
+   * }
+   * ```
+   */
+  public answer(prompt: IQuitPrompt, choice: unknown): boolean;
+}
+
+/**
  * Asks one window to save before TeamRun stops for an update, and collects what did not save: a window that is gone
  * or does not answer in time counts as not saved, since an update is never worth an unsaved change.
  */
@@ -3324,7 +3414,7 @@ export declare class OpenWindow implements IQuitPrompt {
    * import { type OpenWindow, QuitQuestion } from "@noldova/teamrun-shell-desktop";
    *
    * export function ask(open: OpenWindow): boolean {
-   *   return open.show(new QuitQuestion(["Indexing the project"], false));
+   *   return open.show(new QuitQuestion(["Indexing the project"], false, false));
    * }
    * ```
    */

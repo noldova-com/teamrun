@@ -317,7 +317,7 @@ describe("DesktopBridgeService", () => {
     const questions: (QuitQuestion | null)[] = [];
 
     const stop = service.onQuitQuestion(t => questions.push(t));
-    bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: true });
+    bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: true, isUpdate: false });
     bridge.askToQuit(null);
     stop();
     bridge.askToQuit(null);
