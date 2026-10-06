@@ -47,6 +47,7 @@ export class SelectComponent {
   public readonly options = input.required<readonly SelectOption[]>();
   public readonly value = input.required<string>();
   public readonly label = input.required<string>();
+  public readonly describedBy = input<string | null>(null);
   public readonly disabled = input<boolean>(false);
   public readonly valueChange = output<string>();
 
