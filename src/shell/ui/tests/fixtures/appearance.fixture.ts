@@ -15,6 +15,7 @@ import { ThemePainter } from "../../src/app/services/theme-painter";
 import { TypographyPainter } from "../../src/app/services/typography-painter";
 import { DefaultTheme } from "../../src/app/themes/default-theme";
 import { FixtureTheme } from "./fixture-theme";
+import { PointerFixture } from "./pointer.fixture";
 
 export class AppearanceFixture {
   private static readonly ROOT_SIZE: number = 16;
@@ -97,7 +98,7 @@ export class AppearanceFixture {
     park.popover = "manual";
     park.style.cssText = "position: fixed; inset: 0 auto auto 0; width: 4px; height: 4px; margin: 0; padding: 0; border: 0;";
     park.showPopover();
-    await userEvent.hover(park);
+    await PointerFixture.hoverAsync(park);
     return park;
   }
 
