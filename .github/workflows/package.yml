@@ -14,6 +14,11 @@ on:
         type: boolean
         required: true
   workflow_dispatch:
+    inputs:
+      signed:
+        description: Whether to sign the packages of the platforms that teamrun.signedPlatforms declares, which needs the release environment's approval. Only from main.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -33,12 +38,70 @@ jobs:
     timeout-minutes: 5
     outputs:
       targets: ${{ steps.targets.outputs.targets }}
+      signed-targets: ${{ steps.targets.outputs.signed-targets }}
     steps:
+      - name: Require main for a signed run
+        if: github.event_name == 'workflow_dispatch' && inputs.signed
+        timeout-minutes: 1
+        env:
+          REFERENCE: ${{ github.ref }}
+        run: |
+          if [ "$REFERENCE" != refs/heads/main ]; then
+            echo "::error::A signed package run starts from main, not from $REFERENCE."
+            exit 1
+          fi
+
+      - name: Check out the revision
+        if: github.event_name == 'workflow_dispatch' && inputs.signed
+        timeout-minutes: 5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        id: node
+        if: github.event_name == 'workflow_dispatch' && inputs.signed
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js again
+        if: steps.node.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Set up Node.js again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js a last time
+        if: steps.node-again.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Set up Node.js a last time
+        if: steps.node-again.outcome == 'failure'
+        timeout-minutes: 5
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
       - name: List every target by hand and Windows x64 and Linux x64 each night
         id: targets
         timeout-minutes: 1
         env:
           NIGHTLY: ${{ inputs.nightly }}
+          SIGNED: ${{ github.event_name == 'workflow_dispatch' && inputs.signed }}
         run: |
           set -euo pipefail
           if [ "$NIGHTLY" = true ]; then
@@ -46,21 +109,40 @@ jobs:
           else
             retention=14
           fi
+          signing=''
+          if [ "$SIGNED" = true ]; then
+            if ! signing=$(node scripts/signed-platforms.ts); then
+              echo "::error::$signing"
+              exit 1
+            fi
+            echo "Signing the packages of: $signing."
+          fi
           targets=''
-          while IFS='|' read -r target runner architecture night; do
+          signed_targets=''
+          while IFS='|' read -r target runner architecture platform night; do
             if [ "$NIGHTLY" = true ] && [ "$night" != nightly ]; then
               continue
             fi
-            targets="$targets${targets:+,}{\"target\":\"$target\",\"runner\":\"$runner\",\"architecture\":\"$architecture\",\"nightly\":\"${NIGHTLY:-false}\",\"retention\":$retention}"
+            signed=false
+            case " $signing " in
+              *" $platform "*) signed=true ;;
+            esac
+            entry="{\"target\":\"$target\",\"runner\":\"$runner\",\"architecture\":\"$architecture\",\"platform\":\"$platform\",\"signed\":\"$signed\",\"nightly\":\"${NIGHTLY:-false}\",\"retention\":$retention}"
+            if [ "$signed" = true ]; then
+              signed_targets="$signed_targets${signed_targets:+,}$entry"
+            else
+              targets="$targets${targets:+,}$entry"
+            fi
           done <<'TARGETS'
-          Linux x64|ubuntu-24.04|x64|nightly
-          Linux ARM64|ubuntu-24.04-arm|arm64|manual
-          Windows x64|windows-2025|x64|nightly
-          Windows ARM64|windows-11-arm|arm64|manual
-          macOS x64|macos-15-intel|x64|manual
-          macOS ARM64|macos-15|arm64|manual
+          Linux x64|ubuntu-24.04|x64|linux|nightly
+          Linux ARM64|ubuntu-24.04-arm|arm64|linux|manual
+          Windows x64|windows-2025|x64|windows|nightly
+          Windows ARM64|windows-11-arm|arm64|windows|manual
+          macOS x64|macos-15-intel|x64|macos|manual
+          macOS ARM64|macos-15|arm64|macos|manual
           TARGETS
           echo "targets=[$targets]" >> "$GITHUB_OUTPUT"
+          echo "signed-targets=[$signed_targets]" >> "$GITHUB_OUTPUT"
 
   package:
     name: Package and start (${{ matrix.target }})
@@ -70,8 +152,8 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.targets) }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
-    steps:
+    timeout-minutes: 75
+    steps: &package-steps
       - name: Stop Spotlight indexing
         if: runner.os == 'macOS'
         timeout-minutes: 2
@@ -106,8 +188,23 @@ jobs:
 
       - name: Make the package
         id: package
-        timeout-minutes: 25
-        run: npm run package
+        timeout-minutes: 40
+        env:
+          SIGNED: ${{ matrix.signed }}
+          AZURE_TENANT_ID: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_TENANT_ID || '' }}
+          AZURE_CLIENT_ID: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_CLIENT_SECRET || '' }}
+          MAC_CERTIFICATE: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.MAC_CERTIFICATE || '' }}
+          MAC_CERTIFICATE_PASSWORD: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.MAC_CERTIFICATE_PASSWORD || '' }}
+          APPLE_API_KEY_P8: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.APPLE_API_KEY_P8 || '' }}
+          APPLE_API_KEY_ID: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.APPLE_API_KEY_ID || '' }}
+          APPLE_API_ISSUER: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
+        run: |
+          if [ "$SIGNED" = true ]; then
+            npm run package -- --signed
+          else
+            npm run package
+          fi
 
       - name: Install, start and quit the package
         id: smoke
@@ -133,6 +230,7 @@ jobs:
             _build/package/out/TeamRun-*.zip
             _build/package/out/TeamRun-*.AppImage
             _build/package/smoke/*.png
+            _build/package/package-report.json
           retention-days: ${{ matrix.retention }}
           if-no-files-found: error
           overwrite: true
@@ -156,6 +254,7 @@ jobs:
             _build/package/out/TeamRun-*.zip
             _build/package/out/TeamRun-*.AppImage
             _build/package/smoke/*.png
+            _build/package/package-report.json
           retention-days: ${{ matrix.retention }}
           if-no-files-found: error
           overwrite: true
@@ -177,6 +276,7 @@ jobs:
             _build/package/out/TeamRun-*.zip
             _build/package/out/TeamRun-*.AppImage
             _build/package/smoke/*.png
+            _build/package/package-report.json
           retention-days: ${{ matrix.retention }}
           if-no-files-found: error
           overwrite: true
@@ -236,3 +336,16 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
           overwrite: true
+
+  package-signed:
+    name: Package, sign and start (${{ matrix.target }})
+    needs: plan
+    if: needs.plan.outputs.signed-targets != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.signed-targets) }}
+    runs-on: ${{ matrix.runner }}
+    environment: release
+    timeout-minutes: 75
+    steps: *package-steps

@@ -188,7 +188,7 @@ jobs:
         if: matrix.part == 'workflows'
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui -- --repeat-each 5 --retries 0
+            dbus-run-session -- xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui -- --repeat-each 5 --retries 0
           else
             npm run test:ui -- --repeat-each 5 --retries 0
           fi

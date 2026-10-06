@@ -372,7 +372,10 @@ It also requires `bin\teamrun.cmd`, with its folder once in the user's `Path`, a
 Once the runtime has stopped, it installs again over the install and requires the entry still once.
 It then uninstalls silently and requires the install folder emptied and the user's `Path` as it was before the install.
 On macOS, once the runtime answers, it links the bundle's `Contents/Resources/bin/teamrun` from its own folder and requires that link's `teamrun status` to report the runtime as well.
-A run by hand packages every target, macOS included, and keeps the packages as artifacts for two weeks.
+A run by hand packages every target, macOS included, and keeps the packages and the package report as artifacts for two weeks.
+A run by hand from `main` with `signed` set signs the packages of the platforms a release to the update feed signs, as `node scripts/signed-platforms.ts` reads them from `teamrun.signedPlatforms`.
+Those targets package in their own job in the `release` environment, whose packaging step alone receives its platform's credentials, as in a release; the other targets package without an environment.
+`signed` is refused from any other ref, a tag included, and the nightly run never signs.
 The nightly run calls it for Windows x64 and Linux x64 only, keeps those packages three days and reports a failure to make or start the package like its other jobs, in the issue "Nightly: packaging <target>".
 A package that was made and started but could not be kept fails the job without an issue, since the product did not fail.
 The Linux jobs run on Ubuntu 24.04 with libfuse2 removed, as a stock Ubuntu leaves it out, and with unprivileged user namespaces restricted as the runner ships them, so the AppImage starts as it does on a person's machine.
@@ -400,6 +403,7 @@ Section 4's gate rules apply to every required target; targeted runs establish o
 Pin the test dependencies when tooling is introduced.
 Verify the exact Playwright/Electron combination and its application configuration on each target before relying on it, and repeat the relevant compatibility checks when those dependencies or runner images change.
 The test host must supply the required native libraries and a working display; Linux CI may use Xvfb.
+Linux UI workflows run with a session bus of their own (`dbus-run-session`), as on a Linux desktop, so the programs the desktop starts on that bus run during them.
 A local WSL graphical-session pass is not a GitHub-hosted VM or Xvfb witness.
 
 Keep the application's sandbox, context isolation, web security and content security policy intact.

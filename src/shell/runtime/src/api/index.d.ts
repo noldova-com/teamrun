@@ -3822,7 +3822,7 @@ export declare class LaunchSettings {
 }
 
 /**
- * The program and arguments that start a detached runtime. On Linux it wraps the program in Bash that closes inherited descriptors above standard error, without startup files or inherited options. Given a copy record, a program inside an AppImage runs from its own copy of the AppImage instead, which that Bash holds for as long as the program runs: a mount of the AppImage when the program's folder is mounted, or else an extraction in a `teamrun-runtime-` folder of the temporary folder. Bash writes the copy to the record, removes the record once the copy ends, and passes an end signal on to the program.
+ * The program and arguments that start a detached runtime, or any program that must not keep its starter's descriptors. On Linux it wraps the program in Bash that closes inherited descriptors above standard error, without startup files or inherited options. Given a copy record, a program inside an AppImage runs from its own copy of the AppImage instead, which that Bash holds for as long as the program runs: a mount of the AppImage when the program's folder is mounted, or else an extraction in a `teamrun-runtime-` folder of the temporary folder. Bash writes the copy to the record, removes the record once the copy ends, and passes an end signal on to the program.
  */
 export declare class ProcessLaunchCommand {
   /**
@@ -3839,7 +3839,7 @@ export declare class ProcessLaunchCommand {
    * Creates the command.
    *
    * @param platform The platform, as in `process.platform`.
-   * @param executablePath The program that runs the runtime.
+   * @param executablePath The program to start, such as the one that runs the runtime.
    * @param launchArguments Its arguments; the array is copied.
    * @param environment The environment the program is started with, whose `APPIMAGE` and `APPDIR` name the AppImage it runs from.
    * @param copyRecord The file Bash records the program's own copy of its AppImage in, or `null` to start a program inside an AppImage as any other.

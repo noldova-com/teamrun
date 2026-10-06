@@ -69,6 +69,10 @@ export class Resources {
     return `The launch barrier of an unfinished update could not be removed: ${message}`;
   }
 
+  public static formatHandoverFailed(reason: string): string {
+    return `The newer ${Resources.applicationName} could not be started for the hand-over, so this one quits without it: ${reason}`;
+  }
+
   public static formatBarrierUnreadable(message: string): string {
     return `The launch barrier could not be read: ${message}`;
   }
