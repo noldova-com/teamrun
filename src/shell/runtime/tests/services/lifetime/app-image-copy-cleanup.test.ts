@@ -19,6 +19,7 @@ import { AppImageCopyCleanup, DataDirectory } from "@noldova/teamrun-shell-runti
 import { CommandLinePatchFixture } from "../../fixtures/command-line-patch.fixture.js";
 import { ProgramFixture } from "../../fixtures/program.fixture.js";
 import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
+import { TextOutputFixture } from "../../fixtures/text-output.fixture.js";
 
 @TestClass
 export class AppImageCopyCleanupTests {
@@ -37,10 +38,12 @@ export class AppImageCopyCleanupTests {
   public async createsTheLogsFolderWhenThereIsNone(): Promise<void> {
     await using folder = await TemporaryFolderFixture.createAsync();
     const directory = new DataDirectory(path.join(folder.path, "data"));
+    const diagnostics = new TextOutputFixture();
 
-    await AppImageCopyCleanup.removeAsync(directory);
+    await AppImageCopyCleanup.removeAsync(directory, diagnostics);
 
     Assert.areEqual("", (await readdir(directory.logsFolder)).join(","));
+    Assert.areEqual("", diagnostics.text);
   }
 
   @TestMethod
@@ -69,11 +72,13 @@ export class AppImageCopyCleanupTests {
     [`teamrun-copy mount ${AppImageCopyCleanupTests.UNREADABLE_HOLDER} ${hidden.pid} ${image}`],
     [`teamrun-copy mount ${AppImageCopyCleanupTests.GONE} ${logged.pid} ${image}`]);
 
-    await AppImageCopyCleanup.removeAsync(directory);
+    const diagnostics = new TextOutputFixture();
+    await AppImageCopyCleanup.removeAsync(directory, diagnostics);
 
     Assert.isTrue(await Wait.untilAsync(() => !ProgramFixture.isRunning(Number(orphaned.pid)), AppImageCopyCleanupTests.LIMIT), "The orphaned mount did not end.");
     Assert.areEqual("true,true,true,true", [unrelated, held, logged, hidden].map(t => ProgramFixture.isRunning(Number(t.pid))).join(","));
     Assert.areEqual(AppImageCopyCleanupTests.listLeft(), (await readdir(directory.logsFolder)).sort().join(","));
+    Assert.areEqual(AppImageCopyCleanupTests.listFailed(directory), AppImageCopyCleanupTests.readFailed(diagnostics));
   }
 
   @TestMethod
@@ -96,10 +101,12 @@ export class AppImageCopyCleanupTests {
     ], [`teamrun-copy extraction ${AppImageCopyCleanupTests.HOLDER} ${held.path}`],
     [`teamrun-copy extraction ${AppImageCopyCleanupTests.UNREADABLE_HOLDER} ${hidden.path}`], []);
 
-    await AppImageCopyCleanup.removeAsync(directory);
+    const diagnostics = new TextOutputFixture();
+    await AppImageCopyCleanup.removeAsync(directory, diagnostics);
 
     Assert.areEqual("false,true,true,true,true", [orphaned.path, held.path, hidden.path, nested, misnamed].map(t => existsSync(t)).join(","));
     Assert.areEqual(AppImageCopyCleanupTests.listLeft(), (await readdir(directory.logsFolder)).sort().join(","));
+    Assert.areEqual(AppImageCopyCleanupTests.listFailed(directory), AppImageCopyCleanupTests.readFailed(diagnostics));
   }
 
   private static patchCommandLines(mounters: readonly (readonly [number, string])[]): CommandLinePatchFixture {
@@ -109,6 +116,18 @@ export class AppImageCopyCleanupTests {
       [AppImageCopyCleanupTests.UNREADABLE_HOLDER, permission],
       ...mounters
     ]));
+  }
+
+  private static listFailed(directory: DataDirectory): string {
+    return [
+      `${path.join(directory.logsFolder, AppImageCopyCleanupTests.HIDDEN)} EACCES`,
+      `${path.join(directory.logsFolder, AppImageCopyCleanupTests.UNREADABLE)} EISDIR`
+    ].sort().join(",");
+  }
+
+  private static readFailed(diagnostics: TextOutputFixture): string {
+    const failure = /^The runtime could not end the AppImage copy recorded in (.+), so the record is left: Error: ([A-Z]+):/;
+    return diagnostics.text.split("\n").filter(t => t !== "").map(t => failure.exec(t)?.slice(1).join(" ") ?? t).sort().join(",");
   }
 
   private static listLeft(): string {

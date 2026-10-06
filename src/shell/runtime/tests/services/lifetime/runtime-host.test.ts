@@ -255,6 +255,22 @@ export class RuntimeHostTests {
   }
 
   @TestMethod
+  public startsAndLogsALeftoverAppImageCopyItCannotEnd(): Promise<void> {
+    return RuntimeHostFixture.runAsync(async fixture => {
+      const record = path.join(fixture.dataDirectory.logsFolder, "copy-11111111-2222-4333-8444-555555555555.log");
+      await mkdir(record, { recursive: true });
+
+      const host = await fixture.startAsync();
+      host.requestStop("test");
+      await host.waitForStopAsync();
+
+      const log = await readFile(fixture.dataDirectory.runtimeLog, "utf8");
+      Assert.isTrue(/The runtime could not end the AppImage copy recorded in .+, so the record is left: Error: EISDIR/.test(log), log);
+      Assert.isTrue(existsSync(record), "the record is left");
+    });
+  }
+
+  @TestMethod
   public releasesOwnershipWhenItsLogCannotOpen(): Promise<void> {
     return RuntimeHostFixture.runAsync(async fixture => {
       await mkdir(fixture.dataDirectory.root, { recursive: true });

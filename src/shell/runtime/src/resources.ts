@@ -866,6 +866,10 @@ export class Resources {
     return `The runtime's log could not be written, so it is no longer written to: ${reason}`;
   }
 
+  public static formatCopyNotEnded(record: string, reason: string): string {
+    return `The runtime could not end the AppImage copy recorded in ${record}, so the record is left: ${reason}\n`;
+  }
+
   public static formatCopyRecordName(unique: string): string {
     return `${Resources.copyRecordPrefix}${unique}${Resources.startLogExtension}`;
   }

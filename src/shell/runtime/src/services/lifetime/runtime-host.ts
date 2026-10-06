@@ -170,8 +170,8 @@ export class RuntimeHost implements IIdleParticipant {
     let log: RuntimeLog | null = null;
     let database: ShellDatabase | null = null;
     try {
-      await AppImageCopyCleanup.removeAsync(lock.dataDirectory);
       log = await RuntimeLog.openAsync(lock, options.startLogName);
+      await AppImageCopyCleanup.removeAsync(lock.dataDirectory, log.diagnostics);
       const inspection = await DataDirectoryInspector.inspectAsync(options.dataDirectory);
       if (inspection.state !== DataDirectoryState.PreShell)
         database = await ShellDatabase.openAsync(lock, ShellMigrations.all);

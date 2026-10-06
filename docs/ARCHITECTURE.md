@@ -329,6 +329,7 @@ The runtime must not keep the files, sockets or pipes of the client that started
     The launcher removes its start log once it connects, so the start log cannot keep them.
     A runtime that owns the data directory ends any mount an earlier Bash step left running when that Bash no longer runs, and removes any extraction it left.
     It matches a mount by process id, command line and the AppImage's path, never by name alone.
+    It does this once its log is open, and writes each record it cannot settle there with the reason, leaving the record; the runtime still starts.
   - A runtime started this way names the AppImage file, not its copy, as the program it runs from.
 - **Windows:** Electron's main process keeps its standard handles inheritable, and Node.js starts every child with handle inheritance on. The desktop therefore starts the runtime through a short-lived Electron utility process, which Chromium starts with only the handles it lists; the utility process starts the runtime, answers with its process id, and ends only once the desktop acknowledges the answer, so its exit never arrives before the answer.
 - **macOS, and the CLI on Windows:** the host's direct process launch.

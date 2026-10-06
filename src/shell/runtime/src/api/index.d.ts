@@ -2966,8 +2966,8 @@ export declare class ProcessLaunchCommand {
    * @param platform The platform, as in `process.platform`.
    * @param executablePath The program that runs the runtime.
    * @param launchArguments Its arguments; the array is copied.
-   * @param environment The environment the program is started with, whose `APPIMAGE` and `APPDIR` name the AppImage it runs from; empty by default.
-   * @param copyRecord The file Bash records the program's own copy of its AppImage in, or `null`, the default, to start a program inside an AppImage as any other.
+   * @param environment The environment the program is started with, whose `APPIMAGE` and `APPDIR` name the AppImage it runs from.
+   * @param copyRecord The file Bash records the program's own copy of its AppImage in, or `null` to start a program inside an AppImage as any other.
    * @throws {ArgumentException} When the program's path is empty or whitespace.
    * @throws {LaunchException} On Linux, when `/bin/bash` is not executable or `/proc/self/fd` cannot be read.
    * @example
@@ -2977,12 +2977,12 @@ export declare class ProcessLaunchCommand {
    * import { ProcessLaunchCommand, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
    *
    * export function start(dataDirectory: string): void {
-   *   const command = new ProcessLaunchCommand(process.platform, process.execPath, [RuntimeEntry.entryPath, "--data-dir", dataDirectory]);
+   *   const command = new ProcessLaunchCommand(process.platform, process.execPath, [RuntimeEntry.entryPath, "--data-dir", dataDirectory], process.env, null);
    *   spawn(command.executable, command.arguments, { detached: true, stdio: "ignore" }).unref();
    * }
    * ```
    */
-  public constructor(platform: string, executablePath: string, launchArguments: readonly string[], environment?: NodeJS.ProcessEnv, copyRecord?: string | null);
+  public constructor(platform: string, executablePath: string, launchArguments: readonly string[], environment: NodeJS.ProcessEnv, copyRecord: string | null);
 }
 
 /**
@@ -4250,9 +4250,10 @@ export interface IEventSink {
  */
 export declare class AppImageCopyCleanup {
   /**
-   * Reads each copy record, `logs/copy-<id>.log`. When the Bash that held its copies no longer runs, a recorded mount ends if the recorded process is still the mount of the recorded AppImage, a recorded extraction is removed if its folder is a `teamrun-runtime-` folder directly in the temporary folder, and the record is removed. Records of a Bash that still runs, or whose command line cannot be read, are left, as are records, processes and folders that cannot be read, ended or removed; a process without a command line no longer runs. The logs folder is created when it is missing.
+   * Reads each copy record, `logs/copy-<id>.log`. When the Bash that held its copies no longer runs, a recorded mount ends if the recorded process is still the mount of the recorded AppImage, a recorded extraction is removed if its folder is a `teamrun-runtime-` folder directly in the temporary folder, and the record is removed. Records of a Bash that still runs are left. A record whose file, Bash command line, process or folder cannot be read, ended or removed is left too, and the reason is written to the diagnostics; a process without a command line no longer runs. The logs folder is created when it is missing.
    *
    * @param directory The data directory, whose ownership the runtime holds.
+   * @param diagnostics Where a record that is left after a failure is written, with the reason.
    * @returns A promise that resolves once the leftover copies are ended.
    * @throws {Error} Rejected when the logs folder cannot be created or listed.
    * @example
@@ -4260,11 +4261,11 @@ export declare class AppImageCopyCleanup {
    * import { AppImageCopyCleanup, type OwnershipLock } from "@noldova/teamrun-shell-runtime";
    *
    * export function cleanAsync(lock: OwnershipLock): Promise<void> {
-   *   return AppImageCopyCleanup.removeAsync(lock.dataDirectory);
+   *   return AppImageCopyCleanup.removeAsync(lock.dataDirectory, process.stderr);
    * }
    * ```
    */
-  public static removeAsync(directory: DataDirectory): Promise<void>;
+  public static removeAsync(directory: DataDirectory, diagnostics: Writable): Promise<void>;
 }
 
 /**

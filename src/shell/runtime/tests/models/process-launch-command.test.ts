@@ -37,7 +37,7 @@ export class ProcessLaunchCommandTests {
     const launchArguments = ["entry.js", "--data-dir", "/data"];
 
     for (const platform of ["win32", "darwin"]) {
-      const command = new ProcessLaunchCommand(platform, "/opt/node", launchArguments);
+      const command = new ProcessLaunchCommand(platform, "/opt/node", launchArguments, {}, null);
       Assert.areEqual("/opt/node", command.executable);
       Assert.areEqual("entry.js|--data-dir|/data", command.arguments.join("|"));
     }
@@ -47,7 +47,7 @@ export class ProcessLaunchCommandTests {
   public startsTheProgramThroughBashOnLinux(): void {
     using fileSystem = new FileSystemPatchFixture(null);
 
-    const command = new ProcessLaunchCommand("linux", "/opt/node", ["entry.js"]);
+    const command = new ProcessLaunchCommand("linux", "/opt/node", ["entry.js"], {}, null);
 
     Assert.areEqual("/bin/bash", command.executable);
     Assert.areEqual(`${ProcessLaunchCommandTests.SHELL_ARGUMENTS}|/opt/node|entry.js`, command.arguments.join("|"));
@@ -58,7 +58,7 @@ export class ProcessLaunchCommandTests {
   public requiresExecutableBashOnLinux(): void {
     using _fileSystem = new FileSystemPatchFixture("/bin/bash");
 
-    const exception = Assert.throws(() => new ProcessLaunchCommand("linux", "/opt/node", []), LaunchException);
+    const exception = Assert.throws(() => new ProcessLaunchCommand("linux", "/opt/node", [], {}, null), LaunchException);
 
     Assert.areEqual("Starting a program on Linux requires executable Bash at /bin/bash. Install Bash or restore its execute permissions.", exception.message);
     Assert.isInstanceOf(exception.cause, Error);
@@ -68,7 +68,7 @@ export class ProcessLaunchCommandTests {
   public requiresTheDescriptorDirectoryOnLinux(): void {
     using _fileSystem = new FileSystemPatchFixture("/proc/self/fd");
 
-    const exception = Assert.throws(() => new ProcessLaunchCommand("linux", "/opt/node", []), LaunchException);
+    const exception = Assert.throws(() => new ProcessLaunchCommand("linux", "/opt/node", [], {}, null), LaunchException);
 
     Assert.areEqual(
       "Starting a program on Linux requires access to /proc/self/fd. Ensure procfs is mounted at /proc and this process can read and traverse its descriptor directory.",
@@ -78,13 +78,13 @@ export class ProcessLaunchCommandTests {
 
   @TestMethod
   public requiresAnExecutable(): void {
-    Assert.areEqual("executablePath", Assert.throws(() => new ProcessLaunchCommand("win32", " ", []), ArgumentException).parameterName);
+    Assert.areEqual("executablePath", Assert.throws(() => new ProcessLaunchCommand("win32", " ", [], {}, null), ArgumentException).parameterName);
   }
 
   @PlatformFixture.linuxOnly()
   @TestMethod
   public async closesInheritedDescriptorsOnLinux(): Promise<void> {
-    const command = new ProcessLaunchCommand("linux", "/bin/ls", ["/proc/self/fd"]);
+    const command = new ProcessLaunchCommand("linux", "/bin/ls", ["/proc/self/fd"], {}, null);
 
     const direct = await ProcessLaunchCommandTests.listDescriptorsAsync("/bin/ls", ["/proc/self/fd"]);
     const launched = await ProcessLaunchCommandTests.listDescriptorsAsync(command.executable, command.arguments);
@@ -103,7 +103,7 @@ export class ProcessLaunchCommandTests {
       return new ProcessLaunchCommand("linux", "/tmp/.mount_TeamRuX/teamrun", ["entry.js"], environment, record);
     });
     using _fileSystem = new FileSystemPatchFixture(null);
-    const unrecorded = new ProcessLaunchCommand("linux", "/tmp/.mount_TeamRuX/teamrun", ["entry.js"], environment);
+    const unrecorded = new ProcessLaunchCommand("linux", "/tmp/.mount_TeamRuX/teamrun", ["entry.js"], environment, null);
     const outside = new ProcessLaunchCommand("linux", "/opt/teamrun/teamrun", ["entry.js"], environment, record);
 
     const shown = commands.map(t => [t.executable, ...t.arguments.slice(0, 4), ...t.arguments.slice(5)].join("|"));

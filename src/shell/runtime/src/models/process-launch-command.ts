@@ -19,7 +19,7 @@ export class ProcessLaunchCommand {
   public readonly executable: string;
   public readonly arguments: readonly string[];
 
-  public constructor(platform: string, executablePath: string, launchArguments: readonly string[], environment: NodeJS.ProcessEnv = {}, copyRecord: string | null = null) {
+  public constructor(platform: string, executablePath: string, launchArguments: readonly string[], environment: NodeJS.ProcessEnv, copyRecord: string | null) {
     ArgumentException.throwIfNullOrWhitespace(executablePath, Resources.executablePathParameterName);
     if (platform !== Resources.linuxPlatform) {
       this.executable = executablePath;

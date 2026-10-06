@@ -9,16 +9,19 @@
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { Writable } from "node:stream";
 
 import { ProductInfo } from "../../models/product-info.js";
 import { Resources } from "../../resources.js";
 import type { DataDirectory } from "../data-directory/data-directory.js";
 
 export class AppImageCopyCleanup {
-  public static async removeAsync(directory: DataDirectory): Promise<void> {
+  public static async removeAsync(directory: DataDirectory, diagnostics: Writable): Promise<void> {
     await mkdir(directory.logsFolder, { recursive: true });
-    const records = (await readdir(directory.logsFolder)).filter(t => Resources.copyRecordNamePattern.test(t));
-    await Promise.allSettled(records.map(t => AppImageCopyCleanup.endAsync(path.join(directory.logsFolder, t))));
+    const records = (await readdir(directory.logsFolder)).filter(t => Resources.copyRecordNamePattern.test(t)).map(t => path.join(directory.logsFolder, t));
+    await Promise.all(records.map(t => AppImageCopyCleanup.endAsync(t).catch((error: unknown) => {
+      diagnostics.write(Resources.formatCopyNotEnded(t, String(error)));
+    })));
   }
 
   private static async endAsync(record: string): Promise<void> {
