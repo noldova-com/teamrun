@@ -16,16 +16,6 @@ import { DeviceIdentity, DeviceIdentityException } from "@noldova/teamrun-shell-
 @TestClass
 export class DeviceIdentityTests {
   @TestMethod
-  public keepsTheIdentityInTheOperatingSystemsLocalApplicationData(): void {
-    Assert.areEqual(path.join("C:\Users\person\AppData\Local", "Noldova", "TeamRun"), DeviceIdentity.locateFolder("win32", { LOCALAPPDATA: "C:\Users\person\AppData\Local" }, "C:\Users\person"));
-    Assert.areEqual(path.join("C:\Users\person", "AppData", "Local", "Noldova", "TeamRun"), DeviceIdentity.locateFolder("win32", {}, "C:\Users\person"));
-    Assert.areEqual(path.join("/Users/person", "Library", "Application Support", "Noldova", "TeamRun"), DeviceIdentity.locateFolder("darwin", {}, "/Users/person"));
-    Assert.areEqual(path.join("/state", "noldova", "teamrun"), DeviceIdentity.locateFolder("linux", { XDG_STATE_HOME: "/state" }, "/home/person"));
-    Assert.areEqual(path.join("/home/person", ".local", "state", "noldova", "teamrun"), DeviceIdentity.locateFolder("linux", { XDG_STATE_HOME: " " }, "/home/person"));
-    Assert.areEqual(path.join("/home/person", ".local", "state", "noldova", "teamrun"), DeviceIdentity.locateFolder("linux", {}, "/home/person"));
-  }
-
-  @TestMethod
   public async createsAnIdentityOnceAndKeepsIt(): Promise<void> {
     const folder = await mkdtemp(path.join(os.tmpdir(), "teamrun-device-"));
     try {

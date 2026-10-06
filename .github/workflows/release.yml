@@ -38,13 +38,6 @@ jobs:
       actions: read
       contents: read
     steps:
-      - name: Refuse an unsigned release of TeamRun
-        if: github.repository == 'noldova-com/teamrun'
-        timeout-minutes: 1
-        run: |
-          echo '::error::TeamRun publishes no unsigned release, so its releases start once its packages are signed. Run a trial in a test repository.'
-          exit 1
-
       - name: Require the workflow from main
         timeout-minutes: 1
         env:
@@ -319,8 +312,5 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_REVISION: ${{ inputs.revision }}
           RELEASE_FOLDER: ${{ github.workspace }}/_build/release
-          RELEASE_NOTES: >-
-            TeamRun ${{ inputs.version }} for Windows, Linux and macOS, each on x64 and ARM64. Its packages are unsigned.
-            Each target's package passed its install check on that target's own runner in the run that built it:
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RELEASE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/release-publish.ts

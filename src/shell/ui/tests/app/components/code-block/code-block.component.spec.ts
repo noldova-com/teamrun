@@ -124,6 +124,16 @@ describe("CodeBlockComponent", () => {
     expect([style.overflowY === "auto" || style.overflowY === "hidden", body().scrollHeight]).toEqual([true, body().clientHeight]);
   });
 
+  it("fills the width of what holds it when its code is short, even in a row that sizes its items to their content", async () => {
+    await renderAsync();
+    find(".frame").style.display = "flex";
+    host.code.set("a");
+    await fixture.whenStable();
+
+    expect(body().scrollWidth).toBe(body().clientWidth);
+    expect(box("tr-code-block").width).toBe(box(".frame").width);
+  });
+
   it("scrolls a long line sideways inside its body, never widening the block or what holds it", async () => {
     await renderAsync();
 

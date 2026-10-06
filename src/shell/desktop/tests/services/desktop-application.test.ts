@@ -16,9 +16,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, DataDirectoryLocator, PreShellDataFoundException, RuntimeBuild, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
-import { DeviceIdentity, type IIpcEvent, PathCommandException, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
+import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents, UpdateProcess, UpdateSaved } from "@noldova/teamrun-shell-protocol";
+import {
+  ConnectionException, DataDirectoryLocator, DeviceFolder, type Installation, PreShellDataFoundException, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHandoverException, SystemCommand, UpdateBarrier,
+  UpdateBarrierState, UpdateBarrierStatus
+} from "@noldova/teamrun-shell-runtime";
+import { type IIpcEvent, PathCommandException, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
@@ -246,7 +249,7 @@ export class DesktopApplicationTests {
       { descriptions: ["Indexing the project", "Saving the notes"], isWaiting: true },
       null
     ]), JSON.stringify(DesktopApplicationTests.quitQuestions(window)));
-    Assert.areEqual(2000, connection.timeouts[connection.calls.indexOf("shell.work")]);
+    Assert.areEqual(2000, connection.timeouts[connection.calls.lastIndexOf("shell.work")]);
     Assert.isFalse(connection.calls.includes("shell.stop"));
   }
 
@@ -300,7 +303,7 @@ export class DesktopApplicationTests {
     await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(second).length === 1);
 
     Assert.areEqual(0, DesktopApplicationTests.quitQuestions(first).length);
-    Assert.areEqual(2000, slow.timeouts[slow.calls.indexOf("shell.work")]);
+    Assert.areEqual(2000, slow.timeouts[slow.calls.lastIndexOf("shell.work")]);
     Assert.areEqual(
       1,
       DesktopStartFixture.readErrors(process, "The runtime's work could not be read before quitting, so TeamRun quits without asking: ConnectionException: The runtime did not answer shell.work in time.").length);
@@ -449,6 +452,168 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async givesItsLauncherTheInstallationInTheDeviceFolderItIsGiven(): Promise<void> {
+    const folder = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const environment = { SystemRoot: process.env["SystemRoot"] };
+      const installations: Installation[] = [];
+      DesktopStartFixture.start(
+        new FakeElectron(), new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment), undefined, undefined, undefined, undefined, installations);
+      const [installation] = installations;
+      Assert.isDefined(installation);
+      const [holder] = await ProcessPresence.create(process.platform, new SystemCommand()).stampAsync([[process.pid, "desktop"]]);
+      Assert.isDefined(holder);
+      await mkdir(installation.folder, { recursive: true });
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing, null).toJson()));
+
+      const status = await installation.checkAsync(RuntimeBuild.identity.productVersion);
+
+      Assert.areEqual(join(folder, "installations"), dirname(installation.folder));
+      Assert.areEqual(UpdateBarrierStatus.Held, status);
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async opensNoWindowAndExitsWhileAnotherDesktopInstallsAnUpdate(): Promise<void> {
+    const folder = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const electron = new FakeElectron();
+      electron.dialog.answers.push(0);
+      const environment = { SystemRoot: process.env["SystemRoot"] };
+      const installations: Installation[] = [];
+      const launcher = new FakeRuntimeLauncher();
+      DesktopStartFixture.start(electron, new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment), launcher, undefined, undefined, undefined, installations);
+      const [installation] = installations;
+      Assert.isDefined(installation);
+      const [holder] = await ProcessPresence.create(process.platform, new SystemCommand()).stampAsync([[process.pid, "desktop"]]);
+      Assert.isDefined(holder);
+      await mkdir(installation.folder, { recursive: true });
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing, null).toJson()));
+
+      await electron.app.becomeReadyAsync();
+      electron.app.emit("activate");
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+      electron.app.emit("activate");
+
+      Assert.areEqual(0, electron.windows.length);
+      Assert.areEqual(0, launcher.calls.length);
+      Assert.areEqual(JSON.stringify(["TeamRun is installing an update."]), JSON.stringify(electron.dialog.boxes.map(t => t.options.message)));
+      Assert.isTrue(existsSync(installation.barrierFile));
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async removesABarrierAnUpdateLeftBeforeItsHandoffLogsItAndOpensItsWindow(): Promise<void> {
+    const folder = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const electron = new FakeElectron();
+      const environment = { SystemRoot: process.env["SystemRoot"] };
+      const desktop = new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment);
+      const installations: Installation[] = [];
+      DesktopStartFixture.start(electron, desktop, new FakeRuntimeLauncher(), undefined, undefined, undefined, installations);
+      const [installation] = installations;
+      Assert.isDefined(installation);
+      await mkdir(installation.folder, { recursive: true });
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(new UpdateProcess(process.pid, 1, 2, "desktop"), "0.3.0", UpdateBarrierState.Closing, null).toJson()));
+
+      await DesktopStartFixture.openAsync(electron);
+
+      Assert.areEqual(0, electron.dialog.boxes.length);
+      Assert.isFalse(existsSync(installation.barrierFile));
+      Assert.areEqual(1, DesktopStartFixture.readErrors(desktop, "An update stopped before its handoff, so its launch barrier was removed.").length);
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async quitsAndLogsWhenItCannotTellThePersonThatAnUpdateIsInstalling(): Promise<void> {
+    const folder = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const electron = new FakeElectron();
+      electron.dialog.failure = new Error("No display");
+      const environment = { SystemRoot: process.env["SystemRoot"] };
+      const desktop = new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment);
+      const installations: Installation[] = [];
+      DesktopStartFixture.start(electron, desktop, new FakeRuntimeLauncher(), undefined, undefined, undefined, installations);
+      const [installation] = installations;
+      Assert.isDefined(installation);
+      await mkdir(installation.folder, { recursive: true });
+      await writeFile(installation.barrierFile, "{\"holder\":");
+
+      await electron.app.becomeReadyAsync();
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+      Assert.areEqual(0, electron.windows.length);
+      Assert.areEqual(1, DesktopStartFixture.readErrors(desktop, "The launch barrier could not be settled: Error: No display").length);
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async savesEveryWindowForAnUpdateAndQuitsWhenAnotherDesktopClosesTheInstallation(): Promise<void> {
+    const folder = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const electron = new FakeElectron();
+      const launcher = new FakeRuntimeLauncher();
+      const installations: Installation[] = [];
+      const environment = { SystemRoot: process.env["SystemRoot"] };
+      DesktopStartFixture.start(electron, new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment), launcher, undefined, undefined, undefined, installations);
+      await electron.app.becomeReadyAsync();
+      await Condition.waitAsync(() => launcher.connections.length === 1);
+      const [installation] = installations;
+      Assert.isDefined(installation);
+      const [coordinator] = await ProcessPresence.create(process.platform, new SystemCommand()).stampAsync([[process.pid, "desktop"]]);
+      Assert.isDefined(coordinator);
+      await mkdir(installation.folder, { recursive: true });
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(coordinator, "0.3.0", UpdateBarrierState.Preparing, null).toJson()));
+      const window = DesktopStartFixture.firstWindow(electron);
+      const event = DesktopStartFixture.trustedEvent(process.platform);
+
+      launcher.listener?.onEvent(new Event(ShellEvents.updating, null));
+      await Condition.waitAsync(() => window.webContents.sent.some(t => t[0] === "teamrun:updateSaveRequest"));
+      const request = window.webContents.sent.find(t => t[0] === "teamrun:updateSaveRequest");
+      const untrusted = electron.ipcMain.invoke("teamrun:updateSaveAnswer", { ...event, senderFrame: null }, request?.[1], []);
+      const answered = electron.ipcMain.invoke("teamrun:updateSaveAnswer", event, request?.[1], ["Notes couldn't save"]);
+      const connection = launcher.connections[0];
+      await Condition.waitAsync(() => connection?.calls.includes("shell.updateSaved") === true);
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(coordinator, "0.3.0", UpdateBarrierState.Closing, null).toJson()));
+      launcher.listener?.onDisconnected(null);
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+      Assert.isTrue(window.webContents.sent.some(t => t[0] === "teamrun:startupState" && JSON.stringify(t[1]) === JSON.stringify({ kind: "Updating", details: ["0.3.0"] })));
+      Assert.isFalse(untrusted === true);
+      Assert.isTrue(answered === true);
+      Assert.areEqual(JSON.stringify(new UpdateSaved(1000, ["Notes couldn't save"]).toJson()), JSON.stringify(connection?.payloads.at(-1)));
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async recordsItselfInItsInstallationAndLogsWhenItCannotButStartsAnyway(): Promise<void> {
+    const recorded = await DesktopApplicationTests.startRecordingAsync(true);
+    const notFound = await DesktopApplicationTests.startRecordingAsync(false);
+    const failed = await DesktopApplicationTests.startRecordingAsync(new Error("EACCES: permission denied, mkdir"));
+
+    Assert.areEqual(0, DesktopStartFixture.readErrors(recorded, "This desktop could not be recorded").length);
+    Assert.areEqual(JSON.stringify(["This desktop could not be recorded in its installation, so an update may not wait for it: TeamRun could not find its own process in the process table."]),
+      JSON.stringify(DesktopStartFixture.readErrors(notFound, "This desktop could not be recorded")));
+    Assert.areEqual(JSON.stringify(["This desktop could not be recorded in its installation, so an update may not wait for it: Error: EACCES: permission denied, mkdir"]),
+      JSON.stringify(DesktopStartFixture.readErrors(failed, "This desktop could not be recorded")));
+  }
+
+  @TestMethod
   public async opensItsWindowWithTheDevicesLastAppearanceAndKeepsTheOneItsWindowReports(): Promise<void> {
     const appearance = new FakeAppearanceStore();
     appearance.kept = { "shell.mode": "Dark" };
@@ -486,6 +651,21 @@ export class DesktopApplicationTests {
       JSON.stringify(DesktopStartFixture.readErrors(process, "The device's last appearance")));
     Assert.areEqual(JSON.stringify(["The device's appearance could not be kept for the next start: Error: The disk is full."]),
       JSON.stringify(DesktopStartFixture.readErrors(process, "The device's appearance could not be kept")));
+  }
+
+  @TestMethod
+  public async opensOneWindowWhenActivatedBeforeItsLaunchBarrierIsChecked(): Promise<void> {
+    const electron = new FakeElectron();
+    DesktopStartFixture.start(electron, new FakeDesktopProcess("darwin"));
+    await electron.app.becomeReadyAsync();
+
+    electron.app.emit("activate");
+    const whileChecking = electron.windows.length;
+    await Condition.waitAsync(() => electron.windows.length > 0);
+    electron.app.emit("activate");
+
+    Assert.areEqual(0, whileChecking);
+    Assert.areEqual(1, electron.windows.length);
   }
 
   @TestMethod
@@ -545,7 +725,7 @@ export class DesktopApplicationTests {
     process.isDefaultApp = true;
 
     const [settings] = DesktopStartFixture.start(electron, process, new FakeRuntimeLauncher(handover));
-    return electron.app.becomeReadyAsync().then(async () => {
+    return DesktopStartFixture.openAsync(electron).then(async () => {
       await setImmediate();
 
       Assert.areEqual(DataDirectoryLocator.locate(false, {}, process.homeFolder, DesktopStartFixture.checkoutRoot()).root, settings?.dataDirectory.root);
@@ -606,7 +786,7 @@ export class DesktopApplicationTests {
     ]);
     const electron = new FakeElectron(true, true);
     DesktopStartFixture.start(electron, process, new FakeRuntimeLauncher(handover));
-    return electron.app.becomeReadyAsync().then(async () => {
+    return DesktopStartFixture.openAsync(electron).then(async () => {
       await setImmediate();
 
       Assert.areEqual(
@@ -665,6 +845,32 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async restoresTheSavedBoundsTheNextTimeTheRuntimeIsReadyWhenTheConnectionEndsDuringTheRead(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    first.deferred.set("shell.readWindowBounds", () => {
+      first.isClosed = true;
+      return Promise.reject(new ConnectionException("The connection to the runtime is closed."));
+    });
+    const second = new FakeRuntimeConnection();
+    second.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: false });
+    const reconnection = Promise.withResolvers<FakeRuntimeConnection>();
+    const launcher = new FakeRuntimeLauncher(first, reconnection.promise);
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopStartFixture.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopStartFixture.firstWindow(electron);
+
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown);
+    launcher.listener?.onDisconnected(null);
+    reconnection.resolve(second);
+    await Condition.waitAsync(() => window.calls.some(t => t.startsWith("setBounds")));
+
+    Assert.areEqual(JSON.stringify(["show", "setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}"]), JSON.stringify(window.calls));
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's saved bounds").length);
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's bounds").length);
+  }
+
+  @TestMethod
   public async readsTheDeviceIdentityFromTheFolderItIsGivenOrTheOperatingSystemsOne(): Promise<void> {
     const given = new FakeDeviceIdentity();
     const located = new FakeDeviceIdentity();
@@ -679,7 +885,7 @@ export class DesktopApplicationTests {
     await second.app.becomeReadyAsync();
 
     Assert.areEqual(JSON.stringify(["/devices/this"]), JSON.stringify(given.folders));
-    Assert.areEqual(JSON.stringify([DeviceIdentity.locateFolder("win32", environment, "C:\\Users\\person")]), JSON.stringify(located.folders));
+    Assert.areEqual(JSON.stringify([DeviceFolder.locate("win32", environment, "C:\\Users\\person")]), JSON.stringify(located.folders));
   }
 
   @TestMethod
@@ -806,6 +1012,8 @@ export class DesktopApplicationTests {
       connection.answers.set(name, Response.success("r", name));
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopStartFixture.trustedEvent("linux");
+    await Condition.waitAsync(() => connection.calls.includes("shell.readSetting"));
+    const start = connection.calls.length;
 
     const answers = [
       await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", {}),
@@ -813,7 +1021,7 @@ export class DesktopApplicationTests {
       await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", { name: "shell.panelSize", value: 15 }),
       await DesktopApplicationTests.requestAsync(electron, event, "shell.resetSetting", { name: "shell.panelSize", device: "another" })
     ];
-    const sent = connection.calls.flatMap((t, index) => t.includes("Setting") || t === "shell.settings" ? [connection.payloads[index]] : []);
+    const sent = connection.calls.flatMap((t, index) => index >= start && (t.includes("Setting") || t === "shell.settings") ? [connection.payloads[index]] : []);
 
     Assert.areEqual("shell.settings,shell.readSetting,shell.setSetting,shell.resetSetting", answers.map(t => t.payload).join(","));
     Assert.areEqual(JSON.stringify([
@@ -832,6 +1040,8 @@ export class DesktopApplicationTests {
     device.failure = new Error("The identity file is not JSON.");
     const anonymous = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(new FakeRuntimeConnection()), new FakeElectron(), device);
     const event = DesktopStartFixture.trustedEvent("linux");
+    await Condition.waitAsync(() => connection.calls.includes("shell.readSetting"));
+    const start = connection.calls.length;
 
     const failures = [
       await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", null),
@@ -848,7 +1058,7 @@ export class DesktopApplicationTests {
       { code: "Unavailable", message: "This device has no identity, so a request that belongs to it cannot be made." },
       { code: "Unavailable", message: "This device has no identity, so a request that belongs to it cannot be made." }
     ]), JSON.stringify(failures));
-    Assert.isFalse(connection.calls.some(t => t.includes("etting") || t.includes("ommand")));
+    Assert.isFalse(connection.calls.slice(start).some(t => t.includes("etting") || t.includes("ommand")));
   }
 
   @TestMethod
@@ -870,7 +1080,7 @@ export class DesktopApplicationTests {
       answers.push(String((await DesktopApplicationTests.requestAsync(electron, event, method, payload)).failure?.code));
 
     Assert.areEqual(JSON.stringify(["Unauthorized", "InvalidMessage", "InvalidMessage", "InvalidMessage", "Unauthorized", "Unauthorized"]), JSON.stringify(answers));
-    Assert.areEqual(JSON.stringify(["shell.readWindowBounds"]), JSON.stringify(connection.calls));
+    Assert.areEqual(JSON.stringify(["shell.readWindowBounds"]), JSON.stringify(connection.calls.filter(t => !["shell.work", "shell.notifications", "shell.readSetting"].includes(t))));
   }
 
   @TestMethod
@@ -904,12 +1114,14 @@ export class DesktopApplicationTests {
     const unidentified = new FakeDeviceIdentity();
     unidentified.failure = new Error("The identity file is not JSON.");
     const lost = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(new FakeRuntimeConnection()), new FakeElectron(), unidentified);
+    await Condition.waitAsync(() => connection.calls.includes("shell.readSetting"));
+    const start = connection.calls.length;
 
     const state = await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
     const quiet = await DesktopApplicationTests.requestAsync(electron, event, "shell.setDoNotDisturb", { isOn: true });
     const noDevice = await DesktopApplicationTests.requestAsync(lost, event, "shell.notifications", {});
 
-    const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).filter(t => t.startsWith("shell.notifications") || t.startsWith("shell.setDoNotDisturb"));
+    const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).slice(start).filter(t => t.startsWith("shell.notifications") || t.startsWith("shell.setDoNotDisturb"));
     Assert.areEqual(JSON.stringify([`shell.notifications {"device":"${FakeDeviceIdentity.ID}"}`]), JSON.stringify(sent));
     Assert.areEqual("{\"notifications\":[],\"isDoNotDisturb\":true,\"mutedModules\":[\"notes\"],\"sequence\":2}", JSON.stringify(state.payload));
     Assert.areEqual(FailureCode.Unauthorized, quiet.failure?.code);
@@ -1153,6 +1365,41 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async writesWhereThePersonPlacedAWindowToTheNextConnectionWhenTheFirstClosesDuringTheRestore(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    first.deferred.set("shell.writeWindowBounds", () => {
+      first.isClosed = true;
+      return Promise.reject(new ConnectionException("The connection to the runtime is closed."));
+    });
+    const second = new FakeRuntimeConnection();
+    second.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: false });
+    const connections = [Promise.withResolvers<FakeRuntimeConnection>(), Promise.withResolvers<FakeRuntimeConnection>()];
+    const launcher = new FakeRuntimeLauncher(...connections.map(t => t.promise));
+    const process = new FakeDesktopProcess("win32");
+    const electron = await DesktopStartFixture.startReadyAsync("win32", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopStartFixture.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("win32"), DesktopStartFixture.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown);
+
+    window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+    window.change("will-move");
+    connections[0]?.resolve(first);
+    await Condition.waitAsync(() => first.calls.includes("shell.writeWindowBounds"));
+    await setImmediate();
+    launcher.listener?.onDisconnected(null);
+    connections[1]?.resolve(second);
+    await Condition.waitAsync(() => second.calls.includes("shell.writeWindowBounds"));
+
+    Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
+    Assert.isFalse(second.calls.includes("shell.readWindowBounds"));
+    Assert.areEqual(
+      JSON.stringify({ x: 40, y: 60, width: 900, height: 640, maximized: false }),
+      JSON.stringify(second.states.get(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`)));
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's saved bounds").length);
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's bounds").length);
+  }
+
+  @TestMethod
   @TestData("linux")
   @TestData("darwin")
   public async restoresTheSavedBoundsOfAWindowMovedBeforeTheRuntimeWasReadyWhereTheSystemAlsoMovesIt(platform: string): Promise<void> {
@@ -1318,6 +1565,39 @@ export class DesktopApplicationTests {
 
     Assert.areEqual(0, writesWhileGone);
     Assert.areEqual(JSON.stringify({ x: 40, y: 60, width: 900, height: 640, maximized: false }), JSON.stringify(second.states.get(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`)));
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's bounds").length);
+  }
+
+  @TestMethod
+  public async keepsBoundsWhoseConnectionClosesAsItBecomesReadyForTheNextConnection(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    const second = new FakeRuntimeConnection();
+    const third = new FakeRuntimeConnection();
+    second.deferred.set("shell.writeWindowBounds", () => {
+      second.isClosed = true;
+      return Promise.reject(new ConnectionException("The connection to the runtime is closed."));
+    });
+    const reconnections = [Promise.withResolvers<FakeRuntimeConnection>(), Promise.withResolvers<FakeRuntimeConnection>()];
+    const launcher = new FakeRuntimeLauncher(first, ...reconnections.map(t => t.promise));
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopStartFixture.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopStartFixture.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
+
+    launcher.listener?.onDisconnected(null);
+    const readsBeforeTheMove = window.boundsReads;
+    window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+    window.change("move");
+    await Condition.waitAsync(() => window.boundsReads > readsBeforeTheMove);
+    reconnections[0]?.resolve(second);
+    await Condition.waitAsync(() => second.calls.includes("shell.writeWindowBounds"));
+    await setImmediate();
+    launcher.listener?.onDisconnected(null);
+    reconnections[1]?.resolve(third);
+    await Condition.waitAsync(() => third.calls.includes("shell.writeWindowBounds"));
+
+    Assert.areEqual(JSON.stringify({ x: 40, y: 60, width: 900, height: 640, maximized: false }), JSON.stringify(third.states.get(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`)));
     Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's bounds").length);
   }
 
@@ -1534,7 +1814,7 @@ export class DesktopApplicationTests {
     try {
       const electron = new FakeElectron();
       DesktopStartFixture.start(electron, new FakeDesktopProcess("linux", [`--data-dir=${data}`]));
-      await electron.app.becomeReadyAsync();
+      await DesktopStartFixture.openAsync(electron);
 
       const refused = await (electron.ipcMain.invoke("teamrun:openLogFolder", { sender: { id: 1 }, senderFrame: null }) as Promise<boolean>);
       const isOpened = await (electron.ipcMain.invoke("teamrun:openLogFolder", DesktopStartFixture.trustedEvent("linux")) as Promise<boolean>);
@@ -1554,7 +1834,7 @@ export class DesktopApplicationTests {
     const electron = new FakeElectron();
     const pathCommand = new FakePathCommand();
     DesktopStartFixture.start(electron, new FakeDesktopProcess("darwin"), new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeAppearanceStore(), pathCommand);
-    await electron.app.becomeReadyAsync();
+    await DesktopStartFixture.openAsync(electron);
     electron.dialog.answers.push(0, 0, 0, 0);
     const answers = [await (electron.ipcMain.invoke("teamrun:installCommand", { sender: { id: 1 }, senderFrame: null }) as Promise<boolean>)];
 
@@ -1581,8 +1861,8 @@ export class DesktopApplicationTests {
     const pathCommand = new FakePathCommand();
     DesktopStartFixture.start(linux, new FakeDesktopProcess("linux"));
     DesktopStartFixture.start(mac, process, new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeAppearanceStore(), pathCommand);
-    await linux.app.becomeReadyAsync();
-    await mac.app.becomeReadyAsync();
+    await DesktopStartFixture.openAsync(linux);
+    await DesktopStartFixture.openAsync(mac);
     mac.dialog.answers.push(0);
     pathCommand.failure = new PathCommandException("The teamrun command could not be linked at /usr/local/bin/teamrun: Error: Command failed: /usr/bin/osascript");
 
@@ -1667,8 +1947,8 @@ export class DesktopApplicationTests {
       const uncreatedProcess = new FakeDesktopProcess("linux", [`--data-dir=${blocked}`]);
       DesktopStartFixture.start(unopened, unopenedProcess);
       DesktopStartFixture.start(uncreated, uncreatedProcess);
-      await unopened.app.becomeReadyAsync();
-      await uncreated.app.becomeReadyAsync();
+      await DesktopStartFixture.openAsync(unopened);
+      await DesktopStartFixture.openAsync(uncreated);
       const answers: boolean[] = [];
 
       answers.push(await (unopened.ipcMain.invoke("teamrun:openLogFolder", DesktopStartFixture.trustedEvent("linux")) as Promise<boolean>));
@@ -1682,6 +1962,21 @@ export class DesktopApplicationTests {
     finally {
       await rm(data, { recursive: true, force: true });
     }
+  }
+
+  private static async startRecordingAsync(answer: boolean | Error): Promise<FakeDesktopProcess> {
+    const electron = new FakeElectron();
+    const desktop = new FakeDesktopProcess("linux");
+    const installations: Installation[] = [];
+    const recorded: Installation[] = [];
+    DesktopStartFixture.start(electron, desktop, undefined, undefined, undefined, undefined, installations, t => {
+      recorded.push(t);
+      return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);
+    });
+    await DesktopStartFixture.openAsync(electron);
+    Assert.areEqual(1, recorded.length);
+    Assert.areEqual(installations[0], recorded[0]);
+    return desktop;
   }
 
   private static async invokeAsync(electron: FakeElectron, channel: string, event: IIpcEvent, ...values: unknown[]): Promise<Record<string, unknown>> {

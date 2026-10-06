@@ -13,5 +13,6 @@ export enum ExitCode {
   NoRuntime = 3,
   BuildMismatch = 4,
   DataDirectoryUnusable = 5,
-  Stopped = 6
+  Stopped = 6,
+  Updating = 8
 }

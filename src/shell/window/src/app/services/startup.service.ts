@@ -43,11 +43,15 @@ export class StartupService {
   }
 
   private follow(state: StartupState): void {
-    const wasReady = this.stateValue().isReady;
+    const previous = this.stateValue();
     this.stateValue.set(state);
     if (state.isReady)
       this.hasStartedValue.set(true);
-    else if (wasReady)
+    else if (state.kind === StartupStateKind.Updating) {
+      if (previous.kind !== StartupStateKind.Updating)
+        void this.announcer.announce(Resources.formatUpdatingTitle(state.details[0] ?? String.empty), Resources.politeAnnouncement);
+    }
+    else if (previous.canSave)
       void this.announcer.announce(Resources.startingTitle, Resources.politeAnnouncement);
   }
 }

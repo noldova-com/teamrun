@@ -13,6 +13,9 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 export class ObjectExtensionsTests {
   @TestMethod
   public primitiveGuardsRejectBoxedValues(): void {
+    Assert.isTrue(Object.isBigInt(0n));
+    Assert.isFalse(Object.isBigInt(Object(0n)));
+    Assert.isFalse(Object.isBigInt(0));
     Assert.isTrue(Object.isBoolean(false));
     Assert.isFalse(Object.isBoolean(new Boolean(false)));
     Assert.isTrue(Object.isNumber(Number.NaN));

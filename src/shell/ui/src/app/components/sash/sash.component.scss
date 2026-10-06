@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
 @use "states";
 
 :host {
@@ -39,6 +40,8 @@
 
 :host(#{states.$focus-visible}) {
   outline: var(--tr-border-width) solid var(--tr-accent);
+
+  @include forced-focus;
 }
 
 .tr-sash-bar {
@@ -48,6 +51,10 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 150ms linear;
+
+  @include forced-colors {
+    background-color: Highlight;
+  }
 }
 
 :host(.tr-sash-active) .tr-sash-bar,
@@ -75,6 +82,8 @@
   height: var(--tr-sash-grip);
   border-radius: 50%;
   background-color: color-mix(in srgb, var(--tr-text) 30%, transparent);
+
+  @include forced-line;
 }
 
 @media (prefers-reduced-motion: reduce) {

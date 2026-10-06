@@ -17,7 +17,6 @@ import WorkflowSimulation from "../../fixtures/workflow-simulation.fixture.ts";
 class ReleaseWorkflowTests {
   private static readonly SCRIPT_TIMEOUT: number = 30_000;
   private static readonly WORKFLOW: string = "release.yml";
-  private static readonly REFUSE_STEP: string = "Refuse an unsigned release of TeamRun";
   private static readonly MAIN_STEP: string = "Require the workflow from main";
   private static readonly UPLOAD_ACTION: string = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1";
   private static readonly UPLOADS: readonly [string, string, string] = ["Keep the release files", "Keep the release files again", "Keep the release files a last time"];
@@ -40,7 +39,7 @@ class ReleaseWorkflowTests {
       assert.deepEqual(text.split("\n").filter(t => /run: .*\$\{\{/.test(t) || /^ {10}[^ ].*\$\{\{ inputs\./.test(t) && !/^ {10}(RELEASE_\w+|ref): /.test(t)), []);
     });
 
-    test("the check refuses an unsigned release of noldova-com/teamrun and a workflow from another branch than main, then checks the request with the repository's own token", { timeout: ReleaseWorkflowTests.SCRIPT_TIMEOUT }, async t => {
+    test("the check refuses a workflow from another branch than main, then checks the request with the repository's own token", { timeout: ReleaseWorkflowTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(ReleaseWorkflowTests.WORKFLOW);
       const run = async (step: string, environment: Readonly<Record<string, string>> = {}): Promise<readonly [number | null, string]> => {
         const doubles = await CommandDoublesFixture.createAsync();
@@ -49,15 +48,12 @@ class ReleaseWorkflowTests {
         return [result.status, result.stdout];
       };
 
-      assert.ok(workflow.text.includes(`      - name: ${ReleaseWorkflowTests.REFUSE_STEP}\n        if: github.repository == 'noldova-com/teamrun'\n`));
-      assert.deepEqual(await run(ReleaseWorkflowTests.REFUSE_STEP),
-        [1, "::error::TeamRun publishes no unsigned release, so its releases start once its packages are signed. Run a trial in a test repository.\n"]);
       assert.deepEqual(await run(ReleaseWorkflowTests.MAIN_STEP, { REFERENCE: "refs/heads/main" }), [0, ""]);
       assert.deepEqual(await run(ReleaseWorkflowTests.MAIN_STEP, { REFERENCE: "refs/heads/rr/1-release" }),
         [1, "::error::A release runs the workflow from main, not from refs/heads/rr/1-release.\n"]);
       assert.ok(workflow.text.includes(`        env:\n          REFERENCE: \${{ github.ref }}\n`));
       assert.ok(workflow.text.includes(`        env:\n          GH_TOKEN: \${{ github.token }}\n${ReleaseWorkflowTests.REQUEST}        run: node scripts/release-check.ts\n`));
-      assert.ok(workflow.text.indexOf(ReleaseWorkflowTests.REFUSE_STEP) < workflow.text.indexOf(ReleaseWorkflowTests.MAIN_STEP));
+      assert.ok(workflow.text.includes("    steps:\n      - name: Require the workflow from main\n"));
       assert.ok(workflow.text.indexOf(ReleaseWorkflowTests.MAIN_STEP) < workflow.text.indexOf("Check out the revision"));
     });
 
@@ -103,17 +99,15 @@ class ReleaseWorkflowTests {
       ]);
     });
 
-    test("the publish job takes every target's files from this run, also when only it is run again, and publishes them with the release notes", async () => {
+    test("the publish job takes every target's files from this run, also when only it is run again, and publishes them with notes that link the run", async () => {
       const workflow = await WorkflowFileFixture.readAsync(ReleaseWorkflowTests.WORKFLOW);
       const download = new WorkflowSimulation(workflow.text, "Take this run's release files", "Publish the release").find("Take this run's release files");
 
       assert.equal(download.uses, "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1");
       assert.deepEqual(download.settings, ["pattern: release-*", "merge-multiple: true", "path: _build/release"]);
       assert.ok(workflow.text.includes(`        env:\n          GH_TOKEN: \${{ github.token }}\n${ReleaseWorkflowTests.REQUEST}`
-        + "          RELEASE_FOLDER: ${{ github.workspace }}/_build/release\n          RELEASE_NOTES: >-\n"));
-      assert.ok(workflow.text.includes("            TeamRun ${{ inputs.version }} for Windows, Linux and macOS, each on x64 and ARM64. Its packages are unsigned.\n"
-        + "            Each target's package passed its install check on that target's own runner in the run that built it:\n"
-        + "            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n        run: node scripts/release-publish.ts\n"));
+        + "          RELEASE_FOLDER: ${{ github.workspace }}/_build/release\n"
+        + "          RELEASE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n        run: node scripts/release-publish.ts\n"));
       assert.ok(workflow.text.includes("    name: Publish the release\n    needs: build\n"));
       assert.ok(workflow.text.indexOf("Take this run's release files") < workflow.text.indexOf("      - name: Publish the release\n"));
     });

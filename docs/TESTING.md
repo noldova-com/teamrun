@@ -167,8 +167,10 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
 | `scripts/tests/fixtures/repository.fixture.ts` | Between bounded attempts to remove a fixture repository that Windows still holds open. |
 | `src/foundation/testing/tests/fixtures/execution/entry-lifetime.fixture.ts` | One fixture test outlasts its time limit on purpose, so the runner's time limit is tested. |
 | `src/shell/desktop/tests/e2e/teardown.spec.ts` | Three workflows block the main process on purpose. Two test the harness's handling of a main process that stops answering. The third makes it fail first, so a request's failure is tested to carry the main-process failure the desktop log holds. A fourth leaves work running, so a quit that stops at the question about it is reported as that question, with its window and text, and not as a silent main process. |
+| `src/shell/desktop/tests/services/update-barrier-watch.test.ts` | A started watch checks the barrier every millisecond, and the test waits 20 ms once the watch has quit the desktop, and again once it is stopped, so the watch is tested to check no more. |
 | `src/shell/runtime/tests/services/client/runtime-launcher.test.ts` | A runtime publishes itself 600 ms after the launcher starts, so the launcher's wait past its own timeout is tested. |
 | `src/shell/runtime/tests/services/lifetime/runtime-host.test.ts` | Another holder releases the data directory, or publishes discovery, 200 ms after the runtime starts, so the runtime's wait for either is tested. |
+| `src/shell/runtime/tests/services/lifetime/update-preparation.test.ts` | An update's barrier stays unreadable, unparsable, handed off by a process that has exited, or held by one that cannot be looked up, for 200 ms, ten times the interval at which the runtime reads it, so the runtime is tested to keep updating until the barrier is gone. |
 
 ## 4. Results and reporting
 
@@ -218,7 +220,8 @@ The coverage and configuration requirements are:
 
 | Scope | Requirement |
 |---|---|
-| Foundation packages, including Testing itself, plus the shell's `protocol`, `runtime` and `cli` | 100% of executable production code; CLI verification includes arguments, failure paths and process exit |
+| Foundation packages, including Testing itself, plus the shell's `protocol` and `cli` | 100% of executable production code; CLI verification includes arguments, failure paths and process exit |
+| `src/shell/runtime` | 100% of executable production code, except `services/process/windows-process-api.ts`, which loads the Windows addon that reads the process table and ends processes; it runs only on Windows, where the process tests drive it and the addon natively. Package tests drive the Windows process table and ending through a fake of its interface. The package's manifest declares that exclusion with its reason under `teamrun.coverageExclusions`. No coverage is measured for the addon's C source |
 | Repository-owned executable automation, including build, test, packaging and release logic | 100% executable-code coverage, with behavior and process-boundary checks appropriate to the operation |
 | YAML and other non-executable configuration | Applicable schema/configuration validation and workflow checks; no executable-code coverage percentage |
 | A module's `protocol`, `runtime` and `cli` | 100% of executable production code. Where a part drives an external tool, doubles cover parsing, routing and lifecycle; behavior only the real tool can exercise needs separately authorized live verification and explicit accounting of uncovered lines |

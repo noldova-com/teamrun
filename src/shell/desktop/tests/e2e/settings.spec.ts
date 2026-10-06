@@ -80,7 +80,7 @@ test.describe("settings", () => {
     await window.getByRole("treeitem", { name: "Appearance", exact: true }).focus();
     await window.keyboard.press("ArrowDown");
     await window.keyboard.press("Enter");
-    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
+    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications", "Background"]);
     await expect(window.getByRole("treeitem", { name: "Notifications", exact: true })).toHaveAttribute("aria-selected", "true");
     await window.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true }).click();
     await expect(window.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true })).toHaveAttribute("aria-selected", "true");
@@ -306,7 +306,7 @@ test.describe("settings", () => {
     await expect(window.locator(".tr-settings-result-title")).toHaveText(["Clock"]);
     await window.getByRole("treeitem", { name: "Notifications", exact: true }).click();
     await expect(window.getByRole("searchbox", { name: "Search settings" })).toHaveValue("");
-    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
+    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications", "Background"]);
   });
 
   test("Keyboard shortcuts shows each command's id under its title, and a search by a part found only in an id finds the row and underlines that part", async ({ desktop }) => {

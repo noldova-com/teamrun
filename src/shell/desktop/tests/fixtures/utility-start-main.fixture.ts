@@ -9,7 +9,7 @@
 import { app, utilityProcess } from "electron";
 
 import { type IUtilityProcessHost, UtilityProcessStarter } from "@noldova/teamrun-shell-desktop";
-import { DataDirectory, DiscoveryReader, LaunchSettings, RuntimeBuild, RuntimeEntry, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
+import { DataDirectory, DiscoveryReader, Installation, LaunchSettings, RuntimeBuild, RuntimeEntry, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
 
 const root = String(process.argv.at(-1));
 const utilityProcessIds: number[] = [];
@@ -24,7 +24,8 @@ const host: IUtilityProcessHost = {
 void app.whenReady().then(async () => {
   const directory = new DataDirectory(root);
   const settings = new LaunchSettings(directory, process.execPath, RuntimeEntry.entryPath, { ...process.env, ELECTRON_RUN_AS_NODE: "1" }, process.platform, 60_000, 20_000, 50);
-  const client = await new RuntimeLauncher(settings, RuntimeBuild.identity, new UtilityProcessStarter(host)).attachAsync("desktop", { onEvent: () => undefined, onDisconnected: () => undefined });
+  const installation = new Installation(`${root}-installation`, () => Promise.resolve(false));
+  const client = await new RuntimeLauncher(settings, RuntimeBuild.identity, installation, new UtilityProcessStarter(host)).attachAsync("desktop", { onEvent: () => undefined, onDisconnected: () => undefined });
   const discovery = await DiscoveryReader.readAsync(directory);
   process.stdout.write(`${JSON.stringify({ runtime: discovery?.processId, utility: utilityProcessIds[0] })}\n`);
   client.close();

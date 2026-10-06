@@ -8,6 +8,7 @@
 
 import { join } from "node:path";
 
+import type { TrayIconState } from "../enums/tray-icon-state.js";
 import { Resources } from "../resources.js";
 
 export class AppIcons {
@@ -25,5 +26,12 @@ export class AppIcons {
 
   public get dock(): string {
     return join(this.folder, Resources.dockIcon);
+  }
+
+  public tray(state: TrayIconState): string {
+    const name = `${Resources.trayIconPrefix}${state.toLowerCase()}`;
+    const file = this.platform === Resources.windowsPlatform ? `${name}${Resources.trayWindowsExtension}`
+      : this.platform === Resources.macPlatform ? `${name}${Resources.trayMacSuffix}` : `${name}${Resources.trayLinuxExtension}`;
+    return join(this.folder, Resources.trayFolder, file);
   }
 }

@@ -661,6 +661,8 @@ export class Resources {
   public static readonly windowPartSaveFailed: string = `Its window part failed to save while ${productName} was closing.`;
   public static readonly windowPartSaveFailedLate: string = `Its window part failed to save after ${productName} stopped waiting for it.`;
   public static readonly windowPartSaveUnfinished: string = `Its window part did not finish saving within 4 seconds while ${productName} was closing; ${productName} closed without it.`;
+  public static readonly windowPartSaveFailedForUpdate: string = `Its window part failed to save while ${productName} was preparing to install an update.`;
+  public static readonly windowPartSaveUnfinishedForUpdate: string = `Its window part did not finish saving within 4 seconds while ${productName} was preparing to install an update; the update stopped.`;
   public static readonly partSaveTimeout: number = 4000;
   public static readonly partSaveUnfinishedText: string = `${productName} closed after waiting 4 seconds for it.`;
   public static readonly windowLogLimit: number = 65536;
@@ -745,6 +747,7 @@ export class Resources {
   public static readonly stopWorkAction: string = "stopWork";
   public static readonly retryAction: string = "retry";
   public static readonly startingTitle: string = `Starting ${Resources.productName}…`;
+  public static readonly updatingText: string = `Saving your work and closing ${Resources.productName}`;
   public static readonly preShellDataTitle: string = `Data from an earlier ${Resources.productName}`;
   public static readonly preShellDataText: string =
     `This release does not open data that an earlier ${Resources.productName} wrote. Moving it aside keeps all of it in a new folder beside it, ` +
@@ -776,6 +779,10 @@ export class Resources {
 
   public static formatPartSaveFailed(moduleName: string): string {
     return `${moduleName} couldn't save, so ${Resources.productName} stayed open`;
+  }
+
+  public static formatPartSaveFailedForUpdate(moduleName: string): string {
+    return `${moduleName} couldn't save`;
   }
 
   public static formatPartSaveUnfinished(moduleName: string): string {
@@ -926,6 +933,10 @@ export class Resources {
 
   public static formatForeignName(moduleId: string, name: string): string {
     return `The module ${moduleId} may use only its own methods and events and those of the modules it depends on, not ${name}.`;
+  }
+
+  public static formatUpdatingTitle(version: string): string {
+    return `Installing ${Resources.productName} ${version}`;
   }
 
   public static formatNewerBuild(version: string): string {

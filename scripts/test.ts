@@ -151,7 +151,7 @@ export default class Test {
 
   private async runFilteredAsync(filters: readonly string[], flaky: FlakyRecord | null): Promise<number> {
     this.output.write(`Filtered run: ${filters.map(t => JSON.stringify(t)).join(", ")}. A filtered run is not the complete gate.\n`);
-    const build = new PackageBuild(this.root, this.runner, this.environment);
+    const build = new PackageBuild(this.root, this.runner, this.environment, process.platform, process.arch);
     const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
     const checks: readonly ISelectableCheck[] = [
       new PackageTestCheck(this.root, build, this.runner, this.environment, flaky),
@@ -222,7 +222,7 @@ export default class Test {
     const { default: InterfaceNameCheck } = await import("./checks/interface-name-check.ts");
     const { default: SyntaxTreeReader } = await import("./structure/syntax-tree.reader.ts");
     const tree = new SourceTree(this.root, files);
-    const build = new PackageBuild(this.root, this.runner, this.environment);
+    const build = new PackageBuild(this.root, this.runner, this.environment, process.platform, process.arch);
     const modules = new ModuleCatalog(this.root);
     const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
     const apis = new ApiCatalog(this.root, new PackageCatalog(this.root), new BuildLayout(this.root), angular, Test.API_PARTS);
