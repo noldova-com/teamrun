@@ -147,6 +147,15 @@ export class FixtureTheme {
     ["shadow-xlarge", "rgb(0, 0, 255) 0px 0px 16px 0px"],
     ["backdrop", "rgb(0, 128, 0)"],
     ["panel-card-gap", "0.375rem"],
+    ["panel-card-margin", "0.375rem"],
+    ["dock-left-width", "20rem"],
+    ["dock-right-width", "18rem"],
+    ["dock-bottom-height", "12rem"],
+    ["dock-min-size", "8rem"],
+    ["dock-strip-size", "3rem"],
+    ["document-min-size", "11rem"],
+    ["group-min-width", "8.5rem"],
+    ["group-min-height", "5rem"],
     ["tab-height", "2.25rem"],
     ["tab-pill", "1.75rem"],
     ["tab-inset", "0.25rem"],
@@ -230,7 +239,8 @@ export class FixtureTheme {
     ["settings-item-description-gap", "0.25rem"],
     ["settings-item-control-gap", "0.75rem"],
     ["settings-heading-space", "0.75rem"],
-    ["settings-content-inset", "1.125rem"]
+    ["settings-content-inset", "1.125rem"],
+    ["code-header-height", "1.875rem"]
   ]);
   private static readonly SHAPES: ReadonlyMap<string, string> = new Map([["tab", "pill"]]);
 

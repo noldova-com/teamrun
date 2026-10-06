@@ -113,7 +113,7 @@ export class DesktopApplicationTests {
     const electron = await DesktopStartFixture.startReadyAsync("darwin");
     const window = DesktopStartFixture.firstWindow(electron);
     electron.ipcMain.send("teamrun:menuBar", DesktopStartFixture.trustedEvent("darwin"),
-      { menus: [{ place: "shell.file", title: "File", rows: [{ type: "command", id: "shell.file/shell.close/0", label: "Close the tab", key: null, enabled: true, check: "None", checked: false }] }] });
+      { menus: [{ place: "shell.file", title: "File", rows: [{ type: "Command", id: "shell.file/shell.close/0", label: "Close the tab", key: null, enabled: true, check: "None", checked: false }] }] });
     const file = electron.menu.templates.at(-1)?.[1]?.submenu;
 
     window.destroy();
@@ -798,21 +798,23 @@ export class DesktopApplicationTests {
   @TestMethod
   public async addsThisDeviceToItsWindowsSettingsRequests(): Promise<void> {
     const connection = new FakeRuntimeConnection();
-    for (const name of ["shell.settings", "shell.setSetting", "shell.resetSetting"])
+    for (const name of ["shell.settings", "shell.readSetting", "shell.setSetting", "shell.resetSetting"])
       connection.answers.set(name, Response.success("r", name));
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopStartFixture.trustedEvent("linux");
 
     const answers = [
       await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", {}),
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.readSetting", { name: "notes.wrapLines", scope: { name: "notes.project", id: "p1" } }),
       await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", { name: "shell.panelSize", value: 15 }),
       await DesktopApplicationTests.requestAsync(electron, event, "shell.resetSetting", { name: "shell.panelSize", device: "another" })
     ];
     const sent = connection.calls.flatMap((t, index) => t.includes("Setting") || t === "shell.settings" ? [connection.payloads[index]] : []);
 
-    Assert.areEqual("shell.settings,shell.setSetting,shell.resetSetting", answers.map(t => t.payload).join(","));
+    Assert.areEqual("shell.settings,shell.readSetting,shell.setSetting,shell.resetSetting", answers.map(t => t.payload).join(","));
     Assert.areEqual(JSON.stringify([
       { device: FakeDeviceIdentity.ID },
+      { name: "notes.wrapLines", scope: { name: "notes.project", id: "p1" }, device: FakeDeviceIdentity.ID },
       { name: "shell.panelSize", value: 15, device: FakeDeviceIdentity.ID },
       { name: "shell.panelSize", device: FakeDeviceIdentity.ID }
     ]), JSON.stringify(sent));
@@ -1376,10 +1378,10 @@ export class DesktopApplicationTests {
     const trusted = DesktopStartFixture.trustedEvent("linux");
     const window = DesktopStartFixture.firstWindow(electron);
 
-    const answers = ["undo", "redo", "cut", "copy", "paste", "selectAll", "reload", 5].map(t => electron.ipcMain.invoke("teamrun:edit", trusted, t));
-    const refused = electron.ipcMain.invoke("teamrun:edit", { sender: { id: 1 }, senderFrame: null }, "copy");
+    const answers = ["Undo", "Redo", "Cut", "Copy", "Paste", "SelectAll", "undo", "reload", 5].map(t => electron.ipcMain.invoke("teamrun:edit", trusted, t));
+    const refused = electron.ipcMain.invoke("teamrun:edit", { sender: { id: 1 }, senderFrame: null }, "Copy");
 
-    Assert.areEqual(JSON.stringify([true, true, true, true, true, true, false, false]), JSON.stringify(answers));
+    Assert.areEqual(JSON.stringify([true, true, true, true, true, true, false, false, false]), JSON.stringify(answers));
     Assert.areEqual(false, refused);
     Assert.areEqual(JSON.stringify(["undo", "redo", "cut", "copy", "paste", "selectAll"]), JSON.stringify(window.webContents.calls));
   }

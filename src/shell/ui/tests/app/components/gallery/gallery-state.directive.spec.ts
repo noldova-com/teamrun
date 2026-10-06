@@ -111,7 +111,7 @@ describe("GalleryStateDirective", () => {
     const marked = [...frame.querySelectorAll<HTMLElement>(`[${GalleryResources.stateAttribute}="${GalleryState.Focus}"]`)];
 
     expect(marked.map(t => name(t))).toEqual(["Button / Focus", "Icon button / Focus", "Checkbox / Focus", "Text field / Focus", "Select / Focus", "Choice pills / Focus", "Tab / Focus",
-      "Toolbar button / Focus", "Sash / Focus"]);
+      "Toolbar button / Focus", "Sash / Focus", "Code block / Focus"]);
     await PointerFixture.hoverAsync(park);
     for (const element of marked) {
       const shown = look(element);

@@ -13,13 +13,14 @@ import { page, userEvent } from "vitest/browser";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
-import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
+import { ClipboardWriter, DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
 import { SettingsComponent } from "../../../../src/app/components/settings/settings.component";
 import { GalleryTokens } from "../../../../src/app/models/gallery-tokens";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { CommandService } from "../../../../src/app/services/command.service";
+import { DesktopBridgeService } from "../../../../src/app/services/desktop-bridge.service";
 import type { LayoutService } from "../../../../src/app/services/layout.service";
 import { SettingsService } from "../../../../src/app/services/settings.service";
 import { Resources } from "../../../../src/resources";
@@ -103,6 +104,7 @@ describe("SettingsComponent", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: GalleryTokens.component, useFactory: () => gallery },
+        { provide: ClipboardWriter, useExisting: DesktopBridgeService },
         { provide: SettingsService, useValue: settings },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]

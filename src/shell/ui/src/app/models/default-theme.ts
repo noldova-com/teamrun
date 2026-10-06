@@ -147,6 +147,15 @@ export class DefaultTheme {
       ["shadow-xlarge", "0 0 1.25rem rgb(0 0 0 / 15%)"],
       ["backdrop", "rgb(0 0 0 / 50%)"],
       ["panel-card-gap", "0.25rem"],
+      ["panel-card-margin", "0.25rem"],
+      ["dock-left-width", "26rem"],
+      ["dock-right-width", "25rem"],
+      ["dock-bottom-height", "16.25rem"],
+      ["dock-min-size", "10rem"],
+      ["dock-strip-size", "2.75rem"],
+      ["document-min-size", "13.75rem"],
+      ["group-min-width", "10rem"],
+      ["group-min-height", "6.25rem"],
       ["tab-height", "2rem"],
       ["tab-pill", "1.5rem"],
       ["tab-inset", "0.125rem"],
@@ -156,7 +165,7 @@ export class DefaultTheme {
       ["tab-close", "1.25rem"],
       ["icon", "1rem"],
       ["icon-button", "1.375rem"],
-      ["sash", "0.25rem"],
+      ["sash", "var(--tr-panel-card-gap)"],
       ["sash-grip", "0.125rem"],
       ["sash-grip-spacing", "0.3125rem"],
       ["docking-guide", "2.5rem"],
@@ -230,7 +239,8 @@ export class DefaultTheme {
       ["settings-item-description-gap", "0.1875rem"],
       ["settings-item-control-gap", "0.5625rem"],
       ["settings-heading-space", "0.625rem"],
-      ["settings-content-inset", "0.9375rem"]
+      ["settings-content-inset", "0.9375rem"],
+      ["code-header-height", "1.625rem"]
     ]),
     new Map([["tab", "pill"]]));
 }

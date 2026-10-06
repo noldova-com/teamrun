@@ -136,8 +136,8 @@ describe("LayoutReader", () => {
     expect(failure({ version: 1, docks: { Left: dock(), Right: dock() }, middle: documents }).path).toBe("$.docks.Bottom");
     expect(failure(saved({ Left: dock(null, "wide") })).path).toBe("$.docks.Left.size");
     expect(failure(saved({ Left: { root: null, size: null } })).path).toBe("$.docks.Left.collapsed");
-    expect(failure(saved({ Left: dock(null, 5) })).path).toBe("$.docks.Left");
-    expect(failure(saved({ Left: dock(null, 5) })).cause).toBeInstanceOf(ArgumentOutOfRangeException);
+    expect(failure(saved({ Left: dock(null, -5) })).path).toBe("$.docks.Left");
+    expect(failure(saved({ Left: dock(null, -5) })).cause).toBeInstanceOf(ArgumentOutOfRangeException);
   });
 
   it("names a node that is neither a split nor a group and a split that is not valid", () => {

@@ -33,7 +33,7 @@ export class DockingOverlay {
   public outerGuide(): Bounds {
     const area = this.geometry.area;
     const size = Resources.dockingGuideSize;
-    return new Bounds(area.x + (area.width - size) / 2, area.bottom - Resources.panelGap - size, size, size);
+    return new Bounds(area.x + (area.width - size) / 2, area.bottom - this.geometry.metrics.gap - size, size, size);
   }
 
   public plate(frame: GroupFrame): Bounds {

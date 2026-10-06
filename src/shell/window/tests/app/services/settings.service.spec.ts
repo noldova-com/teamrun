@@ -77,6 +77,19 @@ describe("SettingsService", () => {
     ]);
   });
 
+  it("asks the runtime for a setting's entry, for the application or a scope", async () => {
+    const scope = new SettingScope(QualifiedName.parse("chat.conversation"), "c1");
+    bridge.responses.set("shell.readSetting", { payload: new SettingEntry(mode, "Light", true).toJson() });
+
+    const entries = [await service.readAsync("shell.mode", null), await service.readAsync("shell.mode", scope)];
+
+    expect(entries).toEqual([new SettingEntry(mode, "Light", true), new SettingEntry(mode, "Light", true)]);
+    expect(bridge.requests).toEqual([
+      ["shell.readSetting", { name: "shell.mode" }],
+      ["shell.readSetting", { name: "shell.mode", scope: { name: "chat.conversation", id: "c1" } }]
+    ]);
+  });
+
   it("rejects a change the runtime did not confirm because the connection ended as an action not confirmed, and passes any other failure on", async () => {
     bridge.responses.set("shell.setSetting", { failure: { code: "Disconnected", message: "TeamRun is not connected to its runtime." } });
     bridge.responses.set("shell.resetSetting", { failure: { code: "Unavailable", message: "The runtime did not answer shell.resetSetting in time." } });

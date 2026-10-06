@@ -71,7 +71,7 @@ export class CommandLine {
       else
         throw new UsageException(Resources.formatUnknownOption(argument));
     }
-    if (options.has(Resources.helpFlag) || positional[0] === Resources.helpCommand)
+    if (options.has(Resources.helpFlag) || positional[0] === Resources.commandWords[CliCommand.Help])
       return new CommandLine(CliCommand.Help);
     return CommandLine.create(positional, options);
   }
@@ -80,7 +80,7 @@ export class CommandLine {
     const [name, ...rest] = positional;
     if (Object.isUndefined(name))
       throw new UsageException(Resources.commandRequired);
-    const command = Object.values(CliCommand).find(t => t === name && t !== CliCommand.Help);
+    const command = Object.values(CliCommand).find(t => Resources.commandWords[t] === name && t !== CliCommand.Help);
     if (Object.isUndefined(command))
       throw new UsageException(Resources.formatUnknownCommand(name));
     for (const option of [Resources.noStartFlag, Resources.takeOverFlag])

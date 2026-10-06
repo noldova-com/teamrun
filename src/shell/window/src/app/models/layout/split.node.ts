@@ -16,6 +16,7 @@ import type { PanelEdge } from "../../enums/panel-edge";
 import { SplitAxis } from "../../enums/split-axis";
 import type { Bounds } from "./bounds";
 import type { GroupFrame } from "./group-frame";
+import type { LayoutMetrics } from "./layout-metrics";
 import { LayoutNode } from "./layout.node";
 import { SplitHandle } from "./split-handle";
 import { SplitPart } from "./split-part";
@@ -66,11 +67,11 @@ export class SplitNode extends LayoutNode {
     return (this.axis === SplitAxis.Horizontal ? this.last : this.first).cornerGroup;
   }
 
-  public override minimumLength(axis: SplitAxis): number {
-    const minimums = this.parts.map(t => t.node.minimumLength(axis));
+  public override minimumLength(axis: SplitAxis, metrics: LayoutMetrics): number {
+    const minimums = this.parts.map(t => t.node.minimumLength(axis, metrics));
     if (axis !== this.axis)
       return Math.max(...minimums);
-    return minimums.reduce((sum, t) => sum + t, Resources.panelGap * (minimums.length - 1));
+    return minimums.reduce((sum, t) => sum + t, metrics.gap * (minimums.length - 1));
   }
 
   public override withGroup(group: TabGroup): LayoutNode {
@@ -93,22 +94,22 @@ export class SplitNode extends LayoutNode {
     return this.withKept(t => t.withVisibleTabs(registry));
   }
 
-  public override arrange(bounds: Bounds, side: DockSide | null, frames: GroupFrame[], handles: SplitHandle[]): void {
+  public override arrange(bounds: Bounds, side: DockSide | null, frames: GroupFrame[], handles: SplitHandle[], metrics: LayoutMetrics): void {
     const start = this.axis === SplitAxis.Horizontal ? bounds.x : bounds.y;
     const total = bounds.length(this.axis);
-    const available = Math.max(0, total - Resources.panelGap * (this.parts.length - 1));
-    const floor = this.parts.reduce((sum, t) => sum + t.node.minimumLength(this.axis), 0);
+    const available = Math.max(0, total - metrics.gap * (this.parts.length - 1));
+    const floor = this.parts.reduce((sum, t) => sum + t.node.minimumLength(this.axis, metrics), 0);
     const shared = available - floor;
     let position = start;
     this.parts.forEach((part, index) => {
-      const minimum = part.node.minimumLength(this.axis);
+      const minimum = part.node.minimumLength(this.axis, metrics);
       const isLast = index === this.parts.length - 1;
       const length = isLast ? Math.max(0, start + total - position) : shared >= 0 ? minimum + shared * part.weight : available * minimum / floor;
-      part.node.arrange(bounds.slice(this.axis, position, length), side, frames, handles);
+      part.node.arrange(bounds.slice(this.axis, position, length), side, frames, handles, metrics);
       if (isLast)
         return;
-      handles.push(new SplitHandle(this, index, bounds.slice(this.axis, position + length, Resources.panelGap), length, minimum, shared));
-      position += length + Resources.panelGap;
+      handles.push(new SplitHandle(this, index, bounds.slice(this.axis, position + length, metrics.gap), length, minimum, shared));
+      position += length + metrics.gap;
     });
   }
 

@@ -14,6 +14,7 @@ import { Dock } from "../../../../src/app/models/layout/dock";
 import { TabGroup } from "../../../../src/app/models/layout/tab-group";
 import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
+import { LayoutMetricsFixture } from "../../../fixtures/layout-metrics.fixture";
 
 describe("Dock", () => {
   const files = new TabGroup(1, [LayoutFixture.files], LayoutFixture.files);
@@ -21,10 +22,10 @@ describe("Dock", () => {
   const pair = LayoutFixture.createSplit(3, SplitAxis.Horizontal, [files, changes], [1, 1]);
   const dock = new Dock(DockSide.Left, files, 30, false);
 
-  it("accepts no size or a finite size of at least the dock minimum", () => {
-    expect(() => new Dock(DockSide.Left, files, 9.5, false)).toThrow(ArgumentOutOfRangeException);
+  it("accepts no size or a finite size that is not negative", () => {
+    expect(() => new Dock(DockSide.Left, files, -0.5, false)).toThrow(ArgumentOutOfRangeException);
     expect(() => new Dock(DockSide.Left, files, Number.POSITIVE_INFINITY, false)).toThrow(ArgumentOutOfRangeException);
-    expect(new Dock(DockSide.Left, files, 10, false).size).toBe(10);
+    expect(new Dock(DockSide.Left, files, 0, false).size).toBe(0);
     expect(Dock.createEmpty(DockSide.Bottom)).toEqual(new Dock(DockSide.Bottom, null, null, false));
   });
 
@@ -38,19 +39,19 @@ describe("Dock", () => {
   });
 
   it("needs the dock minimum or what its groups need, whichever is larger", () => {
-    expect(dock.minimumSize).toBe(10);
-    expect(dock.withRoot(pair).minimumSize).toBe(20.25);
-    expect(Dock.createEmpty(DockSide.Left).minimumSize).toBe(10);
+    expect(dock.minimumSize(LayoutMetricsFixture.standard)).toBe(10);
+    expect(dock.withRoot(pair).minimumSize(LayoutMetricsFixture.standard)).toBe(20.25);
+    expect(Dock.createEmpty(DockSide.Left).minimumSize(LayoutMetricsFixture.standard)).toBe(10);
   });
 
   it("wants its size, its default size or its strip, each with the gap beside it", () => {
-    expect(dock.preferredTrack).toBe(30.25);
-    expect(dock.withSize(null).preferredTrack).toBe(26.25);
-    expect(new Dock(DockSide.Right, files, null, false).preferredTrack).toBe(25.25);
-    expect(new Dock(DockSide.Bottom, files, null, false).preferredTrack).toBe(16.5);
-    expect(dock.withRoot(pair).withSize(12).preferredTrack).toBe(20.5);
-    expect(dock.withCollapsed(true).preferredTrack).toBe(3);
-    expect(Dock.createEmpty(DockSide.Left).preferredTrack).toBe(0);
+    expect(dock.preferredTrack(LayoutMetricsFixture.standard)).toBe(30.25);
+    expect(dock.withSize(null).preferredTrack(LayoutMetricsFixture.standard)).toBe(26.25);
+    expect(new Dock(DockSide.Right, files, null, false).preferredTrack(LayoutMetricsFixture.standard)).toBe(25.25);
+    expect(new Dock(DockSide.Bottom, files, null, false).preferredTrack(LayoutMetricsFixture.standard)).toBe(16.5);
+    expect(dock.withRoot(pair).withSize(12).preferredTrack(LayoutMetricsFixture.standard)).toBe(20.5);
+    expect(dock.withCollapsed(true).preferredTrack(LayoutMetricsFixture.standard)).toBe(3);
+    expect(Dock.createEmpty(DockSide.Left).preferredTrack(LayoutMetricsFixture.standard)).toBe(0);
   });
 
   it("knows which groups it holds", () => {
@@ -61,7 +62,7 @@ describe("Dock", () => {
     expect(dock.withRoot(files)).toBe(dock);
     expect(dock.withRoot(changes).root).toBe(changes);
     expect(dock.withSize(30)).toBe(dock);
-    expect(dock.withSize(4).size).toBe(10);
+    expect(dock.withSize(4).size).toBe(4);
     expect(dock.withSize(null).size).toBeNull();
     expect(() => dock.withSize(Number.NaN)).toThrow(ArgumentOutOfRangeException);
     expect(dock.withCollapsed(false)).toBe(dock);

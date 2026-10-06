@@ -214,7 +214,7 @@ describe("DesktopBridgeService", () => {
     const service = TestBed.inject(DesktopBridgeService);
 
     const build = await service.readBuildAsync();
-    const isCopied = await service.copyTextAsync("clock: Failed");
+    const isCopied = await service.writeTextAsync("clock: Failed");
     const isOpened = await service.openLogFolderAsync();
 
     expect([build.productVersion, build.fingerprint, isCopied, isOpened]).toEqual(["1.2.3", "abc123", true, true]);

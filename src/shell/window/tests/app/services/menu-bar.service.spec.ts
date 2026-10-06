@@ -71,25 +71,25 @@ describe("MenuBarService", () => {
     expect(menus.map(t => t["place"])).toEqual(["shell.app", "shell.file", "shell.edit", "shell.view", "notes.tools", "shell.window", "shell.help"]);
     expect(menus[0]).toEqual({
       place: "shell.app", title: Resources.productName, rows: [
-        { type: "command", id: "shell.app/shell.settings/0", label: "Settings…", key: "Mod+Comma", enabled: false, check: "None", checked: false }
+        { type: "Command", id: "shell.app/shell.settings/0", label: "Settings…", key: "Mod+Comma", enabled: false, check: "None", checked: false }
       ]
     });
     expect(menus[4]).toEqual({
       place: "notes.tools", title: "Notes", rows: [
-        { type: "command", id: "notes.tools/notes.sorting/0", label: "Sort by", key: null, enabled: true, check: "Radio", checked: false },
-        { type: "command", id: "notes.tools/notes.sorting/1", label: "Sort by", key: null, enabled: true, check: "Radio", checked: true },
-        { type: "separator" },
+        { type: "Command", id: "notes.tools/notes.sorting/0", label: "Sort by", key: null, enabled: true, check: "Radio", checked: false },
+        { type: "Command", id: "notes.tools/notes.sorting/1", label: "Sort by", key: null, enabled: true, check: "Radio", checked: true },
+        { type: "Separator" },
         {
-          type: "submenu", label: "New from template", rows: [
-            { type: "command", id: "notes.tools/notes.more/0/notes.templates/notes.fromTemplate/0", label: "New note", key: "Mod+Alt+N", enabled: true, check: "None", checked: false }
+          type: "Submenu", label: "New from template", rows: [
+            { type: "Command", id: "notes.tools/notes.more/0/notes.templates/notes.fromTemplate/0", label: "New note", key: "Mod+Alt+N", enabled: true, check: "None", checked: false }
           ]
         },
-        { type: "command", id: "notes.tools/notes.more/1", label: "Locked", key: null, enabled: false, check: "None", checked: false }
+        { type: "Command", id: "notes.tools/notes.more/1", label: "Locked", key: null, enabled: false, check: "None", checked: false }
       ]
     });
     expect(menus[2]).toEqual({
       place: "shell.edit", title: "Edit", rows: ["Undo", "Redo", "Cut", "Copy", "Paste", "Select all"]
-        .map((t, i) => ({ type: "command", id: `shell.edit/shell.editing/${i}`, label: t, key: null, enabled: false, check: "None", checked: false }))
+        .map((t, i) => ({ type: "Command", id: `shell.edit/shell.editing/${i}`, label: t, key: null, enabled: false, check: "None", checked: false }))
     });
   });
 

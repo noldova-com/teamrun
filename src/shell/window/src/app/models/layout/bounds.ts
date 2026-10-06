@@ -60,7 +60,7 @@ export class Bounds {
     return this.slice(axis, Resources.leadingEdges.includes(edge) ? start : start + this.length(axis) - length, length);
   }
 
-  public edgeHalf(edge: PanelEdge): Bounds {
-    return this.edgeStrip(edge, Math.max(0, (this.length(Resources.edgeAxes[edge]) - Resources.panelGap) / 2));
+  public edgeHalf(edge: PanelEdge, gap: number): Bounds {
+    return this.edgeStrip(edge, Math.max(0, (this.length(Resources.edgeAxes[edge]) - gap) / 2));
   }
 }

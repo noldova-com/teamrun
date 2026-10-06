@@ -10,6 +10,7 @@ export default interface IRunnerCounts {
   readonly discovered: number;
   readonly passed: number;
   readonly failed: number;
+  readonly rerunPassed: number;
   readonly skipped: number;
   readonly unselected: number;
   readonly unreached: number;

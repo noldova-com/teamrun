@@ -7,7 +7,7 @@
  */
 
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { NotificationPost, SettingChange, SettingScope } from "@noldova/teamrun-shell-protocol";
+import type { NotificationPost, SettingChange, SettingEntry, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import type { MenuItem } from "../models/menu-item";
 import type { ViewBadge } from "../models/view-badge";
@@ -40,6 +40,8 @@ export interface IWindowPartHost {
   dismissNotification(id: string): void;
 
   readSetting(name: string): JsonValue | undefined;
+
+  readSettingAsync(name: string, scope: SettingScope | null): Promise<SettingEntry>;
 
   writeSettingAsync(name: string, value: JsonValue, scope: SettingScope | null): Promise<void>;
 

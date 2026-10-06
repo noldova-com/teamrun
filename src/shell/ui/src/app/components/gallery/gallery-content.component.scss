@@ -1,0 +1,29 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: grid;
+  gap: var(--tr-space-6);
+}
+
+.tr-gallery-narrow {
+  max-width: 12rem;
+}
+
+.tr-gallery-content-card {
+  width: 12.5rem;
+}
+
+.tr-gallery-content-paragraph {
+  margin: 0;
+}
+
+.tr-gallery-content-message {
+  font-size: var(--tr-text-message);
+  line-height: var(--tr-line-message);
+}

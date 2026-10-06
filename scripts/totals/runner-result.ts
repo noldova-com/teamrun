@@ -57,15 +57,15 @@ export default class RunnerResult {
     return RunnerResult.parse(await readFile(file, RunnerResult.ENCODING), source);
   }
 
-  public toTotals(runner: string, title: string, coverage: ICoverageCount | null, expected: readonly string[]): RunnerTotals {
-    const files = new Set(this.files);
+  public toTotals(runner: string, title: string, coverage: ICoverageCount | null, expected: readonly string[], shard: string | null): RunnerTotals {
     return new RunnerTotals(
       runner,
       title,
-      { discovered: this.discovered, passed: this.passed, failed: this.failed, skipped: this.skipped, unselected: this.discovered - this.selected, unreached: this.unreached },
+      { discovered: this.discovered, passed: this.passed, failed: this.failed, rerunPassed: 0, skipped: this.skipped, unselected: this.discovered - this.selected, unreached: this.unreached },
       this.skips.map(t => ({ test: TestIdentity.of(t.file, t.names), reason: t.reason })),
       this.files,
       coverage,
-      { duplicates: this.duplicates.map(t => TestIdentity.of(t.file, t.names)), empty: this.empty, missing: expected.filter(t => !files.has(t)) });
+      { duplicates: this.duplicates.map(t => TestIdentity.of(t.file, t.names)), empty: this.empty },
+      { expected, shard });
   }
 }

@@ -12,6 +12,7 @@ import { DocumentTab } from "../../../../src/app/models/layout/document-tab";
 import type { TabGroup } from "../../../../src/app/models/layout/tab-group";
 import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
+import { LayoutMetricsFixture } from "../../../fixtures/layout-metrics.fixture";
 
 describe("DocumentGroup", () => {
   const { files, plan, todo, settings } = LayoutFixture;
@@ -24,7 +25,7 @@ describe("DocumentGroup", () => {
   });
 
   it("keeps the document area's minimum on both axes", () => {
-    expect([group.minimumLength(SplitAxis.Horizontal), group.minimumLength(SplitAxis.Vertical)]).toEqual([13.75, 13.75]);
+    expect([group.minimumLength(SplitAxis.Horizontal, LayoutMetricsFixture.standard), group.minimumLength(SplitAxis.Vertical, LayoutMetricsFixture.standard)]).toEqual([13.75, 13.75]);
   });
 
   it("stays as an empty group when its last tab leaves or none is registered", () => {

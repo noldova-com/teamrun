@@ -58,7 +58,7 @@ export default class UiReport {
     const lines = [
       `### UI workflows: ${UiReport.escape(target)}`,
       "",
-      RunnerTotals.formatTable([totals], new Map([[totals.title, this.flakyTests.length]])).trimEnd(),
+      RunnerTotals.formatTable([totals]).trimEnd(),
       "",
       `Duration ${(this.durationMs / 1000).toFixed(1)} s, ${this.platformLogLines} platform log lines.`,
       "",

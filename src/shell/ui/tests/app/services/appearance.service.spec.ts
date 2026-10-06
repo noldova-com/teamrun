@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { effect } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { FontChoice } from "../../../src/app/enums/font-choice";
@@ -125,6 +126,24 @@ describe("AppearanceService", () => {
     expect(variable("--tr-text-message")).toBe("12px");
     expect(variable("--tr-font-sans")).toBe("system-ui, \"Segoe UI\", Roboto, sans-serif");
     expect(Number.parseFloat(getComputedStyle(document.documentElement).fontSize)).toBeCloseTo(16 * 18 / 13, 3);
+  });
+
+  it("counts its paints, one more after each paint of the theme and mode or of the typography, so an effect that reads the count sees what was painted", () => {
+    const service = TestBed.inject(AppearanceService);
+    const seen: (readonly [number, string])[] = [];
+    TestBed.runInInjectionContext(() => effect(() => seen.push([service.painted(), variable("--tr-window")])));
+    const before = service.painted();
+
+    TestBed.tick();
+    const first = service.painted();
+    service.setTheme(FixtureTheme.theme);
+    TestBed.tick();
+    service.setTypography(new Typography(18, 12, 16, FontChoice.System));
+    TestBed.tick();
+
+    expect([before, first, service.painted()]).toEqual([0, 2, 4]);
+    expect(seen.at(-1)).toEqual([4, "#2001A0"]);
+    expect(seen.every(([count, color]) => (count >= 3) === (color === "#2001A0"))).toBe(true);
   });
 });
 

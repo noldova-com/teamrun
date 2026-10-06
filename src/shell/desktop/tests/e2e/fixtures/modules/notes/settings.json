@@ -10,6 +10,17 @@
       "scopes": [],
       "page": "Notes",
       "group": "Writing"
+    },
+    {
+      "name": "notes.wrapsLines",
+      "title": "Wrapping lines",
+      "description": "Wraps a note's long lines, for every note, a folder or one note.",
+      "type": { "kind": "Boolean" },
+      "default": false,
+      "locality": "Shared",
+      "scopes": ["notes.folder", "notes.entry"],
+      "page": "Notes",
+      "group": "Writing"
     }
   ]
 }

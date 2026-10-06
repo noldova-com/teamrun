@@ -69,7 +69,7 @@ export default class AngularTestCheck implements ISelectableCheck {
           output.write(AngularTestCheck.NO_REPORT);
         return false;
       }
-      const totals = run.result.toTotals(AngularTestCheck.RUNNER, AngularTestCheck.TOTALS_TITLE, run.coverage, include.length === 0 ? await this.project.specFilesAsync() : include);
+      const totals = run.result.toTotals(AngularTestCheck.RUNNER, AngularTestCheck.TOTALS_TITLE, run.coverage, include.length === 0 ? await this.project.specFilesAsync() : include, null);
       const recorded = include.length === 0 ? await totals.recordAsync(this.project.root, output) : totals.report(output);
       return recorded && run.isSuccessful;
     }

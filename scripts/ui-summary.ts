@@ -16,6 +16,7 @@ import ProcessRunner from "./processes/process-runner.ts";
 import JsonFields from "./totals/json-fields.ts";
 import TotalsException from "./totals/totals.exception.ts";
 import UiWorkflows from "./ui-workflows.ts";
+import UiCheckpoint from "./workflows/ui-checkpoint.ts";
 import UiReport from "./workflows/ui-report.ts";
 import UiReportException from "./workflows/ui-report.exception.ts";
 import UiTestReport from "./workflows/ui-test-report.ts";
@@ -26,6 +27,8 @@ export default class UiSummary {
   private static readonly TARGET_VARIABLE: string = "UI_TARGET";
   private static readonly SCREENSHOT_VARIABLE: string = "SCREENSHOT_URL";
   private static readonly UPLOAD_FAILED_VARIABLE: string = "SCREENSHOT_UPLOAD_FAILED";
+  private static readonly GREP_VARIABLE: string = "GREP";
+  private static readonly SHARD_VARIABLE: string = "UI_SHARD";
   private static readonly TRUE: string = "true";
   private static readonly SETTINGS_REQUIRED: string = "GITHUB_STEP_SUMMARY and UI_TARGET must name the step summary file and the target.\n";
   private static readonly NO_REPORT: string = "The UI workflows produced no report.";
@@ -60,12 +63,16 @@ export default class UiSummary {
     try {
       const text = await readFile(reportPath, "utf8");
       const report = UiReport.parse(text);
-      const listed = await this.runner.captureAsync(process.execPath, [path.join(this.root, ...UiWorkflows.PLAYWRIGHT_CLI), "test", "--config", UiWorkflows.PLAYWRIGHT_CONFIG, "--list", "--reporter=json"], this.root, UiSummary.LIST_TIMEOUT);
-      if (!listed.isSuccessful)
-        return await this.failAsync(summaryPath, target, `${UiSummary.NOT_LISTED}\n${listed.text}`);
-      const result = await new UiTestReport(this.root, UiSummary.REPORT_SOURCE).readAsync(JsonFields.parse(text, UiSummary.REPORT_SOURCE), JsonFields.parse(listed.output, UiSummary.LIST_SOURCE));
-      const totals = result.toTotals(UiSummary.RUNNER, UiSummary.TITLE, null, result.files);
-      const summary = report.formatSummary(target, totals, environment[UiSummary.SCREENSHOT_VARIABLE], environment[UiSummary.UPLOAD_FAILED_VARIABLE] === UiSummary.TRUE);
+      const grep = environment[UiSummary.GREP_VARIABLE] ?? "";
+      const shard = environment[UiSummary.SHARD_VARIABLE] ?? "";
+      const list = await this.listAsync([]);
+      const reader = new UiTestReport(this.root, UiSummary.REPORT_SOURCE);
+      const fields = JsonFields.parse(text, UiSummary.REPORT_SOURCE);
+      const result = await reader.readAsync(fields, list);
+      const selection = grep.length === 0 ? list : await this.listAsync(["--grep", grep]);
+      const totals = result.toTotals(UiSummary.RUNNER, UiSummary.TITLE, null, reader.listFiles(selection), shard.length === 0 ? null : shard).withRerunPassed(report.flakyTests.length);
+      const checkpoints = UiCheckpoint.formatSection(UiCheckpoint.readAll(fields, UiSummary.REPORT_SOURCE));
+      const summary = `${report.formatSummary(target, totals, environment[UiSummary.SCREENSHOT_VARIABLE], environment[UiSummary.UPLOAD_FAILED_VARIABLE] === UiSummary.TRUE)}${checkpoints}`;
       await appendFile(summaryPath, summary);
       this.output.write(summary);
       const recorded = await totals.recordAsync(this.root, this.output);
@@ -77,6 +84,13 @@ export default class UiSummary {
         throw error;
       return await this.failAsync(summaryPath, target, error.message);
     }
+  }
+
+  private async listAsync(listArguments: readonly string[]): Promise<JsonFields> {
+    const listed = await this.runner.captureAsync(process.execPath, [path.join(this.root, ...UiWorkflows.PLAYWRIGHT_CLI), "test", "--config", UiWorkflows.PLAYWRIGHT_CONFIG, "--list", "--reporter=json", ...listArguments], this.root, UiSummary.LIST_TIMEOUT);
+    if (!listed.isSuccessful)
+      throw new UiReportException(`${UiSummary.NOT_LISTED}\n${listed.text}`);
+    return JsonFields.parse(listed.output, UiSummary.LIST_SOURCE);
   }
 
   private async failAsync(summaryPath: string, target: string, message: string): Promise<number> {
