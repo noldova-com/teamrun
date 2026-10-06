@@ -26,7 +26,7 @@ The command line reports on the data directory's runtime and runs the runtime's 
 | `--json` | Prints exactly one JSON value on standard output, and an error as `{"code","message","details"}` on standard error. |
 | `--no-start` | `commands` and `run` fail with exit code 3 instead of starting a runtime. |
 | `--take-over` | `commands` and `run` take over another build's runtime when this build is newer and that runtime is idle. |
-| `--timeout <seconds>` | How long `run`'s command may take, from 1 to 3600 seconds. |
+| `--timeout <seconds>` | How long `run`'s command may take, in whole seconds from 1 to 3600. |
 
 The command line never asks a question; it reports and exits.
 

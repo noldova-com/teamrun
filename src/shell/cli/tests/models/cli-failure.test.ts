@@ -132,7 +132,7 @@ export class CliFailureTests {
     await fixture.startHostAsync(build.declarationsFile);
     const marker = ProbeBuildFixture.markerPath(fixture.dataDirectory);
 
-    const timedOut = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--timeout", "0.2", "--json"]));
+    const timedOut = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--timeout", "1", "--json"]));
     await rm(marker, { force: true });
     const running = fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--json"]));
     await ProbeBuildFixture.waitUntilWaitingAsync(marker);
@@ -172,7 +172,7 @@ export class CliFailureTests {
 
     let unanswered: { code: number; output: string; error: string };
     try {
-      unanswered = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.block", "--timeout", "0.2", "--json"]), build);
+      unanswered = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.block", "--timeout", "1", "--json"]), build);
     }
     finally {
       await writeFile(ProbeBuildFixture.releasePath(fixture.dataDirectory), "yes");
