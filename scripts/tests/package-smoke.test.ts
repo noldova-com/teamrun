@@ -377,29 +377,32 @@ class PackageSmokeTests {
         ]);
       });
 
-    test("on macOS the app comes out of the disk image, the screen is captured with the window, and the desktop is asked to quit", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
-      const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-macos-arm64.dmg");
-      const runner = new SmokeRunnerFixture(["none", "running", "none"]);
-      const output = new TextOutputFixture();
-      const temporaryFolder = new TemporaryFolderFixture(repository.directory);
+    test("on macOS the app comes out of the disk image, the command line answers through a link to the app's command, the screen is captured with the window, and the desktop is asked to quit",
+      { timeout: PackageSmokeTests.TIMEOUT }, async t => {
+        const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-macos-arm64.dmg");
+        const runner = new SmokeRunnerFixture(["none", "running", "running", "none"]);
+        const output = new TextOutputFixture();
+        const temporaryFolder = new TemporaryFolderFixture(repository.directory);
 
-      const exitCode = await PackageSmokeTests.runAsync(t, repository, "darwin", runner, output, "arm64", {}, temporaryFolder);
+        const exitCode = await PackageSmokeTests.runAsync(t, repository, "darwin", runner, output, "arm64", {}, temporaryFolder);
 
-      const status = ["Fixture Studio", path.join("Fixture Studio.app", "Contents", "Resources", PackageSmokeTests.CLI), ...PackageSmokeTests.STATUS];
-      const screen = path.join(repository.directory, "_build", "package", "smoke", "window-macos-arm64.png");
-      assert.equal(exitCode, 0, output.text);
-      assert.deepEqual(runner.calls.slice(3), [status, status, ["screencapture", "-x", screen], status]);
-      assert.equal(existsSync(path.dirname(screen)), true);
-      assert.ok(output.text.includes(`\nThe screen with the window: ${screen}\nThe desktop quit.\n`), output.text);
-      assert.deepEqual(runner.starts, [[path.join("Fixture Studio.app", "Contents", "MacOS", "Fixture Studio"), `--data-dir=${path.join(runner.folder, "data")}`]]);
-      assert.deepEqual(runner.desktop.signals, ["SIGTERM"]);
-      assert.deepEqual(temporaryFolder.platforms, ["darwin"]);
-    });
+        const status = ["Fixture Studio", path.join("Fixture Studio.app", "Contents", "Resources", PackageSmokeTests.CLI), ...PackageSmokeTests.STATUS];
+        const screen = path.join(repository.directory, "_build", "package", "smoke", "window-macos-arm64.png");
+        assert.equal(exitCode, 0, output.text);
+        const command = path.join("Fixture Studio.app", "Contents", "Resources", "bin", "fixture-studio");
+        assert.deepEqual(runner.calls.slice(3), [status, status, ["ln", "-s", command, "fixture-studio"], ["fixture-studio", ...PackageSmokeTests.STATUS], ["screencapture", "-x", screen], status]);
+        assert.ok(output.text.includes(`\nteamrun status through a link to the app's command: version 0.0.7 in ${path.join(runner.folder, "data")}.\n`), output.text);
+        assert.equal(existsSync(path.dirname(screen)), true);
+        assert.ok(output.text.includes(`\nThe screen with the window: ${screen}\nThe desktop quit.\n`), output.text);
+        assert.deepEqual(runner.starts, [[path.join("Fixture Studio.app", "Contents", "MacOS", "Fixture Studio"), `--data-dir=${path.join(runner.folder, "data")}`]]);
+        assert.deepEqual(runner.desktop.signals, ["SIGTERM"]);
+        assert.deepEqual(temporaryFolder.platforms, ["darwin"]);
+      });
 
     test("on macOS a screen that cannot be captured is reported with its reason in the output and the step summary, and the smoke check goes on", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
       const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-macos-arm64.dmg");
       const summary = path.join(repository.directory, "summary.md");
-      const runners = [new SmokeRunnerFixture(["none", "running", "none"], undefined, ["screencapture"]), new SmokeRunnerFixture(["none", "running", "none"], undefined, ["screencapture"])] as const;
+      const runners = [new SmokeRunnerFixture(["none", "running", "running", "none"], undefined, ["screencapture"]), new SmokeRunnerFixture(["none", "running", "running", "none"], undefined, ["screencapture"])] as const;
       const outputs = [new TextOutputFixture(), new TextOutputFixture()] as const;
       const reason = "The screen could not be captured, so the run keeps no picture of the window; screencapture exited with 9:\nscreencapture broke\n";
 
@@ -414,6 +417,22 @@ class PackageSmokeTests {
         assert.ok(output.text.endsWith("The runtime stopped once idle.\n"), output.text);
       }
       assert.equal(await readFile(summary, "utf8"), reason);
+    });
+
+    test("on macOS a link to the app's command that cannot be made or whose command line fails stops the smoke check", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
+      const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-macos-arm64.dmg");
+      const runners = [new SmokeRunnerFixture(["none", "running"], undefined, ["ln"]), new SmokeRunnerFixture(["none", "running", "failed"])] as const;
+      const outputs = [new TextOutputFixture(), new TextOutputFixture()] as const;
+
+      const exitCodes = [
+        await PackageSmokeTests.runAsync(t, repository, "darwin", runners[0], outputs[0], "arm64"),
+        await PackageSmokeTests.runAsync(t, repository, "darwin", runners[1], outputs[1], "arm64")
+      ];
+
+      const command = path.join(runners[1].folder, "Fixture Studio.app", "Contents", "Resources", "bin", "fixture-studio");
+      assert.deepEqual(exitCodes, [1, 1], outputs.map(t => t.text).join());
+      assert.ok(outputs[0].text.includes("ln broke"), outputs[0].text);
+      assert.ok(outputs[1].text.includes(`teamrun status through a link to ${command} exited with 1:\nThe runtime could not start.\n`), outputs[1].text);
     });
 
     test("a failed install or a window that cannot be closed stops the smoke check, and a desktop left running is stopped", { timeout: PackageSmokeTests.TIMEOUT }, async t => {

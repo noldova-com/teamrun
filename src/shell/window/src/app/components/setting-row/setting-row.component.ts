@@ -43,6 +43,7 @@ export class SettingRowComponent {
   public readonly isSet = input<boolean>(false);
   public readonly query = input<string>("");
   public readonly modules = input<readonly SelectOption[]>([]);
+  public readonly languages = input<readonly SelectOption[]>([]);
   public readonly isInverse = input<boolean>(false);
   public readonly canRun = input<boolean>(false);
   public readonly changed = output<JsonValue>();
@@ -54,7 +55,7 @@ export class SettingRowComponent {
   protected readonly describedBy: Signal<string> = computed(() => Object.isNull(this.error()) ? this.descriptionId : `${this.descriptionId} ${this.errorId}`);
   protected readonly options: Signal<readonly SelectOption[]> = computed(() => this.definition().type.options.map(t => new SelectOption(t.value, t.title)));
   protected readonly isFew: Signal<boolean> = computed(() => this.options().length >= Resources.choicePillMinimum && this.options().length <= Resources.choicePillLimit);
-  protected readonly chosenModules: Signal<ReadonlySet<string>> = computed(() => {
+  protected readonly chosen: Signal<ReadonlySet<string>> = computed(() => {
     const value = this.current();
     return new Set(Array.isArray(value) ? value.filter((t): t is string => typeof t === "string") : []);
   });
@@ -93,12 +94,21 @@ export class SettingRowComponent {
 
   protected toggleModule(id: string, isChecked: boolean): void {
     const isChosen = isChecked !== this.isInverse();
-    const chosen = new Set(this.chosenModules());
+    const chosen = new Set(this.chosen());
     if (isChosen)
       chosen.add(id);
     else
       chosen.delete(id);
     this.choose(this.modules().map(t => t.value).filter(t => chosen.has(t)));
+  }
+
+  protected toggleLanguage(tag: string, isChecked: boolean): void {
+    const chosen = new Set(this.chosen());
+    if (isChecked)
+      chosen.add(tag);
+    else
+      chosen.delete(tag);
+    this.choose(this.languages().map(t => t.value).filter(t => chosen.has(t)));
   }
 
   protected asString(value: JsonValue): string {

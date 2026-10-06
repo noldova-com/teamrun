@@ -16,6 +16,7 @@ import TeamRunCommand from "./desktop/teamrun.ts";
 import PackageException from "./packages/package.exception.ts";
 import RootManifest from "./packages/root-manifest.ts";
 import type InstalledPackage from "./packaging/installed-package.ts";
+import PackageConfiguration from "./packaging/package-configuration.ts";
 import PackageInstaller from "./packaging/package-installer.ts";
 import PackageLayout from "./packaging/package-layout.ts";
 import PackageTarget from "./packaging/package-target.ts";
@@ -65,6 +66,8 @@ export default class PackageSmoke {
   private static readonly POWERSHELL: string = "pwsh";
   private static readonly POWERSHELL_OPTIONS: readonly string[] = ["-NoProfile", "-NonInteractive", "-Command"];
   private static readonly PATH_VARIABLE: string = "PATH";
+  private static readonly LINK: string = "ln";
+  private static readonly SYMBOLIC_OPTION: string = "-s";
   private static readonly LOGS_FOLDER: string = "logs";
   private static readonly COPY_RECORD: RegExp = /^copy-[0-9a-f-]{36}\.log$/;
   private static readonly MOUNT_RECORD: RegExp = /^teamrun-copy mount \d+ (\d+) .+$/;
@@ -156,8 +159,10 @@ export default class PackageSmoke {
         throw new PackagingException(`The runtime's discovery file ${path.join(data, ...PackageSmoke.DISCOVERY_SEGMENTS)} names no process.`);
       runtime = found;
       this.runtime = runtime;
-      if (target.platform === PackageTarget.MACOS)
+      if (target.platform === PackageTarget.MACOS) {
+        await this.checkLinkedCommandAsync(path.join(installed.resources, PackageConfiguration.COMMAND_FOLDER, manifest.product.slug), manifest.productVersion, data, folder);
         await this.captureScreenAsync(target, folder);
+      }
 
       await this.quitAsync(target, desktop, folder);
       if (!await desktop.waitAsync(PackageSmoke.QUIT_LIMIT))
@@ -208,6 +213,15 @@ export default class PackageSmoke {
     if (!status.isSuccessful)
       throw new PackagingException(`teamrun status through PowerShell exited with ${status.exitCode}:\n${status.text}`);
     this.checkStarted(status.output, version, data, "through PowerShell");
+  }
+
+  private async checkLinkedCommandAsync(command: string, version: string, data: string, folder: string): Promise<void> {
+    const link = path.join(folder, path.basename(command));
+    await this.runner.requireAsync(PackageSmoke.LINK, [PackageSmoke.SYMBOLIC_OPTION, command, link], folder, PackageSmoke.COMMAND_LIMIT);
+    const status = await this.runner.captureAsync(link, [...PackageSmoke.STATUS_ARGUMENTS, PackageSmoke.DATA_DIRECTORY_OPTION, data], folder, PackageSmoke.COMMAND_LIMIT, this.environment);
+    if (!status.isSuccessful)
+      throw new PackagingException(`teamrun status through a link to ${command} exited with ${status.exitCode}:\n${status.text}`);
+    this.checkStarted(status.output, version, data, "through a link to the app's command");
   }
 
   private createCommandEnvironment(command: string): NodeJS.ProcessEnv {

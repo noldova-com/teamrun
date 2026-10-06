@@ -49,11 +49,22 @@ LICENSE file in the root directory of this source tree.
       </button>
     }
     @case (kinds.Modules) {
-      <div class="tr-setting-row-modules" role="group" [attr.aria-label]="definition().title" [attr.aria-describedby]="describedBy()">
+      <div class="tr-setting-row-list" role="group" [attr.aria-label]="definition().title" [attr.aria-describedby]="describedBy()">
         @for (module of modules(); track module.value) {
-          <tr-checkbox [checked]="chosenModules().has(module.value) !== isInverse()" (checkedChange)="toggleModule(module.value, $event)">{{ module.title }}</tr-checkbox>
+          <tr-checkbox [checked]="chosen().has(module.value) !== isInverse()" (checkedChange)="toggleModule(module.value, $event)">{{ module.title }}</tr-checkbox>
         }
       </div>
+    }
+    @case (kinds.Languages) {
+      @if (languages().length === 0) {
+        <div class="tr-setting-row-note">{{ resources.noLanguagesNote }}</div>
+      } @else {
+        <div class="tr-setting-row-list" role="group" [attr.aria-label]="definition().title" [attr.aria-describedby]="describedBy()">
+          @for (language of languages(); track language.value) {
+            <tr-checkbox [checked]="chosen().has(language.value)" (checkedChange)="toggleLanguage(language.value, $event)">{{ language.title }}</tr-checkbox>
+          }
+        </div>
+      }
     }
   }
 </div>
