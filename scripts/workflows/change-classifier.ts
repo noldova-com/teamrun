@@ -24,6 +24,8 @@ export default class ChangeClassifier {
   private static readonly OUTSIDE_APP_FILES: readonly string[] = [
     ".gitignore",
     "scripts/classify-changes.ts",
+    "scripts/flaky-report.ts",
+    "scripts/flaky-week-summary.ts",
     "scripts/package-smoke.ts",
     "scripts/package.ts",
     "scripts/release-assets.ts",
