@@ -187,6 +187,18 @@ class ChangeClassifierTests {
       assert.equal(failed.selection.summary, "Selection: everything. The packages could not be read: src/foundation/text/package.json could not be read as JSON.");
     });
 
+    test("a failure other than unreadable packages reaches the caller instead of selecting everything", async t => {
+      const repository = await ChangeClassifierTests.createRepositoryAsync(t);
+      const catalog = new PackageCatalog(repository.directory);
+      const failure = new RangeError("The packages could not be listed.");
+      t.mock.method(catalog, "listPackagesAsync", () => Promise.reject(failure));
+      const classifier = new ChangeClassifier(new Git(repository.directory, new ProcessRunner()), catalog);
+      const base = ChangeClassifierTests.readHead(repository);
+      const head = await repository.commitAsync({ "src/notes.ts": "export {};\n" });
+
+      await assert.rejects(classifier.classifyAsync("pull_request", base, head), failure);
+    });
+
     test("documentation leaves the selection, and tooling outside the app selects the script tests", () => {
       const selector = new ChangeSelector([new PackageManifest("src/foundation/core", "@noldova/teamrun-foundation-core", [])]);
 
