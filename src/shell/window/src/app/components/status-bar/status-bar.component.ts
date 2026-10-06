@@ -12,6 +12,7 @@ import { BarItemsService } from "../../services/bar-items.service";
 import { ModuleFailuresComponent } from "../module-failures/module-failures.component";
 import { NotificationsComponent } from "../notifications/notifications.component";
 import { StatusBarItemComponent } from "../status-bar-item/status-bar-item.component";
+import { UpdateService } from "../../services/update.service";
 import { UpdateItemComponent } from "../update-item/update-item.component";
 
 @Component({
@@ -26,4 +27,5 @@ import { UpdateItemComponent } from "../update-item/update-item.component";
 })
 export class StatusBarComponent {
   protected readonly bars: BarItemsService = inject(BarItemsService);
+  protected readonly updates: UpdateService = inject(UpdateService);
 }

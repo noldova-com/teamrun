@@ -51,4 +51,8 @@ export class UpdateState {
   public get canRestart(): boolean {
     return this.kind === UpdateStateKind.Ready;
   }
+
+  public get showsItem(): boolean {
+    return this.kind === UpdateStateKind.Ready || this.kind === UpdateStateKind.Failed || this.kind === UpdateStateKind.Available && this.mustMove;
+  }
 }

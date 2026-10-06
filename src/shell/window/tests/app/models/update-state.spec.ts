@@ -46,4 +46,12 @@ describe("UpdateState", () => {
     expect(actions(of(UpdateStateKind.Failed))).toEqual([true, false]);
     expect(actions(of(UpdateStateKind.Failed, "1.3.0"))).toEqual([true, false]);
   });
+
+  it("shows the status bar's item only for an update that is ready or failed, or one TeamRun must move to Applications for", () => {
+    const of = (kind: UpdateStateKind, mustMove: boolean = false): UpdateState => new UpdateState(kind, "1.3.0", null, null, null, mustMove);
+
+    expect([UpdateStateKind.Off, UpdateStateKind.UpToDate, UpdateStateKind.Checking, UpdateStateKind.Available, UpdateStateKind.Downloading, UpdateStateKind.Ready,
+      UpdateStateKind.Failed].map(t => of(t).showsItem)).toEqual([false, false, false, false, false, true, true]);
+    expect([UpdateStateKind.Available, UpdateStateKind.UpToDate].map(t => of(t, true).showsItem)).toEqual([true, false]);
+  });
 });
