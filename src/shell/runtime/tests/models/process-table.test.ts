@@ -12,7 +12,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import { ProcessSupervisorFixture } from "../fixtures/process-supervisor.fixture.js";
 import { SettingsFixture } from "../fixtures/settings.fixture.js";
 import { SimulatedProcessesFixture } from "../fixtures/simulated-processes.fixture.js";
-import { SystemCommandFixture } from "../fixtures/system-command.fixture.js";
+import { WindowsProcessApiFixture } from "../fixtures/windows-process-api.fixture.js";
 
 @TestClass
 export class ProcessTableTests {
@@ -26,13 +26,13 @@ export class ProcessTableTests {
       ProcessSupervisorFixture.WINDOWS.offset());
     for (const processId of [900_602, 900_603, 900_604, 900_605])
       simulated.add(processId, 0);
-    const command = new SystemCommandFixture([[
+    const windows = new WindowsProcessApiFixture([[
       `900602\t900601\t${now - 8_000}\tC:\\Tools\\child.exe`,
       `900603\t900602\t${now - 1_000}\tC:\\Tools\\grandchild.exe`,
       `900604\t900601\t${now - 4_949}\tC:\\Tools\\late.exe`,
       `900605\t900601\t${now - ProcessSupervisorFixture.HOUR}\tC:\\Windows\\explorer.exe`
-    ].join("\n"), t => simulated.answerKillsAsync(t)]);
-    const processes = ProcessSupervisorFixture.createWindows(settings, { SystemRoot: ProcessSupervisorFixture.SYSTEM_ROOT }, command);
+    ].join("\n")]);
+    const processes = ProcessSupervisorFixture.createWindows(settings, windows);
 
     await processes.cleanUpAsync();
 
@@ -57,11 +57,10 @@ export class ProcessTableTests {
     const children = new Map([[900_802, requested - 51], [900_803, requested - 50], [900_804, seen], [900_805, seen + 50], [900_806, seen + 51]]);
     for (const processId of children.keys())
       simulated.add(processId, 0);
-    const command = new SystemCommandFixture([
-      [...children].map(([processId, started]) => `${processId}\t900801\t${started}\tC:\\Tools\\child.exe`).join("\n"),
-      t => simulated.answerKillsAsync(t)
+    const windows = new WindowsProcessApiFixture([
+      [...children].map(([processId, started]) => `${processId}\t900801\t${started}\tC:\\Tools\\child.exe`).join("\n")
     ]);
-    const processes = ProcessSupervisorFixture.createWindows(settings, { SystemRoot: ProcessSupervisorFixture.SYSTEM_ROOT }, command);
+    const processes = ProcessSupervisorFixture.createWindows(settings, windows);
 
     await processes.cleanUpAsync();
 

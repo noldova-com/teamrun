@@ -260,7 +260,7 @@ export class RuntimeHost implements IIdleParticipant {
   }
 
   private async activateModulesAsync(database: ShellDatabase, settings: SettingsService): Promise<void> {
-    const processes = new ProcessSupervisor(database, this.platform, this.environment, new SystemCommand(), this.log.diagnostics);
+    const processes = ProcessSupervisor.create(database, this.platform, this.environment, new SystemCommand(), this.log.diagnostics);
     this.processes = processes;
     processes.onChanged(() => this.programsEvent.publish(processes.status.toJson()));
     this.methods.register(ShellMethods.programs, new ProgramsMethod(() => processes.status));

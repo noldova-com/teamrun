@@ -19,13 +19,14 @@ import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
 class CommentCheckTests {
   public static register(): void {
-    test("scripts, styles and markup with only the license header pass, and API declarations and other formats are not checked", async t => {
+    test("scripts, C sources, styles and markup with only the license header pass, and API declarations and other formats are not checked", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
         "scripts/build.ts": `${LicenseHeader.BLOCK}\nexport const url = "https://example.com/*";\n`,
         "src/shell/ui/src/styles/theme.scss": `${LicenseHeader.BLOCK}\n:root { background: url(//cdn.example/a.png); }\n`,
         "src/shell/ui/src/app/button.component.html": `${LicenseHeader.MARKUP}\n<button></button>\n`,
+        "src/shell/runtime/src/native/windows-process.c": `${LicenseHeader.BLOCK}\nstatic const char *a = "/* not */";\n`,
         "src/shell/ui/src/api/index.d.ts": `${LicenseHeader.BLOCK}\n/**\n * Declares the kit.\n */\nexport {};\n`,
         "README.md": "# TeamRun\n\n<!-- A note. -->\n",
         ".github/workflows/build.yml": `${LicenseHeader.YAML}\n# A note.\nname: Build\n`
@@ -35,7 +36,7 @@ class CommentCheckTests {
       const check = CommentCheckTests.createCheck(repository);
 
       assert.equal(await check.runAsync(output), true);
-      assert.equal(output.text, "Checked 3 files for comments other than the license header.\n");
+      assert.equal(output.text, "Checked 4 files for comments other than the license header.\n");
       assert.equal(check.title, "Comments");
     });
 
@@ -47,6 +48,7 @@ class CommentCheckTests {
         "scripts/late.mjs": `export {};\n${LicenseHeader.BLOCK}`,
         "src/shell/ui/src/styles/theme.scss": `${LicenseHeader.BLOCK}\n:root {}\n// A note.\n`,
         "src/shell/ui/src/styles/base.css": "/* A note. */\n:root {}\n",
+        "src/shell/runtime/src/native/windows-process.c": `${LicenseHeader.BLOCK}\nstatic int a; // A note.\n`,
         "src/shell/ui/src/app/button.component.html": `${LicenseHeader.MARKUP}\n<button></button> <!-- A note. -->\n`,
         "src/shell/ui/src/types.d.ts": `${LicenseHeader.BLOCK}\n/**\n * Declares a type.\n */\nexport {};\n`
       });
@@ -57,11 +59,12 @@ class CommentCheckTests {
       assert.equal(output.text, [
         `scripts/late.mjs:2${rule}`,
         `scripts/note.ts:9${rule}`,
+        `src/shell/runtime/src/native/windows-process.c:9${rule}`,
         `src/shell/ui/src/app/button.component.html:9${rule}`,
         `src/shell/ui/src/styles/base.css:1${rule}`,
         `src/shell/ui/src/styles/theme.scss:10${rule}`,
         `src/shell/ui/src/types.d.ts:9${rule}`,
-        "Checked 6 files for comments other than the license header.",
+        "Checked 7 files for comments other than the license header.",
         ""
       ].join("\n"));
     });

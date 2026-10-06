@@ -41,6 +41,7 @@ class PackageConfigurationTests {
         electronDist: PackageConfigurationTests.DISTRIBUTION,
         electronVersion: "44.5.1",
         asar: { smartUnpack: false },
+        asarUnpack: ["**/*.node"],
         npmRebuild: false,
         nodeGypRebuild: false,
         buildDependenciesFromSource: false,

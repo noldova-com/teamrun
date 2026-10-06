@@ -99,6 +99,6 @@ if (import.meta.main) {
   const runner = new ProcessRunner();
   const root = process.cwd();
   const angular = new AngularProject(root, runner, new NpmCommand(runner, process.env));
-  const build = new Build(new PackageBuild(root, runner, process.env), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, new ElectronBinary(root, runner), process.stdout);
+  const build = new Build(new PackageBuild(root, runner, process.env, process.platform, process.arch), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, new ElectronBinary(root, runner), process.stdout);
   process.exitCode = await build.runAsync(process.argv.slice(2));
 }

@@ -11,6 +11,7 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 
 import type RepositoryFiles from "../repository/repository-files.ts";
+import CCommentReader from "../structure/c-comment.reader.ts";
 import type ICommentReader from "../structure/interfaces/i-comment.reader.ts";
 import MarkupCommentReader from "../structure/markup-comment.reader.ts";
 import ScriptCommentReader from "../structure/script-comment.reader.ts";
@@ -22,6 +23,7 @@ export default class CommentCheck implements ICheck {
   private static readonly READERS: ReadonlyMap<string, ICommentReader> = new Map([
     ...[...SourceFile.SCRIPT_EXTENSIONS].map((t): [string, ICommentReader] => [t, new ScriptCommentReader()]),
     ...[...SourceFile.STYLE_EXTENSIONS].map((t): [string, ICommentReader] => [t, new StyleCommentReader()]),
+    [SourceFile.C_EXTENSION, new CCommentReader()],
     [".html", new MarkupCommentReader()]
   ]);
   private static readonly API_DECLARATIONS: string = "src/api/index.d.ts";
