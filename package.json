@@ -21,7 +21,11 @@
       "releaseRepository": "noldova-com/teamrun",
       "windowsPublisher": "CN=Rostislav Rotaru, O=Rostislav Rotaru, C=US"
     },
-    "supportedTargets": []
+    "supportedTargets": [],
+    "signedPlatforms": [
+      "windows",
+      "macos"
+    ]
   },
   "private": true,
   "type": "module",
