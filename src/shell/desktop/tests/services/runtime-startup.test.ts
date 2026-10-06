@@ -9,8 +9,8 @@
 import { setImmediate } from "node:timers/promises";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, Event, Failure, FailureCode, PreShellData, QualifiedName, RunningWork, RuntimeHandover, ShellEvents, UpdateProcess, UpdateSaved } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, LaunchException, PreShellDataFoundException, RuntimeHandoverException, UpdateBarrierState, WorkInProgressException } from "@noldova/teamrun-shell-runtime";
+import { BuildIdentity, Event, Failure, FailureCode, PreShellData, QualifiedName, RunningWork, RuntimeHandover, ShellEvents, UpdateSaved } from "@noldova/teamrun-shell-protocol";
+import { ConnectionException, LaunchException, PreShellDataFoundException, RuntimeHandoverException, WorkInProgressException } from "@noldova/teamrun-shell-runtime";
 import { RuntimeStartup, type StartupState } from "@noldova/teamrun-shell-desktop";
 
 import { FakeClock } from "../fixtures/fake-clock.fixture.js";
@@ -377,7 +377,7 @@ export class RuntimeStartupTests {
     Assert.areEqual(1, this.updates.saveCount);
     Assert.areEqual(JSON.stringify(["shell.updateSaved"]), JSON.stringify(connection?.calls));
     Assert.areEqual(JSON.stringify(new UpdateSaved(4121, ["Notes couldn't save"]).toJson()), JSON.stringify(connection?.payloads[0]));
-    Assert.areEqual(JSON.stringify(["Connecting", "Ready", "Updating", "Ready"]), JSON.stringify(this.published));
+    Assert.areEqual(JSON.stringify(["Connecting", "Ready", "Updating", "Updating", "Ready"]), JSON.stringify(this.published));
     Assert.areEqual(JSON.stringify(["shell.updating", "shell.updateEnded", "shell.updateEnded"]), JSON.stringify(this.events));
   }
 
@@ -412,30 +412,47 @@ export class RuntimeStartupTests {
   }
 
   @TestMethod
-  public async waitsOnTheBarrierWhileItsRuntimeIsGoneAndQuitsWhenAnotherDesktopIsClosing(): Promise<void> {
+  public async keepsWaitingWhileItsRuntimeIsGoneUntilTheUpdateCanBeSeenToHaveEnded(): Promise<void> {
     const launcher = new FakeRuntimeLauncher();
     const startup = this.create(launcher);
     await startup.startAsync();
     launcher.listener?.onEvent(new Event(ShellEvents.updating, null));
     await setImmediate();
-    const own = new UpdateProcess(4121, 1500, 1501, "desktop");
-    this.updates.barriers.push(
-      new Error("The barrier is being replaced."),
-      FakeUpdateHost.barrier(UpdateBarrierState.Preparing),
-      FakeUpdateHost.barrier(UpdateBarrierState.Closing, own),
-      FakeUpdateHost.barrier(UpdateBarrierState.Closing));
+    this.updates.ended.push(new Error("ps exited with code 1."), false, true);
 
     launcher.listener?.onDisconnected(null);
-    for (let check = 0; check < 4; check++) {
+    for (let check = 0; check < 3; check++) {
       await setImmediate();
       this.clock.advance(1000);
       await setImmediate();
     }
+    await setImmediate();
 
-    Assert.areEqual(1, this.updates.quitCount);
-    Assert.areEqual(JSON.stringify(["attach desktop IfIdle"]), JSON.stringify(launcher.calls));
-    Assert.areEqual(JSON.stringify([1000, 1000, 1000, 1000]), JSON.stringify(this.clock.waits));
-    Assert.areEqual("Updating", startup.current.kind);
+    Assert.areEqual(0, this.updates.quitCount);
+    Assert.areEqual(JSON.stringify(["attach desktop IfIdle", "attach desktop IfIdle"]), JSON.stringify(launcher.calls));
+    Assert.areEqual(JSON.stringify([1000, 1000, 1000]), JSON.stringify(this.clock.waits));
+    Assert.areEqual("Ready", startup.current.kind);
+  }
+
+  @TestMethod
+  public async goesBackToWhereItWasWhenTheUpdateEndsBeforeItKnowsTheVersion(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher();
+    const startup = this.create(launcher);
+    await startup.startAsync();
+    let read: (barrier: null) => void = () => undefined;
+    this.updates.reading = new Promise(resolve => {
+      read = resolve;
+    });
+
+    launcher.listener?.onEvent(new Event(ShellEvents.updating, null));
+    const frozen = startup.current.toJson();
+    launcher.listener?.onEvent(new Event(ShellEvents.updateEnded, null));
+    read(null);
+    await setImmediate();
+
+    Assert.areEqual(JSON.stringify({ kind: "Updating", details: [""] }), JSON.stringify(frozen));
+    Assert.areEqual(0, this.updates.saveCount);
+    Assert.areEqual(JSON.stringify(["Connecting", "Ready", "Updating", "Ready"]), JSON.stringify(this.published));
   }
 
   @TestMethod
@@ -445,7 +462,7 @@ export class RuntimeStartupTests {
     await startup.startAsync();
     launcher.listener?.onEvent(new Event(ShellEvents.updating, null));
     await setImmediate();
-    this.updates.barriers.push(null);
+    this.updates.ended.push(true);
 
     launcher.listener?.onDisconnected(null);
     await setImmediate();

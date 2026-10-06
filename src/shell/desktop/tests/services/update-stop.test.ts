@@ -40,16 +40,20 @@ export class UpdateStopTests {
       const program = new UpdateProcess(7001, 1500, 1501, "program");
       const other = new UpdateProcess(4130, 1500, 1501, "desktop");
       const self = new UpdateProcess(UpdateStopTests.SELF, 1500, 1501, "desktop");
+      const unconnected = new UpdateProcess(4140, 1500, 1501, "desktop");
       this.ready(first, [program, other, self]);
       this.ready(second, []);
-      this.presence.running.add(7001).add(4130).add(UpdateStopTests.SELF);
+      this.presence.running.add(7001).add(4130).add(4140).add(UpdateStopTests.SELF);
+      await installation.recordDesktopAsync(self);
+      await installation.recordDesktopAsync(other);
+      await installation.recordDesktopAsync(unconnected);
       const states: string[] = [];
       this.presence.onCheck = t => {
         if (t.processId === 7001 && this.waits.length === 1)
           this.presence.running.delete(7001);
-        if (t.processId === 4130) {
-          states.push(JSON.parse(String(this.readBarrier(installation))).state as string);
-          this.presence.running.delete(4130);
+        if ((t.processId === 4130 || t.processId === 4140) && this.waits.length > 1) {
+          states.push(`${t.processId} ${JSON.parse(String(this.readBarrier(installation))).state as string}`);
+          this.presence.running.delete(t.processId);
         }
       };
       let handedOff = "";
@@ -60,12 +64,13 @@ export class UpdateStopTests {
 
       Assert.isTrue(isHandedOff);
       Assert.areEqual(JSON.stringify(new UpdateBarrier(new UpdateProcess(UpdateStopTests.SELF, 1500, 1501, "desktop"), "0.3.0", UpdateBarrierState.HandedOff, null).toJson()), handedOff);
-      Assert.areEqual("Closing", states.join("|"));
-      Assert.areEqual("shell.work|shell.update|shell.stop", this.connections.get(first)?.calls.join("|"));
-      Assert.areEqual("shell.work|shell.update|shell.stop", this.connections.get(second)?.calls.join("|"));
+      Assert.areEqual("4130 Closing|4140 Closing", states.join("|"));
+      Assert.areEqual("shell.work|shell.update|shell.work|shell.stop", this.connections.get(first)?.calls.join("|"));
+      Assert.areEqual("shell.work|shell.update|shell.work|shell.stop", this.connections.get(second)?.calls.join("|"));
+      Assert.areEqual(JSON.stringify({ policy: "IfIdle" }), JSON.stringify(this.connections.get(first)?.payloads[3]));
       Assert.isTrue([...this.connections.values()].every(t => t.isClosed));
-      Assert.areEqual("250", this.waits.join("|"));
-      Assert.isFalse(this.presence.checked.includes(UpdateStopTests.SELF));
+      Assert.areEqual("250|250", this.waits.join("|"));
+      Assert.areEqual(1, this.presence.checked.filter(t => t === UpdateStopTests.SELF).length);
       Assert.areEqual(0, this.asked.length);
     });
   }
@@ -92,10 +97,11 @@ export class UpdateStopTests {
   }
 
   @TestMethod
-  public goesOnPastTheWorkWhenThePersonStopsItAndSkipsADirectoryNotInUse(): Promise<void> {
+  public stopsOnlyTheWorkThePersonAgreedToAndSkipsADirectoryNotInUse(): Promise<void> {
     return this.runAsync(async (installation, folder) => {
       const first = await this.recordAsync(installation, folder, "first");
       const unused = await this.recordAsync(installation, folder, "unused");
+      const idle = await this.recordAsync(installation, folder, "idle");
       this.connection(first).answers.set("shell.work", Response.success("r", { descriptions: ["A reply"], sequence: 1 }));
       this.ready(first, []);
 
@@ -104,6 +110,8 @@ export class UpdateStopTests {
       Assert.isTrue(result);
       Assert.areEqual(1, this.asked.length);
       Assert.isFalse(this.connections.has(unused));
+      Assert.areEqual(JSON.stringify({ policy: "StopWork" }), JSON.stringify(this.connection(first).payloads[3]));
+      Assert.areEqual(JSON.stringify({ policy: "IfIdle" }), JSON.stringify(this.connection(idle).payloads[3]));
     });
   }
 
@@ -156,7 +164,38 @@ export class UpdateStopTests {
       Assert.areEqual(`Work started while TeamRun prepared to update: A command (${late})`, failure.message);
       Assert.isFalse(existsSync(installation.barrierFile));
       Assert.isTrue(this.connection(first).isClosed && this.connection(late).isClosed);
-      Assert.areEqual("shell.work", this.connection(first).calls.join("|"));
+      Assert.areEqual("shell.work|shell.update|shell.work", this.connection(first).calls.join("|"));
+      Assert.areEqual("shell.update|shell.work", this.connection(late).calls.join("|"));
+    });
+  }
+
+  @TestMethod
+  public failsWhenWorkThePersonDidNotSeeStartedWhileTheyDecided(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      const first = await this.recordAsync(installation, folder, "first");
+      const reads = [["A reply"], ["A reply", "A command"]];
+      this.connection(first).deferred.set("shell.work", () => Promise.resolve(Response.success("r", { descriptions: reads.shift() ?? [], sequence: 1 })));
+
+      const failure = await this.failAsync(installation);
+
+      Assert.areEqual(`Work started while TeamRun prepared to update: A command (${first})`, failure.message);
+      Assert.areEqual(1, this.asked.length);
+      Assert.areEqual("shell.work|shell.update|shell.work", this.connection(first).calls.join("|"));
+      Assert.isFalse(existsSync(installation.barrierFile));
+    });
+  }
+
+  @TestMethod
+  public failsAndLetsEverythingResumeWhenARecordedDesktopDoesNotQuitInTime(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      await this.recordAsync(installation, folder, "first");
+      await installation.recordDesktopAsync(new UpdateProcess(4140, 1500, 1501, "desktop"));
+      this.presence.running.add(4140);
+
+      const failure = await this.failAsync(installation);
+
+      Assert.areEqual("These processes did not exit within 10 seconds: desktop 4140", failure.message);
+      Assert.isFalse(existsSync(installation.barrierFile));
     });
   }
 

@@ -24,8 +24,8 @@ export class UpdateSaveCoordinatorTests {
     const requestIds: string[] = [];
     const coordinator = new UpdateSaveCoordinator(t => requestIds.push(t) > 0, 60000);
 
-    const first = coordinator.requestAsync();
-    const second = coordinator.requestAsync();
+    const first = coordinator.requestAsync(1);
+    const second = coordinator.requestAsync(1);
 
     Assert.areNotEqual(requestIds[0], requestIds[1]);
     Assert.isTrue(coordinator.answer(requestIds[1], []));
@@ -40,7 +40,7 @@ export class UpdateSaveCoordinatorTests {
     const requestIds: string[] = [];
     const coordinator = new UpdateSaveCoordinator(t => requestIds.push(t) > 0, 60000);
 
-    const problems = coordinator.requestAsync();
+    const problems = coordinator.requestAsync(1);
 
     Assert.isFalse(coordinator.answer("another", []));
     Assert.isFalse(coordinator.answer(42, []));
@@ -55,17 +55,17 @@ export class UpdateSaveCoordinatorTests {
     const gone = new UpdateSaveCoordinator(() => false, 60000);
     const released = new UpdateSaveCoordinator(() => true, 60000);
 
-    const waiting = released.requestAsync();
+    const waiting = released.requestAsync(2);
     released.release();
 
-    Assert.areEqual("A window closed before it saved.", (await gone.requestAsync()).join("|"));
-    Assert.areEqual("A window closed before it saved.", (await waiting).join("|"));
+    Assert.areEqual("Window 1 closed before it saved.", (await gone.requestAsync(1)).join("|"));
+    Assert.areEqual("Window 2 closed before it saved.", (await waiting).join("|"));
   }
 
   @TestMethod
   public async countsAWindowThatDoesNotAnswerInTimeAsNotSaved(): Promise<void> {
     const coordinator = new UpdateSaveCoordinator(() => true, 1);
 
-    Assert.areEqual("A window did not finish saving within 5 seconds.", (await coordinator.requestAsync()).join("|"));
+    Assert.areEqual("Window 1 did not finish saving within 5 seconds.", (await coordinator.requestAsync(1)).join("|"));
   }
 }

@@ -57,16 +57,17 @@ export class UpdateStop {
       if (!isHeld)
         throw new UpdateStopException(Resources.updateUnderWay);
       const known = new Set(targets.map(t => t.dataDirectory));
-      const late = await this.connectAllAsync((await this.installation.listDataDirectoriesAsync()).filter(t => !known.has(t)));
-      targets.push(...late);
-      const lateWork = await this.readWorkAsync(late);
-      if (lateWork.length > 0)
-        throw new UpdateStopException(Resources.formatWorkStartedMeanwhile(lateWork.join(Resources.workSeparator)));
+      targets.push(...await this.connectAllAsync((await this.installation.listDataDirectoriesAsync()).filter(t => !known.has(t))));
       const processes = (await Promise.all(targets.map(t => this.prepareAsync(t)))).flat();
-      await Promise.all(targets.map(t => this.stopAsync(t)));
+      const remaining = await Promise.all(targets.map(async (t): Promise<readonly [IUpdateTarget, readonly string[]]> => [t, await this.readTargetWorkAsync(t)]));
+      const agreed = new Set(work);
+      const unseen = remaining.flatMap(([, t]) => t).filter(t => !agreed.has(t));
+      if (unseen.length > 0)
+        throw new UpdateStopException(Resources.formatWorkStartedMeanwhile(unseen.join(Resources.workSeparator)));
+      await Promise.all(remaining.map(([target, t]) => this.stopAsync(target, t.length > 0 ? StopPolicy.StopWork : StopPolicy.IfIdle)));
       await this.verifyAsync([...targets.map(t => t.runtime), ...processes.filter(t => t.role !== Resources.clientName)]);
       await this.installation.replaceAsync(new UpdateBarrier(holder, version, UpdateBarrierState.Closing, null));
-      await this.verifyAsync(processes.filter(t => t.role === Resources.clientName && t.processId !== this.processId));
+      await this.verifyAsync(await this.listOtherDesktopsAsync(processes));
       await this.installation.replaceAsync(new UpdateBarrier(holder, version, UpdateBarrierState.HandedOff, null));
       await handOffAsync();
       return true;
@@ -88,13 +89,19 @@ export class UpdateStop {
   }
 
   private async readWorkAsync(targets: readonly IUpdateTarget[]): Promise<readonly string[]> {
-    const work = await Promise.all(targets.map(async target => {
-      const response = await target.connection.callAsync(ShellMethods.work, null, Resources.workQueryTimeout);
-      if (!Object.isUndefined(response.failure))
-        throw new UpdateStopException(Resources.formatUpdateRefused(target.dataDirectory, response.failure.message));
-      return WorkReport.fromJson(response.payload).descriptions.map(t => Resources.formatUpdateWork(t, target.dataDirectory));
-    }));
-    return work.flat();
+    return (await Promise.all(targets.map(t => this.readTargetWorkAsync(t)))).flat();
+  }
+
+  private async readTargetWorkAsync(target: IUpdateTarget): Promise<readonly string[]> {
+    const response = await target.connection.callAsync(ShellMethods.work, null, Resources.workQueryTimeout);
+    if (!Object.isUndefined(response.failure))
+      throw new UpdateStopException(Resources.formatUpdateRefused(target.dataDirectory, response.failure.message));
+    return WorkReport.fromJson(response.payload).descriptions.map(t => Resources.formatUpdateWork(t, target.dataDirectory));
+  }
+
+  private async listOtherDesktopsAsync(processes: readonly UpdateProcess[]): Promise<readonly UpdateProcess[]> {
+    const desktops = [...processes.filter(t => t.role === Resources.clientName), ...await this.installation.listDesktopsAsync()];
+    return desktops.filter((t, index) => t.processId !== this.processId && desktops.findIndex(u => u.processId === t.processId) === index);
   }
 
   private async stampSelfAsync(): Promise<UpdateProcess> {
@@ -114,8 +121,8 @@ export class UpdateStop {
     return ready.processes;
   }
 
-  private async stopAsync(target: IUpdateTarget): Promise<void> {
-    const response = await target.connection.callAsync(ShellMethods.stop, new StopRequest(StopPolicy.StopWork).toJson(), Resources.updatePrepareTimeout);
+  private async stopAsync(target: IUpdateTarget, policy: StopPolicy): Promise<void> {
+    const response = await target.connection.callAsync(ShellMethods.stop, new StopRequest(policy).toJson(), Resources.updatePrepareTimeout);
     if (!Object.isUndefined(response.failure))
       throw new UpdateStopException(Resources.formatUpdateRefused(target.dataDirectory, response.failure.message));
   }

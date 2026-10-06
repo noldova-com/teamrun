@@ -346,6 +346,7 @@ export class Resources {
   public static readonly installationArgument: string = "--installation-dir";
   public static readonly installationsFolderName: string = "installations";
   public static readonly dataDirectoriesFolderName: string = "data-directories";
+  public static readonly desktopsFolderName: string = "desktops";
   public static readonly barrierFileName: string = "barrier.json";
   public static readonly jsonExtension: string = ".json";
   public static readonly installationIdLength: number = 16;

@@ -16,7 +16,6 @@ import {
   LaunchException,
   PreShellDataFoundException,
   RuntimeHandoverException,
-  UpdateBarrierState,
   WorkInProgressException
 } from "@noldova/teamrun-shell-runtime";
 
@@ -40,6 +39,7 @@ export class RuntimeStartup {
   private readonly listener: IRuntimeClientListener;
   private readonly closing: AbortController = new AbortController();
   private state: StartupState = StartupState.connecting();
+  private beforeUpdate: StartupState = StartupState.ready();
   private connectionValue: IRuntimeConnection | null = null;
   private readyAt: number = 0;
   private unstableEnds: number = 0;
@@ -188,15 +188,21 @@ export class RuntimeStartup {
     if (event.name.equals(ShellEvents.updating))
       void this.freezeAsync(this.connectionValue);
     else if (event.name.equals(ShellEvents.updateEnded) && this.state.kind === StartupStateKind.Updating && !Object.isNull(this.connectionValue))
-      this.update(StartupState.ready());
+      this.update(this.beforeUpdate);
     this.forward(event);
   }
 
   private async freezeAsync(connection: IRuntimeConnection | null): Promise<void> {
     if (Object.isNull(connection))
       return;
+    if (this.state.kind !== StartupStateKind.Updating)
+      this.beforeUpdate = this.state;
+    this.update(StartupState.updating(String.empty));
     const barrier = await this.updates.readBarrierAsync().catch(() => null);
-    this.update(StartupState.updating(barrier?.version ?? String.empty));
+    if (this.state.kind !== StartupStateKind.Updating)
+      return;
+    if (!Object.isNull(barrier))
+      this.update(StartupState.updating(barrier.version));
     const saved = new UpdateSaved(this.updates.processId, await this.updates.saveAsync());
     await connection.callAsync(ShellMethods.updateSaved, saved.toJson())
       .catch((error: unknown) => this.log(Resources.formatUpdateSavedUnsent(String(error))));
@@ -205,13 +211,8 @@ export class RuntimeStartup {
   private async followUpdateAsync(): Promise<void> {
     while (!this.isClosed) {
       await this.pauseAsync(Resources.updateBarrierInterval);
-      const barrier = await this.updates.readBarrierAsync().catch(() => undefined);
-      if (Object.isNull(barrier)) {
+      if (await this.updates.hasUpdateEndedAsync().catch(() => false)) {
         await this.attachAsync(StopPolicy.IfIdle);
-        return;
-      }
-      if (barrier?.state === UpdateBarrierState.Closing && barrier.holder.processId !== this.updates.processId) {
-        this.updates.quit();
         return;
       }
     }

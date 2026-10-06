@@ -12,6 +12,7 @@ export interface IUpdateHost {
   readonly processId: number;
 
   readBarrierAsync(): Promise<UpdateBarrier | null>;
+  hasUpdateEndedAsync(): Promise<boolean>;
   saveAsync(): Promise<readonly string[]>;
   quit(): void;
 }

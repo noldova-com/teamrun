@@ -41,7 +41,7 @@ export class ClosingService {
 
   private async saveAllAsync(isUpdate: boolean): Promise<readonly (readonly [string, PartSaveOutcome])[]> {
     const [outcomes] = await Promise.all([
-      Promise.all([...this.parts.listSaves()].map(async ([moduleId, saves]) => [moduleId, await this.savePartAsync(moduleId, saves, isUpdate)] as const)),
+      Promise.all([...this.parts.listSaves()].map(async ([moduleId, saves]): Promise<readonly [string, PartSaveOutcome]> => [moduleId, await this.savePartAsync(moduleId, saves, isUpdate)])),
       this.saveLayoutAsync()
     ]);
     return outcomes;

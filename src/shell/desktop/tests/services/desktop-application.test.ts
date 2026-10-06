@@ -566,16 +566,18 @@ export class DesktopApplicationTests {
       const electron = new FakeElectron();
       const launcher = new FakeRuntimeLauncher();
       const installations: Installation[] = [];
-      DesktopStartFixture.start(electron, new FakeDesktopProcess("linux", [`--device-dir=${folder}`]), launcher, undefined, undefined, undefined, installations);
+      const environment = { SystemRoot: process.env["SystemRoot"] };
+      DesktopStartFixture.start(electron, new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment), launcher, undefined, undefined, undefined, installations);
       await electron.app.becomeReadyAsync();
       await Condition.waitAsync(() => launcher.connections.length === 1);
       const [installation] = installations;
       Assert.isDefined(installation);
-      const coordinator = new UpdateProcess(4120, 1500, 1501, "desktop");
+      const [coordinator] = await ProcessPresence.create(process.platform, new SystemCommand()).stampAsync([[process.pid, "desktop"]]);
+      Assert.isDefined(coordinator);
       await mkdir(installation.folder, { recursive: true });
       await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(coordinator, "0.3.0", UpdateBarrierState.Preparing, null).toJson()));
       const window = DesktopStartFixture.firstWindow(electron);
-      const event = DesktopStartFixture.trustedEvent("linux");
+      const event = DesktopStartFixture.trustedEvent(process.platform);
 
       launcher.listener?.onEvent(new Event(ShellEvents.updating, null));
       await Condition.waitAsync(() => window.webContents.sent.some(t => t[0] === "teamrun:updateSaveRequest"));
@@ -596,6 +598,19 @@ export class DesktopApplicationTests {
     finally {
       await rm(folder, { recursive: true, force: true });
     }
+  }
+
+  @TestMethod
+  public async recordsItselfInItsInstallationAndLogsWhenItCannotButStartsAnyway(): Promise<void> {
+    const recorded = await DesktopApplicationTests.startRecordingAsync(true);
+    const notFound = await DesktopApplicationTests.startRecordingAsync(false);
+    const failed = await DesktopApplicationTests.startRecordingAsync(new Error("EACCES: permission denied, mkdir"));
+
+    Assert.areEqual(0, DesktopStartFixture.readErrors(recorded, "This desktop could not be recorded").length);
+    Assert.areEqual(JSON.stringify(["This desktop could not be recorded in its installation, so an update may not wait for it: TeamRun could not find its own process in the process table."]),
+      JSON.stringify(DesktopStartFixture.readErrors(notFound, "This desktop could not be recorded")));
+    Assert.areEqual(JSON.stringify(["This desktop could not be recorded in its installation, so an update may not wait for it: Error: EACCES: permission denied, mkdir"]),
+      JSON.stringify(DesktopStartFixture.readErrors(failed, "This desktop could not be recorded")));
   }
 
   @TestMethod
@@ -1941,6 +1956,21 @@ export class DesktopApplicationTests {
     finally {
       await rm(data, { recursive: true, force: true });
     }
+  }
+
+  private static async startRecordingAsync(answer: boolean | Error): Promise<FakeDesktopProcess> {
+    const electron = new FakeElectron();
+    const desktop = new FakeDesktopProcess("linux");
+    const installations: Installation[] = [];
+    const recorded: Installation[] = [];
+    DesktopStartFixture.start(electron, desktop, undefined, undefined, undefined, undefined, installations, t => {
+      recorded.push(t);
+      return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);
+    });
+    await DesktopStartFixture.openAsync(electron);
+    Assert.areEqual(1, recorded.length);
+    Assert.areEqual(installations[0], recorded[0]);
+    return desktop;
   }
 
   private static async invokeAsync(electron: FakeElectron, channel: string, event: IIpcEvent, ...values: unknown[]): Promise<Record<string, unknown>> {

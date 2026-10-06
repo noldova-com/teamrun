@@ -13,11 +13,12 @@ import { promisify } from "node:util";
 import { BrowserWindow, Menu, Notification, app, clipboard, dialog, ipcMain, screen, session, shell, utilityProcess } from "electron";
 
 import "@noldova/teamrun-foundation-core";
-import { ChildProcessStarter, RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
+import { ChildProcessStarter, ProcessPresence, RuntimeBuild, RuntimeLauncher, SystemCommand } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "./resources.js";
 import { AppearanceStore } from "./services/appearance-store.js";
 import { DesktopApplication } from "./services/desktop-application.js";
+import { DesktopRecord } from "./services/desktop-record.js";
 import { DeviceIdentity } from "./services/device-identity.js";
 import { PathCommand } from "./services/path-command.js";
 import { UtilityProcessStarter } from "./services/utility-process-starter.js";
@@ -63,4 +64,5 @@ DesktopApplication.start(
   t => new AppearanceStore(t),
   t => PathCommand.forBundle(t, async (program, args) => {
     await promisify(execFile)(program, [...args]);
-  }));
+  }),
+  t => DesktopRecord.recordAsync(t, ProcessPresence.create(process.platform, new SystemCommand()), process.pid));

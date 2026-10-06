@@ -2148,10 +2148,17 @@ export declare class Installation {
   public readonly recordFolder: string;
 
   /**
+   * The desktops' folder, `desktops` in the folder, with one file for each
+   * desktop of the installation, named after its process id.
+   */
+  public readonly desktopFolder: string;
+
+  /**
    * Creates the installation.
    *
    * @param folder The installation's folder.
-   * @param isRunningAsync Whether a barrier's holder still runs.
+   * @param isRunningAsync Whether a barrier's holder, or a recorded desktop,
+   * still runs.
    * @example
    * ```ts
    * import { Installation, type ProcessPresence } from "@noldova/teamrun-shell-runtime";
@@ -2201,7 +2208,7 @@ export declare class Installation {
 
   /**
    * Lists the data directories in the record, skipping an entry that cannot
-   * be read and dropping one whose directory no longer exists.
+   * be read and one whose directory does not exist now, whose entry stays.
    * @returns A promise of the data directories' roots.
    * @example
    * ```ts
@@ -2214,16 +2221,53 @@ export declare class Installation {
   public listDataDirectoriesAsync(): Promise<readonly string[]>;
 
   /**
+   * Records a running desktop of the installation, replacing its file
+   * atomically, so an update can wait for it to quit.
+   *
+   * @param desktop The desktop's process id and start time.
+   * @returns A promise that settles once the desktop is recorded.
+   * @example
+   * ```ts
+   * import type { UpdateProcess } from "@noldova/teamrun-shell-protocol";
+   * import type { Installation } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function joinAsync(installation: Installation, desktop: UpdateProcess): Promise<void> {
+   *   return installation.recordDesktopAsync(desktop);
+   * }
+   * ```
+   */
+  public recordDesktopAsync(desktop: UpdateProcess): Promise<void>;
+
+  /**
+   * Lists the recorded desktops that still run, skipping a record that
+   * cannot be parsed and removing one whose desktop has exited.
+   *
+   * @returns A promise of the running desktops.
+   * @throws Error When a record cannot be read or a desktop cannot be looked
+   * up.
+   * @example
+   * ```ts
+   * import type { UpdateProcess } from "@noldova/teamrun-shell-protocol";
+   * import type { Installation } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function listAsync(installation: Installation): Promise<readonly UpdateProcess[]> {
+   *   return installation.listDesktopsAsync();
+   * }
+   * ```
+   */
+  public listDesktopsAsync(): Promise<readonly UpdateProcess[]>;
+
+  /**
    * Creates the launch barrier, after settling one whose holder no longer
    * runs as {@link Installation.checkAsync} does. It writes the barrier to a
    * temporary file and links it into place, which fails when a barrier
-   * exists, so no reader sees it half-written.
+   * exists, so no reader sees it half-written. A temporary file it cannot
+   * remove stays.
    * @param barrier The barrier to create.
    * @param version The coordinating desktop's product version.
    * @returns A promise of whether the barrier was created; false when another
-   * barrier holds or is unfinished.
-   * @throws Error With the code `EEXIST` when another barrier is created
-   * between the settling and the write.
+   * barrier holds or is unfinished, or is created between the settling and
+   * the link.
    * @example
    * ```ts
    * import { UpdateProcess } from "@noldova/teamrun-shell-protocol";

@@ -315,17 +315,21 @@ export declare class UpdateStop {
 
   /**
    * Stops the installation for an update and calls the handoff. It holds the launch barrier as `Preparing`, asks each
-   * runtime `shell.update` and then `shell.stop` with the policy that stops the work, waits up to 10 seconds for every
-   * runtime and every process they listed except the desktops to exit, sets the barrier to `Closing`, waits up to 10
-   * more seconds for the other desktops, then sets it to `HandedOff`. Every connection closes when it ends.
+   * runtime `shell.update`, then reads each runtime's work again: work the person was not asked about fails the
+   * update, and `shell.stop` stops the work of a runtime that still has the work they agreed to stop and otherwise
+   * stops only if idle. It waits up to 10 seconds for every runtime and every process they listed except the desktops
+   * to exit, sets the barrier to `Closing`, waits up to 10 more seconds for the other desktops, those the runtimes
+   * listed and those recorded in the installation that still run, then sets it to `HandedOff`. Every connection
+   * closes when it ends.
    *
    * @param version The version being installed.
    * @param handOffAsync The updater's handoff, which replaces the application's files.
    * @returns A promise of `true` once the handoff has run, or `false` when the person cancelled at the question about
    * work, with nothing changed.
    * @throws {UpdateStopException} Rejected with the reason when another update holds the barrier, work started
-   * meanwhile, a runtime refused or something did not save, a process did not exit in time or could not be checked,
-   * or the handoff failed; the barrier it held is removed first, so every surviving runtime and desktop resumes.
+   * meanwhile, a runtime refused or something did not save, a process or desktop did not exit in time or could not be
+   * checked, or the handoff failed; the barrier it held is removed first, so every surviving runtime and desktop
+   * resumes.
    * @example
    * ```ts
    * import type { UpdateStop } from "@noldova/teamrun-shell-desktop";
@@ -583,6 +587,23 @@ export interface IUpdateHost {
    * ```
    */
   readBarrierAsync(): Promise<UpdateBarrier | null>;
+
+  /**
+   * Tells whether the update has ended, as {@link Installation.hasEndedAsync} does: the barrier is gone, or its holder
+   * exited before the handoff.
+   *
+   * @returns A promise of whether the update has ended.
+   * @throws Error Rejected when the barrier cannot be read or its holder cannot be looked up.
+   * @example
+   * ```ts
+   * import type { IUpdateHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function isOverAsync(host: IUpdateHost): Promise<boolean> {
+   *   return host.hasUpdateEndedAsync();
+   * }
+   * ```
+   */
+  hasUpdateEndedAsync(): Promise<boolean>;
 
   /**
    * Asks every window to save for the update.
@@ -3071,17 +3092,19 @@ export declare class UpdateSaveCoordinator {
   /**
    * Asks the window to save.
    *
-   * @returns A promise of what did not save: the window's own list, or one problem when the window is gone or did
-   * not answer in time; empty when everything saved.
+   * @param window The window's number among the desktop's open windows, from 1, which names it when it is gone or
+   * does not answer.
+   * @returns A promise of what did not save: the window's own list, or one problem naming the window when it is gone
+   * or did not answer in time; empty when everything saved.
    * @example
    * ```ts
    * import { UpdateSaveCoordinator } from "@noldova/teamrun-shell-desktop";
    *
    * const coordinator = new UpdateSaveCoordinator(t => coordinator.answer(t, []), 5000);
-   * export const problems: readonly string[] = await coordinator.requestAsync();
+   * export const problems: readonly string[] = await coordinator.requestAsync(1);
    * ```
    */
-  public requestAsync(): Promise<readonly string[]>;
+  public requestAsync(window: number): Promise<readonly string[]>;
 
   /**
    * Takes the window's answer to a request.
@@ -3452,10 +3475,13 @@ export declare class DesktopApplication {
    * window reports.
    * @param createPathCommand Creates the service that links the command line on the macOS PATH for the program the
    * desktop runs from; the window's "Install command in PATH" command runs it and shows what happened.
+   * @param recordDesktopAsync Records this desktop in its installation, as {@link DesktopRecord.recordAsync} does, while
+   * the desktop checks the launch barrier, so an update waits for it to quit. A desktop it could not record is logged
+   * and starts anyway.
    * @example
    * ```ts
-   * import { RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
-   * import { AppearanceStore, DesktopApplication, DeviceIdentity, type IDesktopProcess, type IElectron, PathCommand } from "@noldova/teamrun-shell-desktop";
+   * import { ProcessPresence, RuntimeBuild, RuntimeLauncher, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   * import { AppearanceStore, DesktopApplication, DesktopRecord, DeviceIdentity, type IDesktopProcess, type IElectron, PathCommand } from "@noldova/teamrun-shell-desktop";
    *
    * export function launch(electron: IElectron, process: IDesktopProcess): void {
    *   DesktopApplication.start(
@@ -3465,7 +3491,8 @@ export declare class DesktopApplication {
    *     (settings, installation) => new RuntimeLauncher(settings, RuntimeBuild.identity, installation),
    *     t => DeviceIdentity.readOrCreateAsync(t),
    *     t => new AppearanceStore(t),
-   *     t => PathCommand.forBundle(t, () => Promise.resolve()));
+   *     t => PathCommand.forBundle(t, () => Promise.resolve()),
+   *     t => DesktopRecord.recordAsync(t, ProcessPresence.create(process.platform, new SystemCommand()), process.processId));
    * }
    * ```
    */
@@ -3476,7 +3503,105 @@ export declare class DesktopApplication {
     createLauncher: (settings: LaunchSettings, installation: Installation) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
     createAppearanceStore: (folder: string) => IAppearanceStore,
-    createPathCommand: (executablePath: string) => PathCommand): void;
+    createPathCommand: (executablePath: string) => PathCommand,
+    recordDesktopAsync: (installation: Installation) => Promise<boolean>): void;
+}
+
+/**
+ * Records a desktop in its installation, so an update can find it while it has no runtime connection.
+ */
+export declare class DesktopRecord {
+  private constructor();
+
+  /**
+   * Stamps the desktop's process with its start time and records it in the installation.
+   *
+   * @param installation The installation the desktop's program belongs to.
+   * @param presence Stamps the desktop's process.
+   * @param processId The desktop's process id.
+   * @returns A promise of whether the desktop was recorded; false when its process is not in the process table.
+   * @throws Error Rejected when the process table cannot be read or the record cannot be written.
+   * @example
+   * ```ts
+   * import { type Installation, ProcessPresence, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   * import { DesktopRecord } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function recordAsync(installation: Installation): Promise<boolean> {
+   *   return DesktopRecord.recordAsync(installation, ProcessPresence.create(process.platform, new SystemCommand()), process.pid);
+   * }
+   * ```
+   */
+  public static recordAsync(installation: Pick<Installation, "recordDesktopAsync">, presence: Pick<ProcessPresence, "stampAsync">, processId: number): Promise<boolean>;
+}
+
+/**
+ * Quits a desktop that has no runtime connection once another desktop's update reaches `Closing`, so it does not
+ * keep running the installation's files through the handoff.
+ */
+export declare class UpdateBarrierWatch {
+  /**
+   * Creates the watch.
+   *
+   * @param updates The desktop's side of an update: its process id, the barrier, whether the update has ended and how
+   * to quit.
+   * @param isConnected Whether the desktop has a runtime connection, which tells it about an update itself.
+   * @param interval How often, in milliseconds, it reads the barrier.
+   * @throws ArgumentOutOfRangeException synchronously when the interval is not a positive integer.
+   * @example
+   * ```ts
+   * import { type IUpdateHost, UpdateBarrierWatch } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function watch(updates: IUpdateHost, isConnected: () => boolean): UpdateBarrierWatch {
+   *   return new UpdateBarrierWatch(updates, isConnected, 1000);
+   * }
+   * ```
+   */
+  public constructor(updates: Pick<IUpdateHost, "processId" | "readBarrierAsync" | "hasUpdateEndedAsync" | "quit">, isConnected: () => boolean, interval: number);
+
+  /**
+   * Starts checking the barrier every interval; starting it again changes nothing.
+   *
+   * @example
+   * ```ts
+   * import type { UpdateBarrierWatch } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function begin(watch: UpdateBarrierWatch): void {
+   *   watch.start();
+   * }
+   * ```
+   */
+  public start(): void;
+
+  /**
+   * Stops checking the barrier.
+   *
+   * @example
+   * ```ts
+   * import type { UpdateBarrierWatch } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function end(watch: UpdateBarrierWatch): void {
+   *   watch.stop();
+   * }
+   * ```
+   */
+  public stop(): void;
+
+  /**
+   * Checks the barrier once, unless the desktop is connected or a check is still running. It quits the desktop, and
+   * stops, when the barrier is `Closing` for another desktop whose update has not ended; a barrier it cannot read, or
+   * an update it cannot tell has ended, keeps the desktop running.
+   *
+   * @returns A promise of whether it quit the desktop.
+   * @example
+   * ```ts
+   * import type { UpdateBarrierWatch } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function checkAsync(watch: UpdateBarrierWatch): Promise<boolean> {
+   *   return watch.checkAsync();
+   * }
+   * ```
+   */
+  public checkAsync(): Promise<boolean>;
 }
 
 /**

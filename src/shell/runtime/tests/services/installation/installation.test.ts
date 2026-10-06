@@ -84,7 +84,7 @@ export class InstallationTests {
   }
 
   @TestMethod
-  public async listsTheRecordedDataDirectoriesThatStillExist(): Promise<void> {
+  public async listsTheRecordedDataDirectoriesThatExistNowAndKeepsTheRecordOfTheOthers(): Promise<void> {
     await using folder = await TemporaryFolderFixture.createAsync();
     const installation = InstallationTests.open(folder.path);
     const kept = path.join(folder.path, "kept");
@@ -100,7 +100,49 @@ export class InstallationTests {
     Assert.areEqual(0, empty.length);
     Assert.areEqual(kept, roots.join("|"));
     Assert.areEqual(["broken.json", "other.txt"].join("|"), (await readdir(installation.recordFolder)).filter(t => !/^[0-9a-f]{16}\.json$/.test(t)).toSorted().join("|"));
-    Assert.areEqual(3, (await readdir(installation.recordFolder)).length);
+    Assert.areEqual(4, (await readdir(installation.recordFolder)).length);
+  }
+
+  @TestMethod
+  public async listsTheRecordedDesktopsThatRunAndRemovesTheRecordsOfThoseThatExited(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = InstallationTests.open(folder.path);
+    const empty = await installation.listDesktopsAsync();
+    await installation.recordDesktopAsync(InstallationTests.RUNNING);
+    await installation.recordDesktopAsync(InstallationTests.GONE);
+    await writeFile(path.join(installation.desktopFolder, "broken.json"), "{");
+    await writeFile(path.join(installation.desktopFolder, "other.txt"), "{}");
+
+    const desktops = await installation.listDesktopsAsync();
+
+    Assert.areEqual(0, empty.length);
+    Assert.areEqual(path.join(folder.path, "installation", "desktops"), installation.desktopFolder);
+    Assert.areEqual(JSON.stringify([InstallationTests.RUNNING.toJson()]), JSON.stringify(desktops.map(t => t.toJson())));
+    Assert.areEqual(["4120.json", "broken.json", "other.txt"].join("|"), (await readdir(installation.desktopFolder)).toSorted().join("|"));
+  }
+
+  @TestMethod
+  public async skipsADesktopRecordRemovedWhileListingAndPassesOnOneThatCannotBeRead(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = InstallationTests.open(folder.path);
+    await installation.recordDesktopAsync(InstallationTests.RUNNING);
+    const original = fs.promises.readFile;
+    fs.promises.readFile = () => Promise.reject<never>(Object.assign(new Error("ENOENT: no such file or directory, open"), { code: "ENOENT" }));
+    syncBuiltinESMExports();
+    let removed: readonly UpdateProcess[];
+    try {
+      removed = await installation.listDesktopsAsync();
+    }
+    finally {
+      fs.promises.readFile = original;
+      syncBuiltinESMExports();
+    }
+    await mkdir(path.join(installation.desktopFolder, "4130.json"));
+
+    const error = await Assert.throwsAsync(() => installation.listDesktopsAsync(), Error) as NodeJS.ErrnoException;
+
+    Assert.areEqual(0, removed.length);
+    Assert.areEqual("EISDIR", error.code);
   }
 
   @TestMethod
@@ -113,6 +155,66 @@ export class InstallationTests {
     const error = await Assert.throwsAsync(() => installation.listDataDirectoriesAsync(), Error) as NodeJS.ErrnoException;
 
     Assert.areEqual("ENOTDIR", error.code);
+  }
+
+  @TestMethod
+  public async findsAnotherUpdateUnderWayWhenItsBarrierIsCreatedJustBeforeTheLink(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = InstallationTests.open(folder.path);
+    const other = JSON.stringify(new UpdateBarrier(InstallationTests.RUNNING, "0.4.0", UpdateBarrierState.Preparing, null).toJson());
+    const link = fs.promises.link;
+    fs.promises.link = async (existing, target) => {
+      await writeFile(target, other);
+      await link(existing, target);
+    };
+    syncBuiltinESMExports();
+    let isHeld: boolean;
+    try {
+      isHeld = await installation.holdAsync(new UpdateBarrier(InstallationTests.RUNNING, "0.3.0", UpdateBarrierState.Preparing, null), "0.2.0");
+    }
+    finally {
+      fs.promises.link = link;
+      syncBuiltinESMExports();
+    }
+
+    Assert.isFalse(isHeld);
+    Assert.areEqual(other, await installation.readTextAsync());
+    Assert.areEqual("barrier.json", (await readdir(installation.folder)).join(","));
+  }
+
+  @TestMethod
+  public async holdsItsBarrierWhenItCannotRemoveItsTemporaryFileAndPassesOnAFailedLink(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = InstallationTests.open(folder.path);
+    const preparing = new UpdateBarrier(InstallationTests.RUNNING, "0.3.0", UpdateBarrierState.Preparing, null);
+    const original = fs.promises.rm;
+    fs.promises.rm = () => Promise.reject(Object.assign(new Error("EBUSY: resource busy or locked, rm"), { code: "EBUSY" }));
+    syncBuiltinESMExports();
+    let isHeld: boolean;
+    try {
+      isHeld = await installation.holdAsync(preparing, "0.2.0");
+    }
+    finally {
+      fs.promises.rm = original;
+      syncBuiltinESMExports();
+    }
+    await installation.releaseAsync();
+    const link = fs.promises.link;
+    fs.promises.link = () => Promise.reject(Object.assign(new Error("EPERM: operation not permitted, link"), { code: "EPERM" }));
+    syncBuiltinESMExports();
+    let error: Error;
+    try {
+      error = await Assert.throwsAsync(() => installation.holdAsync(preparing, "0.2.0"), Error);
+    }
+    finally {
+      fs.promises.link = link;
+      syncBuiltinESMExports();
+    }
+
+    Assert.isTrue(isHeld);
+    Assert.areEqual("EPERM: operation not permitted, link", error.message);
+    Assert.areEqual(1, (await readdir(installation.folder)).length);
+    Assert.isFalse(existsSync(installation.barrierFile));
   }
 
   @TestMethod

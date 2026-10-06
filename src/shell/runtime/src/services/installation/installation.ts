@@ -13,7 +13,7 @@ import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { JsonReader } from "@noldova/teamrun-foundation-json";
-import type { UpdateProcess } from "@noldova/teamrun-shell-protocol";
+import { UpdateProcess } from "@noldova/teamrun-shell-protocol";
 
 import { UpdateBarrierState } from "../../enums/update-barrier-state.js";
 import { UpdateBarrierStatus } from "../../enums/update-barrier-status.js";
@@ -26,11 +26,13 @@ export class Installation {
   public readonly folder: string;
   public readonly barrierFile: string;
   public readonly recordFolder: string;
+  public readonly desktopFolder: string;
 
   public constructor(folder: string, isRunningAsync: (holder: UpdateProcess) => Promise<boolean>) {
     this.folder = folder;
     this.barrierFile = path.join(folder, Resources.barrierFileName);
     this.recordFolder = path.join(folder, Resources.dataDirectoriesFolderName);
+    this.desktopFolder = path.join(folder, Resources.desktopsFolderName);
     this.isRunningAsync = isRunningAsync;
   }
 
@@ -67,18 +69,38 @@ export class Installation {
     return roots.filter(t => !Object.isNull(t));
   }
 
+  public async recordDesktopAsync(desktop: UpdateProcess): Promise<void> {
+    const file = path.join(this.desktopFolder, `${desktop.processId}${Resources.jsonExtension}`);
+    const temporary = path.join(this.desktopFolder, Resources.formatTemporaryName(path.basename(file), randomUUID()));
+    await mkdir(this.desktopFolder, { recursive: true });
+    await writeFile(temporary, JSON.stringify(desktop.toJson()));
+    await rename(temporary, file);
+  }
+
+  public async listDesktopsAsync(): Promise<readonly UpdateProcess[]> {
+    const files = await Installation.unlessMissingAsync(readdir(this.desktopFolder)) ?? [];
+    const desktops = await Promise.all(files.filter(t => t.endsWith(Resources.jsonExtension)).map(t => this.readDesktopAsync(path.join(this.desktopFolder, t))));
+    return desktops.filter(t => !Object.isNull(t));
+  }
+
   public async holdAsync(barrier: UpdateBarrier, version: string): Promise<boolean> {
     if (await this.checkAsync(version) !== UpdateBarrierStatus.None)
       return false;
     await mkdir(this.folder, { recursive: true });
     const temporary = await this.writeTemporaryAsync(barrier);
+    let isHeld = false;
     try {
       await link(temporary, this.barrierFile);
+      isHeld = true;
+    }
+    catch (error) {
+      if (!Installation.hasCode(error, Resources.existingFileErrorCode))
+        throw error;
     }
     finally {
-      await rm(temporary, { force: true });
+      await rm(temporary, { force: true }).catch(() => undefined);
     }
-    return true;
+    return isHeld;
   }
 
   public async replaceAsync(barrier: UpdateBarrier): Promise<void> {
@@ -168,10 +190,27 @@ export class Installation {
     catch {
       return null;
     }
-    if (existsSync(root))
-      return root;
+    return existsSync(root) ? root : null;
+  }
+
+  private async readDesktopAsync(file: string): Promise<UpdateProcess | null> {
+    const text = await Installation.unlessMissingAsync(readFile(file, Resources.utf8Encoding));
+    const desktop = Object.isNull(text) ? null : Installation.parseDesktop(text);
+    if (Object.isNull(desktop))
+      return null;
+    if (await this.isRunningAsync(desktop))
+      return desktop;
     await rm(file, { force: true });
     return null;
+  }
+
+  private static parseDesktop(text: string): UpdateProcess | null {
+    try {
+      return UpdateProcess.fromJson(JSON.parse(text));
+    }
+    catch {
+      return null;
+    }
   }
 
   private readBarrierAsync(): Promise<string | null> {

@@ -77,6 +77,18 @@ export class Resources {
     return `The launch barrier could not be settled: ${message}`;
   }
 
+  public static formatWindowSaveUnanswered(window: number): string {
+    return `Window ${window} did not finish saving within 5 seconds.`;
+  }
+
+  public static formatWindowSaveGone(window: number): string {
+    return `Window ${window} closed before it saved.`;
+  }
+
+  public static formatDesktopUnrecorded(message: string): string {
+    return `This desktop could not be recorded in its installation, so an update may not wait for it: ${message}`;
+  }
+
   public static readonly checkoutHashAlgorithm: string = "sha256";
   public static readonly hexEncoding: "hex" = "hex";
   public static readonly checkoutHashLength: number = 8;
@@ -348,8 +360,6 @@ export class Resources {
   public static readonly windowHeight: number = 800;
   public static readonly windowAreaShare: number = 0.9;
   public static readonly closeAnswerTimeout: number = 5000;
-  public static readonly windowSaveUnanswered: string = "A window did not finish saving within 5 seconds.";
-  public static readonly windowSaveGone: string = "A window closed before it saved.";
   public static readonly updateBarrierInterval: number = 1000;
   public static readonly updatePrepareTimeout: number = 15000;
   public static readonly updateExitWait: number = 10000;
@@ -399,6 +409,7 @@ export class Resources {
   public static readonly invalidWindowState: string = "The saved window state is not valid.";
   public static readonly positionPairMessage: string = "A window position has both coordinates or neither.";
   public static readonly windowUrlParameter: string = "windowUrl";
+  public static readonly intervalParameter: string = "interval";
   public static readonly timeoutParameter: string = "timeout";
   public static readonly backgroundField: string = "background";
   public static readonly titleBarField: string = "titleBar";

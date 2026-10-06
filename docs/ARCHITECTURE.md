@@ -699,7 +699,7 @@ The ownership database of section 6 is separate.
 | Shortcuts, settings and their values per scope | The shell, in its database |
 | The commands each device last ran from command search | The shell, in its database, the 20 newest per device |
 | The device's last appearance preferences | The desktop, in `appearance.json` beside the device's identity, outside the data directory; a copy of the settings in effect, replaced on each change, and read before the window opens |
-| The data directories an installation's runtimes have owned, and its launch barrier | The installation's folder beside the device's identity, outside every data directory ([Stopping for an update](#stopping-for-an-update)) |
+| The data directories an installation's runtimes have owned, the desktops running from it, and its launch barrier | The installation's folder beside the device's identity, outside every data directory ([Stopping for an update](#stopping-for-an-update)) |
 | Layout, window bounds and a window part's view state | The shell keeps layout and window bounds in its database, written through the runtime; the owning module keeps a part's view state in the data directory. State tied to a display or a window is kept for the device and window that recorded it. A device is identified by a random identity kept in the operating system's local application data, outside the data directory, so devices that share a data directory keep their own; the main window is `main`. Transient state stays in memory; the window keeps the transient state of the shell's own tabs, such as Settings' page, under the tab's key while the tab is open, through moves, and drops it when the tab closes |
 | Drafts and other content the person wrote but did not send | The owning module's database, saved through its runtime part |
 | Credentials an external tool manages | That tool, accessed only through its supported interfaces |
@@ -1006,12 +1006,13 @@ Before the handoff replaces its files, every process of the installation stops, 
 **Installation record.**
 Each installation has a folder `installations/<id>` beside the device's identity, outside every data directory, where the id is the first 16 hexadecimal digits of the SHA-256 of the program's canonical path: its real path with every link resolved, lower-cased on Windows.
 Its `data-directories` folder lists the canonical data directories the installation's runtimes have owned, one file for each, named after the same digest of the directory's path, so runtimes that start together never overwrite each other's entries; a runtime adds its own before it publishes discovery (section 6).
-An entry proves nothing by itself: a directory whose discovery names another program, or that no runtime owns, is skipped, and one that no longer exists is dropped.
+An entry proves nothing by itself: a directory whose discovery names another program, that no runtime owns or that does not exist now is skipped, and its entry kept, since a directory can be missing only for a moment.
+Its `desktops` folder lists the desktops running from the installation, one file for each, named after its process id and holding its process id and start time; a desktop adds its own while it checks the launch barrier at start, logs it when it cannot and starts anyway, and the entry of a desktop that no longer runs is removed when the folder is next read.
 
 **Launch barrier.**
 The installation's `barrier.json` holds the coordinating desktop's process id and start time, the version being installed, the state `Preparing`, `Closing` or `HandedOff` and, once handed off, the process id and start time of the process that took the handoff when the platform gives one.
 It holds while its holder runs, and a `HandedOff` barrier for another version also while the process that took the handoff runs.
-It is written whole to a temporary file and linked into place, which fails when a barrier exists, and each change of state replaces it through a temporary file and a rename, so no reader sees it half-written.
+It is written whole to a temporary file and linked into place, which fails when a barrier exists, so of two desktops that create it at once one finds the other's update under way, and each change of state replaces it through a temporary file and a rename, so no reader sees it half-written.
 While it holds:
 
 - No launcher starts a runtime, and a runtime that finds it after taking ownership releases ownership and exits.
@@ -1039,7 +1040,7 @@ The update stop of the desktop where the person chose Restart to update coordina
    Cancelling ends the update with nothing changed.
 2. **Barrier.**
    It creates the barrier as `Preparing`; an existing barrier whose holder runs means another update is under way, and the update fails.
-   It reads the record again, and a runtime that came into use meanwhile with work in progress fails the update.
+   It reads the record again and connects to every runtime that came into use meanwhile.
    A directory owned without discovery gets five seconds to publish it or let go, as for a starting runtime (section 6), and fails the update otherwise.
    It then asks each runtime `shell.update`, naming the installation's folder, so no new client or program starts, and each client's requests end once it has saved.
 3. **Saves.**
@@ -1050,16 +1051,18 @@ The update stop of the desktop where the person chose Restart to update coordina
    The runtime waits at most 6 seconds for every client, then answers `shell.update` with the outcome and the process id and start time of every client, every program it holds and its AppImage copy's mount; a client that does not answer fails the update.
    The handshake carries no process id, because every build must accept the handshake protocol version 1 defines (section 6).
 4. **Stop.**
-   It asks each runtime `shell.stop` with the policy "stop the work".
+   It reads `shell.work` from each runtime again, and work the person was not asked about in step 1 fails the update.
+   It asks each runtime `shell.stop`: with the policy "stop the work" when it still has work the person agreed to stop, otherwise "only if idle".
    The runtime deactivates its parts, ends their programs, flushes and closes its databases, releases ownership and exits.
 5. **Verify.**
    It waits up to 10 seconds for every runtime and every process step 3 listed except the desktops to exit, checking each by process id and start time as [Programs modules run](#programs-modules-run) identifies a process.
-   It then sets the barrier to `Closing`, and waits up to 10 more seconds for every other desktop to see it, quit and be verified the same way.
+   It then sets the barrier to `Closing`, and waits up to 10 more seconds for every other desktop, those step 3 listed and those the installation's `desktops` folder lists that still run, to see it, quit and be verified the same way.
 6. **Handoff.**
    It sets the barrier to `HandedOff` and calls the handoff, then records in the barrier the process the handoff names as taking over.
    After an AppImage update it first starts `/bin/bash`, detached as a runtime launch is, to wait for its own process to exit and then start the replaced AppImage.
 
-A desktop frozen for an update reads the barrier while its runtime is gone: `Closing` quits it, and a missing barrier unfreezes it and reconnects.
+A desktop frozen for an update reads the barrier while its runtime is gone: `Closing` quits it, and once the update has ended, the barrier missing or its holder gone before the handoff, it unfreezes and reconnects.
+A desktop without a runtime connection, while it reconnects, shows a failed start or is still starting, reads the barrier every second and quits when it is `Closing` for another desktop that still runs.
 A runtime that is still running goes back to normal when the barrier goes or its holder exits before the handoff, as section 6 describes, and its desktops unfreeze on `shell.updateEnded`.
 
 **Failure.**

@@ -44,6 +44,7 @@ import type { IElectron } from "../interfaces/i-electron.js";
 import type { IIpcEvent } from "../interfaces/i-ipc-event.js";
 import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
+import type { IUpdateHost } from "../interfaces/i-update-host.js";
 import type { IWindowContents } from "../interfaces/i-window-contents.js";
 import { MainProcessFailureKind } from "../enums/main-process-failure-kind.js";
 import { PathCommandOutcome } from "../enums/path-command-outcome.js";
@@ -74,6 +75,7 @@ import { SpellChecker } from "./spell-checker.js";
 import { SpellingDictionaries } from "./spelling-dictionaries.js";
 import { SystemNotifier } from "./system-notifier.js";
 import { UpdateBarrierGate } from "./update-barrier-gate.js";
+import { UpdateBarrierWatch } from "./update-barrier-watch.js";
 import { WindowFactory } from "./window-factory.js";
 import { WindowRecovery } from "./window-recovery.js";
 
@@ -99,6 +101,8 @@ export class DesktopApplication {
   private readonly policy: SenderPolicy;
   private readonly factory: WindowFactory;
   private readonly startup: RuntimeStartup;
+  private readonly watch: UpdateBarrierWatch;
+  private readonly recordDesktopAsync: () => Promise<boolean>;
   private readonly gate: UpdateBarrierGate;
   private readonly notifier: SystemNotifier;
   private readonly quit: QuitCoordinator;
@@ -128,7 +132,8 @@ export class DesktopApplication {
     createPathCommand: (executablePath: string) => PathCommand,
     icons: AppIcons,
     spelling: SpellChecker,
-    installation: Installation) {
+    installation: Installation,
+    recordDesktopAsync: () => Promise<boolean>) {
     this.electron = electron;
     this.createPathCommand = createPathCommand;
     this.readDeviceAsync = readDeviceAsync;
@@ -145,12 +150,16 @@ export class DesktopApplication {
     this.factory = new WindowFactory(settings, this.policy, electron, taskbar, icons);
     this.notifier = new SystemNotifier(electron.notifications, log, () => icons.window, () => this.isAnyWindowFocused(), t => this.openNotification(t));
     this.gate = new UpdateBarrierGate(installation, RuntimeBuild.identity.productVersion, electron.dialog, t => log.write(t));
-    this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }), {
+    const updates: IUpdateHost = {
       processId: process.processId,
       readBarrierAsync: () => installation.readAsync(),
+      hasUpdateEndedAsync: () => installation.hasEndedAsync(),
       saveAsync: () => this.saveForUpdateAsync(),
       quit: () => electron.app.exit(Resources.quitExitCode)
-    });
+    };
+    this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }), updates);
+    this.watch = new UpdateBarrierWatch(updates, () => !Object.isNull(this.startup.connection), Resources.updateBarrierInterval);
+    this.recordDesktopAsync = recordDesktopAsync;
     this.quit = new QuitCoordinator(t => this.isLastOpen(t), () => this.readWorkAsync(), () => this.stopWorkAsync());
     this.spelling = spelling;
   }
@@ -162,7 +171,8 @@ export class DesktopApplication {
     createLauncher: (settings: LaunchSettings, installation: Installation) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
     createAppearanceStore: (folder: string) => IAppearanceStore,
-    createPathCommand: (executablePath: string) => PathCommand): void {
+    createPathCommand: (executablePath: string) => PathCommand,
+    recordDesktopAsync: (installation: Installation) => Promise<boolean>): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
     process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
@@ -199,7 +209,7 @@ export class DesktopApplication {
       () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
     const application = new DesktopApplication(
       electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createAppearanceStore, createPathCommand, icons,
-      spelling, installation);
+      spelling, installation, () => recordDesktopAsync(installation));
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
   }
@@ -216,7 +226,10 @@ export class DesktopApplication {
     app.enableSandbox();
     app.on(Resources.secondInstanceEvent, () => this.focus());
     app.on(Resources.windowAllClosedEvent, () => app.quit());
-    app.on(Resources.willQuitEvent, () => this.startup.close());
+    app.on(Resources.willQuitEvent, () => {
+      this.watch.stop();
+      this.startup.close();
+    });
     void app.whenReady().then(() => this.ready());
   }
 
@@ -271,15 +284,26 @@ export class DesktopApplication {
       if (this.hasPassedBarrier && this.windows.size === 0)
         this.open();
     });
-    void Promise.all([this.passBarrierAsync(() => this.gate.passAsync()), this.readAppearanceAsync()]).then(([isClear]) => {
+    void Promise.all([this.passBarrierAsync(() => this.gate.passAsync()), this.readAppearanceAsync(), this.recordSelfAsync()]).then(([isClear]) => {
       if (!isClear) {
         this.electron.app.exit(Resources.quitExitCode);
         return;
       }
       this.hasPassedBarrier = true;
       this.open();
+      this.watch.start();
       void this.startup.startAsync();
     });
+  }
+
+  private async recordSelfAsync(): Promise<void> {
+    try {
+      if (!await this.recordDesktopAsync())
+        this.log.write(Resources.formatDesktopUnrecorded(Resources.updateHolderNotFound));
+    }
+    catch (error) {
+      this.log.write(Resources.formatDesktopUnrecorded(String(error)));
+    }
   }
 
   private async readAppearanceAsync(): Promise<void> {
@@ -716,7 +740,7 @@ export class DesktopApplication {
   }
 
   private async saveForUpdateAsync(): Promise<readonly string[]> {
-    const problems = await Promise.all([...this.windows.values()].map(t => t.updateSaves.requestAsync()));
+    const problems = await Promise.all([...this.windows.values()].map((t, index) => t.updateSaves.requestAsync(index + 1)));
     return problems.flat();
   }
 

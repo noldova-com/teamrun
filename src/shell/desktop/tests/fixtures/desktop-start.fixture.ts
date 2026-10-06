@@ -42,13 +42,14 @@ export class DesktopStartFixture {
     device: FakeDeviceIdentity = new FakeDeviceIdentity(),
     appearance: FakeAppearanceStore = new FakeAppearanceStore(),
     pathCommand: FakePathCommand = new FakePathCommand(),
-    installations: Installation[] = []): LaunchSettings[] {
+    installations: Installation[] = [],
+    recordDesktopAsync: (installation: Installation) => Promise<boolean> = () => Promise.resolve(true)): LaunchSettings[] {
     const settings: LaunchSettings[] = [];
     DesktopApplication.start(electron, process, DesktopStartFixture.MODULE_URL, (t, installation) => {
       settings.push(t);
       installations.push(installation);
       return launcher;
-    }, t => device.readAsync(t), t => appearance.create(t), t => pathCommand.create(t));
+    }, t => device.readAsync(t), t => appearance.create(t), t => pathCommand.create(t), recordDesktopAsync);
     return settings;
   }
 

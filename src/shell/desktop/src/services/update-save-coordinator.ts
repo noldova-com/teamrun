@@ -16,7 +16,7 @@ import { Resources } from "../resources.js";
 export class UpdateSaveCoordinator {
   private readonly send: (requestId: string) => boolean;
   private readonly timeout: number;
-  private readonly pending: Map<string, (problems: readonly string[]) => void> = new Map();
+  private readonly pending: Map<string, (problems: readonly string[] | null) => void> = new Map();
 
   public constructor(send: (requestId: string) => boolean, timeout: number) {
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(timeout, Resources.timeoutParameter);
@@ -25,18 +25,18 @@ export class UpdateSaveCoordinator {
     this.timeout = timeout;
   }
 
-  public requestAsync(): Promise<readonly string[]> {
+  public requestAsync(window: number): Promise<readonly string[]> {
     const requestId = randomUUID();
     return new Promise<readonly string[]>(resolve => {
-      const timer = setTimeout(() => finish([Resources.windowSaveUnanswered]), this.timeout);
-      const finish = (problems: readonly string[]): void => {
+      const timer = setTimeout(() => finish([Resources.formatWindowSaveUnanswered(window)]), this.timeout);
+      const finish = (problems: readonly string[] | null): void => {
         clearTimeout(timer);
         this.pending.delete(requestId);
-        resolve(problems);
+        resolve(problems ?? [Resources.formatWindowSaveGone(window)]);
       };
       this.pending.set(requestId, finish);
       if (!this.send(requestId))
-        finish([Resources.windowSaveGone]);
+        finish(null);
     });
   }
 
@@ -51,6 +51,6 @@ export class UpdateSaveCoordinator {
 
   public release(): void {
     for (const finish of [...this.pending.values()])
-      finish([Resources.windowSaveGone]);
+      finish(null);
   }
 }
