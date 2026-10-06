@@ -14,12 +14,14 @@ import SourceFile from "./source-file.ts";
 import SourceInventory from "./source-inventory.ts";
 
 export default class SourceTree {
+  public static readonly TEST_FOLDERS: ReadonlySet<string> = new Set(["tests", "e2e", "fixtures"]);
+  public static readonly SHELL_OWNER: string = "shell";
+
   private static readonly SOURCE_FOLDER: string = "src";
   private static readonly MODULES_FOLDER: string = "src/modules";
   private static readonly MODULE_FILE: RegExp = /^src\/modules\/([^/]+)\/./;
   private static readonly SHELL_FILE: RegExp = /^src\/(?:shell|foundation)\/./;
   private static readonly SHELL_AREA_DEPTH: number = 2;
-  public static readonly TEST_FOLDERS: ReadonlySet<string> = new Set(["tests", "e2e", "fixtures"]);
   private static readonly SCANNED_EXTENSIONS: ReadonlySet<string> = new Set([
     ".ts", ".mts", ".cts", ".js", ".mjs", ".cjs", ".html", ".css", ".scss", ".json"
   ]);
@@ -27,8 +29,6 @@ export default class SourceTree {
 
   private readonly root: string;
   private readonly files: RepositoryFiles;
-
-  public static readonly SHELL_OWNER: string = "shell";
 
   public constructor(root: string, files: RepositoryFiles) {
     this.root = root;
