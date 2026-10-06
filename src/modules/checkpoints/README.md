@@ -4,33 +4,27 @@
 
 ## 1. Purpose
 
-A checkpoint captures the files of a working folder at one moment: a project's folder, or the folder of a conversation without a project.
-The module captures and compares checkpoints; restoration requires a user request.
+A checkpoint captures the files of a working folder at one moment: a project's folder, or the folder of a conversation without a project. The module captures and compares checkpoints; restoration requires a user request.
 
 ## 2. Parts and dependencies
 
-The runtime part captures, compares and restores checkpoints and keeps their records.
-The module depends on the module that publishes each working folder's stable identity; section 5 lists that dependency as a missing decision.
+The runtime part captures, compares and restores checkpoints and keeps their records. The module depends on the module that publishes each working folder's stable identity; section 5 lists that dependency as a missing decision.
 
 ## 3. Data
 
 Git holds file content; other records, including conversations and settings, remain in their owners' databases.
 
 - Keep one repository per working folder in the module's data-directory folder, `modules/checkpoints`, with every object needed for restoration.
-- Reference the working folder's stable identity published by the module that owns it.
-  The architecture governs device-local paths and reconnection; missing folders are reported, never classified as unchanged.
+- Reference the working folder's stable identity published by the module that owns it. The architecture governs device-local paths and reconnection; missing folders are reported, never classified as unchanged.
 - Module records identify checkpoints in these repositories.
 
 ## 4. Behavior
 
 Captures and restores for one working folder run one at a time; a request that arrives during one waits for it.
 
-Use only TeamRun-delivered Git; never discover or run an installed copy.
-System, user and project configuration, ignore rules, attributes and filters have no effect; no hooks run.
-TeamRun's own policy selects files, stored and restored byte for byte.
+Use only TeamRun-delivered Git; never discover or run an installed copy. System, user and project configuration, ignore rules, attributes and filters have no effect; no hooks run. TeamRun's own policy selects files, stored and restored byte for byte.
 
-Never read, modify, run Git against or depend on the person's repository storage, index, branches, references or configuration.
-Exclude that storage from both capture and restoration.
+Never read, modify, run Git against or depend on the person's repository storage, index, branches, references or configuration. Exclude that storage from both capture and restoration.
 
 ## 5. Missing decisions
 
