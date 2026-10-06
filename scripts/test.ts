@@ -219,6 +219,7 @@ export default class Test {
     const { default: EnumValueCheck } = await import("./checks/enum-value-check.ts");
     const { default: ExceptionNameCheck } = await import("./checks/exception-name-check.ts");
     const { default: FoundationValueCheck } = await import("./checks/foundation-value-check.ts");
+    const { default: InterfaceNameCheck } = await import("./checks/interface-name-check.ts");
     const { default: SyntaxTreeReader } = await import("./structure/syntax-tree.reader.ts");
     const tree = new SourceTree(this.root, files);
     const build = new PackageBuild(this.root, this.runner, this.environment);
@@ -235,6 +236,7 @@ export default class Test {
       new TestWaitCheck(this.root, files),
       new FieldOrderCheck(this.root, files),
       new BucketNameCheck(files, syntax),
+      new InterfaceNameCheck(files, syntax),
       new AngularFileCheck(files, syntax),
       new FoundationValueCheck(files, new PackageCatalog(this.root), syntax),
       new EnumValueCheck(files, syntax),
