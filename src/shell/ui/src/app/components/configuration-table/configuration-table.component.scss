@@ -1,0 +1,80 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.tr-configuration-table {
+  --tr-configuration-table-focus-room: calc(var(--tr-border-width) * 3);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-3);
+  min-width: 0;
+}
+
+.tr-configuration-table-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tr-space-2) var(--tr-space-4);
+}
+
+.tr-configuration-table-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--tr-text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.tr-configuration-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tr-space-2);
+  margin-inline-start: auto;
+}
+
+.tr-configuration-table-explanation {
+  margin: 0;
+  color: var(--tr-text);
+}
+
+.tr-configuration-table-scroll {
+  margin: calc(var(--tr-configuration-table-focus-room) * -1);
+  padding: var(--tr-configuration-table-focus-room);
+  overflow-x: auto;
+}
+
+.tr-configuration-table-grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tr-configuration-table-grid > :is(thead, tbody, tfoot) > tr > :is(th, td) {
+  padding: var(--tr-space-2);
+  border-bottom: var(--tr-border-width) solid var(--tr-card-border);
+  text-align: start;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.tr-configuration-table-grid > :is(thead, tbody, tfoot) > tr > :is(th, td):first-child {
+  padding-inline-start: 0;
+}
+
+.tr-configuration-table-grid > :is(thead, tbody, tfoot) > tr > :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.tr-configuration-table-grid > :is(thead, tbody, tfoot) > tr > .tr-configuration-table-fill {
+  width: 100%;
+  min-width: var(--tr-text-field-width);
+  white-space: normal;
+}
+
+.tr-configuration-table-grid > thead > tr > th {
+  font-weight: 600;
+}

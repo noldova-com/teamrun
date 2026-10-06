@@ -352,6 +352,7 @@ export class Resources {
   public static readonly treeShiftDuration: number = 150;
   public static readonly treeShiftEasing: string = "ease-out";
   public static readonly treeMoveKeys: string = "Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight";
+  public static readonly configurationTableHeadingLevel: number = 3;
   public static readonly scrollOverflow: RegExp = /auto|scroll/u;
   public static readonly reducedMotionQuery: string = "(prefers-reduced-motion: reduce)";
   public static readonly rightToLeftSelector: string = ":dir(rtl)";
