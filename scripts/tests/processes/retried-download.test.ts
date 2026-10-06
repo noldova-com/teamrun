@@ -52,7 +52,7 @@ class RetriedDownloadTests {
       await assert.rejects(MockPausesFixture.settleAsync(t, () => RetriedDownload.runAsync("The tool", output, () => {
         attempts++;
         return Promise.resolve(`exit code ${attempts}: HTTPError`);
-      }), () => `the output is ${JSON.stringify(output.text)}`), new ProcessException("The tool could not be installed in 4 attempts; the last failed with exit code 4: HTTPError."));
+      }), output, () => `the output is ${JSON.stringify(output.text)}`), new ProcessException("The tool could not be installed in 4 attempts; the last failed with exit code 4: HTTPError."));
 
       assert.equal(attempts, RetriedDownloadTests.ATTEMPTS);
       assert.equal(output.text, `${RetriedDownloadTests.pausing(1)}${RetriedDownloadTests.pausing(2)}${RetriedDownloadTests.pausing(3)}`);

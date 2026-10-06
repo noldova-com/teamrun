@@ -125,7 +125,7 @@ class ElectronBinaryTests {
   }
 
   private static runAsync(t: TestContext, runner: InstallerRunnerFixture, output: TextOutputFixture, binary: ElectronBinary): Promise<void> {
-    return MockPausesFixture.settleAsync(t, () => binary.installAsync(output), () => `${runner.captured.length} attempts started; the output is ${JSON.stringify(output.text)}`);
+    return MockPausesFixture.settleAsync(t, () => binary.installAsync(output), output, () => `${runner.captured.length} attempts started; the output is ${JSON.stringify(output.text)}`);
   }
 
   private static async createAsync(t: TestContext): Promise<RepositoryFixture> {
