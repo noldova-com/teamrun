@@ -32,7 +32,7 @@ export class ProcessPresenceTests {
   @TestMethod
   public async stampsTheProcessesTheTableListsWithTheRangeTheirStartFallsIn(): Promise<void> {
     const windows = new WindowsProcessApiFixture([ProcessPresenceTests.WINDOWS_TABLE]);
-    const presence = ProcessPresence.create("win32", new SystemCommandFixture([]), windows);
+    const presence = new ProcessPresence("win32", new SystemCommandFixture([]), windows);
 
     const stamps = await presence.stampAsync([[4188, "program"], [4999, "cli"], [4120, "desktop"]]);
 
@@ -44,7 +44,7 @@ export class ProcessPresenceTests {
   @TestMethod
   public async readsNoTableToStampNoProcesses(): Promise<void> {
     const command = new SystemCommandFixture([]);
-    const presence = ProcessPresence.create("darwin", command);
+    const presence = new ProcessPresence("darwin", command, new WindowsProcessApiFixture());
 
     Assert.areEqual(0, (await presence.stampAsync([])).length);
     Assert.areEqual(0, command.calls.length);
@@ -54,7 +54,7 @@ export class ProcessPresenceTests {
   public async readsNothingOfAnyPlatformUntilItChecksAProcess(): Promise<void> {
     const command = new SystemCommandFixture([]);
     const windows = new WindowsProcessApiFixture();
-    const presences = ["linux", "darwin", "win32"].map(t => ProcessPresence.create(t, command, windows));
+    const presences = ["linux", "darwin", "win32"].map(t => new ProcessPresence(t, command, windows));
 
     const stamps = await Promise.all(presences.map(t => t.stampAsync([])));
 
@@ -66,7 +66,7 @@ export class ProcessPresenceTests {
   @TestMethod
   public async findsAProcessOnlyWhenItsIdIsListedWithAStartThatCanFallInItsRange(): Promise<void> {
     const table = ProcessPresenceTests.WINDOWS_TABLE;
-    const presence = ProcessPresence.create("win32", new SystemCommandFixture([]), new WindowsProcessApiFixture([table, table, table, table]));
+    const presence = new ProcessPresence("win32", new SystemCommandFixture([]), new WindowsProcessApiFixture([table, table, table, table]));
 
     const results = [
       await presence.isRunningAsync(new UpdateProcess(4120, 1500050, 1500100, "desktop")),
@@ -81,7 +81,7 @@ export class ProcessPresenceTests {
   @TestMethod
   public async readsThePosixTableWithPs(): Promise<void> {
     const command = new SystemCommandFixture(["  4120     1  4120   01:00\n", "  4120     1  4120   01:00\n"]);
-    const presence = ProcessPresence.create("darwin", command);
+    const presence = new ProcessPresence("darwin", command, new WindowsProcessApiFixture());
 
     const [stamp] = await presence.stampAsync([[4120, "desktop"]]);
 

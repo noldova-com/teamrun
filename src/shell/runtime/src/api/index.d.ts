@@ -2303,16 +2303,35 @@ export declare class Installation {
  * start, as a runtime identifies the programs it owns.
  */
 export declare class ProcessPresence {
-  private constructor();
-
   /**
    * Creates the presence with the platform's process table reader. It reads
    * nothing, not even the boot's identity, until it first looks up a process.
    *
    * @param platform The platform, as `process.platform` names it.
-   * @param command Runs `ps` outside Windows.
-   * @param windows Reads the process table on Windows; the runtime's own
-   * addon by default.
+   * @param command Runs `ps` on macOS and Linux.
+   * @param windows The system calls that read the process table on Windows.
+   * {@link ProcessPresence.create} passes the system's own functions, called
+   * through the runtime's Windows addon.
+   * @example
+   * ```ts
+   * import { type IWindowsProcessApi, ProcessPresence, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createPresence(windows: IWindowsProcessApi): ProcessPresence {
+   *   return new ProcessPresence("win32", new SystemCommand(), windows);
+   * }
+   * ```
+   */
+  public constructor(platform: string, command: SystemCommand, windows: IWindowsProcessApi);
+
+  /**
+   * Creates the presence a client or runtime runs with, which on Windows
+   * reads the process table through the system's own functions, called
+   * through the runtime's Windows addon. It reads nothing, not even the
+   * boot's identity, until it first looks up a process, and the addon loads
+   * at its first use.
+   *
+   * @param platform The platform, as `process.platform` names it.
+   * @param command Runs `ps` on macOS and Linux.
    * @returns The presence.
    * @example
    * ```ts
@@ -2321,7 +2340,7 @@ export declare class ProcessPresence {
    * export const presence: ProcessPresence = ProcessPresence.create(process.platform, new SystemCommand());
    * ```
    */
-  public static create(platform: string, command: SystemCommand, windows?: IWindowsProcessApi): ProcessPresence;
+  public static create(platform: string, command: SystemCommand): ProcessPresence;
 
   /**
    * Returns the processes that still run with the range their start falls
