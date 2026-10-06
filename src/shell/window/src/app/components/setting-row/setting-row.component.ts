@@ -44,6 +44,7 @@ export class SettingRowComponent {
   public readonly query = input<string>("");
   public readonly modules = input<readonly SelectOption[]>([]);
   public readonly languages = input<readonly SelectOption[]>([]);
+  public readonly languagesNote = input<string | null>(null);
   public readonly isInverse = input<boolean>(false);
   public readonly canRun = input<boolean>(false);
   public readonly changed = output<JsonValue>();
