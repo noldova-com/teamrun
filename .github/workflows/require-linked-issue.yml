@@ -10,13 +10,15 @@ on:
   pull_request:
     branches: [main]
     types: [opened, edited, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   issues: read
   pull-requests: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -30,8 +32,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          QUEUE_BRANCH: ${{ github.event.merge_group.head_ref }}
         run: |
           set -euo pipefail
+
+          if [[ -z "$PR_NUMBER" ]]; then
+            if [[ ! $QUEUE_BRANCH =~ ^refs/heads/gh-readonly-queue/main/pr-([1-9][0-9]*)-[0-9a-f]+$ ]]; then
+              echo '::error::Run this check for a pull request, or for a merge group whose queue branch names its pull request.'
+              exit 1
+            fi
+            PR_NUMBER=${BASH_REMATCH[1]}
+          fi
 
           if ! body=$(timeout 30s gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
             -H 'X-GitHub-Api-Version: 2026-03-10' \

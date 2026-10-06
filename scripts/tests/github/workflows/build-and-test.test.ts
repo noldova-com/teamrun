@@ -152,7 +152,7 @@ class BuildAndTestTests {
 
     test("the aggregate check names the targets a passing pull request run left to main and manual runs", { timeout: BuildAndTestTests.SCRIPT_TIMEOUT }, async t => {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
-      const left = "every target this pull request run covers. Skipped here and run on every push to main and in manual runs: Windows ARM64, macOS x64.";
+      const left = "every target this run covers. Skipped here and run on every push to main and in manual runs: Windows ARM64, macOS x64.";
       for (const [runUi, planned, summary] of [
         ["true", "success", `The document checks passed, and the build, tests and UI workflows passed on ${left}\n`],
         ["false", "skipped", `Only documentation, CI and test tooling or repository configuration changed: the document checks passed, the build and tests passed on ${left} The UI workflows were not required.\n`]
@@ -222,8 +222,8 @@ class BuildAndTestTests {
       assert.equal(workflow.readStepScript("Check the documents"), "npm test -- documents\n");
       assert.equal(workflow.readStepScript("Select the verification scope and the jobs"), "node scripts/classify-changes.ts\n");
       assert.ok(text.indexOf("Check the documents") < text.indexOf("Select the verification scope and the jobs"));
-      assert.ok(text.includes("          EVENT_NAME: ${{ github.event_name }}\n          BASE_SHA: ${{ github.event.pull_request.base.sha }}\n" +
-        "          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}\n"));
+      assert.ok(text.includes("          EVENT_NAME: ${{ github.event_name }}\n          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}\n" +
+        "          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}\n"));
       for (const output of ["run-code", "run-ui", "targets", "target-table", "ui-targets", "ui-plan", "deferred", "ui-deferred"])
         assert.ok(text.includes(`      ${output}: \${{ steps.scope.outputs.${output} }}\n`), output);
       assert.ok(text.includes("  validate:\n    name: Build and test (${{ matrix.target }})\n    needs: changes\n" +
@@ -319,7 +319,7 @@ class BuildAndTestTests {
         "(needs.cache.result == 'success' || needs.cache.result == 'skipped') }}\n"));
       assert.equal(text.match(/persist-credentials: false/g)?.length, 5);
       assert.ok(text.includes("cancel-in-progress: ${{ github.event_name == 'pull_request' }}"));
-      for (const trigger of ["  pull_request:\n    branches: [main]", "  push:\n    branches: [main]", "  workflow_dispatch:"])
+      for (const trigger of ["  pull_request:\n    branches: [main]", "  merge_group:\n    types: [checks_requested]\n", "  push:\n    branches: [main]", "  workflow_dispatch:"])
         assert.ok(text.includes(trigger), trigger);
       for (const use of [...text.matchAll(/uses: (\S+)/g), ...ui.matchAll(/uses: (\S+)/g), ...action.matchAll(/uses: (\S+)/g)])
         assert.match(use[1] ?? "", /^(actions\/[a-z-]+(\/[a-z-]+)?@[0-9a-f]{40}|\.\/\.github\/actions\/prepare|\.\/\.github\/workflows\/ui-workflows\.yml)$/);

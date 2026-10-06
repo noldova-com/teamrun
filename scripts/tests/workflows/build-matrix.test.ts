@@ -32,6 +32,14 @@ class BuildMatrixTests {
       assert.deepEqual([new BuildMatrix("push").targets, new BuildMatrix("push").deferred], [full.targets, []]);
     });
 
+    test("a merge group runs what a pull request runs", () => {
+      const describe = (matrix: BuildMatrix): string[] => [...matrix.targets, ...matrix.deferred, ...matrix.uiTargets, ...matrix.uiDeferred].map(t =>
+        `${t.name}: ${matrix.uiShards(t).map(s => `${s.index}/${s.count} ${s.grep} ${s.isPrebuilt}`).join(", ")}`);
+
+      assert.deepEqual(describe(new BuildMatrix("merge_group")), describe(new BuildMatrix("pull_request")));
+      assert.deepEqual(new BuildMatrix("merge_group").targets.map(t => t.name), ["Linux x64", "Linux ARM64", "Windows x64", "macOS ARM64"]);
+    });
+
     test("pushes run the UI workflows on every target but macOS x64, which builds and tests and leaves them to manual and nightly runs", () => {
       const names = (targets: readonly BuildTarget[]): string[] => targets.map(t => t.name);
       const push = new BuildMatrix("push");

@@ -10,6 +10,8 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   workflow_dispatch:
@@ -85,8 +87,8 @@ jobs:
         id: scope
         env:
           EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
         run: node scripts/classify-changes.ts
 
   validate:
@@ -445,7 +447,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "$DEFERRED" ]; then
-            covered="every target this pull request run covers. Skipped here and run on every push to main and in manual runs: $DEFERRED."
+            covered="every target this run covers. Skipped here and run on every push to main and in manual runs: $DEFERRED."
           elif [ -n "$UI_DEFERRED" ]; then
             covered="every target, with the UI workflows of $UI_DEFERRED left to manual and nightly runs."
           else
