@@ -277,9 +277,14 @@ export class WindowPartHostService implements IWindowPartHost {
       if (!isReconnect && await this.loadLayoutAsync())
         openAtStart = (...t) => this.opener.restoreSaved(...t);
     }
-    finally {
-      this.replayPending(openAtStart);
+    catch (error) {
+      if (this.isLayoutLoaded || !RuntimeDisconnectedException.isIn(error))
+        this.replayPending(openAtStart);
+      else
+        this.pendingOpens.unshift(...this.startOpens.splice(0));
+      throw error;
     }
+    this.replayPending(openAtStart);
   }
 
   private async activateReportedAsync(connection: number): Promise<boolean> {
@@ -375,6 +380,7 @@ export class WindowPartHostService implements IWindowPartHost {
       this.replay(pending, openAtStart);
     for (const pending of this.pendingOpens.splice(0))
       this.replay(pending, (...t) => this.opener.open(...t));
+    this.layout.reopenEarlyDocuments();
   }
 
   private replay(pending: PendingDocument, open: DocumentOpenerService["open"]): void {

@@ -75,7 +75,7 @@ export default class PackageStage {
     const archives = new BuildLayout(this.root);
     const result = await this.npm.runAsync([...PackageStage.INSTALL_ARGUMENTS, this.layout.npmCache, ...packages.map(t => archives.locateArchive(t, versions.of(t.name)))], this.folder);
     if (!result.isSuccessful)
-      throw new PackagingException(`Installing the packages into the stage failed with exit code ${result.exitCode}; it uses only the build's archives and never the registry:\n${`${result.output}${result.errorOutput}`.trim()}`);
+      throw new PackagingException(`Installing the packages into the stage failed with exit code ${result.exitCode}; it uses only the build's archives and never the registry:\n${result.text}`);
     output.write(`Packages in the stage: ${packages.map(t => t.name).join(", ")}.\n`);
 
     await cp(path.join(this.root, product.icons), path.join(this.folder, product.icons), { recursive: true });

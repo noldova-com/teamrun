@@ -20,6 +20,7 @@ import type { ILayoutStore } from "../interfaces/i-layout-store";
 import { DockYield } from "../models/layout/dock-yield";
 import type { DocumentTab } from "../models/layout/document-tab";
 import type { DropTarget } from "../models/layout/drop-target";
+import { EarlyDocument } from "../models/layout/early-document";
 import { Layout } from "../models/layout/layout";
 import { LayoutGeometry } from "../models/layout/layout-geometry";
 import { LayoutReader } from "../models/layout/layout.reader";
@@ -47,6 +48,8 @@ export class LayoutService {
   private readonly revealedState: WritableSignal<TabReveal | null> = signal(null);
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saved: Layout | null = null;
+  private early: EarlyDocument[] | null = [];
+  private reopening: readonly EarlyDocument[] = [];
   private writing: Promise<void> = Promise.resolve();
 
   public readonly layout: Signal<Layout> = this.layoutState.asReadonly();
@@ -94,6 +97,8 @@ export class LayoutService {
     const read = Object.isNull(saved) ? null : this.read(saved);
     const layout = read ?? Layout.createDefault(this.registryState());
     this.clearSaveTimer();
+    this.reopening = (this.early ?? []).filter(t => this.layoutState().isOpen(t.tab));
+    this.early = null;
     this.layoutState.set(layout);
     this.saved = layout;
     return !Object.isNull(read);
@@ -107,8 +112,16 @@ export class LayoutService {
   }
 
   public openDocument(tab: DocumentTab, isPreview: boolean = false): void {
+    this.early?.push(new EarlyDocument(tab, isPreview));
     this.update(this.layoutState().openDocument(tab, isPreview && this.previewTabs()));
     this.reveal(tab);
+  }
+
+  public reopenEarlyDocuments(): void {
+    this.early = null;
+    for (const early of this.reopening)
+      this.openDocument(early.tab, early.isPreview);
+    this.reopening = [];
   }
 
   public restoreDocument(tab: DocumentTab, isPreview: boolean): void {

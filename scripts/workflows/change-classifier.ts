@@ -16,10 +16,12 @@ export default class ChangeClassifier {
   private static readonly DOCUMENTATION_FOLDERS: readonly string[] = ["docs/", ".github/"];
   private static readonly MODULE_DOCUMENT_PATTERN: RegExp = /^src\/modules\/[^/]+\/README\.md$/;
   private static readonly UI_JOB_PATHS: readonly string[] = [".github/actions/", ".github/workflows/build-and-test.yml", ".github/workflows/ui-workflows.yml"];
-  private static readonly OUTSIDE_APP_FOLDERS: readonly string[] = [".github/", "scripts/api/", "scripts/checks/", "scripts/documents/", "scripts/tests/", "scripts/workflows/"];
+  private static readonly OUTSIDE_APP_FOLDERS: readonly string[] = [".github/", "scripts/api/", "scripts/checks/", "scripts/documents/", "scripts/packaging/", "scripts/tests/", "scripts/workflows/"];
   private static readonly OUTSIDE_APP_FILES: readonly string[] = [
     ".gitignore",
     "scripts/classify-changes.ts",
+    "scripts/package-smoke.ts",
+    "scripts/package.ts",
     "scripts/test-options.exception.ts",
     "scripts/test-options.ts",
     "scripts/test.ts",

@@ -57,6 +57,18 @@ class PackagedBuildCheckTests {
       assert.equal(output.text, "The packaged build failed with exit code 1.\n");
     });
 
+    test("the check fails and names the file when the built window still holds the Gallery", async t => {
+      const repository = await PackagedBuildCheckTests.createAsync(t, true);
+      const gallery = new GalleryFile(repository.directory);
+      const angular = PackagedBuildCheckTests.createAngular(repository);
+      const output = new TextOutputFixture();
+      const runner = new PackagedBuildFixture(gallery, [], `<p>${GalleryFile.MARKERS[0]}</p>\n`);
+
+      assert.equal(await new PackagedBuildCheck(repository.directory, new PackagedBuild(repository.directory, runner, gallery, angular), angular).runAsync(output), false);
+
+      assert.equal(output.text, `The window built in _build/variants/packaged/window contains ${JSON.stringify(GalleryFile.MARKERS[0])} in ${path.join("browser", "index.html")}.\n`);
+    });
+
     test("a tree without the Angular project has no window to check", async t => {
       const repository = await PackagedBuildCheckTests.createAsync(t, false);
       const gallery = new GalleryFile(repository.directory);

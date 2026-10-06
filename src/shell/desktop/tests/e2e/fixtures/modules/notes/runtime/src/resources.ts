@@ -13,4 +13,5 @@ export class Resources {
   public static readonly releaseOptionsMethod: string = "notes.releaseOptions";
   public static readonly manyTabsMarker: string = "many-tabs";
   public static readonly longCountMarker: string = "long-count";
+  public static readonly holdFirstOptionsMarker: string = "hold-first-options";
 }

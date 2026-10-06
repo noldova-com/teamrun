@@ -39,7 +39,24 @@ export default class ApiCatalog {
     return [...packages, ...this.parts.map(t => ApiPackage.forPart(this.root, t, this.angular.projectFile, paths))];
   }
 
-  public async listOrReportAsync(output: Writable): Promise<readonly ApiPackage[] | undefined> {
+  public async inspectEachAsync(output: Writable, noPackages: string, verdict: string, inspectAsync: (apiPackage: ApiPackage) => Promise<readonly string[]>): Promise<boolean> {
+    const apiPackages = await this.listOrReportAsync(output);
+    if (apiPackages === undefined)
+      return false;
+    if (apiPackages.length === 0) {
+      output.write(noPackages);
+      return true;
+    }
+    let passed = true;
+    for (const apiPackage of apiPackages) {
+      const problems = await inspectAsync(apiPackage);
+      output.write(problems.length === 0 ? `${apiPackage.directory}: ${verdict}\n` : `${apiPackage.directory}:\n${problems.map(t => `  ${t}\n`).join("")}`);
+      passed &&= problems.length === 0;
+    }
+    return passed;
+  }
+
+  private async listOrReportAsync(output: Writable): Promise<readonly ApiPackage[] | undefined> {
     try {
       return await this.listAsync();
     }
