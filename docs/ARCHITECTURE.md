@@ -530,7 +530,8 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
     Otherwise the runtime answers, cancels its work and stops.
 - A client may also ask `shell.stop` to keep the runtime while it is shared, which combines with either policy.
   It asks this only of a runtime of its own build, because an earlier runtime refuses a field it does not know.
-  The runtime first counts the authenticated connections other than the asking one, whatever names their clients gave, so a second client of the same kind counts too; each client holds one connection to its runtime.
+  The runtime first counts the authenticated connections other than the asking one, whatever names their clients gave, so a second client of the same kind counts too.
+  A client's own further connections count as other clients as well; the desktop holds one connection to its runtime, replacing it only once it has ended, and the command line holds one for each command.
   While any is open, it neither refuses nor cancels and touches no work: it answers with the number it is kept for and goes on running.
   Only when none is open does the policy apply as above.
   Work is shared, so one client's quit never cancels work another client may be using.
