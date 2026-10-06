@@ -36,6 +36,7 @@ import {
 } from "@noldova/teamrun-shell-runtime";
 
 import { PathCommandException } from "../exceptions/path-command.exception.js";
+import type { IContextMenuParams } from "../interfaces/i-context-menu-params.js";
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
 import type { IElectron } from "../interfaces/i-electron.js";
@@ -68,6 +69,8 @@ import { QuitCoordinator } from "./quit-coordinator.js";
 import { RuntimeStartup } from "./runtime-startup.js";
 import { RuntimeWindowStateStore } from "./runtime-window-state-store.js";
 import { SenderPolicy } from "./sender-policy.js";
+import { SpellChecker } from "./spell-checker.js";
+import { SpellingDictionaries } from "./spelling-dictionaries.js";
 import { SystemNotifier } from "./system-notifier.js";
 import { WindowFactory } from "./window-factory.js";
 import { WindowRecovery } from "./window-recovery.js";
@@ -96,6 +99,7 @@ export class DesktopApplication {
   private readonly startup: RuntimeStartup;
   private readonly notifier: SystemNotifier;
   private readonly quit: QuitCoordinator;
+  private readonly spelling: SpellChecker;
   private readonly readDeviceAsync: (folder: string) => Promise<string>;
   private readonly deviceFolder: string;
   private readonly appearanceStore: IAppearanceStore;
@@ -118,7 +122,8 @@ export class DesktopApplication {
     readDeviceAsync: (folder: string) => Promise<string>,
     createAppearanceStore: (folder: string) => IAppearanceStore,
     createPathCommand: (executablePath: string) => PathCommand,
-    icons: AppIcons) {
+    icons: AppIcons,
+    spelling: SpellChecker) {
     this.electron = electron;
     this.createPathCommand = createPathCommand;
     this.readDeviceAsync = readDeviceAsync;
@@ -136,6 +141,7 @@ export class DesktopApplication {
     this.notifier = new SystemNotifier(electron.notifications, log, () => icons.window, () => this.isAnyWindowFocused(), t => this.openNotification(t));
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }));
     this.quit = new QuitCoordinator(t => this.isLastOpen(t), () => this.readWorkAsync(), () => this.stopWorkAsync());
+    this.spelling = spelling;
   }
 
   public static start(
@@ -159,7 +165,8 @@ export class DesktopApplication {
       process.homeFolder,
       join(moduleDirectory, ...Resources.repositoryRootSegments),
       DesktopApplication.readArgument(process.argv, Resources.dataDirectoryArgument));
-    if (Object.isUndefined(DesktopApplication.readArgument(process.argv, Resources.userDataArgument)))
+    const userData = DesktopApplication.readArgument(process.argv, Resources.userDataArgument);
+    if (Object.isUndefined(userData))
       electron.app.setPath(Resources.userDataPath, dataDirectory.profileFolder);
     const launchSettings = new LaunchSettings(
       dataDirectory,
@@ -173,8 +180,15 @@ export class DesktopApplication {
     const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform);
     const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, icons.window, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
     const log = new DesktopLog(dataDirectory, process.errorOutput, redactor);
+    const profileFolder = userData ?? dataDirectory.profileFolder;
+    const languages = process.platform === Resources.macPlatform
+      ? []
+      : SpellingDictionaries.install(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.dictionaryFolderSegments), profileFolder, t => log.write(t));
+    const spelling = new SpellChecker(
+      () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
     const application = new DesktopApplication(
-      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createAppearanceStore, createPathCommand, icons);
+      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createAppearanceStore, createPathCommand, icons,
+      spelling);
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
   }
@@ -196,6 +210,7 @@ export class DesktopApplication {
   }
 
   private ready(): void {
+    this.spelling.start();
     const session = this.electron.session.defaultSession;
     ApplicationMenu.install(this.electron.menu, this.settings);
     this.electron.app.dock?.setIcon(this.icons.dock);
@@ -211,6 +226,9 @@ export class DesktopApplication {
     this.electron.ipcMain.on(Resources.readyChannel, (event, appearance) => this.show(event, appearance));
     this.electron.ipcMain.on(Resources.appearanceChannel, (event, appearance) => this.repaint(event, appearance));
     this.electron.ipcMain.on(Resources.keepAppearanceChannel, (event, preferences) => this.keepAppearance(event, preferences));
+    this.electron.ipcMain.handle(Resources.readSpellingChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.spelling.toJson());
+    this.electron.ipcMain.on(Resources.spellingChannel, (event, isChecking, languages) => this.keepSpelling(event, isChecking, languages));
+    this.electron.ipcMain.handle(Resources.replaceMisspellingChannel, (event, text) => this.replaceMisspelling(event, text));
     this.electron.ipcMain.on(Resources.menuBarChannel, (event, menuBar) => this.showMenuBar(event, menuBar));
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
     this.electron.ipcMain.handle(Resources.quitAnswerChannel, (event, choice) => this.answerQuit(event, choice));
@@ -265,11 +283,40 @@ export class DesktopApplication {
     this.appearanceStore.writeAsync(json).catch((error: unknown) => this.log.write(Resources.formatAppearanceUnsaved(String(error))));
   }
 
+  private keepSpelling(event: IIpcEvent, isChecking: unknown, languages: unknown): void {
+    if (Object.isNull(this.findTrusted(event)))
+      return;
+    if (!Object.isBoolean(isChecking) || !Array.isArray(languages) || !languages.every(t => Object.isString(t))) {
+      this.log.write(Resources.formatSpellingRejected(Resources.spellingInvalid));
+      return;
+    }
+    this.spelling.apply(isChecking, languages);
+  }
+
+  private replaceMisspelling(event: IIpcEvent, text: unknown): boolean {
+    const open = this.findTrusted(event);
+    if (Object.isNull(open) || !Object.isString(text) || text.length === 0 || text.length > Resources.spellingTextLimit)
+      return false;
+    open.window.webContents.replaceMisspelling(text);
+    return true;
+  }
+
+  private forwardFieldMenu(open: OpenWindow, params: IContextMenuParams): void {
+    open.window.webContents.send(Resources.fieldMenuChannel, {
+      [Resources.xField]: params.x,
+      [Resources.yField]: params.y,
+      [Resources.isKeyboardField]: params.menuSourceType === Resources.keyboardMenuSource,
+      [Resources.wordField]: params.misspelledWord,
+      [Resources.suggestionsField]: [...params.dictionarySuggestions]
+    });
+  }
+
   private open(): void {
     const window = this.factory.create(WindowState.createDefault(ScreenArea.of(this.electron.screen.getPrimaryDisplay().workArea)), this.appearance);
     const contentsId = window.webContents.id;
     const open = new OpenWindow(window, this.electron.screen, this.log, this.quit, this.settings.platform);
     window.webContents.on(Resources.didStartLoadingEvent, () => this.notifier.hold());
+    window.webContents.on(Resources.contextMenuEvent, (_event, params) => this.forwardFieldMenu(open, params));
     new WindowRecovery(open, this.electron.dialog, this.log, this.process, () => this.electron.app.quit(), () => this.openLogFolderAsync(), Resources.reloadCrashLimit, Resources.rendererEndLimit);
     this.windows.set(contentsId, open);
     window.once(Resources.closedEvent, () => this.windows.delete(contentsId));

@@ -346,6 +346,9 @@ The context is merged into each item's arguments, the item's own fields winning,
 The shell's own groups put Close the tab in File, and command search, Left dock, Right dock and Bottom dock as checkbox rows, the bottom dock across the window or between the side docks, and Reset the layout in View, and Settings… in the macOS application menu after About.
 On Windows and Linux, Edit holds Undo, Redo, Cut, Copy, Paste and Select all: each acts on the field that had focus before a menu took it, with the field's selection restored first, and is enabled only when that field allows it, such as Copy only with a selection and Paste only into a field that can be written.
 The text field menu, `shell.field`, holds Cut, Copy, Paste and Select all, acting and enabled the same way, on every platform.
+On a misspelled word it starts with the spell checker's suggestions, each replacing the word.
+Only the desktop knows the word and its suggestions, from the window's `context-menu` event, so the window leaves a field's right click, menu key and Shift+F10 to the desktop, which sends the word and suggestions back.
+The window opens the menu when that message matches the click or key it noted, or opens the menu without suggestions after 300 ms, so a missing message cannot lose the menu and a late one cannot open it elsewhere.
 It opens as the context menu of a text field or rich text anywhere in the window outside overlays, anchored to the field, unless the field's own context menu has taken the right click or key, and returns focus to the field when it closes.
 The tab menu is built from the shell's groups in `shell.tab` the same way, for the tab it was opened on: Keep open, Move to, Split and Dock, Move left and Move right, then the close commands.
 Rows that can never apply to that tab are left out, such as Keep open on a kept tab and Move to, Split and Dock on a document.
@@ -847,7 +850,7 @@ Each target is packaged on its own platform and processor.
     They are installed offline from the build's own archives, never from the registry, and without peer dependencies, since the program itself is the desktop's Electron.
   - `_build` holds the window, the module declarations and the product file of `npm run build -- --packaged`.
     The packaging checks the window again for the Gallery.
-  - The identity's icons and `LICENSE`.
+  - The identity's icons, `LICENSE` and `assets/dictionaries`.
 
   The stage becomes `resources/app.asar`, and nothing is unpacked: the command line and the runtime load their modules from it in Node mode, and a notification's icon reaches the OS as image data, never as a path.
 - **Program.**
@@ -858,6 +861,15 @@ Each target is packaged on its own platform and processor.
   The AppImage uses electron-builder's static AppImage runtime (toolset `1.0.3`, runtime 20251108), which electron-builder still labels beta, because it starts on a stock Ubuntu 24.04.
   The legacy runtime needs libfuse2, which current Ubuntu does not install, so the download would not start.
   Where unprivileged user namespaces are restricted, as on current Ubuntu, electron-builder's AppRun launcher starts TeamRun without Chromium's namespace sandbox; the window then loads only TeamRun's own code.
+- **Spelling dictionaries.**
+  `assets/dictionaries` holds the Hunspell dictionaries the desktop ships, in Chromium's `.bdic` form, and `dictionaries.json` lists each one's language and file, so choosing the shipped languages changes only that list and its files.
+  English (United States), `en-US-10-1.bdic`, is the file of Electron's own dictionary archive for its version, built from SCOWL's `en_US` word list with Chromium's additions; its licenses ship beside it.
+  Before Electron is ready, the desktop copies each listed dictionary that the profile's `Dictionaries` folder lacks into it, where Chromium looks for it, and offers only the languages it has put there.
+  At ready it points Chromium's dictionary download at that folder's `file:` URL and chooses the languages, so no dictionary is ever downloaded.
+  Chromium cannot download from a `file:` URL, so a dictionary that is not there fails at once without a connection.
+  A closed loopback port would not do, because any local process listening on it would be asked for a dictionary, which Chromium would then parse.
+  On Windows, Chromium checks a chosen language that Windows has installed with the Windows spell checker, and one that Windows lacks with the shipped dictionary; the chosen languages still decide which.
+  On macOS the system's spell checker chooses the languages, and the desktop copies and offers none.
 - **Installation.**
   The Windows installer installs for the current user without elevation and keeps the data directory when TeamRun is uninstalled.
 - **Command on the PATH (Windows).**
@@ -882,7 +894,7 @@ Each target is packaged on its own platform and processor.
   The Windows ARM64 installer's archive is compressed with 7-Zip's x86 filter.
   The ARM64 7-Zip that packages it would otherwise choose its ARM64 filter, which the installer's older extractor cannot read, so it would skip every `.exe` and `.dll` and still report success.
 - **Licenses.**
-  `resources/licenses` holds TeamRun's license, the fonts' licenses and the window's third-party licenses.
+  `resources/licenses` holds TeamRun's license, the fonts' and the spelling dictionaries' licenses and the window's third-party licenses.
   Electron's and Chromium's licenses stay beside the program.
 - **Fuses.**
   The program's Electron fuses allow only what TeamRun uses:

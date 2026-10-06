@@ -17,6 +17,7 @@ export interface IApplicationHost {
   setDesktopName(name: string): void;
   setPath(name: "userData", path: string): void;
   requestSingleInstanceLock(): boolean;
+  getPreferredSystemLanguages(): string[];
   enableSandbox(): void;
   quit(): void;
   relaunch(): void;
