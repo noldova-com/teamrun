@@ -104,6 +104,7 @@ export class RuntimeApiTests {
       "SettingsService",
       "ShellDatabase",
       "ShellMigrations",
+      "ShellSettings",
       "SystemCommand",
       "SystemCommandException",
       "UnknownSchemaException",

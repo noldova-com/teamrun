@@ -25,12 +25,13 @@ export class ShellSettings {
   public static readonly previewTabs: QualifiedName = ShellSettings.named(Resources.previewTabsSetting);
   public static readonly doNotDisturb: QualifiedName = ShellSettings.named(Resources.doNotDisturbSetting);
   public static readonly mutedModules: QualifiedName = ShellSettings.named(Resources.mutedModulesSetting);
+  public static readonly trayIcon: QualifiedName = ShellSettings.named(Resources.trayIconSetting);
   public static readonly keyBindings: QualifiedName = ShellSettings.named(Resources.keyBindingsSetting);
   public static readonly recentCommandCount: QualifiedName = ShellSettings.named(Resources.recentCommandCountSetting);
   public static readonly spellCheck: QualifiedName = ShellSettings.named(Resources.spellCheckSetting);
   public static readonly spellCheckLanguages: QualifiedName = ShellSettings.named(Resources.spellCheckLanguagesSetting);
 
-  public static readonly all: readonly SettingDefinition[] = [
+  private static readonly common: readonly SettingDefinition[] = [
     ShellSettings.appearance(ShellSettings.theme, Resources.themeTitle, Resources.formatThemeDescription(ProductInfo.current.name),
       SettingType.choice([new SettingOption(Resources.defaultThemeId, Resources.defaultThemeTitle)]), Resources.defaultThemeId, SettingLocality.Shared, Resources.themeGroup),
     ShellSettings.appearance(ShellSettings.mode, Resources.modeTitle, Resources.modeDescription,
@@ -62,10 +63,19 @@ export class ShellSettings {
     new SettingDefinition(ShellSettings.doNotDisturb, Resources.doNotDisturbTitle, Resources.doNotDisturbDescription,
       SettingType.boolean(), false, SettingLocality.Device, [], Resources.notificationsPage, Resources.notificationsGroup),
     new SettingDefinition(ShellSettings.mutedModules, Resources.mutedModulesTitle, Resources.mutedModulesDescription,
-      SettingType.modules(), [], SettingLocality.Shared, [], Resources.notificationsPage, Resources.notificationsGroup),
-    new SettingDefinition(ShellSettings.keyBindings, Resources.keyBindingsTitle, Resources.keyBindingsDescription,
-      SettingType.keyBindings(), {}, SettingLocality.Shared, [], Resources.shortcutsPage, Resources.shortcutsGroup)
+      SettingType.modules(), [], SettingLocality.Shared, [], Resources.notificationsPage, Resources.notificationsGroup)
   ];
+
+  public static definitionsFor(platform: string): readonly SettingDefinition[] {
+    const product = ProductInfo.current.name;
+    return [
+      ...ShellSettings.common,
+      new SettingDefinition(ShellSettings.trayIcon, Resources.formatTrayIconTitle(product, platform), Resources.formatTrayIconDescription(product),
+        SettingType.boolean(), platform !== Resources.macPlatform, SettingLocality.Device, [], Resources.notificationsPage, Resources.backgroundGroup),
+      new SettingDefinition(ShellSettings.keyBindings, Resources.keyBindingsTitle, Resources.keyBindingsDescription,
+        SettingType.keyBindings(), {}, SettingLocality.Shared, [], Resources.shortcutsPage, Resources.shortcutsGroup)
+    ];
+  }
 
   private static named(member: string): QualifiedName {
     return new QualifiedName(Resources.reservedModuleId, member);

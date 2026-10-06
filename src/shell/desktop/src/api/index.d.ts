@@ -420,6 +420,11 @@ export interface IDesktopProcess {
   readonly processId: number;
 
   /**
+   * Runs other programs for the desktop, such as `gdbus` to find a Linux tray.
+   */
+  readonly programs: IProgramHost;
+
+  /**
    * Starts another program, detached, for the hand-over to a newer build.
    *
    * @param executablePath The program.
@@ -1460,6 +1465,109 @@ export interface ISystemNotification {
 }
 
 /**
+ * An icon in the Windows notification area, the macOS menu bar or the Linux tray, as Electron's `Tray` provides it.
+ */
+export interface ITray {
+  /**
+   * Shows another image.
+   *
+   * @param image The image file: `.ico` on Windows, a template `.png` on macOS, `.png` on Linux.
+   * @example
+   * ```ts
+   * import type { ITray } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function showIdle(tray: ITray): void {
+   *   tray.setImage("/teamrun/assets/icons/tray/tray-idle.png");
+   * }
+   * ```
+   */
+  setImage(image: string): void;
+
+  /**
+   * Sets the text shown when the pointer rests on the icon.
+   *
+   * @param toolTip The text.
+   * @example
+   * ```ts
+   * import type { ITray } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function describe(tray: ITray): void {
+   *   tray.setToolTip("TeamRun: 2 running");
+   * }
+   * ```
+   */
+  setToolTip(toolTip: string): void;
+
+  /**
+   * Sets the icon's menu.
+   *
+   * @param menu A menu that {@link IMenuHost.buildFromTemplate} built.
+   * @example
+   * ```ts
+   * import type { IMenuHost, ITray } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function offerQuit(tray: ITray, menu: IMenuHost, quit: () => void): void {
+   *   tray.setContextMenu(menu.buildFromTemplate([{ label: "Quit TeamRun", click: quit }]));
+   * }
+   * ```
+   */
+  setContextMenu(menu: unknown): void;
+
+  /**
+   * Listens for a click on the icon.
+   *
+   * @param event `click`.
+   * @param listener Called on each click.
+   * @returns The tray, for chaining.
+   * @example
+   * ```ts
+   * import type { ITray } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function openOnClick(tray: ITray, open: () => void): void {
+   *   tray.on("click", open);
+   * }
+   * ```
+   */
+  on(event: "click", listener: () => void): unknown;
+
+  /**
+   * Removes the icon.
+   *
+   * @example
+   * ```ts
+   * import type { ITray } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function hide(tray: ITray): void {
+   *   tray.destroy();
+   * }
+   * ```
+   */
+  destroy(): void;
+}
+
+/**
+ * Creates tray icons, as Electron's `Tray` constructor does.
+ */
+export interface ITrayHost {
+  /**
+   * Shows a new icon.
+   *
+   * @param image The icon's image file.
+   * @returns The icon.
+   * @throws Error when the operating system cannot show it.
+   * @example
+   * ```ts
+   * import type { ITray, ITrayHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function show(host: ITrayHost): ITray {
+   *   return host.create("/teamrun/assets/icons/tray/tray-idle.png");
+   * }
+   * ```
+   */
+  create(image: string): ITray;
+}
+
+/**
  * The operating system's notification service, as Electron's `Notification` class provides it.
  */
 export interface INotificationHost {
@@ -2129,6 +2237,11 @@ export interface IElectron {
    * The operating system's notifications, for notifications posted while no window is focused.
    */
   readonly notifications: INotificationHost;
+
+  /**
+   * The tray, for the icon in the Windows notification area, the macOS menu bar or the Linux tray.
+   */
+  readonly tray: ITrayHost;
 
   /**
    * The displays, for placing a window on one that shows it.

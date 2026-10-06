@@ -8,6 +8,8 @@
 
 import type { Writable } from "node:stream";
 
+import type { IProgramHost } from "./i-program-host.js";
+
 export interface IDesktopProcess {
   readonly argv: readonly string[];
   readonly env: NodeJS.ProcessEnv;
@@ -18,6 +20,7 @@ export interface IDesktopProcess {
   readonly isDefaultApp: boolean;
   readonly errorOutput: Writable;
   readonly processId: number;
+  readonly programs: IProgramHost;
 
   startDetached(executablePath: string, args: readonly string[]): void;
   endProcess(processId: number): void;
