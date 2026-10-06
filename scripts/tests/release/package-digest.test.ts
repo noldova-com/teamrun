@@ -36,7 +36,7 @@ class PackageDigestTests {
 
       const read = await PackageDigest.readAsync(path.join(repository.directory, "TeamRun-linux-x64.AppImage.sha256"));
 
-      assert.deepEqual(PackageDigest.of(Buffer.from(content)), read);
+      assert.deepEqual(PackageDigest.fromBytes(Buffer.from(content)), read);
     });
   }
 }

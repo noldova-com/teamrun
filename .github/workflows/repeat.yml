@@ -1,0 +1,226 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Repeat
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plan:
+    name: Select the repeats
+    if: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'repeat') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      legs: ${{ steps.select.outputs.legs }}
+      test-arguments: ${{ steps.select.outputs.test-arguments }}
+      workflow-arguments: ${{ steps.select.outputs.workflow-arguments }}
+    steps:
+      - name: Check out the change history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js to select
+        id: node
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to select again
+        if: steps.node.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to select again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to select a last time
+        if: steps.node-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to select a last time
+        if: steps.node-again.outcome == 'failure'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Select the tests and the jobs
+        id: select
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/repeat-plan.ts
+
+  repeat:
+    name: Repeat (${{ matrix.name }})
+    needs: plan
+    if: ${{ needs.plan.outputs.legs != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.legs) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - name: Stop Spotlight indexing
+        if: runner.os == 'macOS'
+        run: sudo mdutil -i off /System/Volumes/Data
+
+      - name: Check out the revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare the job
+        uses: ./.github/actions/prepare
+        with:
+          architecture: ${{ matrix.architecture }}
+
+      - name: Build
+        if: needs.plan.outputs.test-arguments != ''
+        run: npm run build
+
+      - name: Repeat the tests
+        if: needs.plan.outputs.test-arguments != ''
+        env:
+          TEST_ARGUMENTS: ${{ needs.plan.outputs.test-arguments }}
+          REPEATS: ${{ matrix.repeats }}
+        run: npm test -- $TEST_ARGUMENTS --repeat "$REPEATS"
+
+      - name: Let Electron's sandbox start on Linux
+        if: runner.os == 'Linux' && needs.plan.outputs.workflow-arguments != ''
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Repeat the UI workflows
+        if: needs.plan.outputs.workflow-arguments != ''
+        env:
+          WORKFLOW_ARGUMENTS: ${{ needs.plan.outputs.workflow-arguments }}
+          REPEATS: ${{ matrix.repeats }}
+        run: |
+          set -- $WORKFLOW_ARGUMENTS --repeat-each "$REPEATS" --retries 0
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui -- "$@"
+          else
+            npm run test:ui -- "$@"
+          fi
+
+      - name: Keep what the failures left
+        id: failures
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: repeat-failures-${{ matrix.key }}-${{ github.run_attempt }}
+          path: |
+            _build/angular-tests.log
+            _build/angular-tests.json
+            _build/ui
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping what the failures left again
+        if: failure() && steps.failures.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep what the failures left again
+        id: failures-again
+        if: failure() && steps.failures.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: repeat-failures-${{ matrix.key }}-${{ github.run_attempt }}
+          path: |
+            _build/angular-tests.log
+            _build/angular-tests.json
+            _build/ui
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping what the failures left a last time
+        if: failure() && steps.failures-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep what the failures left a last time
+        id: failures-last
+        if: failure() && steps.failures-again.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: repeat-failures-${{ matrix.key }}-${{ github.run_attempt }}
+          path: |
+            _build/angular-tests.log
+            _build/angular-tests.json
+            _build/ui
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Warn that what the failures left was not kept
+        if: failure() && steps.failures-last.outcome == 'failure'
+        run: |
+          echo "::warning title=What the failures left was not kept::The upload failed three times, so it is not attached. The repeats' result is not affected."
+
+  report:
+    name: Repeat (all targets)
+    needs: [plan, repeat]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every repeat to pass
+        env:
+          LABELLED: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'repeat') }}
+          PLAN_RESULT: ${{ needs.plan.result }}
+          LEGS: ${{ needs.plan.outputs.legs }}
+          REPEAT_RESULT: ${{ needs.repeat.result }}
+        run: |
+          set -euo pipefail
+          if [ "$LABELLED" != true ]; then
+            echo "Nothing is repeated: only a pull request with the repeat label repeats its tests."
+            exit 0
+          fi
+          if [ "$PLAN_RESULT" != success ]; then
+            echo "::error title=The repeats were not selected::Selecting the repeats ended with the result $PLAN_RESULT."
+            exit 1
+          fi
+          if [ "$LEGS" = '[]' ]; then
+            echo "Nothing is repeated: the change affects no test or UI workflow file."
+            exit 0
+          fi
+          if [ "$REPEAT_RESULT" != success ]; then
+            echo "::error title=A repeat did not pass::The repeat jobs ended with the result $REPEAT_RESULT."
+            exit 1
+          fi
+          echo "Every repeat passed on every target."

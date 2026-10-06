@@ -90,15 +90,21 @@ export default class ReleasePublisher {
       "the published release");
     if (published.isDraft)
       throw new ReleaseException(`GitHub kept ${version.tag} as a draft when it was published.`);
-    ReleasePublisher.requireComplete(published, digests);
-    await this.requireTagAsync(version.tag, revision);
+    try {
+      ReleasePublisher.requireComplete(published, digests);
+      await this.requireTagAsync(version.tag, revision);
+    }
+    catch (error) {
+      throw new ReleaseException(`${version.tag} is public now, but checking it after publishing failed: ${String(error)} Check it by hand; a published release is never replaced.`,
+        { cause: error });
+    }
     this.output.write(`Published ${version.tag} from ${revision} with ${digests.size} files.\n`);
   }
 
   private async createDraftAsync(version: ReleaseVersion, revision: string, notes: string): Promise<GitHubRelease> {
     const commit = await this.readTagAsync(version.tag);
     if (commit !== null)
-      throw new ReleaseException(`The tag ${version.tag} already exists, on ${commit}, without a release; a published tag is never moved.`);
+      throw new ReleaseException(`The tag ${version.tag} already points at ${commit}, but no release uses it. A tag is never moved here; remove it by hand only if nothing was published from it.`);
     this.output.write(`Creating the draft release ${version.tag} for ${revision}.\n`);
     return GitHubRelease.read(await this.api.sendAsync("POST", "/releases",
       [["tag_name", version.tag], ["target_commitish", revision], ["name", version.text], ["body", notes]], [["draft", true]]), "the new release");

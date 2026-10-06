@@ -24,7 +24,7 @@ export default class PackageDigest {
     this.size = size;
   }
 
-  public static of(bytes: Buffer): PackageDigest {
+  public static fromBytes(bytes: Buffer): PackageDigest {
     return new PackageDigest(createHash(PackageDigest.SHA256).update(bytes).digest("hex"), createHash(PackageDigest.SHA512).update(bytes).digest("base64"), bytes.length);
   }
 

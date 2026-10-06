@@ -29,7 +29,7 @@ export default class ProcessRunner {
       let size = 0;
       let failure: ProcessException | null = null;
       const stop = (t: ProcessException): void => {
-        failure = t;
+        failure ??= t;
         child.kill();
       };
       const receive = (chunks: Buffer[], chunk: Buffer): void => {
