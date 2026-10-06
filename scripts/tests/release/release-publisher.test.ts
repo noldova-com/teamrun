@@ -18,6 +18,8 @@ import ReleasePublisher from "../../release/release-publisher.ts";
 import ReleaseVersion from "../../release/release-version.ts";
 import GitHubApi from "../../repository/github-api.ts";
 import GitHubException from "../../repository/github.exception.ts";
+import HangLimitFixture from "../fixtures/hang-limit.fixture.ts";
+import MockPausesFixture from "../fixtures/mock-pauses.fixture.ts";
 import ReleaseFolderFixture from "../fixtures/release-folder.fixture.ts";
 import ReleaseGitHubFixture from "../fixtures/release-github.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
@@ -26,8 +28,7 @@ class ReleasePublisherTests {
   private static readonly REVISION: string = "0123456789abcdef0123456789abcdef01234567";
   private static readonly OTHER_REVISION: string = "fedcba9876543210fedcba9876543210fedcba98";
   private static readonly RETRY_PAUSE: number = 10_000;
-  private static readonly TICK: number = 1_000;
-  private static readonly MAXIMUM_TURNS: number = 20_000;
+  private static readonly LIMIT: number = 20_000;
   private static readonly QUIET_TURNS: number = 100;
   private static readonly TIMEOUT: number = 30_000;
 
@@ -109,18 +110,25 @@ class ReleasePublisherTests {
       t.mock.timers.enable({ apis: ["setTimeout"] });
       t.after(() => t.mock.timers.reset());
 
+      let isDone = false;
       const run = ReleasePublisherTests.startAsync(github, release, output, files);
-      await ReleasePublisherTests.settleAsync(() => output.text.includes(" failed on attempt 1 of 3: "), "the first failed upload");
+      const settled = run.then(() => {
+        isDone = true;
+      }, () => {
+        isDone = true;
+      });
+      await ReleasePublisherTests.reachAsync("the first failed upload", () => output.text.includes(" failed on attempt 1 of 3: "), () => output.nextWriteAsync());
       t.mock.timers.tick(ReleasePublisherTests.RETRY_PAUSE - 1);
       for (let turn = 0; turn < ReleasePublisherTests.QUIET_TURNS; turn++)
         await ReleasePublisherTests.turnAsync();
       const early = uploads();
       t.mock.timers.tick(1);
-      await ReleasePublisherTests.settleAsync(() => uploads() === 2, "the second upload once the pause ended");
-      await ReleasePublisherTests.settleAsync(() => github.writes.includes("PATCH /releases/1"), "the publication");
+      await ReleasePublisherTests.reachAsync("the end of publishing once the pause ended", () => isDone, () => settled);
       await run;
 
       assert.equal(early, 1);
+      assert.equal(uploads(), 2);
+      assert.ok(github.writes.includes("PATCH /releases/1"));
       assert.equal(github.releases[0]?.isDraft, false);
     });
 
@@ -302,36 +310,22 @@ class ReleasePublisherTests {
     await new Promise(resolve => setImmediate(resolve));
   }
 
-  private static async settleAsync(condition: () => boolean, subject: string): Promise<void> {
-    for (let turn = 0; turn < ReleasePublisherTests.MAXIMUM_TURNS; turn++) {
-      await ReleasePublisherTests.turnAsync();
-      if (condition())
-        return;
+  private static async reachAsync(subject: string, condition: () => boolean, next: () => Promise<unknown>): Promise<void> {
+    const limit = new HangLimitFixture(ReleasePublisherTests.LIMIT);
+    try {
+      while (!condition()) {
+        await Promise.race([next(), limit.passed]);
+        assert.ok(condition() || !limit.isPassed, `The publisher never reached ${subject} within ${limit.milliseconds} ms.`);
+      }
     }
-    assert.fail(`The publisher never reached ${subject} within ${ReleasePublisherTests.MAXIMUM_TURNS} turns.`);
+    finally {
+      limit.stop();
+    }
   }
 
   private static async publishAsync(t: TestContext, github: ReleaseGitHubFixture, release: ReleaseFolderFixture, output: TextOutputFixture): Promise<void> {
     const files = await release.files.verifyAsync(release.folder, "0.0.2");
-    t.mock.timers.enable({ apis: ["setTimeout"] });
-    try {
-      let isDone = false;
-      const run = ReleasePublisherTests.startAsync(github, release, output, files);
-      const finish = (): void => {
-        isDone = true;
-      };
-      run.then(finish, finish);
-      for (let turn = 0; !isDone; turn++) {
-        if (turn === ReleasePublisherTests.MAXIMUM_TURNS)
-          assert.fail(`Publishing did not settle within ${ReleasePublisherTests.MAXIMUM_TURNS} turns of ${ReleasePublisherTests.TICK} ms.`);
-        await ReleasePublisherTests.turnAsync();
-        t.mock.timers.tick(ReleasePublisherTests.TICK);
-      }
-      await run;
-    }
-    finally {
-      t.mock.timers.reset();
-    }
+    await MockPausesFixture.settleAsync(t, () => ReleasePublisherTests.startAsync(github, release, output, files), output, () => `the publisher's output is ${JSON.stringify(output.text)}`);
   }
 }
 

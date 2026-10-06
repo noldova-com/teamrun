@@ -6,7 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type PackageCatalog from "../packages/package-catalog.ts";
+import PackageException from "../packages/package.exception.ts";
 import type Git from "../repository/git.ts";
+import ChangeSelection from "./change-selection.ts";
+import ChangeSelector from "./change-selector.ts";
 import GitHubEvent from "./github-event.ts";
 import VerificationScope from "./verification-scope.ts";
 
@@ -37,11 +41,14 @@ export default class ChangeClassifier {
   private static readonly PUSH: string = "A push to main verifies everything.";
   private static readonly HISTORY_UNAVAILABLE: string = "The revisions to compare are unavailable.";
   private static readonly EMPTY_COMPARISON: string = "The comparison found no changed files.";
+  private static readonly MERGE_GROUP: string = "A merge group always runs its level in full.";
 
   private readonly git: Git;
+  private readonly catalog: PackageCatalog;
 
-  public constructor(git: Git) {
+  public constructor(git: Git, catalog: PackageCatalog) {
     this.git = git;
+    this.catalog = catalog;
   }
 
   public static affectsUiWorkflows(changedPath: string): boolean {
@@ -51,27 +58,39 @@ export default class ChangeClassifier {
         || ChangeClassifier.isDocumentation(changedPath));
   }
 
-  public static classifyPaths(paths: readonly string[], mergeBase: string): VerificationScope {
+  public static classifyPaths(paths: readonly string[], mergeBase: string, selection: ChangeSelection): VerificationScope {
     if (paths.length === 0)
-      return new VerificationScope(true, true, ChangeClassifier.EMPTY_COMPARISON);
+      return new VerificationScope(true, true, ChangeClassifier.EMPTY_COMPARISON, ChangeSelection.everything(ChangeClassifier.EMPTY_COMPARISON));
     if (paths.every(t => ChangeClassifier.isDocumentation(t)))
-      return new VerificationScope(false, false, `Only Markdown documentation changed since the merge base ${mergeBase}.`);
+      return new VerificationScope(false, false, `Only Markdown documentation changed since the merge base ${mergeBase}.`, selection);
     return paths.some(t => ChangeClassifier.affectsUiWorkflows(t))
-      ? new VerificationScope(true, true, `Files the app is built or tested from changed since the merge base ${mergeBase}.`)
-      : new VerificationScope(true, false, `Only documentation, CI and test tooling or repository configuration changed since the merge base ${mergeBase}.`);
+      ? new VerificationScope(true, true, `Files the app is built or tested from changed since the merge base ${mergeBase}.`, selection)
+      : new VerificationScope(true, false, `Only documentation, CI and test tooling or repository configuration changed since the merge base ${mergeBase}.`, selection);
+  }
+
+  public static selectPaths(paths: readonly string[], selector: ChangeSelector): ChangeSelection {
+    const code = paths.filter(t => !ChangeClassifier.isDocumentation(t));
+    return selector.select(code.filter(t => ChangeClassifier.affectsUiWorkflows(t)), code.filter(t => !ChangeClassifier.affectsUiWorkflows(t)));
   }
 
   public async classifyAsync(eventName?: string, baseRevision?: string, headRevision?: string): Promise<VerificationScope> {
     if (eventName === GitHubEvent.PUSH)
-      return new VerificationScope(true, true, ChangeClassifier.PUSH);
+      return ChangeClassifier.everything(ChangeClassifier.PUSH);
     if (eventName === undefined || !GitHubEvent.PULL_REQUEST_LEVEL.includes(eventName))
-      return new VerificationScope(true, true, ChangeClassifier.MANUAL_RUN);
+      return ChangeClassifier.everything(ChangeClassifier.MANUAL_RUN);
     if (baseRevision === undefined || headRevision === undefined || !await this.existsAsync(baseRevision) || !await this.existsAsync(headRevision))
-      return new VerificationScope(true, true, ChangeClassifier.HISTORY_UNAVAILABLE);
+      return ChangeClassifier.everything(ChangeClassifier.HISTORY_UNAVAILABLE);
 
     const mergeBase = (await this.git.readOutputAsync(["merge-base", baseRevision, headRevision])).trim();
     const changes = await this.git.readOutputAsync(["diff", "--no-renames", "--name-only", "-z", mergeBase, headRevision, "--"]);
-    return ChangeClassifier.classifyPaths(changes.split("\0").filter(t => t.length > 0), mergeBase);
+    const paths = changes.split("\0").filter(t => t.length > 0);
+    return ChangeClassifier.classifyPaths(paths, mergeBase, eventName === GitHubEvent.MERGE_GROUP
+      ? ChangeSelection.everything(ChangeClassifier.MERGE_GROUP)
+      : await this.selectAsync(paths));
+  }
+
+  private static everything(reason: string): VerificationScope {
+    return new VerificationScope(true, true, reason, ChangeSelection.everything(reason));
   }
 
   private static isDocumentation(changedPath: string): boolean {
@@ -79,6 +98,17 @@ export default class ChangeClassifier {
       && (!changedPath.includes("/")
         || ChangeClassifier.DOCUMENTATION_FOLDERS.some(t => changedPath.startsWith(t))
         || ChangeClassifier.MODULE_DOCUMENT_PATTERN.test(changedPath));
+  }
+
+  private async selectAsync(paths: readonly string[]): Promise<ChangeSelection> {
+    try {
+      return ChangeClassifier.selectPaths(paths, new ChangeSelector(await this.catalog.listPackagesAsync(false)));
+    }
+    catch (error) {
+      if (!(error instanceof PackageException))
+        throw error;
+      return ChangeSelection.everything(`The packages could not be read: ${error.message}`);
+    }
   }
 
   private async existsAsync(revision: string): Promise<boolean> {

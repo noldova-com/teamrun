@@ -127,7 +127,7 @@ class AngularProjectTests {
       const runner = new ProcessRunnerFixture([], [AngularProjectTests.FAILED, AngularProjectTests.FAILED, AngularProjectTests.INSTALLED]);
       const output = new TextOutputFixture();
 
-      await MockPausesFixture.settleAsync(t, () => AngularProjectTests.create(repository, runner).prepareAsync(output), () => `${runner.captured.length} attempts started`);
+      await MockPausesFixture.settleAsync(t, () => AngularProjectTests.create(repository, runner).prepareAsync(output), output, () => `${runner.captured.length} attempts started`);
 
       assert.equal(runner.captured.length, 3);
       assert.equal(output.text, `Installing the browser for the Angular tests...\n${AngularProjectTests.pausing(1)}${AngularProjectTests.pausing(2)}`);
@@ -138,9 +138,10 @@ class AngularProjectTests {
       await repository.writeAsync({ "src/node_modules/.teamrun-install": AngularProjectTests.formatRecord("{}\n"), "src/node_modules/@angular/cli/bin/ng.js": "" });
       const attempts = [1, 2, 3, 4].map(number => new ProcessResult(1, "", `Error: Download failed: attempt ${number}\n`));
       const runner = new ProcessRunnerFixture([], attempts);
+      const output = new TextOutputFixture();
 
       await assert.rejects(
-        MockPausesFixture.settleAsync(t, () => AngularProjectTests.create(repository, runner).prepareAsync(new TextOutputFixture()), () => `${runner.captured.length} attempts started`),
+        MockPausesFixture.settleAsync(t, () => AngularProjectTests.create(repository, runner).prepareAsync(output), output, () => `${runner.captured.length} attempts started`),
         new ProcessException("The browser for the Angular tests could not be installed in 4 attempts; the last failed with exit code 1: Error: Download failed: attempt 4."));
 
       assert.equal(runner.captured.length, 4);
