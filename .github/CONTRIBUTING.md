@@ -27,6 +27,7 @@ Submit without labels or milestones if needed; maintainers manage them:
 - `needs triage` marks a report awaiting assessment; remove it after that assessment.
 - `needs information` marks missing details and stays until the required information is supplied.
 - `in progress` marks an issue someone is working on; see [Before making a change](#before-making-a-change).
+- `repeat` on a pull request has CI repeat the tests its change affects; see [Repeated runs](../docs/TESTING.md#flakiness-and-races).
 
 The [labels page](https://github.com/noldova-com/teamrun/labels) describes each label's meaning.
 
