@@ -21,6 +21,7 @@ async function setSizesAsync(window: Page, size: number): Promise<void> {
     await window.evaluate(([setting, value]) => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
       .request("shell.setSetting", { name: setting, value }), [name, size] as const);
   await expect.poll(() => window.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(16 * size / DEFAULT_PANEL_SIZE, 2);
+  await expect.poll(() => window.evaluate(() => ["--tr-text-message", "--tr-text-code"].map(t => getComputedStyle(document.documentElement).getPropertyValue(t)))).toEqual([`${size}px`, `${size}px`]);
 }
 
 async function measureAsync(window: Page): Promise<{ sizes: Record<string, number>; borders: Record<string, number>; windowRow: number; iconButton: number; rem: number }> {
@@ -102,8 +103,8 @@ test.describe("the smallest and largest text", () => {
 
     for (const size of [12, 18]) {
       await setSizesAsync(window, size);
-      expect(await card.evaluate(t => getComputedStyle(t).fontSize)).toBe(`${size}px`);
-      expect(await code.evaluate(t => getComputedStyle(t).fontSize)).toBe(`${size}px`);
+      await expect(card).toHaveCSS("font-size", `${size}px`);
+      await expect(code).toHaveCSS("font-size", `${size}px`);
     }
     await desktop.checkpointAsync("text-size-gallery-largest");
   });
