@@ -61,7 +61,7 @@ class PackageWorkflowTests {
       assert.ok(nightly.text.includes("    needs: [plan, repeat, package]\n"));
     });
 
-    test("a job prepares its target like build and test, makes the package and starts it, under a virtual display on Linux, and every step has its own time limit", async () => {
+    test("a job prepares its target like build and test, makes the package and starts it, under a virtual display on Linux both mounted and extracted, and every step has its own time limit", async () => {
       const workflow = await WorkflowFileFixture.readAsync(PackageWorkflowTests.WORKFLOW);
       const steps = workflow.text.split(/\n(?= +- name: )/).slice(1);
 
@@ -73,6 +73,7 @@ class PackageWorkflowTests {
       assert.equal(workflow.readStepScript(PackageWorkflowTests.SMOKE_STEP), [
         "if [ \"$RUNNER_OS\" = Linux ]; then",
         "  xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run package:smoke",
+        "  APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run package:smoke",
         "else",
         "  npm run package:smoke",
         "fi",
