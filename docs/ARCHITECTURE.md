@@ -528,6 +528,14 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
     Any other request is answered with `BuildMismatch`.
   - When the policy is "only if idle" and work is in progress, `shell.stop` is answered with a `Conflict` failure whose details list the work in progress.
     Otherwise the runtime answers, cancels its work and stops.
+- A client may also ask `shell.stop` to keep the runtime while it is shared, which combines with either policy.
+  It asks this only of a runtime of its own build, because an earlier runtime refuses a field it does not know.
+  The runtime first counts the authenticated connections other than the asking one, whatever names their clients gave, so a second client of the same kind counts too.
+  A client's own further connections count as other clients as well; the desktop holds one connection to its runtime, replacing it only once it has ended, and the command line holds one for each command.
+  While any is open, it neither refuses nor cancels and touches no work: it answers with the number it is kept for and goes on running.
+  Only when none is open does the policy apply as above.
+  Work is shared, so one client's quit never cancels work another client may be using.
+  The desktop's quit asks this way; the command line's stop does not.
 - Work may outlive clients until the idle policy permits shutdown.
 - Explicit shutdown cancels owned work, resolves waiters, flushes state and closes resources; acknowledgement does not prove process exit.
 - Reconnect from durable records, allowing for missed events.
@@ -709,6 +717,7 @@ While the runtime is not ready, the window holds its layout changes and writes t
 Held bounds whose write ends with the connection stay held for the next time the runtime is ready, without a log entry.
 Closing while the runtime cannot be reached loses those bounds, and the desktop log records it.
 The window shows once its appearance is painted and, when the runtime is ready, its saved bounds are applied.
+A read of the saved bounds that ends with the connection is tried again the next time the runtime is ready, without a log entry.
 A new window is 1280 by 800 pixels, but no more than nine tenths of the primary display's work area on each side, and centered on it.
 Saved bounds keep their size when it fits the work area of the display that shows most of the window; a larger size shrinks to no more than nine tenths of that work area on each side, centered on that display, and a saved size below the window's minimum, 640 by 480 pixels, grows to it.
 Bounds that no display shows open centered on the primary display, sized by the same rule, and a window saved maximized opens maximized.

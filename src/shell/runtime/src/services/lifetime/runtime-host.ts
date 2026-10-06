@@ -145,7 +145,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.modules = new ModuleHost(
       declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics,
       this.work, new DiagnosticRedactor(homedir()));
-    this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
+    this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.server.countOtherClients(t), t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
     this.methods.register(ShellMethods.work, new WorkMethod(this.work));
     this.methods.register(ShellMethods.commands, new CommandsMethod(this.commands));
