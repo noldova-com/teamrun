@@ -51,13 +51,13 @@ class BuildMatrixTests {
       assert.deepEqual([pullRequest.uiTargets, pullRequest.uiDeferred], [pullRequest.targets, []]);
     });
 
-    test("Windows and macOS x64 run their UI workflows in three shards, the faster targets in two", () => {
+    test("Windows and macOS x64 run their UI workflows in three shards, macOS ARM64 in two, Linux in five", () => {
       const targets = new BuildMatrix("workflow_dispatch").targets;
 
       assert.ok(targets.every(t => t.uiShards.every(s => s.target === t)));
       assert.deepEqual(targets.map(t => `${t.name}: ${t.uiShards.map(s => `${s.index}/${s.count}`).join(" ")}`), [
-        "Linux x64: 1/2 2/2",
-        "Linux ARM64: 1/2 2/2",
+        "Linux x64: 1/5 2/5 3/5 4/5 5/5",
+        "Linux ARM64: 1/5 2/5 3/5 4/5 5/5",
         "Windows x64: 1/3 2/3 3/3",
         "Windows ARM64: 1/3 2/3 3/3",
         "macOS x64: 1/3 2/3 3/3",
@@ -70,14 +70,14 @@ class BuildMatrixTests {
         `${t.name}: ${matrix.uiShards(t).map(s => `${s.index}/${s.count}${s.grep === "" ? "" : ` ${s.grep}`}${s.isPrebuilt ? " prebuilt" : ""}`).join(" ")}`);
 
       assert.deepEqual(describe(new BuildMatrix("pull_request")), [
-        "Linux x64: 1/2 prebuilt 2/2 prebuilt",
-        "Linux ARM64: 1/2 prebuilt 2/2 prebuilt",
+        "Linux x64: 1/5 prebuilt 2/5 prebuilt 3/5 prebuilt 4/5 prebuilt 5/5 prebuilt",
+        "Linux ARM64: 1/5 prebuilt 2/5 prebuilt 3/5 prebuilt 4/5 prebuilt 5/5 prebuilt",
         "Windows x64: 1/1 @smoke",
         "macOS ARM64: 1/1 @smoke"
       ]);
       assert.deepEqual(describe(new BuildMatrix("workflow_dispatch")), [
-        "Linux x64: 1/2 prebuilt 2/2 prebuilt",
-        "Linux ARM64: 1/2 prebuilt 2/2 prebuilt",
+        "Linux x64: 1/5 prebuilt 2/5 prebuilt 3/5 prebuilt 4/5 prebuilt 5/5 prebuilt",
+        "Linux ARM64: 1/5 prebuilt 2/5 prebuilt 3/5 prebuilt 4/5 prebuilt 5/5 prebuilt",
         "Windows x64: 1/3 prebuilt 2/3 prebuilt 3/3 prebuilt",
         "Windows ARM64: 1/3 prebuilt 2/3 prebuilt 3/3 prebuilt",
         "macOS x64: 1/3 prebuilt 2/3 prebuilt 3/3 prebuilt",
