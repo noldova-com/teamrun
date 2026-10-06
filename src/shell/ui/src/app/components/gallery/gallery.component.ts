@@ -13,7 +13,7 @@ import { ChangeDetectionStrategy, Component, Injector, type Signal, computed, in
 import { ThemeMode } from "../../enums/theme-mode";
 import type { IGalleryScope } from "../../interfaces/i-gallery-scope";
 import type { Theme } from "../../models/theme";
-import { DefaultTheme } from "../../themes/default-theme";
+import { DefaultTheme } from "../../models/default-theme";
 import { GalleryFormsComponent } from "./gallery-forms.component";
 import { GalleryNavigationComponent } from "./gallery-navigation.component";
 import { GalleryOverlayContainer } from "./gallery-overlay-container";

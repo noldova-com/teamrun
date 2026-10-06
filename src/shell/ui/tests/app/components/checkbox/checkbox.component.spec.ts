@@ -13,7 +13,7 @@ import { page, userEvent } from "vitest/browser";
 
 import { CheckboxComponent } from "../../../../src/app/components/checkbox/checkbox.component";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({

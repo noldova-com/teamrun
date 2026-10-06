@@ -15,7 +15,7 @@ import { MenuItemComponent } from "../../../../src/app/components/menu/menu-item
 import { MenuTriggerDirective } from "../../../../src/app/components/menu/menu-trigger.directive";
 import { MenuComponent } from "../../../../src/app/components/menu/menu.component";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({

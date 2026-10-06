@@ -13,7 +13,7 @@ import { ModePreference } from "../../../src/app/enums/mode-preference";
 import { ThemeMode } from "../../../src/app/enums/theme-mode";
 import { Typography } from "../../../src/app/models/typography";
 import { AppearanceService } from "../../../src/app/services/appearance.service";
-import { DefaultTheme } from "../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../fixtures/appearance.fixture";
 import { FixtureTheme } from "../../fixtures/fixture-theme";
 

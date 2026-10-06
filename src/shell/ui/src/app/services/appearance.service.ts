@@ -13,7 +13,7 @@ import { ModePreference } from "../enums/mode-preference";
 import { ThemeMode } from "../enums/theme-mode";
 import type { Theme } from "../models/theme";
 import { Typography } from "../models/typography";
-import { DefaultTheme } from "../themes/default-theme";
+import { DefaultTheme } from "../models/default-theme";
 import { Resources } from "../../resources";
 import { ScrollRevealService } from "./scroll-reveal.service";
 import { ThemePainter } from "./theme-painter";

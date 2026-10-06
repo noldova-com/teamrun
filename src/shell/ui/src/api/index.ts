@@ -77,4 +77,4 @@ export { DialogService } from "../app/services/dialog.service";
 export { OverlayBoundsService } from "../app/services/overlay-bounds.service";
 export { ThemePainter } from "../app/services/theme-painter";
 export { TypographyPainter } from "../app/services/typography-painter";
-export { DefaultTheme } from "../app/themes/default-theme";
+export { DefaultTheme } from "../app/models/default-theme";
