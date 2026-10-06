@@ -364,6 +364,22 @@ describe("SettingsComponent", () => {
       AppearanceFixture.expectLook(inset, DefaultTheme.theme, "settings-content-inset", "padding-left");
   });
 
+  it("starts each group title, on a page and in search results, where its setting rows' headings start, inside their padding", async () => {
+    const host = render();
+    const offsets = (heading: string): readonly number[] => [...host.querySelectorAll(".tr-settings-group")].map(t => {
+      const title = t.querySelector(heading) as HTMLElement;
+      const start = title.getBoundingClientRect().left + parseFloat(getComputedStyle(title).paddingInlineStart);
+      return Math.round(start - (t.querySelector(".tr-setting-row-heading") as HTMLElement).getBoundingClientRect().left);
+    });
+
+    const appearance = offsets(".tr-settings-group-title");
+    await searchAsync("clock");
+    const results = offsets(".tr-settings-result-group");
+
+    expect([appearance.length > 1, results.length]).toEqual([true, 2]);
+    expect([...appearance, ...results]).toEqual([...appearance, ...results].map(() => 0));
+  });
+
   it("searches only for what its own field holds", async () => {
     render();
     await searchAsync("tick");
