@@ -298,7 +298,27 @@ describe("QuickInputComponent", () => {
     expect(filtering.componentInstance.chosen).toEqual(["notes.command20"]);
   });
 
-  it("starts at the first option again when its options change, and chooses nothing and announces no results when it has none", async () => {
+  it("keeps its active option when its options change for the same query while that option is still listed, and starts at the first again for a new query", async () => {
+    await pressAsync("End");
+    host.items.set(many.map(t => new QuickInputItem(t.id, t.title, t.icon, t.detail, t.keyLabel)));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const rebuilt = activeIndex();
+    host.items.set(many.slice(20));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const moved = activeIndex();
+    await pressAsync("Enter");
+
+    host.query.set("Command");
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect([rebuilt, moved, activeIndex()]).toEqual([29, 9, 0]);
+    expect(host.chosen).toEqual(["notes.command29"]);
+  });
+
+  it("starts at the first option again when its active one is no longer listed, and chooses nothing and announces no results when it has none", async () => {
     await pressAsync("End");
     host.items.set(many.slice(0, 2));
     fixture.detectChanges();

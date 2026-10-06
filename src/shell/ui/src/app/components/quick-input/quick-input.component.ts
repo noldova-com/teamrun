@@ -7,8 +7,8 @@
  */
 
 import {
-  ChangeDetectionStrategy, Component, ElementRef, Injector, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, input, model,
-  output, signal, viewChild
+  ChangeDetectionStrategy, Component, ElementRef, Injector, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, inject, input, linkedSignal, model,
+  output, viewChild
 } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
@@ -28,7 +28,15 @@ export class QuickInputComponent {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly injector: Injector = inject(Injector);
   private readonly list: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("list");
-  private readonly activeValue: WritableSignal<number> = signal(0);
+  private readonly activeValue: WritableSignal<number> = linkedSignal({
+    source: () => ({ items: this.items(), query: this.query() }),
+    computation: (source, previous?: { readonly source: { readonly items: readonly QuickInputItem[]; readonly query: string }; readonly value: number }) => {
+      if (Object.isUndefined(previous) || previous.source.query !== source.query)
+        return 0;
+      const id = previous.source.items[previous.value]?.id;
+      return Math.max(0, source.items.findIndex(t => t.id === id));
+    }
+  });
   private shownQuery: string = String.empty;
   private isChoosing: boolean = false;
 
@@ -45,10 +53,6 @@ export class QuickInputComponent {
   public readonly dismissed = output<void>();
 
   public constructor() {
-    effect(() => {
-      this.items();
-      this.activeValue.set(0);
-    });
     afterRenderEffect(() => {
       this.shownQuery = this.query();
     });

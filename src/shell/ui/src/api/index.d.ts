@@ -2574,9 +2574,11 @@ export declare class QueryMatcher {
  */
 export declare class QuickInputComponent {
   /**
-   * The results in the order shown. Every change makes the first one active
-   * again. A result with a section starts that section, after a separator
-   * unless it is the first.
+   * The results in the order shown. A change for a new query makes the first
+   * one active again; a change for the same query keeps the active result
+   * while it is still listed, and otherwise makes the first one active. A
+   * result with a section starts that section, after a separator unless it
+   * is the first.
    */
   public readonly items: InputSignal<readonly QuickInputItem[]>;
 
