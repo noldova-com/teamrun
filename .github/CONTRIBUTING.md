@@ -59,7 +59,7 @@ When the PR completes the issue, a GitHub closing reference such as `Closes #123
 
 Replace `123` with an existing issue from this repository, not a PR or another repository's issue. The first such line counts; references in HTML comments do not. Link additional issues as needed; reviewers verify relevance.
 
-Use the [PR template](PULL_REQUEST_TEMPLATE.md). Fill `## Summary` with what changed and why, and `## Testing` with the checks run, results and remaining limitations; explain relevant checks that were not run or do not apply. These sections and a valid issue reference are required; `## Notes` is optional. An automated check verifies the issue reference; reviewers check the sections.
+Use the [PR template](PULL_REQUEST_TEMPLATE.md). Fill `## Summary` with what changed and why, and `## Testing` with the checks you ran, their results and remaining limitations, and the native checks CI can't cover; explain relevant checks that were not run or do not apply. CI is the gate: [TESTING.md](../docs/TESTING.md#6-verification-scope) says what it covers, so you don't run it. These sections and a valid issue reference are required; `## Notes` is optional. An automated check verifies the issue reference; reviewers check the sections.
 
 Keep the change small enough to review coherently. A PR that changes the appearance links its before and after [screenshots](../docs/TESTING.md#ui-screenshots-and-reports), using disposable data. Commit messages describe the concrete change.
 

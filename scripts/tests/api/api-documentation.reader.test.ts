@@ -280,6 +280,39 @@ class ApiDocumentationReaderTests {
       ]);
     });
 
+    test("a @throws type that resolves passes, and one that does not is refused at its line by name", async t => {
+      const lines = [
+        "/**",
+        " * Shapes.",
+        " */",
+        "export declare class Shape {",
+        "  /**",
+        "   * Grows.",
+        "   *",
+        "   * @throws {RangeError} When it cannot grow.",
+        "   * @throws {Shape} When it is itself in the way.",
+        "   * @throws Missing when no type is given.",
+        "   */",
+        "  public grow(): void;",
+        "  /**",
+        "   * Shrinks.",
+        "   *",
+        "   * @throws {Missing} When it cannot shrink.",
+        "   * @throws {RangeError | Absent} When it is too small.",
+        "   */",
+        "  public shrink(): void;",
+        "}",
+        ""
+      ];
+
+      const problems = await ApiDocumentationReaderTests.readAsync(t, lines, ApiVisibility.PUBLIC);
+
+      assert.deepEqual(problems, [
+        `${ApiDocumentationReaderTests.locate(lines, "   * @throws {Missing} When it cannot shrink.")}: Shape#shrink has a @throws type that does not resolve: Missing`,
+        `${ApiDocumentationReaderTests.locate(lines, "   * @throws {RangeError | Absent} When it is too small.")}: Shape#shrink has a @throws type that does not resolve: Absent`
+      ]);
+    });
+
     test("a JSDoc without text or tags is refused as empty", async t => {
       const lines = [
         "/**",
