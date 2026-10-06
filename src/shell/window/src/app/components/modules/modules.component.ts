@@ -18,6 +18,7 @@ import {
   type WritableSignal,
   afterNextRender,
   computed,
+  effect,
   inject,
   signal
 } from "@angular/core";
@@ -28,10 +29,13 @@ import { TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import type { ContributionGroup } from "../../models/modules/contribution-group";
 import { ModuleOverview } from "../../models/modules/module-overview";
+import { ProgramRow } from "../../models/modules/program-row";
+import { WindowPartTokens } from "../../models/window-part-tokens";
 import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { ModuleSelectionService } from "../../services/module-selection.service";
 import { ModuleStatusService } from "../../services/module-status.service";
+import { ProgramStatusService } from "../../services/program-status.service";
 import { SettingsService } from "../../services/settings.service";
 import { Resources } from "../../../resources";
 import { ModuleActionsComponent } from "../module-actions/module-actions.component";
@@ -53,6 +57,10 @@ export class ModulesComponent {
   private readonly injector: Injector = inject(Injector);
   private readonly modules: Signal<readonly ModuleStatus[]> = inject(ModuleStatusService).modules;
   private readonly selection: ModuleSelectionService = inject(ModuleSelectionService);
+  private readonly programs: ProgramStatusService = inject(ProgramStatusService);
+  private readonly isShown: Signal<boolean> = inject(WindowPartTokens.shown);
+  private readonly time: Intl.DateTimeFormat = new Intl.DateTimeFormat(undefined, Resources.programStartFormat);
+  private readonly now: WritableSignal<number> = signal(Date.now());
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly active: ModuleState = ModuleState.Active;
@@ -63,6 +71,13 @@ export class ModulesComponent {
   public constructor() {
     const errors = inject(ErrorHandler);
     const bridge = inject(DesktopBridgeService);
+    effect(onCleanup => {
+      if (!this.isShown())
+        return;
+      this.now.set(Date.now());
+      const clock = setInterval(() => this.now.set(Date.now()), Resources.minuteDuration);
+      onCleanup(() => clearInterval(clock));
+    });
     void inject(PendingTasks).run(() =>
       bridge.readBuildAsync().then(t => this.version.set(Resources.formatProductVersion(t.productVersion)), (error: unknown) => errors.handleError(error)));
   }
@@ -83,6 +98,16 @@ export class ModulesComponent {
 
   protected contributionsOf(module: ModuleStatus): readonly ContributionGroup[] {
     return ModuleOverview.listContributions(module, (kind, name) => this.titleOf(kind, name));
+  }
+
+  protected programsOf(module: ModuleStatus): readonly ProgramRow[] {
+    const now = this.now();
+    return this.programs.ofModule(module.id).map(t => ProgramRow.from(t, now, this.time));
+  }
+
+  protected countOf(module: ModuleStatus): string | null {
+    const count = this.programs.ofModule(module.id).length;
+    return count > 0 ? Resources.formatProgramCount(count) : null;
   }
 
   private titleOf(kind: string, name: string): string | null {

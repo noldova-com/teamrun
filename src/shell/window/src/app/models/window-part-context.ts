@@ -12,10 +12,12 @@ import type { NotificationPost, SettingEntry, SettingScope } from "@noldova/team
 import { WindowPartAccessException } from "../exceptions/window-part-access.exception";
 import type { IWindowPartContext } from "../interfaces/i-window-part-context";
 import type { IDocumentOptions } from "../interfaces/i-document-options";
+import type { IDocumentUpdate } from "../interfaces/i-document-update";
 import type { IViewDialogOptions } from "../interfaces/i-view-dialog-options";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
 import type { CommandContribution } from "./command-contribution";
 import type { DocumentContribution } from "./document-contribution";
+import { DocumentHeading } from "./document-heading";
 import { DocumentTab } from "./layout/document-tab";
 import type { Tab } from "./layout/tab";
 import { ViewTab } from "./layout/view-tab";
@@ -182,12 +184,19 @@ export class WindowPartContext implements IWindowPartContext {
 
   public openDocument(name: string, instance: string, title: string, options: IDocumentOptions = {}): void {
     this.requireOwn(name);
-    this.host.openDocument(this.moduleId, name, instance, title, options.preview === true);
+    this.host.openDocument(this.moduleId, name, instance, new DocumentHeading(title, options.breadcrumb ?? []), options.preview === true);
   }
 
   public keepDocument(name: string, instance: string): void {
     this.requireOwn(name);
     this.host.keepDocument(this.moduleId, name, instance);
+  }
+
+  public updateDocument(name: string, instance: string, update: IDocumentUpdate): void {
+    this.requireOwn(name);
+    const title = Object.isUndefined(update.title) ? null : DocumentHeading.requireTitle(update.title);
+    const breadcrumb = Object.isUndefined(update.breadcrumb) ? null : DocumentHeading.requireBreadcrumb(update.breadcrumb);
+    this.host.updateDocument(this.moduleId, name, instance, title, breadcrumb);
   }
 
   public async showInDialogAsync(name: string, options: IViewDialogOptions = {}): Promise<void> {

@@ -12,6 +12,7 @@ export { DockSide } from "../app/enums/dock-side";
 export { StatusBarSide } from "../app/enums/status-bar-side";
 export { TopBarSide } from "../app/enums/top-bar-side";
 export type { IDocumentOptions } from "../app/interfaces/i-document-options";
+export type { IDocumentUpdate } from "../app/interfaces/i-document-update";
 export type { IStatusBarItemOptions } from "../app/interfaces/i-status-bar-item-options";
 export type { ITopBarActionOptions } from "../app/interfaces/i-top-bar-action-options";
 export type { IViewDialogOptions } from "../app/interfaces/i-view-dialog-options";

@@ -773,6 +773,7 @@ export class DesktopApplicationTests {
     connection.answers.set("shell.modules", Response.success("r", { modules: [] }));
     connection.answers.set("shell.commands", Response.success("r", { commands: [] }));
     connection.answers.set("shell.runCommand", Response.success("r", 3));
+    connection.answers.set("shell.programs", Response.success("r", { programs: [], sequence: 2 }));
     for (const name of DesktopApplicationTests.NOTIFICATION_METHODS)
       connection.answers.set(name, Response.success("r", name));
     connection.answers.set("notes.missing", Response.failure("r", new Failure(FailureCode.NotFound, "There is no such note.")));
@@ -783,6 +784,7 @@ export class DesktopApplicationTests {
     const modules = await DesktopApplicationTests.requestAsync(electron, event, "shell.modules", null);
     const commands = await DesktopApplicationTests.requestAsync(electron, event, "shell.commands", null);
     const ran = await DesktopApplicationTests.requestAsync(electron, event, "shell.runCommand", { name: "clock.tick", arguments: null });
+    const programs = await DesktopApplicationTests.requestAsync(electron, event, "shell.programs", null);
     const notifications = [];
     for (const name of DesktopApplicationTests.NOTIFICATION_METHODS)
       notifications.push((await DesktopApplicationTests.requestAsync(electron, event, name, null)).payload);
@@ -792,6 +794,7 @@ export class DesktopApplicationTests {
     Assert.areEqual(JSON.stringify({ modules: [] }), JSON.stringify(modules.payload));
     Assert.areEqual(JSON.stringify({ commands: [] }), JSON.stringify(commands.payload));
     Assert.areEqual("3", JSON.stringify(ran.payload));
+    Assert.areEqual(JSON.stringify({ programs: [], sequence: 2 }), JSON.stringify(programs.payload));
     Assert.areEqual(DesktopApplicationTests.NOTIFICATION_METHODS.join(","), notifications.join(","));
     Assert.areEqual(JSON.stringify({ code: "NotFound", message: "There is no such note." }), JSON.stringify(missing.failure?.toJson()));
   }

@@ -18,6 +18,7 @@
   font-size: var(--tr-text-panel);
   app-region: drag;
   user-select: none;
+  --tr-window-row-drag: 6rem;
 }
 
 :host(.tr-window-row-mac) {
@@ -26,8 +27,47 @@
 }
 
 .tr-window-row-breadcrumb {
+  display: flex;
   flex: 1;
+  align-items: center;
   min-width: 0;
+  padding-inline: var(--tr-space-2);
+}
+
+.tr-window-row-heading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: calc(100% - var(--tr-window-row-drag));
+  overflow: hidden;
+}
+
+.tr-window-row-segment,
+.tr-window-row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-window-row-segment,
+.tr-window-row-separator {
+  color: color-mix(in srgb, var(--tr-title-bar-text) 70%, var(--tr-title-bar));
+}
+
+.tr-window-row-segment {
+  flex: 0 1000 auto;
+  min-width: 2em;
+}
+
+.tr-window-row-separator {
+  flex: none;
+  font-size: 1.2em;
+}
+
+.tr-window-row-title {
+  flex: 0 1 auto;
+  min-width: 4em;
+  font-weight: var(--tr-weight-emphasis);
 }
 
 .tr-window-row-start,

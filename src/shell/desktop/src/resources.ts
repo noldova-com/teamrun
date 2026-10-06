@@ -79,7 +79,8 @@ export class Resources {
     ShellMethods.setSetting.text,
     ShellMethods.resetSetting.text,
     ShellMethods.recentCommands.text,
-    ShellMethods.recordCommand.text
+    ShellMethods.recordCommand.text,
+    ShellMethods.programs.text
   ];
   public static readonly deviceMethods: readonly string[] = [
     ShellMethods.settings.text,

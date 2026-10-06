@@ -25,6 +25,7 @@ import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
 import { BuildTokens } from "../../../src/app/models/build-tokens";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { DocumentContribution } from "../../../src/app/models/document-contribution";
+import { DocumentHeading } from "../../../src/app/models/document-heading";
 import { DocumentTab } from "../../../src/app/models/layout/document-tab";
 import { Layout } from "../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../src/app/models/layout/view-registry";
@@ -485,14 +486,33 @@ describe("WindowPartHostService", () => {
     const part = new WindowPartFixture("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
       t.openDocument("notes.note", "1", "Note 1");
-      t.openDocument("notes.note", "2", " ");
+      t.openDocument("notes.page", "2", "Page");
     });
     const { host, layout } = start([source("notes", part)], [status("notes")]);
 
     await vi.waitFor(() => expect(errors.length).toBe(1));
-    host.openDocument("notes", "notes.note", "3", "Note 3", false);
+    host.openDocument("notes", "notes.note", "3", new DocumentHeading("Note 3"), false);
 
     expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1"), new DocumentTab("notes.note", "3")]);
+  });
+
+  it("changes the heading of a document opened during activation once it opens, and of an open one at once", async () => {
+    const note = new DocumentTab("notes.note", "1");
+    const part = new WindowPartFixture("notes", log, t => {
+      t.registerDocument(new DocumentContribution("notes.note", load));
+      t.openDocument("notes.note", "1", "Note 1");
+      t.updateDocument("notes.note", "1", { breadcrumb: ["Notes"] });
+      t.updateDocument("notes.note", "2", { title: "Note 2" });
+    });
+    const { host, layout } = start([source("notes", part)], [status("notes")]);
+    const labels = TestBed.inject(TabLabelService);
+    await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([note]));
+    const opened = labels.headingOf(note).text;
+
+    host.updateDocument("notes", "notes.note", "1", "Plan", null);
+
+    expect([opened, labels.headingOf(note).text]).toEqual(["Notes › Note 1", "Notes › Plan"]);
+    expect(errors).toEqual([]);
   });
 
   it("restores the saved documents a part opens during activation with the saved active one, leaves out one the layout lacks, and opens it when asked later", async () => {
@@ -507,7 +527,7 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(layout.layout().documents.tabs).toHaveLength(3));
     const restored = [layout.layout().documents.tabs, layout.layout().documents.active];
 
-    host.openDocument("notes", "notes.note", "4", "Note 4", false);
+    host.openDocument("notes", "notes.note", "4", new DocumentHeading("Note 4"), false);
 
     expect(restored).toEqual([[note("1"), note("2"), note("3")], note("1")]);
     expect(TestBed.inject(TabLabelService).of(note("3")).title).toBe("Note 3");
@@ -526,12 +546,14 @@ describe("WindowPartHostService", () => {
     vi.spyOn(TestBed.inject(LayoutStoreService), "readAsync").mockReturnValue(new Promise(resolve => read = resolve));
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
-    host.openDocument("notes", "notes.note", "4", "Note 4", false);
+    host.openDocument("notes", "notes.note", "4", new DocumentHeading("Note 4"), false);
     host.keepDocument("notes", "notes.note", "1");
+    host.updateDocument("notes", "notes.note", "1", "First note", ["Notes"]);
     read(saved.toJson());
 
     await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([note("1"), note("2"), note("4")]));
     expect(layout.layout().documents.active).toEqual(note("4"));
+    expect(TestBed.inject(TabLabelService).headingOf(note("1")).text).toBe("Notes › First note");
   });
 
   it("keeps the active document when the runtime is ready again, and adds a document the parts open while reactivating that is not open", async () => {
