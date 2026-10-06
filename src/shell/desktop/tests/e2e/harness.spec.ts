@@ -151,6 +151,27 @@ test.describe("the workflows' checkpoints", () => {
     expect(corners.slice(0, 4)).toEqual([[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 0, 255]]);
     expect(corners[4]).not.toEqual([255, 0, 0]);
   });
+
+  test.describe("on a display scaled to 125%", () => {
+    test.use({ desktopArguments: ["--force-device-scale-factor=1.25"] });
+
+    test("the suite's viewport keeps one device pixel per CSS pixel through checkpoints, a clipped screenshot and zoom, and each checkpoint records the ratio it is", async ({ desktop }, testInfo) => {
+      const readRatio = async (): Promise<number> => (await desktop.readViewportAsync())[2] ?? Number.NaN;
+      const ratios = [await readRatio()];
+
+      await desktop.checkpointAsync("harness-scaled");
+      ratios.push(await readRatio());
+      const clipped = await desktop.window.screenshot({ clip: { x: 0, y: 0, width: 100, height: 50 } });
+      ratios.push(await readRatio());
+      await desktop.zoomAsync(2, 960);
+      const zoomed = await desktop.checkpointAsync("harness-scaled-zoomed");
+      await desktop.zoomAsync(1, 1920);
+
+      expect([ratios, await desktop.readViewportAsync()]).toEqual([[1, 1, 1], [1920, 1080, 1]]);
+      expect([clipped.readUInt32BE(16), clipped.readUInt32BE(20), zoomed.readUInt32BE(16), zoomed.readUInt32BE(20)]).toEqual([100, 50, 1920, 1080]);
+      expect(testInfo.annotations.filter(t => t.type === "checkpoint").map(t => (JSON.parse(t.description ?? "") as { pixelRatio: number }).pixelRatio)).toEqual([1, 2]);
+    });
+  });
 });
 
 test.describe("the layout checks", () => {
