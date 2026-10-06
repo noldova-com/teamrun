@@ -567,9 +567,11 @@ export class Resources {
   public static readonly windowsShellArguments: readonly string[] = ["-NoProfile", "-NonInteractive", "-EncodedCommand"];
   public static readonly windowsProcessTableScript: string =
     "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $starts = @{}; " +
-    "foreach ($p in [System.Diagnostics.Process]::GetProcesses()) { try { $starts[$p.Id] = [long][Math]::Floor($p.StartTime.ToFileTimeUtc() / 10000) - 11644473600000 } catch { } }; " +
-    "foreach ($w in Microsoft.PowerShell.Management\\Get-WmiObject -Query 'SELECT ProcessId, ParentProcessId, ExecutablePath FROM Win32_Process' -ErrorAction Stop) { $started = $starts[[int]$w.ProcessId]; " +
-    "if ($null -ne $started) { \"{0}`t{1}`t{2}`t{3}\" -f $w.ProcessId, $w.ParentProcessId, $started, $w.ExecutablePath } }";
+    "foreach ($p in [System.Diagnostics.Process]::GetProcesses()) { try { $starts[$p.Id] = [long][Math]::Floor($p.StartTime.ToFileTimeUtc() / 10000) - 11644473600000 } catch { } }; M 'procs'; " +
+    "$null = Microsoft.PowerShell.Core\\Get-Command Microsoft.PowerShell.Management\\Get-WmiObject; M 'module'; " +
+    "$rows = @(Microsoft.PowerShell.Management\\Get-WmiObject -Query 'SELECT ProcessId, ParentProcessId, ExecutablePath FROM Win32_Process' -ErrorAction Stop); M 'wmi'; " +
+    "foreach ($w in $rows) { $started = $starts[[int]$w.ProcessId]; " +
+    "if ($null -ne $started) { \"{0}`t{1}`t{2}`t{3}\" -f $w.ProcessId, $w.ParentProcessId, $started, $w.ExecutablePath } }; M 'end'";
   public static readonly windowsScriptEncoding: BufferEncoding = "utf16le";
   public static readonly base64Encoding: BufferEncoding = "base64";
   public static readonly windowsProcessTableRowPattern: RegExp = /^(\d+)\t(\d+)\t(\d+)\t(.*)$/;

@@ -36,11 +36,17 @@ export class WindowsProcessEnder implements IProcessEnder {
   }
 
   public async stopAsync(running: readonly RunningProcess[]): Promise<readonly ProcessEnding[]> {
+    const t0 = Date.now();
     for (const item of running.filter(t => !t.process.input.writableEnded))
       item.process.input.end();
     const exits = await Promise.all(running.map(async t => [t.record, await ProcessSignals.waitForAsync(t.exitTime, this.settings.graceMilliseconds)] as const));
+    const t1 = Date.now();
     const table = await this.reader.readAsync();
-    return await this.killTreesAsync(exits.map(([record, exited]) => [record, this.findTree(table, record, exited), []] as const));
+    const t2 = Date.now();
+    const trees = exits.map(([record, exited]) => [record, this.findTree(table, record, exited), []] as const);
+    const result = await this.killTreesAsync(trees);
+    process.stderr.write(`DIAG593 E ${process.pid} at=${t0} exited=${exits.map(([, t]) => String(!Object.isUndefined(t))).join(",")} targets=${trees.flatMap(([, t]) => t).length} grace=${t1 - t0} read=${t2 - t1} kill=${Date.now() - t2}\n`);
+    return result;
   }
 
   public endAfterExitAsync(record: ProcessRecord): Promise<readonly ProcessEnding[]> {
