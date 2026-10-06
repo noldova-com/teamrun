@@ -27,6 +27,7 @@ export default class ChangeClassifier {
     "scripts/release-publish.ts",
     "scripts/test-options.exception.ts",
     "scripts/test-options.ts",
+    "scripts/test-part.ts",
     "scripts/test.ts",
     "scripts/ui-summary.ts",
     "scripts/watch-pull-requests.ts"
