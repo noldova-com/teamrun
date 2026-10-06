@@ -81,6 +81,25 @@ describe("WindowPartContext", () => {
     ]);
   });
 
+  it("keeps its save steps in order until it removes one or is withdrawn, and removing a step twice changes nothing", () => {
+    const first = (): Promise<void> => Promise.resolve();
+    const second = (): Promise<void> => Promise.resolve();
+    const third = (): Promise<void> => Promise.resolve();
+
+    const removeFirst = context.registerSave(first);
+    context.registerSave(second);
+    context.registerSave(third);
+    const registered = [...context.saves];
+    removeFirst();
+    removeFirst();
+    const remaining = [...context.saves];
+    context.withdraw();
+
+    expect(registered).toEqual([first, second, third]);
+    expect(remaining).toEqual([second, third]);
+    expect(context.saves).toEqual([]);
+  });
+
   it("refuses a notification of another module, an undeclared kind or another module's command, before and on update", async () => {
     const posted = await context.postNotificationAsync(notification("notes.saved", "Saved", null));
 

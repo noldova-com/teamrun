@@ -704,6 +704,14 @@ export class Resources {
     return `The module ${moduleId} may not offer the command ${command} in a notification; it must be its own or a dependency's.`;
   }
 
+  public static formatShellNotificationUnknown(kind: string): string {
+    return `The shell posts no notification of the kind ${kind}.`;
+  }
+
+  public static formatShellNotificationCommand(kind: string): string {
+    return `The shell's notification kind ${kind} offers no command.`;
+  }
+
   public static formatNotificationNotFound(id: string): string {
     return `Notification ${id} is gone; it was dismissed or its module stopped.`;
   }

@@ -7,7 +7,7 @@
  */
 
 import "@noldova/teamrun-foundation-core";
-import type { NotificationPost } from "@noldova/teamrun-shell-protocol";
+import { type NotificationPost, ShellNotifications } from "@noldova/teamrun-shell-protocol";
 
 import { RegistrationException } from "../../exceptions/registration.exception.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
@@ -23,6 +23,8 @@ export class NotificationPolicy {
   }
 
   public findRefusal(post: NotificationPost): string | null {
+    if (post.kind.isShell)
+      return NotificationPolicy.findShellRefusal(post);
     const declaration = this.declarations.find(t => t.id === post.kind.owner);
     if (Object.isUndefined(declaration) || !this.isActive(declaration.id))
       return Resources.formatNotificationModuleInactive(post.kind.owner, post.kind.text);
@@ -33,6 +35,12 @@ export class NotificationPolicy {
     const refusal = NotificationPolicy.findDeclaredRefusal(declaration, post);
     if (!Object.isNull(refusal))
       throw new RegistrationException(refusal);
+  }
+
+  private static findShellRefusal(post: NotificationPost): string | null {
+    if (!ShellNotifications.all.some(t => t.text === post.kind.text))
+      return Resources.formatShellNotificationUnknown(post.kind.text);
+    return Object.isNull(post.open) && post.actions.length === 0 ? null : Resources.formatShellNotificationCommand(post.kind.text);
   }
 
   private static findDeclaredRefusal(declaration: ModuleDeclaration, post: NotificationPost): string | null {
