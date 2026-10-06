@@ -11,31 +11,24 @@ import type { WorkReport } from "@noldova/teamrun-shell-protocol";
 
 import { QuitChoice } from "../enums/quit-choice.js";
 import { QuitOutcome } from "../enums/quit-outcome.js";
-import type { ICloseGuard } from "../interfaces/i-close-guard.js";
 import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import { PendingQuit } from "../models/pending-quit.js";
 
-export class QuitCoordinator implements ICloseGuard {
-  private readonly isLast: (prompt: IQuitPrompt) => boolean;
+export class QuitCoordinator {
   private readonly readWorkAsync: () => Promise<WorkReport | null>;
-  private readonly stopAsync: () => Promise<void>;
-  private isConfirming: boolean = false;
+  private isAsking: boolean = false;
   private heard: WorkReport | null = null;
   private pending: PendingQuit | null = null;
 
-  public constructor(isLast: (prompt: IQuitPrompt) => boolean, readWorkAsync: () => Promise<WorkReport | null>, stopAsync: () => Promise<void>) {
-    this.isLast = isLast;
+  public constructor(readWorkAsync: () => Promise<WorkReport | null>) {
     this.readWorkAsync = readWorkAsync;
-    this.stopAsync = stopAsync;
   }
 
-  public async confirmAsync(prompt: IQuitPrompt): Promise<QuitOutcome> {
-    if (this.isConfirming)
+  public async askAsync(prompt: IQuitPrompt): Promise<QuitOutcome> {
+    if (this.isAsking)
       return QuitOutcome.Stay;
-    if (!this.isLast(prompt))
-      return QuitOutcome.Quit;
 
-    this.isConfirming = true;
+    this.isAsking = true;
     this.heard = null;
     const answered = await this.readWorkAsync();
     const heard = this.takeHeard();
@@ -51,12 +44,8 @@ export class QuitCoordinator implements ICloseGuard {
     });
   }
 
-  public stopWorkAsync(): Promise<void> {
-    return this.stopAsync();
-  }
-
   public receive(report: WorkReport): void {
-    if (!this.isConfirming)
+    if (!this.isAsking)
       return;
     if (Object.isNull(this.pending)) {
       if (report.isNewerThan(this.heard))
@@ -89,6 +78,11 @@ export class QuitCoordinator implements ICloseGuard {
     }
   }
 
+  public dismiss(prompt: IQuitPrompt): void {
+    if (!Object.isNull(this.pending) && this.pending.prompt === prompt)
+      this.finish(this.pending, QuitOutcome.Stay);
+  }
+
   public release(): void {
     if (!Object.isNull(this.pending))
       this.finish(this.pending, QuitOutcome.Quit);
@@ -101,7 +95,7 @@ export class QuitCoordinator implements ICloseGuard {
   }
 
   private quitNow(): QuitOutcome {
-    this.isConfirming = false;
+    this.isAsking = false;
     return QuitOutcome.Quit;
   }
 
@@ -112,7 +106,7 @@ export class QuitCoordinator implements ICloseGuard {
 
   private finish(pending: PendingQuit, outcome: QuitOutcome): void {
     this.pending = null;
-    this.isConfirming = false;
+    this.isAsking = false;
     pending.prompt.show(null);
     pending.settle(outcome);
   }

@@ -8,8 +8,8 @@
 
 export default interface IBuildTargetOptions {
   readonly runsOnPullRequests: boolean;
+  readonly runsOnPushes: boolean;
   readonly runsSmokeOnPullRequests: boolean;
-  readonly runsUiOnPushes: boolean;
   readonly uiShardCount: number;
   readonly splitsTests: boolean;
 }

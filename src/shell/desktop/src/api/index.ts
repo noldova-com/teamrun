@@ -6,13 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
 export type { IApplicationHost } from "../interfaces/i-application-host.js";
 export type { IClipboardHost } from "../interfaces/i-clipboard-host.js";
 export type { ICloseGuard } from "../interfaces/i-close-guard.js";
 export type { IDesktopLog } from "../interfaces/i-desktop-log.js";
 export type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 export type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
+export type { IDeviceFileStore } from "../interfaces/i-device-file-store.js";
 export type { IDialogHost } from "../interfaces/i-dialog-host.js";
 export type { IDisplayHost } from "../interfaces/i-display-host.js";
 export type { IDockHost } from "../interfaces/i-dock-host.js";
@@ -28,6 +28,7 @@ export type { IPathCommandFiles } from "../interfaces/i-path-command-files.js";
 export type { IPermissionHost } from "../interfaces/i-permission-host.js";
 export type { IPreventableEvent } from "../interfaces/i-preventable-event.js";
 export type { IProgramHost } from "../interfaces/i-program-host.js";
+export type { IQuitHost } from "../interfaces/i-quit-host.js";
 export type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 export type { IRuntimeConnection } from "../interfaces/i-runtime-connection.js";
 export type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
@@ -66,7 +67,6 @@ export { SenderInfo } from "../models/sender-info.js";
 export { StartupState } from "../models/startup-state.js";
 export { WindowAppearance } from "../models/window-appearance.js";
 export { WindowState } from "../models/window-state.js";
-export { AppearanceStore } from "../services/appearance-store.js";
 export { ChildProgramHost } from "../services/child-program-host.js";
 export { CloseCoordinator } from "../services/close-coordinator.js";
 export { UpdateSaveCoordinator } from "../services/update-save-coordinator.js";
@@ -74,12 +74,15 @@ export { DesktopApplication } from "../services/desktop-application.js";
 export { DesktopLog } from "../services/desktop-log.js";
 export { DesktopRecord } from "../services/desktop-record.js";
 export { DetachedStart } from "../services/detached-start.js";
+export { DeviceFileStore } from "../services/device-file-store.js";
 export { DeviceIdentity } from "../services/device-identity.js";
+export { DeviceState } from "../services/device-state.js";
 export { LinkPolicy } from "../services/link-policy.js";
 export { MainProcessRecovery } from "../services/main-process-recovery.js";
 export { OpenWindow } from "../services/open-window.js";
 export { PathCommand } from "../services/path-command.js";
 export { QuitCoordinator } from "../services/quit-coordinator.js";
+export { QuitFlow } from "../services/quit-flow.js";
 export { UpdateStop } from "../services/update-stop.js";
 export { UpdateWorkQuestion } from "../services/update-work-question.js";
 export { RuntimeStartup } from "../services/runtime-startup.js";

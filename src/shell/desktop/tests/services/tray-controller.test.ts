@@ -30,7 +30,7 @@ export class TrayControllerTests {
     Assert.areEqual(1, fixture.electron.tray.trays.length);
     Assert.areEqual(DesktopStartFixture.icon("tray/tray-idle.ico"), fixture.tray.images.at(-1));
     Assert.areEqual("TeamRun", fixture.tray.toolTips.at(-1));
-    Assert.areEqual(JSON.stringify(["Open TeamRun", "-", "No work running (disabled)", "-", "Do not disturb [ ]", "-", "Quit TeamRun"]), JSON.stringify(fixture.rows));
+    Assert.areEqual(JSON.stringify(["No work running (disabled)", "-", "Open TeamRun", "Do not disturb [ ]", "-", "Quit TeamRun"]), JSON.stringify(fixture.rows));
     const reads = fixture.connection.calls.map((t, index) => `${t} ${JSON.stringify(fixture.connection.payloads[index])}`)
       .filter(t => t.startsWith("shell.readSetting") || t.startsWith("shell.notifications"));
     Assert.areEqual(
@@ -60,8 +60,8 @@ export class TrayControllerTests {
     Assert.areEqual("TeamRun: 7 running, 3 unread", fixture.tray.toolTips.at(-1));
     Assert.areEqual(
       JSON.stringify([
-        "Open TeamRun", "-", "Reply to Ada (disabled)", "Run the tests (disabled)", "Build (disabled)", "Lint (disabled)", "Format (disabled)", "and 2 more (disabled)", "-",
-        "Fourth", "Third", "First", "-", "Do not disturb [ ]", "-", "Quit TeamRun"
+        "Reply to Ada (disabled)", "Run the tests (disabled)", "Build (disabled)", "Lint (disabled)", "Format (disabled)", "and 2 more (disabled)",
+        "Fourth", "Third", "First", "-", "Open TeamRun", "Do not disturb [ ]", "-", "Quit TeamRun"
       ]),
       JSON.stringify(fixture.rows));
   }
@@ -147,6 +147,10 @@ export class TrayControllerTests {
     window.destroy();
     windows.click("Open TeamRun");
     windows.click("Quit TeamRun");
+    const reopened = windows.electron.windows[1];
+    Assert.isDefined(reopened);
+    await DesktopStartFixture.answerSaveAsync(windows.electron, "win32", reopened, 1);
+    await Condition.waitAsync(() => windows.electron.app.calls.includes("quit"));
 
     Assert.areEqual("restore,focus,focus", window.calls.filter(t => t === "restore" || t === "focus").join(","));
     Assert.areEqual(2, windows.electron.windows.length);
@@ -199,6 +203,43 @@ export class TrayControllerTests {
 
     Assert.areEqual(0, whileOff);
     Assert.areEqual(DesktopStartFixture.icon("tray/tray-idle.png"), fixture.tray.images.at(-1));
+  }
+
+  @TestMethod
+  public async startsFromTheSettingLastHeardOnThisDeviceAndRemembersEachChange(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    fixture.files.state.kept = { trayCloseHintShown: true, trayIcon: false };
+    const answer = Promise.withResolvers<Response>();
+    fixture.connection.deferred.set("shell.readSetting", () => answer.promise);
+    await fixture.startAsync();
+
+    const beforeAnswer = fixture.electron.tray.trays.length;
+    answer.resolve(Response.success("r", { name: "shell.trayIcon", value: true, isSet: false }));
+    await Condition.waitAsync(() => fixture.files.state.writes.length > 0);
+    fixture.send("settingsChanged", { name: "shell.trayIcon", device: FakeDeviceIdentity.ID, value: false, isSet: true });
+    await Condition.waitAsync(() => fixture.files.state.writes.length > 1);
+
+    Assert.areEqual(0, beforeAnswer);
+    Assert.areEqual(1, fixture.electron.tray.trays.length);
+    Assert.isUndefined(fixture.electron.tray.shown);
+    Assert.areEqual(JSON.stringify([{ trayCloseHintShown: true, trayIcon: true }, { trayCloseHintShown: true, trayIcon: false }]), JSON.stringify(fixture.files.state.writes));
+  }
+
+  @TestMethod
+  public async ignoresARememberedSettingThatIsNotOnOrOff(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    fixture.files.state.kept = { trayIcon: "on" };
+    const answer = Promise.withResolvers<Response>();
+    fixture.connection.deferred.set("shell.readSetting", () => answer.promise);
+    await fixture.startAsync();
+
+    Assert.isDefined(fixture.electron.tray.shown);
+    answer.resolve(Response.success("r", { name: "shell.trayIcon", value: true, isSet: false }));
+    await setImmediate();
+    fixture.send("settingsChanged", { name: "shell.trayIcon", device: FakeDeviceIdentity.ID, value: false, isSet: true });
+    await Condition.waitAsync(() => fixture.files.state.writes.length === 1);
+
+    Assert.areEqual(JSON.stringify([{ trayIcon: false }]), JSON.stringify(fixture.files.state.writes));
   }
 
   @TestMethod
@@ -263,6 +304,27 @@ export class TrayControllerTests {
     Assert.areEqual(0, failed);
     Assert.isDefined(fixture.electron.tray.shown);
     Assert.areEqual(1, DesktopStartFixture.readErrors(fixture.process, "The tray icon could not be shown: Error: The tray host refused the icon.").length);
+  }
+
+  @TestMethod
+  public async tellsItsTrustedWindowsWhetherATrayHostCanShowTheIcon(): Promise<void> {
+    const linux = new TrayFixture("linux");
+    await linux.startAsync();
+    const windows = new TrayFixture("win32");
+    await windows.startAsync();
+    const event = DesktopStartFixture.trustedEvent("linux");
+    const window = DesktopStartFixture.firstWindow(linux.electron);
+
+    const before = linux.electron.ipcMain.invoke("teamrun:readTrayAvailable", event);
+    await linux.process.programs.answerAsync("(<true>,)\n");
+    const after = linux.electron.ipcMain.invoke("teamrun:readTrayAvailable", event);
+    const untrusted = linux.electron.ipcMain.invoke("teamrun:readTrayAvailable", { ...event, senderFrame: null });
+    linux.process.programs.output("StatusNotifierHostUnregistered");
+    await linux.process.programs.answerAsync("(<false>,)\n");
+
+    Assert.areEqual("[false,true,null,true]", JSON.stringify([before, after, untrusted, windows.electron.ipcMain.invoke("teamrun:readTrayAvailable", DesktopStartFixture.trustedEvent("win32"))]));
+    Assert.areEqual(JSON.stringify([["teamrun:trayAvailable", true], ["teamrun:trayAvailable", false]]),
+      JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:trayAvailable")));
   }
 
   @TestMethod

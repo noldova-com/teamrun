@@ -17,6 +17,7 @@ import { Event, ShellEvents } from "@noldova/teamrun-shell-protocol";
 import { Condition } from "./condition.fixture.js";
 import { DesktopStartFixture } from "./desktop-start.fixture.js";
 import { FakeDesktopProcess } from "./fake-desktop-process.fixture.js";
+import { FakeDeviceFiles } from "./fake-device-files.fixture.js";
 import { FakeDeviceIdentity } from "./fake-device-identity.fixture.js";
 import { FakeElectron } from "./fake-electron.fixture.js";
 import { FakeRuntimeConnection } from "./fake-runtime-connection.fixture.js";
@@ -27,6 +28,7 @@ export class TrayFixture {
   public readonly connection: FakeRuntimeConnection = new FakeRuntimeConnection();
   public readonly launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher(this.connection);
   public readonly electron: FakeElectron = new FakeElectron();
+  public readonly files: FakeDeviceFiles = new FakeDeviceFiles();
   public readonly process: FakeDesktopProcess;
 
   public constructor(platform: string) {
@@ -55,7 +57,7 @@ export class TrayFixture {
   }
 
   public async startAsync(): Promise<void> {
-    await DesktopStartFixture.startReadyAsync(this.process.platform, this.launcher, this.electron, new FakeDeviceIdentity(), this.process);
+    await DesktopStartFixture.startReadyAsync(this.process.platform, this.launcher, this.electron, new FakeDeviceIdentity(), this.process, this.files);
     await Condition.waitAsync(() => this.connection.calls.includes("shell.readSetting"));
     await setImmediate();
   }

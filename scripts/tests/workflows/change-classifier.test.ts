@@ -135,7 +135,6 @@ class ChangeClassifierTests {
         ["scripts/release-assets.ts", false],
         ["scripts/release-check.ts", false],
         ["scripts/release-publish.ts", false],
-        ["scripts/repeat-plan.ts", false],
         ["scripts/classify-changes.ts", false],
         ["scripts/format-documents.ts", false],
         ["scripts/test.ts", false],

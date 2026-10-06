@@ -32,7 +32,6 @@ export default class ChangeClassifier {
     "scripts/release-assets.ts",
     "scripts/release-check.ts",
     "scripts/release-publish.ts",
-    "scripts/repeat-plan.ts",
     "scripts/test-options.exception.ts",
     "scripts/test-options.ts",
     "scripts/test-part.ts",
