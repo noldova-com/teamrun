@@ -17,7 +17,7 @@ import type {
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
-import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchSettings, ProcessPresence, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
+import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchException, LaunchSettings, ProcessPresence, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -4439,6 +4439,25 @@ export declare class ChildProgramHost implements IProgramHost {
    * ```
    */
   public start(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onOutput: (text: string) => void, onExit: () => void): StartedProgram;
+
+  /**
+   * Starts a program in its own session that outlives the desktop, with its standard streams ignored.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @throws {ArgumentException} When the program's path is empty or whitespace.
+   * @throws {LaunchException} On Linux, when `/bin/bash` is not executable or `/proc/self/fd` cannot be read.
+   * @example
+   * ```ts
+   * import type { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function handOver(programs: ChildProgramHost, executablePath: string): void {
+   *   programs.startDetached(executablePath, ["--data-dir=/home/person/work-data"], process.env);
+   * }
+   * ```
+   */
+  public startDetached(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv): void;
 }
 
 /**

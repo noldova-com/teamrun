@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import { promisify } from "node:util";
 
@@ -25,6 +25,7 @@ import { PathCommand } from "./services/path-command.js";
 import { UtilityProcessStarter } from "./services/utility-process-starter.js";
 
 const starter = process.platform === Resources.windowsPlatform ? new UtilityProcessStarter(utilityProcess) : new ChildProcessStarter();
+const programs = new ChildProgramHost(process.platform, Resources.programTimeout);
 
 DesktopApplication.start(
   {
@@ -55,8 +56,8 @@ DesktopApplication.start(
     isDefaultApp: process.defaultApp === true,
     errorOutput: process.stderr,
     processId: process.pid,
-    programs: new ChildProgramHost(process.platform, Resources.programTimeout),
-    startDetached: (path, args) => spawn(path, [...args], { detached: true, stdio: "ignore" }).unref(),
+    programs,
+    startDetached: (path, args) => programs.startDetached(path, args, process.env),
     endProcess: t => process.kill(t, "SIGKILL"),
     onUncaughtException: t => process.on(Resources.uncaughtExceptionEvent, t),
     onUnhandledRejection: t => process.on(Resources.unhandledRejectionEvent, t)

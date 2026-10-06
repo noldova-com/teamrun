@@ -8,6 +8,9 @@
 
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { existsSync, readFileSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
@@ -28,7 +31,11 @@ export class ChildProgramHostTests {
     "const ran = await host.runAsync('/bin/ls', ['/proc/self/fd'], process.env);",
     "let started = '';",
     "await new Promise(resolve => host.start('/bin/ls', ['/proc/self/fd'], process.env, t => started += t, resolve));",
-    "process.stdout.write([ran, started].map(t => t.trim().split(/\\s+/).join(',')).join('|'));"
+    "const { existsSync, readFileSync } = await import('node:fs');",
+    "host.startDetached('/bin/sh', ['-c', 'ls /proc/self/fd > \"$0.part\" && mv \"$0.part\" \"$0\"', process.argv[3]], process.env);",
+    "for (let i = 0; i < 250 && !existsSync(process.argv[3]); i++) await new Promise(resolve => setTimeout(resolve, 20));",
+    "const detached = readFileSync(process.argv[3], 'utf8');",
+    "process.stdout.write([ran, started, detached].map(t => t.trim().split(/\\s+/).join(',')).join('|'));"
   ].join("\n");
 
   @TestMethod
@@ -68,13 +75,30 @@ export class ChildProgramHostTests {
     Assert.areEqual(1, exits);
   }
 
+  @TestMethod
+  public async startsADetachedProgramWithTheGivenEnvironment(): Promise<void> {
+    const folder = await mkdtemp(path.join(tmpdir(), "teamrun-detached-"));
+    const file = path.join(folder, "started");
+    try {
+      new ChildProgramHost(process.platform, 5000).startDetached(process.execPath, ["-e", "require('node:fs').writeFileSync(process.argv[1], process.env.HANDOVER_ANSWER)", file], { ...process.env, HANDOVER_ANSWER: "handed over" });
+
+      await Condition.waitAsync(() => existsSync(file) && readFileSync(file, "utf8").length > 0);
+      Assert.areEqual("handed over", readFileSync(file, "utf8"));
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
   @PlatformFixture.linuxOnly()
   @TestMethod
   public async startsProgramsOnLinuxWithoutTheDescriptorsTheDesktopHolds(): Promise<void> {
-    const [linux, direct] = await Promise.all(["linux", "win32"].map(t => ChildProgramHostTests.listDescriptorsAsync(t)));
+    const folder = await mkdtemp(path.join(tmpdir(), "teamrun-descriptors-"));
+    const [linux, direct] = await Promise.all(["linux", "win32"].map(t => ChildProgramHostTests.listDescriptorsAsync(t, path.join(folder, t))))
+      .finally(() => rm(folder, { recursive: true, force: true }));
 
     Assert.isTrue(direct?.every(t => t.some(u => u > 3)) === true, `programs started directly inherit the descriptors Node opened without closing them on exec: ${JSON.stringify(direct)}`);
-    Assert.areEqual("[[0,1,2,3],[0,1,2,3]]", JSON.stringify(linux), "only the standard descriptors and the one ls opens itself remain");
+    Assert.areEqual("[[0,1,2,3],[0,1,2,3],[0,1,2,3]]", JSON.stringify(linux), "only the standard descriptors and the one ls opens itself remain");
   }
 
   @TestMethod
@@ -112,8 +136,8 @@ export class ChildProgramHostTests {
     Assert.areEqual(1, missingExits);
   }
 
-  private static async listDescriptorsAsync(platform: string): Promise<number[][]> {
-    const child = spawn(process.execPath, ["--input-type=module", "-e", ChildProgramHostTests.LISTER, import.meta.resolve("@noldova/teamrun-shell-desktop"), platform], { stdio: ["ignore", "pipe", "ignore"] });
+  private static async listDescriptorsAsync(platform: string, file: string): Promise<number[][]> {
+    const child = spawn(process.execPath, ["--input-type=module", "-e", ChildProgramHostTests.LISTER, import.meta.resolve("@noldova/teamrun-shell-desktop"), platform, file], { stdio: ["ignore", "pipe", "ignore"] });
     let output = "";
     child.stdout?.setEncoding("utf8").on("data", (t: string) => output += t);
     await once(child, "close");

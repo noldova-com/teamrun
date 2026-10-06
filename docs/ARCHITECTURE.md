@@ -523,6 +523,7 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
 - A newer build takes over a directory an older build's runtime owns by itself.
   It asks the older runtime to stop; if work is in progress, the person makes section 9's choice to wait for it or stop it; then the older runtime exits and the newer one starts.
   An older build that finds a newer runtime hands the person over to the newer build instead of starting; a development build says that a newer one is running instead.
+  On Linux the older desktop starts the newer one the way it [launches the runtime](#launching-the-runtime), so the newer desktop keeps none of the older one's descriptors.
   A second desktop on a data directory, of any build, focuses the first and exits: the single-instance lock allows one desktop per data directory, and the handover is between a desktop and a runtime.
   The person is never asked to find and quit another TeamRun.
 - A build is newer when its product version is higher.
