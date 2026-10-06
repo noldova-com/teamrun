@@ -12,8 +12,13 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 
 import FlakyRecord from "./checks/flaky-record.ts";
+import ProcessRunner from "./processes/process-runner.ts";
+import JsonFields from "./totals/json-fields.ts";
+import TotalsException from "./totals/totals.exception.ts";
+import UiWorkflows from "./ui-workflows.ts";
 import UiReport from "./workflows/ui-report.ts";
 import UiReportException from "./workflows/ui-report.exception.ts";
+import UiTestReport from "./workflows/ui-test-report.ts";
 
 export default class UiSummary {
   private static readonly REPORT_SEGMENTS: readonly string[] = ["_build", "ui", "report.json"];
@@ -24,13 +29,21 @@ export default class UiSummary {
   private static readonly TRUE: string = "true";
   private static readonly SETTINGS_REQUIRED: string = "GITHUB_STEP_SUMMARY and UI_TARGET must name the step summary file and the target.\n";
   private static readonly NO_REPORT: string = "The UI workflows produced no report.";
+  private static readonly NOT_LISTED: string = "Playwright could not list the UI workflows:";
+  private static readonly REPORT_SOURCE: string = "_build/ui/report.json";
+  private static readonly LIST_SOURCE: string = "The UI workflow list";
+  private static readonly LIST_TIMEOUT: number = 120_000;
+  private static readonly RUNNER: string = "ui";
+  private static readonly TITLE: string = "UI workflows";
 
   private readonly root: string;
   private readonly output: Writable;
+  private readonly runner: ProcessRunner;
 
-  public constructor(root: string, output: Writable) {
+  public constructor(root: string, output: Writable, runner: ProcessRunner) {
     this.root = root;
     this.output = output;
+    this.runner = runner;
   }
 
   public async runAsync(environment: NodeJS.ProcessEnv): Promise<number> {
@@ -45,15 +58,22 @@ export default class UiSummary {
     if (!existsSync(reportPath))
       return await this.failAsync(summaryPath, target, UiSummary.NO_REPORT);
     try {
-      const report = UiReport.parse(await readFile(reportPath, "utf8"));
-      const summary = report.formatSummary(target, environment[UiSummary.SCREENSHOT_VARIABLE], environment[UiSummary.UPLOAD_FAILED_VARIABLE] === UiSummary.TRUE);
+      const text = await readFile(reportPath, "utf8");
+      const report = UiReport.parse(text);
+      const listed = await this.runner.captureAsync(process.execPath, [path.join(this.root, ...UiWorkflows.PLAYWRIGHT_CLI), "test", "--config", UiWorkflows.PLAYWRIGHT_CONFIG, "--list", "--reporter=json"], this.root, UiSummary.LIST_TIMEOUT);
+      if (!listed.isSuccessful)
+        return await this.failAsync(summaryPath, target, `${UiSummary.NOT_LISTED}\n${listed.text}`);
+      const result = await new UiTestReport(this.root, UiSummary.REPORT_SOURCE).readAsync(JsonFields.parse(text, UiSummary.REPORT_SOURCE), JsonFields.parse(listed.output, UiSummary.LIST_SOURCE));
+      const totals = result.toTotals(UiSummary.RUNNER, UiSummary.TITLE, null, result.files);
+      const summary = report.formatSummary(target, totals, environment[UiSummary.SCREENSHOT_VARIABLE], environment[UiSummary.UPLOAD_FAILED_VARIABLE] === UiSummary.TRUE);
       await appendFile(summaryPath, summary);
       this.output.write(summary);
+      const recorded = await totals.recordAsync(this.root, this.output);
       await new FlakyRecord(this.root, environment).addAsync(report.flakyTests, this.output);
-      return 0;
+      return recorded ? 0 : 1;
     }
     catch (error) {
-      if (!(error instanceof UiReportException))
+      if (!(error instanceof UiReportException) && !(error instanceof TotalsException))
         throw error;
       return await this.failAsync(summaryPath, target, error.message);
     }
@@ -67,4 +87,4 @@ export default class UiSummary {
 }
 
 if (import.meta.main)
-  process.exitCode = await new UiSummary(process.cwd(), process.stdout).runAsync(process.env);
+  process.exitCode = await new UiSummary(process.cwd(), process.stdout, new ProcessRunner()).runAsync(process.env);
